@@ -44,7 +44,7 @@ type SelectiveTemplateFromDBModal =
         ]
 
     [<ReactComponent>]
-    static member displayTableAndSelectionElements (model: Model, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit, dispatch, ?hasIcon: bool) =
+    static member displaySelectedProtocolElements (model: Model, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit, dispatch, ?hasIcon: bool) =
         let hasIcon = defaultArg hasIcon true
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
@@ -116,7 +116,7 @@ type SelectiveTemplateFromDBModal =
                     ModalElements.Box(
                         model.ProtocolState.TemplateSelected.Value.Name,
                         "fa-solid fa-cog",
-                        SelectiveTemplateFromDBModal.displayTableAndSelectionElements(model, selectedColumns, setSelectedColumns, dispatch, false))
+                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
                 ]
             Html.div [
                 SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.UseTemplateName dispatch
