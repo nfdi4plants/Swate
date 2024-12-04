@@ -13,7 +13,6 @@ module ModalState =
     | EditColumn of columIndex: int
     | MoveColumn of columnIndex: int
     | BatchUpdateColumnValues of columIndex: int * column: CompositeColumn
-    | SelectiveTemplateImportFromDB
     | SelectiveFileImport of ArcFiles
     | TermDetails of OntologyAnnotation
     | TableCellContext of mouseX: int * mouseY: int * columnIndex: int * rowIndex: int

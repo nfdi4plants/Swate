@@ -5,87 +5,12 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
-open Types.TableManipulation
+open Types.TableImport
 
 open ARCtrl
 open JsonImport
-open Components
 
 type SelectiveTemplateFromDBModal =
-
-    static member RadioPluginsBox(boxName, icon, importType: TableJoinOptions, radioData: (TableJoinOptions * string)[], setImportType: TableJoinOptions -> unit) =
-        let myradio(target: TableJoinOptions, txt: string) =
-            let isChecked = importType = target
-            ModalElements.RadioPlugin("importType", txt, isChecked, fun (b: bool) -> if b then setImportType target)
-        ModalElements.Box (boxName, icon, React.fragment [
-            Html.div [
-                for i in 0..radioData.Length-1 do
-                    myradio(radioData.[i])
-            ]
-        ])
-
-    static member CheckBoxForTableColumnSelection(columns: CompositeColumn [], index, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit) =
-        Html.div [
-            prop.style [style.display.flex; style.justifyContent.center]
-            prop.children [
-                Daisy.checkbox [
-                    prop.type'.checkbox
-                    prop.style [
-                        style.height(length.perc 100)
-                    ]
-                    prop.isChecked
-                        (if selectionInformation.Columns.Length > 0 then
-                            selectionInformation.Columns.[index]
-                        else true)
-                    prop.onChange (fun (b: bool) ->
-                        if columns.Length > 0 then
-                            let selectedData = selectionInformation.Columns
-                            selectedData.[index] <- b
-                            {selectionInformation with Columns = selectedData} |> setSelectedColumns)
-                ]
-            ]
-        ]
-
-    static member TableWithImportColumnCheckboxes(table: ArcTable, ?selectionInformation: SelectedColumns, ?setSelectedColumns: SelectedColumns -> unit) =
-        let columns = table.Columns
-        let displayCheckBox =
-            //Determine whether to display checkboxes or not
-            selectionInformation.IsSome && setSelectedColumns.IsSome                    
-        Daisy.table [
-            prop.children [
-                Html.thead [
-                    Html.tr [
-                        for i in 0..columns.Length-1 do                            
-                            Html.th [
-                                Html.label [
-                                    prop.className "join flex flex-row centered gap-2"
-                                    prop.children [
-                                        if displayCheckBox then
-                                            SelectiveTemplateFromDBModal.CheckBoxForTableColumnSelection(columns, i, selectionInformation.Value, setSelectedColumns.Value)
-                                        Html.text (columns.[i].Header.ToString())
-                                        Html.div [
-                                            prop.onClick (fun e ->
-                                                if columns.Length > 0 && selectionInformation.IsSome then
-                                                    let selectedData = selectionInformation.Value.Columns
-                                                    selectedData.[i] <- not selectedData.[i]
-                                                    {selectionInformation.Value with Columns = selectedData} |> setSelectedColumns.Value)
-                                        ]
-                                    ]
-                                ]
-                            ]
-                    ]
-                ]
-
-                Html.tbody [
-                    for ri in 0 .. (table.RowCount-1) do
-                        let row = table.GetRow(ri, true)
-                        Html.tr [
-                            for c in row do
-                                Html.td (c.ToString())
-                        ]
-                ]
-            ]
-        ]
 
     static member ToProtocolSearchElement (model: Model) dispatch =
         Daisy.button.button [
@@ -106,7 +31,7 @@ type SelectiveTemplateFromDBModal =
                         Html.i [prop.className "fa-solid fa-cog"]
                     Html.span $"Template: {model.ProtocolState.TemplateSelected.Value.Name}"
                 if model.ProtocolState.TemplateSelected.IsSome then
-                    SelectiveTemplateFromDBModal.TableWithImportColumnCheckboxes(model.ProtocolState.TemplateSelected.Value.Table, selectionInformation, setSelectedColumns)
+                    SelectiveImportModal.TableWithImportColumnCheckboxes(model.ProtocolState.TemplateSelected.Value.Table, selectionInformation, setSelectedColumns)
             ]
         ]
 
@@ -139,13 +64,13 @@ type SelectiveTemplateFromDBModal =
             else 0
         let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init length)
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
-        Components.LogicContainer [
+        SidebarComponents.SidebarLayout.LogicContainer [
             Html.div [
                 SelectiveTemplateFromDBModal.ToProtocolSearchElement model dispatch
             ]
             if model.ProtocolState.TemplateSelected.IsSome then                    
                 Html.div [
-                    SelectiveTemplateFromDBModal.RadioPluginsBox(
+                    SelectiveImportModal.RadioPluginsBox(
                         "Import Type",
                         "fa-solid fa-cog",
                         importTypeState.ImportType,

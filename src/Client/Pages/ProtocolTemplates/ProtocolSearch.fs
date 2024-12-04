@@ -7,8 +7,6 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
-open Components
-
 module private HelperProtocolSearch =
 
     let breadcrumbEle (model:Model) dispatch =
@@ -55,7 +53,7 @@ type SearchContainer =
 
                 Html.p "Search the database for protocol templates."
 
-                Components.LogicContainer [
+                SidebarComponents.SidebarLayout.LogicContainer [
                     Protocol.Search.InfoField()
                     Protocol.Search.FileSortElement(model, config, setConfig)
                     Protocol.Search.Component (filteredTemplates, model, dispatch)

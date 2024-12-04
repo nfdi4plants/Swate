@@ -52,7 +52,6 @@
     <Compile Include="Modals\CytoscapeView.fs" />
     <Compile Include="Modals\MoveColumn.fs" />
     <Compile Include="Modals\UpdateColumn.fs" />
-    <Compile Include="Modals\SelectiveTemplateFromDB.fs" />
     <Compile Include="Modals\SelectiveImportModal.fs" />
     <Compile Include="Modals\ModalProvider.fs" />
     <Compile Include="Spreadsheet\IO.fs" />
@@ -92,6 +91,7 @@
     <Compile Include="Pages\ProtocolTemplates\ProtocolState.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolSearchViewComponent.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolSearch.fs" />
+    <Compile Include="Pages\ProtocolTemplates\SelectiveTemplateFromDB.fs" />
     <Compile Include="Pages\ProtocolTemplates\TemplateFromFile.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolView.fs" />
     <Compile Include="Pages\FilePicker\FilePickerView.fs" />

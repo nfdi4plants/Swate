@@ -20,7 +20,6 @@ open ARCtrl
 open Fable.Core.JsInterop
 
 open Modals
-open Components
 
 type private TemplateFromFileState = {
     /// User select type to upload
@@ -100,7 +99,7 @@ type TemplateFromFile =
             | ArcFilesDiscriminate.Template, JsonExportFormat.ROCrate
             | ArcFilesDiscriminate.Template, JsonExportFormat.ISA -> true
             | _ -> false
-        Components.LogicContainer [
+        SidebarComponents.SidebarLayout.LogicContainer [
             // modal!
             match state.UploadedFile with
             | Some af ->

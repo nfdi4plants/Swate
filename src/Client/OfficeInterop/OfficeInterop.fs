@@ -1080,7 +1080,7 @@ let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoi
 
                     do! AnnotationTable.format(newTable, context, true)
 
-                    return [InteropLogging.Msg.create InteropLogging.Warning $"Joined template {refinedTableToAdd.Name} to table {excelTable.name}!"]
+                    return [InteropLogging.Msg.create InteropLogging.Info $"Joined template {refinedTableToAdd.Name} to table {excelTable.name}!"]
                 | Result.Error _ ->
                     return [InteropLogging.Msg.create InteropLogging.Error "No arc table could be created! This should not happen at this stage! Please report this as a bug to the developers.!"]
             | None -> return [InteropLogging.NoActiveTableMsg]
@@ -1522,7 +1522,7 @@ let convertBuildingBlock () =
                         if String.IsNullOrEmpty(msgText) then $"Converted building block of {snd selectedBuildingBlock.[0]} to unit"
                         else msgText
 
-                    return [InteropLogging.Msg.create InteropLogging.Warning msg]
+                    return [InteropLogging.Msg.create InteropLogging.Info msg]
                 | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
             | None -> return [InteropLogging.NoActiveTableMsg]
         }
@@ -1845,7 +1845,7 @@ let deleteTopLevelMetadata () =
                     worksheet.delete()
             )
 
-            return [InteropLogging.Msg.create InteropLogging.Warning $"The top level metadata work sheet has been deleted"]
+            return [InteropLogging.Msg.create InteropLogging.Info $"The top level metadata work sheet has been deleted"]
         }
     )
 
@@ -2433,7 +2433,7 @@ type Main =
                                 do! updateSelectedBuildingBlocks excelTable arcTable propertyColumns indexedTerms
                         do! AnnotationTable.format(excelTable, context, true)
 
-                        return [InteropLogging.Msg.create InteropLogging.Warning $"The annotation table {excelTable.name} is valid"]
+                        return [InteropLogging.Msg.create InteropLogging.Info $"The annotation table {excelTable.name} is valid"]
 
                     | Result.Error ex -> return [InteropLogging.Msg.create InteropLogging.Error ex.Message]
             }

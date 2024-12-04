@@ -5,7 +5,7 @@ open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
 open Modals
-open Types.TableManipulation
+open Types.TableImport
 
 module private InitExtensions =
 

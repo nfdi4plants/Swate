@@ -57,7 +57,7 @@ type Style =
             |> Option.map _.StyleString
             |> Option.defaultValue ""
 
-module TableManipulation =
+module TableImport =
 
     type SelectedColumns = {
         Columns: bool []
