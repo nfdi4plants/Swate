@@ -76,11 +76,11 @@ module OfficeInterop =
                 UpdateUtil.downloadFromString (jsonExport)
                 state, model, Cmd.none
 
-            | AddTemplate (table, selectedColumns, importType) ->
+            | AddTemplate (table, selectedColumns, importType, useTemplateName) ->
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.joinTable
-                        (table, selectedColumns, Some importType.ImportType)
+                        (table, selectedColumns, Some importType.ImportType, useTemplateName)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
@@ -89,7 +89,7 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.joinTable
-                        (table, [||], options)
+                        (table, [||], options, false)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd

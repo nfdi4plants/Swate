@@ -227,12 +227,12 @@ type Widget =
         let insertContent() =
             [
                 Html.div [
-                    SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch)
+                    SelectiveTemplateFromDBModal.displayTableAndSelectionElements(model, selectedColumns, setSelectedColumns, dispatch)
                 ]
                 Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.children [
-                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch)
+                        SelectiveTemplateFromDBModal.displayTableAndSelectionElements(model, selectedColumns, setSelectedColumns, dispatch)
                     ]
                 ]
             ]
