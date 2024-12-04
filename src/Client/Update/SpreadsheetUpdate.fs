@@ -103,11 +103,10 @@ module Spreadsheet =
                     | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
-            | AddTemplate (table, selectedColumns) ->
+            | AddTemplate (table, selectedColumns, importType) ->
                 let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
                 /// Filter out existing building blocks and keep input/output values.
-                let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
-                let msg = fun table -> JoinTable(table, index, options) |> SpreadsheetMsg
+                let msg = fun table -> JoinTable(table, index, Some importType.ImportType) |> SpreadsheetMsg
                 let selectedColumnsIndices =
                     selectedColumns
                     |> Array.mapi (fun i item -> if item = false then Some i else None)
