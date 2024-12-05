@@ -11,12 +11,12 @@ open ARCtrl
 open JsonImport
 
 type AdaptTableName = {
-        UseTemplateName: bool
+        TemplateName: string option
     }
     with
         static member init() =
             {
-                UseTemplateName = false
+                TemplateName = None
             }
 
 type SelectiveTemplateFromDBModal =
@@ -27,9 +27,9 @@ type SelectiveTemplateFromDBModal =
             prop.children [
                 Daisy.checkbox [
                     prop.type'.checkbox
-                    prop.isChecked adaptTableName.UseTemplateName
+                    prop.isChecked adaptTableName.TemplateName.IsSome
                     prop.onChange (fun (b: bool) ->
-                        { adaptTableName with UseTemplateName = b } |> setAdaptTableName)
+                        { adaptTableName with TemplateName = if b then Some templateName else None} |> setAdaptTableName)
                 ]
                 Html.text $"Use Template name: {templateName}"
             ]
@@ -120,6 +120,6 @@ type SelectiveTemplateFromDBModal =
                         SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
                 ]
             Html.div [
-                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.UseTemplateName dispatch
+                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.TemplateName dispatch
             ]
         ]
