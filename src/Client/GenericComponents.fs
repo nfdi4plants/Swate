@@ -10,6 +10,7 @@ module DaisyUiExtensions =
         static member active = prop.className "modal-open"
 
 type Components =
+
     static member DeleteButton(?children, ?props) =
         Daisy.button.button [
             button.square

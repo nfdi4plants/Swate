@@ -3,6 +3,7 @@ namespace Spreadsheet
 open Shared
 open ARCtrl
 open Fable.Core
+open JsonImport
 
 type ColumnType =
 | Main
@@ -201,8 +202,8 @@ type Msg =
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
 | AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
-| AddTemplate of ArcTable
-| JoinTable of ArcTable * index: int option * options: TableJoinOptions option
+| AddTemplate of ArcTable * bool[] * SelectiveImportModalState * string option
+| JoinTable of ArcTable * index: int option * options: TableJoinOptions option * string option
 | UpdateArcFile of ArcFiles
 | InitFromArcFile of ArcFiles
 | InsertOntologyAnnotation of OntologyAnnotation
