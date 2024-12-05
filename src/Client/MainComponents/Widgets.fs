@@ -256,6 +256,12 @@ type Widget =
                                 ]
                                 Html.div [
                                     ModalElements.Box(
+                                        "Rename Table",
+                                        "fa-solid fa-cog",
+                                        SelectiveTemplateFromDBModal.CheckBoxForTakeOverTemplateName(useTemplateName, setUseTemplateName, model.ProtocolState.TemplateSelected.Value.Name))
+                                ]
+                                Html.div [
+                                    ModalElements.Box(
                                         model.ProtocolState.TemplateSelected.Value.Name,
                                         "",
                                         SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))

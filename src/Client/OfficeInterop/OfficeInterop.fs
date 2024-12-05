@@ -1,7 +1,5 @@
 module OfficeInterop.Core
 
-open System.Collections.Generic
-
 open Fable.Core
 open ExcelJS.Fable
 open Excel
@@ -1042,12 +1040,9 @@ let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoi
                     let tableSeqs = arcTable.ToStringSeqs()
 
                     do! context.sync().``then``(fun _ ->
-                        if templateName.IsSome then
-
-                            let removeChars (stripChars:string) (text:string) =
-                                text.Split(stripChars.ToCharArray(), StringSplitOptions.RemoveEmptyEntries) |> String.Concat
+                        if templateName.IsSome then                            
                             //Should be updated to remove all kinds of extra symbols
-                            let templateName = removeChars " -/\()[]{}" templateName.Value
+                            let templateName = Helper.removeChars Helper.charsToRemove templateName.Value
                             newTable.name <- $"annotationTable{templateName}"
                         else
                             newTable.name <- excelTable.name
