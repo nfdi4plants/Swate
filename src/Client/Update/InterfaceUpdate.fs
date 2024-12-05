@@ -170,7 +170,7 @@ module Interface =
                     let cmd = OfficeInterop.AddTemplate (table, selectedColumns, importType, useTemplateName) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.AddTemplate (table, selectedColumns) |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.AddTemplate (table, selectedColumns, importType) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | JoinTable (table, index, options) ->
