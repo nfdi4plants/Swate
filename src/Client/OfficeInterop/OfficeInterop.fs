@@ -939,7 +939,7 @@ let selectiveTablePrepare (activeTable: ArcTable) (toJoinTable: ArcTable) (remov
             columnsToRemove <- containsAtIndex.Value::columnsToRemove
 
     //Remove duplicates because unselected and already existing columns can overlap
-    let columnsToRemove = columnsToRemove |> Set.ofList |> Set.toList
+    let columnsToRemove = columnsToRemove |> List.distinct
 
     tablecopy.RemoveColumns (Array.ofList columnsToRemove)
     tablecopy.IteriColumns(fun i c0 ->

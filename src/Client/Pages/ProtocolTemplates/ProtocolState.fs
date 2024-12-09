@@ -61,6 +61,19 @@ module Protocol =
                     Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
             }
             state, Cmd.ofMsg (UpdateModel nextModel)
+        | AddProtocol prot ->
+            log "AddProtocol"
+            let templates =
+                if List.contains prot model.ProtocolState.TemplatesSelected then
+                    model.ProtocolState.TemplatesSelected
+                else
+                    prot::model.ProtocolState.TemplatesSelected
+            let nextModel = {
+                model with
+                    Model.ProtocolState.TemplatesSelected = templates
+                    //Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
+            }
+            state, Cmd.ofMsg (UpdateModel nextModel)
         | ProtocolIncreaseTimesUsed templateId ->
             failwith "ParseUploadedFileRequest IS NOT IMPLEMENTED YET"
             //let cmd =
