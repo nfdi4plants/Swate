@@ -618,17 +618,14 @@ type Search =
                         prop.children [
                             Daisy.button.a [
                                 button.sm
-                                //prop.onClick (fun _ ->
-                                //    SelectProtocol template |> ProtocolMsg |> dispatch
-                                //)
+                                prop.onClick (fun _ ->
+                                    if model.ProtocolState.TemplatesSelected.Length > 1 then
+                                        SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
+                                    else
+                                        SelectProtocol model.ProtocolState.TemplatesSelected.Head |> ProtocolMsg |> dispatch
+                                )
                                 button.wide
                                 button.success
-
-                                if model.ProtocolState.TemplatesSelected.Length > 0 then
-                                    button.active
-                                else
-                                    button.disabled
-
                                 prop.text "Select templates"
                             ]
                         ]
@@ -645,6 +642,7 @@ type Search =
                             button
                         ]
                     ]
-                ModalElements.Box("Selected Templates", "fa-solid fa-cog", element)
+                if model.ProtocolState.TemplatesSelected.Length > 0 then
+                    ModalElements.Box("Selected Templates", "fa-solid fa-cog", element)
             ]
         ]

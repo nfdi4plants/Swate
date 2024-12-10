@@ -83,6 +83,7 @@ module Protocol =
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse       of string
         | SelectProtocol                of Template
+        | SelectProtocols               of Template list
         | AddProtocol                   of Template
         | ProtocolIncreaseTimesUsed     of protocolName:string
 

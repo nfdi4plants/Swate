@@ -264,7 +264,7 @@ type Widget =
                                     ModalElements.Box(
                                         model.ProtocolState.TemplateSelected.Value.Name,
                                         "",
-                                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
+                                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model.ProtocolState.TemplateSelected, selectedColumns, setSelectedColumns, dispatch, false))
                                 ]
                             Html.div [
                                 SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.TemplateName dispatch
