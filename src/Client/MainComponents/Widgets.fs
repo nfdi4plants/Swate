@@ -34,7 +34,7 @@ module private MoveEventListener =
 
     open Fable.Core.JsInterop
 
-    let ensurePositionInsideWindow (element:IRefValue<HTMLElement option>) (position: Rect) =
+    let ensurePositionInsideWindow (element: IRefValue<HTMLElement option>) (position: Rect) =
         let maxX = Browser.Dom.window.innerWidth - element.current.Value.offsetWidth;
         let tempX = position.X
         let newX = System.Math.Min(System.Math.Max(tempX,0),int maxX)
@@ -43,18 +43,18 @@ module private MoveEventListener =
         let newY = System.Math.Min(System.Math.Max(tempY,0),int maxY)
         {X = newX; Y = newY}
 
-    let calculatePosition (element:IRefValue<HTMLElement option>) (startPosition: Rect) = fun (e: Event) ->
+    let calculatePosition (element: IRefValue<HTMLElement option>) (startPosition: Rect) = fun (e: Event) ->
         let e : MouseEvent = !!e
         let tempX = int e.clientX - startPosition.X
         let tempY = int e.clientY - startPosition.Y
         let tempPosition = {X = tempX; Y = tempY}
         ensurePositionInsideWindow element tempPosition
 
-    let onmousemove (element:IRefValue<HTMLElement option>) (startPosition: Rect) setPosition = fun (e: Event) ->
+    let onmousemove (element: IRefValue<HTMLElement option>) (startPosition: Rect) setPosition = fun (e: Event) ->
         let nextPosition = calculatePosition element startPosition e
         setPosition (Some nextPosition)
 
-    let onmouseup (prefix,element:IRefValue<HTMLElement option>) onmousemove =
+    let onmouseup (prefix,element: IRefValue<HTMLElement option>) onmousemove =
         Browser.Dom.document.removeEventListener("mousemove", onmousemove)
         if element.current.IsSome then
             let rect = element.current.Value.getBoundingClientRect()
@@ -77,7 +77,7 @@ module private ResizeEventListener =
     let onmouseup (prefix, element: IRefValue<HTMLElement option>) onmousemove =
         Browser.Dom.document.removeEventListener("mousemove", onmousemove)
         if element.current.IsSome then
-            Size.write(prefix,{X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
+            Size.write(prefix, {X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
 module private Elements =
 

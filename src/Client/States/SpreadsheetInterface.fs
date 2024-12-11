@@ -19,6 +19,7 @@ type Msg =
 | AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
 /// This function will do preprocessing on the table to join
 | AddTemplate           of ArcTable * bool[] * SelectiveImportModalState * string option
+| AddTemplates          of ArcTable[] * bool[] * SelectiveImportModalState * string option
 | JoinTable             of ArcTable * columnIndex: int option * options: TableJoinOptions option
 | UpdateArcFile         of ArcFiles
 /// Inserts TermMinimal to selected fields of one column
