@@ -118,7 +118,7 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member private TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns) =
+    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns) =
         let name = table0.Name
         let radioGroup = "radioGroup_" + name
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
@@ -128,17 +128,17 @@ type SelectiveImportModal =
             Html.div [
                 ModalElements.RadioPlugin (radioGroup, "Import",
                     isActive && import.Value.FullImport,
-                    (fun (b:bool) -> addTableImport tableIndex true),
+                    (fun (b: bool) -> addTableImport tableIndex true),
                     isDisabled
                 )
                 ModalElements.RadioPlugin (radioGroup, "Append to active table",
                     isActive && not import.Value.FullImport,
-                    (fun (b:bool) -> addTableImport tableIndex false),
+                    (fun (b: bool) -> addTableImport tableIndex false),
                     isDisabled
                 )
                 ModalElements.RadioPlugin (radioGroup, "No Import",
                     not isActive,
-                    (fun (b:bool) -> rmvTableImport tableIndex),
+                    (fun (b: bool) -> rmvTableImport tableIndex),
                     isDisabled
                 )
             ]
