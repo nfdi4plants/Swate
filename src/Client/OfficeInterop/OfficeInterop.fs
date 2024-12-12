@@ -76,8 +76,6 @@ module ARCtrlUtil =
 
 module ARCtrlExtensions =
 
-    open System
-
     type ArcFiles with
 
         /// <summary>
@@ -1015,7 +1013,7 @@ let prepareTemplateInMemory (originTable: ArcTable) (tableToAdd: ArcTable) (sele
 
     finalTable
 
-let exportArcTableToExcle (excelTable: Table) (arcTable:ArcTable) (templateName: string option) (context: RequestContext) =
+let joinArcTablesInExcle (excelTable: Table) (arcTable:ArcTable) (templateName: string option) (context: RequestContext) =
     promise {
         let newTableRange = excelTable.getRange()
 
@@ -1100,7 +1098,7 @@ let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoi
                 | Result.Ok arcTable ->
                     arcTable.Join(refinedTableToAdd, ?index=index, ?joinOptions=options, forceReplace=true)
 
-                    do! exportArcTableToExcle excelTable arcTable templateName context
+                    do! joinArcTablesInExcle excelTable arcTable templateName context
 
                     return [InteropLogging.Msg.create InteropLogging.Info $"Joined template {refinedTableToAdd.Name} to table {excelTable.name}!"]
                 | Result.Error _ ->
@@ -1109,18 +1107,144 @@ let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoi
         }
 
 /// <summary>
+/// Sort the tables and selected columns based on the selected import type
+/// </summary>
+/// <param name="tablesToAdd"></param>
+/// <param name="selectedColumnsCollection"></param>
+/// <param name="importTables"></param>
+let selectTablesToAdd (tablesToAdd: ArcTable []) (selectedColumnsCollection: bool [] []) (importTables: JsonImport.ImportTable list) =
+
+    let importData =
+        importTables
+        |> List.map (fun importTable -> tablesToAdd.[importTable.Index], selectedColumnsCollection.[importTable.Index], importTable.FullImport)
+
+    let mutable tablesToAdd, selectedColumnsCollectionToAdd, tablesToJoin, selectedColumnsCollectionToJoin =
+        list.Empty, list.Empty, list.Empty, list.Empty
+
+    importData
+    |> List.iter (fun (table, selectedColumns, importType) ->
+        if importType then
+            tablesToAdd <- table::tablesToAdd
+            selectedColumnsCollectionToAdd <- selectedColumns::selectedColumnsCollectionToAdd
+        else
+            tablesToJoin <- table::tablesToJoin
+            selectedColumnsCollectionToJoin <- selectedColumns::selectedColumnsCollectionToJoin
+    )
+
+    tablesToAdd |> Array.ofList, selectedColumnsCollectionToAdd |> Array.ofList, tablesToJoin |> Array.ofList, selectedColumnsCollectionToJoin |> Array.ofList
+
+/// <summary>
+/// Join selected template tables with active table
+/// </summary>
+/// <param name="originTable"></param>
+/// <param name="excelTable"></param>
+/// <param name="tablesToJoin"></param>
+/// <param name="selectedColumnsCollection"></param>
+/// <param name="options"></param>
+/// <param name="context"></param>
+let joinTemplatesToTable (originTable:ArcTable) (excelTable: Table) tablesToJoin selectedColumnsCollection options (context: RequestContext) =
+    promise {
+        let selectedRange = context.workbook.getSelectedRange()
+        let tableStartIndex = excelTable.getRange()
+        let _ =
+            tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
+            selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
+
+        do! context.sync()
+
+        let targetIndex =
+            let adaptedStartIndex = selectedRange.columnIndex - tableStartIndex.columnIndex
+            if adaptedStartIndex > float (originTable.ColumnCount) then originTable.ColumnCount
+            else int adaptedStartIndex + 1
+
+        let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (selectedColumns: bool[][]) (options: TableJoinOptions option) i =
+            let tableToAdd = tablesToAdd.[i]
+            let refinedTableToAdd = prepareTemplateInMemory originTable tableToAdd selectedColumns.[i]
+
+            let newTable =
+                if i > 0 then
+                    originTable.Join(refinedTableToAdd, ?joinOptions=options, forceReplace=true)
+                    originTable
+                else
+                    refinedTableToAdd
+
+            if i = tablesToAdd.Length-1 then
+                newTable
+            else
+                loop newTable tablesToAdd selectedColumns options (i + 1)
+
+        let processedJoinTable = loop originTable tablesToJoin selectedColumnsCollection options 0
+
+        let finalTable = prepareTemplateInMemory originTable processedJoinTable [||]
+
+        originTable.Join(finalTable, targetIndex, ?joinOptions=options, forceReplace=true)
+
+        do! joinArcTablesInExcle excelTable originTable None context
+
+        let templateNames = tablesToJoin |> Array.map (fun item -> item.Name)
+
+        return [InteropLogging.Msg.create InteropLogging.Info $"Joined templates {templateNames} to table {excelTable.name}!"]
+    }
+
+/// <summary>
+/// Add new tamplate tables and worksheets
+/// </summary>
+/// <param name="tablesToAdd"></param>
+/// <param name="selectedColumnsCollection"></param>
+/// <param name="options"></param>
+/// <param name="context"></param>
+let addTemplates (tablesToAdd: ArcTable[]) (selectedColumnsCollection: bool [] []) (options: TableJoinOptions option) (context: RequestContext) =
+    promise {
+        let! result = AnnotationTable.tryGetActive context
+
+        for i in 0..tablesToAdd.Length - 1 do
+            let tableToAdd = tablesToAdd.[i]
+            let selectedColumnCollection = selectedColumnsCollection.[i]
+            let newName = ExcelUtil.createNewTableName()
+            let originTable = ArcTable.init(newName)
+            let finalTable =
+                let endTable = prepareTemplateInMemory originTable tableToAdd selectedColumnCollection
+                originTable.Join(endTable, ?joinOptions = options)
+                originTable
+
+            let activeWorksheet =
+                if i = 0 && result.IsNone then context.workbook.worksheets.getActiveWorksheet()
+                else
+                    let newWorkSheet = context.workbook.worksheets.add(tableToAdd.Name)
+                    newWorkSheet.activate()
+                    newWorkSheet
+
+            let tableValues = finalTable.ToStringSeqs()
+            let range = activeWorksheet.getRangeByIndexes(0, 0, float (finalTable.RowCount + 1), (tableValues.Item 0).Count)                
+
+            range.values <- finalTable.ToStringSeqs()
+
+            let newTable = activeWorksheet.tables.add(U2.Case1 range, true)
+            newTable.name <- finalTable.Name
+            newTable.style <- ExcelUtil.TableStyleLight
+
+            do! AnnotationTable.format(newTable, context, true)
+
+        let templateNames = tablesToAdd |> Array.map (fun item -> item.Name)
+        return [InteropLogging.Msg.create InteropLogging.Info $"Added templates {templateNames}!"]
+    }
+
+/// <summary>
 /// Add the given arc table to the active annotation table at the desired index
 /// </summary>
 /// <param name="tableToAdd"></param>
 /// <param name="index"></param>
 /// <param name="options"></param>
-let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [], options: TableJoinOptions option) =
+let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [], options: TableJoinOptions option, importTables: JsonImport.ImportTable list) =
     Excel.run(fun context ->
         promise {
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
-            let! result = AnnotationTable.tryGetActive context
 
+            let tablesToAdd, selectedColumnsCollectionToAdd, tablesToJoin, selectedColumnsCollectionToJoin =
+                selectTablesToAdd tablesToAdd selectedColumnsCollection importTables
+
+            let! result = AnnotationTable.tryGetActive context
             match result with
             | Some excelTable ->
                 let! originTableRes = ArcTable.fromExcelTable(excelTable, context)
@@ -1130,48 +1254,32 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
                     return failwith $"Failed to create arc table for table {excelTable.name}"
                 | Result.Ok originTable ->
 
-                    let selectedRange = context.workbook.getSelectedRange()
-                    let tableStartIndex = excelTable.getRange()
-                    let _ =
-                        tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
-                        selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
-
-                    // sync with proxy objects after loading values from excel
-                    do! context.sync().``then``( fun _ -> ())
-
-                    let targetIndex =
-                        let adaptedStartIndex = selectedRange.columnIndex - tableStartIndex.columnIndex
-                        if adaptedStartIndex > float (originTable.ColumnCount) then originTable.ColumnCount
-                        else int adaptedStartIndex + 1
-
-                    let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (selectedColumns: bool[][]) (options: TableJoinOptions option) i =
-                        let tableToAdd = tablesToAdd.[i]
-                        let refinedTableToAdd = prepareTemplateInMemory originTable tableToAdd selectedColumns.[i]
-
-                        let newTable =
-                            if i > 0 then
-                                originTable.Join(refinedTableToAdd, ?joinOptions=options, forceReplace=true)
-                                originTable
-                            else
-                                refinedTableToAdd
-
-                        if i = tablesToAdd.Length-1 then
-                            newTable
+                    let! msgJoin =
+                        if tablesToJoin.Length > 0 then
+                            joinTemplatesToTable originTable excelTable tablesToJoin selectedColumnsCollectionToJoin options context
                         else
-                            loop newTable tablesToAdd selectedColumns options (i + 1)
+                            promise{return []}
 
-                    let processedAddTable = loop originTable tablesToAdd selectedColumnsCollection options 0
+                    let! msgAdd =
+                        if tablesToJoin.Length > 0 then
+                            addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
+                        else
+                            promise{return []}
 
-                    let finalTable = prepareTemplateInMemory originTable processedAddTable [||]
+                    if msgJoin.IsEmpty then                        
+                        return msgAdd
+                    else
+                        return [msgAdd.Head; msgJoin.Head]
+            | None ->
+                let! msgAdd =
+                    if tablesToJoin.Length > 0 then
+                        addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
+                    else
+                        promise{return []}
 
-                    originTable.Join(finalTable, targetIndex, ?joinOptions=options, forceReplace=true)
-
-                    do! exportArcTableToExcle excelTable originTable None context
-
-                    let templateNames = tablesToAdd |> Array.map (fun item -> item.Name)
-
-                    return [InteropLogging.Msg.create InteropLogging.Info $"Joined templates {templateNames} to table {excelTable.name}!"]
-            | None -> return [InteropLogging.NoActiveTableMsg]
+                if msgAdd.IsEmpty then
+                    return [InteropLogging.NoActiveTableMsg]
+                else return msgAdd
         }
     )
 

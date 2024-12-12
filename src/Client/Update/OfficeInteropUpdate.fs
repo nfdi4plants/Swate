@@ -89,7 +89,7 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.joinTables
-                        (tables, selectedColumns, Some importType.ImportType)
+                        (tables, selectedColumns, Some importType.ImportType, importType.ImportTables)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd

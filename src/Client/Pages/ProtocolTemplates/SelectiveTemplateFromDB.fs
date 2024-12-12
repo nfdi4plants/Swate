@@ -87,8 +87,8 @@ type SelectiveTemplateFromDBModal =
             if templates.Length = 0 then
                 failwith "No template selected!"
             if model.ProtocolState.TemplatesSelected.Length > 1 then
-                let reversedTables = templates |> List.map (fun item -> item.Table) |> Array.ofList
-                SpreadsheetInterface.AddTemplates(reversedTables, selectedColumns, importType) |> InterfaceMsg |> dispatch
+                let importTables = templates |> List.map (fun item -> item.Table) |> Array.ofList
+                SpreadsheetInterface.AddTemplates(importTables, selectedColumns, importType) |> InterfaceMsg |> dispatch
         Html.div [
             prop.className "join flex flex-row justify-center gap-2"
             prop.children [
