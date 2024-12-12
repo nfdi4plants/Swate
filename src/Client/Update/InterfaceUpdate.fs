@@ -173,6 +173,15 @@ module Interface =
                     let cmd = Spreadsheet.AddTemplate (table, selectedColumns, importType, templateName) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | AddTemplates (tables, selectedColumns, importType) ->
+                match host with
+                | Some Swatehost.Excel ->
+                    let cmd = OfficeInterop.AddTemplates (tables, selectedColumns, importType) |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                //| Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                //    let cmd = Spreadsheet.AddTemplates (tables, selectedColumns, importType, templateName) |> SpreadsheetMsg |> Cmd.ofMsg
+                //    model, cmd
+                | _ -> failwith "not implemented"
             | JoinTable (table, index, options) ->
                 match host with
                 | Some Swatehost.Excel ->
@@ -201,9 +210,7 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
             | ImportJson data ->
-                let selectedColumns =
-                    data.selectedColumns
-                    |> Array.map (fun (sc, _) -> sc)
+                let selectedColumns = data.selectedColumns
                 match host with
                 | Some Swatehost.Excel ->
                     /// In Excel we must get the current information from worksheets and update them with the imported information

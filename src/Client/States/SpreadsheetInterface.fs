@@ -19,14 +19,14 @@ type Msg =
 | AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
 /// This function will do preprocessing on the table to join
 | AddTemplate           of ArcTable * bool[] * SelectiveImportModalState * string option
-| AddTemplates          of ArcTable[] * bool[] * SelectiveImportModalState * string option
+| AddTemplates          of ArcTable[] * bool[][] * SelectiveImportModalState
 | JoinTable             of ArcTable * columnIndex: int option * options: TableJoinOptions option
 | UpdateArcFile         of ArcFiles
 /// Inserts TermMinimal to selected fields of one column
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
 | ImportXlsx of byte []
-| ImportJson of {|importState: SelectiveImportModalState; importedFile: ArcFiles; selectedColumns: (SelectedColumns * (SelectedColumns -> unit))[]|}
+| ImportJson of {|importState: SelectiveImportModalState; importedFile: ArcFiles; selectedColumns: SelectedColumns|}
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat
 | UpdateUnitForCells

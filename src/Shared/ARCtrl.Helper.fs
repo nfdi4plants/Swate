@@ -86,7 +86,6 @@ module Table =
     /// This function is meant to prepare a table for joining with another table.
     ///
     /// It removes columns that are already present in the active table.
-    /// It removes all values from the new table.
     /// It also fills new Input/Output columns with the input/output values of the active table.
     ///
     /// The output of this function can be used with the SpreadsheetInterface.JoinTable Message.

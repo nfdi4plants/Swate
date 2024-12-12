@@ -44,7 +44,7 @@ type SelectiveTemplateFromDBModal =
         ]
 
     [<ReactComponent>]
-    static member displaySelectedProtocolElements(selectedTemplate: Template option, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit, dispatch, ?hasIcon: bool) =
+    static member displaySelectedProtocolElements(selectedTemplate: Template option, templateIndex, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit, dispatch, ?hasIcon: bool) =
         let hasIcon = defaultArg hasIcon true
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
@@ -54,54 +54,51 @@ type SelectiveTemplateFromDBModal =
                         Html.i [prop.className "fa-solid fa-cog"]
                     Html.span $"Template: {selectedTemplate.Value.Name}"
                 if selectedTemplate.IsSome then
-                    SelectiveImportModal.TableWithImportColumnCheckboxes(selectedTemplate.Value.Table, selectionInformation, setSelectedColumns)
+                    SelectiveImportModal.TableWithImportColumnCheckboxes(selectedTemplate.Value.Table, templateIndex, selectionInformation, setSelectedColumns)
             ]
         ]
 
-    static member AddFromDBToTableButton (model: Model) selectionInformation importType useTemplateName dispatch =
+    static member AddFromDBToTableButton name (model: Model) selectionInformation importType useTemplateName dispatch =
         let addTemplate (model: Model, selectedColumns) =
             let template =
-                if model.ProtocolState.TemplateSelected.IsNone && model.ProtocolState.TemplatesSelected.Length = 0 then
+                if model.ProtocolState.TemplatesSelected.Length = 0 then
                     failwith "No template selected!"
-                if model.ProtocolState.TemplateSelected.IsSome then
-                    model.ProtocolState.TemplateSelected.Value
                 else
                     model.ProtocolState.TemplatesSelected.Head
             SpreadsheetInterface.AddTemplate(template.Table, selectedColumns, importType, useTemplateName) |> InterfaceMsg |> dispatch
         Html.div [
             prop.className "join flex flex-row justify-center gap-2"
             prop.children [
-                let isDisabled =
-                    model.ProtocolState.TemplateSelected.IsSome || model.ProtocolState.TemplatesSelected.Length = 0
-                ModalElements.Button("Add template", addTemplate, (model, selectionInformation.Columns), isDisabled)
-                if model.ProtocolState.TemplateSelected.IsSome || model.ProtocolState.TemplatesSelected.Length > 0 then
+                let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
+                ModalElements.Button(name, addTemplate, (model, selectionInformation.SelectedColumns.[0]), isDisabled)
+                if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Daisy.button.a [
                         button.outline
-                        prop.onClick (fun _ -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
+                        prop.onClick (fun _ -> Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch)
                         button.error
                         Html.i [prop.className "fa-solid fa-times"] |> prop.children
                     ]
             ]
         ]
 
-    static member AddTemplatesFromDBToTableButton (model: Model) selectionInformation importType useTemplateName dispatch =
-        let addTemplate (model: Model, selectedColumns) =
+    static member AddTemplatesFromDBToTableButton name (model: Model) (selectionInformation: SelectedColumns) importType dispatch =
+        let addTemplates (model: Model, selectedColumns) =
             let templates = model.ProtocolState.TemplatesSelected
             if templates.Length = 0 then
                 failwith "No template selected!"
             if model.ProtocolState.TemplatesSelected.Length > 1 then
-                let reversedTables = templates |> List.rev |> List.map (fun item -> item.Table) |> Array.ofList
-                SpreadsheetInterface.AddTemplates(reversedTables, selectedColumns, importType, useTemplateName) |> InterfaceMsg |> dispatch
+                let reversedTables = templates |> List.map (fun item -> item.Table) |> Array.ofList
+                SpreadsheetInterface.AddTemplates(reversedTables, selectedColumns, importType) |> InterfaceMsg |> dispatch
         Html.div [
             prop.className "join flex flex-row justify-center gap-2"
             prop.children [
-                let isDisabled =
-                    model.ProtocolState.TemplateSelected.IsSome || model.ProtocolState.TemplatesSelected.Length = 0
-                ModalElements.Button("Add template", addTemplate, (model, selectionInformation.Columns), isDisabled)
-                if model.ProtocolState.TemplateSelected.IsSome || model.ProtocolState.TemplatesSelected.Length > 0 then
+                let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
+                let selectedColumnValues = selectionInformation.SelectedColumns
+                ModalElements.Button(name, addTemplates, (model, selectedColumnValues), isDisabled)
+                if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Daisy.button.a [
                         button.outline
-                        prop.onClick (fun _ -> Protocol.RemoveSelectedProtocol |> ProtocolMsg |> dispatch)
+                        prop.onClick (fun _ -> Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch)
                         button.error
                         Html.i [prop.className "fa-solid fa-times"] |> prop.children
                     ]
@@ -110,61 +107,59 @@ type SelectiveTemplateFromDBModal =
 
     [<ReactComponent>]
     static member Main(model: Model, dispatch) =
-        let length =
-            if model.ProtocolState.TemplateSelected.IsSome then
-                model.ProtocolState.TemplateSelected.Value.Table.Columns.Length
-            else 0
-        let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init length)
+        let selectedColumns, setSelectedColumns =
+            let columns =
+                model.ProtocolState.TemplatesSelected
+                |> Array.ofSeq
+                |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
+            React.useState(SelectedColumns.init columns)
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
         let useTemplateName, setUseTemplateName = React.useState(AdaptTableName.init)
         SidebarComponents.SidebarLayout.LogicContainer [
             Html.div [
                 SelectiveTemplateFromDBModal.ToProtocolSearchElement model dispatch
             ]
-            if model.ProtocolState.TemplateSelected.IsSome || model.ProtocolState.TemplatesSelected.Length > 0 then
-                Html.div [
-                    SelectiveImportModal.RadioPluginsBox(
-                        "Import Type",
-                        "fa-solid fa-cog",
-                        importTypeState.ImportType,
-                        "importType",
-                        [|
-                            ARCtrl.TableJoinOptions.Headers, " Column Headers";
-                            ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
-                            ARCtrl.TableJoinOptions.WithValues, " ..With Values";
-                        |],
-                        fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
-                    )
-                ]
-            if model.ProtocolState.TemplateSelected.IsSome || model.ProtocolState.TemplatesSelected.Length = 1 then
-                let template =
-                    if model.ProtocolState.TemplateSelected.IsSome then
-                        model.ProtocolState.TemplateSelected.Value
-                    else
-                        model.ProtocolState.TemplatesSelected.Head
+            if model.ProtocolState.TemplatesSelected.Length > 0 then                
+                SelectiveImportModal.RadioPluginsBox(
+                    "Import Type",
+                    "fa-solid fa-cog",
+                    importTypeState.ImportType,
+                    "importType",
+                    [|
+                        ARCtrl.TableJoinOptions.Headers, " Column Headers";
+                        ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
+                        ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                    |],
+                    fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
+                )
+            if model.ProtocolState.TemplatesSelected.Length = 1 then
+                let template = model.ProtocolState.TemplatesSelected.Head
                 Html.div [
                     ModalElements.Box(
                         "Rename Table",
                         "fa-solid fa-cog",
-                        SelectiveTemplateFromDBModal.CheckBoxForTakeOverTemplateName(useTemplateName, setUseTemplateName, model.ProtocolState.TemplateSelected.Value.Name))
+                        SelectiveTemplateFromDBModal.CheckBoxForTakeOverTemplateName(useTemplateName, setUseTemplateName, template.Name))
                 ]
                 Html.div [
                     ModalElements.Box(
-                        model.ProtocolState.TemplateSelected.Value.Name,
+                        template.Name,
                         "fa-solid fa-cog",
-                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(Some template, selectedColumns, setSelectedColumns, dispatch, false))
+                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(Some template, 0, selectedColumns, setSelectedColumns, dispatch, false))
+                ]
+                Html.div [
+                    SelectiveTemplateFromDBModal.AddFromDBToTableButton "Add template" model selectedColumns importTypeState useTemplateName.TemplateName dispatch
                 ]
             else if model.ProtocolState.TemplatesSelected.Length > 1 then
-                let templates = model.ProtocolState.TemplatesSelected |> List.rev
-                for i in 0..templates.Length-1 do
-                    let template = templates.[i]
+                let templates = model.ProtocolState.TemplatesSelected
+                for templateIndex in 0..templates.Length-1 do
+                    let template = templates.[templateIndex]
                     Html.div [
                         ModalElements.Box(
                             template.Name,
                             "fa-solid fa-cog",
-                            SelectiveTemplateFromDBModal.displaySelectedProtocolElements(Some template, selectedColumns, setSelectedColumns, dispatch, false))
+                            SelectiveTemplateFromDBModal.displaySelectedProtocolElements(Some template, templateIndex, selectedColumns, setSelectedColumns, dispatch, false))
                     ]
-            Html.div [
-                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.TemplateName dispatch
-            ]
+                Html.div [
+                    SelectiveTemplateFromDBModal.AddTemplatesFromDBToTableButton "Add templates" model selectedColumns importTypeState dispatch
+                ]
         ]

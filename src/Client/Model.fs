@@ -246,7 +246,6 @@ module Protocol =
         Loading             : bool
         LastUpdated         : System.DateTime option
         // ------ Protocol from Database ------
-        TemplateSelected    : ARCtrl.Template option
         TemplatesSelected   : ARCtrl.Template list
         Templates           : ARCtrl.Template []
     } with
@@ -254,7 +253,6 @@ module Protocol =
             // Client
             Loading             = false
             LastUpdated         = None
-            TemplateSelected    = None
             TemplatesSelected   = []
             // ------ Protocol from Database ------
             Templates           = [||]

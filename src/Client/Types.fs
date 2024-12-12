@@ -60,10 +60,10 @@ type Style =
 module TableImport =
 
     type SelectedColumns = {
-        Columns: bool []
+        SelectedColumns: bool [] []
     }
     with
-        static member init(length) =
+        static member init(selectedColumns) =
             {
-                Columns = Array.init length (fun _ -> true)
+                SelectedColumns = selectedColumns
             }

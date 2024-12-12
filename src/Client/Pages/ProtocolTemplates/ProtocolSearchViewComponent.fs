@@ -394,7 +394,7 @@ module ComponentAux =
                                 Daisy.button.a [
                                     button.sm
                                     prop.onClick (fun _ ->
-                                        SelectProtocol template |> ProtocolMsg |> dispatch
+                                        SelectProtocols [template] |> ProtocolMsg |> dispatch
                                     )
                                     button.wide
                                     button.success
@@ -619,10 +619,7 @@ type Search =
                             Daisy.button.a [
                                 button.sm
                                 prop.onClick (fun _ ->
-                                    if model.ProtocolState.TemplatesSelected.Length > 1 then
-                                        SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
-                                    else
-                                        SelectProtocol model.ProtocolState.TemplatesSelected.Head |> ProtocolMsg |> dispatch
+                                    SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                                 )
                                 button.wide
                                 button.success

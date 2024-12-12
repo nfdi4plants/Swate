@@ -215,11 +215,12 @@ type Widget =
     static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
         let config, setConfig = React.useState(TemplateFilterConfig.init)
-        let selectedColumnsLength =
-            if model.ProtocolState.TemplateSelected.IsSome then
-                model.ProtocolState.TemplateSelected.Value.Table.Columns.Length
-            else 0
-        let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init selectedColumnsLength)
+        let selectedColumns, setSelectedColumns =
+            let columns =
+                model.ProtocolState.TemplatesSelected
+                |> Array.ofSeq
+                |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
+            React.useState(SelectedColumns.init columns)
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
         let useTemplateName, setUseTemplateName = React.useState(AdaptTableName.init)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
@@ -239,7 +240,7 @@ type Widget =
                             Html.div [
                                 SelectiveTemplateFromDBModal.ToProtocolSearchElement model dispatch
                             ]
-                            if model.ProtocolState.TemplateSelected.IsSome then                    
+                            if model.ProtocolState.TemplatesSelected.Length > 0 then                    
                                 Html.div [
                                     SelectiveImportModal.RadioPluginsBox(
                                         "Import Type",
@@ -258,23 +259,23 @@ type Widget =
                                     ModalElements.Box(
                                         "Rename Table",
                                         "fa-solid fa-cog",
-                                        SelectiveTemplateFromDBModal.CheckBoxForTakeOverTemplateName(useTemplateName, setUseTemplateName, model.ProtocolState.TemplateSelected.Value.Name))
+                                        SelectiveTemplateFromDBModal.CheckBoxForTakeOverTemplateName(useTemplateName, setUseTemplateName, model.ProtocolState.TemplatesSelected.Head.Name))
                                 ]
                                 Html.div [
                                     ModalElements.Box(
-                                        model.ProtocolState.TemplateSelected.Value.Name,
+                                        model.ProtocolState.TemplatesSelected.Head.Name,
                                         "",
-                                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model.ProtocolState.TemplateSelected, selectedColumns, setSelectedColumns, dispatch, false))
+                                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(Some model.ProtocolState.TemplatesSelected.Head, 0, selectedColumns, setSelectedColumns, dispatch, false))
                                 ]
                             Html.div [
-                                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.TemplateName dispatch
+                                SelectiveTemplateFromDBModal.AddFromDBToTableButton "Add template" model selectedColumns importTypeState useTemplateName.TemplateName dispatch
                             ]
                         ]
                     ]
                 ]
             ]
         let content =
-            let switchContent = if model.ProtocolState.TemplateSelected.IsNone then selectContent() else insertContent()
+            let switchContent = if model.ProtocolState.TemplatesSelected.Length = 0 then selectContent() else insertContent()
             Html.div [
                 prop.className "flex flex-col gap-4 @container/templateWidget"
                 prop.children switchContent

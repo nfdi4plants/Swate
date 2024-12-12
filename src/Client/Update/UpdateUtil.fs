@@ -16,16 +16,15 @@ module JsonImportHelper =
     open ARCtrl
     open JsonImport
 
-    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (selectedColumns: SelectedColumns []) =
+    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (selectedColumns: SelectedColumns) =
         if not state.ImportMetadata then failwith "Metadata must be imported"
         /// This updates the existing tables based on import config (joinOptions)
         let createUpdatedTables (arcTables: ResizeArray<ArcTable>) =
             [
                 for importTable in state.ImportTables do
-
-                    let selectedColumn = selectedColumns.[importTable.Index]
+                    let selectedColumn = selectedColumns.SelectedColumns.[importTable.Index]
                     let selectedColumnIndices =
-                        selectedColumn.Columns
+                        selectedColumn
                         |> Array.mapi (fun i item -> if item = false then Some i else None)
                         |> Array.choose (fun x -> x)
                         |> List.ofArray

@@ -53,21 +53,11 @@ module Protocol =
                     Templates = templates
             }
             nextState, Cmd.none
-        | SelectProtocol prot ->
-            log "SelectProtocol"
-            let nextModel = {
-                model with
-                    Model.ProtocolState.TemplateSelected = Some prot
-                    Model.ProtocolState.TemplatesSelected = []
-                    Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
-            }
-            state, Cmd.ofMsg (UpdateModel nextModel)
         | SelectProtocols prots ->
             log "SelectProtocols"
             let newProts = prots
             let nextModel = {
                 model with
-                    Model.ProtocolState.TemplateSelected = None
                     Model.ProtocolState.TemplatesSelected = newProts
                     Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
             }
@@ -95,10 +85,9 @@ module Protocol =
             state, Cmd.none
 
         // Client
-        | RemoveSelectedProtocol ->
+        | RemoveSelectedProtocols ->
             let nextState = {
                 state with
-                    TemplateSelected    = None
                     TemplatesSelected   = []
             }
             nextState, Cmd.none

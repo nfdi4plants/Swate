@@ -77,12 +77,11 @@ module Protocol =
         // Client
         | UpdateTemplates               of Template []
         | UpdateLoading                 of bool
-        | RemoveSelectedProtocol
+        | RemoveSelectedProtocols
         // // ------ Protocol from Database ------
         | GetAllProtocolsForceRequest
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse       of string
-        | SelectProtocol                of Template
         | SelectProtocols               of Template list
         | AddProtocol                   of Template
         | ProtocolIncreaseTimesUsed     of protocolName:string

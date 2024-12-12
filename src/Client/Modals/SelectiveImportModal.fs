@@ -24,7 +24,7 @@ type SelectiveImportModal =
             ]
         ])
 
-    static member CheckBoxForTableColumnSelection(columns: CompositeColumn [], index, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit) =
+    static member CheckBoxForTableColumnSelection(columns: CompositeColumn [], tableIndex, columnIndex, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit) =
         Html.div [
             prop.style [style.display.flex; style.justifyContent.center]
             prop.children [
@@ -34,20 +34,21 @@ type SelectiveImportModal =
                         style.height(length.perc 100)
                     ]
                     prop.isChecked
-                        (if selectionInformation.Columns.Length > 0 then
-                            selectionInformation.Columns.[index]
+                        (if selectionInformation.SelectedColumns.Length > 0 then
+                            selectionInformation.SelectedColumns.[tableIndex].[columnIndex]
                         else true)
                     prop.onChange (fun (b: bool) ->
                         if columns.Length > 0 then
-                            let selectedData = selectionInformation.Columns
-                            selectedData.[index] <- b
-                            {selectionInformation with Columns = selectedData} |> setSelectedColumns)
+                            let selectedData = selectionInformation.SelectedColumns
+                            selectedData.[tableIndex].[columnIndex] <- b
+                            {selectionInformation with SelectedColumns = selectedData} |> setSelectedColumns)
                 ]
             ]
         ]
 
-    static member TableWithImportColumnCheckboxes(table: ArcTable, ?selectionInformation: SelectedColumns, ?setSelectedColumns: SelectedColumns -> unit) =
+    static member TableWithImportColumnCheckboxes(table: ArcTable, ?tableIndex, ?selectionInformation: SelectedColumns, ?setSelectedColumns: SelectedColumns -> unit) =
         let columns = table.Columns
+        let tableIndex = defaultArg tableIndex 0
         let displayCheckBox =
             //Determine whether to display checkboxes or not
             selectionInformation.IsSome && setSelectedColumns.IsSome                    
@@ -55,20 +56,20 @@ type SelectiveImportModal =
             prop.children [
                 Html.thead [
                     Html.tr [
-                        for i in 0..columns.Length-1 do                            
+                        for columnIndex in 0..columns.Length-1 do                            
                             Html.th [
                                 Html.label [
                                     prop.className "join flex flex-row centered gap-2"
                                     prop.children [
                                         if displayCheckBox then
-                                            SelectiveImportModal.CheckBoxForTableColumnSelection(columns, i, selectionInformation.Value, setSelectedColumns.Value)
-                                        Html.text (columns.[i].Header.ToString())
+                                            SelectiveImportModal.CheckBoxForTableColumnSelection(columns, tableIndex, columnIndex, selectionInformation.Value, setSelectedColumns.Value)
+                                        Html.text (columns.[columnIndex].Header.ToString())
                                         Html.div [
                                             prop.onClick (fun e ->
                                                 if columns.Length > 0 && selectionInformation.IsSome then
-                                                    let selectedData = selectionInformation.Value.Columns
-                                                    selectedData.[i] <- not selectedData.[i]
-                                                    {selectionInformation.Value with Columns = selectedData} |> setSelectedColumns.Value)
+                                                    let selectedData = selectionInformation.Value.SelectedColumns
+                                                    selectedData.[tableIndex].[columnIndex] <- not selectedData.[tableIndex].[columnIndex]
+                                                    {selectionInformation.Value with SelectedColumns = selectedData} |> setSelectedColumns.Value)
                                         ]
                                     ]
                                 ]
@@ -117,27 +118,27 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member private TableImport(index: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns) =
+    static member private TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns) =
         let name = table0.Name
         let radioGroup = "radioGroup_" + name
-        let import = state.ImportTables |> List.tryFind (fun it -> it.Index = index)
+        let import = state.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
         let isActive = import.IsSome
         let isDisabled = state.ImportMetadata
         ModalElements.Box (name, "fa-solid fa-table", React.fragment [
             Html.div [
                 ModalElements.RadioPlugin (radioGroup, "Import",
                     isActive && import.Value.FullImport,
-                    (fun (b:bool) -> addTableImport index true),
+                    (fun (b:bool) -> addTableImport tableIndex true),
                     isDisabled
                 )
                 ModalElements.RadioPlugin (radioGroup, "Append to active table",
                     isActive && not import.Value.FullImport,
-                    (fun (b:bool) -> addTableImport index false),
+                    (fun (b:bool) -> addTableImport tableIndex false),
                     isDisabled
                 )
                 ModalElements.RadioPlugin (radioGroup, "No Import",
                     not isActive,
-                    (fun (b:bool) -> rmvTableImport index),
+                    (fun (b:bool) -> rmvTableImport tableIndex),
                     isDisabled
                 )
             ]
@@ -151,7 +152,7 @@ type SelectiveImportModal =
                     prop.className "overflow-x-auto"
                     prop.children [
                         if isActive then
-                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, selectedColumns, setSelectedColumns)
+                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, tableIndex, selectedColumns, setSelectedColumns)
                         else
                             SelectiveImportModal.TableWithImportColumnCheckboxes(table0)
                     ]
@@ -184,10 +185,12 @@ type SelectiveImportModal =
             {state with ImportTables = newImportTables} |> setState
         let rmvTableImport = fun i ->
             {state with ImportTables = state.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setState
-        let selectedColumns =
-            tables
-            |> Array.ofSeq
-            |> Array.map (fun t -> React.useState(SelectedColumns.init t.Columns.Length))
+        let selectedColumns, setSelectedColumns =
+            let columns =
+                tables
+                |> Array.ofSeq
+                |> Array.map (fun t -> Array.init t.Columns.Length (fun _ -> true))
+            React.useState(SelectedColumns.init columns)
         Daisy.modal.div [
             modal.active
             prop.children [
@@ -216,7 +219,6 @@ type SelectiveImportModal =
                         SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport, disArcfile)
                         for ti in 0 .. (tables.Count-1) do
                             let t = tables.[ti]
-                            let selectedColumns, setSelectedColumns = fst selectedColumns.[ti], snd selectedColumns.[ti]
                             SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport, selectedColumns, setSelectedColumns)
                         Daisy.cardActions [
                             Daisy.button.button [
