@@ -1246,7 +1246,8 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
 
             let! result = AnnotationTable.tryGetActive context
             match result with
-            | Some excelTable ->
+            | excelTable when excelTable.IsSome && tablesToJoin.Length > 0 ->
+                let excelTable = excelTable.Value
                 let! originTableRes = ArcTable.fromExcelTable(excelTable, context)
 
                 match originTableRes with
@@ -1271,15 +1272,11 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
                     else
                         return [msgAdd.Head; msgJoin.Head]
             | None ->
-                let! msgAdd =
-                    if tablesToJoin.Length > 0 then
-                        addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
-                    else
-                        promise{return []}
-
-                if msgAdd.IsEmpty then
+                if tablesToAdd.Length > 0 then
+                    let! msgAdd = addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
+                    return msgAdd
+                else
                     return [InteropLogging.NoActiveTableMsg]
-                else return msgAdd
         }
     )
 
