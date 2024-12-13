@@ -926,39 +926,6 @@ let addCompositeColumn (excelTable: Table) (arcTable: ArcTable) (newColumn: Comp
 
     loggingList
 
-let selectiveTablePrepare (activeTable: ArcTable) (toJoinTable: ArcTable) (removeColumns: int list): ArcTable =
-    // Remove existing columns
-    let mutable columnsToRemove = removeColumns
-    // find duplicate columns
-    let tablecopy = toJoinTable.Copy()
-    for header in activeTable.Headers do
-        let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
-        if containsAtIndex.IsSome then
-            columnsToRemove <- containsAtIndex.Value::columnsToRemove
-
-    //Remove duplicates because unselected and already existing columns can overlap
-    let columnsToRemove = columnsToRemove |> List.distinct
-
-    tablecopy.RemoveColumns (Array.ofList columnsToRemove)
-    tablecopy.IteriColumns(fun i c0 ->
-        let c1 = {c0 with Cells = tablecopy.Columns.[i].Cells}
-        let c2 =
-            if c1.Header.isInput then
-                match activeTable.TryGetInputColumn() with
-                | Some ic ->
-                    {c1 with Cells = ic.Cells}
-                | _ -> c1
-            elif c1.Header.isOutput then
-                match activeTable.TryGetOutputColumn() with
-                | Some oc ->
-                    {c1 with Cells = oc.Cells}
-                | _ -> c1
-            else
-                c1
-        tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
-    )
-    tablecopy
-
 /// <summary>
 /// Prepare the given table to be joined with the currently active annotation table
 /// </summary>
@@ -976,7 +943,7 @@ let prepareTemplateInMemoryForExcel (table: Table) (tableToAdd: ArcTable) (selec
                 |> Array.mapi (fun i item -> if item = false then Some i else None)
                 |> Array.choose (fun x -> x)
                 |> List.ofArray
-            
+
             let finalTable = Table.selectiveTablePrepare originTable tableToAdd selectedColumnIndices
 
             let selectedRange = context.workbook.getSelectedRange()
