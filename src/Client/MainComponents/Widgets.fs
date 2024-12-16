@@ -221,6 +221,7 @@ type Widget =
             else 0
         let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init selectedColumnsLength)
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
+        let useTemplateName, setUseTemplateName = React.useState(AdaptTableName.init)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
@@ -255,12 +256,18 @@ type Widget =
                                 ]
                                 Html.div [
                                     ModalElements.Box(
+                                        "Rename Table",
+                                        "fa-solid fa-cog",
+                                        SelectiveTemplateFromDBModal.CheckBoxForTakeOverTemplateName(useTemplateName, setUseTemplateName, model.ProtocolState.TemplateSelected.Value.Name))
+                                ]
+                                Html.div [
+                                    ModalElements.Box(
                                         model.ProtocolState.TemplateSelected.Value.Name,
                                         "",
                                         SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
                                 ]
                             Html.div [
-                                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState dispatch
+                                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.TemplateName dispatch
                             ]
                         ]
                     ]

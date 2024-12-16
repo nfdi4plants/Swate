@@ -103,10 +103,10 @@ module Spreadsheet =
                     | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
-            | AddTemplate (table, selectedColumns, importType) ->
+            | AddTemplate (table, selectedColumns, importType, templateName) ->
                 let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
                 /// Filter out existing building blocks and keep input/output values.
-                let msg = fun table -> JoinTable(table, index, Some importType.ImportType) |> SpreadsheetMsg
+                let msg = fun table -> JoinTable(table, index, Some importType.ImportType, templateName) |> SpreadsheetMsg
                 let selectedColumnsIndices =
                     selectedColumns
                     |> Array.mapi (fun i item -> if item = false then Some i else None)
@@ -118,8 +118,8 @@ module Spreadsheet =
                     |> msg
                     |> Cmd.ofMsg
                 state, model, cmd
-            | JoinTable (table, index, options) ->
-                let nextState = Controller.BuildingBlocks.joinTable table index options state
+            | JoinTable (table, index, options, templateName) ->
+                let nextState = Controller.BuildingBlocks.joinTable table index options state templateName
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
                 let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid

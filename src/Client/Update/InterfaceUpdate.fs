@@ -164,13 +164,13 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
 
-            | AddTemplate (table, selectedColumns, importType) ->
+            | AddTemplate (table, selectedColumns, importType, templateName) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.AddTemplate (table, selectedColumns, importType) |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.AddTemplate (table, selectedColumns, importType, templateName) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.AddTemplate (table, selectedColumns, importType) |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.AddTemplate (table, selectedColumns, importType, templateName) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | JoinTable (table, index, options) ->
@@ -179,7 +179,7 @@ module Interface =
                     let cmd = OfficeInterop.JoinTable (table, options) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.JoinTable (table, index, options) |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.JoinTable (table, index, options, None) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | UpdateArcFile arcFiles ->

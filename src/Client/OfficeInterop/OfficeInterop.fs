@@ -1,7 +1,5 @@
 module OfficeInterop.Core
 
-open System.Collections.Generic
-
 open Fable.Core
 open ExcelJS.Fable
 open Excel
@@ -1008,7 +1006,7 @@ let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (selectedColum
 /// <param name="tableToAdd"></param>
 /// <param name="index"></param>
 /// <param name="options"></param>
-let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoinOptions option) =
+let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoinOptions option, templateName: string option) =
     Excel.run(fun context ->
         promise {
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
@@ -1042,8 +1040,12 @@ let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoi
                     let tableSeqs = arcTable.ToStringSeqs()
 
                     do! context.sync().``then``(fun _ ->
-
-                        newTable.name <- excelTable.name
+                        if templateName.IsSome then                            
+                            //Should be updated to remove all kinds of extra symbols
+                            let templateName = Helper.removeChars Helper.charsToRemove templateName.Value
+                            newTable.name <- $"annotationTable{templateName}"
+                        else
+                            newTable.name <- excelTable.name
 
                         let headerNames =
                             let names = AnnotationTable.getHeaders tableSeqs
