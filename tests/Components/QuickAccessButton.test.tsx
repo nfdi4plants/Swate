@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import QuickAccessButton from "./output/QuickAccessButton";
+import { Fragment } from "react/jsx-runtime";
 
 describe('QuickAccessButton', () => {
   test('renders the button with correct title and children', () => {
@@ -9,7 +10,7 @@ describe('QuickAccessButton', () => {
         desc="Click me"
         onclick={() => {}}
       >
-        Click Here
+        <span>Click Here</span>
       </QuickAccessButton>
     );
 
@@ -26,7 +27,7 @@ describe('QuickAccessButton', () => {
         desc="Click me"
         onclick={handleClick}
       >
-        Click Here
+        <Fragment>Click Here</Fragment>
       </QuickAccessButton>
     );
 
@@ -43,7 +44,7 @@ describe('QuickAccessButton', () => {
         isDisabled={true}
         onclick={() => {}}
       >
-        Click Here
+        <Fragment>Click Here</Fragment>
       </QuickAccessButton>
     );
 
@@ -58,7 +59,7 @@ describe('QuickAccessButton', () => {
         isDisabled={false}
         onclick={() => {}}
       >
-        Click Here
+        <Fragment>Click Here</Fragment>
       </QuickAccessButton>
     );
 

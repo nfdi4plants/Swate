@@ -10,13 +10,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="Util.fs" />
     <Compile Include="Example.fs" />
     <Compile Include="QuickAccessButton.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Javascript" Version="2.2.4" />
+    <PackageReference Include="Fable.React.Types" Version="18.4.0" />
     <PackageReference Include="Fable.Core" Version="4.3.0" />
     <PackageReference Include="Feliz" Version="2.8.0" />
     <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />

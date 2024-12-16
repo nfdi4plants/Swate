@@ -37,4 +37,3 @@ type TestInput =
                 ]
             ]
         ]
-        |> toNative

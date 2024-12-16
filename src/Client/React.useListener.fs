@@ -77,7 +77,7 @@ type React =
             [| func; delay |]
         )
 
-    static member inline useDebouncedCallbackWithCancel<'A>(func: 'A -> unit, ?delay: int) =
+    static member inline useDebouncedCallbackWithCancel<'A>(func: 'A -> unit, ?delay: int, ?oncancel: unit -> unit, ?ondebouncestart: unit -> unit, ?ondebouncerun: unit -> unit) =
         let timeout = React.useRef(None)
         let delay = defaultArg delay 500
 
@@ -86,8 +86,10 @@ type React =
 
                 let later = fun () ->
                     timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
+                    ondebouncerun |> Option.iter(fun f -> f())
                     func arg
 
+                ondebouncestart |> Option.iter(fun f -> f())
                 timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
                 timeout.current <- Some(Fable.Core.JS.setTimeout later delay)
             ),
@@ -95,7 +97,9 @@ type React =
         )
         let cancel = React.useCallback(
             (fun () ->
-                timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
+                if timeout.current.IsSome then
+                    Fable.Core.JS.clearTimeout(timeout.current.Value)
+                    oncancel |> Option.iter(fun f -> f())
             )
         )
         cancel, debouncedCallBack

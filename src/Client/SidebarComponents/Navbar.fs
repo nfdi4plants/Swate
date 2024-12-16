@@ -213,7 +213,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 Html.i [prop.className "fa-solid fa-info"]
             ],
             toggleMetdadataModal
-        ) |> toReact
+        )
 
         QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
@@ -227,7 +227,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 let ctrl = e.metaKey || e.ctrlKey
                 SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
             )
-        ) |> toReact
+        )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             QuickAccessButton.QuickAccessButton(
@@ -241,7 +241,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     let ctrl = not (e.metaKey || e.ctrlKey)
                     OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
                 )
-            ) |> toReact
+            )
         | _ ->
             ()
         QuickAccessButton.QuickAccessButton(
@@ -254,7 +254,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             (fun _ ->
                 SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch
             )
-        ) |> toReact
+        )
         QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
             React.fragment [
@@ -262,7 +262,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
-        ) |> toReact
+        )
         QuickAccessButton.QuickAccessButton(
             "Get Building Block Information",
             React.fragment [
@@ -281,7 +281,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 }
                 |> Promise.start
             )
-        ) |> toReact
+        )
     ]
     |> React.fragment
 
