@@ -178,9 +178,9 @@ module Interface =
                 | Some Swatehost.Excel ->
                     let cmd = OfficeInterop.AddTemplates (tables, selectedColumns, importType) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
-                //| Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                //    let cmd = Spreadsheet.AddTemplates (tables, selectedColumns, importType, templateName) |> SpreadsheetMsg |> Cmd.ofMsg
-                //    model, cmd
+                | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                    let cmd = Spreadsheet.AddTemplates (tables, selectedColumns, importType) |> SpreadsheetMsg |> Cmd.ofMsg
+                    model, cmd
                 | _ -> failwith "not implemented"
             | JoinTable (table, index, options) ->
                 match host with
@@ -229,7 +229,7 @@ module Interface =
                                     match arcfileOpt, activeTable with
                                     | Some arcfile, Ok activeTable -> arcfile.Tables() |> Seq.tryFindIndex (fun table -> table = activeTable)
                                     | _ -> None
-                                return UpdateUtil.JsonImportHelper.updateTables data.importedFile data.importState (*selectedColumns*) activeTableIndex arcfileOpt
+                                return UpdateUtil.JsonImportHelper.updateArcFileTables data.importedFile data.importState activeTableIndex arcfileOpt selectedColumns
                         }
                     let updateArcFile (arcFile: ArcFiles) = SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg
                     let cmd =
@@ -243,7 +243,7 @@ module Interface =
                     let cmd =
                         match data.importState.ImportMetadata with
                         | true -> UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState selectedColumns
-                        | false -> UpdateUtil.JsonImportHelper.updateTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile
+                        | false -> UpdateUtil.JsonImportHelper.updateArcFileTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile selectedColumns
                         |> SpreadsheetInterface.UpdateArcFile |> InterfaceMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"

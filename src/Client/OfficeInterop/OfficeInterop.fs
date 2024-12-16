@@ -1213,15 +1213,12 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
 
             let! result = AnnotationTable.tryGetActive context
             match result with
-            | excelTable when excelTable.IsSome && tablesToJoin.Length > 0 ->
-                let excelTable = excelTable.Value
+            | Some excelTable ->
                 let! originTableRes = ArcTable.fromExcelTable(excelTable, context)
-
                 match originTableRes with
                 | Result.Error _ ->
                     return failwith $"Failed to create arc table for table {excelTable.name}"
                 | Result.Ok originTable ->
-
                     let! msgJoin =
                         if tablesToJoin.Length > 0 then
                             joinTemplatesToTable originTable excelTable tablesToJoin selectedColumnsCollectionToJoin options context
@@ -1229,21 +1226,18 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
                             promise{return []}
 
                     let! msgAdd =
-                        if tablesToJoin.Length > 0 then
-                            addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
-                        else
-                            promise{return []}
+                        addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
 
-                    if msgJoin.IsEmpty then                        
-                        return msgAdd
+                    if msgAdd.IsEmpty then                        
+                        return msgJoin
                     else
-                        return [msgAdd.Head; msgJoin.Head]
+                        return [msgJoin.Head; msgAdd.Head]
             | None ->
-                if tablesToAdd.Length > 0 then
+                if tablesToJoin.Length > 0 then
+                    return [InteropLogging.NoActiveTableMsg]
+                else
                     let! msgAdd = addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
                     return msgAdd
-                else
-                    return [InteropLogging.NoActiveTableMsg]
         }
     )
 

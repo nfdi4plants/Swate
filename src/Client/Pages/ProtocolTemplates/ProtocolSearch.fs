@@ -53,10 +53,13 @@ type SearchContainer =
 
                 Html.p "Search the database for protocol templates."
 
-                SidebarComponents.SidebarLayout.LogicContainer [
-                    Protocol.Search.InfoField()
-                    Protocol.Search.FileSortElement(model, config, setConfig)
-                    Protocol.Search.Component (filteredTemplates, model, dispatch)
+                Html.div [
+                    prop.className "relative flex p-4 shadow-md gap-4 flex-col"
+                    prop.children [
+                            Protocol.Search.InfoField()
+                            Protocol.Search.FileSortElement(model, config, setConfig)
+                            Protocol.Search.Component (filteredTemplates, model, dispatch)
+                    ]
                 ]
             ]
         ]

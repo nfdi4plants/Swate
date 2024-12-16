@@ -117,7 +117,7 @@ type SelectiveTemplateFromDBModal =
         let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinct
+            let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)
             {importTypeState with ImportTables = newImportTables} |> setImportTypeState
         let rmvTableImport = fun i ->
             {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
@@ -157,15 +157,13 @@ type SelectiveTemplateFromDBModal =
                 ]
             else if model.ProtocolState.TemplatesSelected.Length > 1 then
                 let templates = model.ProtocolState.TemplatesSelected
+                let names =
+                    templates
+                    |> List.map (fun item -> item.Name)
+                    |> Array.ofSeq
                 for templateIndex in 0..templates.Length-1 do
                     let template = templates.[templateIndex]
-                    SelectiveImportModal.TableImport(templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, selectedColumns, setSelectedColumns)
-                    //Html.div [
-                    //    ModalElements.Box(
-                    //        template.Name,
-                    //        "fa-solid fa-cog",
-                    //        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(Some template, templateIndex, selectedColumns, setSelectedColumns, dispatch, false))
-                    //]
+                    SelectiveImportModal.TableImport(templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, selectedColumns, setSelectedColumns, template.Name)
                 Html.div [
                     SelectiveTemplateFromDBModal.AddTemplatesFromDBToTableButton "Add templates" model selectedColumns importTypeState dispatch
                 ]

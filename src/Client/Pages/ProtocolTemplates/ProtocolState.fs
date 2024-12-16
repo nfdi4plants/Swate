@@ -55,10 +55,9 @@ module Protocol =
             nextState, Cmd.none
         | SelectProtocols prots ->
             log "SelectProtocols"
-            let newProts = prots
             let nextModel = {
                 model with
-                    Model.ProtocolState.TemplatesSelected = newProts
+                    Model.ProtocolState.TemplatesSelected = prots
                     Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
             }
             state, Cmd.ofMsg (UpdateModel nextModel)
