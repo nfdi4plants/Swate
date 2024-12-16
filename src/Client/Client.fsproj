@@ -35,6 +35,7 @@
     <Compile Include="Messages.fs" />
     <Compile Include="ARCitect\Interop.fs" />
     <Compile Include="ARCitect\ARCitect.fs" />
+    <Compile Include="Modals\ModalElements.fs" />
     <Compile Include="Modals\Util.fs" />
     <Compile Include="Modals\ContextMenus\Util.fs" />
     <Compile Include="Modals\ContextMenus\Base.fs" />
@@ -90,7 +91,7 @@
     <Compile Include="Pages\ProtocolTemplates\ProtocolState.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolSearchViewComponent.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolSearch.fs" />
-    <Compile Include="Pages\ProtocolTemplates\TemplateFromDB.fs" />
+    <Compile Include="Pages\ProtocolTemplates\SelectiveTemplateFromDB.fs" />
     <Compile Include="Pages\ProtocolTemplates\TemplateFromFile.fs" />
     <Compile Include="Pages\ProtocolTemplates\ProtocolView.fs" />
     <Compile Include="Pages\FilePicker\FilePickerView.fs" />

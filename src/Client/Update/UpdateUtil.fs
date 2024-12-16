@@ -2,6 +2,7 @@ module Update.UpdateUtil
 
 open ARCtrl
 open Shared
+open Types.TableImport
 open Fable.Remoting.Client
 
 let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
@@ -15,21 +16,34 @@ module JsonImportHelper =
     open ARCtrl
     open JsonImport
 
-    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) =
+    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (selectedColumns: SelectedColumns []) =
         if not state.ImportMetadata then failwith "Metadata must be imported"
         /// This updates the existing tables based on import config (joinOptions)
         let createUpdatedTables (arcTables: ResizeArray<ArcTable>) =
             [
-                for it in state.ImportTables do
-                    let sourceTable = arcTables.[it.Index]
+                for importTable in state.ImportTables do
+
+                    let selectedColumn = selectedColumns.[importTable.Index]
+                    let selectedColumnIndices =
+                        selectedColumn.Columns
+                        |> Array.mapi (fun i item -> if item = false then Some i else None)
+                        |> Array.choose (fun x -> x)
+                        |> List.ofArray
+
+                    let sourceTable = arcTables.[importTable.Index]
                     let appliedTable = ArcTable.init(sourceTable.Name)
-                    appliedTable.Join(sourceTable, joinOptions=state.ImportType)
+
+                    let finalTable = Table.selectiveTablePrepare appliedTable sourceTable selectedColumnIndices
+                    let values =
+                        sourceTable.Columns
+                        |> Array.map (fun item -> item.Cells |> Array.map (fun itemi -> itemi.ToString()))
+                    appliedTable.Join(finalTable, joinOptions=state.ImportType)
                     appliedTable
             ]
             |> ResizeArray
         let arcFile =
             match uploadedFile with
-            | Assay a as arcFile->
+            | Assay a as arcFile ->
                 let tables = createUpdatedTables a.Tables
                 a.Tables <- tables
                 arcFile

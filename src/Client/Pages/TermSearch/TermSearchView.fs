@@ -8,7 +8,6 @@ open Elmish
 open TermSearch
 open Model
 
-
 let update (termSearchMsg: TermSearch.Msg) (currentState:TermSearch.Model) : TermSearch.Model * Cmd<Messages.Msg> =
     match termSearchMsg with
     // Toggle the search by parent ontology option on/off by clicking on a checkbox

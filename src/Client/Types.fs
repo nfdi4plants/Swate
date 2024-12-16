@@ -56,3 +56,14 @@ type Style =
             | None -> None
             |> Option.map _.StyleString
             |> Option.defaultValue ""
+
+module TableImport =
+
+    type SelectedColumns = {
+        Columns: bool []
+    }
+    with
+        static member init(length) =
+            {
+                Columns = Array.init length (fun _ -> true)
+            }
