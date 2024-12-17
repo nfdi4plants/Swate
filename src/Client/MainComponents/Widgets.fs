@@ -21,7 +21,6 @@ module private InitExtensions =
             | Some p -> Some p
             | None -> None
 
-
 open InitExtensions
 
 open Fable.Core
