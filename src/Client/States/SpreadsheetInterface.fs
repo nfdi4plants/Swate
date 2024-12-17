@@ -1,7 +1,6 @@
 namespace SpreadsheetInterface
 
 open Shared
-open Types.TableImport
 open ARCtrl
 open JsonImport
 
@@ -26,7 +25,7 @@ type Msg =
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
 | ImportXlsx of byte []
-| ImportJson of {|importState: SelectiveImportModalState; importedFile: ArcFiles; selectedColumns: SelectedColumns|}
+| ImportJson of {|importState: SelectiveImportModalState; importedFile: ArcFiles; selectedColumns: bool [] []|}
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat
 | UpdateUnitForCells

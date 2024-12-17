@@ -5,7 +5,6 @@ open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
 open Modals
-open Types.TableImport
 open Types.JsonImport
 
 module private InitExtensions =
@@ -210,78 +209,42 @@ type Widget =
         let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv, help)
 
-
     [<ReactComponent>]
     static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         let templates = model.ProtocolState.Templates
         let config, setConfig = React.useState(TemplateFilterConfig.init)
-        let selectedColumns, setSelectedColumns =
+        let importTypeState, setImportTypeState =
             let columns =
                 model.ProtocolState.TemplatesSelected
                 |> Array.ofSeq
                 |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
-            React.useState(SelectedColumns.init columns)
-        let useTemplateNameState, setUseTemplateNameState = React.useState(AdaptTableName.init)
-        let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
+            React.useState(SelectiveImportModalState.init columns)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)
             {importTypeState with ImportTables = newImportTables} |> setImportTypeState
-        let rmvTableImport = fun _ -> ()
+        let rmvTableImport = fun i ->
+            {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         let selectContent() =
             [
                 Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
                 Protocol.Search.Component (filteredTemplates, model, dispatch, length.px 350)
             ]
+        let templateSelectionElements =
+            SelectiveTemplateFromDB.DisplayTemplateSelection(
+                model,
+                importTypeState,
+                setImportTypeState,
+                addTableImport,
+                rmvTableImport,
+                dispatch)
         let insertContent() =
             [
                 Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
-                    prop.children [
-                        Html.div [
-                            SelectiveTemplateFromDB.ToProtocolSearchElement model dispatch
-                        ]
-                        if model.ProtocolState.TemplatesSelected.Length > 0 then
-                            SelectiveImportModal.RadioPluginsBox(
-                                "Import Type",
-                                "fa-solid fa-cog",
-                                importTypeState.ImportType,
-                                "importType ",
-                                [|
-                                    ARCtrl.TableJoinOptions.Headers, " Column Headers";
-                                    ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
-                                    ARCtrl.TableJoinOptions.WithValues, " ..With Values";
-                                |],
-                                fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
-                            )
-                        if model.ProtocolState.TemplatesSelected.Length = 1 then
-                            let template = model.ProtocolState.TemplatesSelected.Head
-                            Html.div [
-                                ModalElements.Box(
-                                    "Rename Table",
-                                    "fa-solid fa-cog",
-                                    SelectiveTemplateFromDB.CheckBoxForTakeOverTemplateName(useTemplateNameState, setUseTemplateNameState, template.Name))
-                            ]
-                            Html.div [
-                                ModalElements.Box(
-                                    template.Name,
-                                    "fa-solid fa-cog",
-                                    SelectiveTemplateFromDB.displaySelectedProtocolElements(Some template, 0, selectedColumns, setSelectedColumns, dispatch, false))
-                            ]
-                            Html.div [
-                                SelectiveTemplateFromDB.AddFromDBToTableButton "Add template" model selectedColumns importTypeState useTemplateNameState.TemplateName dispatch
-                            ]
-                        else if model.ProtocolState.TemplatesSelected.Length > 1 then
-                            let templates = model.ProtocolState.TemplatesSelected
-                            for templateIndex in 0..templates.Length-1 do
-                                let template = templates.[templateIndex]
-                                SelectiveImportModal.TableImport(templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, selectedColumns, setSelectedColumns, template.Name, templateIndex.ToString())
-                            Html.div [
-                                SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton "Add templates" model selectedColumns importTypeState dispatch
-                            ]
-                    ]
+                    prop.children templateSelectionElements
                 ]
             ]
 

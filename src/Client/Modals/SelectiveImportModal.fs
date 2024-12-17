@@ -5,7 +5,6 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
-open Types.TableImport
 
 open ARCtrl
 open JsonImport
@@ -24,7 +23,7 @@ type SelectiveImportModal =
             ]
         ])
 
-    static member CheckBoxForTableColumnSelection(columns: CompositeColumn [], tableIndex, columnIndex, selectionInformation: SelectedColumns, setSelectedColumns: SelectedColumns -> unit) =
+    static member CheckBoxForTableColumnSelection(columns: CompositeColumn [], tableIndex, columnIndex, selectionInformation: SelectiveImportModalState, setSelectedColumns: SelectiveImportModalState -> unit) =
         Html.div [
             prop.style [style.display.flex; style.justifyContent.center]
             prop.children [
@@ -46,7 +45,7 @@ type SelectiveImportModal =
             ]
         ]
 
-    static member TableWithImportColumnCheckboxes(table: ArcTable, ?tableIndex, ?selectionInformation: SelectedColumns, ?setSelectedColumns: SelectedColumns -> unit) =
+    static member TableWithImportColumnCheckboxes(table: ArcTable, ?tableIndex, ?selectionInformation: SelectiveImportModalState, ?setSelectedColumns: SelectiveImportModalState -> unit) =
         let columns = table.Columns
         let tableIndex = defaultArg tableIndex 0
         let displayCheckBox =
@@ -129,17 +128,17 @@ type SelectiveImportModal =
             Html.div [
                 ModalElements.RadioPlugin (radioGroup, "Import",
                     isActive && import.Value.FullImport,
-                    (fun (b: bool) -> addTableImport tableIndex true),
+                    (fun _ -> addTableImport tableIndex true),
                     isDisabled
                 )
                 ModalElements.RadioPlugin (radioGroup, "Append to active table",
                     isActive && not import.Value.FullImport,
-                    (fun (b: bool) -> addTableImport tableIndex false),
+                    (fun _ -> addTableImport tableIndex false),
                     isDisabled
                 )
                 ModalElements.RadioPlugin (radioGroup, "No Import",
                     not isActive,
-                    (fun (b: bool) -> rmvTableImport tableIndex),
+                    (fun _ -> rmvTableImport tableIndex),
                     isDisabled
                 )
             ]
@@ -164,34 +163,32 @@ type SelectiveImportModal =
 
     [<ReactComponent>]
     static member Main (import: ArcFiles, dispatch, rmv) =
-        let state, setState = React.useState(SelectiveImportModalState.init)
         let tables, disArcfile =
             match import with
             | Assay a -> a.Tables, ArcFilesDiscriminate.Assay
             | Study (s,_) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-        let setMetadataImport = fun b ->
-            if b then
-                {
-                    state with
-                        ImportMetadata  = true;
-                        ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
-                } |> setState
-            else
-                SelectiveImportModalState.init() |> setState
-        let addTableImport = fun (i: int) (fullImport: bool) ->
-            let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::state.ImportTables |> List.distinct
-            {state with ImportTables = newImportTables} |> setState
-        let rmvTableImport = fun i ->
-            {state with ImportTables = state.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setState
-        let selectedColumns, setSelectedColumns =
-            let columns =
+        let columns =
                 tables
                 |> Array.ofSeq
                 |> Array.map (fun t -> Array.init t.Columns.Length (fun _ -> true))
-            React.useState(SelectedColumns.init columns)
+        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init columns)
+        let setMetadataImport = fun b ->
+            if b then
+                {
+                    importDataState with
+                        ImportMetadata  = true;
+                        ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
+                } |> setImportDataState
+            else
+                SelectiveImportModalState.init(columns) |> setImportDataState
+        let addTableImport = fun (i: int) (fullImport: bool) ->
+            let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
+            let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
+            {importDataState with ImportTables = newImportTables} |> setImportDataState
+        let rmvTableImport = fun i ->
+            {importDataState with ImportTables = importDataState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportDataState
         Daisy.modal.div [
             modal.active
             prop.children [
@@ -209,25 +206,25 @@ type SelectiveImportModal =
                         SelectiveImportModal.RadioPluginsBox(
                             "Import Type",
                             "fa-solid fa-cog",
-                            state.ImportType,
+                            importDataState.ImportType,
                             "importType",
                             [|
                                 ARCtrl.TableJoinOptions.Headers,    " Column Headers";
                                 ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
                                 ARCtrl.TableJoinOptions.WithValues, " ..With Values";
                             |],
-                            fun importType -> {state with ImportType = importType} |> setState)
-                        SelectiveImportModal.MetadataImport(state.ImportMetadata, setMetadataImport, disArcfile)
+                            fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
+                        SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
                         for ti in 0 .. (tables.Count-1) do
                             let t = tables.[ti]
-                            SelectiveImportModal.TableImport(ti, t, state, addTableImport, rmvTableImport, selectedColumns, setSelectedColumns)
+                            SelectiveImportModal.TableImport(ti, t, importDataState, addTableImport, rmvTableImport, importDataState, setImportDataState)
                         Daisy.cardActions [
                             Daisy.button.button [
                                 button.info
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
                                 prop.onClick(fun e ->
-                                    {| importState = state; importedFile = import; selectedColumns = selectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                                    {| importState = importDataState; importedFile = import; selectedColumns = importDataState.SelectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )
                             ]

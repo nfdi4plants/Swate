@@ -998,7 +998,8 @@ let joinArcTablesInExcle (excelTable: Table) (arcTable:ArcTable) (templateName: 
 
         do! context.sync().``then``(fun _ ->
             if templateName.IsSome then
-                let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, Helper.charsToRemove, "")
+                let name = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\s", "")
+                let templateName = System.Text.RegularExpressions.Regex.Replace(name, "-", "")
                 newTable.name <- $"annotationTable{templateName}"
             else
                 newTable.name <- excelTable.name

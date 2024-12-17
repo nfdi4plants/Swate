@@ -14,12 +14,16 @@ module JsonImport =
         ImportType: ARCtrl.TableJoinOptions
         ImportMetadata: bool
         ImportTables: ImportTable list
+        SelectedColumns: bool [] []
+        TemplateName: string option
     } with
-        static member init() =
+        static member init(selectedColumns) =
             {
                 ImportType = ARCtrl.TableJoinOptions.Headers
                 ImportMetadata = false
                 ImportTables = []
+                SelectedColumns = selectedColumns
+                TemplateName = None
             }
 
 open Fable.Core
@@ -56,14 +60,3 @@ type Style =
             | None -> None
             |> Option.map _.StyleString
             |> Option.defaultValue ""
-
-module TableImport =
-
-    type SelectedColumns = {
-        SelectedColumns: bool [] []
-    }
-    with
-        static member init(selectedColumns) =
-            {
-                SelectedColumns = selectedColumns
-            }
