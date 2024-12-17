@@ -12,7 +12,11 @@ open Components
 
 type SelectiveImportModal =
 
+    [<ReactComponent>]
     static member RadioPluginsBox(boxName, icon, importType: TableJoinOptions, radioGroupName, radioData: (TableJoinOptions * string)[], setImportType: TableJoinOptions -> unit) =
+
+        let guid = React.useMemo(fun () -> System.Guid.NewGuid().ToString())
+        let radioGroupName = radioGroupName + guid
         let myradio(target: TableJoinOptions, txt: string) =
             let isChecked = importType = target
             ModalElements.RadioPlugin(radioGroupName, txt, isChecked, fun (b: bool) -> if b then setImportType target)
@@ -50,12 +54,12 @@ type SelectiveImportModal =
         let tableIndex = defaultArg tableIndex 0
         let displayCheckBox =
             //Determine whether to display checkboxes or not
-            selectionInformation.IsSome && setSelectedColumns.IsSome                    
+            selectionInformation.IsSome && setSelectedColumns.IsSome
         Daisy.table [
             prop.children [
                 Html.thead [
                     Html.tr [
-                        for columnIndex in 0..columns.Length-1 do                            
+                        for columnIndex in 0..columns.Length-1 do
                             Html.th [
                                 Html.label [
                                     prop.className "join flex flex-row centered gap-2"
@@ -145,7 +149,7 @@ type SelectiveImportModal =
             Daisy.collapse [
                 Html.input [prop.type'.checkbox; prop.className "min-h-0 h-5"]
                 Daisy.collapseTitle [
-                    prop.className "p-1 min-h-0 h-5 text-sm"                    
+                    prop.className "p-1 min-h-0 h-5 text-sm"
                     prop.text (if isActive then "Select Columns" else "Preview Table")
                 ]
                 Daisy.collapseContent [

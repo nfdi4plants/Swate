@@ -213,38 +213,19 @@ type Widget =
     static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         let templates = model.ProtocolState.Templates
         let config, setConfig = React.useState(TemplateFilterConfig.init)
-        let importTypeState, setImportTypeState =
-            let columns =
-                model.ProtocolState.TemplatesSelected
-                |> Array.ofSeq
-                |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
-            React.useState(SelectiveImportModalState.init columns)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
-        let addTableImport = fun (i: int) (fullImport: bool) ->
-            let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)
-            {importTypeState with ImportTables = newImportTables} |> setImportTypeState
-        let rmvTableImport = fun i ->
-            {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         let selectContent() =
             [
                 Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
                 Protocol.Search.Component (filteredTemplates, model, dispatch, length.px 350)
             ]
-        let templateSelectionElements =
-            SelectiveTemplateFromDB.DisplayTemplateSelection(
-                model,
-                importTypeState,
-                setImportTypeState,
-                addTableImport,
-                rmvTableImport,
-                dispatch)
         let insertContent() =
             [
                 Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
-                    prop.children templateSelectionElements
+                    prop.className "flex flex-col gap-2"
+                    prop.children (SelectiveTemplateFromDB.Main(model, dispatch))
                 ]
             ]
 

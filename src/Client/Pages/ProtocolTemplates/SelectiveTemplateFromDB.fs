@@ -94,12 +94,25 @@ type SelectiveTemplateFromDB =
             ]
         ]
 
-    static member DisplayTemplateSelection (model: Model, importTypeState, setImportTypeState, addTableImport, rmvTableImport, dispatch) =
-        [
+    [<ReactComponent>]
+    static member Main (model: Model, dispatch) =
+        let importTypeState, setImportTypeState =
+            let columns =
+                model.ProtocolState.TemplatesSelected
+                |> Array.ofSeq
+                |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
+            React.useState(SelectiveImportModalState.init columns)
+        let addTableImport = fun (i: int) (fullImport: bool) ->
+            let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
+            let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)
+            {importTypeState with ImportTables = newImportTables} |> setImportTypeState
+        let rmvTableImport = fun i ->
+            {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
+        React.fragment [
             Html.div [
                 SelectiveTemplateFromDB.ToProtocolSearchElement model dispatch
             ]
-            if model.ProtocolState.TemplatesSelected.Length > 0 then                
+            if model.ProtocolState.TemplatesSelected.Length > 0 then
                 SelectiveImportModal.RadioPluginsBox(
                     "Import Type",
                     "fa-solid fa-cog",
@@ -138,27 +151,3 @@ type SelectiveTemplateFromDB =
                     SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton "Add templates" model importTypeState dispatch
                 ]
         ]
-
-    [<ReactComponent>]
-    static member Main (model: Model, dispatch) =
-        let importTypeState, setImportTypeState =
-            let columns =
-                model.ProtocolState.TemplatesSelected
-                |> Array.ofSeq
-                |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
-            React.useState(SelectiveImportModalState.init columns)
-        let addTableImport = fun (i: int) (fullImport: bool) ->
-            let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)
-            {importTypeState with ImportTables = newImportTables} |> setImportTypeState
-        let rmvTableImport = fun i ->
-            {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
-        SidebarComponents.SidebarLayout.LogicContainer(
-            SelectiveTemplateFromDB.DisplayTemplateSelection(
-                model,
-                importTypeState,
-                setImportTypeState,
-                addTableImport,
-                rmvTableImport,
-                dispatch)
-            )

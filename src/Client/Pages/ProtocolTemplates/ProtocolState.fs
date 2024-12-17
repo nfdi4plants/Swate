@@ -68,11 +68,11 @@ module Protocol =
                     model.ProtocolState.TemplatesSelected
                 else
                     prot::model.ProtocolState.TemplatesSelected
-            let nextModel = {
-                model with
-                    Model.ProtocolState.TemplatesSelected = templates
+            let nextState = {
+                state with
+                    TemplatesSelected = templates
             }
-            state, Cmd.ofMsg (UpdateModel nextModel)
+            nextState, Cmd.none
         | ProtocolIncreaseTimesUsed templateId ->
             failwith "ParseUploadedFileRequest IS NOT IMPLEMENTED YET"
             //let cmd =

@@ -38,7 +38,9 @@ type Templates =
             // Box 1
             SidebarComponents.SidebarLayout.Description "Add template from database."
 
-            Modals.SelectiveTemplateFromDB.Main(model, dispatch)
+            SidebarComponents.SidebarLayout.LogicContainer [
+                Modals.SelectiveTemplateFromDB.Main(model, dispatch)
+            ]
 
             // Box 2
             SidebarComponents.SidebarLayout.Description (Html.p [
