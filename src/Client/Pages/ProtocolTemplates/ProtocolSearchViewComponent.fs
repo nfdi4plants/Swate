@@ -553,6 +553,46 @@ type Search =
                 ]
         ]
 
+    static member private displayTemplateNames model =
+            Html.div [
+                prop.className "flex gap-2"
+                prop.children [
+                    let names = List.rev model.ProtocolState.TemplatesSelected |> List.map (fun template -> template.Name)
+                    for i in 0..names.Length-1 do
+                        Html.div [ yield! [prop.text $"\"{names.[i]}\""]]
+                ]
+            ]
+    static member private selectTemplatesButton model dispatch =
+        Html.div [
+            prop.className "flex justify-center gap-2"
+            prop.children [
+                Daisy.button.a [
+                    button.sm
+                    prop.onClick (fun _ ->
+                        SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
+                    )
+                    button.wide
+                    if model.ProtocolState.TemplatesSelected.Length > 0 then
+                        button.success
+                    else
+                        button.disabled
+                    prop.text "Select templates"
+                ]
+            ]
+        ]
+    static member SelectedTemplatesElement model dispatch =
+        Html.div [
+            prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
+            prop.children [
+                Html.div [
+                    prop.children [
+                            Search.displayTemplateNames model
+                        ]
+                ]
+                Search.selectTemplatesButton model dispatch
+            ]
+        ]
+
     [<ReactComponent>]
     static member Component (templates, model: Model, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
@@ -603,43 +643,5 @@ type Search =
                         ]
                     ]
                 ]
-                let names =
-                    Html.div [
-                        prop.className "flex gap-2"
-                        prop.children [
-                            let names = List.rev model.ProtocolState.TemplatesSelected |> List.map (fun template -> template.Name)
-                            for i in 0..names.Length-1 do
-                                Html.div [ yield! [prop.text $"\"{names.[i]}\""]]
-                        ]
-                    ]
-                let button =
-                    Html.div [
-                        prop.className "flex justify-center gap-2"
-                        prop.children [
-                            Daisy.button.a [
-                                button.sm
-                                prop.onClick (fun _ ->
-                                    SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
-                                )
-                                button.wide
-                                button.success
-                                prop.text "Select templates"
-                            ]
-                        ]
-                    ]
-                let element =
-                    Html.div [
-                        prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
-                        prop.children [
-                            Html.div [
-                                prop.children [
-                                        names
-                                    ]
-                            ]
-                            button
-                        ]
-                    ]
-                if model.ProtocolState.TemplatesSelected.Length > 0 then
-                    ModalElements.Box("Selected Templates", "fa-solid fa-cog", element)
             ]
         ]

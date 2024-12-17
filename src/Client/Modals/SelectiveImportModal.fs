@@ -121,10 +121,10 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns, ?templateName, ?radioGroup) =
+    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns, ?templateName) =
         let name = defaultArg templateName table0.Name
-        let radioGroup = defaultArg radioGroup ""
-        let radioGroup = "radioGroup_" + radioGroup
+        let guid = React.useMemo(fun () -> System.Guid.NewGuid().ToString())
+        let radioGroup = "radioGroup_" + guid
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
         let isActive = import.IsSome
         let isDisabled = state.ImportMetadata

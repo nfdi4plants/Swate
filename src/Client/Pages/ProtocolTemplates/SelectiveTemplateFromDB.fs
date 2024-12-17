@@ -146,7 +146,7 @@ type SelectiveTemplateFromDB =
                 let templates = model.ProtocolState.TemplatesSelected
                 for templateIndex in 0..templates.Length-1 do
                     let template = templates.[templateIndex]
-                    SelectiveImportModal.TableImport(templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, importTypeState, setImportTypeState, template.Name, template.Name)
+                    SelectiveImportModal.TableImport(templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, importTypeState, setImportTypeState, template.Name)
                 Html.div [
                     SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton "Add templates" model importTypeState dispatch
                 ]
