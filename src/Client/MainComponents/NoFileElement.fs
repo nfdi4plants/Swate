@@ -204,7 +204,7 @@ type NoFileElement =
                     prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
                         let onTermSelect = fun (term) ->  log("SELECT!:", term)
-                        Components.TermSearchV2.TermSearch(onTermSelect, parentId = "test:xx")
+                        Components.TermSearchV2.TermSearch(onTermSelect, Components.Term.init("Test", "TEST"), parentId = "test:xx", displayParent = true)
                         // Helper.createNewFile args.dispatch
                         // Helper.uploadNewTable args.dispatch
                     ]
