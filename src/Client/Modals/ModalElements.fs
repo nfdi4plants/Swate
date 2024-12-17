@@ -5,7 +5,6 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
-open Types.TableImport
 
 open ARCtrl
 open JsonImport

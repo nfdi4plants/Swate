@@ -123,11 +123,7 @@ let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
                 timespan
         id <- Some timeoutId
 
-let charsToRemove = " -/\()[]{}"
-
-//Regex is incapable to remove the whitespaces
-let removeChars (stripChars:string) (text:string) =
-    text.Split(stripChars.ToCharArray(), StringSplitOptions.RemoveEmptyEntries) |> String.Concat
+let charsToRemove = "\s-"
 
 type Clipboard =
     abstract member writeText: string -> JS.Promise<unit>

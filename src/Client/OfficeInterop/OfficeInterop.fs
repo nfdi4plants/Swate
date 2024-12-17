@@ -997,9 +997,8 @@ let joinArcTablesInExcle (excelTable: Table) (arcTable:ArcTable) (templateName: 
         let tableSeqs = arcTable.ToStringSeqs()
 
         do! context.sync().``then``(fun _ ->
-            if templateName.IsSome then                            
-                //Should be updated to remove all kinds of extra symbols
-                let templateName = Helper.removeChars Helper.charsToRemove templateName.Value
+            if templateName.IsSome then
+                let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, Helper.charsToRemove, "")
                 newTable.name <- $"annotationTable{templateName}"
             else
                 newTable.name <- excelTable.name

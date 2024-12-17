@@ -65,7 +65,7 @@ type SelectiveImportModal =
                                             SelectiveImportModal.CheckBoxForTableColumnSelection(columns, tableIndex, columnIndex, selectionInformation.Value, setSelectedColumns.Value)
                                         Html.text (columns.[columnIndex].Header.ToString())
                                         Html.div [
-                                            prop.onClick (fun e ->
+                                            prop.onClick (fun _ ->
                                                 if columns.Length > 0 && selectionInformation.IsSome then
                                                     let selectedData = selectionInformation.Value.SelectedColumns
                                                     selectedData.[tableIndex].[columnIndex] <- not selectedData.[tableIndex].[columnIndex]
@@ -118,9 +118,10 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns, ?templateName) =
+    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns, ?templateName, ?radioGroup) =
         let name = defaultArg templateName table0.Name
-        let radioGroup = "radioGroup_" + name
+        let radioGroup = defaultArg radioGroup ""
+        let radioGroup = "radioGroup_" + radioGroup
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
         let isActive = import.IsSome
         let isDisabled = state.ImportMetadata

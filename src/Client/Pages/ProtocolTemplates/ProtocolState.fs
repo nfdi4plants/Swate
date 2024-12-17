@@ -71,7 +71,6 @@ module Protocol =
             let nextModel = {
                 model with
                     Model.ProtocolState.TemplatesSelected = templates
-                    //Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
             }
             state, Cmd.ofMsg (UpdateModel nextModel)
         | ProtocolIncreaseTimesUsed templateId ->
