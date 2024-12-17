@@ -177,6 +177,7 @@ type NoFileElement =
 
     [<ReactComponent>]
     static member Main (args: {|dispatch: Messages.Msg -> unit|}) =
+        let term, setTerm = React.useState (Components.Term.init("Test", "TEST:1234") |> Some)
         Html.div [
             prop.id UploadHandler.id
             prop.onDragEnter (fun e ->
@@ -203,8 +204,7 @@ type NoFileElement =
                 Html.div [
                     prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
-                        let onTermSelect = fun (term) ->  log("SELECT!:", term)
-                        Components.TermSearchV2.TermSearch(onTermSelect, Components.Term.init("Test", "TEST"), parentId = "test:xx", displayParent = true)
+                        Components.TermSearchV2.TermSearch(setTerm, ?term = term, parentId = "test:xx", advancedSearch = true)
                         // Helper.createNewFile args.dispatch
                         // Helper.uploadNewTable args.dispatch
                     ]

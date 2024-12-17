@@ -4,6 +4,9 @@ open Fable.Core
 open Feliz
 open Feliz.DaisyUI
 
+type private Modals =
+| AdvancedSearch
+| Details
 
 type Term = {
     Name: string option
@@ -234,6 +237,31 @@ type TermSearchV2 =
             ]
         ]
 
+    static member IndicatorItem(indicatorPosition, tooltip, tooltipPosition, icon: string, onclick) =
+        Html.span [
+            prop.className [
+                "indicator-item text-sm"
+                indicatorPosition
+            ]
+            prop.children [
+                Html.span [
+                    prop.className ["tooltip"; tooltipPosition]
+                    prop.custom("data-tip", tooltip)
+                    prop.children [
+                        Html.button [
+                            prop.onClick onclick
+                            prop.className "btn btn-xs btn-ghost px-2"
+                            prop.children [
+                                Html.i [
+                                    prop.className icon
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
     [<ExportDefaultAttribute; NamedParams>]
     static member TermSearch(
         onTermSelect: Term option -> unit,
@@ -242,17 +270,21 @@ type TermSearchV2 =
         ?termSearchQueries: ResizeArray<string * SearchCall>,
         ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
         ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
-        ?displayParent: bool,
+        ?advancedSearch: bool,
+        ?showDetails: bool,
         ?debug: bool
     ) =
 
-        let displayParent = defaultArg displayParent false
+        let showDetails = defaultArg showDetails false
+        let advancedSearch = defaultArg advancedSearch false
         let debug = defaultArg debug false
 
         let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
         let loading, setLoading = React.useStateWithUpdater(Set.empty)
         let inputRef = React.useInputRef()
         let containerRef = React.useRef(None)
+
+        let (modal: Modals option), setModal = React.useState None
 
         let onTermSelect = fun (term: Term option) ->
             if inputRef.current.IsSome then
@@ -361,45 +393,41 @@ type TermSearchV2 =
             parentSearch query
 
         React.useListener.onClickAway(containerRef, fun _ -> setSearchResults(fun _ -> SearchState.init()); cancel())
-        Html.label [
+        Html.div [
             prop.className "form-control"
             prop.children [
                 Html.div [
                     prop.className "indicator"
                     prop.children [
-                        if parentId.IsSome && displayParent then // parent indicator
-                            Html.span [
-                                prop.className "indicator-item indicator-bottom text-sm"
-                                prop.children [
-                                    Html.div [
-                                        prop.className "tooltip tooltip-right"
-                                        prop.custom("data-tip", sprintf "Parent: %s" parentId.Value)
-                                        prop.children [
-                                            Html.i [
-                                                prop.className "size-4 fa-solid fa-tag text-primary"
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
                         match term with
                         | Some { Name = Some name; Id = Some id } -> // full term indicator
                             if System.String.IsNullOrWhiteSpace id |> not then
-                                Html.span [
-                                prop.className "indicator-item text-sm"
-                                prop.children [
-                                    Html.div [
-                                        prop.className "tooltip tooltip-right"
-                                        prop.custom("data-tip", sprintf "Id: %s" id)
-                                        prop.children [
-                                            Html.i [
-                                                prop.className "size-4 fa-solid fa-square-check text-primary"
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        | _ -> Html.none
+                                TermSearchV2.IndicatorItem(
+                                    "",
+                                    sprintf "%s - %s" name id,
+                                    "tooltip-left",
+                                    "fa-solid fa-square-check text-primary",
+                                    fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
+                                )
+                        | _ when showDetails ->
+                            TermSearchV2.IndicatorItem(
+                                "",
+                                "Details",
+                                "tooltip-left",
+                                "fa-solid fa-circle-info text-primary",
+                                fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
+                            )
+                        | _ ->
+                            Html.none
+
+                        if advancedSearch then
+                            TermSearchV2.IndicatorItem(
+                                "indicator-bottom",
+                                "Advanced Search",
+                                "tooltip-left",
+                                "fa-solid fa-magnifying-glass-plus text-primary",
+                                fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch)
+                            )
 
                         Html.div [ // main search component
                             if debug then
