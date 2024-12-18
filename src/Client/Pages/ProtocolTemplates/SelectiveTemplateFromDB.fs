@@ -4,12 +4,17 @@ open Feliz
 open Feliz.DaisyUI
 open Model
 open Messages
-open Shared
 open ARCtrl
 open JsonImport
 
 type SelectiveTemplateFromDB =
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="adaptTableName"></param>
+    /// <param name="setAdaptTableName"></param>
+    /// <param name="templateName"></param>
     static member CheckBoxForTakeOverTemplateName(adaptTableName: SelectiveImportModalState, setAdaptTableName: SelectiveImportModalState -> unit, templateName) =
         Html.label [
             prop.className "join flex flex-row centered gap-2"
@@ -24,6 +29,11 @@ type SelectiveTemplateFromDB =
             ]
         ]
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="model"></param>
+    /// <param name="dispatch"></param>
     static member ToProtocolSearchElement(model: Model) dispatch =
         Daisy.button.button [
             prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
@@ -32,6 +42,15 @@ type SelectiveTemplateFromDB =
             prop.text "Browse database"
         ]
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="selectedTemplate"></param>
+    /// <param name="templateIndex"></param>
+    /// <param name="selectionInformation"></param>
+    /// <param name="setSelectedColumns"></param>
+    /// <param name="dispatch"></param>
+    /// <param name="hasIcon"></param>
     [<ReactComponent>]
     static member DisplaySelectedProtocolElements(selectedTemplate: Template option, templateIndex, selectionInformation: SelectiveImportModalState, setSelectedColumns: SelectiveImportModalState -> unit, dispatch, ?hasIcon: bool) =
         let hasIcon = defaultArg hasIcon true
@@ -47,6 +66,15 @@ type SelectiveTemplateFromDB =
             ]
         ]
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="model"></param>
+    /// <param name="selectionInformation"></param>
+    /// <param name="importType"></param>
+    /// <param name="useTemplateName"></param>
+    /// <param name="dispatch"></param>
     static member AddFromDBToTableButton name (model: Model) selectionInformation importType useTemplateName dispatch =
         let addTemplate (model: Model, selectedColumns) =
             let template =
@@ -70,6 +98,13 @@ type SelectiveTemplateFromDB =
             ]
         ]
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="model"></param>
+    /// <param name="importType"></param>
+    /// <param name="dispatch"></param>
     static member AddTemplatesFromDBToTableButton name (model: Model) importType dispatch =
         let addTemplates (model: Model, selectedColumns) =
             let templates = model.ProtocolState.TemplatesSelected
@@ -94,6 +129,11 @@ type SelectiveTemplateFromDB =
             ]
         ]
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="model"></param>
+    /// <param name="dispatch"></param>
     [<ReactComponent>]
     static member Main (model: Model, dispatch) =
         let importTypeState, setImportTypeState =
