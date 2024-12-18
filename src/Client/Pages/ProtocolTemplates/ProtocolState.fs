@@ -62,7 +62,6 @@ module Protocol =
             }
             state, Cmd.ofMsg (UpdateModel nextModel)
         | AddProtocol prot ->
-            log "AddProtocol"
             let templates =
                 if List.contains prot model.ProtocolState.TemplatesSelected then
                     model.ProtocolState.TemplatesSelected
