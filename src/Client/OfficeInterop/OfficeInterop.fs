@@ -996,13 +996,29 @@ let joinArcTablesInExcle (excelTable: Table) (arcTable:ArcTable) (templateName: 
 
         let tableSeqs = arcTable.ToStringSeqs()
 
-        do! context.sync().``then``(fun _ ->
-            if templateName.IsSome then
-                let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
-                newTable.name <- $"annotationTable{templateName}"
-            else
-                newTable.name <- excelTable.name
+        if templateName.IsSome then
+            let worksheets = context.workbook.worksheets
+            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
+            let _ =
+                activeWorksheet.load(propertyNames = U2.Case2 (ResizeArray["name"])) |> ignore
+                worksheets.load(propertyNames = U2.Case2 (ResizeArray["items"; "name"]))
 
+            do! context.sync()
+
+            let worksheetNames = worksheets.items |> Seq.map (fun item -> item.name) |> Array.ofSeq
+            let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
+
+            if (Array.contains templateName worksheetNames) then
+                let nameCount =
+                    worksheetNames
+                    |> Array.filter(fun item -> item.Contains(templateName))
+                    |> Array.length
+                let templateName = templateName + (nameCount.ToString())
+                activeWorksheet.name <- templateName
+            else
+                activeWorksheet.name <- templateName
+
+        do! context.sync().``then``(fun _ ->
             let headerNames =
                 let names = AnnotationTable.getHeaders tableSeqs
                 names
