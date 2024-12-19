@@ -31,7 +31,7 @@ let View (model : Model) (dispatch : Msg -> unit) =
             prop.className "flex w-full overflow-auto h-screen"
             prop.children [
                 Modals.ModalProvider.Main(model, dispatch)
-                match model.ProtocolState.IsHome, model.PersistentStorageState.Host with
+                match model.PageState.IsHome, model.PersistentStorageState.Host with
                 | false, _ ->
                     View.MainPageView.Main(model, dispatch)
                 | _, Some Swatehost.Excel ->

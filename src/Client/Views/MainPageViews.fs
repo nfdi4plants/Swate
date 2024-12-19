@@ -14,7 +14,7 @@ open MainPageUtil
 type MainPageView =
 
     static member DrawerSideContentItem (model: Model.Model, route: Routing.MainPage, onclick) =
-        let isActive = model.ProtocolState.MainPage = route
+        let isActive = model.PageState.MainPage = route
         Html.li [
             prop.onClick onclick
             prop.children [
@@ -35,7 +35,7 @@ type MainPageView =
                     prop.ariaLabel "Back to spreadsheet view"
                     button.link
                     button.sm
-                    prop.onClick (fun _ -> UpdateModel {model with Model.ProtocolState.MainPage = Routing.MainPage.Default} |> dispatch)
+                    prop.onClick (fun _ -> UpdateModel {model with Model.PageState.MainPage = Routing.MainPage.Default} |> dispatch)
                     prop.children [
                         Html.i [prop.className "fa-solid fa-arrow-left"]
                         Html.span "Back"
@@ -44,9 +44,9 @@ type MainPageView =
                 Html.ul [
                     prop.className "menu gap-y-1"
                     prop.children [
-                        MainPageView.DrawerSideContentItem(model, Routing.MainPage.Settings, fun _ -> UpdateModel {model with Model.ProtocolState.MainPage = Routing.MainPage.Settings} |> dispatch)
-                        MainPageView.DrawerSideContentItem(model, Routing.MainPage.About, fun _ -> UpdateModel {model with Model.ProtocolState.MainPage = Routing.MainPage.About} |> dispatch)
-                        MainPageView.DrawerSideContentItem(model, Routing.MainPage.PrivacyPolicy, fun _ -> UpdateModel {model with Model.ProtocolState.MainPage = Routing.MainPage.PrivacyPolicy} |> dispatch)
+                        MainPageView.DrawerSideContentItem(model, Routing.MainPage.Settings, fun _ -> UpdateModel {model with Model.PageState.MainPage = Routing.MainPage.Settings} |> dispatch)
+                        MainPageView.DrawerSideContentItem(model, Routing.MainPage.About, fun _ -> UpdateModel {model with Model.PageState.MainPage = Routing.MainPage.About} |> dispatch)
+                        MainPageView.DrawerSideContentItem(model, Routing.MainPage.PrivacyPolicy, fun _ -> UpdateModel {model with Model.PageState.MainPage = Routing.MainPage.PrivacyPolicy} |> dispatch)
                     ]
                 ]
             ]
@@ -78,7 +78,7 @@ type MainPageView =
 
             Html.div [
                 prop.ariaLabel "logo"
-                prop.onClick (fun _ -> UpdateModel {model with Model.ProtocolState.MainPage = Routing.MainPage.Default} |> dispatch)
+                prop.onClick (fun _ -> UpdateModel {model with Model.PageState.MainPage = Routing.MainPage.Default} |> dispatch)
                 prop.className "cursor-pointer"
                 prop.children [
                     Html.img [
@@ -90,7 +90,7 @@ type MainPageView =
         ]
 
     static member MainContent(model: Model.Model, dispatch) =
-        match model.ProtocolState.MainPage with
+        match model.PageState.MainPage with
         | Routing.MainPage.Settings ->
             Pages.Settings.Main(model, dispatch)
         | Routing.MainPage.About ->

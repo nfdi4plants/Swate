@@ -9,6 +9,7 @@ open Update
 
 let initialModel =
     {
+        PageState                   = PageState                 .init()
         PersistentStorageState      = PersistentStorageState    .init()
         DevState                    = DevState                  .init()
         TermSearchState             = TermSearch.Model          .init()

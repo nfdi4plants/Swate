@@ -231,7 +231,7 @@ type Widget =
 
         let content =
             let switchContent =
-                if model.ProtocolState.TemplatesSelected.Length > 0 && model.ProtocolState.WidgetTypes = Routing.WidgetTypes.Protocol then
+                if model.ProtocolState.TemplatesSelected.Length > 0 && model.PageState.SidebarPage = Routing.SidebarPage.Protocol then
                     insertContent()
                 else selectContent()
             Html.div [
