@@ -112,12 +112,16 @@ module Spreadsheet =
                     |> Array.mapi (fun i item -> if item = false then Some i else None)
                     |> Array.choose (fun x -> x)
                     |> List.ofArray
-
                 let cmd =
                     Table.selectiveTablePrepare state.ActiveTable table selectedColumnsIndices
                     |> msg
                     |> Cmd.ofMsg
                 state, model, cmd
+            | AddTemplates (tables, selectedColumns, importType) ->
+                let arcFile = model.SpreadsheetModel.ArcFile
+                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile selectedColumns
+                let nextState = {state with ArcFile = Some updatedArcFile}
+                nextState, model, Cmd.none
             | JoinTable (table, index, options, templateName) ->
                 let nextState = Controller.BuildingBlocks.joinTable table index options state templateName
                 nextState, model, Cmd.none

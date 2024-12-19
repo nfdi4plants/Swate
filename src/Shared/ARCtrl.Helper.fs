@@ -83,10 +83,25 @@ module Table =
         tablecopy
 
     /// <summary>
+    /// Convert one array of cell types to another one, based on the first array of cell types
+    /// </summary>
+    /// <param name="cellsOrigin"></param>
+    /// <param name="cellsToAdd"></param>
+    let convertCellTypes (cellsOrigin: CompositeCell []) (cellsToAdd: CompositeCell []) =
+        let newCellsToAdd = cellsToAdd
+        for i in 0..cellsOrigin.Length - 1 do
+            if cellsOrigin.[i].isFreeText then
+                if cellsToAdd.[i].isData then
+                    newCellsToAdd.[i] <- cellsToAdd.[i].ToDataCell()
+            else
+                if cellsToAdd.[i].isFreeText then
+                    newCellsToAdd.[i] <- cellsToAdd.[i].ToFreeTextCell()
+        newCellsToAdd
+
+    /// <summary>
     /// This function is meant to prepare a table for joining with another table.
     ///
     /// It removes columns that are already present in the active table.
-    /// It removes all values from the new table.
     /// It also fills new Input/Output columns with the input/output values of the active table.
     ///
     /// The output of this function can be used with the SpreadsheetInterface.JoinTable Message.
@@ -107,6 +122,7 @@ module Table =
         let columnsToRemove = columnsToRemove |> Set.ofList |> Set.toList
 
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
+        
         tablecopy.IteriColumns(fun i c0 ->
             let c1 = {c0 with Cells = tablecopy.Columns.[i].Cells}
             let c2 =
