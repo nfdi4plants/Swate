@@ -4,7 +4,7 @@ open Elmish.UrlParser
 open Feliz
 
 [<RequireQualifiedAccess>]
-type SidebarPage =
+type WidgetTypes =
     | BuildingBlock
     | TermSearch
     | FilePicker

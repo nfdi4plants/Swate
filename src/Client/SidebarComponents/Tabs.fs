@@ -9,12 +9,12 @@ open Feliz.DaisyUI
 
 type Tabs =
 
-    static member private NavigationTab (pageLink: Routing.SidebarPage) (model:Model) (dispatch:Msg-> unit) =
-        let isActive = pageLink = model.PageState.SidebarPage
+    static member private NavigationTab (pageLink: Routing.WidgetTypes) (model:Model) (dispatch:Msg-> unit) =
+        let isActive = pageLink = model.ProtocolState.WidgetTypes
         Daisy.tab [
             if isActive then tab.active
             prop.className "navigation" // this class does not do anything, but disables <a> styling.
-            prop.onClick (fun e -> e.preventDefault(); UpdateModel { model with Model.PageState.SidebarPage = pageLink } |> dispatch)
+            prop.onClick (fun e -> e.preventDefault(); UpdateModel { model with Model.ProtocolState.WidgetTypes = pageLink } |> dispatch)
             prop.children (pageLink.AsIcon())
         ]
 
@@ -25,11 +25,11 @@ type Tabs =
             tabs.boxed
             prop.className "w-full"
             prop.children [
-                Tabs.NavigationTab Routing.SidebarPage.BuildingBlock     model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.TermSearch        model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.Protocol          model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.FilePicker        model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.DataAnnotator     model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.JsonExport        model dispatch
+                Tabs.NavigationTab Routing.WidgetTypes.BuildingBlock     model dispatch
+                Tabs.NavigationTab Routing.WidgetTypes.TermSearch        model dispatch
+                Tabs.NavigationTab Routing.WidgetTypes.Protocol          model dispatch
+                Tabs.NavigationTab Routing.WidgetTypes.FilePicker        model dispatch
+                Tabs.NavigationTab Routing.WidgetTypes.DataAnnotator     model dispatch
+                Tabs.NavigationTab Routing.WidgetTypes.JsonExport        model dispatch
             ]
         ]

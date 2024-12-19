@@ -52,7 +52,7 @@ type NavbarBurger =
     [<ReactComponent>]
     static member private Dropdown(isOpen, setIsOpen, model: Model.Model, dispatch) =
 
-        let navigateTo = fun (mainPage: Routing.MainPage) -> {model with Model.PageState.MainPage = mainPage} |> Messages.UpdateModel |> dispatch
+        let navigateTo = fun (mainPage: Routing.MainPage) -> {model with Model.ProtocolState.MainPage = mainPage} |> Messages.UpdateModel |> dispatch
         Components.BaseDropdown.Main(
             isOpen,
             setIsOpen,

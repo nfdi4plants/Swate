@@ -125,20 +125,6 @@ type PersistentStorageState = {
         HasOntologiesLoaded     = false
     }
 
-type PageState = {
-    SidebarPage : Routing.SidebarPage
-    MainPage: Routing.MainPage
-} with
-    static member init () =
-        {
-            SidebarPage = SidebarPage.BuildingBlock
-            MainPage = MainPage.Default
-        }
-    member this.IsHome =
-        match this.MainPage with
-        | MainPage.Default  -> true
-        | _                 -> false
-
 module FilePicker =
     type Model = {
         FileNames   : (int*string) list
@@ -248,6 +234,8 @@ module Protocol =
         // ------ Protocol from Database ------
         TemplatesSelected   : ARCtrl.Template list
         Templates           : ARCtrl.Template []
+        WidgetTypes         : Routing.WidgetTypes
+        MainPage            : Routing.MainPage
     } with
         static member init () = {
             // Client
@@ -256,7 +244,13 @@ module Protocol =
             TemplatesSelected   = []
             // ------ Protocol from Database ------
             Templates           = [||]
+            WidgetTypes         = WidgetTypes.BuildingBlock
+            MainPage            = MainPage.Default
         }
+        member this.IsHome =
+            match this.MainPage with
+            | MainPage.Default  -> true
+            | _                 -> false
 
 type RequestBuildingBlockInfoStates =
 | Inactive
@@ -269,8 +263,6 @@ type RequestBuildingBlockInfoStates =
         | RequestDataBaseInformation    -> "Search Database "
 
 type Model = {
-    ///PageState
-    PageState               : PageState
     ///Data that needs to be persistent once loaded
     PersistentStorageState  : PersistentStorageState
     ///Error handling, Logging, etc.

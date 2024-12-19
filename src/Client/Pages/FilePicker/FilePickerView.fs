@@ -14,7 +14,7 @@ let update (filePickerMsg:FilePicker.Msg) (state: FilePicker.Model) (model: Mode
         let nextModel = {
             model with
                 Model.FilePickerState.FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
-                Model.PageState.SidebarPage = Routing.SidebarPage.FilePicker
+                Model.ProtocolState.WidgetTypes = Routing.WidgetTypes.FilePicker
         }
         let nextCmd = UpdateModel nextModel|> Cmd.ofMsg
         state, nextCmd

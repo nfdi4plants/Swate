@@ -14,26 +14,26 @@ type SidebarView =
         Html.div [
             prop.className "grow overflow-y-auto"
             prop.children [
-                match model.PageState with
-                | {SidebarPage = Routing.SidebarPage.BuildingBlock } ->
+                match model.ProtocolState with
+                | {WidgetTypes = Routing.WidgetTypes.BuildingBlock } ->
                     BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
-                | {SidebarPage = Routing.SidebarPage.TermSearch } ->
+                | {WidgetTypes = Routing.WidgetTypes.TermSearch } ->
                     TermSearch.Main (model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.FilePicker } ->
+                | {WidgetTypes = Routing.WidgetTypes.FilePicker } ->
                     FilePicker.filePickerComponent model dispatch
 
-                | {SidebarPage = Routing.SidebarPage.Protocol } ->
+                | {WidgetTypes = Routing.WidgetTypes.Protocol } ->
                     Protocol.Templates.Main (model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.DataAnnotator } ->
+                | {WidgetTypes = Routing.WidgetTypes.DataAnnotator } ->
                     Pages.DataAnnotator.Main(model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.JsonExport } ->
+                | {WidgetTypes = Routing.WidgetTypes.JsonExport } ->
                     JsonExporter.Core.FileExporter.Main(model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.ProtocolSearch } ->
+                | {WidgetTypes = Routing.WidgetTypes.ProtocolSearch } ->
                     Protocol.SearchContainer.Main model dispatch
             ]
         ]

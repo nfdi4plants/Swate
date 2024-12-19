@@ -57,8 +57,8 @@ module Protocol =
             log "SelectProtocols"
             let nextModel = {
                 model with
-                    Model.ProtocolState.TemplatesSelected = prots
-                    Model.PageState.SidebarPage = Routing.SidebarPage.Protocol
+                    Model.ProtocolState.TemplatesSelected   = prots
+                    Model.ProtocolState.WidgetTypes         = Routing.WidgetTypes.Protocol
             }
             state, Cmd.ofMsg (UpdateModel nextModel)
         | AddProtocol prot ->
@@ -69,7 +69,8 @@ module Protocol =
                     prot::model.ProtocolState.TemplatesSelected
             let nextState = {
                 state with
-                    TemplatesSelected = templates
+                    TemplatesSelected   = templates
+                    WidgetTypes         = Routing.WidgetTypes.ProtocolSearch
             }
             nextState, Cmd.none
         | ProtocolIncreaseTimesUsed templateId ->

@@ -980,6 +980,34 @@ let prepareTemplateInMemory (originTable: ArcTable) (tableToAdd: ArcTable) (sele
 
     finalTable
 
+/// <summary>
+/// Checks whether the given worksheet name exists or not and updates it, when it already exists by adding a number
+/// </summary>
+/// <param name="templateName"></param>
+/// <param name="context"></param>
+let getNewActiveWorkSheetName (worksheetName: string) (context: RequestContext) =
+    promise {
+        let worksheets = context.workbook.worksheets
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
+        let _ =
+            activeWorksheet.load(propertyNames = U2.Case2 (ResizeArray["name"])) |> ignore
+            worksheets.load(propertyNames = U2.Case2 (ResizeArray["items"; "name"]))
+
+        do! context.sync()
+
+        let worksheetNames = worksheets.items |> Seq.map (fun item -> item.name) |> Array.ofSeq
+        let worksheetName = System.Text.RegularExpressions.Regex.Replace(worksheetName, "\W", "")
+
+        if (Array.contains worksheetName worksheetNames) then
+            let nameCount =
+                worksheetNames
+                |> Array.filter(fun item -> item.Contains(worksheetName))
+                |> Array.length
+            return (worksheetName + (nameCount.ToString()))
+        else
+            return worksheetName
+    }
+
 let joinArcTablesInExcle (excelTable: Table) (arcTable:ArcTable) (templateName: string option) (context: RequestContext) =
     promise {
         let newTableRange = excelTable.getRange()
@@ -997,26 +1025,13 @@ let joinArcTablesInExcle (excelTable: Table) (arcTable:ArcTable) (templateName: 
         let tableSeqs = arcTable.ToStringSeqs()
 
         if templateName.IsSome then
-            let worksheets = context.workbook.worksheets
+            let! workSheetName = getNewActiveWorkSheetName templateName.Value context
             let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
-            let _ =
-                activeWorksheet.load(propertyNames = U2.Case2 (ResizeArray["name"])) |> ignore
-                worksheets.load(propertyNames = U2.Case2 (ResizeArray["items"; "name"]))
+            let _ = activeWorksheet.load(propertyNames = U2.Case2 (ResizeArray["name"]))
 
             do! context.sync()
 
-            let worksheetNames = worksheets.items |> Seq.map (fun item -> item.name) |> Array.ofSeq
-            let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
-
-            if (Array.contains templateName worksheetNames) then
-                let nameCount =
-                    worksheetNames
-                    |> Array.filter(fun item -> item.Contains(templateName))
-                    |> Array.length
-                let templateName = templateName + (nameCount.ToString())
-                activeWorksheet.name <- templateName
-            else
-                activeWorksheet.name <- templateName
+            activeWorksheet.name <- workSheetName
 
         do! context.sync().``then``(fun _ ->
             let headerNames =
@@ -1189,12 +1204,16 @@ let addTemplates (tablesToAdd: ArcTable[]) (selectedColumnsCollection: bool [] [
                 originTable.Join(endTable, ?joinOptions = options)
                 originTable
 
-            let activeWorksheet =
-                if i = 0 && result.IsNone then context.workbook.worksheets.getActiveWorksheet()
+            let! activeWorksheet =
+                if i = 0 && result.IsNone then
+                    promise { return context.workbook.worksheets.getActiveWorksheet() }
                 else
-                    let newWorkSheet = context.workbook.worksheets.add(tableToAdd.Name)
-                    newWorkSheet.activate()
-                    newWorkSheet
+                    promise {
+                        let! workSheetName = getNewActiveWorkSheetName tableToAdd.Name context
+                        let newWorkSheet = context.workbook.worksheets.add(workSheetName)
+                        newWorkSheet.activate()
+                        return newWorkSheet
+                    }
 
             let tableValues = finalTable.ToStringSeqs()
             let range = activeWorksheet.getRangeByIndexes(0, 0, float (finalTable.RowCount + 1), (tableValues.Item 0).Count)                
@@ -1245,6 +1264,8 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
 
                     if msgAdd.IsEmpty then                        
                         return msgJoin
+                    else if msgJoin.IsEmpty then
+                        return msgAdd
                     else
                         return [msgJoin.Head; msgAdd.Head]
             | None ->
