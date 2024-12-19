@@ -21,8 +21,7 @@ module private HelperProtocolSearch =
                     Html.li [
                         prop.className "is-active"
                         prop.children (Html.a [
-                            prop.onClick (fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
-                            prop.text (Routing.SidebarPage.ProtocolSearch.AsStringRdbl)
+                            prop.onClick (fun _ -> UpdateModel {model with Model.ProtocolState.IsProtocolSearch = true} |> dispatch)
                         ])
                     ]
                 ]

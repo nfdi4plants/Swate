@@ -9,7 +9,6 @@ type SidebarPage =
     | TermSearch
     | FilePicker
     | Protocol
-    | ProtocolSearch
     | JsonExport
     | DataAnnotator
 
@@ -19,7 +18,6 @@ type SidebarPage =
         | TermSearch        -> "Terms"
         | FilePicker        -> "File Picker"
         | Protocol          -> "Templates"
-        | ProtocolSearch    -> "Template Search"
         | JsonExport        -> "Json Export"
         | DataAnnotator     -> "Data Annotator"
 
@@ -37,8 +35,6 @@ type SidebarPage =
             createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ]; Html.i [prop.className "fa-solid fa-table-columns" ]]
         | Protocol          ->
             createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]]
-        | ProtocolSearch    ->
-            createElem [ Html.i [prop.className "fa-solid fa-table" ]; Html.i [prop.className "fa-solid fa-magnifying-glass" ]]
         | JsonExport        ->
             createElem [ Html.i [prop.className "fa-solid fa-file-export" ]]
         | FilePicker        ->

@@ -36,7 +36,7 @@ type SelectiveTemplateFromDB =
     /// <param name="dispatch"></param>
     static member ToProtocolSearchElement(model: Model) dispatch =
         Daisy.button.button [
-            prop.onClick(fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.ProtocolSearch} |> dispatch)
+            prop.onClick(fun _ -> UpdateModel {model with Model.ProtocolState.IsProtocolSearch = true} |> dispatch)
             button.primary
             button.block
             prop.text "Browse database"

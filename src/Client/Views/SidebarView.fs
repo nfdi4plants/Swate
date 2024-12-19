@@ -14,27 +14,27 @@ type SidebarView =
         Html.div [
             prop.className "grow overflow-y-auto"
             prop.children [
-                match model.PageState with
-                | {SidebarPage = Routing.SidebarPage.BuildingBlock } ->
-                    BuildingBlock.Core.addBuildingBlockComponent model dispatch
-
-                | {SidebarPage = Routing.SidebarPage.TermSearch } ->
-                    TermSearch.Main (model, dispatch)
-
-                | {SidebarPage = Routing.SidebarPage.FilePicker } ->
-                    FilePicker.filePickerComponent model dispatch
-
-                | {SidebarPage = Routing.SidebarPage.Protocol } ->
-                    Protocol.Templates.Main (model, dispatch)
-
-                | {SidebarPage = Routing.SidebarPage.DataAnnotator } ->
-                    Pages.DataAnnotator.Main(model, dispatch)
-
-                | {SidebarPage = Routing.SidebarPage.JsonExport } ->
-                    JsonExporter.Core.FileExporter.Main(model, dispatch)
-
-                | {SidebarPage = Routing.SidebarPage.ProtocolSearch } ->
+                if model.ProtocolState.IsProtocolSearch then
                     Protocol.SearchContainer.Main model dispatch
+                else
+                    match model.PageState with
+                    | {SidebarPage = Routing.SidebarPage.BuildingBlock } ->
+                        BuildingBlock.Core.addBuildingBlockComponent model dispatch
+
+                    | {SidebarPage = Routing.SidebarPage.TermSearch } ->
+                        TermSearch.Main (model, dispatch)
+
+                    | {SidebarPage = Routing.SidebarPage.FilePicker } ->
+                        FilePicker.filePickerComponent model dispatch
+
+                    | {SidebarPage = Routing.SidebarPage.Protocol } ->
+                        Protocol.Templates.Main (model, dispatch)
+
+                    | {SidebarPage = Routing.SidebarPage.DataAnnotator } ->
+                        Pages.DataAnnotator.Main(model, dispatch)
+
+                    | {SidebarPage = Routing.SidebarPage.JsonExport } ->
+                        JsonExporter.Core.FileExporter.Main(model, dispatch)
             ]
         ]
 
