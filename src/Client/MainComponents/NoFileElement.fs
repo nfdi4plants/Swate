@@ -177,7 +177,17 @@ type NoFileElement =
 
     [<ReactComponent>]
     static member Main (args: {|dispatch: Messages.Msg -> unit|}) =
-        let term, setTerm = React.useState (Components.Term.init("Test", "TEST:1234") |> Some)
+        let term, setTerm = React.useState (None)
+        let advancedSearchState, setAdvancedSearchState = React.useState ("")
+        let input (cc: Components.AdvancedSearchController) =
+            Html.input [
+                prop.className "input input-bordered"
+                prop.type'.text
+                prop.autoFocus true
+                prop.value advancedSearchState
+                prop.onChange (fun e -> setAdvancedSearchState e)
+                prop.onKeyDown (key.enter, fun _ -> cc.StartSearch())
+            ]
         Html.div [
             prop.id UploadHandler.id
             prop.onDragEnter (fun e ->
@@ -204,7 +214,17 @@ type NoFileElement =
                 Html.div [
                     prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
-                        Components.TermSearchV2.TermSearch(setTerm, ?term = term, parentId = "test:xx", advancedSearch = true)
+                        let advancedSearch : Components.AdvancedSearch<string> = {
+                            Input = advancedSearchState;
+                            Search = fun s -> promise {
+                                return ResizeArray([
+                                    for i in 1..300 do
+                                        Components.Term.init (s + "_" + string i)
+                                ])
+                            };
+                            Form = fun cc -> input cc
+                        }
+                        Components.TermSearchV2.TermSearch(setTerm, term, parentId = "test:xx", advancedSearch = advancedSearch, showDetails = true, debug = true)
                         // Helper.createNewFile args.dispatch
                         // Helper.uploadNewTable args.dispatch
                     ]
