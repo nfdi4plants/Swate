@@ -231,10 +231,10 @@ type Widget =
 
         let content =
             let switchContent =
-                if model.ProtocolState.TemplatesSelected.Length > 0 && not model.ProtocolState.IsProtocolSearch then
-                    insertContent ()
-                else
+                if model.ProtocolState.IsProtocolSearch then
                     selectContent ()
+                else
+                    insertContent ()
             Html.div [
                 prop.className "flex flex-col gap-4 @container/templateWidget"
                 prop.children switchContent

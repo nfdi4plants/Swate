@@ -38,9 +38,12 @@ type Templates =
             // Box 1
             SidebarComponents.SidebarLayout.Description "Add template from database."
 
-            SidebarComponents.SidebarLayout.LogicContainer [
-                Modals.SelectiveTemplateFromDB.Main(model, dispatch)
-            ]
+            if model.ProtocolState.IsProtocolSearch then
+                Protocol.SearchContainer.Main model dispatch
+            else
+                SidebarComponents.SidebarLayout.LogicContainer [
+                    Modals.SelectiveTemplateFromDB.Main(model, dispatch)
+                ]
 
             // Box 2
             SidebarComponents.SidebarLayout.Description (Html.p [

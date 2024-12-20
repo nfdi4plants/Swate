@@ -70,7 +70,6 @@ module Protocol =
             let nextState = {
                 state with
                     TemplatesSelected   = templates
-                    IsProtocolSearch    = true
             }
             nextState, Cmd.none
         | ProtocolIncreaseTimesUsed templateId ->
