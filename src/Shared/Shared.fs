@@ -10,7 +10,7 @@ open DTOs.ParentTermQuery
 module Regex =
 
     open System.Text.RegularExpressions
-    
+
     /// (|Regex|_|) pattern input
     let (|Regex|_|) pattern input =
         let m = Regex.Match(input, pattern)
@@ -20,15 +20,21 @@ module Regex =
 module Route =
 
     let builder typeName methodName =
-        sprintf "/api/%s/%s" typeName methodName
+        let prefix = // This is required to publishing components with production url while maintaining flexible approach in full stack environment
+            #if PUBLISH_COMPONENTS
+            "https://swate-alpha.nfdi4plants.org"
+            #else
+            ""
+            #endif
+        sprintf "%s/api/%s/%s" prefix typeName methodName
 
 module SorensenDice =
-    
+
     let inline calculateDistance (x : Set<'T>) (y : Set<'T>) =
         match  (x.Count, y.Count) with
         | (0, 0) -> 1.
         | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
-    
+
     let createBigrams (s:string) =
         s
             .ToUpperInvariant()
@@ -82,7 +88,7 @@ module SwateObsolete =
         module Pattern =
 
             module MatchGroups =
-        
+
                 [<Literal>]
                 let numberFormat = "numberFormat"
 
@@ -149,7 +155,7 @@ module SwateObsolete =
                 value.Value.Trim().[1..value.Length-2]
                 // remove #id pattern
                 |> fun str -> Regex.Replace(str, IdPattern, "")
-                |> Some 
+                |> Some
             | _ ->
                 None
 

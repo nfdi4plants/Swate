@@ -310,7 +310,7 @@ type TermSearchV2 =
             prop.text str
         ]
         let content = Html.div [
-            prop.className "grid grid-cols-1 md:grid-cols-2 gap-2"
+            prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
             prop.children [
                 label "Name"
                 Html.div (Option.defaultValue "<no-name>" term.Name)
@@ -653,7 +653,6 @@ type TermSearchV2 =
                                             startSearch inputRef.current.Value.value
                                     )
                                     prop.onKeyDown (key.escape, fun _ ->
-                                        log "Escape"
                                         cancel()
                                     )
                                 ]

@@ -4,14 +4,14 @@ open Shared.Database
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl
-open Shared
 open Components
+open Shared
 
 
 module private TermModalUtil =
     type State =
         | Loading
-        | Found of Term
+        | Found of Database.Term
         | NotFound
 
 open TermModalUtil

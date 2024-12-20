@@ -5,14 +5,12 @@
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="GenericComponents.fs" />
     <None Include="tailwind.config.js" />
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
     <Compile Include="Types.fs" />
     <Compile Include="Helper.fs" />
-    <Compile Include="React.useListener.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
@@ -75,7 +73,6 @@
     <Compile Include="SharedComponents\Metadata\Template.fs" />
     <Compile Include="SharedComponents\BaseNavbar.fs" />
     <Compile Include="SharedComponents\NavbarBurger.fs" />
-    <Compile Include="SharedComponents\TermSearchV2.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />
     <Compile Include="SidebarComponents\Tabs.fs" />
     <Compile Include="SidebarComponents\Navbar.fs" />
@@ -129,7 +126,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Components\Components.fsproj" />
-    <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ARCtrl.Javascript" Version="2.2.4" />

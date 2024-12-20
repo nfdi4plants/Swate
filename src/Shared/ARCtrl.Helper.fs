@@ -453,7 +453,7 @@ module Extensions =
         member this.ToTabStr() = this.GetContentSwate() |> String.concat "\t"
 
         static member fromTabStr (str:string) (header: CompositeHeader) =
-            let content = str.Split('\t', System.StringSplitOptions.TrimEntries)
+            let content = str.Split('\t') |> Array.map _.Trim()
             CompositeCell.fromContentValid(content, header)
 
         static member ToTabTxt (cells: CompositeCell []) =
@@ -462,7 +462,7 @@ module Extensions =
             |> String.concat (System.Environment.NewLine)
 
         static member fromTabTxt (tabTxt: string) (header: CompositeHeader) =
-            let lines = tabTxt.Split(System.Environment.NewLine, System.StringSplitOptions.None)
+            let lines = tabTxt.Split([|System.Environment.NewLine|], System.StringSplitOptions.None)
             let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr line header)
             cells
 
