@@ -248,7 +248,6 @@ module Protocol =
         // ------ Protocol from Database ------
         TemplatesSelected   : ARCtrl.Template list
         Templates           : ARCtrl.Template []
-        IsProtocolSearch      : bool
     } with
         static member init () = {
             // Client
@@ -257,7 +256,6 @@ module Protocol =
             TemplatesSelected   = []
             // ------ Protocol from Database ------
             Templates           = [||]
-            IsProtocolSearch    = false
         }
 
 type RequestBuildingBlockInfoStates =

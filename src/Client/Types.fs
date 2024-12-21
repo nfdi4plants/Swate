@@ -17,12 +17,12 @@ module JsonImport =
         SelectedColumns: bool [] []
         TemplateName: string option
     } with
-        static member init(selectedColumns) =
+        static member init() =
             {
                 ImportType = ARCtrl.TableJoinOptions.Headers
                 ImportMetadata = false
                 ImportTables = []
-                SelectedColumns = selectedColumns
+                SelectedColumns = Array.empty
                 TemplateName = None
             }
 

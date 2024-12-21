@@ -10,6 +10,8 @@ open Feliz.DaisyUI
 
 open Modals
 
+open JsonImport
+
 /// Fields of Template that can be searched
 [<RequireQualifiedAccess>]
 type SearchFields =
@@ -321,7 +323,7 @@ module ComponentAux =
 
     let createAuthorsStringHelper (authors: ResizeArray<Person>) = authors |> Seq.map createAuthorStringHelper |> String.concat ", "
 
-    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) dispatch  =
+    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) setProtocolSearch (importTypeState: SelectiveImportModalState) setImportTypeState dispatch  =
         [
             Html.tr [
                 prop.key $"{i}_{template.Id}"
@@ -394,6 +396,9 @@ module ComponentAux =
                                 Daisy.button.a [
                                     button.sm
                                     prop.onClick (fun _ ->
+                                        setProtocolSearch false
+                                        let columns =  [|Array.init template.Table.Columns.Length (fun _ -> true)|]
+                                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
                                         SelectProtocols [template] |> ProtocolMsg |> dispatch
                                     )
                                     button.wide
@@ -562,13 +567,20 @@ type Search =
                         Html.div [ yield! [prop.text $"\"{names.[i]}\""]]
                 ]
             ]
-    static member private selectTemplatesButton model dispatch =
+
+    static member private selectTemplatesButton model setProtocolSearch importTypeState setImportTypeState dispatch =
         Html.div [
             prop.className "flex justify-center gap-2"
             prop.children [
                 Daisy.button.a [
                     button.sm
                     prop.onClick (fun _ ->
+                        setProtocolSearch false
+                        let columns =
+                            model.ProtocolState.TemplatesSelected
+                            |> Array.ofSeq
+                            |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
+                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                     )
                     button.wide
@@ -580,7 +592,8 @@ type Search =
                 ]
             ]
         ]
-    static member SelectedTemplatesElement model dispatch =
+
+    static member SelectedTemplatesElement model setProtocolSearch importTypeState setImportTypeState dispatch =
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
             prop.children [
@@ -589,12 +602,12 @@ type Search =
                             Search.displayTemplateNames model
                         ]
                 ]
-                Search.selectTemplatesButton model dispatch
+                Search.selectTemplatesButton model setProtocolSearch importTypeState setImportTypeState dispatch
             ]
         ]
 
     [<ReactComponent>]
-    static member Component (templates, model: Model, dispatch, ?maxheight: Styles.ICssUnit) =
+    static member Component (templates, model: Model, setProtocolSearch, (importTypeState: SelectiveImportModalState), setImportTypeState, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
         let showIds, setShowIds = React.useState(fun _ -> [])
         Html.div [
@@ -639,7 +652,7 @@ type Search =
                                         let setIsShown (show: bool) =
                                             if show then i::showIds |> setShowIds else showIds |> List.filter (fun id -> id <> i) |> setShowIds
                                         yield!
-                                            protocolElement i templates.[i] isShown setIsShown model dispatch
+                                            protocolElement i templates.[i] isShown setIsShown model setProtocolSearch importTypeState setImportTypeState dispatch
                         ]
                     ]
                 ]

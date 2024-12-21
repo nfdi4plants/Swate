@@ -34,9 +34,11 @@ type SelectiveTemplateFromDB =
     /// </summary>
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
-    static member ToProtocolSearchElement(model: Model) dispatch =
+    static member ToProtocolSearchElement(model: Model) setProtocolSearch dispatch =
         Daisy.button.button [
-            prop.onClick(fun _ -> UpdateModel {model with Model.ProtocolState.IsProtocolSearch = true} |> dispatch)
+            prop.onClick(fun _ ->
+                setProtocolSearch true
+                UpdateModel model |> dispatch)
             button.primary
             button.block
             prop.text "Browse database"
@@ -51,7 +53,6 @@ type SelectiveTemplateFromDB =
     /// <param name="setSelectedColumns"></param>
     /// <param name="dispatch"></param>
     /// <param name="hasIcon"></param>
-    [<ReactComponent>]
     static member DisplaySelectedProtocolElements(selectedTemplate: Template option, templateIndex, selectionInformation: SelectiveImportModalState, setSelectedColumns: SelectiveImportModalState -> unit, dispatch, ?hasIcon: bool) =
         let hasIcon = defaultArg hasIcon true
         Html.div [
@@ -75,7 +76,7 @@ type SelectiveTemplateFromDB =
     /// <param name="importType"></param>
     /// <param name="useTemplateName"></param>
     /// <param name="dispatch"></param>
-    static member AddFromDBToTableButton name (model: Model) selectionInformation importType useTemplateName dispatch =
+    static member AddFromDBToTableButton name (model: Model) selectionInformation importType setImportType useTemplateName protocolSearchState setProtocolSearch dispatch =
         let addTemplate (model: Model, selectedColumns) =
             let template =
                 if model.ProtocolState.TemplatesSelected.Length = 0 then
@@ -91,7 +92,10 @@ type SelectiveTemplateFromDB =
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Daisy.button.a [
                         button.outline
-                        prop.onClick (fun _ -> Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch)
+                        prop.onClick (fun _ ->
+                            Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
+                            {importType with SelectedColumns = Array.empty} |> setImportType
+                            setProtocolSearch protocolSearchState)
                         button.error
                         Html.i [prop.className "fa-solid fa-times"] |> prop.children
                     ]
@@ -105,7 +109,7 @@ type SelectiveTemplateFromDB =
     /// <param name="model"></param>
     /// <param name="importType"></param>
     /// <param name="dispatch"></param>
-    static member AddTemplatesFromDBToTableButton name (model: Model) importType dispatch =
+    static member AddTemplatesFromDBToTableButton name (model: Model) importType setImportType protocolSearchState setProtocolSearch dispatch =
         let addTemplates (model: Model, selectedColumns) =
             let templates = model.ProtocolState.TemplatesSelected
             if templates.Length = 0 then
@@ -122,7 +126,10 @@ type SelectiveTemplateFromDB =
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Daisy.button.a [
                         button.outline
-                        prop.onClick (fun _ -> Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch)
+                        prop.onClick (fun _ ->
+                            Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
+                            {importType with SelectedColumns = Array.empty} |> setImportType
+                            setProtocolSearch protocolSearchState)
                         button.error
                         Html.i [prop.className "fa-solid fa-times"] |> prop.children
                     ]
@@ -135,13 +142,7 @@ type SelectiveTemplateFromDB =
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
     [<ReactComponent>]
-    static member Main (model: Model, dispatch) =
-        let importTypeState, setImportTypeState =
-            let columns =
-                model.ProtocolState.TemplatesSelected
-                |> Array.ofSeq
-                |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
-            React.useState(SelectiveImportModalState.init columns)
+    static member Main (model: Model, protocolSearchState, setProtocolSearch, importTypeState, setImportTypeState, dispatch) =
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)
@@ -150,7 +151,7 @@ type SelectiveTemplateFromDB =
             {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
         React.fragment [
             Html.div [
-                SelectiveTemplateFromDB.ToProtocolSearchElement model dispatch
+                SelectiveTemplateFromDB.ToProtocolSearchElement model setProtocolSearch dispatch
             ]
             if model.ProtocolState.TemplatesSelected.Length > 0 then
                 SelectiveImportModal.RadioPluginsBox(
@@ -180,7 +181,7 @@ type SelectiveTemplateFromDB =
                         SelectiveTemplateFromDB.DisplaySelectedProtocolElements(Some template, 0, importTypeState, setImportTypeState, dispatch, false))
                 ]
                 Html.div [
-                    SelectiveTemplateFromDB.AddFromDBToTableButton "Add template" model importTypeState importTypeState importTypeState.TemplateName dispatch
+                    SelectiveTemplateFromDB.AddFromDBToTableButton "Add template" model importTypeState importTypeState setImportTypeState importTypeState.TemplateName protocolSearchState setProtocolSearch dispatch
                 ]
             else if model.ProtocolState.TemplatesSelected.Length > 1 then
                 let templates = model.ProtocolState.TemplatesSelected
@@ -188,6 +189,6 @@ type SelectiveTemplateFromDB =
                     let template = templates.[templateIndex]
                     SelectiveImportModal.TableImport(templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, importTypeState, setImportTypeState, template.Name)
                 Html.div [
-                    SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton "Add templates" model importTypeState dispatch
+                    SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton "Add templates" model importTypeState setImportTypeState protocolSearchState setProtocolSearch dispatch
                 ]
         ]

@@ -75,5 +75,4 @@ module Routing =
             map Route.Home                  (s "" <?> intParam "is_swatehost")
         ]
 
-
     let parsePath (location:Browser.Types.Location) : Route option = Elmish.UrlParser.parsePath route location

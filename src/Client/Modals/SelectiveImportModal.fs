@@ -177,7 +177,7 @@ type SelectiveImportModal =
                 tables
                 |> Array.ofSeq
                 |> Array.map (fun t -> Array.init t.Columns.Length (fun _ -> true))
-        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init columns)
+        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init())
         let setMetadataImport = fun b ->
             if b then
                 {
@@ -186,7 +186,7 @@ type SelectiveImportModal =
                         ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
                 } |> setImportDataState
             else
-                SelectiveImportModalState.init(columns) |> setImportDataState
+                SelectiveImportModalState.init() |> setImportDataState
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
