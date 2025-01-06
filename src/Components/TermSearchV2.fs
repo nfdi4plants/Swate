@@ -340,6 +340,7 @@ type TermSearchV2 =
     [<ReactComponent>]
     static member AdvancedSearchModal(rvm, advancedSearch: AdvancedSearch<'A>, onTermSelect) =
         let searchResults, setSearchResults = React.useState(SearchState.init)
+        /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
         let (tempPagination: int option), setTempPagination = React.useState(None)
         let pagination, setPagination = React.useState(0)
         let BinSize = 20
@@ -354,6 +355,10 @@ type TermSearchV2 =
             |> Promise.start
           Cancel = rvm
         }
+        React.useEffect(
+            (fun () -> setTempPagination (pagination + 1 |> Some)),
+            [|box pagination|]
+        )
         let searchFormComponent() = React.fragment [
             advancedSearch.Form controller
             Html.button [
@@ -424,7 +429,7 @@ type TermSearchV2 =
             ]
         ]
         let content = Html.div [
-            prop.className "flex flex-col gap-2 overflow-hidden"
+            prop.className "flex flex-col gap-2 overflow-hidden p-2"
             prop.children [
                 match searchResults with
                 | SearchState.Idle ->

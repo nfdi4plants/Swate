@@ -22,7 +22,7 @@ module Route =
     let builder typeName methodName =
         let prefix = // This is required to publishing components with production url while maintaining flexible approach in full stack environment
             #if PUBLISH_COMPONENTS
-            "https://swate-alpha.nfdi4plants.org"
+            URLs.PRODUCTION_URL
             #else
             ""
             #endif
