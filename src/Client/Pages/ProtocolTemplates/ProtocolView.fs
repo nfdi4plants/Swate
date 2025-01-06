@@ -28,7 +28,7 @@ type Templates =
     [<ReactComponent>]
     static member Main (model:Model, dispatch) =
         let isProtocolSearch, setProtocolSearch = React.useState(false)
-        let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init())
+        let importTypeStateData = React.useState(SelectiveImportModalState.init())
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"
 
@@ -44,10 +44,10 @@ type Templates =
             SidebarComponents.SidebarLayout.Description "Add template from database."
 
             if isProtocolSearch then
-                Protocol.SearchContainer.Main model setProtocolSearch importTypeState setImportTypeState dispatch
+                Protocol.SearchContainer.Main model setProtocolSearch importTypeStateData dispatch
             else
                 SidebarComponents.SidebarLayout.LogicContainer [
-                    Modals.SelectiveTemplateFromDB.Main(model, false, setProtocolSearch, importTypeState, setImportTypeState, dispatch)
+                    Modals.SelectiveTemplateFromDB.Main(model, false, setProtocolSearch, importTypeStateData, dispatch)
                 ]
 
             // Box 2

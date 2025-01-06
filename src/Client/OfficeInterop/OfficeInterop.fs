@@ -344,9 +344,9 @@ let tryGetPrevAnnotationTableName (context: RequestContext) =
             let prevTable =
                 tables.items
                 |> Seq.toArray
-                |> Array.choose (fun x ->
-                    if x.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) then
-                        Some (x.worksheet.position ,x.name)
+                |> Array.choose (fun table ->
+                    if table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) then
+                        Some (table.worksheet.position ,table.name)
                     else
                         None
                 )
@@ -371,7 +371,6 @@ let tryGetPrevArcTable (context: RequestContext) : JS.Promise<ArcTable option> =
 
         match prevTableName with
         | Some name ->
-
             let! result = ArcTable.fromExcelTableName (name, context)
             return
                 match result with
@@ -1128,7 +1127,10 @@ let selectTablesToAdd (tablesToAdd: ArcTable []) (selectedColumnsCollection: boo
             selectedColumnsCollectionToJoin <- selectedColumns::selectedColumnsCollectionToJoin
     )
 
-    tablesToAdd |> Array.ofList, selectedColumnsCollectionToAdd |> Array.ofList, tablesToJoin |> Array.ofList, selectedColumnsCollectionToJoin |> Array.ofList
+    tablesToAdd |> Array.ofList,
+    selectedColumnsCollectionToAdd |> Array.ofList,
+    tablesToJoin |> Array.ofList,
+    selectedColumnsCollectionToJoin |> Array.ofList
 
 /// <summary>
 /// Join selected template tables with active table
@@ -1241,10 +1243,8 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
         promise {
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
-
             let tablesToAdd, selectedColumnsCollectionToAdd, tablesToJoin, selectedColumnsCollectionToJoin =
                 selectTablesToAdd tablesToAdd selectedColumnsCollection importTables
-
             let! result = AnnotationTable.tryGetActive context
             match result with
             | Some excelTable ->
@@ -1257,7 +1257,7 @@ let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [],
                         if tablesToJoin.Length > 0 then
                             joinTemplatesToTable originTable excelTable tablesToJoin selectedColumnsCollectionToJoin options context
                         else
-                            promise{return []}
+                            promise {return []}
 
                     let! msgAdd =
                         addTemplates tablesToAdd selectedColumnsCollectionToAdd options context

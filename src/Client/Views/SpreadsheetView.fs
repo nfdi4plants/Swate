@@ -35,7 +35,7 @@ open JsonImport
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
     let widgets, setWidgets = React.useState([])
-    let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init())
+    let importTypeStateData = React.useState(SelectiveImportModalState.init())
     let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
     let bringWidgetToFront (widget: Widget) =
         let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
@@ -45,7 +45,7 @@ let Main (model: Model, dispatch) =
         let bringWidgetToFront = fun _ -> bringWidgetToFront widget
         match widget with
         | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget)
-        | Widget._Template -> Widget.Templates (model, importTypeState, setImportTypeState, dispatch, rmv widget)
+        | Widget._Template -> Widget.Templates (model, importTypeStateData, dispatch, rmv widget)
         | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
         | Widget._DataAnnotator -> Widget.DataAnnotator(model, dispatch, rmv widget)
         |> WidgetOrderContainer bringWidgetToFront

@@ -142,7 +142,8 @@ type SelectiveTemplateFromDB =
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
     [<ReactComponent>]
-    static member Main (model: Model, protocolSearchState, setProtocolSearch, importTypeState, setImportTypeState, dispatch) =
+    static member Main (model: Model, protocolSearchState, setProtocolSearch, importTypeStateData, dispatch) =
+        let importTypeState, setImportTypeState = importTypeStateData
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)

@@ -22,7 +22,7 @@ module JsonImportHelper =
     /// <param name="state"></param>
     /// <param name="selectedColumns"></param>
     /// <param name="fullImport"></param>
-    let createUpdatedTables (arcTables: ResizeArray<ArcTable>)  (state: SelectiveImportModalState) (selectedColumns: bool [] []) fullImport =
+    let createUpdatedTables (arcTables: ResizeArray<ArcTable>) (state: SelectiveImportModalState) (selectedColumns: bool [] []) fullImport =
         [
             for importTable in state.ImportTables do
                 let fullImport = defaultArg fullImport importTable.FullImport

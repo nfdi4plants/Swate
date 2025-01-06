@@ -209,7 +209,7 @@ type Widget =
         Widget.Base(content, prefix, rmv, help)
 
     [<ReactComponent>]
-    static member Templates (model: Model, importTypeState, setImportTypeState, dispatch, rmv: MouseEvent -> unit) =
+    static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
         let templates = model.ProtocolState.Templates
         let config, setConfig = React.useState(TemplateFilterConfig.init)
         let isProtocolSearch, setProtocolSearch = React.useState(true)
@@ -218,20 +218,17 @@ type Widget =
         let selectContent() =
             [
                 Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
-                ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeState setImportTypeState dispatch)
-                Protocol.Search.Component (filteredTemplates, model, setProtocolSearch, importTypeState, setImportTypeState, dispatch, length.px 350)
+                ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch)
+                Protocol.Search.Component (filteredTemplates, model, setProtocolSearch, importTypeStateData, dispatch, length.px 350)
             ]
         let insertContent() =
             [
                 Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
                     prop.className "flex flex-col gap-2"
-                    prop.children (SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeState, setImportTypeState, dispatch))
+                    prop.children (SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch))
                 ]
             ]
-
-        //if model.ProtocolState.TemplatesSelected.Length = 0 then
-        //    setProtocolSearch false
 
         let content =
             let switchContent =
@@ -262,7 +259,6 @@ type Widget =
                             FilePicker.FileNameTable.table model dispatch
                         ]
                     ]
-                    //fileNameElements model dispatch
                     FilePicker.insertButton model dispatch
             ]
         ]

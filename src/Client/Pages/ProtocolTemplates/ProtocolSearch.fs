@@ -35,7 +35,7 @@ open Fable.Core
 type SearchContainer =
 
     [<ReactComponent>]
-    static member Main (model:Model) setProtocolSearch importTypeState setImportTypeState dispatch =
+    static member Main (model:Model) setProtocolSearch importTypeStateData dispatch =
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
         let config, setConfig = React.useState(TemplateFilterConfig.init)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
@@ -60,8 +60,8 @@ type SearchContainer =
                     prop.children [
                         Protocol.Search.InfoField()
                         Protocol.Search.FileSortElement(model, config, setConfig)
-                        ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeState setImportTypeState dispatch)
-                        Protocol.Search.Component (filteredTemplates, model, setProtocolSearch, importTypeState, setImportTypeState, dispatch)
+                        ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch)
+                        Protocol.Search.Component (filteredTemplates, model, setProtocolSearch, importTypeStateData, dispatch)
                     ]
                 ]
             ]

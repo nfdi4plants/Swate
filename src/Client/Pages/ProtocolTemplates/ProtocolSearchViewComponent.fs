@@ -323,7 +323,7 @@ module ComponentAux =
 
     let createAuthorsStringHelper (authors: ResizeArray<Person>) = authors |> Seq.map createAuthorStringHelper |> String.concat ", "
 
-    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) setProtocolSearch (importTypeState: SelectiveImportModalState) setImportTypeState dispatch  =
+    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) setProtocolSearch importTypeStateData dispatch  =
         [
             Html.tr [
                 prop.key $"{i}_{template.Id}"
@@ -397,6 +397,7 @@ module ComponentAux =
                                     button.sm
                                     prop.onClick (fun _ ->
                                         setProtocolSearch false
+                                        let importTypeState, setImportTypeState = importTypeStateData
                                         let columns =  [|Array.init template.Table.Columns.Length (fun _ -> true)|]
                                         {importTypeState with SelectedColumns = columns} |> setImportTypeState
                                         SelectProtocols [template] |> ProtocolMsg |> dispatch
@@ -568,7 +569,8 @@ type Search =
                 ]
             ]
 
-    static member private selectTemplatesButton model setProtocolSearch importTypeState setImportTypeState dispatch =
+    static member private selectTemplatesButton model setProtocolSearch importTypeStateData dispatch =
+        let importTypeState, setImportTypeState = importTypeStateData
         Html.div [
             prop.className "flex justify-center gap-2"
             prop.children [
@@ -593,7 +595,7 @@ type Search =
             ]
         ]
 
-    static member SelectedTemplatesElement model setProtocolSearch importTypeState setImportTypeState dispatch =
+    static member SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch =
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
             prop.children [
@@ -602,12 +604,12 @@ type Search =
                             Search.displayTemplateNames model
                         ]
                 ]
-                Search.selectTemplatesButton model setProtocolSearch importTypeState setImportTypeState dispatch
+                Search.selectTemplatesButton model setProtocolSearch importTypeStateData dispatch
             ]
         ]
 
     [<ReactComponent>]
-    static member Component (templates, model: Model, setProtocolSearch, (importTypeState: SelectiveImportModalState), setImportTypeState, dispatch, ?maxheight: Styles.ICssUnit) =
+    static member Component (templates, model: Model, setProtocolSearch, importTypeStateData, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
         let showIds, setShowIds = React.useState(fun _ -> [])
         Html.div [
@@ -652,7 +654,7 @@ type Search =
                                         let setIsShown (show: bool) =
                                             if show then i::showIds |> setShowIds else showIds |> List.filter (fun id -> id <> i) |> setShowIds
                                         yield!
-                                            protocolElement i templates.[i] isShown setIsShown model setProtocolSearch importTypeState setImportTypeState dispatch
+                                            protocolElement i templates.[i] isShown setIsShown model setProtocolSearch importTypeStateData dispatch
                         ]
                     ]
                 ]
