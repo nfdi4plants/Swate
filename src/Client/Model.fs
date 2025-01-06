@@ -1,17 +1,15 @@
 namespace Model
 
-open Fable.React
-open Fable.React.Props
 open Shared
 open Feliz
 open Routing
 open Database
 
 type LogItem =
-    | Debug of (System.DateTime*string)
-    | Info  of (System.DateTime*string)
-    | Error of (System.DateTime*string)
-    | Warning of (System.DateTime*string)
+    | Debug     of (System.DateTime*string)
+    | Info      of (System.DateTime*string)
+    | Error     of (System.DateTime*string)
+    | Warning   of (System.DateTime*string)
 
     static member ofInteropLogginMsg (msg:InteropLogging.Msg) =
         match msg.LogIdentifier with
@@ -26,25 +24,25 @@ type LogItem =
     static member private WarningCell = Html.td [prop.className "bg-warning text-warning-content font-semibold"; prop.text "Warning"]
 
     static member toTableRow = function
-        | Debug (t,m) ->
+        | Debug (t, m) ->
             Html.tr [
                 Html.td (sprintf "[%s]" (t.ToShortTimeString()))
                 LogItem.DebugCell
                 Html.td m
             ]
-        | Info  (t,m) ->
+        | Info  (t, m) ->
             Html.tr [
                 Html.td (sprintf "[%s]" (t.ToShortTimeString()))
                 LogItem.InfoCell
                 Html.td m
             ]
-        | Error (t,m) ->
+        | Error (t, m) ->
             Html.tr [
                 Html.td (sprintf "[%s]" (t.ToShortTimeString()))
                 LogItem.ErrorCell
                 Html.td m
             ]
-        | Warning (t,m) ->
+        | Warning (t, m) ->
             Html.tr [
                 Html.td (sprintf "[%s]" (t.ToShortTimeString()))
                 LogItem.WarningCell
@@ -64,13 +62,13 @@ module TermSearch =
     open ARCtrl
 
     type Model = {
-        SelectedTerm            : OntologyAnnotation option
-        ParentTerm              : OntologyAnnotation option
+        SelectedTerm    : OntologyAnnotation option
+        ParentTerm      : OntologyAnnotation option
 
     } with
         static member init () = {
-            SelectedTerm                = None
-            ParentTerm                  = None
+            SelectedTerm    = None
+            ParentTerm      = None
         }
 
 module AdvancedSearch =
@@ -92,20 +90,20 @@ module AdvancedSearch =
         HasAdvancedSearchResultsLoading     : bool
     } with
         static member init () = {
-            ModalId                             = ""
-            HasModalVisible                     = false
-            HasOntologyDropdownVisible          = false
-            AdvancedSearchOptions               = AdvancedSearchTypes.AdvancedSearchOptions.init ()
-            AdvancedSearchTermResults           = [||]
-            HasAdvancedSearchResultsLoading     = false
-            Subpage                             = InputFormSubpage
+            ModalId                         = ""
+            HasModalVisible                 = false
+            HasOntologyDropdownVisible      = false
+            AdvancedSearchOptions           = AdvancedSearchTypes.AdvancedSearchOptions.init ()
+            AdvancedSearchTermResults       = [||]
+            HasAdvancedSearchResultsLoading = false
+            Subpage                         = InputFormSubpage
         }
         static member BuildingBlockHeaderId = "BuildingBlockHeader_ATS_Id"
         static member BuildingBlockBodyId = "BuildingBlockBody_ATS_Id"
 
 type DevState = {
-    Log                                 : LogItem list
-    DisplayLogList                      : LogItem list
+    Log             : LogItem list
+    DisplayLogList  : LogItem list
 } with
     static member init () = {
         DisplayLogList  = []
@@ -143,7 +141,7 @@ type PageState = {
 
 module FilePicker =
     type Model = {
-        FileNames       : (int*string) list
+        FileNames   : (int*string) list
     } with
         static member init () = {
             FileNames = []
@@ -154,7 +152,6 @@ open Fable.Core
 module BuildingBlock =
 
     open ARCtrl
-    open ARCtrl.Helper
 
     [<RequireQualifiedAccess>]
     type DropdownPage =
@@ -164,15 +161,15 @@ module BuildingBlock =
 
         member this.toString =
             match this with
-            | Main -> "Main Page"
-            | More -> "More"
-            | IOTypes (t) -> t.ToString()
+            | Main      -> "Main Page"
+            | More      -> "More"
+            | IOTypes t -> t.ToString()
 
         member this.toTooltip =
             match this with
-            | More -> "More"
-            | IOTypes (t) -> $"Per table only one {t} is allowed. The value of this column must be a unique identifier."
-            | _ -> ""
+            | More      -> "More"
+            | IOTypes t -> $"Per table only one {t} is allowed. The value of this column must be a unique identifier."
+            | _         -> ""
 
     type BuildingBlockUIState = {
         DropdownIsActive    : bool
@@ -193,10 +190,10 @@ module BuildingBlock =
     } with
         static member init () = {
 
-            HeaderCellType      = CompositeHeaderDiscriminate.Parameter
-            HeaderArg           = None
-            BodyCellType        = CompositeCellDiscriminate.Term
-            BodyArg             = None
+            HeaderCellType  = CompositeHeaderDiscriminate.Parameter
+            HeaderArg       = None
+            BodyCellType    = CompositeCellDiscriminate.Term
+            BodyArg         = None
         }
 
         member this.TryHeaderOA() =
@@ -226,14 +223,13 @@ module Protocol =
     | All
     | OnlyCurated
     | Community of string
-
         member this.ToStringRdb() =
             match this with
             | All               -> "All"
             | OnlyCurated       -> "DataPLANT official"
             | Community name    -> name
 
-        static member fromString(str:string) =
+        static member fromString(str: string) =
             match str with
             | "All" -> All
             | "DataPLANT official" -> OnlyCurated
@@ -247,19 +243,19 @@ module Protocol =
     /// This model is used for both protocol insert and protocol search
     type Model = {
         // Client
-        Loading                 : bool
-        LastUpdated             : System.DateTime option
+        Loading             : bool
+        LastUpdated         : System.DateTime option
         // ------ Protocol from Database ------
-        TemplateSelected        : ARCtrl.Template option
-        Templates               : ARCtrl.Template []
+        TemplatesSelected   : ARCtrl.Template list
+        Templates           : ARCtrl.Template []
     } with
         static member init () = {
             // Client
-            Loading                 = false
-            LastUpdated             = None
-            TemplateSelected        = None
+            Loading             = false
+            LastUpdated         = None
+            TemplatesSelected   = []
             // ------ Protocol from Database ------
-            Templates               = [||]
+            Templates           = [||]
         }
 
 type RequestBuildingBlockInfoStates =
@@ -274,25 +270,25 @@ type RequestBuildingBlockInfoStates =
 
 type Model = {
     ///PageState
-    PageState                   : PageState
+    PageState               : PageState
     ///Data that needs to be persistent once loaded
-    PersistentStorageState      : PersistentStorageState
+    PersistentStorageState  : PersistentStorageState
     ///Error handling, Logging, etc.
-    DevState                    : DevState
+    DevState                : DevState
     ///States regarding term search
-    TermSearchState             : TermSearch.Model
+    TermSearchState         : TermSearch.Model
     ///Use this in the future to model excel stuff like table data
-    ExcelState                  : OfficeInterop.Model
+    ExcelState              : OfficeInterop.Model
     ///States regarding File picker functionality
-    FilePickerState             : FilePicker.Model
-    ProtocolState               : Protocol.Model
+    FilePickerState         : FilePicker.Model
+    ProtocolState           : Protocol.Model
     ///Insert annotation columns
-    AddBuildingBlockState       : BuildingBlock.Model
-    CytoscapeModel              : Cytoscape.Model
+    AddBuildingBlockState   : BuildingBlock.Model
+    CytoscapeModel          : Cytoscape.Model
     ///
-    DataAnnotatorModel          : DataAnnotator.Model
+    DataAnnotatorModel      : DataAnnotator.Model
     /// Contains all information about spreadsheet view
-    SpreadsheetModel            : Spreadsheet.Model
-    History                     : LocalHistory.Model
-    ModalState                  : ModalState
+    SpreadsheetModel        : Spreadsheet.Model
+    History                 : LocalHistory.Model
+    ModalState              : ModalState
 }

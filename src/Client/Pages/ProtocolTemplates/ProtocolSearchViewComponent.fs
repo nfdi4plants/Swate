@@ -8,6 +8,9 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
+open Modals
+
+open JsonImport
 
 /// Fields of Template that can be searched
 [<RequireQualifiedAccess>]
@@ -16,7 +19,7 @@ type SearchFields =
 | Organisation
 | Authors
 
-    static member private ofFieldString (str:string) =
+    static member private ofFieldString (str: string) =
         let str = str.ToLower()
         match str with
         | "/o" | "/org"             -> Some Organisation
@@ -36,7 +39,7 @@ type SearchFields =
         | Organisation  -> "organisation"
         | Authors       -> "authors"
 
-    static member GetOfQuery(query:string) =
+    static member GetOfQuery(query: string) =
         SearchFields.ofFieldString query
 
 open ARCtrl
@@ -73,7 +76,7 @@ module ComponentAux =
     [<LiteralAttribute>]
     let SearchFieldId = "template_searchfield_main"
 
-    let queryField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
+    let queryField (model: Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         Html.div [
             Html.p $"Search by {state.Searchfield.toNameRdb}"
             let hasSearchAddon = state.Searchfield <> SearchFields.Name
@@ -114,10 +117,9 @@ module ComponentAux =
             ]
         ]
 
-    let Tag (tag:OntologyAnnotation, color: IReactProperty, isRemovable: bool, onclick: (Browser.Types.MouseEvent -> unit) option) =
+    let Tag (tag: OntologyAnnotation, color: IReactProperty, isRemovable: bool, onclick: (Browser.Types.MouseEvent -> unit) option) =
         Daisy.badge [
             color
-
             prop.className [
                 if onclick.IsSome then "cursor-pointer hover:brightness-110"
                 "text-nowrap"
@@ -157,7 +159,7 @@ module ComponentAux =
             ]
         ]
 
-    let tagQueryField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
+    let tagQueryField (model: Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         let allTags = model.ProtocolState.Templates |> Seq.collect (fun x -> x.Tags) |> Seq.distinct |> Seq.filter (fun x -> state.ProtocolFilterTags |> List.contains x |> not ) |> Array.ofSeq
         let allErTags = model.ProtocolState.Templates |> Seq.collect (fun x -> x.EndpointRepositories) |> Seq.distinct |> Seq.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not ) |> Array.ofSeq
         let hitTagList, hitErTagList =
@@ -281,7 +283,7 @@ module ComponentAux =
             ]
         ]
 
-    let TagDisplayField (model:Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
+    let TagDisplayField (model: Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         Html.div [
             prop.className "flex"
             prop.children [
@@ -304,6 +306,7 @@ module ComponentAux =
 
     let curatedTag = Daisy.badge [prop.text "curated"; badge.primary]
     let communitytag = Daisy.badge [prop.text "community"; badge.warning]
+
     let curatedCommunityTag =
         Daisy.badge [
             prop.style [style.custom("background", "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)")]
@@ -317,9 +320,10 @@ module ComponentAux =
     let createAuthorStringHelper (author: Person) =
         let mi = if author.MidInitials.IsSome then author.MidInitials.Value else ""
         $"{author.FirstName} {mi} {author.LastName}"
+
     let createAuthorsStringHelper (authors: ResizeArray<Person>) = authors |> Seq.map createAuthorStringHelper |> String.concat ", "
 
-    let protocolElement i (template:ARCtrl.Template) (isShown:bool) (setIsShown: bool -> unit) (model:Model) dispatch  =
+    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) setProtocolSearch importTypeStateData dispatch  =
         [
             Html.tr [
                 prop.key $"{i}_{template.Id}"
@@ -387,15 +391,30 @@ module ComponentAux =
                             ]
                         ]
                         Html.div [
-                            prop.className "flex justify-center"
+                            prop.className "flex justify-center gap-2"
                             prop.children [
                                 Daisy.button.a [
                                     button.sm
                                     prop.onClick (fun _ ->
-                                        SelectProtocol template |> ProtocolMsg |> dispatch
+                                        setProtocolSearch false
+                                        let importTypeState, setImportTypeState = importTypeStateData
+                                        let columns =  [|Array.init template.Table.Columns.Length (fun _ -> true)|]
+                                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
+                                        SelectProtocols [template] |> ProtocolMsg |> dispatch
                                     )
-                                    button.wide; button.success
+                                    button.wide
+                                    button.success
                                     prop.text "select"
+                                ]
+                                Daisy.button.a [
+                                    button.sm
+                                    prop.onClick (fun _ ->
+                                        setIsShown (not isShown)
+                                        AddProtocol template |> ProtocolMsg |> dispatch
+                                    )
+                                    button.wide
+                                    button.success
+                                    prop.text "add"
                                 ]
                             ]
                         ]
@@ -404,7 +423,7 @@ module ComponentAux =
             ]
         ]
 
-    let RefreshButton (model:Model) dispatch =
+    let RefreshButton (model: Model) dispatch =
         Daisy.button.button [
             button.sm
             prop.onClick (fun _ -> Messages.Protocol.GetAllProtocolsForceRequest |> ProtocolMsg |> dispatch)
@@ -414,6 +433,7 @@ module ComponentAux =
         ]
 
 module FilterHelper =
+
     open ComponentAux
 
     let sortTableBySearchQuery (searchfield: SearchFields) (searchQuery: string) (protocol: ARCtrl.Template []) =
@@ -425,7 +445,7 @@ module FilterHelper =
         then
             let query = query.ToLower()
             let queryBigram = query |> Shared.SorensenDice.createBigrams
-            let createScore (str:string) =
+            let createScore (str: string) =
                 str
                 |> Shared.SorensenDice.createBigrams
                 |> Shared.SorensenDice.calculateDistance queryBigram
@@ -469,6 +489,7 @@ module FilterHelper =
             scoredTemplate
         else
             protocol
+
     let filterTableByTags tags ertags tagfilter (templates: ARCtrl.Template []) =
         if tags <> [] || ertags <> [] then
             let tagArray = tags@ertags |> ResizeArray
@@ -476,16 +497,14 @@ module FilterHelper =
             Array.ofSeq filteredTemplates
         else
             templates
-    let filterTableByCommunityFilter communityfilter (protocol:ARCtrl.Template []) =
+
+    let filterTableByCommunityFilter communityfilter (protocol: ARCtrl.Template []) =
         match communityfilter with
         | Protocol.CommunityFilter.All              -> protocol
         | Protocol.CommunityFilter.OnlyCurated      -> protocol |> Array.filter (fun x -> x.Organisation.IsOfficial())
         | Protocol.CommunityFilter.Community name   -> protocol |> Array.filter (fun x -> x.Organisation.ToString() = name)
 
-open Feliz
-open System
 open ComponentAux
-
 
 type Search =
 
@@ -540,8 +559,57 @@ type Search =
                 ]
         ]
 
+    static member private displayTemplateNames model =
+            Html.div [
+                prop.className "flex gap-2"
+                prop.children [
+                    let names = List.rev model.ProtocolState.TemplatesSelected |> List.map (fun template -> template.Name)
+                    for i in 0..names.Length-1 do
+                        Html.div [ yield! [prop.text $"\"{names.[i]}\""]]
+                ]
+            ]
+
+    static member private selectTemplatesButton model setProtocolSearch importTypeStateData dispatch =
+        let importTypeState, setImportTypeState = importTypeStateData
+        Html.div [
+            prop.className "flex justify-center gap-2"
+            prop.children [
+                Daisy.button.a [
+                    button.sm
+                    prop.onClick (fun _ ->
+                        setProtocolSearch false
+                        let columns =
+                            model.ProtocolState.TemplatesSelected
+                            |> Array.ofSeq
+                            |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
+                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
+                        SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
+                    )
+                    button.wide
+                    if model.ProtocolState.TemplatesSelected.Length > 0 then
+                        button.success
+                    else
+                        button.disabled
+                    prop.text "Select templates"
+                ]
+            ]
+        ]
+
+    static member SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch =
+        Html.div [
+            prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
+            prop.children [
+                Html.div [
+                    prop.children [
+                            Search.displayTemplateNames model
+                        ]
+                ]
+                Search.selectTemplatesButton model setProtocolSearch importTypeStateData dispatch
+            ]
+        ]
+
     [<ReactComponent>]
-    static member Component (templates, model:Model, dispatch, ?maxheight: Styles.ICssUnit) =
+    static member Component (templates, model: Model, setProtocolSearch, importTypeStateData, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
         let showIds, setShowIds = React.useState(fun _ -> [])
         Html.div [
@@ -581,12 +649,12 @@ type Search =
                                 | [||] ->
                                     Html.tr [ Html.td "Empty" ]
                                 | _ ->
-                                    for i in 0 .. templates.Length-1 do
+                                    for i in 0..templates.Length-1 do
                                         let isShown = showIds |> List.contains i
                                         let setIsShown (show: bool) =
-                                            if show then i::showIds |> setShowIds else showIds |> List.filter (fun x -> x <> i) |> setShowIds
+                                            if show then i::showIds |> setShowIds else showIds |> List.filter (fun id -> id <> i) |> setShowIds
                                         yield!
-                                            protocolElement i templates.[i] isShown setIsShown model dispatch
+                                            protocolElement i templates.[i] isShown setIsShown model setProtocolSearch importTypeStateData dispatch
                         ]
                     ]
                 ]

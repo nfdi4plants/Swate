@@ -9,6 +9,8 @@ open ExcelJS.Fable
 open Excel
 open GlobalBindings
 
+open Regex
+
 module SidebarControllerAux =
 
     /// <summary>
@@ -100,7 +102,7 @@ let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptio
     
     if templateName.IsSome then
         //Should be updated to remove all kinds of extra symbols
-        let templateName = Helper.removeChars Helper.charsToRemove templateName.Value
+        let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
         let newTable = ArcTable.create(templateName, state.ActiveTable.Headers, state.ActiveTable.Values)
         state.ArcFile.Value.Tables().SetTable(state.ActiveTable.Name, newTable)
 

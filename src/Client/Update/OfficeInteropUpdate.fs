@@ -80,7 +80,16 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.joinTable
-                        (table, selectedColumns, Some importType.ImportType, templateName)
+                        (table, selectedColumns, Some importType.ImportType, templateName, None)
+                        (curry GenericInteropLogs Cmd.none >> DevMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+
+            | AddTemplates (tables, selectedColumns, importType) ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        OfficeInterop.Core.joinTables
+                        (tables, selectedColumns, Some importType.ImportType, importType.ImportTables)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
@@ -89,7 +98,7 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         OfficeInterop.Core.joinTable
-                        (table, [||], options, None)
+                        (table, [||], options, None, None)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd

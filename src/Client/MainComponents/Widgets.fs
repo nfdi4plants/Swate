@@ -5,7 +5,6 @@ open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
 open Modals
-open Types.TableImport
 open Types.JsonImport
 
 module private InitExtensions =
@@ -22,7 +21,6 @@ module private InitExtensions =
             | Some p -> Some p
             | None -> None
 
-
 open InitExtensions
 
 open Fable.Core
@@ -34,7 +32,7 @@ module private MoveEventListener =
 
     open Fable.Core.JsInterop
 
-    let ensurePositionInsideWindow (element:IRefValue<HTMLElement option>) (position: Rect) =
+    let ensurePositionInsideWindow (element: IRefValue<HTMLElement option>) (position: Rect) =
         let maxX = Browser.Dom.window.innerWidth - element.current.Value.offsetWidth;
         let tempX = position.X
         let newX = System.Math.Min(System.Math.Max(tempX,0),int maxX)
@@ -43,18 +41,18 @@ module private MoveEventListener =
         let newY = System.Math.Min(System.Math.Max(tempY,0),int maxY)
         {X = newX; Y = newY}
 
-    let calculatePosition (element:IRefValue<HTMLElement option>) (startPosition: Rect) = fun (e: Event) ->
+    let calculatePosition (element: IRefValue<HTMLElement option>) (startPosition: Rect) = fun (e: Event) ->
         let e : MouseEvent = !!e
         let tempX = int e.clientX - startPosition.X
         let tempY = int e.clientY - startPosition.Y
         let tempPosition = {X = tempX; Y = tempY}
         ensurePositionInsideWindow element tempPosition
 
-    let onmousemove (element:IRefValue<HTMLElement option>) (startPosition: Rect) setPosition = fun (e: Event) ->
+    let onmousemove (element: IRefValue<HTMLElement option>) (startPosition: Rect) setPosition = fun (e: Event) ->
         let nextPosition = calculatePosition element startPosition e
         setPosition (Some nextPosition)
 
-    let onmouseup (prefix,element:IRefValue<HTMLElement option>) onmousemove =
+    let onmouseup (prefix,element: IRefValue<HTMLElement option>) onmousemove =
         Browser.Dom.document.removeEventListener("mousemove", onmousemove)
         if element.current.IsSome then
             let rect = element.current.Value.getBoundingClientRect()
@@ -77,7 +75,7 @@ module private ResizeEventListener =
     let onmouseup (prefix, element: IRefValue<HTMLElement option>) onmousemove =
         Browser.Dom.document.removeEventListener("mousemove", onmousemove)
         if element.current.IsSome then
-            Size.write(prefix,{X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
+            Size.write(prefix, {X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
 module private Elements =
 
@@ -210,71 +208,34 @@ type Widget =
         let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv, help)
 
-
     [<ReactComponent>]
-    static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
-        let templates, setTemplates = React.useState(model.ProtocolState.Templates)
+    static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
+        let templates = model.ProtocolState.Templates
         let config, setConfig = React.useState(TemplateFilterConfig.init)
-        let selectedColumnsLength =
-            if model.ProtocolState.TemplateSelected.IsSome then
-                model.ProtocolState.TemplateSelected.Value.Table.Columns.Length
-            else 0
-        let selectedColumns, setSelectedColumns = React.useState(SelectedColumns.init selectedColumnsLength)
-        let importTypeState, setImportTypeState = React.useState(SelectiveImportModalState.init)
-        let useTemplateName, setUseTemplateName = React.useState(AdaptTableName.init)
+        let isProtocolSearch, setProtocolSearch = React.useState(true)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
-        React.useEffect((fun _ -> setTemplates model.ProtocolState.Templates), [|box model.ProtocolState.Templates|])
         let selectContent() =
             [
                 Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
-                Protocol.Search.Component (filteredTemplates, model, dispatch, length.px 350)
+                ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch)
+                Protocol.Search.Component (filteredTemplates, model, setProtocolSearch, importTypeStateData, dispatch, length.px 350)
             ]
         let insertContent() =
             [
                 Html.div [
                     prop.style [style.maxHeight (length.px 350); style.overflow.auto]
-                    prop.children [
-                        SidebarComponents.SidebarLayout.LogicContainer [
-                            Html.div [
-                                SelectiveTemplateFromDBModal.ToProtocolSearchElement model dispatch
-                            ]
-                            if model.ProtocolState.TemplateSelected.IsSome then                    
-                                Html.div [
-                                    SelectiveImportModal.RadioPluginsBox(
-                                        "Import Type",
-                                        "fa-solid fa-cog",
-                                        importTypeState.ImportType,
-                                        "importType ",
-                                        [|
-                                            ARCtrl.TableJoinOptions.Headers, " Column Headers";
-                                            ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
-                                            ARCtrl.TableJoinOptions.WithValues, " ..With Values";
-                                        |],
-                                        fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
-                                    )
-                                ]
-                                Html.div [
-                                    ModalElements.Box(
-                                        "Rename Table",
-                                        "fa-solid fa-cog",
-                                        SelectiveTemplateFromDBModal.CheckBoxForTakeOverTemplateName(useTemplateName, setUseTemplateName, model.ProtocolState.TemplateSelected.Value.Name))
-                                ]
-                                Html.div [
-                                    ModalElements.Box(
-                                        model.ProtocolState.TemplateSelected.Value.Name,
-                                        "",
-                                        SelectiveTemplateFromDBModal.displaySelectedProtocolElements(model, selectedColumns, setSelectedColumns, dispatch, false))
-                                ]
-                            Html.div [
-                                SelectiveTemplateFromDBModal.AddFromDBToTableButton model selectedColumns importTypeState useTemplateName.TemplateName dispatch
-                            ]
-                        ]
-                    ]
+                    prop.className "flex flex-col gap-2"
+                    prop.children (SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch))
                 ]
             ]
+
         let content =
-            let switchContent = if model.ProtocolState.TemplateSelected.IsNone then selectContent() else insertContent()
+            let switchContent =
+                if isProtocolSearch then
+                    selectContent ()
+                else
+                    insertContent ()
             Html.div [
                 prop.className "flex flex-col gap-4 @container/templateWidget"
                 prop.children switchContent
@@ -298,7 +259,6 @@ type Widget =
                             FilePicker.FileNameTable.table model dispatch
                         ]
                     ]
-                    //fileNameElements model dispatch
                     FilePicker.insertButton model dispatch
             ]
         ]

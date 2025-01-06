@@ -76,8 +76,6 @@ module ARCtrlUtil =
 
 module ARCtrlExtensions =
 
-    open System
-
     type ArcFiles with
 
         /// <summary>
@@ -346,9 +344,9 @@ let tryGetPrevAnnotationTableName (context: RequestContext) =
             let prevTable =
                 tables.items
                 |> Seq.toArray
-                |> Array.choose (fun x ->
-                    if x.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) then
-                        Some (x.worksheet.position ,x.name)
+                |> Array.choose (fun table ->
+                    if table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) then
+                        Some (table.worksheet.position ,table.name)
                     else
                         None
                 )
@@ -373,7 +371,6 @@ let tryGetPrevArcTable (context: RequestContext) : JS.Promise<ArcTable option> =
 
         match prevTableName with
         | Some name ->
-
             let! result = ArcTable.fromExcelTableName (name, context)
             return
                 match result with
@@ -928,44 +925,11 @@ let addCompositeColumn (excelTable: Table) (arcTable: ArcTable) (newColumn: Comp
 
     loggingList
 
-let selectiveTablePrepare (activeTable: ArcTable) (toJoinTable: ArcTable) (removeColumns: int list): ArcTable =
-    // Remove existing columns
-    let mutable columnsToRemove = removeColumns
-    // find duplicate columns
-    let tablecopy = toJoinTable.Copy()
-    for header in activeTable.Headers do
-        let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
-        if containsAtIndex.IsSome then
-            columnsToRemove <- containsAtIndex.Value::columnsToRemove
-
-    //Remove duplicates because unselected and already existing columns can overlap
-    let columnsToRemove = columnsToRemove |> Set.ofList |> Set.toList
-
-    tablecopy.RemoveColumns (Array.ofList columnsToRemove)
-    tablecopy.IteriColumns(fun i c0 ->
-        let c1 = {c0 with Cells = tablecopy.Columns.[i].Cells}
-        let c2 =
-            if c1.Header.isInput then
-                match activeTable.TryGetInputColumn() with
-                | Some ic ->
-                    {c1 with Cells = ic.Cells}
-                | _ -> c1
-            elif c1.Header.isOutput then
-                match activeTable.TryGetOutputColumn() with
-                | Some oc ->
-                    {c1 with Cells = oc.Cells}
-                | _ -> c1
-            else
-                c1
-        tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
-    )
-    tablecopy
-
 /// <summary>
 /// Prepare the given table to be joined with the currently active annotation table
 /// </summary>
 /// <param name="tableToAdd"></param>
-let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (selectedColumns:bool []) (context: RequestContext) =
+let prepareTemplateInMemoryForExcel (table: Table) (tableToAdd: ArcTable) (selectedColumns:bool []) (context: RequestContext) =
     promise {
         let! originTableRes = ArcTable.fromExcelTable(table, context)
 
@@ -978,7 +942,7 @@ let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (selectedColum
                 |> Array.mapi (fun i item -> if item = false then Some i else None)
                 |> Array.choose (fun x -> x)
                 |> List.ofArray
-            
+
             let finalTable = Table.selectiveTablePrepare originTable tableToAdd selectedColumnIndices
 
             let selectedRange = context.workbook.getSelectedRange()
@@ -1001,13 +965,118 @@ let prepareTemplateInMemory (table: Table) (tableToAdd: ArcTable) (selectedColum
     }
 
 /// <summary>
+/// Prepare the given table to be joined with the currently active annotation table
+/// </summary>
+/// <param name="tableToAdd"></param>
+let prepareTemplateInMemory (originTable: ArcTable) (tableToAdd: ArcTable) (selectedColumns:bool []) =
+    let selectedColumnIndices =
+        selectedColumns
+        |> Array.mapi (fun i item -> if item = false then Some i else None)
+        |> Array.choose (fun x -> x)
+        |> List.ofArray
+            
+    let finalTable = Table.selectiveTablePrepare originTable tableToAdd selectedColumnIndices
+
+    finalTable
+
+/// <summary>
+/// Checks whether the given worksheet name exists or not and updates it, when it already exists by adding a number
+/// </summary>
+/// <param name="templateName"></param>
+/// <param name="context"></param>
+let getNewActiveWorkSheetName (worksheetName: string) (context: RequestContext) =
+    promise {
+        let worksheets = context.workbook.worksheets
+        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
+        let _ =
+            activeWorksheet.load(propertyNames = U2.Case2 (ResizeArray["name"])) |> ignore
+            worksheets.load(propertyNames = U2.Case2 (ResizeArray["items"; "name"]))
+
+        do! context.sync()
+
+        let worksheetNames = worksheets.items |> Seq.map (fun item -> item.name) |> Array.ofSeq
+        let worksheetName = System.Text.RegularExpressions.Regex.Replace(worksheetName, "\W", "")
+
+        if (Array.contains worksheetName worksheetNames) then
+            let nameCount =
+                worksheetNames
+                |> Array.filter(fun item -> item.Contains(worksheetName))
+                |> Array.length
+            return (worksheetName + (nameCount.ToString()))
+        else
+            return worksheetName
+    }
+
+let joinArcTablesInExcle (excelTable: Table) (arcTable:ArcTable) (templateName: string option) (context: RequestContext) =
+    promise {
+        let newTableRange = excelTable.getRange()
+
+        let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowCount"]))
+
+        do! context.sync().``then``(fun _ ->
+            excelTable.delete()
+        )
+
+        let! (newTable, _) = AnnotationTable.createAtRange(false, false, newTableRange, context)
+
+        let _ = newTable.load(propertyNames = U2.Case2 (ResizeArray["name"; "values"; "columns"]))
+
+        let tableSeqs = arcTable.ToStringSeqs()
+
+        if templateName.IsSome then
+            let! workSheetName = getNewActiveWorkSheetName templateName.Value context
+            let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
+            let _ = activeWorksheet.load(propertyNames = U2.Case2 (ResizeArray["name"]))
+
+            do! context.sync()
+
+            activeWorksheet.name <- workSheetName
+
+        do! context.sync().``then``(fun _ ->
+            let headerNames =
+                let names = AnnotationTable.getHeaders tableSeqs
+                names
+                |> Array.map (fun name -> extendName names name)
+
+            headerNames
+            |> Array.iteri(fun i header ->
+                ExcelUtil.Table.addColumn i newTable header (int newTableRange.rowCount) "" |> ignore)
+        )
+
+        let bodyRange = newTable.getDataBodyRange()
+
+        let _ = bodyRange.load(propertyNames = U2.Case2 (ResizeArray["columnCount"; "rowCount"; "values"]))
+
+        do! context.sync().``then``(fun _ ->
+
+            //We delete the annotation table because we cannot overwrite an existing one
+            //As a result we create a new annotation table that has one column
+            //We delete the newly created column of the newly created table
+            newTable.columns.getItemAt(bodyRange.columnCount - 1.).delete()
+        )
+
+        let newBodyRange = newTable.getDataBodyRange()
+
+        let _ =
+            newTable.columns.load(propertyNames = U2.Case2 (ResizeArray["name"; "items"])) |> ignore
+            newBodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"; "values"]))
+
+        do! context.sync()
+
+        let bodyValues = AnnotationTable.getBody tableSeqs
+        newBodyRange.values <- bodyValues
+
+        do! AnnotationTable.format(newTable, context, true)
+    }
+
+/// <summary>
 /// Add the given arc table to the active annotation table at the desired index
 /// </summary>
 /// <param name="tableToAdd"></param>
 /// <param name="index"></param>
 /// <param name="options"></param>
-let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoinOptions option, templateName: string option) =
-    Excel.run(fun context ->
+let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoinOptions option, templateName: string option, context0) =
+    excelRunWith context0 <| fun context ->
         promise {
             //When a name is available get the annotation and arctable for easy access of indices and value adaption
             //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
@@ -1015,7 +1084,7 @@ let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoi
 
             match result with
             | Some excelTable ->
-                let! (refinedTableToAdd: ArcTable, index: int option) = prepareTemplateInMemory excelTable tableToAdd selectedColumns context
+                let! (refinedTableToAdd: ArcTable, index: int option) = prepareTemplateInMemoryForExcel excelTable tableToAdd selectedColumns context
 
                 //Arctable enables a fast check for the existence of input- and output-columns and their indices
                 let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)
@@ -1025,67 +1094,186 @@ let joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoi
                 | Result.Ok arcTable ->
                     arcTable.Join(refinedTableToAdd, ?index=index, ?joinOptions=options, forceReplace=true)
 
-                    let newTableRange = excelTable.getRange()
-
-                    let _ = newTableRange.load(propertyNames = U2.Case2 (ResizeArray["rowCount"]))
-
-                    do! context.sync().``then``(fun _ ->
-                        excelTable.delete()
-                    )
-
-                    let! (newTable, _) = AnnotationTable.createAtRange(false, false, newTableRange, context)
-
-                    let _ = newTable.load(propertyNames = U2.Case2 (ResizeArray["name"; "values"; "columns"]))
-
-                    let tableSeqs = arcTable.ToStringSeqs()
-
-                    do! context.sync().``then``(fun _ ->
-                        if templateName.IsSome then                            
-                            //Should be updated to remove all kinds of extra symbols
-                            let templateName = Helper.removeChars Helper.charsToRemove templateName.Value
-                            newTable.name <- $"annotationTable{templateName}"
-                        else
-                            newTable.name <- excelTable.name
-
-                        let headerNames =
-                            let names = AnnotationTable.getHeaders tableSeqs
-                            names
-                            |> Array.map (fun name -> extendName names name)
-
-                        headerNames
-                        |> Array.iteri(fun i header ->
-                            ExcelUtil.Table.addColumn i newTable header (int newTableRange.rowCount) "" |> ignore)
-                    )
-
-                    let bodyRange = newTable.getDataBodyRange()
-
-                    let _ = bodyRange.load(propertyNames = U2.Case2 (ResizeArray["columnCount"; "rowCount"; "values"]))
-
-                    do! context.sync().``then``(fun _ ->
-
-                        //We delete the annotation table because we cannot overwrite an existing one
-                        //As a result we create a new annotation table that has one column
-                        //We delete the newly created column of the newly created table
-                        newTable.columns.getItemAt(bodyRange.columnCount - 1.).delete()
-                    )
-
-                    let newBodyRange = newTable.getDataBodyRange()
-
-                    let _ =
-                        newTable.columns.load(propertyNames = U2.Case2 (ResizeArray["name"; "items"])) |> ignore
-                        newBodyRange.load(propertyNames = U2.Case2 (ResizeArray["name"; "columnCount"; "values"]))
-
-                    do! context.sync()
-
-                    let bodyValues = AnnotationTable.getBody tableSeqs
-                    newBodyRange.values <- bodyValues
-
-                    do! AnnotationTable.format(newTable, context, true)
+                    do! joinArcTablesInExcle excelTable arcTable templateName context
 
                     return [InteropLogging.Msg.create InteropLogging.Info $"Joined template {refinedTableToAdd.Name} to table {excelTable.name}!"]
                 | Result.Error _ ->
                     return [InteropLogging.Msg.create InteropLogging.Error "No arc table could be created! This should not happen at this stage! Please report this as a bug to the developers.!"]
             | None -> return [InteropLogging.NoActiveTableMsg]
+        }
+
+/// <summary>
+/// Sort the tables and selected columns based on the selected import type
+/// </summary>
+/// <param name="tablesToAdd"></param>
+/// <param name="selectedColumnsCollection"></param>
+/// <param name="importTables"></param>
+let selectTablesToAdd (tablesToAdd: ArcTable []) (selectedColumnsCollection: bool [] []) (importTables: JsonImport.ImportTable list) =
+
+    let importData =
+        importTables
+        |> List.map (fun importTable -> tablesToAdd.[importTable.Index], selectedColumnsCollection.[importTable.Index], importTable.FullImport)
+
+    let mutable tablesToAdd, selectedColumnsCollectionToAdd, tablesToJoin, selectedColumnsCollectionToJoin =
+        list.Empty, list.Empty, list.Empty, list.Empty
+
+    importData
+    |> List.iter (fun (table, selectedColumns, importType) ->
+        if importType then
+            tablesToAdd <- table::tablesToAdd
+            selectedColumnsCollectionToAdd <- selectedColumns::selectedColumnsCollectionToAdd
+        else
+            tablesToJoin <- table::tablesToJoin
+            selectedColumnsCollectionToJoin <- selectedColumns::selectedColumnsCollectionToJoin
+    )
+
+    tablesToAdd |> Array.ofList,
+    selectedColumnsCollectionToAdd |> Array.ofList,
+    tablesToJoin |> Array.ofList,
+    selectedColumnsCollectionToJoin |> Array.ofList
+
+/// <summary>
+/// Join selected template tables with active table
+/// </summary>
+/// <param name="originTable"></param>
+/// <param name="excelTable"></param>
+/// <param name="tablesToJoin"></param>
+/// <param name="selectedColumnsCollection"></param>
+/// <param name="options"></param>
+/// <param name="context"></param>
+let joinTemplatesToTable (originTable:ArcTable) (excelTable: Table) tablesToJoin selectedColumnsCollection options (context: RequestContext) =
+    promise {
+        let selectedRange = context.workbook.getSelectedRange()
+        let tableStartIndex = excelTable.getRange()
+        let _ =
+            tableStartIndex.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|])) |> ignore
+            selectedRange.load(propertyNames=U2.Case2 (ResizeArray[|"columnIndex"|]))
+
+        do! context.sync()
+
+        let targetIndex =
+            let adaptedStartIndex = selectedRange.columnIndex - tableStartIndex.columnIndex
+            if adaptedStartIndex > float (originTable.ColumnCount) then originTable.ColumnCount
+            else int adaptedStartIndex + 1
+
+        let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (selectedColumns: bool[][]) (options: TableJoinOptions option) i =
+            let tableToAdd = tablesToAdd.[i]
+            let refinedTableToAdd = prepareTemplateInMemory originTable tableToAdd selectedColumns.[i]
+
+            let newTable =
+                if i > 0 then
+                    originTable.Join(refinedTableToAdd, ?joinOptions=options, forceReplace=true)
+                    originTable
+                else
+                    refinedTableToAdd
+
+            if i = tablesToAdd.Length-1 then
+                newTable
+            else
+                loop newTable tablesToAdd selectedColumns options (i + 1)
+
+        let processedJoinTable = loop originTable tablesToJoin selectedColumnsCollection options 0
+
+        let finalTable = prepareTemplateInMemory originTable processedJoinTable [||]
+
+        originTable.Join(finalTable, targetIndex, ?joinOptions=options, forceReplace=true)
+
+        do! joinArcTablesInExcle excelTable originTable None context
+
+        let templateNames = tablesToJoin |> Array.map (fun item -> item.Name)
+
+        return [InteropLogging.Msg.create InteropLogging.Info $"Joined templates {templateNames} to table {excelTable.name}!"]
+    }
+
+/// <summary>
+/// Add new tamplate tables and worksheets
+/// </summary>
+/// <param name="tablesToAdd"></param>
+/// <param name="selectedColumnsCollection"></param>
+/// <param name="options"></param>
+/// <param name="context"></param>
+let addTemplates (tablesToAdd: ArcTable[]) (selectedColumnsCollection: bool [] []) (options: TableJoinOptions option) (context: RequestContext) =
+    promise {
+        let! result = AnnotationTable.tryGetActive context
+
+        for i in 0..tablesToAdd.Length - 1 do
+            let tableToAdd = tablesToAdd.[i]
+            let selectedColumnCollection = selectedColumnsCollection.[i]
+            let newName = ExcelUtil.createNewTableName()
+            let originTable = ArcTable.init(newName)
+            let finalTable =
+                let endTable = prepareTemplateInMemory originTable tableToAdd selectedColumnCollection
+                originTable.Join(endTable, ?joinOptions = options)
+                originTable
+
+            let! activeWorksheet =
+                if i = 0 && result.IsNone then
+                    promise { return context.workbook.worksheets.getActiveWorksheet() }
+                else
+                    promise {
+                        let! workSheetName = getNewActiveWorkSheetName tableToAdd.Name context
+                        let newWorkSheet = context.workbook.worksheets.add(workSheetName)
+                        newWorkSheet.activate()
+                        return newWorkSheet
+                    }
+
+            let tableValues = finalTable.ToStringSeqs()
+            let range = activeWorksheet.getRangeByIndexes(0, 0, float (finalTable.RowCount + 1), (tableValues.Item 0).Count)                
+
+            range.values <- finalTable.ToStringSeqs()
+
+            let newTable = activeWorksheet.tables.add(U2.Case1 range, true)
+            newTable.name <- finalTable.Name
+            newTable.style <- ExcelUtil.TableStyleLight
+
+            do! AnnotationTable.format(newTable, context, true)
+
+        let templateNames = tablesToAdd |> Array.map (fun item -> item.Name)
+        return [InteropLogging.Msg.create InteropLogging.Info $"Added templates {templateNames}!"]
+    }
+
+/// <summary>
+/// Add the given arc table to the active annotation table at the desired index
+/// </summary>
+/// <param name="tableToAdd"></param>
+/// <param name="index"></param>
+/// <param name="options"></param>
+let joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [], options: TableJoinOptions option, importTables: JsonImport.ImportTable list) =
+    Excel.run(fun context ->
+        promise {
+            //When a name is available get the annotation and arctable for easy access of indices and value adaption
+            //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
+            let tablesToAdd, selectedColumnsCollectionToAdd, tablesToJoin, selectedColumnsCollectionToJoin =
+                selectTablesToAdd tablesToAdd selectedColumnsCollection importTables
+            let! result = AnnotationTable.tryGetActive context
+            match result with
+            | Some excelTable ->
+                let! originTableRes = ArcTable.fromExcelTable(excelTable, context)
+                match originTableRes with
+                | Result.Error _ ->
+                    return failwith $"Failed to create arc table for table {excelTable.name}"
+                | Result.Ok originTable ->
+                    let! msgJoin =
+                        if tablesToJoin.Length > 0 then
+                            joinTemplatesToTable originTable excelTable tablesToJoin selectedColumnsCollectionToJoin options context
+                        else
+                            promise {return []}
+
+                    let! msgAdd =
+                        addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
+
+                    if msgAdd.IsEmpty then                        
+                        return msgJoin
+                    else if msgJoin.IsEmpty then
+                        return msgAdd
+                    else
+                        return [msgJoin.Head; msgAdd.Head]
+            | None ->
+                if tablesToJoin.Length > 0 then
+                    return [InteropLogging.NoActiveTableMsg]
+                else
+                    let! msgAdd = addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
+                    return msgAdd
         }
     )
 

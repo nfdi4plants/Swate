@@ -5,7 +5,6 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
-open Types.TableImport
 
 open ARCtrl
 open JsonImport
@@ -70,28 +69,6 @@ type ModalElements =
                     ]
                 ]
                 content
-            ]
-        ]
-
-    static member BoxWithChildren(children: ReactElement list, ?title: string, ?icon: string, ?className: string list) =
-        Html.div [
-            prop.className [
-                "rounded shadow p-2 flex flex-col gap-2 border"
-                if className.IsSome then
-                    className.Value |> String.concat " "
-            ]
-            prop.children [
-                Html.h3 [
-                    prop.className "font-semibold gap-2 flex flex-row items-center"
-                    if icon.IsSome || title.IsSome then
-                        prop.children [
-                            if icon.IsSome then
-                                Html.i [prop.className icon.Value]
-                            if title.IsSome then
-                                Html.span title.Value
-                        ]
-                    prop.children children
-                ]
             ]
         ]
 
