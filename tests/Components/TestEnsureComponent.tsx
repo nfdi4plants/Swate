@@ -1,5 +1,6 @@
 // MyComponent.tsx
 import React, { useState } from 'react';
+import './tailwind.css'
 
 const MyComponent = () => {
   const [value, setValue] = useState('');
@@ -14,6 +15,7 @@ const MyComponent = () => {
       />
       <button
         data-testid="button"
+        className='bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-[300px]'
         onClick={() => setClicked(true)}
       >
         Click me

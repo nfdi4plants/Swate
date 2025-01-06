@@ -8,6 +8,7 @@ export default defineConfig({
         jsx: 'automatic', // Enables React 17+ JSX Transform
     },
     test: {
+      css: true,
       globals: true,
       environment: "jsdom",
       setupFiles: './vitest.setup.ts', // Loads the setup file

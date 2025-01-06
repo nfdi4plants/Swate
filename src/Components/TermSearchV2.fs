@@ -121,6 +121,21 @@ module private API =
                 |]
             }
 
+    let callSearch = fun (query: string) ->
+        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create query)
+        |> Async.StartAsPromise
+        //|> Promise.map(fun results ->
+        //    results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
+        //)
+
+    let callParentSearch = fun (parent: string) (query: string) ->
+        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create(query, parentTermId = parent))
+        |> Async.StartAsPromise
+
+    let callAllChildSearch = fun (parent: string) ->
+        Api.ontology.findAllChildTerms (Shared.DTOs.ParentTermQuery.ParentTermQueryDto.create(parent))
+        |> Async.StartAsPromise
+
 [<Mangle(false); Erase>]
 type TermSearchV2 =
 
@@ -251,11 +266,13 @@ type TermSearchV2 =
             ]
         ]
 
-    static member private IndicatorItem(indicatorPosition, tooltip, tooltipPosition, icon: string, onclick) =
+    static member private IndicatorItem(indicatorPosition: string, tooltip, tooltipPosition, icon: string, onclick, ?isActive: bool) =
+        let isActive = defaultArg isActive true
         Html.span [
             prop.className [
-                "indicator-item text-sm"
+                "indicator-item text-sm transition-[opacity] opacity-0"
                 indicatorPosition
+                if isActive then "!opacity-100"
             ]
             prop.children [
                 Html.button [
@@ -355,6 +372,7 @@ type TermSearchV2 =
             |> Promise.start
           Cancel = rvm
         }
+        // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
         React.useEffect(
             (fun () -> setTempPagination (pagination + 1 |> Some)),
             [|box pagination|]
@@ -457,9 +475,12 @@ type TermSearchV2 =
         let debug = defaultArg debug false
 
         let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
-        let loading, setLoading = React.useStateWithUpdater(Set.empty)
+        // Set of string ids for each action started. As long as one id is still contained, shows loading spinner
+        let (loading: Set<string>), setLoading = React.useStateWithUpdater(Set.empty)
         let inputRef = React.useInputRef()
         let containerRef = React.useRef(None)
+        // Used to show indicator buttons only when focused
+        let focused, setFocused = React.useState(false)
 
         let cancelled = React.useRef(false)
 
@@ -583,10 +604,17 @@ type TermSearchV2 =
             setSearchResults (fun _ -> SearchState.init())
             allChildSearch()
 
-        React.useListener.onClickAway(containerRef, fun _ -> setSearchResults(fun _ -> SearchState.init()); cancel())
+        React.useListener.onClickAway(containerRef,
+            (fun _ ->
+                setFocused false
+                setSearchResults(fun _ -> SearchState.init())
+                cancel()
+            )
+        )
 
         Html.div [
             prop.className "form-control"
+            prop.ref containerRef
             prop.children [
                 match modal with
                 | Some Details when term.IsSome ->
@@ -601,7 +629,7 @@ type TermSearchV2 =
                     prop.className "indicator"
                     prop.children [
                         match term with
-                        | Some { Name = Some name; Id = Some id } -> // full term indicator
+                        | Some { Name = Some name; Id = Some id } -> // full term indicator, show always
                             if System.String.IsNullOrWhiteSpace id |> not then
                                 TermSearchV2.IndicatorItem(
                                     "",
@@ -610,13 +638,14 @@ type TermSearchV2 =
                                     "fa-solid fa-square-check text-primary",
                                     fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
                                 )
-                        | _ when showDetails && term.IsSome ->
+                        | _ when showDetails && term.IsSome -> // show only when focused
                             TermSearchV2.IndicatorItem(
                                 "",
                                 "Details",
                                 "tooltip-left",
                                 "fa-solid fa-circle-info text-info",
-                                fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
+                                (fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)),
+                                focused
                             )
                         | _ ->
                             Html.none
@@ -627,14 +656,14 @@ type TermSearchV2 =
                                 "Advanced Search",
                                 "tooltip-left",
                                 "fa-solid fa-magnifying-glass-plus text-primary",
-                                fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch)
+                                (fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch)),
+                                focused
                             )
 
                         Html.div [ // main search component
                             if debug then
                                 prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                                 prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
-                            prop.ref containerRef
                             prop.className "input input-bordered flex flex-row items-center relative"
                             prop.children [
                                 Html.input [
@@ -659,6 +688,9 @@ type TermSearchV2 =
                                     )
                                     prop.onKeyDown (key.escape, fun _ ->
                                         cancel()
+                                    )
+                                    prop.onFocus(fun _ ->
+                                        setFocused true
                                     )
                                 ]
                                 Daisy.loading [

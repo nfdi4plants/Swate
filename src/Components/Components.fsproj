@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="Api.fs" />
     <Compile Include="React.useListener.fs" />
     <Compile Include="GenericComponents.fs" />
     <Compile Include="Example.fs" />

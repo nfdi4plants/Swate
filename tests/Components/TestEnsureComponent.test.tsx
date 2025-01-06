@@ -20,4 +20,15 @@ describe('TestEnsureComponent', () => {
 
     expect(screen.getByTestId('message')).toBeInTheDocument();
   });
+
+  test('renders with Tailwind classes', () => {
+    render(<TestEnsureComponent />);
+
+    const button = screen.getByTestId('button');
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveClass('w-[300px]');
+
+    const computedStyle = getComputedStyle(button);
+    expect(computedStyle.width).toBe('300px');
+  });
 });
