@@ -10,9 +10,9 @@ open Feliz.DaisyUI
 
 open Components
 open ARCtrl
-open ARCtrl.Spreadsheet
 open Shared
 open Components.Metadata
+open OfficeInterop.Core
 
 type private NavbarState = {
     BurgerActive: bool
@@ -37,7 +37,7 @@ type ExcelMetadataState = {
 let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     let createMetadata (metadata: ArcFiles) =
         promise {
-            let! msgs = OfficeInterop.Core.updateTopLevelMetadata metadata
+            let! msgs = updateTopLevelMetadata metadata
             GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
             do! refresh()
         }

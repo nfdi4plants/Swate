@@ -9,6 +9,8 @@ open Routing
 open Messages
 open Model
 
+open OfficeInterop.Core
+
 let urlUpdate (route: Route option) (model:Model) : Model * Cmd<Messages.Msg> =
     let cmd (host: Swatehost) = SpreadsheetInterface.Initialize host |> InterfaceMsg |> Cmd.ofMsg
     let host =
@@ -79,7 +81,7 @@ module Dev =
         | LogTableMetadata ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.Core.getTableMetaData
+                    Main.getTableMetaData
                     ()
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
