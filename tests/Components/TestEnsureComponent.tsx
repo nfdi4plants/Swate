@@ -1,6 +1,5 @@
 // MyComponent.tsx
 import React, { useState } from 'react';
-import './tailwind.css'
 
 const MyComponent = () => {
   const [value, setValue] = useState('');

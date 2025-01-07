@@ -4,7 +4,7 @@ console.log('tailwindcss config loaded');
 module.exports = {
     mode: "jit",
     content: [
-        './tests/components/**/*.{js,ts,jsx,tsx}',
+        './tests/components/**/*.{js,ts,jsx,tsx}', // this must be relative to root :disappointed:
     ],
     daisyui: {
         themes: [

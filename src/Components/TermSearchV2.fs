@@ -9,35 +9,43 @@ type private Modals =
 | AdvancedSearch
 | Details
 
-type Term = {
-    Name: string option
-    Id: string option
-    Description: string option
-    Href: string option
-    IsObsolete: bool option
-    Source: string option
-    Data: obj option
-} with
-    static member init(?name, ?id, ?description, ?source: string, ?href, ?obsolete: bool, ?data) = {
-        Name = name
-        Id = id
-        Source = source
-        IsObsolete = obsolete
-        Href = href
-        Description = description
-        Data = data
-    }
+// [<AllowNullLiteral>]
+// [<Global>]
+// type Term
+//     [<ParamObjectAttribute; Emit("$0")>]
+//     (?name, ?id, ?description, ?source: string, ?href, ?isObsolete: bool, ?data) =
+//     member val name: string option = jsNative with get, set
+//     member val id: string option = jsNative with get, set
+//     member val description: string option = jsNative with get, set
+//     member val source: string option = jsNative with get, set
+//     member val href: string option = jsNative with get, set
+//     member val isObsolete: bool option = jsNative with get, set
+//     member val data: obj option = jsNative with get, set
 
-type AdvancedSearchController = {
-    StartSearch: unit -> unit
-    Cancel: unit -> unit
-}
+type Term = {|
+    name: string option;
+    id: string option;
+    description: string option;
+    source: string option;
+    href: string option;
+    isObsolete: bool option;
+    data: obj option
+|}
 
-type AdvancedSearch<'A> = {
-    Input: 'A
-    Search: 'A -> JS.Promise<ResizeArray<Term>>
-    Form: AdvancedSearchController -> ReactElement
-}
+type TermUtil =
+    static member init (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
+        {|name = name; id = id; description = description; source = source; href = href; isObsolete = isObsolete; data = data|}
+
+type AdvancedSearchController = {|
+    startSearch: unit -> unit
+    cancel: unit -> unit
+|}
+
+type AdvancedSearch<'A> = {|
+    input: 'A
+    search: 'A -> JS.Promise<ResizeArray<Term>>
+    form: AdvancedSearchController -> ReactElement
+|}
 
 type SearchCall = string -> JS.Promise<ResizeArray<Term>>
 
@@ -52,7 +60,7 @@ type TermSearchResult = {
     static member addSearchResults (prevResults: ResizeArray<TermSearchResult>) (newResults: ResizeArray<TermSearchResult>) =
         for newResult in newResults do
             // check if new result is already in the list by id
-            let index = prevResults.FindIndex(fun x -> x.Term.Id = newResult.Term.Id)
+            let index = prevResults.FindIndex(fun x -> x.Term.id = newResult.Term.id)
             // if it exists and the newResult is result of directedSearch, we update the item
             // Directed search normally takes longer to complete but is additional information
             // so we update non-directed search results with the directed search results
@@ -90,11 +98,11 @@ module private API =
                 do! Promise.sleep 1500
                 //Init mock data for about 10 items
                 return ResizeArray [|
-                    Term.init("Term 1", "1", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", obsolete = false, href= "www.test.de'/1")
-                    Term.init("Term 2", "2", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", obsolete = false, href= "www.test.de'/2")
-                    Term.init("Term 3", "3", obsolete = false)
-                    Term.init("Term 4 Is a Very special term with a extremely long name", "4", obsolete = false, href= "www.test.de'/3")
-                    Term.init("Term 5", "5", obsolete = false, href= "www.test.de'/4")
+                    TermUtil.init("Term 1", "1", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", isObsolete = false, href= "www.test.de'/1")
+                    TermUtil.init("Term 2", "2", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", isObsolete = false, href= "www.test.de'/2")
+                    TermUtil.init("Term 3", "3", isObsolete = false)
+                    TermUtil.init("Term 4 Is a Very special term with a extremely long name", "4", isObsolete = false, href= "www.test.de'/3")
+                    TermUtil.init("Term 5", "5", isObsolete = false, href= "www.test.de'/4")
                 |]
             }
 
@@ -105,7 +113,7 @@ module private API =
                 do! Promise.sleep 2000
                 //Init mock data for about 10 items
                 return ResizeArray [|
-                    Term.init("Term 1", "1", href= "/term/1", obsolete = false)
+                    TermUtil.init("Term 1", "1", href= "/term/1", isObsolete = false)
                 |]
             }
 
@@ -117,7 +125,7 @@ module private API =
                 //Init mock data for about 10 items
                 return ResizeArray [|
                     for i in 0 .. 100 do
-                        Term.init(sprintf "Child %d" i, i.ToString(), href = (sprintf "/term/%d" i), obsolete = (i % 5 = 0))
+                        TermUtil.init(sprintf "Child %d" i, i.ToString(), href = (sprintf "/term/%d" i), isObsolete = (i % 5 = 0))
                 |]
             }
 
@@ -142,7 +150,7 @@ type TermSearchV2 =
     [<ReactComponent>]
     static member private TermItem(term: TermSearchResult, onTermSelect: Term option -> unit, ?key: string) =
         let collapsed, setCollapsed = React.useState(false)
-        let isObsolete = term.Term.IsObsolete.IsSome && term.Term.IsObsolete.Value
+        let isObsolete = term.Term.isObsolete.IsSome && term.Term.isObsolete.Value
         let isDirectedSearch = term.IsDirectedSearchResult
         let activeClasses = "group-[.collapse-open]:bg-secondary group-[.collapse-open]:text-secondary-content"
         Html.div [
@@ -178,7 +186,7 @@ type TermSearchV2 =
                                     ]
                                 ]
                                 Html.span [
-                                    let name = Option.defaultValue "<no-name>" term.Term.Name
+                                    let name = Option.defaultValue "<no-name>" term.Term.name
                                     prop.title name
                                     prop.className [
                                         "truncate font-bold"
@@ -187,11 +195,11 @@ type TermSearchV2 =
                                     prop.text name
                                 ]
                                 Html.a [
-                                    let id = Option.defaultValue "<no-id>" term.Term.Id
-                                    if term.Term.Href.IsSome then
+                                    let id = Option.defaultValue "<no-id>" term.Term.id
+                                    if term.Term.href.IsSome then
                                         prop.onClick (fun e -> e.stopPropagation())
                                         prop.target.blank
-                                        prop.href term.Term.Href.Value
+                                        prop.href term.Term.href.Value
                                         prop.className "link link-primary"
                                     prop.text id
                                 ]
@@ -209,7 +217,7 @@ type TermSearchV2 =
                         Html.p [
                             prop.className "text-sm"
                             prop.children [
-                                Html.text (Option.defaultValue "<no-description>" term.Term.Description)
+                                Html.text (Option.defaultValue "<no-description>" term.Term.description)
                             ]
                         ]
                     ]
@@ -266,7 +274,7 @@ type TermSearchV2 =
             ]
         ]
 
-    static member private IndicatorItem(indicatorPosition: string, tooltip, tooltipPosition, icon: string, onclick, ?isActive: bool) =
+    static member private IndicatorItem(indicatorPosition: string, tooltip, tooltipPosition, icon: string, onclick, ?isActive: bool, ?props: IReactProperty list) =
         let isActive = defaultArg isActive true
         Html.span [
             prop.className [
@@ -278,6 +286,8 @@ type TermSearchV2 =
                 Html.button [
                     prop.custom("data-tip", tooltip)
                     prop.onClick onclick
+                    for prop in defaultArg props [] do
+                        prop
                     prop.className [
                         "btn btn-xs btn-ghost px-2"
                         "tooltip"; tooltipPosition
@@ -294,9 +304,12 @@ type TermSearchV2 =
     static member private BaseModal(
         title: string,
         content: ReactElement,
-        rmv: _ -> unit
+        rmv: _ -> unit,
+        ?debug: string
     ) =
         Html.div [
+            if debug.IsSome then
+                prop.custom("data-testid", debug.Value)
             prop.className "fixed top-0 left-0 right-0 bottom-0 z-50 bg-base-300 bg-opacity-50 flex items-center justify-center p-2 sm:p-10"
             prop.onMouseDown(fun _ -> rmv())
             prop.children [
@@ -330,22 +343,22 @@ type TermSearchV2 =
             prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
             prop.children [
                 label "Name"
-                Html.div (Option.defaultValue "<no-name>" term.Name)
+                Html.div (Option.defaultValue "<no-name>" term.name)
                 label "Id"
-                Html.div (Option.defaultValue "<no-id>" term.Id)
+                Html.div (Option.defaultValue "<no-id>" term.id)
                 label "Description"
-                Html.div (Option.defaultValue "<no-description>" term.Description)
+                Html.div (Option.defaultValue "<no-description>" term.description)
                 label "Source"
-                Html.div (Option.defaultValue "<no-source>" term.Source)
-                if term.IsObsolete.IsSome && term.IsObsolete.Value then
+                Html.div (Option.defaultValue "<no-source>" term.source)
+                if term.isObsolete.IsSome && term.isObsolete.Value then
                     Html.div [
                         prop.className "text-error"
                         prop.text "obsolete"
                     ]
-                if term.Href.IsSome then
+                if term.href.IsSome then
                     Html.a [
                         prop.className "link link-primary"
-                        prop.href term.Href.Value
+                        prop.href term.href.Value
                         prop.target.blank
                         prop.text "Link"
                     ]
@@ -355,34 +368,34 @@ type TermSearchV2 =
 
 
     [<ReactComponent>]
-    static member AdvancedSearchModal(rvm, advancedSearch: AdvancedSearch<'A>, onTermSelect) =
+    static member AdvancedSearchModal(rvm, advancedSearch: AdvancedSearch<'A>, onTermSelect, ?debug: bool) =
         let searchResults, setSearchResults = React.useState(SearchState.init)
         /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
         let (tempPagination: int option), setTempPagination = React.useState(None)
         let pagination, setPagination = React.useState(0)
         let BinSize = 20
         let BinCount = React.useMemo((fun () -> searchResults.Results.Count / BinSize), [|box searchResults|])
-        let controller = {
-          StartSearch = fun () ->
-            advancedSearch.Search advancedSearch.Input
+        let controller = {|
+          startSearch = fun () ->
+            advancedSearch.search advancedSearch.input
             |> Promise.map(fun results ->
                 let results = results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
                 setSearchResults (SearchState.SearchDone results)
             )
             |> Promise.start
-          Cancel = rvm
-        }
+          cancel = rvm
+        |}
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
         React.useEffect(
             (fun () -> setTempPagination (pagination + 1 |> Some)),
             [|box pagination|]
         )
         let searchFormComponent() = React.fragment [
-            advancedSearch.Form controller
+            advancedSearch.form controller
             Html.button [
                 prop.className "btn btn-primary"
                 prop.onClick(fun _ ->
-                    advancedSearch.Search advancedSearch.Input
+                    advancedSearch.search advancedSearch.input
                     |> Promise.map(fun results ->
                         let results = results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
                         setSearchResults (SearchState.SearchDone results)
@@ -456,7 +469,7 @@ type TermSearchV2 =
                     resultsComponent results
             ]
         ]
-        TermSearchV2.BaseModal("Advanced Search", content, rvm)
+        TermSearchV2.BaseModal("Advanced Search", content, rvm, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
 
     [<ExportDefaultAttribute; NamedParams>]
     static member TermSearch(
@@ -488,7 +501,7 @@ type TermSearchV2 =
 
         let onTermSelect = fun (term: Term option) ->
             if inputRef.current.IsSome then
-                let v = Option.bind (fun t -> t.Name) term |> Option.defaultValue ""
+                let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
                 inputRef.current.Value.value <- v
             setSearchResults (fun _ -> SearchState.init())
             onTermSelect term
@@ -613,6 +626,9 @@ type TermSearchV2 =
         )
 
         Html.div [
+            if debug then
+                prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
+                prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className "form-control"
             prop.ref containerRef
             prop.children [
@@ -623,17 +639,17 @@ type TermSearchV2 =
                     let onTermSelect = fun (term: Term option) ->
                         onTermSelect term
                         setModal None
-                    TermSearchV2.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect)
+                    TermSearchV2.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
                 | _ -> Html.none
                 Html.div [
                     prop.className "indicator"
                     prop.children [
                         match term with
-                        | Some { Name = Some name; Id = Some id } -> // full term indicator, show always
-                            if System.String.IsNullOrWhiteSpace id |> not then
+                        | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
+                            if System.String.IsNullOrWhiteSpace term.id.Value |> not then
                                 TermSearchV2.IndicatorItem(
                                     "",
-                                    sprintf "%s - %s" name id,
+                                    sprintf "%s - %s" term.name.Value term.id.Value,
                                     "tooltip-left",
                                     "fa-solid fa-square-check text-primary",
                                     fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
@@ -657,25 +673,25 @@ type TermSearchV2 =
                                 "tooltip-left",
                                 "fa-solid fa-magnifying-glass-plus text-primary",
                                 (fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch)),
-                                focused
+                                focused,
+                                [prop.custom("data-testid", "advanced-search-indicator")]
                             )
 
                         Html.div [ // main search component
-                            if debug then
-                                prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
-                                prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
                             prop.className "input input-bordered flex flex-row items-center relative"
                             prop.children [
                                 Html.input [
+                                    if debug then
+                                        prop.custom("data-testid", "term-search-input")
                                     prop.ref(inputRef)
-                                    prop.defaultValue (term |> Option.bind _.Name |> Option.defaultValue "")
+                                    prop.defaultValue (term |> Option.bind _.name |> Option.defaultValue "")
                                     prop.placeholder "..."
                                     prop.onChange (fun (e: string) ->
                                         if System.String.IsNullOrEmpty e then
                                             onTermSelect None
                                             cancel()
                                         else
-                                            onTermSelect (Some <| Term.init(e))
+                                            onTermSelect (Some <| TermUtil.init(e))
                                             startSearch e
                                     )
                                     prop.onDoubleClick(fun _ ->
