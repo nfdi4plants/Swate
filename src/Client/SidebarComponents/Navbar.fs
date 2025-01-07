@@ -1,7 +1,5 @@
 module SidebarComponents.Navbar
 
-open System
-
 open Model
 open Messages
 
@@ -12,7 +10,6 @@ open Components
 open ARCtrl
 open Shared
 open Components.Metadata
-open OfficeInterop.Core
 
 type private NavbarState = {
     BurgerActive: bool
@@ -37,7 +34,7 @@ type ExcelMetadataState = {
 let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     let createMetadata (metadata: ArcFiles) =
         promise {
-            let! msgs = updateTopLevelMetadata metadata
+            let! msgs = OfficeInterop.Core.Main.updateTopLevelMetadata metadata
             GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
             do! refresh()
         }

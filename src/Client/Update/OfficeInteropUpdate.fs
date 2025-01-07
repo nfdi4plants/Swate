@@ -37,7 +37,7 @@ module OfficeInterop =
             | InsertOntologyTerm ontologyAnnotation ->
                 let cmd =
                     Cmd.OfPromise.either
-                        fillSelectedWithOntologyAnnotation
+                        Main.fillSelectedWithOntologyAnnotation
                         (ontologyAnnotation)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -115,7 +115,7 @@ module OfficeInterop =
             | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either
-                        convertBuildingBlock
+                        Main.convertBuildingBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -132,7 +132,7 @@ module OfficeInterop =
             | ValidateBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        validateSelectedAndNeighbouringBuildingBlocks
+                        Main.validateSelectedAndNeighbouringBuildingBlocks
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -161,7 +161,7 @@ module OfficeInterop =
             | InsertFileNames fileNameList ->
                 let cmd =
                     Cmd.OfPromise.either
-                        insertFileNamesFromFilePicker
+                        Main.insertFileNamesFromFilePicker
                         (fileNameList)
                         (curry GenericLog Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -170,7 +170,7 @@ module OfficeInterop =
             | UpdateTopLevelMetadata arcFiles ->
                 let cmd =
                     Cmd.OfPromise.either
-                        updateTopLevelMetadata
+                        Main.updateTopLevelMetadata
                         (arcFiles)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
@@ -178,7 +178,7 @@ module OfficeInterop =
             | DeleteTopLevelMetadata ->
                 let cmd =
                     Cmd.OfPromise.either
-                        deleteTopLevelMetadata
+                        Main.deleteTopLevelMetadata
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error

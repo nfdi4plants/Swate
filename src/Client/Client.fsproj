@@ -21,8 +21,7 @@
     <Compile Include="Api.fs" />
     <Compile Include="Routing.fs" />
     <Compile Include="OfficeInterop\InteropLogging.fs" />
-    <Compile Include="OfficeInterop\ExcelUtil.fs" />
-    <Compile Include="OfficeInterop\ArcCtrlHelper.fs" />
+    <Compile Include="OfficeInterop\ARCtrlHelper.fs" />
     <Compile Include="OfficeInterop\ExcelHelper.fs" />
     <Compile Include="OfficeInterop\ArcTableHelper.fs" />
     <Compile Include="OfficeInterop\OfficeInterop.fs" />

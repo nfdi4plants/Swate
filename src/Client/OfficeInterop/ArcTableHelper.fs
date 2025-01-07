@@ -1,4 +1,4 @@
-module ArcTableHelper
+module OfficeInterop.ArcTableHelper
 
 open Fable.Core
 open ExcelJS.Fable
@@ -111,7 +111,7 @@ type ArcTable with
     /// <param name="context"></param>
     static member fromExcelTableName (tableName: string, context: RequestContext) =
         promise {
-            let! table = ExcelUtil.tryGetTableByName context tableName
+            let! table = tryGetTableByName context tableName
 
             match table with
             | Some (table, _, _) ->
