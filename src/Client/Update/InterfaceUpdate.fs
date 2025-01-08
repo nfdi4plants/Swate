@@ -12,7 +12,9 @@ open Elmish
 open Model
 open Shared
 open Fable.Core.JsInterop
-open Shared.ARCtrlHelper
+
+open ARCtrl
+open ArcTableHelper
 
 module private ModelUtil =
 
@@ -223,7 +225,7 @@ module Interface =
                                 let! arcfile = OfficeInterop.Core.Main.tryParseToArcFile()
                                 let arcfileOpt = arcfile |> Result.toOption
                                 let! activeTable = ExcelJS.Fable.GlobalBindings.Excel.run(fun context ->
-                                    OfficeInterop.Core.tryGetActiveArcTable context
+                                    ArcTable.tryGetActiveArcTable(context)
                                 )
                                 let activeTableIndex =
                                     match arcfileOpt, activeTable with

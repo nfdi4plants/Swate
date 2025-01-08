@@ -5,10 +5,10 @@ open Elmish
 open Messages
 open OfficeInterop
 open OfficeInterop.Core
-open Shared
 open Model
 
 module OfficeInterop =
+
     let update (state: OfficeInterop.Model) (model:Model) (msg: OfficeInterop.Msg) : OfficeInterop.Model * Model * Cmd<Messages.Msg> =
 
         let innerUpdate (state: OfficeInterop.Model) (model: Model) (msg: OfficeInterop.Msg) =
@@ -26,7 +26,7 @@ module OfficeInterop =
                 state, model, cmd
 
             | AutoFitTable hidecols ->
-                let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (fun c -> OfficeInterop.Core.AnnotationTable.formatActive c hidecols)
+                let p = fun () -> ExcelJS.Fable.GlobalBindings.Excel.run (fun c -> ExcelHelper.formatActive c hidecols)
                 let cmd =
                     Cmd.OfPromise.attempt
                         p
@@ -37,7 +37,7 @@ module OfficeInterop =
             | InsertOntologyTerm ontologyAnnotation ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.fillSelectedWithOntologyAnnotation
+                        Main.fillSelectedWithOntologyAnnotation
                         (ontologyAnnotation)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -46,7 +46,7 @@ module OfficeInterop =
             | AddAnnotationBlock compositeColumn ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.Main.addCompositeColumn
+                        Main.addCompositeColumn
                         (compositeColumn)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -79,8 +79,8 @@ module OfficeInterop =
             | AddTemplate (table, selectedColumns, importType, templateName) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.joinTable
-                        (table, selectedColumns, Some importType.ImportType, templateName, None)
+                        Main.joinTable
+                        (table, selectedColumns, Some importType.ImportType, templateName)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
@@ -88,7 +88,7 @@ module OfficeInterop =
             | AddTemplates (tables, selectedColumns, importType) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.joinTables
+                        Main.joinTables
                         (tables, selectedColumns, Some importType.ImportType, importType.ImportTables)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -97,8 +97,8 @@ module OfficeInterop =
             | JoinTable (table, options) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.joinTable
-                        (table, [||], options, None, None)
+                        Main.joinTable
+                        (table, [||], options, None)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
@@ -106,7 +106,7 @@ module OfficeInterop =
             | RemoveBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.removeSelectedAnnotationBlock
+                        Main.removeSelectedAnnotationBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -115,7 +115,7 @@ module OfficeInterop =
             | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.convertBuildingBlock
+                        Main.convertBuildingBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -124,7 +124,7 @@ module OfficeInterop =
             | CreateAnnotationTable tryUsePrevOutput ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.AnnotationTable.create
+                        Main.createAnnotationTable
                         (false, tryUsePrevOutput)
                         (curry GenericInteropLogs Cmd.none >> DevMsg) //success
                         (curry GenericError Cmd.none >> DevMsg) //error
@@ -132,7 +132,7 @@ module OfficeInterop =
             | ValidateBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.validateSelectedAndNeighbouringBuildingBlocks
+                        Main.validateSelectedAndNeighbouringBuildingBlocks
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -145,7 +145,7 @@ module OfficeInterop =
             | RectifyTermColumns ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.Main.rectifyTermColumns
+                        Main.rectifyTermColumns
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -161,7 +161,7 @@ module OfficeInterop =
             | InsertFileNames fileNameList ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.insertFileNamesFromFilePicker
+                        Main.insertFileNamesFromFilePicker
                         (fileNameList)
                         (curry GenericLog Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -170,7 +170,7 @@ module OfficeInterop =
             | UpdateTopLevelMetadata arcFiles ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.updateTopLevelMetadata
+                        Main.updateTopLevelMetadata
                         (arcFiles)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
@@ -178,7 +178,7 @@ module OfficeInterop =
             | DeleteTopLevelMetadata ->
                 let cmd =
                     Cmd.OfPromise.either
-                        OfficeInterop.Core.deleteTopLevelMetadata
+                        Main.deleteTopLevelMetadata
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error

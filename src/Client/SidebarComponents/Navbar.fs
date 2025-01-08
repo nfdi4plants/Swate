@@ -1,7 +1,5 @@
 module SidebarComponents.Navbar
 
-open System
-
 open Model
 open Messages
 
@@ -10,7 +8,6 @@ open Feliz.DaisyUI
 
 open Components
 open ARCtrl
-open ARCtrl.Spreadsheet
 open Shared
 open Components.Metadata
 
@@ -37,7 +34,7 @@ type ExcelMetadataState = {
 let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     let createMetadata (metadata: ArcFiles) =
         promise {
-            let! msgs = OfficeInterop.Core.updateTopLevelMetadata metadata
+            let! msgs = OfficeInterop.Core.Main.updateTopLevelMetadata metadata
             GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
             do! refresh()
         }

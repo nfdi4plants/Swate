@@ -2,8 +2,6 @@ namespace BuildingBlock
 
 open Feliz
 open Feliz.DaisyUI
-
-open OfficeInterop.Core
 open Shared
 
 type CellDiscriminateState = {
@@ -20,7 +18,7 @@ module private CellConvertComponentHelpers =
     let setCellTypes (state: CellDiscriminateState) (setState: CellDiscriminateState -> unit) =
         promise {
             //Write function to access current state of selected excel cell excel
-            let! (selectedCellType, targetCellType) = tryGetValidConversionCellTypes ()
+            let! (selectedCellType, targetCellType) = OfficeInterop.Core.Main.tryGetValidConversionCellTypes ()
 
             setState {
                 state with
@@ -60,7 +58,7 @@ type CellConvertComponent =
                         prop.text $"Unconvertible"
                     prop.onClick (fun _ ->
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
-                        convertBuildingBlock () |> Promise.start)
+                        OfficeInterop.Core.Main.convertBuildingBlock () |> Promise.start)
                 ]
                 Html.div (string cellDiscriminateState.TargetCellState)
             ]
