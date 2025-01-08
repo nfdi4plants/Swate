@@ -10,7 +10,7 @@
   "scripts": {
     "start": "dotnet fable watch ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts --run vite",
     "fable": "dotnet fable ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts --fableLib fable-library --noReflection",
-    "build": "npm run fable && tsc --outDir ./dist --declaration --noEmit false && vite build",
+    "build": "npm run fable -- --noCache && tsc --outDir ./dist --declaration --noEmit false && vite build",
     "test": "dotnet fable watch ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts --run vitest",
     "pretest:run": "dotnet fable ./Components.fsproj --lang ts -e --noCache",
     "test:run": "vitest run"
