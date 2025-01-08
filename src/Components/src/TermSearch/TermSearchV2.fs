@@ -129,20 +129,20 @@ module private API =
                 |]
             }
 
-    let callSearch = fun (query: string) ->
-        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create query)
-        |> Async.StartAsPromise
-        //|> Promise.map(fun results ->
-        //    results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
-        //)
+    // let callSearch = fun (query: string) ->
+    //     Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create query)
+    //     |> Async.StartAsPromise
+    //     //|> Promise.map(fun results ->
+    //     //    results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
+    //     //)
 
-    let callParentSearch = fun (parent: string) (query: string) ->
-        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create(query, parentTermId = parent))
-        |> Async.StartAsPromise
+    // let callParentSearch = fun (parent: string) (query: string) ->
+    //     Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create(query, parentTermId = parent))
+    //     |> Async.StartAsPromise
 
-    let callAllChildSearch = fun (parent: string) ->
-        Api.ontology.findAllChildTerms (Shared.DTOs.ParentTermQuery.ParentTermQueryDto.create(parent))
-        |> Async.StartAsPromise
+    // let callAllChildSearch = fun (parent: string) ->
+    //     Api.ontology.findAllChildTerms (Shared.DTOs.ParentTermQuery.ParentTermQueryDto.create(parent))
+    //     |> Async.StartAsPromise
 
 [<Mangle(false); Erase>]
 type TermSearchV2 =
@@ -244,7 +244,7 @@ type TermSearchV2 =
                 //     ]
                 Html.div [
                     Html.span "Can't find what you need? Get in "
-                    Html.a [prop.href Shared.URLs.Helpdesk.UrlOntologyTopic; prop.target.blank; prop.text "contact"; prop.className "link link-primary"]
+                    Html.a [prop.href @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"; prop.target.blank; prop.text "contact"; prop.className "link link-primary"]
                     Html.span " with us!"
                 ]
             ]

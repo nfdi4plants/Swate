@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 
 // Assuming TestInput is the transpiled component from Fable
-import Example from './output/Example'; // Update the import path as needed
+import Example from './POC.fs.js'; // Update the import path as needed
 
 describe('TestInput Component', () => {
   it('renders with initial number and children', () => {

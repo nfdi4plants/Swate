@@ -10,25 +10,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="Api.fs" />
-    <Compile Include="React.useListener.fs" />
-    <Compile Include="GenericComponents.fs" />
-    <Compile Include="Example.fs" />
-    <Compile Include="TermSearchV2.fs" />
-    <Compile Include="QuickAccessButton.fs" />
+    <Compile Include="Util\React.useListener.fs" />
+    <Compile Include="Util\Api.fs" />
+    <Compile Include="POC\POC.fs" />
+    <Compile Include="GenericComponents\GenericComponents.fs" />
+    <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
+    <Compile Include="TermSearch\TermSearchV2.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
-    <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />
     <PackageReference Include="Fable.Core" Version="4.3.0" />
     <PackageReference Include="Feliz" Version="2.8.0" />
     <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import QuickAccessButton from "./output/QuickAccessButton";
+import QuickAccessButton from "./QuickAccessButton.fs.js";
 import { Fragment } from "react/jsx-runtime";
 
 describe('QuickAccessButton', () => {

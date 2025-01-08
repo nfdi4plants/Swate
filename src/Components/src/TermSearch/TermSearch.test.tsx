@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Fragment } from "react/jsx-runtime";
-import TermSearch from './output/TermSearchV2'
+import TermSearch from './TermSearchV2.fs.js'
 
 describe('TermSearch', () => {
 

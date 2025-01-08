@@ -25,6 +25,7 @@ release.sh
 /.db/neo4j
 /src/Client/output
 /tests/Client/output
-/tests/Components/output
 /.paket
-
+*/**/fable_modules
+*/**/*.fs.ts
+dist/

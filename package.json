@@ -4,11 +4,7 @@
     "node": "~18 || ~20",
     "npm": "~9 || ~10"
   },
-  "scripts": {
-    "test": "dotnet fable watch ./src/Components/Components.fsproj --define PUBLISH_COMPONENTS --lang ts -o ./tests/Components/output --run vitest -r ./tests/Components",
-    "pretest:run": "dotnet fable ./src/Components/Components.fsproj --lang ts -e tsx -o ./tests/Components/output --noCache",
-    "test:run": "vitest run -r ./tests/Components"
-  },
+  "scripts": {  },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.15",
     "@testing-library/jest-dom": "^6.6.3",

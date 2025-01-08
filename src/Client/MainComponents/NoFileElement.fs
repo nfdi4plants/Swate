@@ -186,7 +186,7 @@ type NoFileElement =
                 prop.autoFocus true
                 prop.value advancedSearchState
                 prop.onChange (fun e -> setAdvancedSearchState e)
-                prop.onKeyDown (key.enter, fun _ -> cc.StartSearch())
+                prop.onKeyDown (key.enter, fun _ -> cc.startSearch())
             ]
         Html.div [
             prop.id UploadHandler.id
@@ -214,16 +214,16 @@ type NoFileElement =
                 Html.div [
                     prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
-                        let advancedSearch : Components.AdvancedSearch<string> = {
-                            Input = advancedSearchState;
-                            Search = fun s -> promise {
+                        let advancedSearch : Components.AdvancedSearch<string> = {|
+                            input = advancedSearchState;
+                            search = fun s -> promise {
                                 return ResizeArray([
                                     for i in 1..300 do
-                                        Components.Term (s + "_" + string i)
+                                        Components.TermUtil.init (s + "_" + string i)
                                 ])
                             };
-                            Form = fun cc -> input cc
-                        }
+                            form = fun cc -> input cc
+                        |}
                         Components.TermSearchV2.TermSearch(setTerm, term, parentId = "test:xx", advancedSearch = advancedSearch, showDetails = true, debug = true)
                         // Helper.createNewFile args.dispatch
                         // Helper.uploadNewTable args.dispatch
