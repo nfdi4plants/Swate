@@ -222,7 +222,7 @@ module Interface =
                             | true -> // full import, does not require additional information
                                 return UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState selectedColumns
                             | false -> // partial import, requires additional information
-                                let! arcfile = OfficeInterop.Core.Main.TryParseToArcFile()
+                                let! arcfile = OfficeInterop.Core.Main.tryParseToArcFile()
                                 let arcfileOpt = arcfile |> Result.toOption
                                 let! activeTable = ExcelJS.Fable.GlobalBindings.Excel.run(fun context ->
                                     ArcTable.tryGetActiveArcTable(context)

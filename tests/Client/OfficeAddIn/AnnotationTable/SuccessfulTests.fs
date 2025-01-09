@@ -88,7 +88,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop ArcInvestigation updateTest successful" <| async {
         let testContext: RequestContext = importDefault "../../Fixtures/OfficeMockObjects/AnnotationTableFixtureSuccessful.js"
-        let! resultRes = OfficeInterop.Core.Main.UpdateArcFile(arcInvestigation, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcInvestigation, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "develop ArcInvestigation updateTest successful failed"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 0 tables!" $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
@@ -96,7 +96,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop ArcAssay updateTest successful" <| async {
         let testContext: RequestContext = importDefault "../../Fixtures/OfficeMockObjects/AnnotationTableFixtureSuccessful.js"
-        let! resultRes = OfficeInterop.Core.Main.UpdateArcFile(arcAssay, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcAssay, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "develop ArcAssay updateTest successful failed"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
@@ -104,7 +104,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop ArcStudy updateTest successful" <| async {
         let testContext: RequestContext = importDefault "../../Fixtures/OfficeMockObjects/AnnotationTableFixtureSuccessful.js"
-        let! resultRes = OfficeInterop.Core.Main.UpdateArcFile(arcStudy, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcStudy, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "develop ArcStudy updateTest successful failed"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
@@ -112,7 +112,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop Template updateTest successful" <| async {
         let testContext: RequestContext = importDefault "../../Fixtures/OfficeMockObjects/AnnotationTableFixtureSuccessful.js"
-        let! resultRes = OfficeInterop.Core.Main.UpdateArcFile(arcTemplate, testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.updateArcFile(arcTemplate, testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "develop Template updateTest successful failed"
         Expect.equal result.Head.MessageTxt "Replaced existing Swate information! Added 1 tables!" $"Error: {result |> List.map (fun item -> item.MessageTxt)}"

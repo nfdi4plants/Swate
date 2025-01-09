@@ -19,7 +19,7 @@ module OfficeInterop =
                 log ("UpdateArcFile", arcFile)
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.UpdateArcFile
+                        Main.updateArcFile
                         arcFile
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -37,7 +37,7 @@ module OfficeInterop =
             | InsertOntologyTerm ontologyAnnotation ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.FillSelectedWithOntologyAnnotation
+                        Main.fillSelectedWithOntologyAnnotation
                         (ontologyAnnotation)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -46,7 +46,7 @@ module OfficeInterop =
             | AddAnnotationBlock compositeColumn ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.AddCompositeColumn
+                        Main.addCompositeColumn
                         (compositeColumn)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -88,7 +88,7 @@ module OfficeInterop =
             | AddTemplates (tables, selectedColumns, importType) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.JoinTables
+                        Main.joinTables
                         (tables, selectedColumns, Some importType.ImportType, importType.ImportTables)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -106,7 +106,7 @@ module OfficeInterop =
             | RemoveBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.RemoveSelectedAnnotationBlock
+                        Main.removeSelectedAnnotationBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -115,7 +115,7 @@ module OfficeInterop =
             | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.ConvertBuildingBlock
+                        Main.convertBuildingBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -132,7 +132,7 @@ module OfficeInterop =
             | ValidateBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.ValidateSelectedAndNeighbouringBuildingBlocks
+                        Main.validateSelectedAndNeighbouringBuildingBlocks
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -161,7 +161,7 @@ module OfficeInterop =
             | InsertFileNames fileNameList ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.InsertFileNamesFromFilePicker
+                        Main.insertFileNamesFromFilePicker
                         (fileNameList)
                         (curry GenericLog Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -178,7 +178,7 @@ module OfficeInterop =
             | DeleteTopLevelMetadata ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.DeleteTopLevelMetadata
+                        Main.deleteTopLevelMetadata
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
