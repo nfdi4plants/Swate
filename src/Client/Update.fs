@@ -79,7 +79,7 @@ module Dev =
         | LogTableMetadata ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.Core.Main.getTableMetaData
+                    OfficeInterop.Core.Main.GetTableMetaData
                     ()
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)

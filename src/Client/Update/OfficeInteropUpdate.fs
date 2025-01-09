@@ -19,7 +19,7 @@ module OfficeInterop =
                 log ("UpdateArcFile", arcFile)
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.updateArcFile
+                        Main.UpdateArcFile
                         arcFile
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -37,7 +37,7 @@ module OfficeInterop =
             | InsertOntologyTerm ontologyAnnotation ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.fillSelectedWithOntologyAnnotation
+                        Main.FillSelectedWithOntologyAnnotation
                         (ontologyAnnotation)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -46,7 +46,7 @@ module OfficeInterop =
             | AddAnnotationBlock compositeColumn ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.addCompositeColumn
+                        Main.AddCompositeColumn
                         (compositeColumn)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -79,7 +79,7 @@ module OfficeInterop =
             | AddTemplate (table, selectedColumns, importType, templateName) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.joinTable
+                        Main.JoinTable
                         (table, selectedColumns, Some importType.ImportType, templateName)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -88,7 +88,7 @@ module OfficeInterop =
             | AddTemplates (tables, selectedColumns, importType) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.joinTables
+                        Main.JoinTables
                         (tables, selectedColumns, Some importType.ImportType, importType.ImportTables)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -97,7 +97,7 @@ module OfficeInterop =
             | JoinTable (table, options) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.joinTable
+                        Main.JoinTable
                         (table, [||], options, None)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -106,7 +106,7 @@ module OfficeInterop =
             | RemoveBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.removeSelectedAnnotationBlock
+                        Main.RemoveSelectedAnnotationBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -115,7 +115,7 @@ module OfficeInterop =
             | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.convertBuildingBlock
+                        Main.ConvertBuildingBlock
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -124,7 +124,7 @@ module OfficeInterop =
             | CreateAnnotationTable tryUsePrevOutput ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.createAnnotationTable
+                        Main.CreateAnnotationTable
                         (false, tryUsePrevOutput)
                         (curry GenericInteropLogs Cmd.none >> DevMsg) //success
                         (curry GenericError Cmd.none >> DevMsg) //error
@@ -132,7 +132,7 @@ module OfficeInterop =
             | ValidateBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.validateSelectedAndNeighbouringBuildingBlocks
+                        Main.ValidateSelectedAndNeighbouringBuildingBlocks
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -145,7 +145,7 @@ module OfficeInterop =
             | RectifyTermColumns ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.rectifyTermColumns
+                        Main.RectifyTermColumns
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -161,7 +161,7 @@ module OfficeInterop =
             | InsertFileNames fileNameList ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.insertFileNamesFromFilePicker
+                        Main.InsertFileNamesFromFilePicker
                         (fileNameList)
                         (curry GenericLog Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -170,7 +170,7 @@ module OfficeInterop =
             | UpdateTopLevelMetadata arcFiles ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.updateTopLevelMetadata
+                        Main.UpdateTopLevelMetadata
                         (arcFiles)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
@@ -178,7 +178,7 @@ module OfficeInterop =
             | DeleteTopLevelMetadata ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.deleteTopLevelMetadata
+                        Main.DeleteTopLevelMetadata
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error

@@ -849,42 +849,6 @@ module UpdateHandler =
 
             let _ = table.rows.load(propertyNames = U2.Case2 (ResizeArray[|"count"|]))
 
-            //let! table, logging = context.sync().``then``(fun _ ->
-
-            //    //logic to compare size of previous table and current table and adapt size of inMemory table
-            //    if prevTableOutput.IsSome then
-            //        //Skip header because it is newly generated for inMemory table
-            //        let newColValues =
-            //            prevTableOutput.Value.[1..]
-            //            |> Array.map (fun cell ->
-            //                [|cell|]
-            //                |> Array.map (box >> Some)
-            //                |> ResizeArray
-            //            ) |> ResizeArray
-
-            //        let rowCount0 = int table.rows.count
-            //        let diff = rowCount0 - newColValues.Count
-
-            //        if diff > 0 then // table larger than values -> Delete rows to reduce excel table size to previous table size
-            //            table.rows?deleteRowsAt(newColValues.Count, diff)
-            //        elif diff < 0 then // more values than table -> Add rows to increase excel table size to previous table size
-            //            let absolute = (-1) * diff
-            //            let nextvalues = createMatrixForTables 1 absolute ""
-            //            table.rows.add(-1, U4.Case1 nextvalues) |> ignore
-
-            //        let body = (table.columns.getItemAt 0.).getDataBodyRange()
-            //        body.values <- newColValues
-
-            //    // Fit widths and heights of cols and rows to value size. (In this case the new column headers).
-            //    activeSheet.getUsedRange().format.autofitColumns()
-            //    activeSheet.getUsedRange().format.autofitRows()
-
-            //    r.enableEvents <- true
-
-            //    // Return info message
-
-            //    table, logging
-            //)
             let logging = InteropLogging.Msg.create InteropLogging.Info (sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." newTableRange.address (newTableRange.rowCount - 1.))
 
             return (table, logging)
@@ -983,7 +947,8 @@ module UpdateHandler =
                 if adaptedStartIndex > float (originTable.ColumnCount) then originTable.ColumnCount
                 else int adaptedStartIndex + 1
 
-            let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (selectedColumns: bool[][]) (options: TableJoinOptions option) i =
+            //Loop over all tables to be added and add them to the origin table
+            let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (selectedColumns: bool[] []) (options: TableJoinOptions option) i =
                 let tableToAdd = tablesToAdd.[i]
                 let refinedTableToAdd = prepareTemplateInMemory originTable tableToAdd selectedColumns.[i]
 
@@ -1015,9 +980,10 @@ module UpdateHandler =
 type Main =
 
     /// <summary>
-    /// Get metadata of active table
+    /// Get metadata of active table.
     /// </summary>
-    static member getTableMetaData (?context0) =
+    /// <param name="context0"></param>
+    static member GetTableMetaData (?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! excelTable = tryGetActiveExcelTable context
@@ -1052,9 +1018,10 @@ type Main =
             }
 
     /// <summary>
-    /// Delete the annotation block of the selected column in excel
+    /// Delete the annotation block of the selected column in excel.
     /// </summary>
-    static member removeSelectedAnnotationBlock (?context0) =
+    /// <param name="context0"></param>
+    static member RemoveSelectedAnnotationBlock (?context0) =
         excelRunWith context0 <| fun context ->
             promise {
 
@@ -1081,7 +1048,9 @@ type Main =
     /// <summary>
     /// Reads all excel information and returns ArcFiles object, with metadata and tables.
     /// </summary>
-    static member tryParseToArcFile (?getTables, ?context0) =
+    /// <param name="getTables"></param>
+    /// <param name="context0"></param>
+    static member TryParseToArcFile (?getTables, ?context0) =
         let getTables = defaultArg getTables true
         excelRunWith context0 <| fun context ->
             promise {
@@ -1161,7 +1130,7 @@ type Main =
     /// </summary>
     /// <param name="isDark"></param>
     /// <param name="tryUseLastOutput"></param>
-    static member createAnnotationTable (isDark: bool, tryUseLastOutput: bool) =
+    static member CreateAnnotationTable (isDark: bool, tryUseLastOutput: bool) =
         Excel.run (fun context ->
             let selectedRange = context.workbook.getSelectedRange()
             promise {
@@ -1178,7 +1147,7 @@ type Main =
     /// <param name="tableToAdd"></param>
     /// <param name="index"></param>
     /// <param name="options"></param>
-    static member joinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoinOptions option, templateName: string option, ?context0) =
+    static member JoinTable (tableToAdd: ArcTable, selectedColumns: bool [], options: TableJoinOptions option, templateName: string option, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 //When a name is available get the annotation and arctable for easy access of indices and value adaption
@@ -1211,7 +1180,7 @@ type Main =
     /// <param name="tableToAdd"></param>
     /// <param name="index"></param>
     /// <param name="options"></param>
-    static member joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [], options: TableJoinOptions option, importTables: JsonImport.ImportTable list, ?context0) =
+    static member JoinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: bool [] [], options: TableJoinOptions option, importTables: JsonImport.ImportTable list, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 //When a name is available get the annotation and arctable for easy access of indices and value adaption
@@ -1254,7 +1223,7 @@ type Main =
     /// </summary>
     /// <param name="arcTable"></param>
     /// <param name="context0"></param>
-    static member createNewAnnotationTable(arcTable: ArcTable, ?context0) =
+    static member CreateNewAnnotationTable(arcTable: ArcTable, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 let worksheetName = arcTable.Name
@@ -1282,14 +1251,14 @@ type Main =
     /// This function deletes all existing arc tables in the excel file and metadata sheets, and writes a new ArcFile to excel
     /// </summary>
     /// <param name="arcFiles"></param>
-    static member updateArcFile (arcFiles: ArcFiles, ?context0) =
+    static member UpdateArcFile (arcFiles: ArcFiles, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
                 let! updatedWorksheet = updateWorkSheet context worksheetName seqOfSeqs
                 let tables = arcFiles.Tables()
                 for table in tables do
-                    do! Main.createNewAnnotationTable(table, context).``then``(fun _ -> ())
+                    do! Main.CreateNewAnnotationTable(table, context).``then``(fun _ -> ())
                 updatedWorksheet.activate()
                 return [InteropLogging.Msg.create InteropLogging.Info $"Replaced existing Swate information! Added {tables.TableCount} tables!"]
             }
@@ -1303,7 +1272,7 @@ type Main =
     /// with the correct value
     /// The later is not implemented yet
     /// </summary>
-    static member rectifyTermColumns (?context0, ?getTerms0) =
+    static member RectifyTermColumns (?context0, ?getTerms0) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! excelTableRes = tryGetActiveExcelTable context
@@ -1419,7 +1388,7 @@ type Main =
     /// </summary>
     /// <param name="table"></param>
     /// <param name="context0"></param>
-    static member getParentTerm (?table: Excel.Table, ?context0: RequestContext) =
+    static member GetParentTerm (?table: Excel.Table, ?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
 
@@ -1451,7 +1420,7 @@ type Main =
     /// </summary>
     /// <param name="table"></param>
     /// <param name="context0"></param>
-    static member getCompositeColumnDetails (?table: Excel.Table, ?context0: RequestContext) =
+    static member GetCompositeColumnDetails (?table: Excel.Table, ?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! excelTable =
@@ -1478,14 +1447,7 @@ type Main =
                     let rowIndex = int selectedRange.rowIndex
 
                     if rowIndex > 0 then
-                        let values =
-                            tableRange.values
-                            |> Array.ofSeq
-                            |> Array.map (fun item ->
-                                item |> Array.ofSeq
-                                |> Array.map (fun itemi ->
-                                    Option.map string itemi
-                                    |> Option.defaultValue ""))
+                        let values = getTableValues tableRange
 
                         let value = values.[rowIndex].[mainColumnIndex]
 
@@ -1513,7 +1475,7 @@ type Main =
     /// Handle any diverging functionality here. This function is also used to make sure any new building blocks comply to the swate annotation-table definition
     /// </summary>
     /// <param name="newColumn"></param>
-    static member addCompositeColumn (newColumn: CompositeColumn, ?table: Excel.Table, ?context0: RequestContext) =
+    static member AddCompositeColumn (newColumn: CompositeColumn, ?table: Excel.Table, ?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! excelTable =
@@ -1538,7 +1500,7 @@ type Main =
                     arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
                     //Replace old excel table with new one
-                    let! _ = Main.createNewAnnotationTable(arcTable)
+                    let! _ = Main.CreateNewAnnotationTable(arcTable)
 
                     let! newTable = tryGetActiveExcelTable(context)
 
@@ -1555,7 +1517,7 @@ type Main =
     /// Get the valid cell type for the conversion based on input cell type
     /// </summary>
     /// <param name="cellType"></param>
-    static member tryGetValidConversionCellTypes (?context0: RequestContext) =
+    static member TryGetValidConversionCellTypes (?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! result = tryGetActiveExcelTable context
@@ -1590,7 +1552,7 @@ type Main =
     /// Checks whether the annotation table is a valid arc table or not
     /// BEcause a renamed column header can break a building block, the selected column and its neighbouring building blocks are checked
     /// </summary>
-    static member validateSelectedAndNeighbouringBuildingBlocks (?context0: RequestContext) =
+    static member ValidateSelectedAndNeighbouringBuildingBlocks (?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! excelTableRes = tryGetActiveExcelTable context
@@ -1637,7 +1599,7 @@ type Main =
     /// This function is used to convert building blocks that can be converted. Data building blocks can be converted into free text, free text into data,
     /// terms into units and units into terms
     /// </summary>
-    static member convertBuildingBlock (?context0: RequestContext) =
+    static member ConvertBuildingBlock (?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! excelTableRes = tryGetActiveExcelTable context
@@ -1733,7 +1695,7 @@ type Main =
     /// Delete excel worksheet that contains top level metadata
     /// </summary>
     /// <param name="identifier"></param>
-    static member deleteTopLevelMetadata (?context0: RequestContext) =
+    static member DeleteTopLevelMetadata (?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let worksheets = context.workbook.worksheets
@@ -1755,7 +1717,7 @@ type Main =
     /// Updates top level metadata excel worksheet of assays
     /// </summary>
     /// <param name="assay"></param>
-    static member updateTopLevelMetadata (arcFiles: ArcFiles, ?context0: RequestContext) =
+    static member UpdateTopLevelMetadata (arcFiles: ArcFiles, ?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
@@ -1771,7 +1733,7 @@ type Main =
     /// Fill the selected building blocks, or single columns, with the selected term
     /// </summary>
     /// <param name="ontologyAnnotation"></param>
-    static member fillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation, ?context0: RequestContext) =
+    static member FillSelectedWithOntologyAnnotation (ontologyAnnotation: OntologyAnnotation, ?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
             promise {
                 let! result = tryGetActiveExcelTable context
@@ -1812,19 +1774,7 @@ type Main =
 
                         do! context.sync()
 
-                        let tableValues =
-                            tableRange.values
-                            |> Array.ofSeq
-                            |> Array.map (fun row ->
-                                row
-                                |> Array.ofSeq
-                                |> Array.map (fun column ->
-                                    column
-                                    |> Option.map string
-                                    |> Option.defaultValue ""
-                                    |> (fun s -> s.TrimEnd())
-                                )
-                            )
+                        let tableValues = getTableValues tableRange
 
                         let tableHeaders = tableValues.[0]
 
@@ -1893,7 +1843,7 @@ type Main =
     /// This function is used to insert file names into the selected range.
     /// </summary>
     /// <param name="fileNameList"></param>
-    static member insertFileNamesFromFilePicker (fileNameList: string list, ?context0: RequestContext) =
+    static member InsertFileNamesFromFilePicker (fileNameList: string list, ?context0: RequestContext) =
         excelRunWith context0 <| fun context ->
 
             // Ref. 2

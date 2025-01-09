@@ -34,7 +34,7 @@ type ExcelMetadataState = {
 let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
     let createMetadata (metadata: ArcFiles) =
         promise {
-            let! msgs = OfficeInterop.Core.Main.updateTopLevelMetadata metadata
+            let! msgs = OfficeInterop.Core.Main.UpdateTopLevelMetadata metadata
             GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
             do! refresh()
         }
@@ -164,7 +164,7 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
         fun () ->
             promise {
                 setExcelMetadataType (ExcelMetadataState.init())
-                let! result = OfficeInterop.Core.Main.tryParseToArcFile(getTables=false)
+                let! result = OfficeInterop.Core.Main.TryParseToArcFile(getTables=false)
                 match result with
                 | Result.Ok arcFile ->
                     setExcelMetadataType {
@@ -268,7 +268,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             ],
             (fun _ ->
                 promise {
-                    let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails()
+                    let! ontologyAnnotationRes = OfficeInterop.Core.Main.GetCompositeColumnDetails()
 
                     match ontologyAnnotationRes with
                     | Result.Error msgs -> GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch

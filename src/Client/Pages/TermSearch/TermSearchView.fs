@@ -88,7 +88,7 @@ let Main (model:Model, dispatch) =
         | Some Swatehost.Excel ->
             fun _ ->
                 promise {
-                    let! parent = OfficeInterop.Core.Main.getParentTerm()
+                    let! parent = OfficeInterop.Core.Main.GetParentTerm()
                     TermSearch.UpdateParentTerm parent |> TermSearchMsg |> dispatch
                 }
             |> Some

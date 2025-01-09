@@ -18,7 +18,7 @@ module private CellConvertComponentHelpers =
     let setCellTypes (state: CellDiscriminateState) (setState: CellDiscriminateState -> unit) =
         promise {
             //Write function to access current state of selected excel cell excel
-            let! (selectedCellType, targetCellType) = OfficeInterop.Core.Main.tryGetValidConversionCellTypes ()
+            let! (selectedCellType, targetCellType) = OfficeInterop.Core.Main.TryGetValidConversionCellTypes ()
 
             setState {
                 state with
@@ -58,7 +58,7 @@ type CellConvertComponent =
                         prop.text $"Unconvertible"
                     prop.onClick (fun _ ->
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState |> Promise.start
-                        OfficeInterop.Core.Main.convertBuildingBlock () |> Promise.start)
+                        OfficeInterop.Core.Main.ConvertBuildingBlock () |> Promise.start)
                 ]
                 Html.div (string cellDiscriminateState.TargetCellState)
             ]
