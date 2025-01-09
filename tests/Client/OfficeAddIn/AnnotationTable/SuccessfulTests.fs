@@ -72,7 +72,7 @@ let private TestsSuccessful = testList "Successful tests" [
             promise {
                 return [|None|]
             }
-        let! resultRes = OfficeInterop.Core.Main.RectifyTermColumns (testContext, getTerms) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.rectifyTermColumns (testContext, getTerms) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "develop rectifyTermColumnsTest successful failed"
         Expect.equal result.Head.MessageTxt "The annotation table annotationTable 1 is valid" $"Error: {result |> List.map (fun item -> item.MessageTxt)}"
@@ -120,7 +120,7 @@ let private TestsSuccessful = testList "Successful tests" [
 
     testCaseAsync "develop parseExcelInvestigationMetaDataToArcFileTest successful" <| async {
         let testContext: RequestContext = importDefault "../../Fixtures/OfficeMockObjects/AnnotationTableFixtureSuccessful.js"
-        let! resultRes = OfficeInterop.Core.Main.TryParseToArcFile(context0=testContext) |> Async.AwaitPromise
+        let! resultRes = OfficeInterop.Core.Main.tryParseToArcFile(context0=testContext) |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "develop parseExcelInvestigationMetaDataToArcFileTest successful failed"
         Expect.equal (Result.toOption result).IsNone true $"Error: {result}"

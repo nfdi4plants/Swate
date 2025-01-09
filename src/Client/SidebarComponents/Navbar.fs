@@ -164,7 +164,7 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
         fun () ->
             promise {
                 setExcelMetadataType (ExcelMetadataState.init())
-                let! result = OfficeInterop.Core.Main.TryParseToArcFile(getTables=false)
+                let! result = OfficeInterop.Core.Main.tryParseToArcFile(getTables=false)
                 match result with
                 | Result.Ok arcFile ->
                     setExcelMetadataType {

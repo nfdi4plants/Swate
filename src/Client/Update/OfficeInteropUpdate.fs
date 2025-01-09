@@ -79,7 +79,7 @@ module OfficeInterop =
             | AddTemplate (table, selectedColumns, importType, templateName) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.JoinTable
+                        Main.joinTable
                         (table, selectedColumns, Some importType.ImportType, templateName)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -97,7 +97,7 @@ module OfficeInterop =
             | JoinTable (table, options) ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.JoinTable
+                        Main.joinTable
                         (table, [||], options, None)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -124,7 +124,7 @@ module OfficeInterop =
             | CreateAnnotationTable tryUsePrevOutput ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.CreateAnnotationTable
+                        Main.createAnnotationTable
                         (false, tryUsePrevOutput)
                         (curry GenericInteropLogs Cmd.none >> DevMsg) //success
                         (curry GenericError Cmd.none >> DevMsg) //error
@@ -145,7 +145,7 @@ module OfficeInterop =
             | RectifyTermColumns ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.RectifyTermColumns
+                        Main.rectifyTermColumns
                         ()
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -170,7 +170,7 @@ module OfficeInterop =
             | UpdateTopLevelMetadata arcFiles ->
                 let cmd =
                     Cmd.OfPromise.either
-                        Main.UpdateTopLevelMetadata
+                        Main.updateTopLevelMetadata
                         (arcFiles)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg) //error
