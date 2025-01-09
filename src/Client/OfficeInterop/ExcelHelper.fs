@@ -133,6 +133,20 @@ let getSelectedRangeAdress (context: RequestContext) =
         return range.address
     }
 
+let getTableValues (tableRange: Range) =
+    tableRange.values
+    |> Array.ofSeq
+    |> Array.map (fun row ->
+        row
+        |> Array.ofSeq
+        |> Array.map (fun column ->
+            column
+            |> Option.map string
+            |> Option.defaultValue ""
+            |> (fun s -> s.TrimEnd())
+        )
+    )
+
 [<AutoOpen>]
 module Table =
 

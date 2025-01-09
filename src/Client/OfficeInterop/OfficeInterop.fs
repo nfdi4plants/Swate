@@ -849,42 +849,6 @@ module UpdateHandler =
 
             let _ = table.rows.load(propertyNames = U2.Case2 (ResizeArray[|"count"|]))
 
-            //let! table, logging = context.sync().``then``(fun _ ->
-
-            //    //logic to compare size of previous table and current table and adapt size of inMemory table
-            //    if prevTableOutput.IsSome then
-            //        //Skip header because it is newly generated for inMemory table
-            //        let newColValues =
-            //            prevTableOutput.Value.[1..]
-            //            |> Array.map (fun cell ->
-            //                [|cell|]
-            //                |> Array.map (box >> Some)
-            //                |> ResizeArray
-            //            ) |> ResizeArray
-
-            //        let rowCount0 = int table.rows.count
-            //        let diff = rowCount0 - newColValues.Count
-
-            //        if diff > 0 then // table larger than values -> Delete rows to reduce excel table size to previous table size
-            //            table.rows?deleteRowsAt(newColValues.Count, diff)
-            //        elif diff < 0 then // more values than table -> Add rows to increase excel table size to previous table size
-            //            let absolute = (-1) * diff
-            //            let nextvalues = createMatrixForTables 1 absolute ""
-            //            table.rows.add(-1, U4.Case1 nextvalues) |> ignore
-
-            //        let body = (table.columns.getItemAt 0.).getDataBodyRange()
-            //        body.values <- newColValues
-
-            //    // Fit widths and heights of cols and rows to value size. (In this case the new column headers).
-            //    activeSheet.getUsedRange().format.autofitColumns()
-            //    activeSheet.getUsedRange().format.autofitRows()
-
-            //    r.enableEvents <- true
-
-            //    // Return info message
-
-            //    table, logging
-            //)
             let logging = InteropLogging.Msg.create InteropLogging.Info (sprintf "Annotation Table created in [%s] with dimensions 2c x (%.0f + 1h)r." newTableRange.address (newTableRange.rowCount - 1.))
 
             return (table, logging)
@@ -983,7 +947,8 @@ module UpdateHandler =
                 if adaptedStartIndex > float (originTable.ColumnCount) then originTable.ColumnCount
                 else int adaptedStartIndex + 1
 
-            let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (selectedColumns: bool[][]) (options: TableJoinOptions option) i =
+            //Loop over all tables to be added and add them to the origin table
+            let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (selectedColumns: bool[] []) (options: TableJoinOptions option) i =
                 let tableToAdd = tablesToAdd.[i]
                 let refinedTableToAdd = prepareTemplateInMemory originTable tableToAdd selectedColumns.[i]
 
@@ -1015,8 +980,9 @@ module UpdateHandler =
 type Main =
 
     /// <summary>
-    /// Get metadata of active table
+    /// Get metadata of active table.
     /// </summary>
+    /// <param name="context0"></param>
     static member getTableMetaData (?context0) =
         excelRunWith context0 <| fun context ->
             promise {
@@ -1052,8 +1018,9 @@ type Main =
             }
 
     /// <summary>
-    /// Delete the annotation block of the selected column in excel
+    /// Delete the annotation block of the selected column in excel.
     /// </summary>
+    /// <param name="context0"></param>
     static member removeSelectedAnnotationBlock (?context0) =
         excelRunWith context0 <| fun context ->
             promise {
@@ -1081,6 +1048,8 @@ type Main =
     /// <summary>
     /// Reads all excel information and returns ArcFiles object, with metadata and tables.
     /// </summary>
+    /// <param name="getTables"></param>
+    /// <param name="context0"></param>
     static member tryParseToArcFile (?getTables, ?context0) =
         let getTables = defaultArg getTables true
         excelRunWith context0 <| fun context ->
@@ -1478,14 +1447,7 @@ type Main =
                     let rowIndex = int selectedRange.rowIndex
 
                     if rowIndex > 0 then
-                        let values =
-                            tableRange.values
-                            |> Array.ofSeq
-                            |> Array.map (fun item ->
-                                item |> Array.ofSeq
-                                |> Array.map (fun itemi ->
-                                    Option.map string itemi
-                                    |> Option.defaultValue ""))
+                        let values = getTableValues tableRange
 
                         let value = values.[rowIndex].[mainColumnIndex]
 
@@ -1812,19 +1774,7 @@ type Main =
 
                         do! context.sync()
 
-                        let tableValues =
-                            tableRange.values
-                            |> Array.ofSeq
-                            |> Array.map (fun row ->
-                                row
-                                |> Array.ofSeq
-                                |> Array.map (fun column ->
-                                    column
-                                    |> Option.map string
-                                    |> Option.defaultValue ""
-                                    |> (fun s -> s.TrimEnd())
-                                )
-                            )
+                        let tableValues = getTableValues tableRange
 
                         let tableHeaders = tableValues.[0]
 
