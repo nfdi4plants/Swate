@@ -1,5 +1,5 @@
 import React from 'react';
-import TermSearch from '../src/TermSearch/TermSearchV2.fs.ts';
+import TermSearch from '../src/TermSearch/TermSearchV2.fs.js';
 
 const App = () => {
     return (

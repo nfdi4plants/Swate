@@ -2,20 +2,31 @@
   "name": "@nfdi4plants/swate-components",
   "version": "1.0.0",
   "description": "Customizable React components for ontology annotation, based on Swate and the ARC.",
-  "main": "./dist/index.js",
+  "main": "./dist/index.umd.js",
+  "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
-  "scripts": {
-    "start": "dotnet fable watch ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts --run vite",
-    "fable": "dotnet fable ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts --fableLib fable-library --noReflection",
-    "build": "npm run fable -- --noCache && tsc --outDir ./dist --declaration --noEmit false && vite build",
-    "test": "dotnet fable watch ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts --run vitest",
-    "pretest:run": "dotnet fable ./Components.fsproj --lang ts -e --noCache",
-    "test:run": "vitest run"
+  "exports": {
+    ".": {
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.umd.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./style.css": "./dist/style.css"
   },
-
+  "scripts": {
+    "start": "dotnet fable watch ./src/Components.fsproj --define PUBLISH_COMPONENTS --run vite",
+    "fable": "dotnet fable ./src/Components.fsproj --define PUBLISH_COMPONENTS",
+    "build": "npm run fable -- --fableLib @fable-org/fable-library-js --noCache && tsc --outDir ./dist && vite build",
+    "test": "npm run fable -- --watch --run vitest",
+    "pretest:run": "npm run fable -- --noCache",
+    "test:run": "vitest run",
+    "prelink": "npm run build",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nfdi4plants/Swate.git"
@@ -33,6 +44,8 @@
   },
   "homepage": "https://github.com/nfdi4plants/Swate#readme",
   "dependencies": {
+    "@fable-org/fable-library-js": "^1.8.0",
+    "@fortawesome/fontawesome-free": "^6.7.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -41,22 +54,36 @@
     "react-dom": "^18.2.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "react-dom": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.4",
-    "typescript": "^5.6.3",
-    "vite": "^5.0.5",
-    "vite-plugin-node-polyfills": "^0.22.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "vitest": "^2.1.5",
+    "@chromatic-com/storybook": "^3.2.3",
+    "@storybook/addon-essentials": "^8.4.7",
+    "@storybook/addon-interactions": "^8.4.7",
+    "@storybook/addon-onboarding": "^8.4.7",
+    "@storybook/blocks": "^8.4.7",
+    "@storybook/react": "^8.4.7",
+    "@storybook/react-vite": "^8.4.7",
+    "@storybook/test": "^8.4.7",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "@types/testing-library__react": "^10.0.1"
+    "@types/testing-library__react": "^10.0.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "storybook": "^8.4.7",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.0.5",
+    "vite-plugin-dts": "^4.5.0",
+    "vite-plugin-node-polyfills": "^0.22.0",
+    "vitest": "^2.1.5"
   }
 }

@@ -219,7 +219,7 @@ type NoFileElement =
                             search = fun s -> promise {
                                 return ResizeArray([
                                     for i in 1..300 do
-                                        Components.TermUtil.init (s + "_" + string i)
+                                        Components.Term (s + "_" + string i)
                                 ])
                             };
                             form = fun cc -> input cc

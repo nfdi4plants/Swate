@@ -2,10 +2,11 @@ import { describe, expect, test, vi } from "vitest";
 import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Fragment } from "react/jsx-runtime";
 import TermSearch from './TermSearchV2.fs.js'
+import React from 'react';
 
 describe('TermSearch', () => {
 
-  test('renders TermSearch with advancedSearch input and responds to changes', async () => {
+  test('renders TermSearch with input and responds to changes', async () => {
     const setTermMock = vi.fn();
     const term = undefined;
     render(

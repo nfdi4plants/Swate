@@ -1,27 +1,34 @@
-import { defineConfig } from "vite";
+import { defineConfig } from 'vitest/config';
+import dts from 'vite-plugin-dts'
 import react from "@vitejs/plugin-react";
+import tailwindcss from "tailwindcss";
 
 export default defineConfig({
     plugins: [
-        react()
+        react(),
+        dts({
+            include: ['src'],
+            tsconfigPath: 'tsconfig.json',
+        })
     ],
     esbuild: {
         jsx: 'automatic', // Enables React 17+ JSX Transform
     },
     build: {
         lib: {
-            entry: './src/index.ts', // Entry file for your library
-            name: 'swate-components', // Global name for UMD builds
-            fileName: (format) => `swate-components.${format}.js`,
+            entry: './src/index.js', // Entry file for your library
+            name: "@nfdi4plants/swate-components",
+            fileName: (format) => `index.${format}.js`,
         },
         rollupOptions: {
             // Exclude peer dependencies from the final bundle
-            external: ['react', 'react-dom'],
+            external: ['react', 'react-dom', 'tailwindcss'],
             output: {
-            globals: {
-                react: 'React',
-                'react-dom': 'ReactDOM',
-            },
+                globals: {
+                    react: 'React',
+                    'react-dom': 'ReactDOM',
+                    tailwindcss: "tailwindcss",
+                },
             },
         },
     },
@@ -31,4 +38,9 @@ export default defineConfig({
       environment: "jsdom",
       setupFiles: './vitest.setup.ts', // Loads the setup file
     },
+    css: {
+        postcss: {
+          plugins: [tailwindcss],
+        },
+      },
   });

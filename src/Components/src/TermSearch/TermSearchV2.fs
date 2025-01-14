@@ -9,32 +9,19 @@ type private Modals =
 | AdvancedSearch
 | Details
 
-// [<AllowNullLiteral>]
-// [<Global>]
-// type Term
-//     [<ParamObjectAttribute; Emit("$0")>]
-//     (?name, ?id, ?description, ?source: string, ?href, ?isObsolete: bool, ?data) =
-//     member val name: string option = jsNative with get, set
-//     member val id: string option = jsNative with get, set
-//     member val description: string option = jsNative with get, set
-//     member val source: string option = jsNative with get, set
-//     member val href: string option = jsNative with get, set
-//     member val isObsolete: bool option = jsNative with get, set
-//     member val data: obj option = jsNative with get, set
+[<AllowNullLiteral>]
+[<Global>]
+type Term
+    [<ParamObjectAttribute; Emit("$0")>]
+    (?name, ?id, ?description, ?source: string, ?href, ?isObsolete: bool, ?data) =
+    member val name: string option = jsNative with get, set
+    member val id: string option = jsNative with get, set
+    member val description: string option = jsNative with get, set
+    member val source: string option = jsNative with get, set
+    member val href: string option = jsNative with get, set
+    member val isObsolete: bool option = jsNative with get, set
+    member val data: obj option = jsNative with get, set
 
-type Term = {|
-    name: string option;
-    id: string option;
-    description: string option;
-    source: string option;
-    href: string option;
-    isObsolete: bool option;
-    data: obj option
-|}
-
-type TermUtil =
-    static member init (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
-        {|name = name; id = id; description = description; source = source; href = href; isObsolete = isObsolete; data = data|}
 
 type AdvancedSearchController = {|
     startSearch: unit -> unit
@@ -47,11 +34,54 @@ type AdvancedSearch<'A> = {|
     form: AdvancedSearchController -> ReactElement
 |}
 
-type SearchCall = string -> JS.Promise<ResizeArray<Term>>
+[<AutoOpen>]
+module TypeDefs =
 
-type ParentSearchCall = string -> string -> JS.Promise<ResizeArray<Term>>
+    emitJsStatement ( ) """/**
+ * Represents a term object with optional metadata.
+ * @typedef {Object} Term
+ * @property {string} [name] - The name of the term.
+ * @property {string} [id] - The unique identifier for the term.
+ * @property {string} [description] - A description of the term.
+ * @property {string} [source] - The source from which the term originates.
+ * @property {string} [href] - A URL linking to more information about the term.
+ * @property {boolean} [isObsolete] - Whether the term is obsolete.
+ * @property {Object} [data] - Additional metadata associated with the term.
+ */"""
 
-type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
+    emitJsStatement ( ) """/**
+ * A search function that resolves a list of terms.
+ * @typedef {function(string): Promise<Term[]>} SearchCall
+ */"""
+
+    emitJsStatement ( ) """/**
+ * A parent search function that resolves a list of terms based on a parent ID and query.
+ * @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
+ */"""
+
+    emitJsStatement ( ) """/**
+ * A function that fetches all child terms of a parent.
+ * @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
+ */"""
+
+
+    ///
+    /// A search function that resolves a list of terms.
+    /// @typedef {function(string): Promise<Term[]>} SearchCall
+    ///
+    type SearchCall = string -> JS.Promise<ResizeArray<Term>>
+
+    //
+    // A parent search function that resolves a list of terms based on a parent ID and query.
+    // @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
+    //
+    type ParentSearchCall = string -> string -> JS.Promise<ResizeArray<Term>>
+
+    ///
+    /// A function that fetches all child terms of a parent.
+    /// @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
+    ///
+    type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
 
 type TermSearchResult = {
     Term: Term
@@ -98,11 +128,11 @@ module private API =
                 do! Promise.sleep 1500
                 //Init mock data for about 10 items
                 return ResizeArray [|
-                    TermUtil.init("Term 1", "1", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", isObsolete = false, href= "www.test.de'/1")
-                    TermUtil.init("Term 2", "2", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", isObsolete = false, href= "www.test.de'/2")
-                    TermUtil.init("Term 3", "3", isObsolete = false)
-                    TermUtil.init("Term 4 Is a Very special term with a extremely long name", "4", isObsolete = false, href= "www.test.de'/3")
-                    TermUtil.init("Term 5", "5", isObsolete = false, href= "www.test.de'/4")
+                    Term("Term 1", "1", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", isObsolete = false, href= "www.test.de'/1")
+                    Term("Term 2", "2", "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.", "MS", isObsolete = false, href= "www.test.de'/2")
+                    Term("Term 3", "3", isObsolete = false)
+                    Term("Term 4 Is a Very special term with a extremely long name", "4", isObsolete = false, href= "www.test.de'/3")
+                    Term("Term 5", "5", isObsolete = false, href= "www.test.de'/4")
                 |]
             }
 
@@ -113,7 +143,7 @@ module private API =
                 do! Promise.sleep 2000
                 //Init mock data for about 10 items
                 return ResizeArray [|
-                    TermUtil.init("Term 1", "1", href= "/term/1", isObsolete = false)
+                    Term("Term 1", "1", href= "/term/1", isObsolete = false)
                 |]
             }
 
@@ -125,7 +155,7 @@ module private API =
                 //Init mock data for about 10 items
                 return ResizeArray [|
                     for i in 0 .. 100 do
-                        TermUtil.init(sprintf "Child %d" i, i.ToString(), href = (sprintf "/term/%d" i), isObsolete = (i % 5 = 0))
+                        Term(sprintf "Child %d" i, i.ToString(), href = (sprintf "/term/%d" i), isObsolete = (i % 5 = 0))
                 |]
             }
 
@@ -471,6 +501,23 @@ type TermSearchV2 =
         ]
         TermSearchV2.BaseModal("Advanced Search", content, rvm, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
 
+    ///
+    /// Executes a term search with various search parameters and callbacks.
+    ///
+    /// @param {Object} params - The parameters for the term search.
+    /// @param {function(Term|undefined): void} params.onTermSelect - A callback triggered when a term is selected.
+    /// @param {Term|undefined} params.term - A plain JavaScript object representing the currently selected term, or `null` if no term is selected.
+    /// @param {string} [params.parentId] - The ID of the parent term, if applicable.
+    /// @param {Array<[string, SearchCall]>} [params.termSearchQueries] -
+    ///   A list of term search queries. Each item is a tuple containing a description and a search function.
+    /// @param {Array<[string, ParentSearchCall]>} [params.parentSearchQueries] -
+    ///   A list of parent term search queries. Each item is a tuple containing a description and a search function.
+    /// @param {Array<[string, AllChildrenSearchCall]>} [params.allChildrenSearchQueries] -
+    ///   A list of child term search queries. Each item is a tuple containing a description and a search function.
+    /// @param {AdvancedSearch<any>} [params.advancedSearch] - Configuration for performing custom advanced searches.
+    /// @param {boolean} [params.showDetails=false] - Indicates whether detailed information about terms should be displayed.
+    /// @param {boolean} [params.debug=false] - Indicates whether to enable debug mode.
+    ///
     [<ExportDefaultAttribute; NamedParams>]
     static member TermSearch(
         onTermSelect: Term option -> unit,
@@ -691,7 +738,7 @@ type TermSearchV2 =
                                             onTermSelect None
                                             cancel()
                                         else
-                                            onTermSelect (Some <| TermUtil.init(e))
+                                            onTermSelect (Some <| Term(e))
                                             startSearch e
                                     )
                                     prop.onDoubleClick(fun _ ->

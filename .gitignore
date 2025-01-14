@@ -29,3 +29,5 @@ release.sh
 */**/fable_modules
 */**/*.fs.ts
 dist/
+
+*storybook.log
