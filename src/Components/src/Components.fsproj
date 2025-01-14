@@ -5,11 +5,25 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageId>Swate.Components</PackageId>
+    <PackageVersion>1.0.0-alpha.1</PackageVersion>
+    <Authors>Kevin Frey</Authors>
+    <Description>Swate react components</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>F# fable rdm react fable-library fable-javascript</PackageTags>
+    <PackageProjectUrl>https://github.com/nfdi4plants/Swate</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/Swate</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Remove="C:\Users\Kevin\.nuget\packages\fable.core\4.3.0\contentFiles\any\netstandard2.0\CHANGELOG.md" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\"/>
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="POC\POC.fs" />
@@ -25,5 +39,18 @@
     <PackageReference Include="Feliz" Version="2.8.0" />
     <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include all files that are compiled with this project -->
+    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
+    <!-- Include the project file itself as well -->
+    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <NpmDependencies>
+      <NpmPackage Name="@fortawesome/fontawesome-free" Version="gt 6.7.2 lt 7.0.0" ResolutionStrategy="Max" />
+    </NpmDependencies>
+  </PropertyGroup>
 
 </Project>
