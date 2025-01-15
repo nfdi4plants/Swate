@@ -384,7 +384,7 @@ module Spreadsheet =
                 state, model, Cmd.none
         try
             innerUpdate state model msg
-            // |> Helper.updateHistoryStorageMsg msg
+            |> Helper.updateHistoryStorageMsg msg
         with
             | e ->
                 let cmd = GenericError (Cmd.none, e) |> DevMsg |> Cmd.ofMsg
