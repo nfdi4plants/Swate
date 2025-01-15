@@ -9,6 +9,7 @@ open Shared.Database
 open Shared.DTOs.TermQuery
 open Shared.DTOs.ParentTermQuery
 open Fable.Core.JsInterop
+open Swate
 
 module TermSearchAux =
 
@@ -176,7 +177,7 @@ module TermSearchAux =
                             ]
                         ]
                     ]
-                    Components.CollapseButton(show, setShow, classes="btn-sm btn-ghost")
+                    Components.Components.CollapseButton(show, setShow, classes="btn-sm btn-ghost")
                 ]
             ]
 

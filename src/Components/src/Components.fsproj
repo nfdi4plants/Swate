@@ -7,7 +7,7 @@
 
   <PropertyGroup>
     <PackageId>Swate.Components</PackageId>
-    <PackageVersion>1.0.0-alpha.1</PackageVersion>
+    <PackageVersion>1.0.0-alpha.3</PackageVersion>
     <Authors>Kevin Frey</Authors>
     <Description>Swate react components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -24,12 +24,14 @@
 
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\"/>
+    <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/"/>
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="POC\POC.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchV2.fs" />
+    <Compile Include="Style.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,7 +51,7 @@
 
   <PropertyGroup>
     <NpmDependencies>
-      <NpmPackage Name="@fortawesome/fontawesome-free" Version="gt 6.7.2 lt 7.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@fortawesome/fontawesome-free" Version="gte 6.7.2 lt 7.0.0" ResolutionStrategy="Max" />
     </NpmDependencies>
   </PropertyGroup>
 

@@ -1,4 +1,4 @@
-module Api
+module Swate.Components.Api
 
 let x = 0
 // open Fable.Remoting.Client

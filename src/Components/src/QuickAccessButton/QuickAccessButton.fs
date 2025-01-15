@@ -1,4 +1,4 @@
-namespace Components
+namespace Swate.Components
 
 open Fable.Core
 open Feliz

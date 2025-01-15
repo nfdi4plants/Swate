@@ -19,7 +19,7 @@
 #### .NET
 
 1. Update version in `./src/Components.fsproj`
-2. `dotnet pack`
+2. `npm run build:net` (creates tailwind style css and packs nuget package)
 3. Upload nuget package from `./src/bin/Releases`
 
 #### NPM

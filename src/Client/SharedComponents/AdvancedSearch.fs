@@ -3,7 +3,8 @@ module Components.AdvancedSearch
 open Fable.React
 open Fable.React.Props
 open Elmish
-
+open Swate
+open Swate.Components
 open Shared
 open Database
 open Model
@@ -16,6 +17,7 @@ open AdvancedSearchTypes
 open AdvancedSearch
 
 open Messages
+
 
 let private StartAdvancedSearch (state: AdvancedSearch.Model) setState dispatch =
     let setter (terms: Term []) =

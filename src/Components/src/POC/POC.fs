@@ -10,18 +10,11 @@ open Feliz
 [<Erase; Mangle(false)>]
 type TestInput =
 
-    // [<ExportDefault>] can only be used on a single member in a module
-    // [<NamedParams>] is used for correct type hinting in typescript
-    // with: export function TestInput({ children, number }: {children?: ReactElement, number?: int32 }): any {
-    // without: export function TestInput(children?: ReactElement, number?: int32): any {
-    // ⚠️ ... fails because react requires object as input
-    ///
-    /// A great component that displays a shop name!
-    ///
-    /// @param {object} testInputInputProps
-    /// @param {JSX.Element | undefined} testInputInputProps.children All children added before input and number display
-    /// @returns {JSX.Element}
-    ///
+    /// [<ExportDefault>] can only be used on a single member in a module
+    /// [<NamedParams>] is used for correct type hinting in typescript
+    /// with: export function TestInput({ children, number }: {children?: ReactElement, number?: int32 }): any {
+    /// without: export function TestInput(children?: ReactElement, number?: int32): any {
+    /// ⚠️ ... fails because react requires object as input
     [<ExportDefault; NamedParams>]
     static member TestInput(?children: ReactElement, ?number: int) =
         let state, useState = React.useState (number |> Option.defaultValue 0)

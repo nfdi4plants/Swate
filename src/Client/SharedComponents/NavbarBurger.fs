@@ -2,6 +2,7 @@ namespace Components
 
 open Feliz
 open Feliz.DaisyUI
+open Swate.Components
 
 type NavbarBurger =
 

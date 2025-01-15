@@ -13,6 +13,7 @@ open ARCtrl
 open ARCtrl.Spreadsheet
 open Shared
 open Components.Metadata
+open Swate.Components
 
 type private NavbarState = {
     BurgerActive: bool

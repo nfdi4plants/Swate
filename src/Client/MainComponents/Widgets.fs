@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
+open Swate
 
 module private InitExtensions =
 

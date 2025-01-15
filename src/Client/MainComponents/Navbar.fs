@@ -10,6 +10,7 @@ open Components
 open MainComponents
 open Model
 open Shared
+open Swate.Components
 
 let private FileName (model: Model) =
     let txt =

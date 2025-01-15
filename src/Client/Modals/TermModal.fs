@@ -4,7 +4,7 @@ open Shared.Database
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl
-open Components
+open Swate.Components
 open Shared
 
 
@@ -63,7 +63,7 @@ type TermModal =
                                             Html.span [ prop.className "font-bold"; prop.text oa.NameText]
                                             Html.div [ prop.className "text-xs"; prop.text oa.TermAccessionShort]
                                         ]
-                                        Components.Components.DeleteButton(props=[prop.onClick rmv])
+                                        Components.DeleteButton(props=[prop.onClick rmv])
                                     ]
                                 ]
                                 Html.div [

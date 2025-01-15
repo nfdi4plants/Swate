@@ -12,6 +12,7 @@ open ARCtrl
 open Shared
 open Fetch
 open ARCtrl.Json
+open Swate.Components
 open Components
 
 module private API =
