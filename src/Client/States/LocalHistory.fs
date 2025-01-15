@@ -1,6 +1,11 @@
 module LocalHistory
 
+open Fable.Core
+open JsInterop
+open System
+
 open Fable.SimpleJson
+open IndexedDB
 
 module GeneralHelpers =
 
@@ -55,6 +60,7 @@ module ConversionTypes =
     open ARCtrl
     open ARCtrl.Json
     open Shared
+    open Fable.Core
 
     [<RequireQualifiedAccess>]
     type JsonArcFiles =
@@ -64,24 +70,41 @@ module ConversionTypes =
     | Template
     | None
 
+    [<Emit("performance.now")>]
+    let performanceNow: unit -> int = jsNative
+
     type SessionStorage = {
         JsonArcFiles: JsonArcFiles
         JsonString: string
         ActiveView: Spreadsheet.ActiveView
     } with
         static member fromSpreadsheetModel (model: Spreadsheet.Model) =
+            let start = performanceNow()
             let jsonArcFile, jsonString =
                 match model.ArcFile with
-                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toCompressedJsonString 0 i
-                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, ArcStudy.toCompressedJsonString 0 s
-                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toCompressedJsonString 0 a
+                | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toJsonString 0 i
+                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
+                | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some (ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
                 | None -> JsonArcFiles.None, ""
+
+            ///Compress a JSON string using pako (GZIP) and encode it as a Base64 string
+            let compressJsonToBase64String (json: string) =
+                let jsonBytes = Text.Encoding.UTF8.GetBytes(json)
+                ///Import pako library from JavaScript
+                let pako: obj = importAll "pako"
+                let compressedBytes: byte[] = pako?deflate(jsonBytes)
+                Convert.ToBase64String(compressedBytes)
+
+            let compressedJsonString = compressJsonToBase64String jsonString
+            let ent = performanceNow()
+            log(ent - start)
             {
-                JsonArcFiles = jsonArcFile 
-                JsonString = jsonString
-                ActiveView = model.ActiveView
+                JsonArcFiles    = jsonArcFile 
+                JsonString      = compressedJsonString
+                ActiveView      = model.ActiveView
             }
+
         member this.ToSpreadsheetModel() = 
             let init = Spreadsheet.Model.init()
             try
@@ -101,6 +124,7 @@ module ConversionTypes =
                 }
             with
                 | _ -> init
+
         static member toSpreadsheetModel (sessionStorage: SessionStorage) =
             sessionStorage.ToSpreadsheetModel()
 
@@ -140,8 +164,13 @@ type Spreadsheet.Model with
         | None      -> Spreadsheet.Model.init()
 
     member this.SaveToLocalStorage() =
-        let snapshotJsonString = this.ToJsonString()
-        Browser.WebStorage.localStorage.setItem(Keys.swate_local_spreadsheet_key, snapshotJsonString)
+        promise {
+            let snapshotJsonString = this.ToJsonString()
+            let! indexedDB = createDatabase "StuffDatabase" 2
+            log(snapshotJsonString)
+            do! addItem "StuffDatabase" 2 "items" snapshotJsonString Keys.swate_local_spreadsheet_key
+        }
+        |> Promise.start
 
 /// <summary>
 /// This type is used to store information about local history. Can be used to revert changes.
