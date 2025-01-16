@@ -19,7 +19,8 @@
     // Allow emitting .d.ts files even if there are errors
     "noEmitOnError": false,
     // Use strict mode if possible but relax for edge cases
-    "strict": false
+    "strict": false,
+    "jsx": "react-jsx",
   },
   "include": [ "src" ],
   "exclude": [
@@ -27,7 +28,7 @@
     "dist",
     "./src/**/*.test.tsx",
     "./src/**/*.stories.jsx",
-    "./src/POC",
+    "./src/**/*.stories.tsx",
     "./src/fable_module"
   ],
   "compilerOptions.paths" : {

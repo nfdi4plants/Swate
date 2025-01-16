@@ -1,4 +1,5 @@
-import type { Preview } from "@storybook/react";
+import { Preview } from "@storybook/react";
+import { withThemeByDataAttribute } from '@storybook/addon-themes';
 import '../tailwind.css'
 import '@fortawesome/fontawesome-free/css/all.min.css'
 
@@ -11,6 +12,16 @@ const preview: Preview = {
       },
     },
   },
+  decorators: [
+    withThemeByDataAttribute ({
+      themes: {
+        light: 'light',
+        dark: 'dark'
+      },
+      defaultTheme: 'light',
+      attributeName: 'data-theme'
+    })
+  ]
 };
 
 export default preview;

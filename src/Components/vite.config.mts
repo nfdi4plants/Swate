@@ -32,12 +32,6 @@ export default defineConfig({
             },
         },
     },
-    test: {
-      css: true,
-      globals: true,
-      environment: "jsdom",
-      setupFiles: './vitest.setup.ts', // Loads the setup file
-    },
     css: {
         postcss: {
           plugins: [tailwindcss],

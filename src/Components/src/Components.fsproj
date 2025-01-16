@@ -27,7 +27,6 @@
     <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/"/>
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
-    <Compile Include="POC\POC.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchV2.fs" />
