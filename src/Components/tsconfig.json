@@ -15,8 +15,22 @@
     // go to js file when using IDE functions like
     // "Go to Definition" in VSCode
     "declarationMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // Allow emitting .d.ts files even if there are errors
+    "noEmitOnError": false,
+    // Use strict mode if possible but relax for edge cases
+    "strict": false
   },
   "include": [ "src" ],
-  "exclude": [ "node_modules", "dist", "./src/**/*.test.tsx", "./src/**/*.stories.{jsx,tsx}", "./src/POC", "./src/fable_module" ]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "./src/**/*.test.tsx",
+    "./src/**/*.stories.jsx",
+    "./src/POC",
+    "./src/fable_module"
+  ],
+  "compilerOptions.paths" : {
+    "fable_module/*": ["./src/fable_module/*"]
+  }
 }

@@ -20,7 +20,7 @@
   "scripts": {
     "start": "dotnet fable watch ./src/Components.fsproj --define PUBLISH_COMPONENTS --run vite",
     "fable": "dotnet fable ./src/Components.fsproj --define PUBLISH_COMPONENTS",
-    "build": "npm run fable -- --fableLib @fable-org/fable-library-js --noCache && tsc --outDir ./dist && vite build",
+    "build": "npm run fable -- --lang ts --fableLib @fable-org/fable-library-js --noCache && vite build",
     "prebuild:net": "npx tailwindcss -o ./src/swateBundleStyle.css -m",
     "build:net": "dotnet pack ./src/Components.fsproj",
     "test": "npm run fable -- --watch --run vitest",

@@ -37,32 +37,32 @@ type AdvancedSearch<'A> = {|
 [<AutoOpen>]
 module TypeDefs =
 
-    emitJsStatement ( ) """/**
- * Represents a term object with optional metadata.
- * @typedef {Object} Term
- * @property {string} [name] - The name of the term.
- * @property {string} [id] - The unique identifier for the term.
- * @property {string} [description] - A description of the term.
- * @property {string} [source] - The source from which the term originates.
- * @property {string} [href] - A URL linking to more information about the term.
- * @property {boolean} [isObsolete] - Whether the term is obsolete.
- * @property {Object} [data] - Additional metadata associated with the term.
- */"""
+//     emitJsStatement ( ) """/**
+//  * Represents a term object with optional metadata.
+//  * @typedef {Object} Term
+//  * @property {string} [name] - The name of the term.
+//  * @property {string} [id] - The unique identifier for the term.
+//  * @property {string} [description] - A description of the term.
+//  * @property {string} [source] - The source from which the term originates.
+//  * @property {string} [href] - A URL linking to more information about the term.
+//  * @property {boolean} [isObsolete] - Whether the term is obsolete.
+//  * @property {Object} [data] - Additional metadata associated with the term.
+//  */"""
 
-    emitJsStatement ( ) """/**
- * A search function that resolves a list of terms.
- * @typedef {function(string): Promise<Term[]>} SearchCall
- */"""
+//     emitJsStatement ( ) """/**
+//  * A search function that resolves a list of terms.
+//  * @typedef {function(string): Promise<Term[]>} SearchCall
+//  */"""
 
-    emitJsStatement ( ) """/**
- * A parent search function that resolves a list of terms based on a parent ID and query.
- * @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
- */"""
+//     emitJsStatement ( ) """/**
+//  * A parent search function that resolves a list of terms based on a parent ID and query.
+//  * @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
+//  */"""
 
-    emitJsStatement ( ) """/**
- * A function that fetches all child terms of a parent.
- * @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
- */"""
+//     emitJsStatement ( ) """/**
+//  * A function that fetches all child terms of a parent.
+//  * @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
+//  */"""
 
 
     ///
@@ -501,23 +501,6 @@ type TermSearchV2 =
         ]
         TermSearchV2.BaseModal("Advanced Search", content, rvm, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
 
-    ///
-    /// Executes a term search with various search parameters and callbacks.
-    ///
-    /// @param {Object} params - The parameters for the term search.
-    /// @param {function(Term|undefined): void} params.onTermSelect - A callback triggered when a term is selected.
-    /// @param {Term|undefined} params.term - A plain JavaScript object representing the currently selected term, or `null` if no term is selected.
-    /// @param {string} [params.parentId] - The ID of the parent term, if applicable.
-    /// @param {Array<[string, SearchCall]>} [params.termSearchQueries] -
-    ///   A list of term search queries. Each item is a tuple containing a description and a search function.
-    /// @param {Array<[string, ParentSearchCall]>} [params.parentSearchQueries] -
-    ///   A list of parent term search queries. Each item is a tuple containing a description and a search function.
-    /// @param {Array<[string, AllChildrenSearchCall]>} [params.allChildrenSearchQueries] -
-    ///   A list of child term search queries. Each item is a tuple containing a description and a search function.
-    /// @param {AdvancedSearch<any>} [params.advancedSearch] - Configuration for performing custom advanced searches.
-    /// @param {boolean} [params.showDetails=false] - Indicates whether detailed information about terms should be displayed.
-    /// @param {boolean} [params.debug=false] - Indicates whether to enable debug mode.
-    ///
     [<ExportDefaultAttribute; NamedParams>]
     static member TermSearch(
         onTermSelect: Term option -> unit,
