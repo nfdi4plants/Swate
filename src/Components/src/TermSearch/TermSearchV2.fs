@@ -250,6 +250,13 @@ type TermSearchV2 =
                                 Html.text (Option.defaultValue "<no-description>" term.Term.description)
                             ]
                         ]
+                        if term.Term.data.IsSome then
+                            Html.pre [
+                                prop.className "text-xs"
+                                prop.children [
+                                    Html.code (Fable.Core.JS.JSON.stringify(term.Term.data.Value, space = '\t'))
+                                ]
+                            ]
                     ]
                 ]
             ]
@@ -380,6 +387,14 @@ type TermSearchV2 =
                 Html.div (Option.defaultValue "<no-description>" term.description)
                 label "Source"
                 Html.div (Option.defaultValue "<no-source>" term.source)
+                if term.data.IsSome then
+                    label "Data"
+                    Html.pre [
+                        prop.className "text-xs"
+                        prop.children [
+                            Html.code (Fable.Core.JS.JSON.stringify(term.data.Value, space = '\t'))
+                        ]
+                    ]
                 if term.isObsolete.IsSome && term.isObsolete.Value then
                     Html.div [
                         prop.className "text-error"
@@ -501,6 +516,9 @@ type TermSearchV2 =
         ]
         TermSearchV2.BaseModal("Advanced Search", content, rvm, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
 
+    ///
+    /// Customizable react component for term search. Utilizing SwateDB search by default.
+    ///
     [<ExportDefaultAttribute; NamedParams>]
     static member TermSearch(
         onTermSelect: Term option -> unit,
@@ -528,6 +546,13 @@ type TermSearchV2 =
         let cancelled = React.useRef(false)
 
         let (modal: Modals option), setModal = React.useState None
+
+        /// Close term search result window when opening a modal
+        let setModal =
+            fun (modal: Modals option) ->
+                if modal.IsSome then
+                    setSearchResults (fun _ -> SearchState.init())
+                setModal modal
 
         let onTermSelect = fun (term: Term option) ->
             if inputRef.current.IsSome then
@@ -684,7 +709,7 @@ type TermSearchV2 =
                                     "fa-solid fa-square-check text-primary",
                                     fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
                                 )
-                        | _ when showDetails && term.IsSome -> // show only when focused
+                        | Some _ when showDetails -> // show only when focused
                             TermSearchV2.IndicatorItem(
                                 "",
                                 "Details",

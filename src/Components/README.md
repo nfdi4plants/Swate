@@ -10,9 +10,21 @@
 
 `npm start`
 
-### Build
+### Run Storybook
+
+`npm run storybook`
+
+### Build Storybook
+
+`npm run build:storybook`
+
+### Build Npm Package
 
 `npm run build`
+
+### Build .NET Package
+
+`npm run build:net`
 
 ### Release
 

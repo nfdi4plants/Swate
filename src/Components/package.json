@@ -18,8 +18,8 @@
     "./style.css": "./dist/style.css"
   },
   "scripts": {
-    "start": "dotnet fable watch ./src/Components.fsproj --define PUBLISH_COMPONENTS --run vite",
     "fable": "dotnet fable ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts",
+    "start": "npm run fable -- --watch --run vite",
     "build": "npm run fable -- --fableLib @fable-org/fable-library-js --noCache && vite build",
     "prebuild:net": "npx tailwindcss -o ./src/swateBundleStyle.css -m",
     "build:net": "dotnet pack ./src/Components.fsproj",
@@ -27,7 +27,7 @@
     "test:run": "npm run fable -- --run npx vitest --project=storybook",
     "prelink": "npm run build",
     "storybook": "npm run fable -- --watch --run storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build:storybook": "storybook build"
   },
   "repository": {
     "type": "git",

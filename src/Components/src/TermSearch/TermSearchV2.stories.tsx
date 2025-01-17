@@ -1,6 +1,24 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn, within, expect, userEvent, waitFor, fireEvent } from '@storybook/test';
 import TermSearch from "./TermSearchV2.fs.js";
+import React from 'react';
+
+const renderTermSearch = (args: any) => {
+  const [term, setTerm] = React.useState(undefined);
+
+  return (
+    <div className='container mx-auto flex flex-col p-2 gap-4 h-[400px]'>
+      <TermSearch
+        {...args}
+        term={term}
+        onTermSelect={(selectedTerm) => {
+          setTerm(selectedTerm);
+          args.onTermSelect(selectedTerm); // Call mock or external handler
+        }}
+      />
+    </div>
+  );
+};
 
 const meta = {
   title: "Components/TermSearch",
@@ -17,6 +35,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  render: renderTermSearch,
   args: {
     onTermSelect: fn((term) => console.log(term)),
     term: undefined,
@@ -35,9 +54,10 @@ export const Default: Story = {
 
 const advancedSearch = {
   input: "test",
-  search: fn(() => Promise.resolve([{name: "test", id: "TST:00001", description: "Test Term", isObsolete: true}])),
+  search: fn(() => Promise.resolve([{name: "test", id: "TST:00001", description: "Test Term", isObsolete: true, data: {test1: "Hello", test2: "World"}}])),
   form: (controller: { startSearch: (() => void), cancel: (() => void) }) => (
     <input
+      className='input input-bordered'
       data-testid="advanced-search-input"
       type="text"
       onKeyDown={(e) => e.code === "Enter" ? controller.startSearch() : null}
@@ -45,7 +65,11 @@ const advancedSearch = {
   ),
 };
 
+/**
+ * Advanced search with a custom form
+ */
 export const AdvancedSearch: Story = {
+  render: renderTermSearch,
   args: {
     term: undefined,
     onTermSelect: fn((term) => console.log(term)),
@@ -68,7 +92,7 @@ export const AdvancedSearch: Story = {
     await userEvent.type(input, "test", {delay: 50});
     await fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
 
-    await expect(args.advancedSearch.search).toHaveBeenCalled()
-    await expect(args.advancedSearch.search).toHaveBeenCalledWith("test")
+    await expect(args.advancedSearch!.search).toHaveBeenCalled()
+    await expect(args.advancedSearch!.search).toHaveBeenCalledWith("test")
   }
 }
