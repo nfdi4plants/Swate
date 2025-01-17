@@ -39,7 +39,6 @@ export const Default: Story = {
   args: {
     onTermSelect: fn((term) => console.log(term)),
     term: undefined,
-    parentId: "test:xx",
     showDetails: true,
     debug: true
   },
@@ -52,9 +51,42 @@ export const Default: Story = {
   }
 }
 
+export const ParentSearch: Story = {
+  render: renderTermSearch,
+  args: {
+    onTermSelect: fn((term) => console.log(term)),
+    term: undefined,
+    parentId: "MS:1000031",
+    showDetails: true,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId('term-search-input');
+    expect(input).toBeInTheDocument();
+    userEvent.type(input, "SCIEX", {delay: 50});
+
+    await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
+    await waitFor(() => {
+      let directedOutput = canvas.getByText("SCIEX instrument model");
+      expect(directedOutput).toBeInTheDocument()
+      let expectedIcon = canvas.getByTitle("Directed Search")
+      expect(expectedIcon).toBeInTheDocument()
+    });
+  }
+}
+
 const advancedSearch = {
   input: "test",
-  search: fn(() => Promise.resolve([{name: "test", id: "TST:00001", description: "Test Term", isObsolete: true, data: {test1: "Hello", test2: "World"}}])),
+  search: fn(() => Promise.resolve([
+    {
+      name: "test",
+      id: "TST:00001",
+      description: "Test Term",
+      isObsolete: true,
+      data: {test1: "Hello", test2: "World"}
+    }])
+  ),
   form: (controller: { startSearch: (() => void), cancel: (() => void) }) => (
     <input
       className='input input-bordered'

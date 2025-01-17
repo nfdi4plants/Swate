@@ -264,7 +264,7 @@ type TermSearchV2 =
                                         prop.className "link link-primary"
                                     prop.text id
                                 ]
-                                Components.CollapseButton(collapsed, setCollapsed, classes="btn-sm rounded")
+                                Components.CollapseButton(collapsed, setCollapsed, classes="btn-sm rounded justify-self-end")
                             ]
                         ]
                     ]
@@ -296,12 +296,11 @@ type TermSearchV2 =
 
     static member private NoResultsElement(advancedSearchToggle: (unit -> unit) option) =
         Html.div [
-            prop.className "gap-y-2"
+            prop.className "gap-y-2 py-2 px-4"
             prop.children [
                 Html.div "No terms found matching your input."
                 if advancedSearchToggle.IsSome then
                     Html.div [
-                        prop.classes ["term-select-item"]
                         prop.children [
                             Html.span "Can't find the term you are looking for? "
                             Html.a [
