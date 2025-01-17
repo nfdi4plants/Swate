@@ -9,7 +9,6 @@ open Messages
 open Browser.Types
 open Fable.Core.JsInterop
 open ARCtrl
-open Shared
 open Fetch
 open ARCtrl.Json
 open Swate.Components
@@ -659,7 +658,7 @@ type FormComponents =
                         input |> setter
                     ),
                     "Roles",
-                    parent=Shared.TermCollection.PersonRoleWithinExperiment
+                    parent=TermCollection.PersonRoleWithinExperiment
                 )
                 if rmv.IsSome then
                     Helper.deleteButton rmv.Value
@@ -879,7 +878,7 @@ type FormComponents =
                         input |> setter
                     ),
                     "Status",
-                    parent=Shared.TermCollection.PublicationStatus
+                    parent=TermCollection.PublicationStatus
                 )
                 FormComponents.CommentsInput(
                     input.Comments,

@@ -10,9 +10,8 @@ open SpreadsheetInterface
 
 open Elmish
 open Model
-open Shared
+open ARCtrl
 open Fable.Core.JsInterop
-open Shared.ARCtrlHelper
 
 module private ModelUtil =
 

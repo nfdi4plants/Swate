@@ -8,14 +8,8 @@
     <Compile Include="DTOs\ParentTermQueryDto.fs" />
     <Compile Include="DTOs\TermQueryDto.fs" />
     <Compile Include="Extensions.fs" />
-    <Compile Include="StaticTermCollection.fs" />
     <Compile Include="URLs.fs" />
-    <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="AdvancedSearchTypes.fs" />
     <Compile Include="Shared.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" Version="2.2.4" />
-    <PackageReference Include="ARCtrl.Json" Version="2.2.4" />
   </ItemGroup>
 </Project>

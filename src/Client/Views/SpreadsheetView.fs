@@ -8,6 +8,7 @@ open MainComponents
 open Shared
 open Fable.Core.JsInterop
 open Model
+open ARCtrl
 
 let private WidgetOrderContainer bringWidgetToFront (widget) =
     Html.div [

@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\README.md" Pack="true" PackagePath="\"/>
-    <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/"/>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
@@ -34,6 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />
     <PackageReference Include="Fable.Core" Version="4.3.0" />
@@ -46,6 +47,10 @@
     <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <!-- Include the project file itself as well -->
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Shared.fsproj" />
   </ItemGroup>
 
   <PropertyGroup>

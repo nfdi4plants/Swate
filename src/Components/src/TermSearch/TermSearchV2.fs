@@ -22,6 +22,22 @@ type Term
     member val isObsolete: bool option = jsNative with get, set
     member val data: obj option = jsNative with get, set
 
+module private APIExtentions =
+
+    let private optionOfString (str:string) =
+        Option.whereNot System.String.IsNullOrWhiteSpace str
+
+    type Shared.Database.Term with
+        member this.ToComponentTerm() =
+            Term(
+                ?name = optionOfString this.Name,
+                ?id = optionOfString this.Accession,
+                ?description = optionOfString this.Description,
+                ?source = optionOfString this.FK_Ontology,
+                isObsolete = this.IsObsolete
+            )
+
+open APIExtentions
 
 type AdvancedSearchController = {|
     startSearch: unit -> unit
@@ -159,20 +175,32 @@ module private API =
                 |]
             }
 
-    // let callSearch = fun (query: string) ->
-    //     Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create query)
-    //     |> Async.StartAsPromise
-    //     //|> Promise.map(fun results ->
-    //     //    results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
-    //     //)
+    let callSearch = fun (query: string) ->
+        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create query)
+        |> Async.StartAsPromise
+        |> Promise.map(fun results ->
+            results
+            |> Array.map (fun t0 -> t0.ToComponentTerm())
+            |> ResizeArray
+        )
 
-    // let callParentSearch = fun (parent: string) (query: string) ->
-    //     Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create(query, parentTermId = parent))
-    //     |> Async.StartAsPromise
+    let callParentSearch = fun (parent: string) (query: string) ->
+        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create(query, parentTermId = parent))
+        |> Async.StartAsPromise
+        |> Promise.map(fun results ->
+            results
+            |> Array.map (fun t0 -> t0.ToComponentTerm())
+            |> ResizeArray
+        )
 
-    // let callAllChildSearch = fun (parent: string) ->
-    //     Api.ontology.findAllChildTerms (Shared.DTOs.ParentTermQuery.ParentTermQueryDto.create(parent))
-    //     |> Async.StartAsPromise
+    let callAllChildSearch = fun (parent: string) ->
+        Api.ontology.findAllChildTerms (Shared.DTOs.ParentTermQuery.ParentTermQueryDto.create(parent, 300))
+        |> Async.StartAsPromise
+        |> Promise.map(fun results ->
+            results.results
+            |> Array.map (fun t0 -> t0.ToComponentTerm())
+            |> ResizeArray
+        )
 
 [<Mangle(false); Erase>]
 type TermSearchV2 =
@@ -183,9 +211,11 @@ type TermSearchV2 =
         let isObsolete = term.Term.isObsolete.IsSome && term.Term.isObsolete.Value
         let isDirectedSearch = term.IsDirectedSearchResult
         let activeClasses = "group-[.collapse-open]:bg-secondary group-[.collapse-open]:text-secondary-content"
+        let gridClasses = "grid grid-cols-subgrid col-span-4"
         Html.div [
             prop.className [
                 "group collapse rounded-none"
+                gridClasses
                 if collapsed then "collapse-open"
             ]
             prop.children [
@@ -196,11 +226,12 @@ type TermSearchV2 =
                     )
                     prop.className [
                         "collapse-title p-2 min-h-fit cursor-pointer"
+                        gridClasses
                         activeClasses
                     ]
                     prop.children [
                         Html.div [
-                            prop.className "items-center grid grid-cols-[auto,1fr,auto,auto] gap-2"
+                            prop.className "items-center grid grid-cols-subgrid col-span-4 gap-2"
                             prop.children [
                                 Html.i [
                                     if isObsolete then
@@ -241,6 +272,7 @@ type TermSearchV2 =
                 Html.div [
                     prop.className [
                         "collapse-content prose-sm"
+                        "col-span-4"
                         activeClasses
                     ]
                     prop.children [
@@ -262,23 +294,23 @@ type TermSearchV2 =
             ]
         ]
 
-    static member private NoResultsElement() =
+    static member private NoResultsElement(advancedSearchToggle: (unit -> unit) option) =
         Html.div [
             prop.className "gap-y-2"
             prop.children [
                 Html.div "No terms found matching your input."
-                // if advancedTermSearchActiveSetter.IsSome then
-                //     Html.div [
-                //         prop.classes ["term-select-item"]
-                //         prop.children [
-                //             Html.span "Can't find the term you are looking for? "
-                //             Html.a [
-                //                 prop.className "link link-primary"
-                //                 prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); advancedTermSearchActiveSetter.Value true)
-                //                 prop.text "Try Advanced Search!"
-                //             ]
-                //         ]
-                //     ]
+                if advancedSearchToggle.IsSome then
+                    Html.div [
+                        prop.classes ["term-select-item"]
+                        prop.children [
+                            Html.span "Can't find the term you are looking for? "
+                            Html.a [
+                                prop.className "link link-primary"
+                                prop.onClick(fun e -> e.preventDefault(); e.stopPropagation(); advancedSearchToggle.Value())
+                                prop.text "Try Advanced Search!"
+                            ]
+                        ]
+                    ]
                 Html.div [
                     Html.span "Can't find what you need? Get in "
                     Html.a [prop.href @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"; prop.target.blank; prop.text "contact"; prop.className "link link-primary"]
@@ -288,22 +320,22 @@ type TermSearchV2 =
         ]
 
 
-    static member private TermDropdown(onTermSelect, state: SearchState, loading: Set<string>) =
+    static member private TermDropdown(onTermSelect, state: SearchState, loading: Set<string>, advancedSearchToggle: (unit -> unit) option) =
         Html.div [
             prop.style [style.scrollbarGutter.stable]
             prop.className [
                 "min-w-[400px]"
                 "absolute top-[100%] left-0 right-0 z-50"
-                "bg-base-200 rounded shadow-lg border-2 border-primary py-2 pl-4 max-h-[400px] overflow-y-auto divide-y divide-dashed divide-base-100"
+                "grid grid-cols-[auto,1fr,auto,auto]"
+                "bg-base-200 rounded shadow-lg border-2 border-primary max-h-[400px] overflow-y-auto divide-y divide-dashed divide-base-100"
                 if state = SearchState.Idle then "hidden"
             ]
 
-            // "flex flex-col w-full absolute z-10 top-[100%] left-0 right-0 bg-white shadow-lg rounded-md divide-y-2 max-h-[400px] overflow-y-auto"
             prop.children [
                 match state with
                 // when search is not idle and all loading is done, but no results are found
                 | SearchState.SearchDone searchResults when searchResults.Count = 0 && loading.IsEmpty ->
-                    TermSearchV2.NoResultsElement()
+                    TermSearchV2.NoResultsElement(advancedSearchToggle)
                 | SearchState.SearchDone searchResults ->
                     for res in searchResults do
                         TermSearchV2.TermItem(res, onTermSelect)
@@ -424,7 +456,8 @@ type TermSearchV2 =
           startSearch = fun () ->
             advancedSearch.search advancedSearch.input
             |> Promise.map(fun results ->
-                let results = results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
+                let results = results.ConvertAll(fun t0 ->
+                    {Term = t0; IsDirectedSearchResult = false})
                 setSearchResults (SearchState.SearchDone results)
             )
             |> Promise.start
@@ -529,7 +562,10 @@ type TermSearchV2 =
         ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
         ?advancedSearch: AdvancedSearch<'A>,
         ?showDetails: bool,
-        ?debug: bool
+        ?debug: bool,
+        ?disableDefaultSearch: bool,
+        ?disableDefaultParentSearch: bool,
+        ?disableDefaultAllChildrenSearch: bool
     ) =
 
         let showDetails = defaultArg showDetails false
@@ -610,7 +646,10 @@ type TermSearchV2 =
         /// Collect all given search functions into one combined search
         let termSearchFunc = fun (query: string) ->
             [
-                createTermSearch "DEFAULT_SIMPLE" API.Mocks.callSearch query
+                if disableDefaultSearch.IsSome && disableDefaultSearch.Value then
+                    ()
+                else
+                    createTermSearch "DEFAULT_SIMPLE" API.callSearch query
                 if termSearchQueries.IsSome then
                     for id, termSearch in termSearchQueries.Value do
                         createTermSearch id termSearch query
@@ -621,7 +660,10 @@ type TermSearchV2 =
         let parentSearch = fun (query: string) ->
             [
                 if parentId.IsSome then
-                    createParentChildTermSearch "DEFAULT_PARENTCHILD" API.Mocks.callParentSearch parentId.Value query
+                    if disableDefaultParentSearch.IsSome && disableDefaultParentSearch.Value then
+                        ()
+                    else
+                        createParentChildTermSearch "DEFAULT_PARENTCHILD" API.callParentSearch parentId.Value query
                     if parentSearchQueries.IsSome then
                         for id, parentSearch in parentSearchQueries.Value do
                             createParentChildTermSearch id parentSearch parentId.Value query
@@ -633,7 +675,10 @@ type TermSearchV2 =
         let allChildSearch = fun () ->
             [
                 if parentId.IsSome then
-                    createAllChildTermSearch "DEFAULT_ALLCHILD" API.Mocks.callAllChildSearch parentId.Value
+                    if disableDefaultAllChildrenSearch.IsSome && disableDefaultAllChildrenSearch.Value then
+                        ()
+                    else
+                        createAllChildTermSearch "DEFAULT_ALLCHILD" API.callAllChildSearch parentId.Value
                     if allChildrenSearchQueries.IsSome then
                         for id, allChildSearch in allChildrenSearchQueries.Value do
                             createAllChildTermSearch id allChildSearch parentId.Value
@@ -770,7 +815,8 @@ type TermSearchV2 =
                                         if loading.IsEmpty then "invisible";
                                     ]
                                 ]
-                                TermSearchV2.TermDropdown(onTermSelect, searchResults, loading)
+                                let advancedSearchToggle = advancedSearch |> Option.map (fun _ -> fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch))
+                                TermSearchV2.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle)
                             ]
                         ]
                     ]

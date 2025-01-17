@@ -4,7 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 
 open OfficeInterop.Core
-open Shared
+open ARCtrl
 
 type CellDiscriminateState = {
         SelectedCellState: CompositeCellDiscriminate option

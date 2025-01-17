@@ -6,6 +6,7 @@ open Messages.BuildingBlock
 open Shared
 
 open Elmish
+open ARCtrl
 
 let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) : BuildingBlock.Model * Cmd<Messages.Msg> =
     match addBuildingBlockMsg with

@@ -11,6 +11,7 @@ open MainComponents
 open Model
 open Shared
 open Swate.Components
+open ARCtrl
 
 let private FileName (model: Model) =
     let txt =
