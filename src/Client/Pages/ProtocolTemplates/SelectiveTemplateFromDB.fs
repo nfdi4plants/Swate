@@ -154,12 +154,6 @@ type SelectiveTemplateFromDB =
             {importTypeState with ImportTables = newImportTables} |> setImportTypeState
         let rmvTableImport = fun i ->
             {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
-        //if model.ProtocolState.TemplatesSelected.Length > 0 then
-        //    let columns =
-        //        model.ProtocolState.TemplatesSelected
-        //        |> List.map (fun template -> Array.init template.Table.Columns.Length (fun _ -> true))
-        //        |> Array.ofList
-        //    {importTypeState with SelectedColumns = columns} |> setImportTypeState
         React.fragment [
             Html.div [
                 SelectiveTemplateFromDB.ToProtocolSearchElement(model, setProtocolSearch, importTypeState, setImportTypeState, dispatch)
