@@ -80,7 +80,7 @@ type SelectiveTemplateFromDB =
     /// <param name="importType"></param>
     /// <param name="useTemplateName"></param>
     /// <param name="dispatch"></param>
-    static member AddFromDBToTableButton(name, model: Model, selectionInformation, importType, setImportType, useTemplateName, protocolSearchState, setProtocolSearch, dispatch) =
+    static member AddFromDBToTableButton(name, model: Model, importType, setImportType, useTemplateName, protocolSearchState, setProtocolSearch, dispatch) =
         let addTemplate (model: Model, selectedColumns) =
             let template =
                 if model.ProtocolState.TemplatesSelected.Length = 0 then
@@ -92,7 +92,7 @@ type SelectiveTemplateFromDB =
             prop.className "flex flex-row justify-center gap-2"
             prop.children [
                 let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
-                ModalElements.Button(name, addTemplate, (model, selectionInformation.SelectedColumns.[0]), isDisabled)
+                ModalElements.Button(name, addTemplate, (model, importType.SelectedColumns.[0]), isDisabled)
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Daisy.button.a [
                         button.outline
@@ -187,7 +187,7 @@ type SelectiveTemplateFromDB =
                 ]
                 Html.div [
                     SelectiveTemplateFromDB.AddFromDBToTableButton(
-                        "Add template", model, importTypeState, importTypeState, setImportTypeState, importTypeState.TemplateName, protocolSearchState, setProtocolSearch, dispatch)
+                        "Add template", model, importTypeState, setImportTypeState, importTypeState.TemplateName, protocolSearchState, setProtocolSearch, dispatch)
                 ]
             else if model.ProtocolState.TemplatesSelected.Length > 1 then
                 let templates = model.ProtocolState.TemplatesSelected
