@@ -27,6 +27,7 @@ module private ModelUtil =
             | Some Swatehost.Browser ->
                 let dt = LocalStorage.Darkmode.DataTheme.GET()
                 LocalStorage.Darkmode.DataTheme.SET dt
+                let model = Spreadsheet.Model.fromLocalStorage()
                 { this with
                     Model.SpreadsheetModel = Spreadsheet.Model.fromLocalStorage()
                     Model.History = this.History.UpdateFromSessionStorage()

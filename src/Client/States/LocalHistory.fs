@@ -9,13 +9,42 @@ open IndexedDB
 
 module GeneralHelpers =
 
+    let pako: obj = importAll "pako"
+
+    /// <summary>
+    /// Get specific item from session storage
+    /// </summary>
+    /// <param name="key"></param>
     let tryGetSessionItem(key: string) =
         let v = Browser.WebStorage.sessionStorage.getItem(key)
         if isNull v then None else Some v
 
+    /// <summary>
+    /// Get specific item from local storage
+    /// </summary>
+    /// <param name="key"></param>
     let tryGetLocalItem(key: string) =
         let v = Browser.WebStorage.localStorage.getItem(key)
         if isNull v then None else Some v
+
+    /// <summary>
+    /// Compress a JSON string using pako (GZIP) and encode it as a Base64 string
+    /// </summary>
+    /// <param name="json"></param>
+    let compressJsonToBase64String (json: string) =
+        let jsonBytes = Text.Encoding.UTF8.GetBytes(json)
+        ///Import pako library from JavaScript
+        let compressedBytes: byte[] = pako?deflate(jsonBytes)
+        Convert.ToBase64String(compressedBytes)
+
+    /// <summary>
+    /// Decompress a Base64 string using pako (GZIP)
+    /// </summary>
+    /// <param name="json"></param>
+    let decompressBase64ToJson (json: string) =
+        let compressedBytes = Convert.FromBase64String(json)
+        let jsonBytes: byte[] = pako?inflate(compressedBytes)
+        Text.Encoding.UTF8.GetString(jsonBytes)
 
 module Keys = 
 
@@ -83,20 +112,12 @@ module ConversionTypes =
             let jsonArcFile, jsonString =
                 match model.ArcFile with
                 | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toJsonString 0 i
-                | Some (ArcFiles.Study (s,al)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
+                | Some (ArcFiles.Study (s, al)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
                 | Some (ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some (ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
                 | None -> JsonArcFiles.None, ""
 
-            ///Compress a JSON string using pako (GZIP) and encode it as a Base64 string
-            let compressJsonToBase64String (json: string) =
-                let jsonBytes = Text.Encoding.UTF8.GetBytes(json)
-                ///Import pako library from JavaScript
-                let pako: obj = importAll "pako"
-                let compressedBytes: byte[] = pako?deflate(jsonBytes)
-                Convert.ToBase64String(compressedBytes)
-
-            let compressedJsonString = compressJsonToBase64String jsonString
+            let compressedJsonString = GeneralHelpers.compressJsonToBase64String jsonString
             let ent = performanceNow()
             log(ent - start)
             {
@@ -108,14 +129,21 @@ module ConversionTypes =
         member this.ToSpreadsheetModel() = 
             let init = Spreadsheet.Model.init()
             try
-                let arcFile = 
+                let arcFile =
                     match this.JsonArcFiles with
-                    | JsonArcFiles.Investigation -> ArcInvestigation.fromCompressedJsonString this.JsonString |> ArcFiles.Investigation |> Some
+                    | JsonArcFiles.Investigation ->
+                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
+                        ArcInvestigation.fromJsonString decompressedString |> ArcFiles.Investigation |> Some
                     | JsonArcFiles.Study ->
-                        let s = ArcStudy.fromCompressedJsonString this.JsonString
+                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
+                        let s = ArcStudy.fromJsonString decompressedString
                         ArcFiles.Study(s, []) |> Some
-                    | JsonArcFiles.Assay -> ArcAssay.fromCompressedJsonString this.JsonString |> ArcFiles.Assay |> Some
-                    | JsonArcFiles.Template -> Template.fromJsonString this.JsonString |> ArcFiles.Template |> Some
+                    | JsonArcFiles.Assay ->
+                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
+                        ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
+                    | JsonArcFiles.Template ->
+                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
+                        Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
                     | JsonArcFiles.None -> None
                 {
                     init with
@@ -132,8 +160,8 @@ type Spreadsheet.Model with
     static member fromJsonString (json: string) = 
         let conversionModel = Json.tryParseAs<ConversionTypes.SessionStorage>(json)
         match conversionModel with
-        | Ok m -> m.ToSpreadsheetModel()
-        | Error e -> 
+        | Ok m      -> m.ToSpreadsheetModel()
+        | Error e   -> 
             log ("Error trying to read Spreadsheet.Model from local storage: ", e)
             Spreadsheet.Model.init()
         
@@ -156,17 +184,41 @@ type Spreadsheet.Model with
         | None ->
             failwith "Could not find any history."
 
-    ///</summary>This function tries to get the data model from local storage saved under "swate_spreadsheet_key"</summary>
+    /// <summary>
+    /// This function tries to get the data model from local storage saved under "swate_spreadsheet_key"
+    /// </summary>
     static member fromLocalStorage() = 
         let snapshotJsonString = GeneralHelpers.tryGetLocalItem(Keys.swate_local_spreadsheet_key)
         match snapshotJsonString with
         | Some j    -> Spreadsheet.Model.fromJsonString j
         | None      -> Spreadsheet.Model.init()
 
+    /// <summary>
+    /// Save data in web local storage
+    /// </summary>
     member this.SaveToLocalStorage() =
+        let snapshotJsonString = this.ToJsonString()
+        Browser.WebStorage.localStorage.setItem(Keys.swate_local_spreadsheet_key, snapshotJsonString)
+
+    /// <summary>
+    /// Tries to get the data model from indexed db saved under "swate_spreadsheet_key"
+    /// </summary>
+    static member fromIndexedDB() =
+        promise{
+            let! indexedDB = openDatabase "StuffDatabase" 2 "items"
+            let! snapshotJsonString = getItem indexedDB "items" Keys.swate_local_spreadsheet_key
+            match snapshotJsonString with
+            | Some j    -> return Spreadsheet.Model.fromJsonString j
+            | None      -> return Spreadsheet.Model.init()
+        }
+
+    /// <summary>
+    /// Save data in web indexedDB
+    /// </summary>
+    member this.SaveToIndexedDB() =
         promise {
             let snapshotJsonString = this.ToJsonString()
-            let! indexedDB = createDatabase "StuffDatabase" 2
+            let! indexedDB = createDatabase "StuffDatabase" 2 "items"
             log(snapshotJsonString)
             do! addItem "StuffDatabase" 2 "items" snapshotJsonString Keys.swate_local_spreadsheet_key
         }

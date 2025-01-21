@@ -35,6 +35,10 @@ module Spreadsheet =
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
         /// It works based of exlusion. As it specifies certain messages not triggering history update.
         /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="state"></param>
+        /// <param name="model"></param>
+        /// <param name="cmd"></param>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
             match msg with
             | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _

@@ -10,7 +10,7 @@ open System
 /// </summary>
 /// <param name="dbName"></param>
 /// <param name="version"></param>
-let createDatabase (dbName: string) version =
+let createDatabase (dbName: string) version localStorage =
     promise {
         let indexedDB = emitJsExpr<obj>("globalThis.indexedDB") "globalThis.indexedDB"
         let request: obj = indexedDB?``open``(dbName, version)
@@ -20,8 +20,31 @@ let createDatabase (dbName: string) version =
                 request?onerror <- fun _ -> reject(new Exception(request?error?message "Failed to open database"))
                 request?onupgradeneeded <- fun e ->
                     let resultDb = e?target?result
-                    if resultDb?objectStoreNames?contains("items") |> not then
-                        resultDb?createObjectStore("items")
+                    if resultDb?objectStoreNames?contains(localStorage) |> not then
+                        resultDb?createObjectStore(localStorage)
+                    resolve(request?result)
+            )
+            |> Async.StartAsPromise
+        return db
+    }
+
+/// <summary>
+/// Create or update an indexed database
+/// </summary>
+/// <param name="dbName"></param>
+/// <param name="version"></param>
+let openDatabase (dbName: string) version (localStorage: string) =
+    promise {
+        let indexedDB = emitJsExpr<obj>("globalThis.indexedDB") "globalThis.indexedDB"
+        let request: obj = indexedDB?``open``(dbName, version)
+        let! db =
+            Async.FromContinuations(fun (resolve, reject, _) ->
+                request?onsuccess <- fun _ -> resolve(request?result)
+                request?onerror <- fun _ -> reject(new Exception(request?error?message "Failed to open database"))
+                request?onupgradeneeded <- fun e ->
+                    let resultDb = e?target?result
+                    if resultDb?objectStoreNames?contains(localStorage) |> not then
+                        createDatabase dbName (version + 1) localStorage |> ignore
                     resolve(request?result)
             )
             |> Async.StartAsPromise
@@ -70,17 +93,25 @@ let addItem (dbName: string) version (localStorage: string) (item: obj) (key: st
 /// <param name="key"></param>
 let getItem (db: obj) (localStorage: string) (key: string) =
     promise {
-        let tx = db?transaction(localStorage, "readonly")
-        let store = tx?objectStore(localStorage)
-        let storeRequest = store?get(key)
+        if db?objectStoreNames?contains("items") then
+            let transaction = db?transaction(localStorage, "readonly")
+            let store = transaction?objectStore(localStorage)
+            let storeRequest = store?get(key)
 
-        let! items =
-            Async.FromContinuations(fun (resolve, reject, _) ->
-                storeRequest?onsuccess <- fun _ -> resolve(storeRequest?result)
-                storeRequest?onerror <- fun _ -> reject(new Exception(storeRequest?error?message "Failed to open database"))
-            )
-            |> Async.StartAsPromise
-        return items
+            let! item =
+                Async.FromContinuations(fun (resolve, reject, _) ->
+                    storeRequest?onsuccess <- fun _ -> resolve(storeRequest?result)
+                    storeRequest?onerror <- fun _ -> reject(new Exception(storeRequest?error?message "Failed to open database"))
+                )
+                |> Async.StartAsPromise
+
+            let result = item.ToString()
+
+            if String.IsNullOrEmpty result then
+                return None
+            else return Some result
+        else
+            return None
     }
 
 /// <summary>
