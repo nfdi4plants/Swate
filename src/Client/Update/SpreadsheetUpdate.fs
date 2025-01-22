@@ -47,6 +47,10 @@ module Spreadsheet =
                 state, model, cmd
             | _ ->
                 state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
+                promise {
+                    let! result = model.History.SaveSessionSnapshotV2 state
+                    return ()
+                } |> Promise.start
                 let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
@@ -188,7 +192,7 @@ module Spreadsheet =
                     | _ ->
                         /// Run this first so an error breaks the function before any mutables are changed
                         let nextState =
-                            Spreadsheet.Model.fromSessionStorage(newPosition)
+                           Model.fromSessionStorage(newPosition)
                         Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, string newPosition)
                         let nextModel = {model with History.HistoryCurrentPosition = newPosition}
                         nextState, nextModel
