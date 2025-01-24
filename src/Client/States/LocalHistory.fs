@@ -125,9 +125,6 @@ module ConversionTypes =
     | Template
     | None
 
-    [<Emit("performance.now")>]
-    let performanceNow: unit -> int = jsNative
-
     type SessionStorage = {
         JsonArcFiles: JsonArcFiles
         JsonString: string
@@ -153,19 +150,16 @@ module ConversionTypes =
             let init = Spreadsheet.Model.init()
             try
                 let arcFile =
+                    let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
                     match this.JsonArcFiles with
                     | JsonArcFiles.Investigation ->
-                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
                         ArcInvestigation.fromJsonString decompressedString |> ArcFiles.Investigation |> Some
                     | JsonArcFiles.Study ->
-                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
                         let s = ArcStudy.fromJsonString decompressedString
                         ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay ->
-                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
                         ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
                     | JsonArcFiles.Template ->
-                        let decompressedString = GeneralHelpers.decompressBase64ToJson this.JsonString
                         Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
                     | JsonArcFiles.None -> None
                 {
@@ -223,24 +217,12 @@ type Spreadsheet.Model with
         Browser.WebStorage.localStorage.setItem(Keys.swate_local_spreadsheet_key, snapshotJsonString)
 
     /// <summary>
-    /// Get the data model from indexed db saved under "swate_spreadsheet_key"
+    /// Tries to get the data model from indexed db
     /// </summary>
-    static member fromIndexedDB() =
+    static member tryFromIndexedDB(database, tableKey, key) =
         promise{
-            let! indexedDB = openDatabase "StuffDatabase" "items"
-            let! snapshotJsonString = tryGetItem indexedDB "items" Keys.swate_local_spreadsheet_key
-            match snapshotJsonString with
-            | Some j -> return Spreadsheet.Model.fromJsonString j
-            | None   -> return Spreadsheet.Model.init()
-        }
-
-    /// <summary>
-    /// Tries to get the data model from indexed db saved under "swate_spreadsheet_key"
-    /// </summary>
-    static member tryFromIndexedDB(database, localstorage, key) =
-        promise{
-            let! indexedDB = openDatabase database localstorage
-            let! snapshotJsonString = tryGetItem indexedDB localstorage key
+            let! indexedDB = openDatabase database tableKey
+            let! snapshotJsonString = tryGetItem indexedDB tableKey key
             IndexedDB.closeDatabase indexedDB
             match snapshotJsonString with
             | Some json -> return Some json
@@ -250,20 +232,20 @@ type Spreadsheet.Model with
     /// <summary>
     /// Save data in web indexedDB
     /// </summary>
-    static member saveToIndexedDB(database, localstorage, snapshotJsonString, key) =
+    static member saveToIndexedDB(database, tableKey, snapshotJsonString, key) =
         promise {
-            let! indexedDB = openDatabase database localstorage
-            do! addItem indexedDB localstorage snapshotJsonString key
+            let! indexedDB = openDatabase database tableKey
+            do! addItem indexedDB tableKey snapshotJsonString key
             IndexedDB.closeDatabase indexedDB
         }    
 
     /// <summary>
     /// Tries to get the data model from indexed db saved under "swate_spreadsheet_key"
     /// </summary>
-    static member deleteItemIndexedDB(database, localstorage, key) =
+    static member deleteItemIndexedDB(database, tableKey, key) =
         promise{
-            let! indexedDB = openDatabase database localstorage
-            do! deleteItem indexedDB localstorage key
+            let! indexedDB = openDatabase database tableKey
+            do! deleteItem indexedDB tableKey key
         }
 
     /// <summary>
@@ -272,15 +254,14 @@ type Spreadsheet.Model with
     /// <param name="databaseName"></param>
     /// <param name="tableKeys"></param>
     static member initHistoryIndexedDB() =
-        promise{
-            do! initInidexedDB
-                    IndexedDB.swate_history_table
-                    [|
-                        IndexedDB.LocalStorage.swate_history_items;
-                        IndexedDB.LocalStorage.swate_history_keys;
-                        IndexedDB.LocalStorage.swate_history_position
-                    |]
-        }
+        initInidexedDB
+            IndexedDB.swate_history_table
+            [|
+                IndexedDB.LocalStorage.swate_history_items;
+                IndexedDB.LocalStorage.swate_history_keys;
+                IndexedDB.LocalStorage.swate_history_position
+            |]
+        |> Promise.start
 
     /// <summary>
     /// Initializes history indexedDB
@@ -288,15 +269,14 @@ type Spreadsheet.Model with
     /// <param name="databaseName"></param>
     /// <param name="tableKeys"></param>
     static member clearHistoryIndexedDB() =
-        promise{
-            do! clearInidexedDB
-                    IndexedDB.swate_history_table
-                    [|
-                        IndexedDB.LocalStorage.swate_history_items;
-                        IndexedDB.LocalStorage.swate_history_keys;
-                        IndexedDB.LocalStorage.swate_history_position
-                    |]
-        }
+        clearInidexedDB
+            IndexedDB.swate_history_table
+            [|
+                IndexedDB.LocalStorage.swate_history_items;
+                IndexedDB.LocalStorage.swate_history_keys;
+                IndexedDB.LocalStorage.swate_history_position
+            |]
+        |> Promise.start
 
 /// <summary>
 /// This type is used to store information about local history. Can be used to revert changes.
@@ -398,17 +378,15 @@ type Model =
         promise{
             /// recursively generate new guids, check if existing and if so repeat until new guid.
             let rec generateNewGuid() =
-                promise {
-                    let key = System.Guid.NewGuid()
-                    let! try_key = Spreadsheet.Model.tryFromIndexedDB(IndexedDB.swate_history_table, IndexedDB.LocalStorage.swate_history_keys, key.ToString())
-                    // if key exists redo, else use key
-                    match try_key with
-                    | Some _ -> return! generateNewGuid()
-                    | None   -> return key
-                }
+                let key = System.Guid.NewGuid()
+                if List.contains key this.HistoryOrder then
+                    generateNewGuid()
+                else
+                    key
+
             /// newGuid will be used to store the order in a list
             /// newKey is used as key to store the table state
-            let! newKey = generateNewGuid()
+            let newKey = generateNewGuid()
             // Add new history state to current history order.
             let nextState, toRemoveList =
                 // if e.g at position 4 and we create new table state from position 4 we want to delete position 0 .. 3 and use 4 as new 0
@@ -489,9 +467,7 @@ type Model =
         nextState
 
     static member ResetHistoryWebStorage() =
-        promise {
-            do! Spreadsheet.Model.clearHistoryIndexedDB()
-        } |> Promise.start
+        Spreadsheet.Model.clearHistoryIndexedDB()
         Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
         Browser.WebStorage.sessionStorage.clear()
 

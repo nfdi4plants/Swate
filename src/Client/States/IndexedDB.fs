@@ -76,7 +76,6 @@ let initInidexedDB (dbName: string) (tableKeys: string []) =
     promise {
         for tableKey in tableKeys do
              let! db = openDatabase dbName tableKey
-             log("initInidexedDB", db.ToString())
              closeDatabase db
     }
 
