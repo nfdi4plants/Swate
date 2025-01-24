@@ -261,7 +261,6 @@ type Spreadsheet.Model with
                 IndexedDB.LocalStorage.swate_history_keys;
                 IndexedDB.LocalStorage.swate_history_position
             |]
-        |> Promise.start
 
     /// <summary>
     /// Initializes history indexedDB
@@ -276,7 +275,6 @@ type Spreadsheet.Model with
                 IndexedDB.LocalStorage.swate_history_keys;
                 IndexedDB.LocalStorage.swate_history_position
             |]
-        |> Promise.start
 
 /// <summary>
 /// This type is used to store information about local history. Can be used to revert changes.
@@ -467,7 +465,7 @@ type Model =
         nextState
 
     static member ResetHistoryWebStorage() =
-        Spreadsheet.Model.clearHistoryIndexedDB()
+        Spreadsheet.Model.clearHistoryIndexedDB() |> Promise.start
         Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
         Browser.WebStorage.sessionStorage.clear()
 

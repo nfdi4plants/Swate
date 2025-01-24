@@ -97,12 +97,12 @@ module Interface =
                             ExcelHelper.officeload() |> Async.StartImmediate
                             Cmd.none
                         | Swatehost.Browser ->
-                            Spreadsheet.Model.initHistoryIndexedDB()
+                            Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
                             Cmd.none
                         | Swatehost.ARCitect ->
                             Cmd.ofEffect (fun _ ->
                                 LocalHistory.Model.ResetHistoryWebStorage()
-                                Spreadsheet.Model.initHistoryIndexedDB()
+                                Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
                                 ARCitect.ARCitect.send ARCitect.Init
                             )
                     ]
