@@ -373,8 +373,8 @@ type Model =
     /// <summary>
     /// Save the next table state to session storage for history control. Table state is stored with guid as key and order is stored as guid list.
     /// </summary>
-    /// <param name="model"></param>
-    member this.SaveSessionSnapshotIndexedDB (model: Spreadsheet.Model, snapshotJsonString) : JS.Promise<Model> =
+    /// <param name="snapshotJsonString"></param>
+    member this.SaveSessionSnapshotIndexedDB (snapshotJsonString) : JS.Promise<Model> =
         promise{
             /// recursively generate new guids, check if existing and if so repeat until new guid.
             let rec generateNewGuid() =

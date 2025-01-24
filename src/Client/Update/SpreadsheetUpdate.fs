@@ -51,7 +51,7 @@ module Spreadsheet =
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
                 state, model, cmd
             | _ -> //This matchcase handles undo / redo functionality
-                let cmd =
+                let newCmd =
                     Cmd.OfPromise.either
                         model.History.SaveSessionSnapshotIndexedDB
                         (state, snapshotJsonString)
@@ -68,7 +68,7 @@ module Spreadsheet =
                         ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
                     | _ -> ()
 
-                state, model, cmd
+                state, model, newCmd
 
     let update (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
 
@@ -198,17 +198,11 @@ module Spreadsheet =
                         state, model, Cmd.none
                     | _ ->
                         /// Run this first so an error breaks the function before any mutables are changed
-                        let cmd =
-                            Cmd.OfPromise.either
-                                Model.fromIndexedDBByKeyPosition
-                                (newPosition)
-                                (fun nextState -> Messages.UpdateModelAnd (nextState, Cmd.none))
-                                (curry GenericError Cmd.none >> DevMsg)
                         let newCmd =
                             Cmd.OfPromise.either
                                 Model.updateIndexedDBPosition
                                 (newPosition)
-                                (fun _ -> Messages.UpdateHistoryPositionAnd (newPosition, cmd))
+                                (fun _ -> Messages.UpdateHistoryPosition newPosition)
                                 (curry GenericError Cmd.none >> DevMsg)
                         state, model, newCmd
                 nextState, nextModel, cmd

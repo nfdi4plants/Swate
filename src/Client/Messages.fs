@@ -113,8 +113,8 @@ type Msg =
 | Run                       of (unit -> unit)
 | UpdateHistory             of LocalHistory.Model
 | UpdateHistoryAnd          of LocalHistory.Model * Cmd<Msg>
-| UpdateModelAnd            of Spreadsheet.Model * Cmd<Msg>
-| UpdateHistoryPositionAnd  of int * Cmd<Msg>
+| UpdateState               of Spreadsheet.Model
+| UpdateHistoryPosition     of int
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI
