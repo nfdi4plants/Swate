@@ -153,6 +153,9 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
         | UpdateModal modal ->
             {model with Model.ModalState.ActiveModal = modal}, Cmd.none
         | UpdateHistory next -> {model with History = next}, Cmd.none
+        | UpdateHistoryAnd (newHistory, cmd) -> {model with History = newHistory}, cmd
+        | UpdateModelAnd (nextState, cmd) -> {model with SpreadsheetModel = nextState}, cmd
+        | UpdateHistoryPositionAnd (newPosition, cmd) -> {model with History.HistoryCurrentPosition = newPosition}, cmd
         | TestMyAPI ->
             let cmd =
                 Cmd.OfAsync.either

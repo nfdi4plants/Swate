@@ -10,7 +10,7 @@ open System
 /// </summary>
 /// <param name="dbName"></param>
 /// <param name="version"></param>
-let createDatabase (dbName: string) version localStorage =
+let createDatabase (dbName: string) version tableKey =
     promise {
         let indexedDB = emitJsExpr<obj>("globalThis.indexedDB") "globalThis.indexedDB"
         let request: obj = indexedDB?``open``(dbName, version)
@@ -20,8 +20,8 @@ let createDatabase (dbName: string) version localStorage =
                 request?onerror <- fun _ -> reject(new Exception(request?error?message))
                 request?onupgradeneeded <- fun e ->
                     let resultDb = e?target?result
-                    if resultDb?objectStoreNames?contains(localStorage) |> not then
-                        let _ = resultDb?createObjectStore(localStorage)
+                    if resultDb?objectStoreNames?contains(tableKey) |> not then
+                        let _ = resultDb?createObjectStore(tableKey)
                         resolve(request?result)
                     else
                         resolve(request?result)
@@ -35,7 +35,7 @@ let createDatabase (dbName: string) version localStorage =
 /// </summary>
 /// <param name="dbName"></param>
 /// <param name="version"></param>
-let rec openDatabase (dbName: string) (localStorage: string) =
+let rec openDatabase (dbName: string) (tableKey: string) =
     promise {
         let indexedDB = emitJsExpr<obj>("globalThis.indexedDB") "globalThis.indexedDB"
         let request: obj = indexedDB?``open``(dbName)
@@ -44,10 +44,10 @@ let rec openDatabase (dbName: string) (localStorage: string) =
                 request?onsuccess <- fun e ->
                     let resultDb = e?target?result
                     let version = resultDb?version
-                    if resultDb?objectStoreNames?contains(localStorage) |> not then
+                    if resultDb?objectStoreNames?contains(tableKey) |> not then
                         resultDb?close() // Close the current db instance to avoid transaction problems
                         let _ = 
-                            createDatabase dbName (version + 1) localStorage 
+                            createDatabase dbName (version + 1) tableKey 
                             |> Promise.start
                         resolve(None)
                     else
@@ -56,9 +56,8 @@ let rec openDatabase (dbName: string) (localStorage: string) =
             )
             |> Async.StartAsPromise
         match db with
-        | Some db -> return db
-        | None -> 
-            return! openDatabase dbName localStorage
+        | Some db   -> return db
+        | None      -> return! openDatabase dbName tableKey
     }
 
 /// <summary>
@@ -68,12 +67,72 @@ let rec openDatabase (dbName: string) (localStorage: string) =
 let closeDatabase db =
     db?close()
 
-let addItem db (localStorage: string) (item: obj) (key: string) =
+/// <summary>
+/// Initializes the indexedDB and its associated tables
+/// </summary>
+/// <param name="dbName"></param>
+/// <param name="tableKeys"></param>
+let initInidexedDB (dbName: string) (tableKeys: string []) =
     promise {
-        if db?objectStoreNames?contains(localStorage) then
-            let transaction = db?transaction(localStorage, "readwrite")
-            let store = transaction?objectStore(localStorage)
+        for tableKey in tableKeys do
+             let! db = openDatabase dbName tableKey
+             log("initInidexedDB", db.ToString())
+             closeDatabase db
+    }
+
+let clearTable db (tableKey: string) =
+    promise {
+        if db?objectStoreNames?contains(tableKey) then
+            let transaction = db?transaction(tableKey, "readwrite")
+            let store = transaction?objectStore(tableKey)
+            let storeRequest = store?clear()
+            do! Async.FromContinuations(fun (resolve, reject, _) ->
+                    storeRequest?onsuccess <- fun _ -> resolve(storeRequest?result)
+                    storeRequest?onerror <- fun _ -> reject(new Exception(storeRequest?error?message))
+                )
+                |> Async.StartAsPromise
+    }
+
+let clearInidexedDB (dbName: string) (tableKeys: string []) =
+    promise {
+        for tableKey in tableKeys do
+             let! db = openDatabase dbName tableKey
+             do! clearTable db tableKey
+             closeDatabase db
+    }
+
+/// <summary>
+/// Add item to indexedDB
+/// </summary>
+/// <param name="db"></param>
+/// <param name="tableKey"></param>
+/// <param name="item"></param>
+/// <param name="key"></param>
+let addItem db (tableKey: string) (item: obj) (key: string) =
+    promise {
+        if db?objectStoreNames?contains(tableKey) then
+            let transaction = db?transaction(tableKey, "readwrite")
+            let store = transaction?objectStore(tableKey)
             let storeRequest = store?add(item, key)
+            do! Async.FromContinuations(fun (resolve, reject, _) ->
+                    storeRequest?onsuccess <- fun _ -> resolve(storeRequest?result)
+                    storeRequest?onerror <- fun _ -> reject(new Exception(storeRequest?error?message))
+                )
+                |> Async.StartAsPromise
+    }
+
+/// <summary>
+/// Delete item from indexedDB
+/// </summary>
+/// <param name="db"></param>
+/// <param name="tableKey"></param>
+/// <param name="key"></param>
+let deleteItem db (tableKey: string) (key: string) =
+    promise {
+        if db?objectStoreNames?contains(tableKey) then
+            let transaction = db?transaction(tableKey, "readwrite")
+            let store = transaction?objectStore(tableKey)
+            let storeRequest = store?delete(key)
             do! Async.FromContinuations(fun (resolve, reject, _) ->
                     storeRequest?onsuccess <- fun _ -> resolve(storeRequest?result)
                     storeRequest?onerror <- fun _ -> reject(new Exception(storeRequest?error?message))
@@ -87,11 +146,11 @@ let addItem db (localStorage: string) (item: obj) (key: string) =
 /// <param name="db"></param>
 /// <param name="storeName"></param>
 /// <param name="data"></param>
-let updateItem db (localStorage: string) (item: obj) (key: string) =
+let updateItem db (tableKey: string) (item: obj) (key: string) =
     promise {
-        if db?objectStoreNames?contains(localStorage) then
-            let transaction = db?transaction(localStorage, "readwrite")
-            let store = transaction?objectStore(localStorage)
+        if db?objectStoreNames?contains(tableKey) then
+            let transaction = db?transaction(tableKey, "readwrite")
+            let store = transaction?objectStore(tableKey)
             let storeRequest = store?put(item, key)
             do! Async.FromContinuations(fun (resolve, reject, _) ->
                     storeRequest?onsuccess <- fun _ -> resolve(storeRequest?result)
@@ -106,11 +165,11 @@ let updateItem db (localStorage: string) (item: obj) (key: string) =
 /// <param name="db"></param>
 /// <param name="localStorage"></param>
 /// <param name="key"></param>
-let tryGetItem (db: obj) (localStorage: string) (key: string) =
+let tryGetItem (db: obj) (tableKey: string) (key: string) =
     promise {
-        if db?objectStoreNames?contains(localStorage) then
-            let transaction = db?transaction(localStorage, "readonly")
-            let store = transaction?objectStore(localStorage)
+        if db?objectStoreNames?contains(tableKey) then
+            let transaction = db?transaction(tableKey, "readonly")
+            let store = transaction?objectStore(tableKey)
             let storeRequest = store?get(key)
             let! item =
                 Async.FromContinuations(fun (resolve, reject, _) ->
@@ -135,11 +194,11 @@ let tryGetItem (db: obj) (localStorage: string) (key: string) =
 /// </summary>
 /// <param name="db"></param>
 /// <param name="localStorage"></param>
-let getAllItems (db: obj) (localStorage: string) =
+let getAllItems (db: obj) (tableKey: string) =
     promise {
-        if db?objectStoreNames?contains(localStorage) then
-            let transaction = db?transaction(localStorage, "readonly")
-            let store = transaction?objectStore(localStorage)
+        if db?objectStoreNames?contains(tableKey) then
+            let transaction = db?transaction(tableKey, "readonly")
+            let store = transaction?objectStore(tableKey)
             let storeRequest = store?getAll()
 
             let! item =
@@ -149,11 +208,13 @@ let getAllItems (db: obj) (localStorage: string) =
                 )
                 |> Async.StartAsPromise
 
-            let result = item.ToString()
-
-            if String.IsNullOrEmpty result then
+            if isNullOrUndefined item then
                 return None
-            else return Some result
+            else
+                let result = item.ToString()
+                if String.IsNullOrEmpty result then
+                    return None
+                else return Some result
         else
             return None
     }

@@ -17,7 +17,8 @@ module Spreadsheet =
     module Helper =
 
         let fullSaveModel (state: Spreadsheet.Model) (model:Model) =
-            state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
+            let snapshotJsonString = state.ToJsonString()
+            Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString) // This will cache the most up to date table state to local storage.
             let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
             if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                 match state.ArcFile with // model is not yet updated at this position.
@@ -40,18 +41,23 @@ module Spreadsheet =
         /// <param name="model"></param>
         /// <param name="cmd"></param>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
+            //This will cache the most up to date table state to local storage.
+            //This is used as a simple autosave feature.
+            let snapshotJsonString = state.ToJsonString()
+            Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
+
             match msg with
             | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
-                state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
-            | _ ->
-                state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
-                promise {
-                    let! result = model.History.SaveSessionSnapshotV2 state
-                    return ()
-                } |> Promise.start
-                let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
+            | _ -> //This matchcase handles undo / redo functionality
+                let cmd =
+                    Cmd.OfPromise.either
+                        model.History.SaveSessionSnapshotIndexedDB
+                        (state, snapshotJsonString)
+                        (fun newHistory -> Messages.UpdateHistoryAnd (newHistory, cmd))
+                        (curry GenericError Cmd.none >> DevMsg)
+
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some (Assay assay) ->
@@ -61,7 +67,8 @@ module Spreadsheet =
                     | Some (Investigation inv) ->
                         ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
                     | _ -> ()
-                state, {model with History = nextHistory}, cmd
+
+                state, model, cmd
 
     let update (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
 
@@ -185,18 +192,26 @@ module Spreadsheet =
                 let nextState = Controller.Table.updateTableOrder (prev_index, new_index) state
                 nextState, model, Cmd.none
             | UpdateHistoryPosition (newPosition) ->
-                let nextState, nextModel =
+                let nextState, nextModel, cmd =
                     match newPosition with
                     | _ when model.History.NextPositionIsValid(newPosition) |> not ->
-                        state, model
+                        state, model, Cmd.none
                     | _ ->
                         /// Run this first so an error breaks the function before any mutables are changed
-                        let nextState =
-                           Model.fromSessionStorage(newPosition)
-                        Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, string newPosition)
-                        let nextModel = {model with History.HistoryCurrentPosition = newPosition}
-                        nextState, nextModel
-                nextState, nextModel, Cmd.none
+                        let cmd =
+                            Cmd.OfPromise.either
+                                Model.fromIndexedDBByKeyPosition
+                                (newPosition)
+                                (fun nextState -> Messages.UpdateModelAnd (nextState, Cmd.none))
+                                (curry GenericError Cmd.none >> DevMsg)
+                        let newCmd =
+                            Cmd.OfPromise.either
+                                Model.updateIndexedDBPosition
+                                (newPosition)
+                                (fun _ -> Messages.UpdateHistoryPositionAnd (newPosition, cmd))
+                                (curry GenericError Cmd.none >> DevMsg)
+                        state, model, newCmd
+                nextState, nextModel, cmd
             | AddRows (n) ->
                 let nextState =
                     if state.TableViewIsActive() then

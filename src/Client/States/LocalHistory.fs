@@ -90,7 +90,8 @@ module HistoryOrder =
 
     let tryGetHistoryKeys() =
         promise{
-            let! tryHistory = IndexedDB.getAllItems IndexedDB.swate_history_table IndexedDB.LocalStorage.swate_history_keys
+            let! historyKeys = openDatabase IndexedDB.swate_history_table IndexedDB.LocalStorage.swate_history_keys
+            let! tryHistory = IndexedDB.getAllItems historyKeys IndexedDB.LocalStorage.swate_history_keys
             match tryHistory with
             | Some historyJson -> return (ofJson historyJson |> Some)
             | None -> return None
@@ -133,7 +134,6 @@ module ConversionTypes =
         ActiveView: Spreadsheet.ActiveView
     } with
         static member fromSpreadsheetModel (model: Spreadsheet.Model) =
-            let start = performanceNow()
             let jsonArcFile, jsonString =
                 match model.ArcFile with
                 | Some (ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toJsonString 0 i
@@ -143,8 +143,6 @@ module ConversionTypes =
                 | None -> JsonArcFiles.None, ""
 
             let compressedJsonString = GeneralHelpers.compressJsonToBase64String jsonString
-            let ent = performanceNow()
-            log(ent - start)
             {
                 JsonArcFiles    = jsonArcFile 
                 JsonString      = compressedJsonString
@@ -221,8 +219,7 @@ type Spreadsheet.Model with
     /// <summary>
     /// Save data in web local storage
     /// </summary>
-    member this.SaveToLocalStorage() =
-        let snapshotJsonString = this.ToJsonString()
+    static member SaveToLocalStorage(snapshotJsonString) =
         Browser.WebStorage.localStorage.setItem(Keys.swate_local_spreadsheet_key, snapshotJsonString)
 
     /// <summary>
@@ -253,13 +250,53 @@ type Spreadsheet.Model with
     /// <summary>
     /// Save data in web indexedDB
     /// </summary>
-    member this.SaveToIndexedDB(database, localstorage, key) =
+    static member saveToIndexedDB(database, localstorage, snapshotJsonString, key) =
         promise {
-            let snapshotJsonString = this.ToJsonString()
             let! indexedDB = openDatabase database localstorage
             do! addItem indexedDB localstorage snapshotJsonString key
             IndexedDB.closeDatabase indexedDB
         }    
+
+    /// <summary>
+    /// Tries to get the data model from indexed db saved under "swate_spreadsheet_key"
+    /// </summary>
+    static member deleteItemIndexedDB(database, localstorage, key) =
+        promise{
+            let! indexedDB = openDatabase database localstorage
+            do! deleteItem indexedDB localstorage key
+        }
+
+    /// <summary>
+    /// Initializes history indexedDB
+    /// </summary>
+    /// <param name="databaseName"></param>
+    /// <param name="tableKeys"></param>
+    static member initHistoryIndexedDB() =
+        promise{
+            do! initInidexedDB
+                    IndexedDB.swate_history_table
+                    [|
+                        IndexedDB.LocalStorage.swate_history_items;
+                        IndexedDB.LocalStorage.swate_history_keys;
+                        IndexedDB.LocalStorage.swate_history_position
+                    |]
+        }
+
+    /// <summary>
+    /// Initializes history indexedDB
+    /// </summary>
+    /// <param name="databaseName"></param>
+    /// <param name="tableKeys"></param>
+    static member clearHistoryIndexedDB() =
+        promise{
+            do! clearInidexedDB
+                    IndexedDB.swate_history_table
+                    [|
+                        IndexedDB.LocalStorage.swate_history_items;
+                        IndexedDB.LocalStorage.swate_history_keys;
+                        IndexedDB.LocalStorage.swate_history_position
+                    |]
+        }
 
 /// <summary>
 /// This type is used to store information about local history. Can be used to revert changes.
@@ -296,6 +333,32 @@ type Model =
         (isSmallerZero || isEqual || isBiggerLimit || isBiggerExisting)
         |> not
 
+    /// <summary>
+    /// updated history position in indexedDB.
+    /// </summary>
+    /// <param name="position"></param>
+    static member updateIndexedDBPosition (position: int) =
+        promise {
+            let! historyPosition = openDatabase IndexedDB.swate_history_table IndexedDB.LocalStorage.swate_history_position
+            do! IndexedDB.updateItem historyPosition IndexedDB.LocalStorage.swate_history_position position IndexedDB.LocalStorage.swate_history_position
+            IndexedDB.closeDatabase historyPosition
+        }
+
+    /// <summary>
+    /// updated history position in indexedDB.
+    /// </summary>
+    /// <param name="position"></param>
+    static member updateHistoryKeys item =
+        promise {
+            let! historyOrder = openDatabase IndexedDB.swate_history_table IndexedDB.LocalStorage.swate_history_keys
+            do! IndexedDB.updateItem historyOrder IndexedDB.LocalStorage.swate_history_keys item IndexedDB.LocalStorage.swate_history_keys
+            IndexedDB.closeDatabase historyOrder
+        }
+
+    /// <summary>
+    /// Get item from session storage.
+    /// </summary>
+    /// <param name="position"></param>
     static member fromSessionStorage (position: int) =
         let history = HistoryOrder.tryFromSession()
         let guid = history |> Option.map (List.tryItem position) |> Option.flatten
@@ -306,16 +369,32 @@ type Model =
         | Some stateJson -> Spreadsheet.Model.fromJsonString(stateJson)
         | None -> failwith "Could not find any history."
 
-    // Whenever `SaveSpreadsheetModelSnapshot` is called, also generate a new GUID. Save the model with the "swate_history_table_prefix_GUID" as key in session storage.
-    // In addition save with key "swate_history_key" a list with the generated GUIDs in which the newest GUID is added first.
-    // Save the current history position with key "swate_history_position" in session storage.
+    /// <summary>
+    /// Get item from indexedDB based on position of historyKey.
+    /// </summary>
+    /// <param name="position"></param>
+    static member fromIndexedDBByKeyPosition (position: int) =
+        promise {
+            let! history = HistoryOrder.tryGetHistoryKeys()
+            let key = history |> Option.map (List.tryItem position) |> Option.flatten
+            if key.IsNone then 
+                failwith "Not enough items in history list."
+            let! tryState = Spreadsheet.Model.tryFromIndexedDB(IndexedDB.swate_history_table, IndexedDB.LocalStorage.swate_history_items, key.ToString())
+            match tryState with
+            | Some stateJson -> return Spreadsheet.Model.fromJsonString(stateJson)
+            | None -> return failwith "Could not find any history."
+        }
+
+    // Whenever `SaveSpreadsheetModelSnapshot` is called, also generate a new GUID. Save the model with the "swate_history_table" with a key in indexedDB.
+    // In addition save with key "swate_history_keys" a list with the generated GUIDs in which the newest GUID is added first.
+    // Save the current history position with key "swate_history_position" in indexedDB.
     // If we go back the history then update the "swate_history_position" and load the table with GUID at position "swate_history_position" as model.
     // If the user changes something when "swate_history_position" <> 0 (up to date, newest), delete all positions up to "swate_history_position" and the corresponding tables.
     /// <summary>
     /// Save the next table state to session storage for history control. Table state is stored with guid as key and order is stored as guid list.
     /// </summary>
     /// <param name="model"></param>
-    member this.SaveSessionSnapshotV2 (model: Spreadsheet.Model) : JS.Promise<Model> =
+    member this.SaveSessionSnapshotIndexedDB (model: Spreadsheet.Model, snapshotJsonString) : JS.Promise<Model> =
         promise{
             /// recursively generate new guids, check if existing and if so repeat until new guid.
             let rec generateNewGuid() =
@@ -331,7 +410,7 @@ type Model =
             /// newKey is used as key to store the table state
             let! newKey = generateNewGuid()
             // Add new history state to current history order.
-            let nextState =
+            let nextState, toRemoveList =
                 // if e.g at position 4 and we create new table state from position 4 we want to delete position 0 .. 3 and use 4 as new 0
                 let rebranchedList, toRemoveList1 =
                     if this.HistoryCurrentPosition <> 0 then
@@ -344,31 +423,24 @@ type Model =
                 /// Split list into two at index of MaxHistory. Kepp the list with index below MaxHistory and iterate over the other list to remove the stored states.
                 let newlist, toRemoveList2 = if newlist.Length > this.HistoryItemCountLimit then List.splitAt this.HistoryItemCountLimit newlist else newlist, []
                 let toRemoveList = toRemoveList1@toRemoveList2
-                if List.isEmpty toRemoveList |> not then
-                    toRemoveList |> List.iter (fun guid ->
-                        let rmvKey = Keys.create_swate_session_history_table_key(guid)
-                        Browser.WebStorage.sessionStorage.removeItem(rmvKey)
-                    )
-                { this with HistoryOrder = newlist; HistoryExistingItemCount = newlist.Length; HistoryCurrentPosition = 0 }
+
+                { this with HistoryOrder = newlist; HistoryExistingItemCount = newlist.Length; HistoryCurrentPosition = 0 }, toRemoveList
+
+            if List.isEmpty toRemoveList |> not then
+                let toRemoveArray = toRemoveList |> Array.ofList
+                for rmvKey in toRemoveArray do
+                    do! Spreadsheet.Model.deleteItemIndexedDB(IndexedDB.swate_history_table, IndexedDB.LocalStorage.swate_history_items, rmvKey.ToString())
+
             // apply all storage changes after everything else went through
             // set current table state with key and guid
-            do! model.SaveToIndexedDB(IndexedDB.swate_history_table, IndexedDB.LocalStorage.swate_history_items, newKey.ToString())
+            do! Spreadsheet.Model.saveToIndexedDB(IndexedDB.swate_history_table, IndexedDB.LocalStorage.swate_history_items, snapshotJsonString, newKey.ToString())
             // set new table guid history
-            let! historyOrder = openDatabase IndexedDB.swate_history_table IndexedDB.LocalStorage.swate_history_keys
-            do! IndexedDB.updateItem historyOrder IndexedDB.LocalStorage.swate_history_keys (HistoryOrder.toJson(nextState.HistoryOrder)) IndexedDB.LocalStorage.swate_history_keys
-            IndexedDB.closeDatabase historyOrder
+            do! Model.updateHistoryKeys(HistoryOrder.toJson(nextState.HistoryOrder))
             // reset new table position to 0
-            let! historyPosition = openDatabase IndexedDB.swate_history_table IndexedDB.LocalStorage.swate_history_position
-            do! IndexedDB.updateItem historyPosition IndexedDB.LocalStorage.swate_history_position "0" IndexedDB.LocalStorage.swate_history_position
-            IndexedDB.closeDatabase historyPosition
+            do! Model.updateIndexedDBPosition(0)
             return nextState
         }
 
-    // Whenever `SaveSpreadsheetModelSnapshot` is called, also generate a new GUID. Save the model with the "swate_session_history_table_prefix_GUID" as key in session storage.
-    // In addition save with key "swate_session_history_key" a list with the generated GUIDs in which the newest GUID is added first.
-    // Save the current history position with key "swate_session_history_position" in session storage.
-    // If we go back the history then update the "swate_session_history_position" and load the table with GUID at position "swate_session_history_position" as model.
-    // If the user changes something when "swate_session_history_position" <> 0 (up to date, newest), delete all positions up to "swate_session_history_position" and the corresponding tables.
     /// <summary>
     /// Save the next table state to session storage for history control. Table state is stored with guid as key and order is stored as guid list.
     /// </summary>
@@ -417,8 +489,15 @@ type Model =
         nextState
 
     static member ResetHistoryWebStorage() =
+        promise {
+            do! Spreadsheet.Model.clearHistoryIndexedDB()
+        } |> Promise.start
         Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
         Browser.WebStorage.sessionStorage.clear()
+
+    //static member ResetHistoryWebStorage() =
+    //    Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
+    //    Browser.WebStorage.sessionStorage.clear()
 
     member this.ResetAll() =
         Model.ResetHistoryWebStorage()
