@@ -46,15 +46,16 @@ module Spreadsheet =
             let snapshotJsonString = state.ToJsonString()
             Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
 
+            //This matchcase handles undo / redo functionality
             match msg with
             | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
                 state, model, cmd
-            | _ -> //This matchcase handles undo / redo functionality
+            | _ ->
                 let newCmd =
                     Cmd.OfPromise.either
                         model.History.SaveSessionSnapshotIndexedDB
-                        (state, snapshotJsonString)
+                        (snapshotJsonString)
                         (fun newHistory -> Messages.UpdateHistoryAnd (newHistory, cmd))
                         (curry GenericError Cmd.none >> DevMsg)
 
