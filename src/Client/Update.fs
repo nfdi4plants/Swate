@@ -154,13 +154,13 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             {model with Model.ModalState.ActiveModal = modal}, Cmd.none
         | UpdateHistory next -> {model with History = next}, Cmd.none
         | UpdateHistoryAnd (newHistory, cmd) -> {model with History = newHistory}, cmd
-        | UpdateState nextState -> {model with SpreadsheetModel = nextState}, Cmd.none
+        | UpdateSpreadSheetModel nextState -> {model with SpreadsheetModel = nextState}, Cmd.none
         | UpdateHistoryPosition newPosition ->
             let cmd =
                 Cmd.OfPromise.either
                     LocalHistory.Model.fromIndexedDBByKeyPosition
                     (newPosition)
-                    (fun nextState -> Messages.UpdateState nextState)
+                    (fun nextState -> Messages.UpdateSpreadSheetModel nextState)
                     (curry GenericError Cmd.none >> DevMsg)
             {model with History.HistoryCurrentPosition = newPosition}, cmd
         | TestMyAPI ->
