@@ -83,7 +83,7 @@ module AdvancedSearch =
     type Model = {
         ModalId                             : string
         ///
-        AdvancedSearchOptions               : AdvancedSearchTypes.AdvancedSearchOptions
+        AdvancedSearchOptions               : Shared.DTOs.AdvancedSearchQuery
         AdvancedSearchTermResults           : Term []
         // Client visual design
         Subpage           : AdvancedSearchSubpages
@@ -95,7 +95,7 @@ module AdvancedSearch =
             ModalId                             = ""
             HasModalVisible                     = false
             HasOntologyDropdownVisible          = false
-            AdvancedSearchOptions               = AdvancedSearchTypes.AdvancedSearchOptions.init ()
+            AdvancedSearchOptions               = Shared.DTOs.AdvancedSearchQuery.init ()
             AdvancedSearchTermResults           = [||]
             HasAdvancedSearchResultsLoading     = false
             Subpage                             = InputFormSubpage

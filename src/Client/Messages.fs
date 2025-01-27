@@ -37,7 +37,7 @@ module TermSearch =
 module AdvancedSearch =
 
     type Msg =
-        | GetSearchResults of {| config:AdvancedSearchTypes.AdvancedSearchOptions; responseSetter: Term [] -> unit |}
+        | GetSearchResults of {| config:Shared.DTOs.AdvancedSearchQuery; responseSetter: Term [] -> unit |}
 
 module Ontologies =
 

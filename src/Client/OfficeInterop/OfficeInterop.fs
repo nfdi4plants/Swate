@@ -8,8 +8,8 @@ open Excel
 open GlobalBindings
 
 open Shared
+open Shared.DTOs
 open Database
-open DTOs.TermQuery
 
 open OfficeInterop
 open OfficeInterop.ExcelUtil
@@ -169,7 +169,7 @@ module ARCtrlExtensions =
                     excelTable.load(U2.Case2 (ResizeArray [|"name"|])) |> ignore
                     headerRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
                     bodyRowRange.load(U2.Case2 (ResizeArray [|"values"|])) |> ignore
-                    
+
 
                 return! context.sync().``then``(fun _ ->
                     let headers =
@@ -467,13 +467,13 @@ module AnnotationTable =
                 activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
                 context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|])) |> ignore
                 tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "style"; "values"|]))
-            
+
             return! context.sync().``then``(fun _ ->
                 /// Get name of the table of currently active worksheet.
                 let activeTable =
                     tables.items
                     |> Seq.toArray
-                    |> Array.tryFind (fun table ->                        
+                    |> Array.tryFind (fun table ->
                         table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) && table.worksheet.position = activeWorksheet.position
                     )
                 activeTable
@@ -1635,7 +1635,7 @@ let validateSelectedAndNeighbouringBuildingBlocks () =
 /// <param name="names"></param>
 let searchTermInDatabase name =
     promise {
-        let term = TermQueryDto.create(name, searchMode=Database.FullTextSearch.Exact)
+        let term = TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
         let! results = Async.StartAsPromise(Api.ontology.searchTerm term)
         let result = Array.tryHead results
         return result
@@ -1650,7 +1650,7 @@ let searchTermsInDatabase names =
         let terms =
             names
             |> List.map (fun name ->
-                TermQueryDto.create(name, searchMode=Database.FullTextSearch.Exact)
+                TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
             )
             |> Array.ofSeq
         let! result = Async.StartAsPromise(Api.ontology.searchTerms terms)
@@ -1820,7 +1820,7 @@ let private updateWorkSheet (context: RequestContext) (worksheetName: string) (s
 
         do! context.sync()
 
-        let range = worksheet.getUsedRange true        
+        let range = worksheet.getUsedRange true
         let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
         do! context.sync()
 
@@ -1882,7 +1882,7 @@ let expandTableRowCount (table: Table) (tableRowCount: int) (tableColumnCount: i
         ExcelUtil.Table.addRows -1. table tableColumnCount diff "" |> ignore
 
         do! context.sync()
-    }    
+    }
 
 /// <summary>
 /// Insert the ontology information in the selected range independent of an annotation table
@@ -2496,7 +2496,7 @@ type Main =
                             Array.create arcTable.RowCount newColumn.Cells.[0]
                         else
                             newColumn.Cells
-                    
+
                     arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
                     let! _ = Main.createNewAnnotationTable(arcTable)

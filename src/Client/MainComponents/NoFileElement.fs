@@ -215,17 +215,16 @@ type NoFileElement =
                 Html.div [
                     prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
                     prop.children [
-                        let advancedSearch : Components.AdvancedSearch<string> = {|
-                            input = advancedSearchState;
-                            search = fun s -> promise {
+                        let advancedSearch : Components.AdvancedSearch = {|
+                            search = fun () -> promise {
                                 return ResizeArray([
                                     for i in 1..300 do
-                                        Components.Term (s + "_" + string i)
+                                        Components.Term (advancedSearchState + "_" + string i)
                                 ])
                             };
                             form = fun cc -> input cc
                         |}
-                        Components.TermSearchV2.TermSearch(setTerm, term, parentId = "test:xx", advancedSearch = advancedSearch, showDetails = true, debug = true)
+                        Components.TermSearchV2.TermSearch(setTerm, term, parentId = "test:xx", advancedSearch = !^true, showDetails = true, debug = true)
                         // Helper.createNewFile args.dispatch
                         // Helper.uploadNewTable args.dispatch
                     ]

@@ -6,8 +6,7 @@ open Browser.Types
 open ARCtrl
 open Shared
 open Shared.Database
-open Shared.DTOs.TermQuery
-open Shared.DTOs.ParentTermQuery
+open Shared.DTOs
 open Fable.Core.JsInterop
 open Swate
 
@@ -32,22 +31,22 @@ module TermSearchAux =
 
     let searchByName(query: string, setResults: Term [] -> unit) =
         async {
-            let query = TermQueryDto.create(query, 10)
+            let query = TermQuery.create(query, 10)
             let! terms = Api.ontology.searchTerm query
             setResults terms
         }
 
     let searchByParent(query: string, parentTAN: string, setResults: Term [] -> unit) =
         async {
-            let query = TermQueryDto.create(query, 50, parentTAN)
+            let query = TermQuery.create(query, 50, parentTAN)
             let! terms = Api.ontology.searchTerm query
             setResults terms
         }
 
     let findAllChildTerms(parentTAN: string, setResults: Term [] -> unit) =
         async {
-            let query = ParentTermQueryDto.create(parentTAN, 50)
-            let! terms = Api.ontology.findAllChildTerms query
+            let query = ParentTermQuery.create(parentTAN, 50)
+            let! terms = Api.ontology.searchChildTerms query
             setResults terms.results
         }
 

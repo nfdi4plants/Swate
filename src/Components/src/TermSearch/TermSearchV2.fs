@@ -9,19 +9,6 @@ type private Modals =
 | AdvancedSearch
 | Details
 
-[<AllowNullLiteral>]
-[<Global>]
-type Term
-    [<ParamObjectAttribute; Emit("$0")>]
-    (?name, ?id, ?description, ?source: string, ?href, ?isObsolete: bool, ?data) =
-    member val name: string option = jsNative with get, set
-    member val id: string option = jsNative with get, set
-    member val description: string option = jsNative with get, set
-    member val source: string option = jsNative with get, set
-    member val href: string option = jsNative with get, set
-    member val isObsolete: bool option = jsNative with get, set
-    member val data: obj option = jsNative with get, set
-
 module private APIExtentions =
 
     let private optionOfString (str:string) =
@@ -39,16 +26,7 @@ module private APIExtentions =
 
 open APIExtentions
 
-type AdvancedSearchController = {|
-    startSearch: unit -> unit
-    cancel: unit -> unit
-|}
 
-type AdvancedSearch<'A> = {|
-    input: 'A
-    search: 'A -> JS.Promise<ResizeArray<Term>>
-    form: AdvancedSearchController -> ReactElement
-|}
 
 [<AutoOpen>]
 module TypeDefs =
@@ -176,7 +154,7 @@ module private API =
             }
 
     let callSearch = fun (query: string) ->
-        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create query)
+        Api.ontology.searchTerm (Shared.DTOs.TermQuery.create query)
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -185,7 +163,7 @@ module private API =
         )
 
     let callParentSearch = fun (parent: string) (query: string) ->
-        Api.ontology.searchTerm (Shared.DTOs.TermQuery.TermQueryDto.create(query, parentTermId = parent))
+        Api.ontology.searchTerm (Shared.DTOs.TermQuery.create(query, parentTermId = parent))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -194,10 +172,19 @@ module private API =
         )
 
     let callAllChildSearch = fun (parent: string) ->
-        Api.ontology.findAllChildTerms (Shared.DTOs.ParentTermQuery.ParentTermQueryDto.create(parent, 300))
+        Api.ontology.searchChildTerms (Shared.DTOs.ParentTermQuery.create(parent, 300))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results.results
+            |> Array.map (fun t0 -> t0.ToComponentTerm())
+            |> ResizeArray
+        )
+
+    let callAdvancedSearch = fun dto ->
+        Api.ontology.searchTermAdvanced dto
+        |> Async.StartAsPromise
+        |> Promise.map(fun results ->
+            results
             |> Array.map (fun t0 -> t0.ToComponentTerm())
             |> ResizeArray
         )
@@ -231,7 +218,7 @@ type TermSearchV2 =
                     ]
                     prop.children [
                         Html.div [
-                            prop.className "items-center grid grid-cols-subgrid col-span-4 gap-2"
+                            prop.className "items-center grid col-span-4 gap-2 grid-cols-[auto,1fr,auto,auto]"
                             prop.children [
                                 Html.i [
                                     if isObsolete then
@@ -377,7 +364,7 @@ type TermSearchV2 =
     ) =
         Html.div [
             if debug.IsSome then
-                prop.custom("data-testid", debug.Value)
+                prop.testid debug.Value
             prop.className "fixed top-0 left-0 right-0 bottom-0 z-50 bg-base-300 bg-opacity-50 flex items-center justify-center p-2 sm:p-10"
             prop.onMouseDown(fun _ -> rmv())
             prop.children [
@@ -442,18 +429,109 @@ type TermSearchV2 =
         ]
         TermSearchV2.BaseModal("Details", content, rvm)
 
+    static member private AdvancedSearchDefault(advancedSearchState: Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState) = fun (cc: AdvancedSearchController) ->
+        React.fragment [
+            Html.div [
+                prop.className "prose"
+                prop.children [
+                    Html.p "Use the following fields to search for terms."
+                    Html.p [
+                        Html.text "Name and Description fields follow Apache Lucene query syntax. "
+                        Html.a [prop.href @"https://lucene.apache.org/core/2_9_4/queryparsersyntax.html"; prop.target.blank; prop.text "Learn more!"; prop.className "text-xs"]
+                    ]
+
+                ]
+            ]
+            Html.label [
+                prop.className "form-control w-full"
+                prop.children [
+                    Html.div [
+                        prop.className "label"
+                        prop.children [
+                            Html.span [
+                                prop.className "label-text"
+                                prop.text "Term Name"
+                            ]
+                        ]
+                    ]
+                    Html.input [
+                        prop.testid "advanced-search-term-name-input"
+                        prop.className "input input-bordered w-full"
+                        prop.type'.text
+                        prop.autoFocus true
+                        prop.value advancedSearchState.TermName
+                        prop.onChange (fun e -> setAdvancedSearchState {advancedSearchState with TermName = e})
+                        prop.onKeyDown (key.enter, fun _ -> cc.startSearch())
+                    ]
+                ]
+            ]
+            Html.label [
+                prop.className "form-control w-full"
+                prop.children [
+                    Html.div [
+                        prop.className "label"
+                        prop.children [
+                            Html.span [
+                                prop.className "label-text"
+                                prop.text "Term Description"
+                            ]
+                        ]
+                    ]
+                    Html.input [
+                        prop.testid "advanced-search-term-description-input"
+                        prop.className "input input-bordered w-full"
+                        prop.type'.text
+                        prop.value advancedSearchState.TermDefinition
+                        prop.onChange (fun e -> setAdvancedSearchState {advancedSearchState with TermDefinition = e})
+                        prop.onKeyDown (key.enter, fun _ -> cc.startSearch())
+                    ]
+                ]
+            ]
+            Html.div [
+                prop.className "form-control max-w-xs"
+                prop.children [
+                    Html.label [
+                        prop.className "label cursor-pointer"
+                        prop.children [
+                            Html.span [
+                                prop.className "label-text"
+                                prop.text "Keep Obsolete"
+                            ]
+                            Html.input [
+                                prop.className "checkbox"
+                                prop.type'.checkbox
+                                prop.isChecked advancedSearchState.KeepObsolete
+                                prop.onChange (fun e -> setAdvancedSearchState {advancedSearchState with KeepObsolete = e})
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
 
     [<ReactComponent>]
-    static member AdvancedSearchModal(rvm, advancedSearch: AdvancedSearch<'A>, onTermSelect, ?debug: bool) =
+    static member private AdvancedSearchModal(rvm, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool) =
         let searchResults, setSearchResults = React.useState(SearchState.init)
         /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
         let (tempPagination: int option), setTempPagination = React.useState(None)
         let pagination, setPagination = React.useState(0)
+
+        // Only used if advancedSearch is set to default
+        let advancedSearchState, setAdvancedSearchState = React.useState (Shared.DTOs.AdvancedSearchQuery.init)
+
+        let advancedSearch =
+            match advancedSearch0 with
+            | U2.Case1 advancedSearch -> advancedSearch
+            | U2.Case2 _ -> {|
+                search = fun () -> API.callAdvancedSearch advancedSearchState
+                form = TermSearchV2.AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState)
+            |}
+
         let BinSize = 20
         let BinCount = React.useMemo((fun () -> searchResults.Results.Count / BinSize), [|box searchResults|])
         let controller = {|
           startSearch = fun () ->
-            advancedSearch.search advancedSearch.input
+            advancedSearch.search()
             |> Promise.map(fun results ->
                 let results = results.ConvertAll(fun t0 ->
                     {Term = t0; IsDirectedSearchResult = false})
@@ -472,12 +550,7 @@ type TermSearchV2 =
             Html.button [
                 prop.className "btn btn-primary"
                 prop.onClick(fun _ ->
-                    advancedSearch.search advancedSearch.input
-                    |> Promise.map(fun results ->
-                        let results = results.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = false})
-                        setSearchResults (SearchState.SearchDone results)
-                    )
-                    |> Promise.start
+                    controller.startSearch()
                 )
                 prop.text "Submit"
             ]
@@ -559,7 +632,7 @@ type TermSearchV2 =
         ?termSearchQueries: ResizeArray<string * SearchCall>,
         ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
         ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
-        ?advancedSearch: AdvancedSearch<'A>,
+        ?advancedSearch: U2<AdvancedSearch, bool>,
         ?showDetails: bool,
         ?debug: bool,
         ?disableDefaultSearch: bool,
@@ -581,6 +654,13 @@ type TermSearchV2 =
         let cancelled = React.useRef(false)
 
         let (modal: Modals option), setModal = React.useState None
+
+        React.useEffect (fun _ ->
+            promise {
+                let! res = Api.TIB.getIRIFromOboId("MS:1000031")
+                Browser.Dom.console.log res._embedded.terms
+            } |> Promise.start
+        )
 
         /// Close term search result window when opening a modal
         let setModal =
@@ -734,7 +814,7 @@ type TermSearchV2 =
                 match modal with
                 | Some Details when term.IsSome ->
                     TermSearchV2.DetailsModal((fun () -> setModal None), term.Value)
-                | Some AdvancedSearch when advancedSearch.IsSome ->
+                | Some AdvancedSearch when advancedSearch.IsSome->
                     let onTermSelect = fun (term: Term option) ->
                         onTermSelect term
                         setModal None
@@ -773,7 +853,7 @@ type TermSearchV2 =
                                 "fa-solid fa-magnifying-glass-plus text-primary",
                                 (fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch)),
                                 focused,
-                                [prop.custom("data-testid", "advanced-search-indicator")]
+                                [prop.testid "advanced-search-indicator"]
                             )
 
                         Html.div [ // main search component
@@ -781,7 +861,7 @@ type TermSearchV2 =
                             prop.children [
                                 Html.input [
                                     if debug then
-                                        prop.custom("data-testid", "term-search-input")
+                                        prop.testid "term-search-input"
                                     prop.ref(inputRef)
                                     prop.defaultValue (term |> Option.bind _.name |> Option.defaultValue "")
                                     prop.placeholder "..."

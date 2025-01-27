@@ -1,8 +1,8 @@
-module Shared.DTOs.TermQuery
+namespace Shared.DTOs
 
 open Shared
 
-type TermQueryDto = {
+type TermQuery = {
     query: string
     limit: int option
     parentTermId: string option
@@ -17,8 +17,8 @@ type TermQueryDto = {
         searchMode = searchMode
     }
 
-type TermQueryDtoResults = {
-    query: TermQueryDto
+type TermQueryResults = {
+    query: TermQuery
     results: Database.Term []
 } with
     static member create(query, results) = {

@@ -3,8 +3,8 @@ import { fn, within, expect, userEvent, waitFor, fireEvent } from '@storybook/te
 import TermSearch from "./TermSearchV2.fs.js";
 import React from 'react';
 
-const renderTermSearch = (args: any) => {
-  const [term, setTerm] = React.useState(undefined);
+function renderTermSearch(args: any) {
+  const [term, setTerm] = React.useState(undefined as Term | undefined);
 
   return (
     <div className='container mx-auto flex flex-col p-2 gap-4 h-[400px]'>
@@ -45,7 +45,7 @@ export const Default: Story = {
   play: async ({ args, canvasElement }) => {
     const input = within(canvasElement).getByTestId('term-search-input');
     expect(input).toBeInTheDocument();
-    userEvent.type(input, "instrument model", {delay: 50});
+    await userEvent.type(input, "instrument model", {delay: 50});
 
     await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
   }
@@ -53,6 +53,7 @@ export const Default: Story = {
 
 export const ParentSearch: Story = {
   render: renderTermSearch,
+  parameters: {isolated: true},
   args: {
     onTermSelect: fn((term) => console.log(term)),
     term: undefined,
@@ -64,49 +65,30 @@ export const ParentSearch: Story = {
     const canvas = within(canvasElement);
     const input = canvas.getByTestId('term-search-input');
     expect(input).toBeInTheDocument();
-    userEvent.type(input, "SCIEX", {delay: 50});
+
+    await userEvent.type(input, "SCIEX", {delay: 50});
 
     await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
-    await waitFor(() => {
-      let directedOutput = canvas.getByText("SCIEX instrument model");
-      expect(directedOutput).toBeInTheDocument()
-      let expectedIcon = canvas.getByTitle("Directed Search")
-      expect(expectedIcon).toBeInTheDocument()
-    });
+
+    await waitFor(() => { // await api call response
+      const directedOutput = canvas.getByText("SCIEX instrument model");
+      expect(directedOutput).toBeInTheDocument();
+      const expectedIcon = canvas.getByTitle("Directed Search");
+      expect(expectedIcon).toBeInTheDocument();
+    }, { timeout: 3000 });
   }
 }
 
-const advancedSearch = {
-  input: "test",
-  search: fn(() => Promise.resolve([
-    {
-      name: "test",
-      id: "TST:00001",
-      description: "Test Term",
-      isObsolete: true,
-      data: {test1: "Hello", test2: "World"}
-    }])
-  ),
-  form: (controller: { startSearch: (() => void), cancel: (() => void) }) => (
-    <input
-      className='input input-bordered'
-      data-testid="advanced-search-input"
-      type="text"
-      onKeyDown={(e) => e.code === "Enter" ? controller.startSearch() : null}
-    />
-  ),
-};
 
-/**
- * Advanced search with a custom form
- */
-export const AdvancedSearch: Story = {
+export const DefaultAdvancedSearch: Story = {
   render: renderTermSearch,
+  parameters: {isolated: true},
   args: {
-    term: undefined,
     onTermSelect: fn((term) => console.log(term)),
-    advancedSearch: advancedSearch,
-    showDetails: false,
+    term: undefined,
+    parentId: "MS:1000031",
+    showDetails: true,
+    advancedSearch: true,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -121,10 +103,137 @@ export const AdvancedSearch: Story = {
     const input = canvas.getByTestId("advanced-search-input");
     expect(input).toBeInTheDocument();
 
-    await userEvent.type(input, "test", {delay: 50});
+    await userEvent.type(input, "instrument", {delay: 50});
     await fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
 
-    await expect(args.advancedSearch!.search).toHaveBeenCalled()
-    await expect(args.advancedSearch!.search).toHaveBeenCalledWith("test")
+    await waitFor(() => {
+      const r = canvas.getByText("Instrument Model")
+      expect(r).toBeInTheDocument()
+    });
+  }
+}
+
+const customAdvancedSearch = (input: string, setInput: (value: string) => void) => ({
+  search: () =>
+    Promise.resolve([
+      {
+        name: input,
+        id: "TST:00001",
+        description: "Test Term",
+        isObsolete: true,
+        data: { test1: "Hello", test2: "World" },
+      },
+    ]),
+  form: (controller: { startSearch: () => void; cancel: () => void }) => (
+    <input
+      className="input input-bordered"
+      data-testid="advanced-search-input"
+      type="text"
+      onChange={(e) => setInput(e.target.value)}
+      onKeyDown={(e) => (e.code === "Enter" ? controller.startSearch() : null)}
+    />
+  ),
+});
+
+function renderCustomAdvancedTermSearch(args: any) {
+  const [term, setTerm] = React.useState(undefined as Term | undefined);
+  const [input, setInput] = React.useState("");
+
+  // Create advancedSearch dynamically
+  const advancedSearchInstance = customAdvancedSearch(input, setInput);
+
+  return (
+    <div className='container mx-auto flex flex-col p-2 gap-4 h-[400px]'>
+      <TermSearch
+        {...args}
+        term={term}
+        onTermSelect={(selectedTerm) => {
+          setTerm(selectedTerm);
+          args.onTermSelect(selectedTerm); // Call mock or external handler
+        }}
+        advancedSearch={advancedSearchInstance}
+      />
+    </div>
+  );
+};
+
+
+/**
+ * Advanced search with a custom form
+ *
+ * ```tsx
+ * const advancedSearch = (input: string, setInput: (value: string) => void) => ({
+ *   search: () =>
+ *     Promise.resolve([
+ *       {
+ *         name: input,
+ *         id: "TST:00001",
+ *         description: "Test Term",
+ *         isObsolete: true,
+ *         data: { test1: "Hello", test2: "World" },
+ *       },
+ *     ]),
+ *   form: (controller: { startSearch: () => void; cancel: () => void }) => (
+ *     <input
+ *       className="input input-bordered"
+ *       data-testid="advanced-search-input"
+ *       type="text"
+ *       onChange={(e) => setInput(e.target.value)}
+ *       onKeyDown={(e) => (e.code === "Enter" ? controller.startSearch() : null)}
+ *     />
+ *   ),
+ * });
+ *
+ * function renderAdvancedTermSearch(args: any) {
+ *   const [term, setTerm] = React.useState(undefined as Term | undefined);
+ *   const [input, setInput] = React.useState("");
+ *
+ *   // Create advancedSearch dynamically
+ *   const advancedSearchInstance = advancedSearch(input, setInput);
+ *
+ *   return (
+ *     <div className='container mx-auto flex flex-col p-2 gap-4 h-[400px]'>
+ *       <TermSearch
+ *         {...args}
+ *         term={term}
+ *         onTermSelect={(selectedTerm) => {
+ *           setTerm(selectedTerm);
+ *           args.onTermSelect(selectedTerm); // Call mock or external handler
+ *         }}
+ *         advancedSearch={advancedSearchInstance}
+ *       />
+ *     </div>
+ *   );
+ * };
+ * ```
+ **/
+export const CustomAdvancedSearch: Story = {
+  render: renderCustomAdvancedTermSearch,
+  args: {
+    term: undefined,
+    onTermSelect: fn((term) => console.log(term)),
+    showDetails: false,
+    debug: true
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const indicator = canvas.getByTestId("advanced-search-indicator");
+    expect(indicator).toBeInTheDocument();
+    userEvent.click(indicator);
+
+    const modal = await waitFor(() => canvas.getByTestId("advanced-search-modal"));
+    expect(modal).toBeInTheDocument();
+
+    const input = canvas.getByTestId("advanced-search-term-name-input");
+    expect(input).toBeInTheDocument();
+
+    await userEvent.type(input, "test input", {delay: 50});
+    await fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => {
+      const r = canvas.getByText("test input")
+      expect(r).toHaveClass("line-through")
+      expect(r).toBeInTheDocument()
+    });
   }
 }

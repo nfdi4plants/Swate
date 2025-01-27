@@ -1,5 +1,5 @@
 import React from 'react';
-import TermSearch from '../src/TermSearch/TermSearchV2.fs.js';
+import TermSearch from '../src/TermSearch/TermSearchV2.fs.ts';
 
 const App = () => {
     const [term, setTerm] = React.useState(undefined);
@@ -20,6 +20,7 @@ const App = () => {
               parentId="MS:1000031"
               showDetails
               debug={true}
+              advancedSearch
             />
         </div>
     );

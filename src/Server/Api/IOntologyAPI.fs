@@ -3,8 +3,7 @@ module API.IOntologyAPI
 open Shared
 open Database
 
-open DTOs.TermQuery
-open DTOs.ParentTermQuery
+open Shared.DTOs
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open ARCtrl
@@ -27,7 +26,7 @@ module Helper =
     module V3 =
         open ARCtrl.Helper.Regex.ActivePatterns
 
-        let searchSingleTerm credentials (content: TermQueryDto) =
+        let searchSingleTerm credentials (content: TermQuery) =
             async {
                 let dbSearchRes =
                     match content.query.Trim() with
@@ -36,7 +35,7 @@ module Helper =
                     // This suggests we search for a term name
                     | notAnAccession ->
                         let searchmode = content.searchMode |> Option.defaultWith (fun () -> getSearchModeFromQuery content.query)
-                        let ontologies = content.ontologies |> Option.defaultValue [] |> getOntologiesModeFromList 
+                        let ontologies = content.ontologies |> Option.defaultValue [] |> getOntologiesModeFromList
                         if content.parentTermId.IsSome then
                             Term.Term(credentials).searchByParentStepwise(notAnAccession, content.parentTermId.Value, searchmode, ?limit=content.limit)
                         elif searchmode = Database.FullTextSearch.Exact then
@@ -47,11 +46,11 @@ module Helper =
                 return dbSearchRes
             }
 
-        let searchChildTerms credentials (content: ParentTermQueryDto) =
+        let searchChildTerms credentials (content: ParentTermQuery) =
             async {
-                let dbSearchRes = 
+                let dbSearchRes =
                     Term.Term(credentials).findAllChildTerms(content.parentTermId, ?limit=content.limit) |> Array.ofSeq
-                
+
                 return dbSearchRes
             }
 
@@ -63,9 +62,9 @@ module V3 =
     let ontologyApi (credentials: Helper.Neo4JCredentials) : IOntologyAPIv3 =
         {
             //Development
-            getTestNumber = 
+            getTestNumber =
                 fun () -> async { return 42 }
-            searchTerm = fun content -> 
+            searchTerm = fun content ->
                 async {
                     let! results = Helper.V3.searchSingleTerm credentials content
                     return results
@@ -77,23 +76,28 @@ module V3 =
                             Helper.V3.searchSingleTerm credentials query
                     ]
                     let! results = asyncQueries |> Async.Parallel
-                    let zipped = Array.map2 (fun a b -> TermQueryDtoResults.create(a,b)) queries results
+                    let zipped = Array.map2 (fun a b -> TermQueryResults.create(a,b)) queries results
                     return zipped
                 }
             getTermById = fun id  ->
                 async {
                     let dbSearchRes = Term.Term(credentials).getByAccession id
-                    return 
+                    return
                         match Seq.length dbSearchRes with
                         | 1 -> dbSearchRes |> Seq.head |> Some
                         | 0 -> None
                         | _ -> failwith $"Found multiple terms with the same accession: {id}" // must be multiples as negative cannot exist for length
                 }
-            findAllChildTerms  = fun content ->
+            searchChildTerms = fun (dto: ParentTermQuery) ->
                 async {
-                    let! results = Helper.V3.searchChildTerms credentials content
-                    let zipped = ParentTermQueryDtoResults.create(content, results)
+                    let! results = Helper.V3.searchChildTerms credentials dto
+                    let zipped = ParentTermQueryResults.create(dto, results)
                     return zipped
+                }
+            searchTermAdvanced = fun (dto: AdvancedSearchQuery) ->
+                async {
+                    let results = Term.Term(credentials).getByAdvancedTermSearch(dto) |> Array.ofSeq
+                    return results
                 }
         }
 
@@ -116,7 +120,7 @@ module V1 =
         /// We use sorensen dice to avoid scoring mutliple occassions of the same word (Issue https://github.com/nfdi4plants/Swate/issues/247)
         let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
             terms |> SorensenDice.sortBySimilarity searchStr (fun term -> term.Name)
-    
+
         {
             //Development
 
@@ -169,7 +173,7 @@ module V1 =
             getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
                 async {
                     let searchRes = Database.Term.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
-                    return searchRes  
+                    return searchRes
                 }
 
             getTermSuggestionsByChildTerm = fun (max:int, typedSoFar:string, childTerm:TermMinimal) ->
@@ -194,7 +198,7 @@ module V1 =
             getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
                 async {
                     let searchRes = Term.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
-                    return searchRes  
+                    return searchRes
                 }
 
             getTermsForAdvancedSearch = fun advancedSearchOption ->
@@ -249,7 +253,7 @@ module V1 =
                                     else
                                         // search by accession must be unique, and has unique restriction in database, so there can only be 0 or 1 result
                                         let r = dbResults |> Array.exactlyOne
-                                        if r.Name <> termSearchable.Term.Name then 
+                                        if r.Name <> termSearchable.Term.Name then
                                             failwith $"""Found mismatch between Term Accession and Term Name. Term name "{termSearchable.Term.Name}" and term accession "{termSearchable.Term.TermAccession}",
                                             but accession belongs to name "{r.Name}" (ontology: {r.FK_Ontology})"""
                                         Some r
@@ -288,7 +292,7 @@ module V2 =
         /// <summary>We use sorensen dice to avoid scoring mutliple occassions of the same word (Issue https://github.com/nfdi4plants/Swate/issues/247)</summary>
         let sorensenDiceSortTerms (searchStr:string) (terms: Term []) =
             terms |> SorensenDice.sortBySimilarity searchStr (fun term -> term.Name)
-    
+
         {
             //Development
 
@@ -318,7 +322,7 @@ module V2 =
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms typedSoFar
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
-                    let arrSorted = sorensenDiceSortTerms inp.query arr 
+                    let arrSorted = sorensenDiceSortTerms inp.query arr
                     return arrSorted
                 }
 
@@ -343,14 +347,14 @@ module V2 =
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms inp.query
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
-                    let arrSorted = sorensenDiceSortTerms inp.query arr 
+                    let arrSorted = sorensenDiceSortTerms inp.query arr
                     return arrSorted
                 }
 
             getAllTermsByParentTerm = fun (parentTerm:TermMinimal) ->
                 async {
                     let searchRes = Database.Term.Term(credentials).getAllByParent(parentTerm,limit=500) |> Array.ofSeq
-                    return searchRes  
+                    return searchRes
                 }
 
             getTermSuggestionsByChildTerm = fun inp ->
@@ -370,14 +374,14 @@ module V2 =
                         |> Array.ofSeq
                         //|> sorensenDiceSortTerms inp.query
                     let arr = if dbSearchRes.Length <= inp.n then dbSearchRes else Array.take inp.n dbSearchRes
-                    let arrSorted = sorensenDiceSortTerms inp.query arr 
+                    let arrSorted = sorensenDiceSortTerms inp.query arr
                     return arrSorted
                 }
 
             getAllTermsByChildTerm = fun (childTerm:TermMinimal) ->
                 async {
                     let searchRes = Term.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
-                    return searchRes  
+                    return searchRes
                 }
 
             getTermsForAdvancedSearch = fun advancedSearchOption ->
@@ -432,7 +436,7 @@ module V2 =
                                     else
                                         // search by accession must be unique, and has unique restriction in database, so there can only be 0 or 1 result
                                         let r = dbResults |> Array.exactlyOne
-                                        if termSearchable.Term.Name <> "" && r.Name <> termSearchable.Term.Name then 
+                                        if termSearchable.Term.Name <> "" && r.Name <> termSearchable.Term.Name then
                                             failwith $"""Found mismatch between Term Accession and Term Name. Term name "{termSearchable.Term.Name}" and term accession "{termSearchable.Term.TermAccession}",
                                             but accession belongs to name "{r.Name}" (ontology: {r.FK_Ontology})"""
                                         Some r

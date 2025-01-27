@@ -1,8 +1,8 @@
-module Shared.DTOs.ParentTermQuery
+namespace Shared.DTOs
 
 open Shared
 
-type ParentTermQueryDto = {
+type ParentTermQuery = {
     parentTermId: string
     limit: int option
 } with
@@ -11,8 +11,8 @@ type ParentTermQueryDto = {
         limit = limit
     }
 
-type ParentTermQueryDtoResults = {
-    query: ParentTermQueryDto
+type ParentTermQueryResults = {
+    query: ParentTermQuery
     results: Database.Term []
 } with
     static member create(query, results) = {

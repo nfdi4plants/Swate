@@ -13,7 +13,7 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
-open AdvancedSearchTypes
+open Shared.DTOs
 open AdvancedSearch
 
 open Messages
@@ -36,7 +36,7 @@ let private createLinkOfAccession (accession:string) =
         prop.text accession
     ]
 
-let private isValidAdancedSearchOptions (opt:AdvancedSearchOptions) =
+let private isValidAdancedSearchOptions (opt:AdvancedSearchQuery) =
     ((
         opt.TermName.Length
         + opt.TermDefinition.Length
