@@ -154,7 +154,7 @@ module private API =
             }
 
     let callSearch = fun (query: string) ->
-        Api.ontology.searchTerm (Shared.DTOs.TermQuery.create query)
+        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create query)
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -163,7 +163,7 @@ module private API =
         )
 
     let callParentSearch = fun (parent: string) (query: string) ->
-        Api.ontology.searchTerm (Shared.DTOs.TermQuery.create(query, parentTermId = parent))
+        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, parentTermId = parent))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -172,7 +172,7 @@ module private API =
         )
 
     let callAllChildSearch = fun (parent: string) ->
-        Api.ontology.searchChildTerms (Shared.DTOs.ParentTermQuery.create(parent, 300))
+        Api.SwateApi.searchChildTerms (Shared.DTOs.ParentTermQuery.create(parent, 300))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results.results
@@ -181,7 +181,7 @@ module private API =
         )
 
     let callAdvancedSearch = fun dto ->
-        Api.ontology.searchTermAdvanced dto
+        Api.SwateApi.searchTermAdvanced dto
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -530,15 +530,15 @@ type TermSearchV2 =
         let BinSize = 20
         let BinCount = React.useMemo((fun () -> searchResults.Results.Count / BinSize), [|box searchResults|])
         let controller = {|
-          startSearch = fun () ->
-            advancedSearch.search()
-            |> Promise.map(fun results ->
-                let results = results.ConvertAll(fun t0 ->
-                    {Term = t0; IsDirectedSearchResult = false})
-                setSearchResults (SearchState.SearchDone results)
-            )
-            |> Promise.start
-          cancel = rvm
+            startSearch = fun () ->
+                advancedSearch.search()
+                |> Promise.map(fun results ->
+                    let results = results.ConvertAll(fun t0 ->
+                        {Term = t0; IsDirectedSearchResult = false})
+                    setSearchResults (SearchState.SearchDone results)
+                )
+                |> Promise.start
+            cancel = rvm
         |}
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
         React.useEffect(
@@ -583,7 +583,7 @@ type TermSearchV2 =
                             let disabled = tempPagination.IsNone || (tempPagination.Value-1) = pagination
                             prop.disabled disabled
                             prop.onClick(fun _ ->
-                              tempPagination |> Option.iter ((fun x -> x-1) >> setPagination)
+                                tempPagination |> Option.iter ((fun x -> x-1) >> setPagination)
                             )
                             prop.text "Go"
                         ]
@@ -657,8 +657,10 @@ type TermSearchV2 =
 
         React.useEffect (fun _ ->
             promise {
-                let! res = Api.TIB.getIRIFromOboId("MS:1000031")
-                Browser.Dom.console.log res._embedded.terms
+                // let! res = Api.TIB.tryGetIRIFromOboId("MS:1000031")
+                // Browser.Dom.console.log res
+                let! results = Api.TIBApi.searchAllChildrenOf("MS:1000031")
+                Browser.Dom.console.log results
             } |> Promise.start
         )
 
