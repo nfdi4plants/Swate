@@ -227,7 +227,7 @@ type SelectiveImportModal =
                                 button.info
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
-                                prop.onClick(fun e ->
+                                prop.onClick( fun e ->
                                     {| importState = importDataState; importedFile = import; selectedColumns = importDataState.SelectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )

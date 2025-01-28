@@ -46,8 +46,6 @@ type Templates =
                     prop.text "Only missing building blocks will be added."
                 ]
             ])
-            // Box 1
-            SidebarComponents.SidebarLayout.Description "Add template from database."
 
             if isProtocolSearch then
                 Protocol.SearchContainer.Main model setProtocolSearch importTypeStateData dispatch

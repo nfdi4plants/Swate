@@ -328,9 +328,10 @@ module ComponentAux =
             Html.tr [
                 prop.key $"{i}_{template.Id}"
                 prop.className [
-                    "base-content"
+                    "base-content cursor-default"
                     if List.contains template model.ProtocolState.TemplatesSelected then
                         "bg-base-200 shadow-lg"
+
                 ]
                 prop.onClick (fun e ->
                     e.preventDefault()
@@ -556,16 +557,6 @@ type Search =
                 ]
         ]
 
-    static member private displayTemplateNames model =
-            Html.div [
-                prop.className "flex gap-2"
-                prop.children [
-                    let names = List.rev model.ProtocolState.TemplatesSelected |> List.map (fun template -> template.Name)
-                    for i in 0..names.Length-1 do
-                        Html.div [ yield! [prop.text $"\"{names.[i]}\""]]
-                ]
-            ]
-
     static member private selectTemplatesButton model setProtocolSearch importTypeStateData dispatch =
         let importTypeState, setImportTypeState = importTypeStateData
         Html.div [
@@ -582,7 +573,6 @@ type Search =
                         {importTypeState with SelectedColumns = columns} |> setImportTypeState
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                     )
-                    button.wide
                     if model.ProtocolState.TemplatesSelected.Length > 0 then
                         button.success
                     else
@@ -596,11 +586,6 @@ type Search =
         Html.div [
             prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
             prop.children [
-                Html.div [
-                    prop.children [
-                            Search.displayTemplateNames model
-                        ]
-                ]
                 Search.selectTemplatesButton model setProtocolSearch importTypeStateData dispatch
             ]
         ]
