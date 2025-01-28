@@ -173,7 +173,7 @@ type SelectiveImportModal =
             | Study (s,_) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-        let columns =
+        let selectedColumns =
                 tables
                 |> Array.ofSeq
                 |> Array.map (fun t -> Array.init t.Columns.Length (fun _ -> true))
@@ -187,6 +187,8 @@ type SelectiveImportModal =
                 } |> setImportDataState
             else
                 SelectiveImportModalState.init() |> setImportDataState
+        if importDataState.SelectedColumns.Length <> selectedColumns.Length then
+            { importDataState with SelectedColumns = selectedColumns } |> setImportDataState
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
