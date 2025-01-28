@@ -323,21 +323,18 @@ module ComponentAux =
 
     let createAuthorsStringHelper (authors: ResizeArray<Person>) = authors |> Seq.map createAuthorStringHelper |> String.concat ", "
 
-    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) setProtocolSearch importTypeStateData dispatch  =
+    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) dispatch  =
         [
             Html.tr [
                 prop.key $"{i}_{template.Id}"
-                prop.classes [ "nonSelectText"; if isShown then "hoverTableEle"]
-                prop.style [
-                    style.cursor.pointer; style.userSelect.none;
+                prop.className [
+                    "base-content"
+                    if List.contains template model.ProtocolState.TemplatesSelected then
+                        "bg-base-200 shadow-lg"
                 ]
                 prop.onClick (fun e ->
                     e.preventDefault()
                     setIsShown (not isShown)
-                    //if isActive then
-                    //    UpdateDisplayedProtDetailsId None |> ProtocolMsg |> dispatch
-                    //else
-                    //    UpdateDisplayedProtDetailsId (Some i) |> ProtocolMsg |> dispatch
                 )
                 prop.children [
                     Html.td [
@@ -393,29 +390,29 @@ module ComponentAux =
                         Html.div [
                             prop.className "flex justify-center gap-2"
                             prop.children [
-                                Daisy.button.a [
-                                    button.sm
-                                    prop.onClick (fun _ ->
-                                        setProtocolSearch false
-                                        let importTypeState, setImportTypeState = importTypeStateData
-                                        let columns =  [|Array.init template.Table.Columns.Length (fun _ -> true)|]
-                                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
-                                        SelectProtocols [template] |> ProtocolMsg |> dispatch
-                                    )
-                                    button.wide
-                                    button.success
-                                    prop.text "select"
-                                ]
-                                Daisy.button.a [
-                                    button.sm
-                                    prop.onClick (fun _ ->
-                                        setIsShown (not isShown)
-                                        AddProtocol template |> ProtocolMsg |> dispatch
-                                    )
-                                    button.wide
-                                    button.success
-                                    prop.text "add"
-                                ]
+                                if List.contains template model.ProtocolState.TemplatesSelected then
+                                    let templates = model.ProtocolState.TemplatesSelected |> Array.ofSeq
+                                    let templateIndex = Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates                                    
+                                    Daisy.button.a [
+                                        button.sm
+                                        prop.onClick (fun _ ->
+                                            setIsShown (not isShown)
+                                            let newTemplatesSelected = List.removeAt templateIndex model.ProtocolState.TemplatesSelected
+                                            SelectProtocols newTemplatesSelected |> ProtocolMsg |> dispatch
+                                        )
+                                        button.primary
+                                        prop.text "remove"
+                                    ]
+                                else
+                                    Daisy.button.a [
+                                        button.sm
+                                        prop.onClick (fun _ ->
+                                            setIsShown (not isShown)
+                                            AddProtocol template |> ProtocolMsg |> dispatch
+                                        )
+                                        button.primary
+                                        prop.text "select"
+                                    ]
                             ]
                         ]
                     ]
@@ -517,7 +514,7 @@ type Search =
                     Html.text " For more information you can look "
                     Html.a [ prop.href Shared.URLs.SWATE_WIKI; prop.target "_Blank"; prop.text "here"]
                     Html.text ". If you find any problems with a template or have other suggestions you can contact us "
-                    Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
+                    Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.className ["link"]; prop.text "here"]
                     Html.text "."
                 ]
                 Html.p "You can search by template name, organisation and authors. Just type:"
@@ -590,7 +587,7 @@ type Search =
                         button.success
                     else
                         button.disabled
-                    prop.text "Select templates"
+                    prop.text "Add templates"
                 ]
             ]
         ]
@@ -609,7 +606,7 @@ type Search =
         ]
 
     [<ReactComponent>]
-    static member Component (templates, model: Model, setProtocolSearch, importTypeStateData, dispatch, ?maxheight: Styles.ICssUnit) =
+    static member Component (templates, model: Model, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
         let showIds, setShowIds = React.useState(fun _ -> [])
         Html.div [
@@ -652,9 +649,12 @@ type Search =
                                     for i in 0..templates.Length-1 do
                                         let isShown = showIds |> List.contains i
                                         let setIsShown (show: bool) =
-                                            if show then i::showIds |> setShowIds else showIds |> List.filter (fun id -> id <> i) |> setShowIds
+                                            if show then
+                                                i::showIds |> setShowIds
+                                            else
+                                                showIds |> List.filter (fun id -> id <> i) |> setShowIds
                                         yield!
-                                            protocolElement i templates.[i] isShown setIsShown model setProtocolSearch importTypeStateData dispatch
+                                            protocolElement i templates.[i] isShown setIsShown model dispatch
                         ]
                     ]
                 ]

@@ -15,8 +15,10 @@ module private HelperProtocolSearch =
             prop.children [
                 Html.ul [
                     Html.li [Html.a [
-                        prop.onClick (fun _ -> UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.Protocol} |> dispatch)
-                        prop.text (Routing.SidebarPage.Protocol.AsStringRdbl)
+                        prop.onClick (fun _ ->
+                            setIsProtocolSearch false
+                            UpdateModel {model with Model.PageState.SidebarPage = Routing.SidebarPage.Protocol} |> dispatch)
+                        prop.text "Back"
                     ]]
                     Html.li [
                         prop.className "is-active"
@@ -60,8 +62,8 @@ type SearchContainer =
                     prop.children [
                         Protocol.Search.InfoField()
                         Protocol.Search.FileSortElement(model, config, setConfig)
-                        ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch)
-                        Protocol.Search.Component (filteredTemplates, model, setProtocolSearch, importTypeStateData, dispatch)
+                        Search.SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch
+                        Protocol.Search.Component (filteredTemplates, model, dispatch)
                     ]
                 ]
             ]

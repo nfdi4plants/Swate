@@ -39,7 +39,6 @@ type SelectiveTemplateFromDB =
             prop.onClick(fun _ ->
                 setProtocolSearch true
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
-                    Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
                     {importTypeState with SelectedColumns = Array.empty} |> setImportTypeState
                 else
                     UpdateModel model |> dispatch)
