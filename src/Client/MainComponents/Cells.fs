@@ -11,6 +11,7 @@ open Shared
 open ARCtrl
 open Components
 open Model
+
 module private CellAux =
 
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =

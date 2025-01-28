@@ -16,7 +16,6 @@ module OfficeInterop =
             match msg with
 
             | UpdateArcFile arcFile ->
-                log ("UpdateArcFile", arcFile)
                 let cmd =
                     Cmd.OfPromise.either
                         Main.updateArcFile

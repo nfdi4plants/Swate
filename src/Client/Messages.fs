@@ -94,26 +94,29 @@ type TopLevelMsg =
     | CloseSuggestions
 
 type Msg =
-| UpdateModel           of Model
-| DevMsg                of DevMsg
-| OntologyMsg           of Ontologies.Msg
-| TermSearchMsg         of TermSearch.Msg
-| AdvancedSearchMsg     of AdvancedSearch.Msg
-| OfficeInteropMsg      of OfficeInterop.Msg
-| PersistentStorageMsg  of PersistentStorage.Msg
-| FilePickerMsg         of FilePicker.Msg
-| BuildingBlockMsg      of BuildingBlock.Msg
-| ProtocolMsg           of Protocol.Msg
+| UpdateModel               of Model
+| DevMsg                    of DevMsg
+| OntologyMsg               of Ontologies.Msg
+| TermSearchMsg             of TermSearch.Msg
+| AdvancedSearchMsg         of AdvancedSearch.Msg
+| OfficeInteropMsg          of OfficeInterop.Msg
+| PersistentStorageMsg      of PersistentStorage.Msg
+| FilePickerMsg             of FilePicker.Msg
+| BuildingBlockMsg          of BuildingBlock.Msg
+| ProtocolMsg               of Protocol.Msg
 // | CytoscapeMsg                  of Cytoscape.Msg
-| DataAnnotatorMsg      of DataAnnotator.Msg
-| SpreadsheetMsg        of Spreadsheet.Msg
+| DataAnnotatorMsg          of DataAnnotator.Msg
+| SpreadsheetMsg            of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
-| InterfaceMsg          of SpreadsheetInterface.Msg
-| Batch                 of seq<Messages.Msg>
-| Run                   of (unit -> unit)
-| UpdateHistory         of LocalHistory.Model
+| InterfaceMsg              of SpreadsheetInterface.Msg
+| Batch                     of seq<Messages.Msg>
+| Run                       of (unit -> unit)
+| UpdateHistory             of LocalHistory.Model
+| UpdateHistoryAnd          of LocalHistory.Model * Cmd<Msg>
+| UpdateSpreadSheetModel    of Spreadsheet.Model
+| UpdateHistoryPosition     of int
 /// Top level msg to test specific api interactions, only for dev.
 | TestMyAPI
 | TestMyPostAPI
-| UpdateModal           of Model.ModalState.ModalTypes option
+| UpdateModal               of Model.ModalState.ModalTypes option
 | DoNothing

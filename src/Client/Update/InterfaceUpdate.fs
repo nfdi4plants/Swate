@@ -27,6 +27,7 @@ module private ModelUtil =
             | Some Swatehost.Browser ->
                 let dt = LocalStorage.Darkmode.DataTheme.GET()
                 LocalStorage.Darkmode.DataTheme.SET dt
+                let model = Spreadsheet.Model.fromLocalStorage()
                 { this with
                     Model.SpreadsheetModel = Spreadsheet.Model.fromLocalStorage()
                     Model.History = this.History.UpdateFromSessionStorage()
@@ -79,6 +80,9 @@ module private ExcelHelper =
 
 module Interface =
 
+    open LocalHistory
+    open Model
+
     let update (model: Model) (msg: SpreadsheetInterface.Msg) : Model * Cmd<Messages.Msg> =
         let host = model.PersistentStorageState.Host
 
@@ -93,10 +97,12 @@ module Interface =
                             ExcelHelper.officeload() |> Async.StartImmediate
                             Cmd.none
                         | Swatehost.Browser ->
+                            Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
                             Cmd.none
                         | Swatehost.ARCitect ->
                             Cmd.ofEffect (fun _ ->
                                 LocalHistory.Model.ResetHistoryWebStorage()
+                                Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
                                 ARCitect.ARCitect.send ARCitect.Init
                             )
                     ]
