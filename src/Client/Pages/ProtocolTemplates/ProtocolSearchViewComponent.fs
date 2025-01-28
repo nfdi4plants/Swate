@@ -89,7 +89,6 @@ module ComponentAux =
                         prop.className "join-item input input-bordered input-sm input-primary flex items-center w-full"
                         prop.children [
                             Html.input [
-                                prop.style [style.minWidth 200]
                                 prop.placeholder $".. {state.Searchfield.toNameRdb}"
                                 prop.id SearchFieldId
                                 prop.valueOrDefault state.ProtocolSearchQuery

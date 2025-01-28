@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -25,6 +25,7 @@
     <Compile Include="OfficeInterop\ExcelHelper.fs" />
     <Compile Include="OfficeInterop\ArcTableHelper.fs" />
     <Compile Include="OfficeInterop\OfficeInterop.fs" />
+    <Compile Include="States\IndexedDB.fs" />
     <Compile Include="States\DataAnnotator.fs" />
     <Compile Include="States\ARCitect.fs" />
     <Compile Include="States\SpreadsheetInterface.fs" />
