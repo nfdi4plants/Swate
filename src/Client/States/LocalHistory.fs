@@ -467,11 +467,6 @@ type Model =
     static member ResetHistoryWebStorage() =
         Spreadsheet.Model.clearHistoryIndexedDB() |> Promise.start
         Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
-        Browser.WebStorage.sessionStorage.clear()
-
-    //static member ResetHistoryWebStorage() =
-    //    Browser.WebStorage.localStorage.removeItem(Keys.swate_local_spreadsheet_key)
-    //    Browser.WebStorage.sessionStorage.clear()
 
     member this.ResetAll() =
         Model.ResetHistoryWebStorage()
