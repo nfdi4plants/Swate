@@ -101,7 +101,7 @@ export const DefaultAdvancedSearch: Story = {
     const modal = await waitFor(() => canvas.getByTestId("advanced-search-modal"));
     expect(modal).toBeInTheDocument();
 
-    const input = canvas.getByTestId("advanced-search-input");
+    const input = canvas.getByTestId("advanced-search-term-name-input");
     expect(input).toBeInTheDocument();
 
     await userEvent.type(input, "instrument", {delay: 50});
@@ -114,27 +114,29 @@ export const DefaultAdvancedSearch: Story = {
   }
 }
 
-const customAdvancedSearch = (input: string, setInput: (value: string) => void) => ({
-  search: () =>
-    Promise.resolve([
-      {
-        name: input,
-        id: "TST:00001",
-        description: "Test Term",
-        isObsolete: true,
-        data: { test1: "Hello", test2: "World" },
-      },
-    ]),
-  form: (controller: { startSearch: () => void; cancel: () => void }) => (
-    <input
-      className="input input-bordered"
-      data-testid="advanced-search-input"
-      type="text"
-      onChange={(e) => setInput(e.target.value)}
-      onKeyDown={(e) => (e.code === "Enter" ? controller.startSearch() : null)}
-    />
-  ),
-});
+function customAdvancedSearch (input: string, setInput: (value: string) => void) {
+  return {
+    search: () =>
+      Promise.resolve([
+        {
+          name: input,
+          id: "TST:00001",
+          description: "Test Term",
+          isObsolete: true,
+          data: { test1: "Hello", test2: "World" },
+        },
+      ]),
+    form: (controller: { startSearch: () => void; cancel: () => void }) => (
+      <input
+        className="input input-bordered"
+        data-testid="advanced-search-input"
+        type="text"
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => (e.code === "Enter" ? controller.startSearch() : null)}
+      />
+    ),
+  }
+};
 
 function renderCustomAdvancedTermSearch(args: any) {
   const [term, setTerm] = React.useState(undefined as Term | undefined);
@@ -225,7 +227,7 @@ export const CustomAdvancedSearch: Story = {
     const modal = await waitFor(() => canvas.getByTestId("advanced-search-modal"));
     expect(modal).toBeInTheDocument();
 
-    const input = canvas.getByTestId("advanced-search-term-name-input");
+    const input = canvas.getByTestId("advanced-search-input");
     expect(input).toBeInTheDocument();
 
     await userEvent.type(input, "test input", {delay: 50});
@@ -290,7 +292,6 @@ export const TIBSearch: Story = {
         const searchResults = parsedData[1]
         expect(Array.isArray(searchResults)).toBe(true); // element should be result array
         expect(searchResults.length).toBeGreaterThan(100);
-        console.log("Parsed debug search results:", searchResults);
       } catch (error) {
         throw new Error(`Failed to parse data-debug-searchresults: ${debugValue}`);
       }
