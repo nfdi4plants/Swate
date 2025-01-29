@@ -173,11 +173,7 @@ type SelectiveImportModal =
             | Study (s,_) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-        let columns =
-                tables
-                |> Array.ofSeq
-                |> Array.map (fun t -> Array.init t.Columns.Length (fun _ -> true))
-        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init())
+        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init(tables))
         let setMetadataImport = fun b ->
             if b then
                 {
@@ -186,7 +182,7 @@ type SelectiveImportModal =
                         ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
                 } |> setImportDataState
             else
-                SelectiveImportModalState.init() |> setImportDataState
+                SelectiveImportModalState.init(tables) |> setImportDataState
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
