@@ -9,8 +9,6 @@ let SwateApi : IOntologyAPIv3 =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IOntologyAPIv3>
 
-
-
 // https://api.terminology.tib.eu/swagger-ui/index.html
 open Fetch
 
@@ -29,6 +27,10 @@ let private appendQueryParams (url: string) (queryParams: (string * obj) list) :
 
 [<RequireQualifiedAccess>]
 module TIBTypes =
+
+    [<Literal>]
+    let BaseAPIUrl = "https://api.terminology.tib.eu/api"
+
     type Term =
         abstract iri: string
         abstract lang: string
@@ -62,6 +64,10 @@ module TIBTypes =
     type SearchApi =
         abstract response: SearchResults
 
+    type SchemaValuesApi =
+        abstract content: string []
+        abstract numberOfElements: int
+
 [<AutoOpen>]
 module TIBTypesExtensions =
     type TIBTypes.SearchApi with
@@ -83,7 +89,7 @@ module TIBTypesExtensions =
 type TIBApi =
     static member tryGetIRIFromOboId (oboId: string) =
         fetch
-            (appendQueryParams "https://api.terminology.tib.eu/api/terms" ["obo_id", oboId])
+            (appendQueryParams $"{TIBTypes.BaseAPIUrl}/terms" ["obo_id", oboId])
             [
                 RequestProperties.Method HttpMethod.GET
                 requestHeaders  [ HttpRequestHeaders.Accept "application/json" ]
@@ -99,9 +105,9 @@ type TIBApi =
 
     // TODO: Maybe we should use allChildrenOf instead of childrenOf?
     // The latter only uses subclassOf/is_a, whereas the other one uses all relationships
-    static member search(q: string, ?rows: int, ?obsoletes: bool, ?queryFields: ResizeArray<string>, ?childrenOf: string) =
+    static member search(q: string, ?rows: int, ?obsoletes: bool, ?queryFields: ResizeArray<string>, ?childrenOf: string, ?collection: string) =
         promise {
-            let baseUrl = @"https://api.terminology.tib.eu/api/search"
+            let baseUrl = $"{TIBTypes.BaseAPIUrl}/search"
             let mutable childrenOf_ = None
             if childrenOf.IsSome then
                 let! parentIri = TIBApi.tryGetIRIFromOboId childrenOf.Value
@@ -118,6 +124,9 @@ type TIBApi =
                     "queryFields", (queryFields.Value |> String.concat "," |> box)
                 if childrenOf_.IsSome then
                     "childrenOf", childrenOf_.Value
+                if collection.IsSome then
+                    "schema", "collection"
+                    "classification", collection.Value
             ]
             let url = appendQueryParams baseUrl queryParams
             return!
@@ -133,14 +142,24 @@ type TIBApi =
                 )
         }
 
-    static member defaultSearch(q: string, ?rows: int) =
+    static member defaultSearch(q: string, ?rows: int, ?collection: string) =
         let rows = defaultArg rows 10
-        TIBApi.search(q, rows = rows, obsoletes = false, queryFields = ResizeArray ["label"])
+        TIBApi.search(q, rows = rows, obsoletes = false, queryFields = ResizeArray ["label"], ?collection = collection)
 
-    static member searchChildrenOf(q: string, parentOboId: string, ?rows: int) =
+    static member searchChildrenOf(q: string, parentOboId: string, ?rows: int, ?collection: string) =
         let rows = defaultArg rows 10
-        TIBApi.search(q, rows = rows, childrenOf = parentOboId)
+        TIBApi.search(q, rows = rows, childrenOf = parentOboId, ?collection = collection)
 
-    static member searchAllChildrenOf(parentOboId: string, ?rows: int) =
+    static member searchAllChildrenOf(parentOboId: string, ?rows: int, ?collection: string) =
         let rows = defaultArg rows 500
-        TIBApi.search("*", rows = rows, childrenOf = parentOboId)
+        TIBApi.search("*", rows = rows, childrenOf = parentOboId, ?collection = collection)
+
+    static member getCollections() =
+        let url = $"{TIBTypes.BaseAPIUrl}/ontologies/schemavalues?schema=collection&lang=en"
+        fetch url [
+            RequestProperties.Method HttpMethod.GET
+            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
+        ]
+        |> Promise.bind (fun response ->
+            response.json<TIBTypes.SchemaValuesApi>()
+        )

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn, within, expect, userEvent, waitFor, fireEvent } from '@storybook/test';
 import TermSearch from "./TermSearchV2.fs.js";
+import { TIBApi } from '../Util/Api.fs.js';
 import React from 'react';
 
 function renderTermSearch(args: any) {
@@ -73,8 +74,8 @@ export const ParentSearch: Story = {
     await waitFor(() => { // await api call response
       const directedOutput = canvas.getByText("SCIEX instrument model");
       expect(directedOutput).toBeInTheDocument();
-      const expectedIcon = canvas.getByTitle("Directed Search");
-      expect(expectedIcon).toBeInTheDocument();
+      const expectedIcons = canvas.getAllByTitle("Directed Search");
+      expect(expectedIcons.length).toBeGreaterThan(0);
     }, { timeout: 3000 });
   }
 }
@@ -235,5 +236,65 @@ export const CustomAdvancedSearch: Story = {
       expect(r).toHaveClass("line-through")
       expect(r).toBeInTheDocument()
     });
+  }
+}
+
+export const TIBSearch: Story = {
+  render: renderTermSearch,
+  args: {
+    term: undefined,
+    parentId: "MS:1000031",
+    onTermSelect: fn((term) => console.log(term)),
+    debug: true,
+    disableDefaultSearch: true,
+    disableDefaultParentSearch: true,
+    disableDefaultAllChildrenSearch: true,
+    termSearchQueries: [
+      ["tib_search", (query) => TIBApi.defaultSearch(query, 10, "DataPLANT")]
+    ],
+    parentSearchQueries: [
+      ["tib_search", ([parentId, query]) => TIBApi.searchChildrenOf(query, parentId, 10, "DataPLANT")]
+    ],
+    allChildrenSearchQueries: [
+      ["tib_search", (parentId) => TIBApi.searchAllChildrenOf(parentId, 500, "DataPLANT")]
+    ]
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId('term-search-input');
+    expect(input).toBeInTheDocument();
+
+    await userEvent.type(input, "SCIEX", {delay: 50});
+
+    await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
+
+    await waitFor(() => { // await api call response
+      const directedOutput = canvas.getByText("SCIEX instrument model");
+      expect(directedOutput).toBeInTheDocument();
+      const expectedIcons = canvas.getAllByTitle("Directed Search");
+      expect(expectedIcons.length).toBeGreaterThan(0);
+    }, { timeout: 3000 });
+
+    await userEvent.clear(input);
+
+    await userEvent.dblClick(input);
+
+    await waitFor(() => { // await api call response
+      const debugContainer = canvas.getByTestId("term-search-container");
+      expect(debugContainer).toBeInTheDocument();
+      const debugValue = debugContainer.getAttribute("data-debug-searchresults")
+
+      try {
+        const parsedData = JSON.parse(debugValue!);
+        expect(Array.isArray(parsedData)).toBe(true); // f# discriminated unions are serialized as arrays
+        const searchResults = parsedData[1]
+        expect(Array.isArray(searchResults)).toBe(true); // element should be result array
+        expect(searchResults.length).toBeGreaterThan(100);
+        console.log("Parsed debug search results:", searchResults);
+      } catch (error) {
+        throw new Error(`Failed to parse data-debug-searchresults: ${debugValue}`);
+      }
+
+    }, { timeout: 3000 });
   }
 }

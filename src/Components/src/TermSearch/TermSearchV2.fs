@@ -69,7 +69,7 @@ module TypeDefs =
     // A parent search function that resolves a list of terms based on a parent ID and query.
     // @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
     //
-    type ParentSearchCall = string -> string -> JS.Promise<ResizeArray<Term>>
+    type ParentSearchCall = (string*string) -> JS.Promise<ResizeArray<Term>>
 
     ///
     /// A function that fetches all child terms of a parent.
@@ -162,7 +162,7 @@ module private API =
             |> ResizeArray
         )
 
-    let callParentSearch = fun (parent: string) (query: string) ->
+    let callParentSearch = fun (parent: string, query: string) ->
         Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, parentTermId = parent))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
@@ -655,15 +655,6 @@ type TermSearchV2 =
 
         let (modal: Modals option), setModal = React.useState None
 
-        React.useEffect (fun _ ->
-            promise {
-                // let! res = Api.TIB.tryGetIRIFromOboId("MS:1000031")
-                // Browser.Dom.console.log res
-                let! results = Api.TIBApi.searchAllChildrenOf("MS:1000031")
-                Browser.Dom.console.log results
-            } |> Promise.start
-        )
-
         /// Close term search result window when opening a modal
         let setModal =
             fun (modal: Modals option) ->
@@ -702,10 +693,10 @@ type TermSearchV2 =
 
         let createParentChildTermSearch = fun (id: string) (search: ParentSearchCall) ->
             let id = "PC_" + id
-            fun (parentId: string) (query: string) ->
+            fun (parentId: string, query: string) ->
                 promise {
                     startLoadingBy id
-                    let! termSearchResults = search parentId query
+                    let! termSearchResults = search (parentId, query)
                     let termSearchResults = termSearchResults.ConvertAll(fun t0 -> {Term = t0; IsDirectedSearchResult = true})
                     if not cancelled.current then
                         setSearchResults(fun prevResults -> TermSearchResult.addSearchResults prevResults.Results termSearchResults |> SearchState.SearchDone)
@@ -744,10 +735,10 @@ type TermSearchV2 =
                     if disableDefaultParentSearch.IsSome && disableDefaultParentSearch.Value then
                         ()
                     else
-                        createParentChildTermSearch "DEFAULT_PARENTCHILD" API.callParentSearch parentId.Value query
+                        createParentChildTermSearch "DEFAULT_PARENTCHILD" API.callParentSearch (parentId.Value, query)
                     if parentSearchQueries.IsSome then
                         for id, parentSearch in parentSearchQueries.Value do
-                            createParentChildTermSearch id parentSearch parentId.Value query
+                            createParentChildTermSearch id parentSearch (parentId.Value, query)
                     // setLoading(false)
             ]
             |> Promise.all
@@ -808,6 +799,7 @@ type TermSearchV2 =
 
         Html.div [
             if debug then
+                prop.testId "term-search-container"
                 prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className "form-control"
