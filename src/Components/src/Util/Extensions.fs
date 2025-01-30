@@ -7,3 +7,4 @@ module Extensions =
 
     type prop with
         static member testid (value: string) = prop.custom("data-testid", value)
+

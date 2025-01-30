@@ -389,43 +389,91 @@ type TermSearchV2 =
             ]
         ]
 
-    static member private DetailsModal(rvm, term: Term) =
+    [<ReactComponent>]
+    static member private DetailsModal(rvm, term: Term option, config: (string * string) list) =
+        let showConfig, setShowConfig = React.useState(false)
         let label (str: string) = Html.div [
             prop.className "font-bold"
             prop.text str
         ]
-        let content = Html.div [
+        let termContent =
+            match term with
+            | Some term ->
+                Html.div [
+                    prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
+                    prop.children [
+                        label "Name"
+                        Html.div (Option.defaultValue "<no-name>" term.name)
+                        label "Id"
+                        Html.div (Option.defaultValue "<no-id>" term.id)
+                        label "Description"
+                        Html.div (Option.defaultValue "<no-description>" term.description)
+                        label "Source"
+                        Html.div (Option.defaultValue "<no-source>" term.source)
+                        if term.data.IsSome then
+                            label "Data"
+                            Html.pre [
+                                prop.className "text-xs"
+                                prop.children [
+                                    Html.code (Fable.Core.JS.JSON.stringify(term.data.Value, space = '\t'))
+                                ]
+                            ]
+                        if term.isObsolete.IsSome && term.isObsolete.Value then
+                            Html.div [
+                                prop.className "text-error"
+                                prop.text "obsolete"
+                            ]
+                        if term.href.IsSome then
+                            Html.a [
+                                prop.className "link link-primary"
+                                prop.href term.href.Value
+                                prop.target.blank
+                                prop.text "Link"
+                            ]
+                    ]
+                ]
+            | _ ->
+                Html.div [
+                    prop.text "No term selected."
+                ]
+        let componentConfig = Html.div [
             prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
             prop.children [
-                label "Name"
-                Html.div (Option.defaultValue "<no-name>" term.name)
-                label "Id"
-                Html.div (Option.defaultValue "<no-id>" term.id)
-                label "Description"
-                Html.div (Option.defaultValue "<no-description>" term.description)
-                label "Source"
-                Html.div (Option.defaultValue "<no-source>" term.source)
-                if term.data.IsSome then
-                    label "Data"
-                    Html.pre [
-                        prop.className "text-xs"
-                        prop.children [
-                            Html.code (Fable.Core.JS.JSON.stringify(term.data.Value, space = '\t'))
+                for (key, value) in config do
+                    label key
+                    Html.div value
+            ]
+        ]
+        let content = Html.div [
+            match showConfig with
+            | false ->
+                termContent
+                Html.div [
+                    prop.className "w-full flex justify-end"
+                    prop.children [
+                        Html.button [
+                            prop.className "btn btn-primary btn-xs"
+                            prop.onClick(fun _ -> setShowConfig (not showConfig))
+                            prop.children [
+                                Html.i [
+                                    prop.className "fa-solid fa-cog"
+                                ]
+                            ]
                         ]
                     ]
-                if term.isObsolete.IsSome && term.isObsolete.Value then
-                    Html.div [
-                        prop.className "text-error"
-                        prop.text "obsolete"
+                ]
+            | true ->
+                Html.button [
+                    prop.className "btn btn-neutral btn-xs btn-outline mb-2"
+                    prop.onClick(fun _ -> setShowConfig (not showConfig))
+                    prop.children [
+                        Html.i [
+                            prop.className "fa-solid fa-arrow-left"
+                        ]
+                        Html.span "back"
                     ]
-                if term.href.IsSome then
-                    Html.a [
-                        prop.className "link link-primary"
-                        prop.href term.href.Value
-                        prop.target.blank
-                        prop.text "Link"
-                    ]
-            ]
+                ]
+                componentConfig
         ]
         TermSearchV2.BaseModal("Details", content, rvm)
 
@@ -806,8 +854,25 @@ type TermSearchV2 =
             prop.ref containerRef
             prop.children [
                 match modal with
-                | Some Details when term.IsSome ->
-                    TermSearchV2.DetailsModal((fun () -> setModal None), term.Value)
+                | Some Details ->
+                    let configDetails =
+                        [
+                            "Parent Id", parentId
+                            "Disable Default Search", Option.map string disableDefaultSearch
+                            "Disable Default Parent Search", Option.map string disableDefaultParentSearch
+                            "Disable Default All Children Search", Option.map string disableDefaultAllChildrenSearch
+                            "Custom Term Search Queries", Option.map (Seq.map fst >> String.concat "; ") termSearchQueries
+                            "Custom Parent Search Queries", Option.map (Seq.map fst >> String.concat "; ") parentSearchQueries
+                            "Custom All Children Search Queries", Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
+                            "Advanced Search", Option.map (function | U2.Case1 _ -> "Custom" | U2.Case2 _ -> "Default") advancedSearch
+                        ]
+                        |> List.fold(fun acc (key, value) ->
+                            match value with
+                            | Some value -> (key, value)::acc
+                            | _ -> acc
+                        ) []
+                        |> List.rev
+                    TermSearchV2.DetailsModal((fun () -> setModal None), term, configDetails)
                 | Some AdvancedSearch when advancedSearch.IsSome->
                     let onTermSelect = fun (term: Term option) ->
                         onTermSelect term
@@ -827,7 +892,7 @@ type TermSearchV2 =
                                     "fa-solid fa-square-check text-primary",
                                     fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
                                 )
-                        | Some _ when showDetails -> // show only when focused
+                        | _ when showDetails -> // show only when focused
                             TermSearchV2.IndicatorItem(
                                 "",
                                 "Details",
