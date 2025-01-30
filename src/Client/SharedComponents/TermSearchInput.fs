@@ -252,10 +252,10 @@ type TermSearch =
             prop.style [style.top (length.perc 110); style.scrollbarGutter.stable]
             prop.children [
                 match searchNameState.SearchIs, searchTreeState.SearchIs, show with
-                | SearchIs.Done, _,_ | _, SearchIs.Done, _->
+                | SearchIs.Done, _, _ | _, SearchIs.Done, _->
                     matchSearchState searchNameState false
                     matchSearchState searchTreeState true
-                | _,_, true ->
+                | _, _, true ->
                     Html.div [
                         prop.className "px-3 col-span-4"
                         prop.children [

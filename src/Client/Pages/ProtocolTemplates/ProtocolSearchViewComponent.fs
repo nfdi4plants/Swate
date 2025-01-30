@@ -130,7 +130,7 @@ module ComponentAux =
                     Svg.svg [
                         svg.xmlns "http://www.w3.org/2000/svg"
                         svg.fill "none"
-                        svg.viewBox (0,0,24,24)
+                        svg.viewBox (0, 0, 24, 24)
                         svg.className "inline-block h-4 w-4 stroke-current"
                         svg.children [
                             Svg.path [
@@ -167,11 +167,10 @@ module ComponentAux =
                 let queryBigram = state.ProtocolTagSearchQuery |> Shared.SorensenDice.createBigrams
                 let getMatchingTags (allTags: OntologyAnnotation []) =
                     allTags
-                    |> Array.map (fun x ->
-                        x.NameText
+                    |> Array.map (fun oa ->
+                        oa.NameText
                         |> Shared.SorensenDice.createBigrams
-                        |> Shared.SorensenDice.calculateDistance queryBigram
-                        , x
+                        |> Shared.SorensenDice.calculateDistance queryBigram, oa
                     )
                     |> Array.filter (fun x -> fst x >= 0.3 || (snd x).TermAccessionShort = state.ProtocolTagSearchQuery)
                     |> Array.sortByDescending fst
@@ -192,7 +191,7 @@ module ComponentAux =
                             Html.input [
                                 prop.placeholder ".. protocol tag"
                                 prop.valueOrDefault state.ProtocolTagSearchQuery
-                                prop.onChange (fun (e:string) ->
+                                prop.onChange (fun (e: string) ->
                                     {state with ProtocolTagSearchQuery = e} |> setState
                                 )
                             ]
@@ -211,8 +210,8 @@ module ComponentAux =
                                     (fun tagSuggestion ->
                                         let nextState = {
                                             state with
-                                                ProtocolFilterErTags = tagSuggestion::state.ProtocolFilterErTags
-                                                ProtocolTagSearchQuery = ""
+                                                ProtocolFilterErTags    = tagSuggestion::state.ProtocolFilterErTags
+                                                ProtocolTagSearchQuery  = ""
                                         }
                                         setState nextState
                                     )
@@ -221,8 +220,8 @@ module ComponentAux =
                                 let updateToggle = (fun tagSuggestion ->
                                     let nextState = {
                                         state with
-                                            ProtocolFilterTags = tagSuggestion::state.ProtocolFilterTags
-                                            ProtocolTagSearchQuery = ""
+                                            ProtocolFilterTags      = tagSuggestion::state.ProtocolFilterTags
+                                            ProtocolTagSearchQuery  = ""
                                     }
                                     setState nextState
                                 )

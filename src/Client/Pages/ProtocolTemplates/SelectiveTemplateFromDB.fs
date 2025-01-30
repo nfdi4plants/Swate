@@ -149,10 +149,10 @@ type SelectiveTemplateFromDB =
         let importTypeState, setImportTypeState = importTypeStateData
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun x -> x.Index)
+            let newImportTables = newImportTable::importTypeState.ImportTables |> List.distinctBy (fun table -> table.Index)
             {importTypeState with ImportTables = newImportTables} |> setImportTypeState
-        let rmvTableImport = fun i ->
-            {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportTypeState
+        let rmvTableImport = fun index ->
+            {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> index)} |> setImportTypeState
         React.fragment [
             Html.div [
                 SelectiveTemplateFromDB.ToProtocolSearchElement(model, setProtocolSearch, importTypeState, setImportTypeState, dispatch)
