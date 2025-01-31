@@ -79,7 +79,6 @@ module private EventPresets =
 
 open Shared
 open Fable.Core.JsInterop
-open CellStyles
 
 type Cell =
 
@@ -138,7 +137,7 @@ type Cell =
             prop.key $"Header_{state.ActiveView.ViewIndex}-{columnIndex}-{columnType}"
             prop.id $"Header_{columnIndex}_{columnType}"
             prop.readOnly readonly
-            cellStyle [
+            CellStyles.cellStyle [
                 "resize-x w-[300px] truncate" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
                 if columnType.IsRefColumn then
                     "bg-base-200"
@@ -162,10 +161,10 @@ type Cell =
                                 | _ -> cellValue
                             let extendableButtonOpt =
                                 if columnType = Main && not header.IsSingleColumn then
-                                    extendHeaderButton(state_extend, columnIndex, setState_extend) |> Some
+                                    CellStyles.ExtendHeaderButton(state_extend, columnIndex, setState_extend) |> Some
                                 else
                                     None
-                            basicValueDisplayCell cellValue extendableButtonOpt
+                            CellStyles.BasicValueDisplayCell(cellValue, extendableButtonOpt)
                     ]
                 ]
             ]
@@ -220,7 +219,7 @@ type Cell =
         Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
 
     static member Empty() =
-        Html.td [ cellStyle []; prop.readOnly true; prop.children [
+        Html.td [ CellStyles.cellStyle []; prop.readOnly true; prop.children [
             Html.div [
                 prop.style [style.height (length.perc 100); style.cursor.notAllowed; style.userSelect.none]
                 prop.className "flex grow items-center justify-center bg-base-300 opacity-60"
@@ -245,82 +244,72 @@ type Cell =
             ele.focus()
         let makeActive() = UpdateActiveCell (Some (!^index, columnType)) |> SpreadsheetMsg |> dispatch
         let cellId = Controller.Cells.mkCellId columnIndex rowIndex state
-        let ref = React.useElementRef()
-        // ---
-        // Not sure if we can delete this comment,
-        // i am not 100% happy with the scroll logic.
-        // Previously the code in this comment made the browser scroll zu the cell whenever it was updated to selected with arrow key navigation.
-
-        // I had some issues (and still have some issues) with this logic and the lazy load table.1
-        // But for now i updated the logic to use focus.
-        //
-        // For now i would leave the comment to reenable the logic when working for a permanent clean solution
-        // ---
-        //React.useEffect((fun _ ->
-        //    if ref.current.IsSome && CellStyles.ScrollToCellId = Some cellId then
-        //        //let options = createEmpty<Browser.Types.ScrollIntoViewOptions>
-        //        //options.behavior <- Browser.Types.ScrollBehavior.Auto
-        //        //options.``inline`` <- Browser.Types.ScrollAlignment.Nearest
-        //        //options.block <- Browser.Types.ScrollAlignment.Nearest
-        //        ref.current.Value.focus()
-        //), [|box CellStyles.ScrollToCellId|])
+        // let ref = React.useElementRef()
         Html.td [
             if tooltip.IsSome then prop.title tooltip.Value
-            prop.key cellId
             prop.id cellId // This is used for scrollintoview on keyboard navigation
-            prop.ref ref
+            // prop.ref ref
             prop.tabIndex 0
-            cellStyle [
+            CellStyles.cellStyle [
                 if isSelected then "!bg-base-300"
             ]
             prop.readOnly readonly
-            //prop.ref ref
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
-            if not readonly then
-                prop.onDoubleClick(fun e ->
-                    e.preventDefault()
-                    e.stopPropagation()
+            prop.onDoubleClick(fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                if not readonly then
                     if isIdle then makeActive()
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
-                )
-                if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
+            )
+            if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
             prop.onMouseDown(fun e -> if isIdle && e.shiftKey then e.preventDefault())
             prop.children [
                 if isActive then
                     // Update change to mainState and exit active input.
                     if oasetter.IsSome then
-                        let oa = oasetter.Value.oa
-                        let onBlur = fun e -> makeIdle();
-                        let onEscape = fun e -> makeIdle();
-                        let onEnter = fun e -> makeIdle();
-                        let setter = fun (oa: OntologyAnnotation option) ->
-                            let oa = oa |> Option.defaultValue (OntologyAnnotation())
+                        let input = oasetter.Value.oa.ToTerm() |> Some
+                        let onBlur = fun e -> promise { makeIdle() };
+                        let onKeyDown = fun e -> promise { makeIdle() };
+                        let setter = fun (termOpt: Swate.Components.Term option) ->
+                            let oa = termOpt |> Option.map OntologyAnnotation.fromTerm |> Option.defaultWith OntologyAnnotation
                             oasetter.Value.setter oa
-                        let headerOA = if state.TableViewIsActive() then state.ActiveTable.Headers.[columnIndex].TryOA() else None
-                        Components.TermSearch.Input(
-                            setter, input=oa, fullwidth=true, ?parent=headerOA, displayParent=false,
-                            onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true,
-                            classes="h-[35px] !rounded-none w-full !border-0"
+                        let headerOA =
+                            if state.TableViewIsActive() then
+                                state.ActiveTable.Headers.[columnIndex].TryOA()
+                                |> Option.bind (fun x -> x.TermAccessionShort |> Option.whereNot System.String.IsNullOrWhiteSpace)
+                            else
+                                None
+                        // Components.TermSearch.Input(
+                        //     setter, input=oa, fullwidth=true, ?parent=headerOA, displayParent=false,
+                        //     onBlur=onBlur, onEscape=onEscape, onEnter=onEnter, autofocus=true,
+                        //     classes="h-[35px] !rounded-none w-full !border-0"
+                        // )
+                        Swate.Components.TermSearch.TermSearch(
+                            setter,
+                            term=input,
+                            ?parentId=headerOA,
+                            autoFocus=true,
+                            onBlur=onBlur,
+                            onKeyDown=onKeyDown,
+                            classNames=(Swate.Components.TermSearchStyle(!^"h-[35px] !rounded-none w-full !border-0"))
                         )
                     else
                         Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
                 else
                     if columnType = Main && oasetter.IsSome then
-                        CellStyles.compositeCellDisplay oasetter.Value.oa displayValue
+                        CellStyles.CompositeCellDisplay(oasetter.Value.oa, displayValue)
                     else
-                        basicValueDisplayCell displayValue None
+                        CellStyles.BasicValueDisplayCell(displayValue, None)
             ]
         ]
 
     [<ReactComponent>]
     static member BodySelect(value: string, setter: string -> unit, values: #seq<string>, index: (int*int), model: Model.Model, dispatch) =
         let columnIndex, rowIndex = index
-        let state = model.SpreadsheetModel
-        let ref = React.useElementRef()
         Html.td [
             prop.key $"Cell_Select_{columnIndex}_{rowIndex}"
-            cellStyle []
-            prop.ref ref
+            CellStyles.cellStyle []
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
             prop.children [
                 Html.div [

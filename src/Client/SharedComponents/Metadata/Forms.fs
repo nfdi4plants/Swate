@@ -490,7 +490,7 @@ type FormComponents =
                     prop.ref portal
                     prop.className "w-full flex gap-2 relative"
                     prop.children [
-                        TermSearchV2.TermSearch(
+                        TermSearch.TermSearch(
                             (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
                             (input |> Option.map _.ToTerm()),
                             ?parentId = (parent |> Option.map _.TermAccessionShort),

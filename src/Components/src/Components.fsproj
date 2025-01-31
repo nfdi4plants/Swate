@@ -31,7 +31,7 @@
     <Compile Include="Util\Api.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
-    <Compile Include="TermSearch\TermSearchV2.fs" />
+    <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 

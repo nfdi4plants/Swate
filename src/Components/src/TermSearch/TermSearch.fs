@@ -191,7 +191,7 @@ module private API =
         )
 
 [<Mangle(false); Erase>]
-type TermSearchV2 =
+type TermSearch =
 
     [<ReactComponent>]
     static member private TermItem(term: TermSearchResult, onTermSelect: Term option -> unit, ?key: string) =
@@ -322,10 +322,10 @@ type TermSearchV2 =
                 match state with
                 // when search is not idle and all loading is done, but no results are found
                 | SearchState.SearchDone searchResults when searchResults.Count = 0 && loading.IsEmpty ->
-                    TermSearchV2.NoResultsElement(advancedSearchToggle)
+                    TermSearch.NoResultsElement(advancedSearchToggle)
                 | SearchState.SearchDone searchResults ->
                     for res in searchResults do
-                        TermSearchV2.TermItem(res, onTermSelect)
+                        TermSearch.TermItem(res, onTermSelect)
                 | _ -> Html.none
             ]
         ]
@@ -476,7 +476,7 @@ type TermSearchV2 =
                 ]
                 componentConfig
         ]
-        TermSearchV2.BaseModal("Details", content, rvm)
+        TermSearch.BaseModal("Details", content, rvm)
 
     static member private AdvancedSearchDefault(advancedSearchState: Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState) = fun (cc: AdvancedSearchController) ->
         React.fragment [
@@ -573,7 +573,7 @@ type TermSearchV2 =
             | U2.Case1 advancedSearch -> advancedSearch
             | U2.Case2 _ -> {|
                 search = fun () -> API.callAdvancedSearch advancedSearchState
-                form = TermSearchV2.AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState)
+                form = TermSearch.AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState)
             |}
 
         let BinSize = 20
@@ -612,7 +612,7 @@ type TermSearchV2 =
                 prop.className "max-h-[50%] overflow-y-auto"
                 prop.children [
                     for res in results.GetRange(pagination * BinSize, BinSize) do
-                        TermSearchV2.TermItem(res, onTermSelect, JS.JSON.stringify res)
+                        TermSearch.TermItem(res, onTermSelect, JS.JSON.stringify res)
                 ]
             ]
             if BinCount > 1 then
@@ -673,12 +673,16 @@ type TermSearchV2 =
                     resultsComponent results
             ]
         ]
-        TermSearchV2.BaseModal("Advanced Search", content, rvm, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
+        TermSearch.BaseModal("Advanced Search", content, rvm, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
 
     ///
     /// Customizable react component for term search. Utilizing SwateDB search by default.
     ///
+    #if PUBLISH_COMPONENTS
     [<ExportDefaultAttribute; NamedParams>]
+    #else
+    [<ReactComponent>]
+    #endif
     static member TermSearch(
         onTermSelect: Term option -> unit,
         term: Term option,
@@ -688,13 +692,16 @@ type TermSearchV2 =
         ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
         ?advancedSearch: U2<AdvancedSearch, bool>,
         ?onFocus: unit -> Fable.Core.JS.Promise<unit>,
+        ?onBlur: unit -> Fable.Core.JS.Promise<unit>,
+        ?onKeyDown: Browser.Types.KeyboardEvent -> Fable.Core.JS.Promise<unit>,
         ?showDetails: bool,
         ?debug: bool,
         ?disableDefaultSearch: bool,
         ?disableDefaultParentSearch: bool,
         ?disableDefaultAllChildrenSearch: bool,
         ?portalTermSelectArea: IRefValue<option<HTMLElement>>,
-        ?fullwidth: bool, ?autoFocus: bool
+        ?fullwidth: bool, ?autoFocus: bool,
+        ?classNames: TermSearchStyle
     ) =
 
         let showDetails = defaultArg showDetails false
@@ -854,6 +861,8 @@ type TermSearchV2 =
             (fun _ ->
                 setFocused false
                 setSearchResults(fun _ -> SearchState.init())
+                if onBlur.IsSome then
+                    onBlur.Value() |> Promise.start
                 cancel()
             )
         )
@@ -888,12 +897,12 @@ type TermSearchV2 =
                             | _ -> acc
                         ) []
                         |> List.rev
-                    TermSearchV2.DetailsModal((fun () -> setModal None), term, configDetails)
+                    TermSearch.DetailsModal((fun () -> setModal None), term, configDetails)
                 | Some AdvancedSearch when advancedSearch.IsSome->
                     let onTermSelect = fun (term: Term option) ->
                         onTermSelect term
                         setModal None
-                    TermSearchV2.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
+                    TermSearch.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
                 | _ -> Html.none
                 Html.div [
                     prop.className "indicator w-full"
@@ -901,7 +910,7 @@ type TermSearchV2 =
                         match term with
                         | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
                             if System.String.IsNullOrWhiteSpace term.id.Value |> not then
-                                TermSearchV2.IndicatorItem(
+                                TermSearch.IndicatorItem(
                                     "",
                                     sprintf "%s - %s" term.name.Value term.id.Value,
                                     "tooltip-left",
@@ -909,7 +918,7 @@ type TermSearchV2 =
                                     fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
                                 )
                         | _ when showDetails -> // show only when focused
-                            TermSearchV2.IndicatorItem(
+                            TermSearch.IndicatorItem(
                                 "",
                                 "Details",
                                 "tooltip-left",
@@ -921,7 +930,7 @@ type TermSearchV2 =
                             Html.none
 
                         if advancedSearch.IsSome then
-                            TermSearchV2.IndicatorItem(
+                            TermSearch.IndicatorItem(
                                 "indicator-bottom",
                                 "Advanced Search",
                                 "tooltip-left",
@@ -932,7 +941,11 @@ type TermSearchV2 =
                             )
 
                         Html.div [ // main search component
-                            prop.className "input input-bordered flex flex-row items-center relative w-full"
+                            prop.className [
+                                "input input-bordered flex flex-row items-center relative w-full"
+                                if classNames.IsSome && classNames.Value.inputLabel.IsSome then
+                                    TermSearchStyle.resolveStyle classNames.Value.inputLabel.Value
+                            ]
                             prop.children [
                                 Html.i [
                                     prop.className [
@@ -965,8 +978,13 @@ type TermSearchV2 =
                                         elif System.String.IsNullOrEmpty inputRef.current.Value.value |> not then
                                             startSearch inputRef.current.Value.value
                                     )
-                                    prop.onKeyDown (key.escape, fun _ ->
-                                        cancel()
+                                    prop.onKeyDown (fun e ->
+                                        match e.which with
+                                        | 27. -> // escape
+                                            cancel()
+                                        | _ -> ()
+                                        if onKeyDown.IsSome then
+                                            onKeyDown.Value e |> Promise.start
                                     )
                                     prop.onFocus(fun _ ->
                                         if onFocus.IsSome then
@@ -984,11 +1002,11 @@ type TermSearchV2 =
                                 match portalTermSelectArea with
                                 | Some portalTermSelectArea when portalTermSelectArea.current.IsSome ->
                                     ReactDOM.createPortal(
-                                        TermSearchV2.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle),
+                                        TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle),
                                         portalTermSelectArea.current.Value
                                     )
                                 | _ ->
-                                    TermSearchV2.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle)
+                                    TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle)
                             ]
                         ]
                     ]

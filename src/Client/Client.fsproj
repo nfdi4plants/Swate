@@ -64,7 +64,6 @@
     <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\AdvancedSearch.fs" />
-    <Compile Include="SharedComponents\TermSearchInput.fs" />
     <Compile Include="SharedComponents\Metadata\Generic.fs" />
     <Compile Include="SharedComponents\Metadata\Forms.fs" />
     <Compile Include="SharedComponents\Metadata\DatamapConfig.fs" />

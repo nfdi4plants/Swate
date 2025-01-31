@@ -103,20 +103,14 @@ let Main (model:Model, dispatch) =
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            // Components.TermSearch.Input(
-            // setTerm,
-            // fullwidth=true,
-            // ?parent=model.TermSearchState.ParentTerm,
-            // advancedSearchDispatch=dispatch,
-            // ?onFocus=excelGetParentTerm,
-            // autofocus=true)
-            Swate.Components.TermSearchV2.TermSearch(
+            Swate.Components.TermSearch.TermSearch(
                 setTerm,
                 (model.TermSearchState.SelectedTerm |> Option.map _.ToTerm()),
                 ?parentId = (model.TermSearchState.ParentTerm |> Option.map _.TermAccessionShort),
                 advancedSearch = !^true,
                 ?onFocus = excelGetParentTerm,
-                autoFocus = true
+                autoFocus = true,
+                classNames=Swate.Components.TermSearchStyle(!^"input-lg")
             )
             addButton(model, dispatch)
         ]

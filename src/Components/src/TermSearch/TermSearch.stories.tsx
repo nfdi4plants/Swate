@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn, within, expect, userEvent, waitFor, fireEvent } from '@storybook/test';
-import TermSearch from "./TermSearchV2.fs.js";
+import TermSearch from "./TermSearch.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
 import React from 'react';
 
