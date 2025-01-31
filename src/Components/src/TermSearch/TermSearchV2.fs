@@ -25,6 +25,7 @@ module private APIExtentions =
             )
 
 open APIExtentions
+open Browser.Types
 
 
 
@@ -685,11 +686,14 @@ type TermSearchV2 =
         ?debug: bool,
         ?disableDefaultSearch: bool,
         ?disableDefaultParentSearch: bool,
-        ?disableDefaultAllChildrenSearch: bool
+        ?disableDefaultAllChildrenSearch: bool,
+        ?portalTermSelectArea: IRefValue<option<HTMLElement>>,
+        ?fullwidth: bool
     ) =
 
         let showDetails = defaultArg showDetails false
         let debug = defaultArg debug false
+        let fullwidth = defaultArg fullwidth false
 
         let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
         // Set of string ids for each action started. As long as one id is still contained, shows loading spinner
@@ -837,7 +841,9 @@ type TermSearchV2 =
             setSearchResults (fun _ -> SearchState.init())
             allChildSearch()
 
-        React.useListener.onClickAway(containerRef,
+        // Run when clicking outside of the search container
+        // If portal for term select area is given then use it, otherwise this will be called when clicking on term select area.
+        React.useListener.onClickAway((if portalTermSelectArea.IsSome then portalTermSelectArea.Value else containerRef),
             (fun _ ->
                 setFocused false
                 setSearchResults(fun _ -> SearchState.init())
@@ -850,7 +856,10 @@ type TermSearchV2 =
                 prop.testId "term-search-container"
                 prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
-            prop.className "form-control"
+            prop.className [
+                "form-control"
+                if fullwidth then "w-full"
+            ]
             prop.ref containerRef
             prop.children [
                 match modal with
@@ -880,7 +889,7 @@ type TermSearchV2 =
                     TermSearchV2.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
                 | _ -> Html.none
                 Html.div [
-                    prop.className "indicator"
+                    prop.className "indicator w-full"
                     prop.children [
                         match term with
                         | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
@@ -916,9 +925,10 @@ type TermSearchV2 =
                             )
 
                         Html.div [ // main search component
-                            prop.className "input input-bordered flex flex-row items-center relative"
+                            prop.className "input input-bordered flex flex-row items-center relative w-full"
                             prop.children [
                                 Html.input [
+                                    prop.className "grow"
                                     if debug then
                                         prop.testid "term-search-input"
                                     prop.ref(inputRef)
@@ -954,7 +964,14 @@ type TermSearchV2 =
                                     ]
                                 ]
                                 let advancedSearchToggle = advancedSearch |> Option.map (fun _ -> fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch))
-                                TermSearchV2.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle)
+                                match portalTermSelectArea with
+                                | Some portalTermSelectArea when portalTermSelectArea.current.IsSome ->
+                                    ReactDOM.createPortal(
+                                        TermSearchV2.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle),
+                                        portalTermSelectArea.current.Value
+                                    )
+                                | _ ->
+                                    TermSearchV2.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle)
                             ]
                         ]
                     ]
