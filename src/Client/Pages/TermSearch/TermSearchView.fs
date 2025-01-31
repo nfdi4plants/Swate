@@ -82,7 +82,9 @@ let private addButton (model: Model, dispatch) =
 
 [<ReactComponent>]
 let Main (model:Model, dispatch) =
-    let setTerm = fun (term: OntologyAnnotation option) -> TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
+    let setTerm = fun (term: Swate.Components.Term option) ->
+        let term = term |> Option.map OntologyAnnotation.fromTerm
+        TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
 
     let excelGetParentTerm =
         match model.PersistentStorageState.Host with
@@ -101,7 +103,21 @@ let Main (model:Model, dispatch) =
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            Components.TermSearch.Input(setTerm, fullwidth=true, ?parent=model.TermSearchState.ParentTerm, advancedSearchDispatch=dispatch, ?onFocus=excelGetParentTerm, autofocus=true)
+            // Components.TermSearch.Input(
+            // setTerm,
+            // fullwidth=true,
+            // ?parent=model.TermSearchState.ParentTerm,
+            // advancedSearchDispatch=dispatch,
+            // ?onFocus=excelGetParentTerm,
+            // autofocus=true)
+            Swate.Components.TermSearchV2.TermSearch(
+                setTerm,
+                (model.TermSearchState.SelectedTerm |> Option.map _.ToTerm()),
+                ?parentId = (model.TermSearchState.ParentTerm |> Option.map _.TermAccessionShort),
+                advancedSearch = !^true,
+                ?onFocus = excelGetParentTerm,
+                autoFocus = true
+            )
             addButton(model, dispatch)
         ]
     ]

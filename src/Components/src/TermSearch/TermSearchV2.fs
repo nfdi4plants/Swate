@@ -627,6 +627,11 @@ type TermSearchV2 =
                             prop.max BinCount
                             prop.onChange (fun (e: int) -> System.Math.Min(System.Math.Max(e, 1), BinCount) |> Some |> setTempPagination)
                         ]
+                        Html.div [
+                            prop.className "input input-bordered join-item shrink flex justify-center items-center bg-opacity-60 cursor-not-allowed border-l-0 select-none"
+                            prop.type'.text
+                            prop.text ($"/{BinCount}")
+                        ]
                         Html.button [
                             prop.className "btn btn-primary join-item"
                             let disabled = tempPagination.IsNone || (tempPagination.Value-1) = pagination
@@ -682,18 +687,20 @@ type TermSearchV2 =
         ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
         ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
         ?advancedSearch: U2<AdvancedSearch, bool>,
+        ?onFocus: unit -> Fable.Core.JS.Promise<unit>,
         ?showDetails: bool,
         ?debug: bool,
         ?disableDefaultSearch: bool,
         ?disableDefaultParentSearch: bool,
         ?disableDefaultAllChildrenSearch: bool,
         ?portalTermSelectArea: IRefValue<option<HTMLElement>>,
-        ?fullwidth: bool
+        ?fullwidth: bool, ?autoFocus: bool
     ) =
 
         let showDetails = defaultArg showDetails false
         let debug = defaultArg debug false
         let fullwidth = defaultArg fullwidth false
+        let autoFocus = defaultArg autoFocus false
 
         let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
         // Set of string ids for each action started. As long as one id is still contained, shows loading spinner
@@ -941,6 +948,7 @@ type TermSearchV2 =
                                     prop.ref(inputRef)
                                     prop.defaultValue (term |> Option.bind _.name |> Option.defaultValue "")
                                     prop.placeholder "..."
+                                    prop.autoFocus autoFocus
                                     prop.onChange (fun (e: string) ->
                                         if System.String.IsNullOrEmpty e then
                                             onTermSelect None
@@ -961,6 +969,8 @@ type TermSearchV2 =
                                         cancel()
                                     )
                                     prop.onFocus(fun _ ->
+                                        if onFocus.IsSome then
+                                            onFocus.Value() |> Promise.start
                                         setFocused true
                                     )
                                 ]
