@@ -313,7 +313,7 @@ type TermSearch =
             setSearchTreeState {searchTreeState with SearchIs = SearchIs.Idle}
             setSearchNameState {searchNameState with SearchIs = SearchIs.Idle}
         let selectTerm (t:Term option) =
-            let oaOpt = t |> Option.map OntologyAnnotation.fromTerm
+            let oaOpt = t |> Option.map OntologyAnnotation.fromDBTerm
             setter oaOpt
             if inputRef.current.IsSome then
                 inputRef.current.Value.value <- oaOpt |> Option.map (fun oa -> oa.Name) |> Option.flatten |> Option.defaultValue ""

@@ -479,7 +479,7 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member OntologyAnnotationInput (input: OntologyAnnotation, setter: OntologyAnnotation -> unit, ?label: string, ?parent: OntologyAnnotation, ?rmv: MouseEvent -> unit) =
+    static member OntologyAnnotationInput (input: OntologyAnnotation option, setter: OntologyAnnotation option -> unit, ?label: string, ?parent: OntologyAnnotation, ?rmv: MouseEvent -> unit) =
         let isExtended, setIsExtended = React.useState(false)
         let portal = React.useElementRef()
         Html.div [
@@ -490,12 +490,14 @@ type FormComponents =
                     prop.ref portal
                     prop.className "w-full flex gap-2 relative"
                     prop.children [
-                        TermSearch.Input(
-                            (fun oaOpt -> oaOpt |> Option.defaultValue (OntologyAnnotation()) |> setter),
-                            input,
-                            fullwidth=true,
-                            ?portalTermSelectArea=portal.current,
-                            ?parent=parent
+                        TermSearchV2.TermSearch(
+                            (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
+                            (input |> Option.map _.ToTerm()),
+                            ?parentId = (parent |> Option.map _.TermAccessionShort),
+                            portalTermSelectArea = portal,
+                            showDetails = true,
+                            advancedSearch = !^true,
+                            fullwidth = true
                         )
                         Components.CollapseButton(isExtended, setIsExtended)
                         if rmv.IsSome then
@@ -507,18 +509,19 @@ type FormComponents =
                         prop.className "flex flex-col @md/main:flex-row gap-2"
                         prop.children [
                             FormComponents.TextInput(
-                                Option.defaultValue "" input.TermSourceREF,
+                                input|> (Option.bind _.TermSourceREF >> Option.defaultValue ""),
                                 (fun (s: string) ->
                                     let s = s |> Option.whereNot String.IsNullOrWhiteSpace
-                                    input.TermSourceREF <- s
+                                    let input = input
+                                    input |> Option.iter (fun x -> x.TermSourceREF <- s)
                                     input |> setter),
                                 placeholder="term source ref"
                             )
                             FormComponents.TextInput(
-                                Option.defaultValue "" input.TermAccessionNumber,
+                                input|> (Option.bind _.TermAccessionNumber >> Option.defaultValue ""),
                                 (fun s0 ->
                                     let s = s0 |> Option.whereNot String.IsNullOrWhiteSpace
-                                    input.TermAccessionNumber <- s
+                                    input |> Option.iter (fun x -> x.TermAccessionNumber <- s)
                                     input |> setter
                                 ),
                                 placeholder="term accession number"
@@ -534,7 +537,14 @@ type FormComponents =
             oas,
             OntologyAnnotation.empty,
             setter,
-            (fun (v,setV,rmv) -> FormComponents.OntologyAnnotationInput(v, setV, ?parent=parent, rmv=rmv)),
+            (fun (v,setV,rmv) ->
+                FormComponents.OntologyAnnotationInput(
+                    Some v,
+                    (fun t -> t |> Option.defaultValue (OntologyAnnotation.empty()) |> setV),
+                    ?parent=parent,
+                    rmv=rmv
+                )
+            ),
             ?label=label
         )
 
@@ -872,9 +882,9 @@ type FormComponents =
                 ]
                 createFieldTextInput(input.Authors, "Authors", fun s -> input.Authors <- s)
                 FormComponents.OntologyAnnotationInput(
-                    Option.defaultValue (OntologyAnnotation.empty()) input.Status,
+                    input.Status,
                     (fun s ->
-                        input.Status <- s |> Option.whereNot _.isEmpty()
+                        input.Status <- s
                         input |> setter
                     ),
                     "Status",

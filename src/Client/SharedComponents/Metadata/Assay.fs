@@ -24,25 +24,25 @@ let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay ->
                     disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
                 )
                 FormComponents.OntologyAnnotationInput(
-                    assay.MeasurementType |> Option.defaultValue (OntologyAnnotation()),
+                    assay.MeasurementType,
                     (fun oa ->
-                        assay.MeasurementType <- oa |> Option.whereNot _.isEmpty()
+                        assay.MeasurementType <- oa
                         setArcAssay <| assay
                     ),
                     "Measurement Type"
                 )
                 FormComponents.OntologyAnnotationInput(
-                    assay.TechnologyType |> Option.defaultValue (OntologyAnnotation.empty()),
+                    assay.TechnologyType,
                     (fun oa ->
-                        assay.TechnologyType <- oa |> Option.whereNot _.isEmpty()
+                        assay.TechnologyType <- oa
                         setArcAssay <| assay
                     ),
                     "Technology Type"
                 )
                 FormComponents.OntologyAnnotationInput(
-                    assay.TechnologyPlatform |> Option.defaultValue (OntologyAnnotation.empty()),
+                    assay.TechnologyPlatform,
                     (fun oa ->
-                        assay.TechnologyPlatform <- oa |> Option.whereNot _.isEmpty()
+                        assay.TechnologyPlatform <- oa
                         setArcAssay <| assay
                     ),
                     "Technology Platform"

@@ -89,7 +89,7 @@ type TermModal =
                                                 ]
                                             Html.a [
                                                 prop.className "space-x-2 float-right link-primary"
-                                                prop.href (OntologyAnnotation.fromTerm term |> _.TermAccessionOntobeeUrl)
+                                                prop.href (OntologyAnnotation.fromDBTerm term |> _.TermAccessionOntobeeUrl)
                                                 prop.target.blank
                                                 prop.children [
                                                     Html.span "Ref"
