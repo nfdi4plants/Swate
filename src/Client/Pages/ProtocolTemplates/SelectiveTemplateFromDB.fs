@@ -170,25 +170,14 @@ type SelectiveTemplateFromDB =
                     |],
                     fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
                 )
-            if model.ProtocolState.TemplatesSelected.Length = 1 then
-                let template = model.ProtocolState.TemplatesSelected.Head
-                Html.div [
-                    ModalElements.Box(
-                        "Rename Table",
-                        "fa-solid fa-cog",
-                        SelectiveTemplateFromDB.CheckBoxForTakeOverTemplateName(importTypeState, setImportTypeState, template.Name))
-                ]
-                Html.div [
-                    ModalElements.Box(
-                        template.Name,
-                        "fa-solid fa-cog",
-                        SelectiveTemplateFromDB.DisplaySelectedProtocolElements(Some template, 0, importTypeState, setImportTypeState, dispatch, false))
-                ]
-                Html.div [
-                    SelectiveTemplateFromDB.AddFromDBToTableButton(
-                        "Add template", model, importTypeState, setImportTypeState, importTypeState.TemplateName, protocolSearchState, setProtocolSearch, dispatch)
-                ]
-            else if model.ProtocolState.TemplatesSelected.Length > 1 then
+
+            let addButtonName =
+                if model.ProtocolState.TemplatesSelected.Length = 1 then
+                    "Add template"
+                else
+                    "Add templates"
+
+            if model.ProtocolState.TemplatesSelected.Length > 0 then
                 let templates = model.ProtocolState.TemplatesSelected
                 for templateIndex in 0..templates.Length-1 do
                     let template = templates.[templateIndex]
@@ -196,6 +185,6 @@ type SelectiveTemplateFromDB =
                         templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, importTypeState, setImportTypeState, template.Name)
                 Html.div [
                     SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton(
-                        "Add templates", model, importTypeState, setImportTypeState, protocolSearchState, setProtocolSearch, dispatch)
+                        addButtonName, model, importTypeState, setImportTypeState, protocolSearchState, setProtocolSearch, dispatch)
                 ]
         ]
