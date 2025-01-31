@@ -927,6 +927,13 @@ type TermSearchV2 =
                         Html.div [ // main search component
                             prop.className "input input-bordered flex flex-row items-center relative w-full"
                             prop.children [
+                                Html.i [
+                                    prop.className [
+                                        "fa-solid fa-search text-primary pr-2 transition-all w-6 overflow-x-hidden opacity-100"
+                                        if focused || inputRef.current.IsSome && System.String.IsNullOrEmpty inputRef.current.Value.value |> not then
+                                            "!w-0 !opacity-0"
+                                    ]
+                                ]
                                 Html.input [
                                     prop.className "grow"
                                     if debug then
