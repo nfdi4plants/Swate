@@ -30,7 +30,8 @@ open Fable.Core
 type SearchContainer =
 
     [<ReactComponent>]
-    static member Main (model:Model) setProtocolSearch importTypeStateData dispatch =
+    static member Main(model:Model, setProtocolSearch, importTypeStateData, dispatch, ?hasBreadCrumps) =
+        let hasBreadCrumps = defaultArg hasBreadCrumps false
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
         let config, setConfig = React.useState(TemplateFilterConfig.init)
         let showTemplatesFilter, setShowTemplatesFilter = React.useState(false)
@@ -46,9 +47,10 @@ type SearchContainer =
             prop.className "flex flex-col gap-2"
             prop.children [
                 Html.div [
-                    prop.className "flex flex-row justify-between"
+                    prop.className [ if hasBreadCrumps then "flex flex-row justify-between" else "flex justify-end" ]
                     prop.children [
-                        HelperProtocolSearch.breadcrumbEle model setProtocolSearch dispatch
+                        if hasBreadCrumps then
+                            HelperProtocolSearch.breadcrumbEle model setProtocolSearch dispatch
                         Html.div [
                             prop.className "flex flex-row gap-2"
                             prop.children [

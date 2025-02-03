@@ -48,7 +48,7 @@ type Templates =
             ])
 
             if isProtocolSearch then
-                Protocol.SearchContainer.Main model setProtocolSearch importTypeStateData dispatch
+                Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch, true)
             else
                 SidebarComponents.SidebarLayout.LogicContainer [
                     Modals.SelectiveTemplateFromDB.Main(model, false, setProtocolSearch, importTypeStateData, dispatch)
