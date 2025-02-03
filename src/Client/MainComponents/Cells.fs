@@ -263,14 +263,21 @@ type Cell =
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
             )
             if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
-            prop.onMouseDown(fun e -> if isIdle && e.shiftKey then e.preventDefault())
+            prop.onMouseDown(fun e -> if isIdle then e.preventDefault())
             prop.children [
                 if isActive then
                     // Update change to mainState and exit active input.
                     if oasetter.IsSome then
                         let input = oasetter.Value.oa.ToTerm() |> Some
                         let onBlur = fun e -> promise { makeIdle() };
-                        let onKeyDown = fun e -> promise { makeIdle() };
+                        let onKeyDown = fun (e: Browser.Types.KeyboardEvent) ->
+                            promise {
+                                match e.which with
+                                | 13. //enter
+                                | 27. -> //escape
+                                    makeIdle()
+                                | _ -> ()
+                            };
                         let setter = fun (termOpt: Swate.Components.Term option) ->
                             let oa = termOpt |> Option.map OntologyAnnotation.fromTerm |> Option.defaultWith OntologyAnnotation
                             oasetter.Value.setter oa

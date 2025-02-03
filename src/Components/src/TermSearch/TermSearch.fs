@@ -78,7 +78,14 @@ module TypeDefs =
     ///
     type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
 
-type TermSearchResult = {
+type private KeyboardNavigationController = {
+    SelectedTermSearchResult: int option
+} with
+    static member init() = {
+        SelectedTermSearchResult = None
+    }
+
+type private TermSearchResult = {
     Term: Term
     IsDirectedSearchResult: bool
 } with
@@ -101,7 +108,7 @@ type TermSearchResult = {
         ResizeArray(prevResults)
 
 
-type SearchState =
+type private SearchState =
 | Idle
 | SearchDone of ResizeArray<TermSearchResult>
 with
@@ -194,17 +201,26 @@ module private API =
 type TermSearch =
 
     [<ReactComponent>]
-    static member private TermItem(term: TermSearchResult, onTermSelect: Term option -> unit, ?key: string) =
+    static member private TermItem(term: TermSearchResult, onTermSelect: Term option -> unit, ?isActive: bool, ?key: string) =
         let collapsed, setCollapsed = React.useState(false)
         let isObsolete = term.Term.isObsolete.IsSome && term.Term.isObsolete.Value
         let isDirectedSearch = term.IsDirectedSearchResult
         let activeClasses = "group-[.collapse-open]:bg-secondary group-[.collapse-open]:text-secondary-content"
         let gridClasses = "grid grid-cols-subgrid col-span-4"
+        let ref = React.useElementRef()
+        React.useEffect ((fun _ ->
+            if isActive.IsSome && isActive.Value then
+                ref.current.Value.scrollIntoView(jsOptions<ScrollIntoViewOptions> (fun o ->
+                // o.behavior <- Browser.Types.ScrollBehavior.Smooth
+                o.block <- Browser.Types.ScrollAlignment.Nearest // Only scroll if needed
+            ))
+        ), [|box isActive|])
         Html.div [
+            prop.ref ref
             prop.className [
                 "group collapse rounded-none"
                 gridClasses
-                if collapsed then "collapse-open"
+                if collapsed || (isActive.IsSome && isActive.Value) then "collapse-open"
             ]
             prop.children [
                 Html.div [
@@ -306,8 +322,7 @@ type TermSearch =
             ]
         ]
 
-
-    static member private TermDropdown(onTermSelect, state: SearchState, loading: Set<string>, advancedSearchToggle: (unit -> unit) option) =
+    static member private TermDropdown(onTermSelect, state: SearchState, loading: Set<string>, advancedSearchToggle: (unit -> unit) option, keyboardNavState: KeyboardNavigationController) =
         Html.div [
             prop.style [style.scrollbarGutter.stable]
             prop.className [
@@ -324,8 +339,10 @@ type TermSearch =
                 | SearchState.SearchDone searchResults when searchResults.Count = 0 && loading.IsEmpty ->
                     TermSearch.NoResultsElement(advancedSearchToggle)
                 | SearchState.SearchDone searchResults ->
-                    for res in searchResults do
-                        TermSearch.TermItem(res, onTermSelect)
+                    for i in 0 .. searchResults.Count-1 do
+                        let res = searchResults.[i]
+                        let isActive = keyboardNavState.SelectedTermSearchResult |> Option.map (fun x -> x = i)
+                        TermSearch.TermItem(res, onTermSelect, ?isActive = isActive)
                 | _ -> Html.none
             ]
         ]
@@ -612,7 +629,7 @@ type TermSearch =
                 prop.className "max-h-[50%] overflow-y-auto"
                 prop.children [
                     for res in results.GetRange(pagination * BinSize, BinSize) do
-                        TermSearch.TermItem(res, onTermSelect, JS.JSON.stringify res)
+                        TermSearch.TermItem(res, onTermSelect, key = JS.JSON.stringify res)
                 ]
             ]
             if BinCount > 1 then
@@ -708,6 +725,8 @@ type TermSearch =
         let debug = defaultArg debug false
         let fullwidth = defaultArg fullwidth false
         let autoFocus = defaultArg autoFocus false
+
+        let (keyboardNavState: KeyboardNavigationController), setKeyboardNavState = React.useState(KeyboardNavigationController.init)
 
         let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
         // Set of string ids for each action started. As long as one id is still contained, shows loading spinner
@@ -843,6 +862,7 @@ type TermSearch =
             cancelSearch()
             cancelParentSearch()
             cancelAllChildSearch()
+            setKeyboardNavState(KeyboardNavigationController.init())
 
         let startSearch = fun (query: string) ->
             cancelled.current <- false
@@ -866,6 +886,35 @@ type TermSearch =
                 cancel()
             )
         )
+
+        // keyboard navigation
+        React.useListener.on("keydown", (fun (e:Browser.Types.KeyboardEvent) ->
+            if focused then // only run when focused
+                Browser.Dom.console.log("keyboard event")
+                match searchResults, e.which with
+                | SearchState.SearchDone res, 38. when res.Count > 0 -> // up
+                    setKeyboardNavState(
+                        match keyboardNavState.SelectedTermSearchResult with
+                        | Some 0 -> None
+                        | Some i -> Some(System.Math.Max(i - 1, 0))
+                        | _ -> None
+                        |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                    )
+                | SearchState.SearchDone res, 40. when res.Count > 0 -> // down
+                    setKeyboardNavState(
+                        match keyboardNavState.SelectedTermSearchResult with
+                        | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
+                        | _ -> Some(0)
+                        |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                    )
+                | SearchState.Idle, 40. when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
+                    startSearch inputRef.current.Value.value
+                | SearchState.SearchDone res, 13. when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
+                    onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
+                    cancel()
+                | _ ->
+                    ()
+        ))
 
         Html.div [
             if debug then
@@ -1002,11 +1051,11 @@ type TermSearch =
                                 match portalTermSelectArea with
                                 | Some portalTermSelectArea when portalTermSelectArea.current.IsSome ->
                                     ReactDOM.createPortal(
-                                        TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle),
+                                        TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState),
                                         portalTermSelectArea.current.Value
                                     )
                                 | _ ->
-                                    TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle)
+                                    TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState)
                             ]
                         ]
                     ]
