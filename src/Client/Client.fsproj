@@ -12,6 +12,7 @@
     <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Helper.fs" />
+    <Compile Include="LocalStorage\SwateSearchConfig.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
@@ -95,6 +96,7 @@
     <Compile Include="Pages\Info\PrivacyPolicy.fs" />
     <Compile Include="Pages\Info\InfoView.fs" />
     <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
+    <Compile Include="Pages\Settings\SearchConfig.fs" />
     <Compile Include="Pages\Settings\SettingsView.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
     <Compile Include="Pages\DataAnnotator\DataAnnotator.fs" />

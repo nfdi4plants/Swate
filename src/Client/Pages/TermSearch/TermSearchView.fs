@@ -110,7 +110,14 @@ let Main (model:Model, dispatch) =
                 advancedSearch = !^true,
                 ?onFocus = excelGetParentTerm,
                 autoFocus = true,
-                classNames=Swate.Components.TermSearchStyle(!^"input-lg")
+                classNames=Swate.Components.TermSearchStyle(!^"input-lg"),
+                disableDefaultSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                disableDefaultAllChildrenSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                disableDefaultParentSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
+                parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
+                allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch,
+                showDetails = true
             )
             addButton(model, dispatch)
         ]

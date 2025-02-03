@@ -58,7 +58,13 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                             fullwidth=true,
                             classNames = Swate.Components.TermSearchStyle(!^"border-current join-item"),
                             advancedSearch = !^true,
-                            showDetails = true
+                            showDetails = true,
+                            disableDefaultSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultAllChildrenSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultParentSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
+                            parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
+                            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
                         )
                 ]
             ]
@@ -93,7 +99,13 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                             fullwidth=true,
                             classNames = Swate.Components.TermSearchStyle(!^"border-current join-item"),
                             advancedSearch = !^true,
-                            showDetails = true
+                            showDetails = true,
+                            disableDefaultSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultAllChildrenSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultParentSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
+                            parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
+                            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
                         )
                     elif state.HeaderCellType.HasIOType() then
                         Daisy.input [

@@ -27,57 +27,6 @@ module private APIExtentions =
 open APIExtentions
 open Browser.Types
 
-
-
-[<AutoOpen>]
-module TypeDefs =
-
-//     emitJsStatement ( ) """/**
-//  * Represents a term object with optional metadata.
-//  * @typedef {Object} Term
-//  * @property {string} [name] - The name of the term.
-//  * @property {string} [id] - The unique identifier for the term.
-//  * @property {string} [description] - A description of the term.
-//  * @property {string} [source] - The source from which the term originates.
-//  * @property {string} [href] - A URL linking to more information about the term.
-//  * @property {boolean} [isObsolete] - Whether the term is obsolete.
-//  * @property {Object} [data] - Additional metadata associated with the term.
-//  */"""
-
-//     emitJsStatement ( ) """/**
-//  * A search function that resolves a list of terms.
-//  * @typedef {function(string): Promise<Term[]>} SearchCall
-//  */"""
-
-//     emitJsStatement ( ) """/**
-//  * A parent search function that resolves a list of terms based on a parent ID and query.
-//  * @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
-//  */"""
-
-//     emitJsStatement ( ) """/**
-//  * A function that fetches all child terms of a parent.
-//  * @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
-//  */"""
-
-
-    ///
-    /// A search function that resolves a list of terms.
-    /// @typedef {function(string): Promise<Term[]>} SearchCall
-    ///
-    type SearchCall = string -> JS.Promise<ResizeArray<Term>>
-
-    //
-    // A parent search function that resolves a list of terms based on a parent ID and query.
-    // @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
-    //
-    type ParentSearchCall = (string*string) -> JS.Promise<ResizeArray<Term>>
-
-    ///
-    /// A function that fetches all child terms of a parent.
-    /// @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
-    ///
-    type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
-
 type private KeyboardNavigationController = {
     SelectedTermSearchResult: int option
 } with
@@ -93,17 +42,20 @@ type private TermSearchResult = {
         for newResult in newResults do
             // check if new result is already in the list by id
             let index = prevResults.FindIndex(fun x -> x.Term.id = newResult.Term.id)
-            // if it exists and the newResult is result of directedSearch, we update the item
+            // if it exists and the newResult is result of directedSearch, we update the item, priority on the new
             // Directed search normally takes longer to complete but is additional information
             // so we update non-directed search results with the directed search results
-            if index >= 0 && newResult.IsDirectedSearchResult then
-                prevResults.[index] <- newResult
-            // if it exists but the new result is not a directed search result, we do nothing
-            // maybe update the item with new information in the future
-            elif index >= 0 then
-                ()
+            if index >= 0 then
+                match prevResults.[index], newResult with
+                | {IsDirectedSearchResult = false; Term = t1}, {IsDirectedSearchResult = true; Term = t2} ->
+                    prevResults.[index] <- {IsDirectedSearchResult = true; Term = Term.joinLeft t2 t1}
+                | {IsDirectedSearchResult = true; Term = t1}, {IsDirectedSearchResult = false; Term = t2} ->
+                    prevResults.[index] <- {IsDirectedSearchResult = true; Term = Term.joinLeft t1 t2}
+                | {IsDirectedSearchResult = false; Term = t1}, {IsDirectedSearchResult = false; Term = t2} ->
+                    prevResults.[index] <- {IsDirectedSearchResult = false; Term = Term.joinLeft t1 t2}
+                | {IsDirectedSearchResult = true; Term = t1}, {IsDirectedSearchResult = true; Term = t2} ->
+                    prevResults.[index] <- {IsDirectedSearchResult = true; Term = Term.joinLeft t1 t2}
             else
-                // if it does not exist, we add it to the results
                 prevResults.Add(newResult)
         ResizeArray(prevResults)
 
@@ -890,7 +842,6 @@ type TermSearch =
         // keyboard navigation
         React.useListener.on("keydown", (fun (e:Browser.Types.KeyboardEvent) ->
             if focused then // only run when focused
-                Browser.Dom.console.log("keyboard event")
                 match searchResults, e.which with
                 | SearchState.SearchDone res, 38. when res.Count > 0 -> // up
                     setKeyboardNavState(

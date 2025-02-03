@@ -39,11 +39,6 @@ module AdvancedSearch =
     type Msg =
         | GetSearchResults of {| config:Shared.DTOs.AdvancedSearchQuery; responseSetter: Term [] -> unit |}
 
-module Ontologies =
-
-   type Msg =
-    | GetOntologies
-
 type DevMsg =
     | LogTableMetadata
     | GenericLog            of Cmd<Messages.Msg> * (string*string)
@@ -53,9 +48,18 @@ type DevMsg =
 
 module PersistentStorage =
     type Msg =
-    | NewSearchableOntologies of Ontology []
     | UpdateAppVersion of string
+    | UpdateSwateDefaultSearch of bool
+    | AddTIBSearchCatalogue of string
+    | RemoveTIBSearchCatalogue of string
+    | SetTIBSearchCatalogues of Set<string>
+
+module PageState =
+
+    type Msg =
     | UpdateShowSidebar of bool
+    | UpdateMainPage of MainPage
+    | UpdateSidebarPage of SidebarPage
 
 module FilePicker =
     type Msg =
@@ -97,7 +101,6 @@ type TopLevelMsg =
 type Msg =
 | UpdateModel                   of Model
 | DevMsg                        of DevMsg
-| OntologyMsg                   of Ontologies.Msg
 | TermSearchMsg                 of TermSearch.Msg
 | AdvancedSearchMsg             of AdvancedSearch.Msg
 | OfficeInteropMsg              of OfficeInterop.Msg
@@ -110,6 +113,7 @@ type Msg =
 | SpreadsheetMsg                of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg                  of SpreadsheetInterface.Msg
+| PageStateMsg                  of PageState.Msg
 | Batch                         of seq<Messages.Msg>
 | Run                           of (unit -> unit)
 | UpdateHistory                 of LocalHistory.Model

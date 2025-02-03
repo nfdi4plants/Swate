@@ -322,8 +322,8 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
                 prop.children [
                     Components.DeleteButton(props = [
                         prop.onClick (fun _ ->
-                            Messages.PersistentStorage.UpdateShowSidebar (not model.PersistentStorageState.ShowSideBar)
-                            |> Messages.PersistentStorageMsg
+                            Messages.PageState.UpdateShowSidebar (not model.PageState.ShowSideBar)
+                            |> Messages.PageStateMsg
                             |> dispatch
                         )
                         button.sm

@@ -42,7 +42,7 @@ let View (model : Model) (dispatch : Msg -> unit) =
                         ]
                     ]
                 | _, _ ->
-                    let isActive = model.SpreadsheetModel.TableViewIsActive() && model.PersistentStorageState.ShowSideBar
+                    let isActive = model.SpreadsheetModel.TableViewIsActive() && model.PageState.ShowSideBar
                     Daisy.drawer [
                         prop.className [
                             "drawer-end"

@@ -10,7 +10,7 @@ type PrivacyPolicy =
     [<ReactComponent>]
     static member Main() =
         Html.div [
-            prop.className "prose py-1 lg:py-4"
+            prop.className "prose-sm md:prose lg:prose-lg py-1 lg:py-4"
             prop.innerHtml $"""
                 <h1>Privacy Policy</h1>
 

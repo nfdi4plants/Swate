@@ -139,6 +139,7 @@ type TIBApi =
                 )
                 |> Promise.map (fun searchApi ->
                     searchApi.ToMyTerm()
+                    |> ResizeArray
                 )
         }
 

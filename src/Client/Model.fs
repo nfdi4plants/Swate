@@ -113,28 +113,51 @@ type DevState = {
     }
 
 type PersistentStorageState = {
-    SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
     Host                    : Swatehost option
-    ShowSideBar             : bool
-    HasOntologiesLoaded     : bool
+    SwateDefaultSearch      : bool
+    TIBSearchCatalogues     : Set<string>
+
 } with
     static member init () = {
-        SearchableOntologies    = [||]
         Host                    = Some Swatehost.Browser
         AppVersion              = ""
-        ShowSideBar             = false
-        HasOntologiesLoaded     = false
+        SwateDefaultSearch      = true
+        TIBSearchCatalogues     = Set.empty
     }
 
+    member this.TIBQueries =
+        {|
+            TermSearch = ResizeArray [
+                for c in this.TIBSearchCatalogues do
+                    let n = "TIB_" + c
+                    let query: Swate.Components.SearchCall = fun (q: string) -> Swate.Components.Api.TIBApi.defaultSearch(q, 10, c)
+                    yield (n, query)
+            ];
+            ParentSearch = ResizeArray [
+                for c in this.TIBSearchCatalogues do
+                    let n = "TIB_" + c
+                    let query: Swate.Components.ParentSearchCall = fun (q: string, p: string) -> Swate.Components.Api.TIBApi.searchChildrenOf(q, p, 10, c)
+                    yield (n, query)
+            ];
+            AllChildrenSearch = ResizeArray [
+                for c in this.TIBSearchCatalogues do
+                    let n = "TIB_" + c
+                    let query: Swate.Components.AllChildrenSearchCall = fun (p: string) -> Swate.Components.Api.TIBApi.searchAllChildrenOf(p, collection = c)
+                    yield (n, query)
+            ]
+        |}
+    member this.DisableSwateDefaultSearch = not this.SwateDefaultSearch
 type PageState = {
     SidebarPage : Routing.SidebarPage
     MainPage: Routing.MainPage
+    ShowSideBar: bool
 } with
     static member init () =
         {
             SidebarPage = SidebarPage.BuildingBlock
             MainPage = MainPage.Default
+            ShowSideBar = false
         }
     member this.IsHome =
         match this.MainPage with
