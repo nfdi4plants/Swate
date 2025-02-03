@@ -224,7 +224,7 @@ type Widget =
         let selectContent() =
             [
                 Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
-                ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch)
+                ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectTemplatesButton(model, setProtocolSearch, importTypeStateData, dispatch))
                 Protocol.Search.Component (filteredTemplates, model, dispatch, length.px 350)
             ]
         let insertContent() =

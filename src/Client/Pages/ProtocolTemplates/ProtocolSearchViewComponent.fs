@@ -120,7 +120,7 @@ module ComponentAux =
         Daisy.badge [
             color
             prop.className [
-                if onclick.IsSome then "cursor-pointer hover:brightness-110"
+                if onclick.IsSome then "cursor-pointer"
                 "text-nowrap"
             ]
             if onclick.IsSome then
@@ -326,7 +326,7 @@ module ComponentAux =
             Html.tr [
                 prop.key $"{i}_{template.Id}"
                 prop.className [
-                    "base-content cursor-default"
+                    "base-content cursor-pointer hover:bg-base-200"
                     if List.contains template model.ProtocolState.TemplatesSelected then
                         "bg-base-200 shadow-lg"
 
@@ -555,13 +555,13 @@ type Search =
                 ]
         ]
 
-    static member private selectTemplatesButton model setProtocolSearch importTypeStateData dispatch =
+    static member SelectTemplatesButton(model, setProtocolSearch, importTypeStateData, dispatch) =
         let importTypeState, setImportTypeState = importTypeStateData
         Html.div [
             prop.className "flex justify-center gap-2"
             prop.children [
                 Daisy.button.a [
-                    button.sm
+                    button.wide
                     prop.onClick (fun _ ->
                         setProtocolSearch false
                         let columns =
@@ -572,19 +572,11 @@ type Search =
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                     )
                     if model.ProtocolState.TemplatesSelected.Length > 0 then
-                        button.success
+                        button.primary
                     else
                         button.disabled
                     prop.text "Add templates"
                 ]
-            ]
-        ]
-
-    static member SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch =
-        Html.div [
-            prop.style [style.overflowX.auto; style.marginBottom (length.rem 1)]
-            prop.children [
-                Search.selectTemplatesButton model setProtocolSearch importTypeStateData dispatch
             ]
         ]
 

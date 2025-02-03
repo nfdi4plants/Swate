@@ -171,12 +171,6 @@ type SelectiveTemplateFromDB =
                     fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
                 )
 
-            let addButtonName =
-                if model.ProtocolState.TemplatesSelected.Length = 1 then
-                    "Add template"
-                else
-                    "Add templates"
-
             if model.ProtocolState.TemplatesSelected.Length > 0 then
                 let templates = model.ProtocolState.TemplatesSelected
                 for templateIndex in 0..templates.Length-1 do
@@ -185,6 +179,6 @@ type SelectiveTemplateFromDB =
                         templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, importTypeState, setImportTypeState, template.Name)
                 Html.div [
                     SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton(
-                        addButtonName, model, importTypeState, setImportTypeState, protocolSearchState, setProtocolSearch, dispatch)
+                        "Import", model, importTypeState, setImportTypeState, protocolSearchState, setProtocolSearch, dispatch)
                 ]
         ]

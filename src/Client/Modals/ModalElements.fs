@@ -16,13 +16,12 @@ type ModalElements =
     static member Button(text: string, onClickAction, buttonInput, ?isDisabled: bool) =
         let isDisabled = defaultArg isDisabled false
         Daisy.button.a [
-            button.success
+            button.primary
             button.wide
             if isDisabled then
                 button.error
             prop.disabled isDisabled
             prop.onClick (fun _ -> onClickAction buttonInput)
-            
             prop.text text
         ]
 
