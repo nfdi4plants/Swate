@@ -114,7 +114,7 @@ module private API =
             }
 
     let callSearch = fun (query: string) ->
-        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create query)
+        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, 10))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -123,7 +123,7 @@ module private API =
         )
 
     let callParentSearch = fun (parent: string, query: string) ->
-        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, parentTermId = parent))
+        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, 10, parentTermId = parent))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
