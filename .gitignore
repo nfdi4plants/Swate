@@ -31,3 +31,4 @@ release.sh
 dist/
 
 *storybook.log
+storybook-static/

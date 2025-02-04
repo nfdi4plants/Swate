@@ -27,6 +27,7 @@
     "prebuild:net": "npx tailwindcss -o ./src/swateBundleStyle.css -m",
     "build": "npm run fable -- --fableLib @fable-org/fable-library-js --noCache && vite build",
     "build:net": "dotnet pack ./src/Components.fsproj",
+    "prebuild:storybook": "npm run fable -- --noCache",
     "build:storybook": "storybook build"
   },
   "repository": {

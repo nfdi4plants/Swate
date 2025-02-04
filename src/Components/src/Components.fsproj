@@ -7,7 +7,7 @@
 
   <PropertyGroup>
     <PackageId>Swate.Components</PackageId>
-    <PackageVersion>1.0.0-alpha.3</PackageVersion>
+    <PackageVersion>$(PackageVersion)</PackageVersion>
     <Authors>Kevin Frey</Authors>
     <Description>Swate react components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
