@@ -11,9 +11,12 @@ let sharedPath = Path.getFullName "src/Shared"
 let serverPath = Path.getFullName "src/Server"
 let clientPath = Path.getFullName "src/Client"
 let deployPath = Path.getFullName "deploy"
+
+
 let sharedTestsPath = Path.getFullName "tests/Shared"
 let serverTestsPath = Path.getFullName "tests/Server"
 let clientTestsPath = Path.getFullName "tests/Client"
+let componentTestsPath = Path.getFullName "src/Components"
 
 let dockerComposePath = Path.getFullName ".db/docker-compose.yml"
 
@@ -354,8 +357,8 @@ module Tests =
         [
             "server", dotnet [ "watch"; "run" ] serverTestsPath
             // This below will start web ui for tests, but cannot execute due to office-addin-mock
-            //"client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] clientTestsPath
             "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js"; "--watch" ] clientTestsPath
+            "components", npm [ "run"; "test" ] componentTestsPath
         ]
         |> runParallel
 
@@ -363,8 +366,8 @@ module Tests =
         [
             "server", dotnet [ "run" ] serverTestsPath
             "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
-        ]|> runParallel
-        run npm [ "run"; "test:run" ] "."
+            "components", npm [ "run"; "test:run" ] componentTestsPath
+        ] |> runParallel
 
 Target.create "Format" (fun _ ->
     run dotnet [ "fantomas"; "."; "-r" ] "src"

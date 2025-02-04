@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts'
 import react from "@vitejs/plugin-react";
 import tailwindcss from "tailwindcss";
@@ -22,7 +22,7 @@ export default defineConfig({
         },
         rollupOptions: {
             // Exclude peer dependencies from the final bundle
-            external: ['react', 'react-dom', 'tailwindcss'],
+            external: ['react', 'react-dom', 'tailwindcss', '@fable-org/fable-library-js'],
             output: {
                 globals: {
                     react: 'React',

@@ -81,7 +81,7 @@ export const ParentSearch: Story = {
 }
 
 
-export const DefaultAdvancedSearch: Story = {
+const DefaultAdvancedSearch: Story = {
   render: renderTermSearch,
   parameters: {isolated: true},
   args: {
