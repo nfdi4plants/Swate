@@ -123,10 +123,12 @@ type SearchConfig =
     static member private TIBSearch(model: Model.Model, dispatch: Messages.Msg -> unit) =
         let selectedCatalogues = model.PersistentStorageState.TIBSearchCatalogues
         let catalogues, setCatalogues = React.useState([||])
+        let loading, setLoading = React.useState(true)
         React.useEffectOnce(fun _ -> // get all currently supported catalogues
             promise {
                 let! catalogues = Swate.Components.Api.TIBApi.getCollections()
                 setCatalogues catalogues.content
+                setLoading false
             } |> ignore
         )
         let catalogues: Catalogues =
@@ -173,17 +175,32 @@ type SearchConfig =
                     ]
                 ]
             ]
-            for catalogue in selectedCatalogues do
-                let rmv = fun () ->
-                    Messages.PersistentStorage.RemoveTIBSearchCatalogue catalogue
-                    |> PersistentStorageMsg
-                    |> dispatch
-                let setter = fun (s: string) ->
-                    (selectedCatalogues |> Set.remove catalogue |> Set.add s)
-                    |> PersistentStorage.SetTIBSearchCatalogues
-                    |> PersistentStorageMsg
-                    |> dispatch
-                SearchConfig.TIBSearchCatalogueElement (catalogue, catalogues, setter, rmv)
+            if loading then
+                Html.div [
+                    prop.className "flex justify-center"
+                    prop.children [
+                        Html.i [prop.className "fa-solid fa-spinner fa-spin"]
+                    ]
+                ]
+            elif catalogues.AllCatalogues.Count = 0 then
+                Html.div [
+                    prop.className "flex justify-center"
+                    prop.children [
+                        Html.p [ prop.text "No catalogues found." ]
+                    ]
+                ]
+            else
+                for catalogue in selectedCatalogues do
+                    let rmv = fun () ->
+                        Messages.PersistentStorage.RemoveTIBSearchCatalogue catalogue
+                        |> PersistentStorageMsg
+                        |> dispatch
+                    let setter = fun (s: string) ->
+                        (selectedCatalogues |> Set.remove catalogue |> Set.add s)
+                        |> PersistentStorage.SetTIBSearchCatalogues
+                        |> PersistentStorageMsg
+                        |> dispatch
+                    SearchConfig.TIBSearchCatalogueElement (catalogue, catalogues, setter, rmv)
         ]
 
     static member Main(model, dispatch) =
