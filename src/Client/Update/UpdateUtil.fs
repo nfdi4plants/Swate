@@ -22,17 +22,13 @@ module JsonImportHelper =
     /// <param name="state"></param>
     /// <param name="selectedColumns"></param>
     /// <param name="fullImport"></param>
-    let createUpdatedTables (arcTables: ResizeArray<ArcTable>) (state: SelectiveImportModalState) (selectedColumns: bool [] []) fullImport =
+    let createUpdatedTables (arcTables: ResizeArray<ArcTable>) (state: SelectiveImportModalState) (selectedColumns: Set<int>[]) fullImport =
         [
             for importTable in state.ImportTables do
                 let fullImport = defaultArg fullImport importTable.FullImport
                 if importTable.FullImport = fullImport then
                     let selectedColumn = selectedColumns.[importTable.Index]
-                    let selectedColumnIndices =
-                        selectedColumn
-                        |> Array.mapi (fun i item -> if item = false then Some i else None)
-                        |> Array.choose (fun x -> x)
-                        |> List.ofArray
+                    let selectedColumnIndices = selectedColumn |> List.ofSeq
 
                     let sourceTable = arcTables.[importTable.Index]
                     let appliedTable = ArcTable.init(sourceTable.Name)
@@ -49,7 +45,7 @@ module JsonImportHelper =
     /// <param name="uploadedFile"></param>
     /// <param name="state"></param>
     /// <param name="selectedColumns"></param>
-    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (selectedColumns: bool [] []) =
+    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (selectedColumns: Set<int>[]) =
         if not state.ImportMetadata then failwith "Metadata must be imported"
         /// This updates the existing tables based on import config (joinOptions)
         let arcFile =
@@ -78,7 +74,7 @@ module JsonImportHelper =
     /// <param name="activeTableIndex"></param>
     /// <param name="existingOpt"></param>
     /// <param name="selectedColumns"></param>
-    let updateTables (importTables: ResizeArray<ArcTable>) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (selectedColumns: bool [] []) =
+    let updateTables (importTables: ResizeArray<ArcTable>) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (selectedColumns: Set<int>[]) =
         match existingOpt with
         | Some existing ->
             let existingTables =
@@ -121,7 +117,7 @@ module JsonImportHelper =
     /// <param name="importState"></param>
     /// <param name="activeTableIndex">Required to append imported tables to the active table.</param>
     /// <param name="existing"></param>
-    let updateArcFileTables (import: ArcFiles) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (selectedColumns: bool [] []) =
+    let updateArcFileTables (import: ArcFiles) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (selectedColumns: Set<int>[]) =
         let importTables =
             match import with
             | Assay a -> a.Tables

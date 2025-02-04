@@ -97,7 +97,7 @@ module OfficeInterop =
                 let cmd =
                     Cmd.OfPromise.either
                         Main.joinTable
-                        (table, [||], options, None)
+                        (table, Set.empty, options, None)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd

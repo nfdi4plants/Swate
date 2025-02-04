@@ -123,11 +123,7 @@ module Spreadsheet =
                 let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
                 /// Filter out existing building blocks and keep input/output values.
                 let msg = fun table -> JoinTable(table, index, Some importType.ImportType, templateName) |> SpreadsheetMsg
-                let selectedColumnsIndices =
-                    selectedColumns
-                    |> Array.mapi (fun i item -> if item = false then Some i else None)
-                    |> Array.choose (fun x -> x)
-                    |> List.ofArray
+                let selectedColumnsIndices = selectedColumns |> List.ofSeq
                 let cmd =
                     Table.selectiveTablePrepare state.ActiveTable table selectedColumnsIndices
                     |> msg
