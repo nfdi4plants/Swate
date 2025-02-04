@@ -1,6 +1,5 @@
 module Spreadsheet.Controller.BuildingBlocks
 
-open System.Collections.Generic
 open Spreadsheet
 open Types
 open ARCtrl
@@ -9,6 +8,8 @@ open Shared
 open ExcelJS.Fable
 open Excel
 open GlobalBindings
+
+open Regex
 
 module SidebarControllerAux =
 
@@ -97,7 +98,14 @@ let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; 
     state.ActiveTable.AddColumn(newHeader, values, forceReplace=true)
     {state with ArcFile = state.ArcFile}
 
-let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) (templateName:string option): Spreadsheet.Model =
+    
+    if templateName.IsSome then
+        //Should be updated to remove all kinds of extra symbols
+        let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
+        let newTable = ArcTable.create(templateName, state.ActiveTable.Headers, state.ActiveTable.Values)
+        state.ArcFile.Value.Tables().SetTable(state.ActiveTable.Name, newTable)
+
     let table = state.ActiveTable
     table.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
     {state with ArcFile = state.ArcFile}

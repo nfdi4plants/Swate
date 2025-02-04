@@ -278,7 +278,7 @@ type TermSearch =
         Html.div [
             prop.style [style.scrollbarGutter.stable]
             prop.className [
-                "min-w-[400px]"
+                "min-w-[400px] not-prose"
                 "absolute top-[100%] left-0 right-0 z-50"
                 "grid grid-cols-[auto,1fr,auto,auto]"
                 "bg-base-200 rounded shadow-lg border-2 border-primary max-h-[400px] overflow-y-auto divide-y divide-dashed divide-base-100"
@@ -873,7 +873,7 @@ type TermSearch =
                 prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "form-control"
+                "form-control not-prose"
                 if fullwidth then "w-full"
             ]
             prop.ref containerRef

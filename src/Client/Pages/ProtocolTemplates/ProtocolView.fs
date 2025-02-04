@@ -21,12 +21,22 @@ open Feliz
 open Feliz.DaisyUI
 open ARCtrl
 
+open JsonImport
+
 type Templates =
 
-    static member Main (model:Model, dispatch) =
+    [<ReactComponent>]
+    static member Main (model: Model, dispatch) =
+        let isProtocolSearch, setProtocolSearch = React.useState(false)
+        let importTypeStateData = React.useState(SelectiveImportModalState.init([]))
+        if model.ProtocolState.TemplatesSelected.Length > 0 && (fst importTypeStateData).SelectedColumns.Length = 0 then
+            let columns =
+                model.ProtocolState.TemplatesSelected
+                |> List.map (fun template -> Array.init template.Table.Columns.Length (fun _ -> true))
+                |> Array.ofList
+            {fst importTypeStateData with SelectedColumns = columns} |> snd importTypeStateData
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"
-
 
             SidebarComponents.SidebarLayout.Description (Html.p [
                 Html.b "Search the database for templates."
@@ -39,7 +49,12 @@ type Templates =
             // Box 1
             SidebarComponents.SidebarLayout.Description "Add template from database."
 
-            TemplateFromDB.Main(model, dispatch)
+            if isProtocolSearch then
+                Protocol.SearchContainer.Main model setProtocolSearch importTypeStateData dispatch
+            else
+                SidebarComponents.SidebarLayout.LogicContainer [
+                    Modals.SelectiveTemplateFromDB.Main(model, false, setProtocolSearch, importTypeStateData, dispatch)
+                ]
 
             // Box 2
             SidebarComponents.SidebarLayout.Description (Html.p [

@@ -20,11 +20,6 @@ module private LayoutHelperAux =
         if v > 5 then false else true
 
 type SidebarLayout =
-    static member Container (children: ReactElement list) =
-        Html.div [
-            prop.className "flex flex-col gap-2 py-4"
-            prop.children children
-        ]
 
     static member LogicContainer (children: ReactElement list) =
         Html.div [
@@ -39,6 +34,13 @@ type SidebarLayout =
             prop.className "relative flex p-4 animated-border shadow-md gap-4 flex-col" //experimental
             prop.children children
         ]
+
+    static member Container (children: ReactElement list) =
+        Html.div [
+            prop.className "flex flex-col gap-2 py-4"
+            prop.children children
+        ]
+
     static member Header(txt: string) =
         Html.h3 [
             prop.className "text-lg font-semibold"

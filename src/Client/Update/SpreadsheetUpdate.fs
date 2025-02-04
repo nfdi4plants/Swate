@@ -17,7 +17,8 @@ module Spreadsheet =
     module Helper =
 
         let fullSaveModel (state: Spreadsheet.Model) (model:Model) =
-            state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
+            let snapshotJsonString = state.ToJsonString()
+            Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString) // This will cache the most up to date table state to local storage.
             let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
             if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                 match state.ArcFile with // model is not yet updated at this position.
@@ -35,15 +36,29 @@ module Spreadsheet =
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
         /// It works based of exlusion. As it specifies certain messages not triggering history update.
         /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="state"></param>
+        /// <param name="model"></param>
+        /// <param name="cmd"></param>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
+            //This will cache the most up to date table state to local storage.
+            //This is used as a simple autosave feature.
+            let snapshotJsonString = state.ToJsonString()
+            Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
+
+            //This matchcase handles undo / redo functionality
             match msg with
-            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _
+            | UpdateActiveView _  | Reset | UpdateSelectedCells _
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
-                state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
                 state, model, cmd
             | _ ->
-                state.SaveToLocalStorage() // This will cache the most up to date table state to local storage.
-                let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
+                let newCmd =
+                    Cmd.OfPromise.either
+                        model.History.SaveSessionSnapshotIndexedDB
+                        (snapshotJsonString)
+                        (fun newHistory -> Messages.History.UpdateAnd (newHistory, cmd) |> HistoryMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some (Assay assay) ->
@@ -53,7 +68,8 @@ module Spreadsheet =
                     | Some (Investigation inv) ->
                         ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
                     | _ -> ()
-                state, {model with History = nextHistory}, cmd
+
+                state, model, newCmd
 
     let update (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
 
@@ -103,18 +119,27 @@ module Spreadsheet =
                     | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
-            | AddTemplate table ->
+            | AddTemplate (table, selectedColumns, importType, templateName) ->
                 let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
                 /// Filter out existing building blocks and keep input/output values.
-                let options = Some ARCtrl.TableJoinOptions.WithValues // If changed to anything else we need different logic to keep input/output values
-                let msg = fun t -> JoinTable(t, index, options) |> SpreadsheetMsg
+                let msg = fun table -> JoinTable(table, index, Some importType.ImportType, templateName) |> SpreadsheetMsg
+                let selectedColumnsIndices =
+                    selectedColumns
+                    |> Array.mapi (fun i item -> if item = false then Some i else None)
+                    |> Array.choose (fun x -> x)
+                    |> List.ofArray
                 let cmd =
-                    Table.selectiveTablePrepare state.ActiveTable table
+                    Table.selectiveTablePrepare state.ActiveTable table selectedColumnsIndices
                     |> msg
                     |> Cmd.ofMsg
                 state, model, cmd
-            | JoinTable (table, index, options) ->
-                let nextState = Controller.BuildingBlocks.joinTable table index options state
+            | AddTemplates (tables, selectedColumns, importType) ->
+                let arcFile = model.SpreadsheetModel.ArcFile
+                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile selectedColumns
+                let nextState = {state with ArcFile = Some updatedArcFile}
+                nextState, model, Cmd.none
+            | JoinTable (table, index, options, templateName) ->
+                let nextState = Controller.BuildingBlocks.joinTable table index options state templateName
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
                 let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
@@ -167,19 +192,6 @@ module Spreadsheet =
             | UpdateTableOrder (prev_index, new_index) ->
                 let nextState = Controller.Table.updateTableOrder (prev_index, new_index) state
                 nextState, model, Cmd.none
-            | UpdateHistoryPosition (newPosition) ->
-                let nextState, nextModel =
-                    match newPosition with
-                    | _ when model.History.NextPositionIsValid(newPosition) |> not ->
-                        state, model
-                    | _ ->
-                        /// Run this first so an error breaks the function before any mutables are changed
-                        let nextState =
-                            Spreadsheet.Model.fromSessionStorage(newPosition)
-                        Browser.WebStorage.sessionStorage.setItem(Keys.swate_session_history_position, string newPosition)
-                        let nextModel = {model with History.HistoryCurrentPosition = newPosition}
-                        nextState, nextModel
-                nextState, nextModel, Cmd.none
             | AddRows (n) ->
                 let nextState =
                     if state.TableViewIsActive() then
@@ -375,7 +387,7 @@ module Spreadsheet =
                 state, model, Cmd.none
         try
             innerUpdate state model msg
-            // |> Helper.updateHistoryStorageMsg msg
+            |> Helper.updateHistoryStorageMsg msg
         with
             | e ->
                 let cmd = GenericError (Cmd.none, e) |> DevMsg |> Cmd.ofMsg

@@ -90,7 +90,7 @@ module Dev =
         | LogTableMetadata ->
             let cmd =
                 Cmd.OfPromise.either
-                    OfficeInterop.Core.getTableMetaData
+                    OfficeInterop.Core.Main.getTableMetaData
                     ()
                     (curry GenericLog Cmd.none >> DevMsg)
                     (curry GenericError Cmd.none >> DevMsg)
@@ -162,6 +162,25 @@ module DataAnnotator =
             }
             nextState, model, Cmd.none
 
+module History =
+    let update (msg: History.Msg) (model: Model) : Model * Cmd<Msg> =
+        match msg with
+        | History.UpdateAnd (newHistory, cmd) -> {model with History = newHistory}, cmd
+        | History.UpdateHistoryPosition newPosition ->
+            match newPosition with
+            | _ when model.History.NextPositionIsValid(newPosition) |> not ->
+                model, Cmd.none
+            | _ ->
+                let nextModel = {model with History.HistoryCurrentPosition = newPosition}
+                let cmd =
+                    Cmd.OfPromise.either
+                        LocalHistory.Model.fromIndexedDBByKeyPosition
+                        (newPosition)
+                        (fun nextState -> Messages.UpdateModel { nextModel with SpreadsheetModel = nextState })
+                        (curry GenericError Cmd.none >> DevMsg)
+                model, cmd
+
+
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
@@ -171,7 +190,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             model, Cmd.none
         | UpdateModal modal ->
             {model with Model.ModalState.ActiveModal = modal}, Cmd.none
-        | UpdateHistory next -> {model with History = next}, Cmd.none
         | TestMyAPI ->
             let cmd =
                 Cmd.OfAsync.either
@@ -294,6 +312,10 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
 
         | PageStateMsg msg ->
             let nextModel, nextCmd = PageState.update msg currentModel
+            nextModel, nextCmd
+
+        | HistoryMsg msg ->
+            let nextModel, nextCmd = History.update msg currentModel
             nextModel, nextCmd
 
     /// This function is used to determine which msg should be logged to activity log.

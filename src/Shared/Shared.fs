@@ -240,14 +240,14 @@ type IOntologyAPIv1 = {
     ///
     getTermSuggestions                  : (int*string)                                                  -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*SwateObsolete.TermMinimal)                                      -> Async<Term []>
-    getAllTermsByParentTerm             : SwateObsolete.TermMinimal                                                   -> Async<Term []>
+    getTermSuggestionsByParentTerm      : (int*string*SwateObsolete.TermMinimal)                        -> Async<Term []>
+    getAllTermsByParentTerm             : SwateObsolete.TermMinimal                                     -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
     getTermSuggestionsByChildTerm       : (int*string*SwateObsolete.TermMinimal)                                      -> Async<Term []>
     getAllTermsByChildTerm              : SwateObsolete.TermMinimal                                                   -> Async<Term []>
     getTermsForAdvancedSearch           : (AdvancedSearchQuery)                   -> Async<Term []>
     getUnitTermSuggestions              : (int*string)                                                  -> Async<Term []>
-    getTermsByNames                     : SwateObsolete.TermSearchable []                                             -> Async<SwateObsolete.TermSearchable []>
+    getTermsByNames                     : SwateObsolete.TermSearchable []                               -> Async<SwateObsolete.TermSearchable []>
 
     // Tree related requests
     getTreeByAccession                  : string                                                        -> Async<TreeTypes.Tree>

@@ -1,6 +1,8 @@
 [<AutoOpen>]
 module Types
 
+open ARCtrl
+
 module JsonImport =
 
     [<RequireQualifiedAccess>]
@@ -14,12 +16,20 @@ module JsonImport =
         ImportType: ARCtrl.TableJoinOptions
         ImportMetadata: bool
         ImportTables: ImportTable list
+        SelectedColumns: bool [] []
+        TemplateName: string option
     } with
-        static member init() =
+        static member init(tables: seq<ArcTable>) =
+            let selectedColumns =
+                tables
+                |> Array.ofSeq
+                |> Array.map (fun t -> Array.init t.Columns.Length (fun _ -> true))
             {
                 ImportType = ARCtrl.TableJoinOptions.Headers
                 ImportMetadata = false
                 ImportTables = []
+                SelectedColumns = selectedColumns
+                TemplateName = None
             }
 
 open Fable.Core

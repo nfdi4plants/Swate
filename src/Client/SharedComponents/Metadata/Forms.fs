@@ -706,7 +706,7 @@ type FormComponents =
                     prop.type'.dateTimeLocal
                     prop.ref ref
                     prop.onChange(fun (e: System.DateTime) ->
-                        let dtString = e.ToString("yyyy-MM-ddThh:mm")
+                        let dtString = e.ToString("yyyy-MM-ddTHH:mm")
                         onChange dtString
                     )
                 ]
@@ -715,7 +715,7 @@ type FormComponents =
 
     static member DateTimeInput (input: System.DateTime, setter: System.DateTime -> unit, ?label: string) =
         FormComponents.DateTimeInput(
-            input.ToString("yyyy-MM-ddThh:mm"),
+            input.ToString("yyyy-MM-ddTHH:mm"),
             (fun (s: string) ->
                 setter (System.DateTime.Parse(s))),
             ?label=label

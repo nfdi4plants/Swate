@@ -5,6 +5,8 @@ open ARCtrl
 
 open Feliz
 
+open Model
+
 module ModalState =
 
     type TableModals =

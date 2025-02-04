@@ -7,6 +7,11 @@ open Fable.Mocha
 open ExcelJS.Fable.Excel
 
 open ARCtrl
+
+open OfficeInterop
+open ExcelHelper
+open Core
+
 // ⚠️ These tests do only work on node.js as the we sents user data to microsoft !!! ⚠️
 // Check out https://github.com/OfficeDev/Office-Addin-Scripts/issues/905
 
@@ -46,7 +51,7 @@ let arcTemplate =
 let private TestsBasic = testList "Basic tests" [
     testCaseAsync "develop mock" <| async {
         let testContext: RequestContext = importDefault "../../Fixtures/OfficeMockObjects/BasicFixture.js"
-        let! result = OfficeInterop.ExcelUtil.getSelectedRangeAdress testContext |> Async.AwaitPromise
+        let! result = getSelectedRangeAdress testContext |> Async.AwaitPromise
         Expect.equal result "C2:G3" "Verify correct setup"
     }
 ]
@@ -54,7 +59,7 @@ let private TestsBasic = testList "Basic tests" [
 let private TestsSuccessful = testList "Successful tests" [
     testCaseAsync "develop getTablesTest successful" <| async {
         let testContext: RequestContext = importDefault "../../Fixtures/OfficeMockObjects/AnnotationTableFixtureSuccessful.js"
-        let! resultRes = OfficeInterop.Core.getExcelAnnotationTables testContext |> Async.AwaitPromise
+        let! resultRes = getExcelAnnotationTables testContext |> Async.AwaitPromise
 
         let result = Expect.wantOk (Result.Ok resultRes) "develop getTablesTest successful failed"
         Expect.equal (Result.toOption result).Value.Count 1 $"Error: {result}"

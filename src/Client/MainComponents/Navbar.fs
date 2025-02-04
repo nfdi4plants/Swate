@@ -48,7 +48,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                     //let overMax = newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory
                     //let notEnoughHistory = Spreadsheet.LocalStorage.AvailableHistoryItems - (Spreadsheet.LocalStorage.CurrentHistoryPosition + 1) <= 0
                     if state.NextPositionIsValid(newPosition) then
-                        Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
+                        History.UpdateHistoryPosition newPosition |> Msg.HistoryMsg |> dispatch
                 ),
                 isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1) |> not)
             )
@@ -60,7 +60,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                 (fun _ ->
                     let newPosition = state.HistoryCurrentPosition - 1
                     if state.NextPositionIsValid(newPosition) then
-                        Spreadsheet.UpdateHistoryPosition newPosition |> Msg.SpreadsheetMsg |> dispatch
+                        History.UpdateHistoryPosition newPosition |> Msg.HistoryMsg |> dispatch
                 ),
                 isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1) |> not)
             )
@@ -175,7 +175,7 @@ let Main(model: Model, dispatch, widgets, setWidgets) =
         ]
         Daisy.navbarCenter [
             prop.children [
-                // QuickAccessButtonListStart model.History dispatch
+                QuickAccessButtonListStart model.History dispatch
                 WidgetNavbarList(model, dispatch, addWidget)
             ]
         ]

@@ -25,7 +25,7 @@ let private CreateBodyCells (columnIndex, rowIndex, state:Set<int>, model:Model,
                 Cell.Empty()
             Cell.BodyTSR(index, cell, model, dispatch)
             Cell.BodyTAN(index, cell, model, dispatch)
-        elif header.IsDataColumn then
+        elif header.IsDataColumn && isExtended then
             if cell.isData then
                 Cell.BodyDataSelector(index, cell, model, dispatch)
                 Cell.BodyDataFormat(index, cell, model, dispatch)
@@ -48,9 +48,11 @@ let private CreateHeaderCells(columnIndex, state, setState, model, dispatch) =
                 Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch)
                 Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
         elif header.IsDataColumn then
-            Cell.HeaderDataSelector(columnIndex, header, state, setState, model, dispatch)
-            Cell.HeaderDataFormat(columnIndex, header, state, setState, model, dispatch)
-            Cell.HeaderDataSelectorFormat(columnIndex, header, state, setState, model, dispatch)
+            let isExtended = state.Contains columnIndex
+            if isExtended then
+                Cell.HeaderDataSelector(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderDataFormat(columnIndex, header, state, setState, model, dispatch)
+                Cell.HeaderDataSelectorFormat(columnIndex, header, state, setState, model, dispatch)
         else
             ()
     ]

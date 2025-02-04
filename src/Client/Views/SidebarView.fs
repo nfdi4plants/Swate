@@ -10,7 +10,7 @@ open Feliz
 open Feliz.DaisyUI
 
 type SidebarView =
-    static member private content (model:Model) (dispatch: Msg -> unit) =
+    static member private content (model: Model) (dispatch: Msg -> unit) =
         Html.div [
             prop.className "grow overflow-y-auto"
             prop.children [
@@ -32,9 +32,6 @@ type SidebarView =
 
                 | {SidebarPage = Routing.SidebarPage.JsonExport } ->
                     JsonExporter.Core.FileExporter.Main(model, dispatch)
-
-                | {SidebarPage = Routing.SidebarPage.ProtocolSearch } ->
-                    Protocol.SearchContainer.Main model dispatch
             ]
         ]
 

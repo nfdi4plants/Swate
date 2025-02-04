@@ -3,6 +3,8 @@ module Helper
 
 open Fable.Core
 
+open System
+
 let log (a) = Browser.Dom.console.log a
 
 let logw (a) = Browser.Dom.console.warn a
@@ -120,7 +122,6 @@ let throttleAndDebounce(fn: 'a -> unit, timespan: int) =
                 )
                 timespan
         id <- Some timeoutId
-
 
 type Clipboard =
     abstract member writeText: string -> JS.Promise<unit>

@@ -7,10 +7,9 @@ open Fable.Remoting.Client
 open Fable.SimpleJson
 open Database
 
-open OfficeInterop
 open Model
-open Routing
 open ARCtrl
+open Routing
 open Fable.Core
 
 type System.Exception with
@@ -25,13 +24,13 @@ type System.Exception with
         | ex ->
             ex.Message
 
-let curry f a b = f (a,b)
+let curry f a b = f (a, b)
 
 module TermSearch =
 
     type Msg =
-        | UpdateSelectedTerm of OntologyAnnotation option
-        | UpdateParentTerm of OntologyAnnotation option
+        | UpdateSelectedTerm    of OntologyAnnotation option
+        | UpdateParentTerm      of OntologyAnnotation option
 
 
 module AdvancedSearch =
@@ -63,33 +62,34 @@ module PageState =
 
 module FilePicker =
     type Msg =
-        | LoadNewFiles              of string list
-        | UpdateFileNames           of newFileNames:(int*string) list
+        | LoadNewFiles      of string list
+        | UpdateFileNames   of newFileNames:(int*string) list
 
 module BuildingBlock =
 
     open TermSearch
 
     type Msg =
-    | UpdateHeaderWithIO of CompositeHeaderDiscriminate * IOType
-    | UpdateHeaderCellType of CompositeHeaderDiscriminate
-    | UpdateHeaderArg of U2<OntologyAnnotation,IOType> option
-    | UpdateBodyCellType of CompositeCellDiscriminate
-    | UpdateBodyArg of U2<string, OntologyAnnotation> option
+    | UpdateHeaderWithIO    of CompositeHeaderDiscriminate * IOType
+    | UpdateHeaderCellType  of CompositeHeaderDiscriminate
+    | UpdateHeaderArg       of U2<OntologyAnnotation,IOType> option
+    | UpdateBodyCellType    of CompositeCellDiscriminate
+    | UpdateBodyArg         of U2<string, OntologyAnnotation> option
 
 module Protocol =
 
     type Msg =
         // Client
-        | UpdateTemplates                   of Template []
-        | UpdateLoading                     of bool
-        | RemoveSelectedProtocol
+        | UpdateTemplates               of Template []
+        | UpdateLoading                 of bool
+        | RemoveSelectedProtocols
         // // ------ Protocol from Database ------
         | GetAllProtocolsForceRequest
         | GetAllProtocolsRequest
-        | GetAllProtocolsResponse           of string
-        | SelectProtocol                    of Template
-        | ProtocolIncreaseTimesUsed         of protocolName:string
+        | GetAllProtocolsResponse       of string
+        | SelectProtocols               of Template list
+        | AddProtocol                   of Template
+        | ProtocolIncreaseTimesUsed     of protocolName:string
 
 type SettingsDataStewardMsg =
     // Client
@@ -97,6 +97,12 @@ type SettingsDataStewardMsg =
 
 type TopLevelMsg =
     | CloseSuggestions
+
+module History =
+
+    type Msg =
+    | UpdateAnd of LocalHistory.Model * Cmd<Messages.Msg>
+    | UpdateHistoryPosition of int
 
 type Msg =
 | UpdateModel                   of Model
@@ -108,17 +114,16 @@ type Msg =
 | FilePickerMsg                 of FilePicker.Msg
 | BuildingBlockMsg              of BuildingBlock.Msg
 | ProtocolMsg                   of Protocol.Msg
-// | CytoscapeMsg                  of Cytoscape.Msg
-| DataAnnotatorMsg              of DataAnnotator.Msg
-| SpreadsheetMsg                of Spreadsheet.Msg
+| DataAnnotatorMsg          of DataAnnotator.Msg
+| SpreadsheetMsg            of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg                  of SpreadsheetInterface.Msg
 | PageStateMsg                  of PageState.Msg
 | Batch                         of seq<Messages.Msg>
-| Run                           of (unit -> unit)
-| UpdateHistory                 of LocalHistory.Model
+| HistoryMsg                    of History.Msg
+| UpdateModal               of Model.ModalState.ModalTypes option
 /// Top level msg to test specific api interactions, only for dev.
+| Run                           of (unit -> unit)
 | TestMyAPI
 | TestMyPostAPI
-| UpdateModal                  of Model.ModalState.ModalTypes option
 | DoNothing

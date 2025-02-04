@@ -11,6 +11,7 @@ open Shared
 open ARCtrl
 open Components
 open Model
+
 module private CellAux =
 
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
@@ -160,7 +161,7 @@ type Cell =
                                 | TSR | TAN -> $"{columnType} ({cellValue})"
                                 | _ -> cellValue
                             let extendableButtonOpt =
-                                if columnType = Main && not header.IsSingleColumn then
+                                if (columnType = Main && not header.IsSingleColumn) || (columnType = Main && header.IsDataColumn) then
                                     CellStyles.ExtendHeaderButton(state_extend, columnIndex, setState_extend) |> Some
                                 else
                                     None
