@@ -82,18 +82,18 @@ type SelectiveTemplateFromDB =
     /// <param name="useTemplateName"></param>
     /// <param name="dispatch"></param>
     static member AddFromDBToTableButton(name, model: Model, importType, setImportType, useTemplateName, protocolSearchState, setProtocolSearch, dispatch) =
-        let addTemplate (model: Model, deSelectedColumns) =
+        let addTemplate (model: Model, deselectedColumns) =
             let template =
                 if model.ProtocolState.TemplatesSelected.Length = 0 then
                     failwith "No template selected!"
                 else
                     model.ProtocolState.TemplatesSelected.Head
-            SpreadsheetInterface.AddTemplate(template.Table, deSelectedColumns, importType, useTemplateName) |> InterfaceMsg |> dispatch
+            SpreadsheetInterface.AddTemplate(template.Table, deselectedColumns, importType, useTemplateName) |> InterfaceMsg |> dispatch
         Html.div [
             prop.className "flex flex-row justify-center gap-2"
             prop.children [
                 let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
-                ModalElements.Button(name, addTemplate, (model, getDeSelectedTableColumns importType.DeSelectedColumns 0), isDisabled)
+                ModalElements.Button(name, addTemplate, (model, getDeSelectedTableColumns importType.DeselectedColumns 0), isDisabled)
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Daisy.button.a [
                         button.outline
@@ -115,19 +115,19 @@ type SelectiveTemplateFromDB =
     /// <param name="importType"></param>
     /// <param name="dispatch"></param>
     static member AddTemplatesFromDBToTableButton(name, model: Model, importType, setImportType, protocolSearchState, setProtocolSearch, dispatch) =
-        let addTemplates (model: Model, deSelectedColumns) =
+        let addTemplates (model: Model, deselectedColumns) =
             let templates = model.ProtocolState.TemplatesSelected
             if templates.Length = 0 then
                 failwith "No template selected!"
             if model.ProtocolState.TemplatesSelected.Length > 1 then
                 let importTables = templates |> List.map (fun item -> item.Table) |> Array.ofList
-                SpreadsheetInterface.AddTemplates(importTables, deSelectedColumns, importType) |> InterfaceMsg |> dispatch
+                SpreadsheetInterface.AddTemplates(importTables, deselectedColumns, importType) |> InterfaceMsg |> dispatch
         Html.div [
             prop.className "join flex flex-row justify-center gap-2"
             prop.children [
                 let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
-                let deSelectedColumnValues = importType.DeSelectedColumns
-                ModalElements.Button(name, addTemplates, (model, deSelectedColumnValues), isDisabled)
+                let deselectedColumnValues = importType.DeselectedColumns
+                ModalElements.Button(name, addTemplates, (model, deselectedColumnValues), isDisabled)
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Daisy.button.a [
                         button.outline

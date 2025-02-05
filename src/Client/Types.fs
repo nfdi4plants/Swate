@@ -16,7 +16,7 @@ module JsonImport =
         ImportType: ARCtrl.TableJoinOptions
         ImportMetadata: bool
         ImportTables: ImportTable list
-        DeSelectedColumns: Set<int*int>
+        DeselectedColumns: Set<int*int>
         TemplateName: string option
     } with
         static member init() =
@@ -24,21 +24,15 @@ module JsonImport =
                 ImportType = ARCtrl.TableJoinOptions.Headers
                 ImportMetadata = false
                 ImportTables = []
-                DeSelectedColumns = Set.empty
+                DeselectedColumns = Set.empty
                 TemplateName = None
             }
 
-        static member updateDeSelectedColumns(deSelectedColumns: Set<int*int>, tableIndex: int, columnIndex: int) =
-            if Set.contains (columnIndex, tableIndex) deSelectedColumns then
-                Set.remove (columnIndex, tableIndex) deSelectedColumns
+        member this.toggleDeselectedColumns(tableIndex: int, columnIndex: int) =
+            if Set.contains (columnIndex, tableIndex) this.DeselectedColumns then
+                Set.remove (columnIndex, tableIndex) this.DeselectedColumns
             else
-                Set.add (columnIndex, tableIndex) deSelectedColumns
-
-        static member getDeSelectedTableColumns (deSelectedColumns: Set<int*int>, tableIndex: int) =
-            deSelectedColumns
-            |> List.ofSeq
-            |> List.map (fun item -> if (fst item) = tableIndex then Some (snd item) else None)
-            |> List.choose (fun item -> item)
+                Set.add (columnIndex, tableIndex) this.DeselectedColumns
 
 open Fable.Core
 

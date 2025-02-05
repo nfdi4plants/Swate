@@ -36,14 +36,11 @@ type SelectiveImportModal =
                     prop.style [
                         style.height(length.perc 100)
                     ]
-                    prop.isChecked
-                        (if not selectionInformation.DeSelectedColumns.IsEmpty then
-                            not (Set.contains (columnIndex, tableIndex) selectionInformation.DeSelectedColumns)
-                        else true)
+                    prop.isChecked (not (Set.contains (columnIndex, tableIndex) selectionInformation.DeselectedColumns))
                     prop.onChange (fun (b: bool) ->
                         if columns.Length > 0 then
-                            let selectedData = SelectiveImportModalState.updateDeSelectedColumns(selectionInformation.DeSelectedColumns, tableIndex, columnIndex)
-                            {selectionInformation with DeSelectedColumns = selectedData} |> setSelectedColumns)
+                            let selectedData = selectionInformation.toggleDeselectedColumns(tableIndex, columnIndex)
+                            {selectionInformation with DeselectedColumns = selectedData} |> setSelectedColumns)
                 ]
             ]
         ]
@@ -69,8 +66,8 @@ type SelectiveImportModal =
                                         Html.div [
                                             prop.onClick (fun _ ->
                                                 if columns.Length > 0 && selectionInformation.IsSome then
-                                                    let selectedData = SelectiveImportModalState.updateDeSelectedColumns(selectionInformation.Value.DeSelectedColumns, tableIndex, columnIndex)
-                                                    {selectionInformation.Value with DeSelectedColumns = selectedData} |> setSelectedColumns.Value)
+                                                    let selectedData = selectionInformation.Value.toggleDeselectedColumns(tableIndex, columnIndex)
+                                                    {selectionInformation.Value with DeselectedColumns = selectedData} |> setSelectedColumns.Value)
                                         ]
                                     ]
                                 ]
@@ -119,7 +116,7 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, deSelectedColumns, setSelectedColumns, ?templateName) =
+    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, deselectedColumns, setSelectedColumns, ?templateName) =
         let name = defaultArg templateName table0.Name
         let guid = React.useMemo(fun () -> System.Guid.NewGuid().ToString())
         let radioGroup = "radioGroup_" + guid
@@ -154,7 +151,7 @@ type SelectiveImportModal =
                     prop.className "overflow-x-auto"
                     prop.children [
                         if isActive then
-                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, tableIndex, deSelectedColumns, setSelectedColumns)
+                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, tableIndex, deselectedColumns, setSelectedColumns)
                         else
                             SelectiveImportModal.TableWithImportColumnCheckboxes(table0)
                     ]
@@ -222,7 +219,7 @@ type SelectiveImportModal =
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
                                 prop.onClick(fun e ->
-                                    {| importState = importDataState; importedFile = import; deSelectedColumns = importDataState.DeSelectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                                    {| importState = importDataState; importedFile = import; deselectedColumns = importDataState.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )
                             ]

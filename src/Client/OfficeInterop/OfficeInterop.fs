@@ -192,13 +192,12 @@ module GetHandler =
     /// <summary>
     /// Get the deselected column indices of the given table index
     /// </summary>
-    /// <param name="deSelectedColumns"></param>
+    /// <param name="deselectedColumns"></param>
     /// <param name="tableIndex"></param>
-    let getDeSelectedTableColumns (deSelectedColumns: Set<int*int>) (tableIndex: int) =
-        deSelectedColumns
+    let getDeSelectedTableColumns (deselectedColumns: Set<int*int>) (tableIndex: int) =
+        deselectedColumns
         |> List.ofSeq
-        |> List.map (fun item -> if (fst item) = tableIndex then Some (snd item) else None)
-        |> List.choose (fun item -> item)
+        |> List.choose (fun item -> if (fst item) = tableIndex then Some (snd item) else None)
 
     /// <summary>
     /// Sort the tables and selected columns based on the selected import type
@@ -511,7 +510,7 @@ module UpdateHandler =
     /// Prepare the given table to be joined with the currently active annotation table
     /// </summary>
     /// <param name="tableToAdd"></param>
-    let prepareTemplateInMemoryForExcel (table: Table) (tableToAdd: ArcTable) (deSelectedColumnIndices: int list) (context: RequestContext) =
+    let prepareTemplateInMemoryForExcel (table: Table) (tableToAdd: ArcTable) (deselectedColumnIndices: int list) (context: RequestContext) =
         promise {
             let! originTableRes = ArcTable.fromExcelTable(table, context)
 
@@ -519,7 +518,7 @@ module UpdateHandler =
             | Result.Error _ ->
                 return failwith $"Failed to create arc table for table {table.name}"
             | Result.Ok originTable ->
-                let finalTable = Table.selectiveTablePrepare originTable tableToAdd deSelectedColumnIndices
+                let finalTable = Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
                 let selectedRange = context.workbook.getSelectedRange()
                 let tableStartIndex = table.getRange()
 
@@ -948,9 +947,9 @@ module UpdateHandler =
                 else int adaptedStartIndex + 1
 
             //Loop over all tables to be added and add them to the origin table
-            let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (deSelectedColumns: Set<int*int>) (options: TableJoinOptions option) i =
+            let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (deselectedColumns: Set<int*int>) (options: TableJoinOptions option) i =
                 let tableToAdd = tablesToAdd.[i]
-                let deselectedColumnIndices = getDeSelectedTableColumns deSelectedColumns i
+                let deselectedColumnIndices = getDeSelectedTableColumns deselectedColumns i
                 let refinedTableToAdd = Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
 
                 let newTable =
@@ -963,7 +962,7 @@ module UpdateHandler =
                 if i = tablesToAdd.Length-1 then
                     newTable
                 else
-                    loop newTable tablesToAdd deSelectedColumns options (i + 1)
+                    loop newTable tablesToAdd deselectedColumns options (i + 1)
 
             let processedJoinTable = loop originTable tablesToJoin selectedColumnsCollection options 0
 
@@ -1148,7 +1147,7 @@ type Main =
     /// <param name="tableToAdd"></param>
     /// <param name="index"></param>
     /// <param name="options"></param>
-    static member joinTable (tableToAdd: ArcTable, deSelectedColumnIndices: int list, options: TableJoinOptions option, templateName: string option, ?context0) =
+    static member joinTable (tableToAdd: ArcTable, deselectedColumnIndices: int list, options: TableJoinOptions option, templateName: string option, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 //When a name is available get the annotation and arctable for easy access of indices and value adaption
@@ -1157,7 +1156,7 @@ type Main =
 
                 match result with
                 | Some excelTable ->
-                    let! (refinedTableToAdd: ArcTable, index: int option) = prepareTemplateInMemoryForExcel excelTable tableToAdd deSelectedColumnIndices context
+                    let! (refinedTableToAdd: ArcTable, index: int option) = prepareTemplateInMemoryForExcel excelTable tableToAdd deselectedColumnIndices context
 
                     //Arctable enables a fast check for the existence of input- and output-columns and their indices
                     let! arcTableRes = ArcTable.fromExcelTable(excelTable, context)

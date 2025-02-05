@@ -25,7 +25,7 @@ type Msg =
 | InsertOntologyAnnotation of OntologyAnnotation
 | InsertFileNames of string list
 | ImportXlsx of byte []
-| ImportJson of {| importState: SelectiveImportModalState; importedFile: ArcFiles; deSelectedColumns: Set<int*int> |}
+| ImportJson of {| importState: SelectiveImportModalState; importedFile: ArcFiles; deselectedColumns: Set<int*int> |}
 /// Starts chain to export active table to isa json
 | ExportJson of ArcFiles * JsonExportFormat
 | UpdateUnitForCells

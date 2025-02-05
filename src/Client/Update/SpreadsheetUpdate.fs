@@ -119,19 +119,19 @@ module Spreadsheet =
                     | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
-            | AddTemplate (table, deSelectedColumns, importType, templateName) ->
+            | AddTemplate (table, deselectedColumns, importType, templateName) ->
                 let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
                 /// Filter out existing building blocks and keep input/output values.
                 let msg = fun table -> JoinTable(table, index, Some importType.ImportType, templateName) |> SpreadsheetMsg
-                let deSelectedColumnsIndices = deSelectedColumns |> List.ofSeq
+                let deselectedColumnsIndices = deselectedColumns |> List.ofSeq
                 let cmd =
-                    Table.selectiveTablePrepare state.ActiveTable table deSelectedColumnsIndices
+                    Table.selectiveTablePrepare state.ActiveTable table deselectedColumnsIndices
                     |> msg
                     |> Cmd.ofMsg
                 state, model, cmd
-            | AddTemplates (tables, deSelectedColumns, importType) ->
+            | AddTemplates (tables, deselectedColumns, importType) ->
                 let arcFile = model.SpreadsheetModel.ArcFile
-                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile deSelectedColumns
+                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile deselectedColumns
                 let nextState = {state with ArcFile = Some updatedArcFile}
                 nextState, model, Cmd.none
             | JoinTable (table, index, options, templateName) ->
