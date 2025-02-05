@@ -20,7 +20,7 @@ jobs:
 
       - name: Extract Latest Tag as Version
         id: get_version
-        run: echo "PACKAGE_VERSION=$(git describe --tags --always --dirty)" >> $GITHUB_ENV
+        run: echo "PACKAGE_VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
 
       - name: Restore Dependencies
         run: dotnet restore src/Components/src/Components.fsproj
