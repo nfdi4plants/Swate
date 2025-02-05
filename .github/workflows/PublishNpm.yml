@@ -17,7 +17,7 @@ jobs:
 
       - name: Extract Latest Tag as Version
         id: get_version
-        run: echo "PACKAGE_VERSION=$(git describe --tags --always --dirty)" >> $GITHUB_ENV
+        run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> "$GITHUB_ENV"
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -35,19 +35,31 @@ jobs:
       - name: Restore .NET dependencies
         run: dotnet tool restore
 
+      - name: Install root NPM Dependencies
+        run: npm install
+
       - name: Install NPM Dependencies
         run: npm install
         working-directory: src/Components
 
       - name: Set Package Version
-        run: npm version --no-git-tag-version $PACKAGE_VERSION
-        working-directory: src/Componentes
+        run: npm version --no-git-tag-version $GIT_TAG_LATEST
+        working-directory: src/Components
 
       - name: Build Package
         run: npm run build
-        working-directory: src/Componentes
-      # - name: Publish to NPM
-      #   run: npm publish --access public
-      #   working-directory: src/Components
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: src/Components
+
+      - name: Publish to NPM (Latest)
+        if: github.ref_name == 'release'
+        run: echo "non prerelase not configured for npm release."
+        working-directory: src/Components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
+
+      - name: Publish to NPM (Next)
+        if: github.ref_name == 'nightly' || github.ref_name == 'gh-action-test-branch'
+        run: npm publish --access public --tag next
+        working-directory: src/Components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}

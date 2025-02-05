@@ -37,5 +37,5 @@
 #### NPM
 
 1. Update version in `./package.json`.
-2. `npm run bundle` (transpiles with fable, creates tsc typed from jsdocs, and bundles with rollup)
+2. `npm run bundle` (transpiles with fable, creates tsc types, and bundles with rollup)
 3. `npm publish [--tag next]` (Use `--tag next` for prerelease)
