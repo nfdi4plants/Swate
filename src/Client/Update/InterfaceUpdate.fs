@@ -278,10 +278,10 @@ module Interface =
                     let cmd = OfficeInterop.InsertFileNames fileNames |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    if model.SpreadsheetModel.DeSelectedCells.IsEmpty then
+                    if model.SpreadsheetModel.SelectedCells.IsEmpty then
                         model, Cmd.ofMsg (DevMsg.GenericError (Cmd.none, exn("No cell(s) selected.")) |> DevMsg)
                     else
-                        let columnIndex, rowIndex = model.SpreadsheetModel.DeSelectedCells.MinimumElement
+                        let columnIndex, rowIndex = model.SpreadsheetModel.SelectedCells.MinimumElement
                         let mutable rowIndex = rowIndex
                         let cells = [|
                             for name in fileNames do
@@ -301,8 +301,8 @@ module Interface =
                     let cmd = OfficeInterop.RemoveBuildingBlock |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    if Set.isEmpty model.SpreadsheetModel.DeSelectedCells then failwith "No column selected"
-                    let deSelectedColumns, _ = model.SpreadsheetModel.DeSelectedCells |> Set.toArray |> Array.unzip
+                    if Set.isEmpty model.SpreadsheetModel.SelectedCells then failwith "No column selected"
+                    let deSelectedColumns, _ = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.unzip
                     let distinct = deSelectedColumns |> Array.distinct
                     let cmd =
                         if distinct.Length <> 1 then

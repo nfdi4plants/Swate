@@ -36,7 +36,7 @@ let switchTable (nextIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model 
     | _ ->
         { state with
             ActiveCell = None
-            DeSelectedCells = Set.empty
+            SelectedCells = Set.empty
             ActiveView = ActiveView.Table nextIndex }
 
 /// <summary>This is the basic function to create new Tables from an array of SwateBuildingBlocks</summary>
@@ -106,32 +106,32 @@ let deleteRow (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveRow index
     {state with
         ArcFile = state.ArcFile
-        DeSelectedCells = Set.empty }
+        SelectedCells = Set.empty }
 
 let deleteRows (indexArr: int []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveRows indexArr
     {state with
         ArcFile = state.ArcFile
-        DeSelectedCells = Set.empty }
+        SelectedCells = Set.empty }
     
 
 let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveColumn index
     {state with
         ArcFile = state.ArcFile
-        DeSelectedCells = Set.empty}
+        SelectedCells = Set.empty}
 
 let setColumn (index: int) (column: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.UpdateColumn (index, column.Header, column.Cells)
     {state with
         ArcFile = state.ArcFile
-        DeSelectedCells = Set.empty}
+        SelectedCells = Set.empty}
 
 let moveColumn (current: int) (next: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.MoveColumn (current, next)
     {state with
         ArcFile = state.ArcFile
-        DeSelectedCells = Set.empty }
+        SelectedCells = Set.empty }
 
 let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = Generic.getCell index state

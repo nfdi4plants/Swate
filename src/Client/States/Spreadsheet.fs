@@ -73,7 +73,7 @@ module ActivePattern =
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
 type Model = {
     ActiveView: ActiveView
-    DeSelectedCells: Set<int*int>
+    SelectedCells: Set<int*int>
     ActiveCell: (U2<int,(int*int)> * ColumnType) option
     ArcFile: ArcFiles option
 } with
@@ -83,13 +83,13 @@ type Model = {
         | Some (U2.Case2 (ci, ri), ct), U2.Case2 targetIndex -> (ci,ri) = targetIndex && ct = columnType
         | _ -> false
     member this.CellIsSelected(index: int*int) =
-        this.DeSelectedCells.Contains((index))
+        this.SelectedCells.Contains((index))
     member this.CellIsIdle(index: U2<int, int*int>, columnType) =
         this.CellIsActive(index, columnType) |> not
     static member init() =
         {
             ActiveView = ActiveView.Metadata
-            DeSelectedCells = Set.empty
+            SelectedCells = Set.empty
             ActiveCell = None
             ArcFile = None
         }
@@ -104,7 +104,7 @@ type Model = {
     static member init(arcFile: ArcFiles) =
         {
             ActiveView = ActiveView.Metadata
-            DeSelectedCells = Set.empty
+            SelectedCells = Set.empty
             ActiveCell = None
             ArcFile = Some arcFile
         }

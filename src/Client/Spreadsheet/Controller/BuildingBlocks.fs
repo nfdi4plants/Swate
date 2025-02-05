@@ -19,8 +19,8 @@ module SidebarControllerAux =
     /// <param name="state"></param>
     let getNextColumnIndex (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
-        if not state.DeSelectedCells.IsEmpty then
-            let indexNextToSelected = state.DeSelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1
+        if not state.SelectedCells.IsEmpty then
+            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1
             indexNextToSelected
         else
             state.ActiveTable.ColumnCount
@@ -111,7 +111,7 @@ let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptio
     {state with ArcFile = state.ArcFile}
 
 let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let selected = state.DeSelectedCells |> Set.toArray
+    let selected = state.SelectedCells |> Set.toArray
     SanityChecks.verifyOnlyOneColumnSelected selected
     for (colIndex, rowIndex) in selected do
         let c = Generic.getCell (colIndex,rowIndex) state

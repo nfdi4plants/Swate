@@ -8,7 +8,7 @@ open Shared
 type DataMapCell =
     static member Main (mouseX, mouseY, ci: int, ri: int, model: Model.Model, dispatch: Messages.Msg -> unit) =
         let index = ci, ri
-        let isSelectedCell = model.SpreadsheetModel.DeSelectedCells.Contains index
+        let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
         let isHeader = Util.isHeader ri
         let fillColumn = Util.fillColumn index dispatch
         let clear = Util.clear isSelectedCell index dispatch

@@ -41,7 +41,7 @@ let paste isSelectedCell index dispatch = fun _ ->
         Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
 
 let deleteRow index (model: Model.Model) dispatch = fun _ ->
-    let s = Set.toArray model.SpreadsheetModel.DeSelectedCells
+    let s = Set.toArray model.SpreadsheetModel.SelectedCells
     if Array.isEmpty s |> not && Array.forall (fun (c,r) -> c = fst index) s && Array.contains index s then
         let indexArr = s |> Array.map snd |> Array.distinct
         Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
