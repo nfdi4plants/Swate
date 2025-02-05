@@ -47,6 +47,7 @@ jobs:
       # Build the project
       - name: Build
         run: npm run build:storybook
+        working-directory: src/Components
 
       # #👇 Add Storybook build and deploy to GitHub Pages as a step in the workflow
       # - uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
