@@ -49,10 +49,10 @@ jobs:
         run: npm run build:storybook
         working-directory: src/Components
 
-      # #👇 Add Storybook build and deploy to GitHub Pages as a step in the workflow
-      # - uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
-      #   with:
-      #     install_command: echo "install skipped"  # default: npm ci
-      #     build_command: echo "build skipped" # default: npm run build-storybook
-      #     path: src/Components/storybook-static # default: dist/storybook
-      #     checkout: false # default: true
+      #👇 Add Storybook build and deploy to GitHub Pages as a step in the workflow
+      - uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
+        with:
+          install_command: echo "install skipped"  # default: npm ci
+          build_command: echo "build skipped" # default: npm run build-storybook
+          path: src/Components/storybook-static # default: dist/storybook
+          checkout: false # default: true
