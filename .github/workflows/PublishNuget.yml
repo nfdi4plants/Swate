@@ -22,7 +22,7 @@ jobs:
 
       - name: Extract Latest Tag as Version
         id: get_version
-        run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0)" >> "$GITHUB_ENV"
+        run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> "$GITHUB_ENV"
 
       - name: Debug GIT_TAG_LATEST
         run: echo "Version extracted; $GIT_TAG_LATEST"
