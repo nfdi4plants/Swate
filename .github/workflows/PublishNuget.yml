@@ -24,6 +24,9 @@ jobs:
         id: get_version
         run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0)" >> "$GITHUB_ENV"
 
+      - name: Debug GIT_TAG_LATEST
+        run: echo "Version extracted; $GIT_TAG_LATEST"
+
       - name: Restore Dependencies
         run: dotnet restore src/Components/src/Components.fsproj
 
@@ -34,9 +37,6 @@ jobs:
       - name: Run Prebuild Script
         run: npm run prebuild:net
         working-directory: src/Components
-
-      - name: Debug GIT_TAG_LATEST
-        run: echo "Version extracted: $GIT_TAG_LATEST"
 
       - name: Build Project
         run: dotnet build src/Components/src/Components.fsproj --configuration Release /p:GitTag=$GIT_TAG_LATEST
