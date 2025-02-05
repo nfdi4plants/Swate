@@ -4,8 +4,7 @@ name: Build and Publish Storybook to GitHub Pages
 on:
   # Event for the workflow to run on
   push:
-    branches:
-      - 'nightly' # Replace with the branch you want to deploy from
+    branches: ['nightly', 'gh-action-test-branch']
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 permissions:
@@ -47,7 +46,7 @@ jobs:
 
       # Build the project
       - name: Build
-        run: npm run build:storybook # this does not work currently, as it does not move the transpiled files from Shared to storybook-static
+        run: npm run build:storybook
 
       # #👇 Add Storybook build and deploy to GitHub Pages as a step in the workflow
       # - uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
