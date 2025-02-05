@@ -51,14 +51,14 @@ jobs:
         working-directory: src/Components
 
       - name: Publish to NPM (Latest)
-        if: github.ref_name != 'nightly'
+        if: github.ref_name == 'release'
         run: echo "non prerelase not configured for npm release."
         working-directory: src/Components
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
 
       - name: Publish to NPM (Next)
-        if: github.ref_name == 'nightly'
+        if: github.ref_name == 'nightly' || github.ref_name == 'gh-action-test-branch'
         run: npm publish --access public --tag next
         working-directory: src/Components
         env:
