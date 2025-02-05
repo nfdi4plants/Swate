@@ -20,7 +20,7 @@ jobs:
 
       - name: Extract Latest Tag as Version
         id: get_version
-        run: echo "PACKAGE_VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+        run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0)" >> "$GITHUB_ENV"
 
       - name: Restore Dependencies
         run: dotnet restore src/Components/src/Components.fsproj
@@ -34,10 +34,10 @@ jobs:
         working-directory: src/Components
 
       - name: Build Project
-        run: dotnet build src/Components/src/Components.fsproj --configuration Release /p:PackageVersion=${PACKAGE_VERSION}
+        run: dotnet build src/Components/src/Components.fsproj --configuration Release /p:GitTag=$GIT_TAG_LATEST
 
       - name: Pack NuGet Package
-        run: dotnet pack src/Components/src/Components.fsproj --configuration Release --output nupkgs /p:PackageVersion=${PACKAGE_VERSION}
+        run: dotnet pack src/Components/src/Components.fsproj --configuration Release --output nupkgs /p:GitTag=$GIT_TAG_LATEST
 
       # - name: Publish to NuGet
       #   run: dotnet nuget push nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
