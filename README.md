@@ -2,47 +2,54 @@
 
 > **Swate** - something or someone that gets you absolutely joyed ([Urban dictionary](https://www.urbandictionary.com/define.php?term=swate))
 
-**Swate** is a **S**wate **w**orkflow **a**nnotation **t**ool for **e**xcel.
 
-Swate aims to provide a low-friction workflow annotation experience that makes the usage of controlled vocabularies (ontologies) as easy and intuitive as possible. It is designed to integrate in the familiar spreadsheet environment that is the center of a great deal of data-focused wetlab work.
+![Swate Logo](https://raw.githubusercontent.com/nfdi4plants/Branding/refs/heads/master/logos/Swate/Swate_logo_bg_transparent.svg)
 
-![image](https://user-images.githubusercontent.com/39732517/135290851-cacd8626-2cc3-4c58-a343-c5ad037e3c5c.png)
+Swate is a powerful web tool designed for research data management, providing versatile features across multiple platforms. Whether you're working in the browser, VS Code, Electron, or Excel, Swate enhances your data management workflow with a seamless experience.
 
+### Available Platforms:
+- **Web Tool**: [swate-alpha.nfdi4plants.org](https://swate-alpha.nfdi4plants.org)
+- **VS Code Plugin**: [arc-vs-code](https://github.com/nfdi4plants/arc-vs-code)
+- **Electron App**: [ARCitect](https://github.com/nfdi4plants/ARCitect)
+- **Excel Add-In**: [ARC Excel Add-In](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/annotate-in-excel/)
 
-<!-- TOC -->
-## Table of contents
+### Features:
+- Seamless integration across multiple platforms
+- Rich set of tools for managing and annotating research data
+- **React Components** released as npm package `@nfdi4plants/swate-components`
+- **Fable NuGet package** `Swate.Components` for .NET developers
+- **Storybook** available for component previews
 
-- [Docs](#docs)
-<!-- - [Install/Use](#installuse) -->
-- [Contact](#contact)
+### 🚀 Getting Started
 
-<!-- /TOC -->
+To get started with Swate, choose your preferred platform:
 
-## Docs
+1. **Web Tool**: Visit [swate-alpha.nfdi4plants.org](https://swate-alpha.nfdi4plants.org)
+2. **VS Code Plugin**: Find installation instructions in the [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/vs-code-extension/)
+3. **Electron App**: Download and install the app from the [GitHub Releases Page](https://github.com/nfdi4plants/ARCitect/releases)
+4. **Excel Add-In**: Find installation instructions in the [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/annotate-in-excel/)
 
-- Ontology term search
-- ISA conform output
-- Minimal information standards
+### 🛠 Installation for Developers
 
-Try our [quickstart](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/guides/swate_QuickStart.html) or a more in-depth [walkthrough](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/guides/swate_walkthrough.html).
+#### React Components
 
-For a full in-depth view of all Swate features check the [documentation](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/SwateManual/index.html).
+- **JavaScript**:
+  Install via npm:
+  ```bash
+  npm install @nfdi4plants/swate-components
+  ```
 
-<!--
-## Install/Use
+- **Fable F#**:
+  Install via NuGet:
+  ```bash
+  dotnet add package Swate.Components
+  ```
 
-[Swate installation](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/docs/SwateManual/Docs01-Installing-Swate.html)
--->
+### 📖 Storybook Preview
 
-## Contact
+See all available components in action by visiting our [Storybook](https://nfdi4plants.github.io/Swate/).
 
-If you have any issues using Swate, missing features or found a nasty bug :bug: you can always contact us via:
-
-- [GitHub Issues](https://github.com/nfdi4plants/Swate/issues)
-- [DataPLANT Helpdesk](https://support.nfdi4plants.org/?topic=Tools_Swate)
-
-
-## Contributing
+### 🌱 Contributing
 
 > [!IMPORTANT]
 > A quote i found years ago by @Thorium.
