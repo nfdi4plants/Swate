@@ -66,13 +66,12 @@ type CellStyles =
 
     static member CompositeCellDisplay (oa: OntologyAnnotation, displayValue: string) =
         let hasValidOA = oa.TermAccessionShort <> ""
-        let v = displayValue
         Html.div [
             CellStyles.cellInnerContainerStyle []
             prop.children [
                 Html.span [
                     prop.className "grow"
-                    prop.text v
+                    prop.text displayValue
                 ]
                 if hasValidOA then
                     Html.i [

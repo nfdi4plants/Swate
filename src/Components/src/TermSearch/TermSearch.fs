@@ -398,7 +398,7 @@ type TermSearch =
                                 prop.className "link link-primary"
                                 prop.href term.href.Value
                                 prop.target.blank
-                                prop.text "Link"
+                                prop.text "Source Link"
                             ]
                     ]
                 ]
