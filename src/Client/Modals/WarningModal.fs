@@ -7,7 +7,7 @@ open Messages
 open Shared
 open Feliz
 open Feliz.DaisyUI
-open Components
+open Swate.Components
 
 open Feliz
 open Feliz.DaisyUI

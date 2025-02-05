@@ -9,6 +9,7 @@ open Browser.Types
 open Fable.Core.JsInterop
 open ARCtrl
 open Shared
+open Swate
 
 open Elmish
 
@@ -170,6 +171,8 @@ module private Helper =
                 ]
             ]
         ]
+
+open Fable.Core
 
 type NoFileElement =
 

@@ -8,7 +8,7 @@ open Shared
 
 open ARCtrl
 open JsonImport
-open Components
+open Swate.Components
 
 type SelectiveImportModal =
 

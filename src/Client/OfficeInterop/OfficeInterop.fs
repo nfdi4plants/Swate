@@ -6,8 +6,8 @@ open Excel
 open GlobalBindings
 
 open Shared
+open Shared.DTOs
 open Database
-open DTOs.TermQuery
 
 open OfficeInterop
 
@@ -356,7 +356,7 @@ module GetHandler =
     /// <param name="names"></param>
     let searchTermInDatabase name =
         promise {
-            let term = TermQueryDto.create(name, searchMode=Database.FullTextSearch.Exact)
+            let term = TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
             let! results = Async.StartAsPromise(Api.ontology.searchTerm term)
             let result = Array.tryHead results
             return result
@@ -371,7 +371,7 @@ module GetHandler =
             let terms =
                 names
                 |> List.map (fun name ->
-                    TermQueryDto.create(name, searchMode=Database.FullTextSearch.Exact)
+                    TermQuery.create(name, searchMode=Database.FullTextSearch.Exact)
                 )
                 |> Array.ofSeq
             let! result = Async.StartAsPromise(Api.ontology.searchTerms terms)
@@ -485,7 +485,7 @@ module UpdateHandler =
                         }
 
                 let tableValues = finalTable.ToStringSeqs()
-                let range = activeWorksheet.getRangeByIndexes(0, 0, float (finalTable.RowCount + 1), (tableValues.Item 0).Count)                
+                let range = activeWorksheet.getRangeByIndexes(0, 0, float (finalTable.RowCount + 1), (tableValues.Item 0).Count)
 
                 range.values <- finalTable.ToStringSeqs()
 
@@ -670,7 +670,7 @@ module UpdateHandler =
 
             do! context.sync()
 
-            let range = worksheet.getUsedRange true        
+            let range = worksheet.getUsedRange true
             let _ = range.load(propertyNames = U2.Case2 (ResizeArray["values"]))
             do! context.sync()
 
@@ -710,7 +710,7 @@ module UpdateHandler =
             Table.addRows -1. table tableColumnCount diff "" |> ignore
 
             do! context.sync()
-        }    
+        }
 
     /// <summary>
     /// Insert the ontology information in the selected range independent of an annotation table
@@ -1204,7 +1204,7 @@ type Main =
                         let! msgAdd =
                             addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
 
-                        if msgAdd.IsEmpty then                        
+                        if msgAdd.IsEmpty then
                             return msgJoin
                         else if msgJoin.IsEmpty then
                             return msgAdd
@@ -1496,7 +1496,7 @@ type Main =
                             Array.create arcTable.RowCount newColumn.Cells.[0]
                         else
                             newColumn.Cells
-                    
+
                     arcTable.AddColumn(newColumn.Header, values, forceReplace=true, skipFillMissing=false)
 
                     //Replace old excel table with new one

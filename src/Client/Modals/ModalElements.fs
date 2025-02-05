@@ -8,7 +8,6 @@ open Shared
 
 open ARCtrl
 open JsonImport
-open Components
 open Fable.React.Helpers
 
 type ModalElements =
@@ -22,7 +21,7 @@ type ModalElements =
                 button.error
             prop.disabled isDisabled
             prop.onClick (fun _ -> onClickAction buttonInput)
-            
+
             prop.text text
         ]
 

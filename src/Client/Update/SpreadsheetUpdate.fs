@@ -48,7 +48,7 @@ module Spreadsheet =
 
             //This matchcase handles undo / redo functionality
             match msg with
-            | UpdateActiveView _ | UpdateHistoryPosition _ | Reset | UpdateSelectedCells _
+            | UpdateActiveView _  | Reset | UpdateSelectedCells _
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
                 state, model, cmd
             | _ ->
@@ -56,7 +56,7 @@ module Spreadsheet =
                     Cmd.OfPromise.either
                         model.History.SaveSessionSnapshotIndexedDB
                         (snapshotJsonString)
-                        (fun newHistory -> Messages.UpdateHistoryAnd (newHistory, cmd))
+                        (fun newHistory -> Messages.History.UpdateAnd (newHistory, cmd) |> HistoryMsg)
                         (curry GenericError Cmd.none >> DevMsg)
 
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
@@ -192,21 +192,6 @@ module Spreadsheet =
             | UpdateTableOrder (prev_index, new_index) ->
                 let nextState = Controller.Table.updateTableOrder (prev_index, new_index) state
                 nextState, model, Cmd.none
-            | UpdateHistoryPosition (newPosition) ->
-                let nextState, nextModel, cmd =
-                    match newPosition with
-                    | _ when model.History.NextPositionIsValid(newPosition) |> not ->
-                        state, model, Cmd.none
-                    | _ ->
-                        /// Run this first so an error breaks the function before any mutables are changed
-                        let newCmd =
-                            Cmd.OfPromise.either
-                                Model.updateIndexedDBPosition
-                                (newPosition)
-                                (fun _ -> Messages.UpdateHistoryPosition newPosition)
-                                (curry GenericError Cmd.none >> DevMsg)
-                        state, model, newCmd
-                nextState, nextModel, cmd
             | AddRows (n) ->
                 let nextState =
                     if state.TableViewIsActive() then

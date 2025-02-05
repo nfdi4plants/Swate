@@ -6,6 +6,7 @@ open Model
 open Messages
 open Feliz
 open Feliz.DaisyUI
+open Swate.Components
 
 module private DataAnnotatorHelper =
 

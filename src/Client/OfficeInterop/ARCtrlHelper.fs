@@ -207,7 +207,7 @@ let prepareTemplateInMemory (originTable: ArcTable) (tableToAdd: ArcTable) (sele
         |> Array.mapi (fun i item -> if item = false then Some i else None)
         |> Array.choose (fun x -> x)
         |> List.ofArray
-            
+
     let finalTable = Table.selectiveTablePrepare originTable tableToAdd selectedColumnIndices
 
     finalTable
@@ -235,6 +235,6 @@ module ARCtrlExtensions =
                 let seqOfSeqs = ArcStudy.toMetadataCollection study (Option.whereNot List.isEmpty assays)
                 metadataWorksheetName, seqOfSeqs
             | ArcFiles.Template template ->
-                let metadataWorksheetName = Template.metaDataSheetName
+                let metadataWorksheetName = Template.metadataSheetName
                 let seqOfSeqs = Template.toMetadataCollection template
                 metadataWorksheetName, seqOfSeqs

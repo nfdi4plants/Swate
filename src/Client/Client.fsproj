@@ -5,14 +5,14 @@
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="GenericComponents.fs" />
     <None Include="tailwind.config.js" />
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
+    <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Helper.fs" />
-    <Compile Include="React.useListener.fs" />
+    <Compile Include="LocalStorage\SwateSearchConfig.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
@@ -68,8 +68,6 @@
     <Compile Include="SharedComponents\BaseDropdown.fs" />
     <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
-    <Compile Include="SharedComponents\AdvancedSearch.fs" />
-    <Compile Include="SharedComponents\TermSearchInput.fs" />
     <Compile Include="SharedComponents\Metadata\Generic.fs" />
     <Compile Include="SharedComponents\Metadata\Forms.fs" />
     <Compile Include="SharedComponents\Metadata\DatamapConfig.fs" />
@@ -101,6 +99,7 @@
     <Compile Include="Pages\Info\PrivacyPolicy.fs" />
     <Compile Include="Pages\Info\InfoView.fs" />
     <Compile Include="Pages\ActivityLog\ActivityLogView.fs" />
+    <Compile Include="Pages\Settings\SearchConfig.fs" />
     <Compile Include="Pages\Settings\SettingsView.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
     <Compile Include="Pages\DataAnnotator\DataAnnotator.fs" />
@@ -131,10 +130,8 @@
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Components\Components.fsproj" />
-    <ProjectReference Include="..\Shared\Shared.fsproj" />
-  </ItemGroup>
-  <ItemGroup>
+    <PackageReference Include="ARCtrl.Core" Version="2.2.4" />
+    <PackageReference Include="ARCtrl.Json" Version="2.2.4" />
     <PackageReference Include="ARCtrl.Javascript" Version="2.2.4" />
     <PackageReference Include="Fable.Core" Version="4.3.0" />
     <PackageReference Include="Fable.Elmish" Version="4.2.0" />
@@ -142,7 +139,6 @@
     <PackageReference Include="Fable.Elmish.React" Version="4.0.0" />
     <PackageReference Include="Fable.Elmish.Browser" Version="4.0.3" />
     <PackageReference Include="Fable.Elmish.Debugger" Version="4.1.0" />
-    <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.SimpleJson" Version="3.24.0" />
     <PackageReference Include="Feliz" Version="2.8.0" />
@@ -150,5 +146,9 @@
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
     <PackageReference Include="FsSpreadsheet.Js" Version="[6.2.0]" />
     <PackageReference Include="Fable.Mocha" Version="2.17.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Components\src\Components.fsproj" />
+    <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
 </Project>

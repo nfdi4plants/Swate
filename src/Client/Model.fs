@@ -71,36 +71,6 @@ module TermSearch =
             ParentTerm      = None
         }
 
-module AdvancedSearch =
-
-
-    type AdvancedSearchSubpages =
-    | InputFormSubpage
-    | ResultsSubpage
-
-    type Model = {
-        ModalId                             : string
-        ///
-        AdvancedSearchOptions               : AdvancedSearchTypes.AdvancedSearchOptions
-        AdvancedSearchTermResults           : Term []
-        // Client visual design
-        Subpage           : AdvancedSearchSubpages
-        HasModalVisible                     : bool
-        HasOntologyDropdownVisible          : bool
-        HasAdvancedSearchResultsLoading     : bool
-    } with
-        static member init () = {
-            ModalId                         = ""
-            HasModalVisible                 = false
-            HasOntologyDropdownVisible      = false
-            AdvancedSearchOptions           = AdvancedSearchTypes.AdvancedSearchOptions.init ()
-            AdvancedSearchTermResults       = [||]
-            HasAdvancedSearchResultsLoading = false
-            Subpage                         = InputFormSubpage
-        }
-        static member BuildingBlockHeaderId = "BuildingBlockHeader_ATS_Id"
-        static member BuildingBlockBodyId = "BuildingBlockBody_ATS_Id"
-
 type DevState = {
     Log             : LogItem list
     DisplayLogList  : LogItem list
@@ -111,28 +81,51 @@ type DevState = {
     }
 
 type PersistentStorageState = {
-    SearchableOntologies    : (Set<string>*Ontology) []
     AppVersion              : string
     Host                    : Swatehost option
-    ShowSideBar             : bool
-    HasOntologiesLoaded     : bool
+    SwateDefaultSearch      : bool
+    TIBSearchCatalogues     : Set<string>
+
 } with
     static member init () = {
-        SearchableOntologies    = [||]
         Host                    = Some Swatehost.Browser
         AppVersion              = ""
-        ShowSideBar             = false
-        HasOntologiesLoaded     = false
+        SwateDefaultSearch      = true
+        TIBSearchCatalogues     = Set.empty
     }
 
+    member this.TIBQueries =
+        {|
+            TermSearch = ResizeArray [
+                for c in this.TIBSearchCatalogues do
+                    let n = "TIB_" + c
+                    let query: Swate.Components.SearchCall = fun (q: string) -> Swate.Components.Api.TIBApi.defaultSearch(q, 10, c)
+                    yield (n, query)
+            ];
+            ParentSearch = ResizeArray [
+                for c in this.TIBSearchCatalogues do
+                    let n = "TIB_" + c
+                    let query: Swate.Components.ParentSearchCall = fun (q: string, p: string) -> Swate.Components.Api.TIBApi.searchChildrenOf(q, p, 10, c)
+                    yield (n, query)
+            ];
+            AllChildrenSearch = ResizeArray [
+                for c in this.TIBSearchCatalogues do
+                    let n = "TIB_" + c
+                    let query: Swate.Components.AllChildrenSearchCall = fun (p: string) -> Swate.Components.Api.TIBApi.searchAllChildrenOf(p, 300, collection = c)
+                    yield (n, query)
+            ]
+        |}
+    member this.DisableSwateDefaultSearch = not this.SwateDefaultSearch
 type PageState = {
     SidebarPage : Routing.SidebarPage
     MainPage: Routing.MainPage
+    ShowSideBar: bool
 } with
     static member init () =
         {
             SidebarPage = SidebarPage.BuildingBlock
             MainPage = MainPage.Default
+            ShowSideBar = false
         }
     member this.IsHome =
         match this.MainPage with
