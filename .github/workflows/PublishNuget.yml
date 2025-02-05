@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure all tags are fetched
 
       - name: Install .NET SDK
         uses: actions/setup-dotnet@v4
@@ -32,6 +34,9 @@ jobs:
       - name: Run Prebuild Script
         run: npm run prebuild:net
         working-directory: src/Components
+
+      - name: Debug GIT_TAG_LATEST
+        run: echo "Version extracted: $GIT_TAG_LATEST"
 
       - name: Build Project
         run: dotnet build src/Components/src/Components.fsproj --configuration Release /p:GitTag=$GIT_TAG_LATEST

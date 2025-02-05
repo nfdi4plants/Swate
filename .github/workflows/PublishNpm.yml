@@ -41,11 +41,11 @@ jobs:
 
       - name: Set Package Version
         run: npm version --no-git-tag-version $GIT_TAG_LATEST
-        working-directory: src/Componentes
+        working-directory: src/Components
 
       - name: Build Package
         run: npm run build
-        working-directory: src/Componentes
+        working-directory: src/Components
       # - name: Publish to NPM
       #   run: npm publish --access public
       #   working-directory: src/Components
