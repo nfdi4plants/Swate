@@ -2,7 +2,7 @@ name: Publish NPM Package
 
 on:
   push:
-    branches: ['nightly']
+    branches: ['nightly', 'gh-action-test-branch']
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
 
       - name: Extract Latest Tag as Version
         id: get_version
-        run: echo "PACKAGE_VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+        run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0)" >> "$GITHUB_ENV"
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -40,7 +40,7 @@ jobs:
         working-directory: src/Components
 
       - name: Set Package Version
-        run: npm version --no-git-tag-version $PACKAGE_VERSION
+        run: npm version --no-git-tag-version $GIT_TAG_LATEST
         working-directory: src/Componentes
 
       - name: Build Package
