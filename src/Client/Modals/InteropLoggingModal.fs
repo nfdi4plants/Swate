@@ -6,7 +6,7 @@ open Messages
 open Shared
 open Feliz
 open Feliz.DaisyUI
-open Components
+open Swate.Components
 
 type InteropLogging =
     static member Main(model:DevState, dispatch) =

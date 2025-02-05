@@ -10,6 +10,7 @@ open Components
 open ARCtrl
 open Shared
 open Components.Metadata
+open Swate.Components
 
 type private NavbarState = {
     BurgerActive: bool
@@ -210,7 +211,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 Html.i [prop.className "fa-solid fa-info"]
             ],
             toggleMetdadataModal
-        ) |> toReact
+        )
 
         QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
@@ -224,7 +225,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 let ctrl = e.metaKey || e.ctrlKey
                 SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
             )
-        ) |> toReact
+        )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             QuickAccessButton.QuickAccessButton(
@@ -238,7 +239,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     let ctrl = not (e.metaKey || e.ctrlKey)
                     OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
                 )
-            ) |> toReact
+            )
         | _ ->
             ()
         QuickAccessButton.QuickAccessButton(
@@ -251,7 +252,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             (fun _ ->
                 SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch
             )
-        ) |> toReact
+        )
         QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
             React.fragment [
@@ -259,7 +260,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 Html.i [prop.className "fa-solid fa-table-columns"]
             ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
-        ) |> toReact
+        )
         QuickAccessButton.QuickAccessButton(
             "Get Building Block Information",
             React.fragment [
@@ -273,12 +274,12 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     match ontologyAnnotationRes with
                     | Result.Error msgs -> GenericInteropLogs (Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
                     | Result.Ok term ->
-                        let ontologyAnnotation = OntologyAnnotation.fromTerm term
+                        let ontologyAnnotation = OntologyAnnotation.fromDBTerm term
                         Model.ModalState.TableModals.TermDetails ontologyAnnotation |> Model.ModalState.ModalTypes.TableModal |> Some |> Messages.UpdateModal |> dispatch
                 }
                 |> Promise.start
             )
-        ) |> toReact
+        )
     ]
     |> React.fragment
 
@@ -318,8 +319,8 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
                 prop.children [
                     Components.DeleteButton(props = [
                         prop.onClick (fun _ ->
-                            Messages.PersistentStorage.UpdateShowSidebar (not model.PersistentStorageState.ShowSideBar)
-                            |> Messages.PersistentStorageMsg
+                            Messages.PageState.UpdateShowSidebar (not model.PageState.ShowSideBar)
+                            |> Messages.PageStateMsg
                             |> dispatch
                         )
                         button.sm

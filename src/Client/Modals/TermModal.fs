@@ -4,14 +4,14 @@ open Shared.Database
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl
+open Swate.Components
 open Shared
-open Components
 
 
 module private TermModalUtil =
     type State =
         | Loading
-        | Found of Term
+        | Found of Database.Term
         | NotFound
 
 open TermModalUtil
@@ -63,7 +63,7 @@ type TermModal =
                                             Html.span [ prop.className "font-bold"; prop.text oa.NameText]
                                             Html.div [ prop.className "text-xs"; prop.text oa.TermAccessionShort]
                                         ]
-                                        Components.Components.DeleteButton(props=[prop.onClick rmv])
+                                        Components.DeleteButton(props=[prop.onClick rmv])
                                     ]
                                 ]
                                 Html.div [
@@ -89,7 +89,7 @@ type TermModal =
                                                 ]
                                             Html.a [
                                                 prop.className "space-x-2 float-right link-primary"
-                                                prop.href (OntologyAnnotation.fromTerm term |> _.TermAccessionOntobeeUrl)
+                                                prop.href (OntologyAnnotation.fromDBTerm term |> _.TermAccessionOntobeeUrl)
                                                 prop.target.blank
                                                 prop.children [
                                                     Html.span "Ref"

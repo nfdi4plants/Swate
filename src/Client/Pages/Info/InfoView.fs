@@ -115,12 +115,11 @@ module private AboutHelper =
 
 type About =
     static member Main =
-        Components.Forms.Generic.Section [
-            Html.div [
-                prop.className "prose-sm md:prose lg:prose-lg divide-y-2 gap-y-2"
-                prop.children [
-                    AboutHelper.IntroductionElement
-                    AboutHelper.GetInContactElements
-                ]
+        Html.div [
+            prop.className "prose-sm md:prose lg:prose-lg divide-y-2 gap-y-2 py-1 lg:py-4"
+            prop.children [
+                Html.h1 "Swate"
+                AboutHelper.IntroductionElement
+                AboutHelper.GetInContactElements
             ]
         ]

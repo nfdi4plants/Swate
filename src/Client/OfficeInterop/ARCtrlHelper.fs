@@ -220,6 +220,6 @@ module ARCtrlExtensions =
                 let seqOfSeqs = ArcStudy.toMetadataCollection study (Option.whereNot List.isEmpty assays)
                 metadataWorksheetName, seqOfSeqs
             | ArcFiles.Template template ->
-                let metadataWorksheetName = Template.metaDataSheetName
+                let metadataWorksheetName = Template.metadataSheetName
                 let seqOfSeqs = Template.toMetadataCollection template
                 metadataWorksheetName, seqOfSeqs

@@ -9,6 +9,7 @@ open Database
 
 open Model
 open ARCtrl
+open Routing
 open Fable.Core
 
 type System.Exception with
@@ -35,12 +36,7 @@ module TermSearch =
 module AdvancedSearch =
 
     type Msg =
-        | GetSearchResults of {| config:AdvancedSearchTypes.AdvancedSearchOptions; responseSetter: Term [] -> unit |}
-
-module Ontologies =
-
-   type Msg =
-    | GetOntologies
+        | GetSearchResults of {| config:Shared.DTOs.AdvancedSearchQuery; responseSetter: Term [] -> unit |}
 
 type DevMsg =
     | LogTableMetadata
@@ -51,9 +47,18 @@ type DevMsg =
 
 module PersistentStorage =
     type Msg =
-    | NewSearchableOntologies   of Ontology []
-    | UpdateAppVersion          of string
-    | UpdateShowSidebar         of bool
+    | UpdateAppVersion of string
+    | UpdateSwateDefaultSearch of bool
+    | AddTIBSearchCatalogue of string
+    | RemoveTIBSearchCatalogue of string
+    | SetTIBSearchCatalogues of Set<string>
+
+module PageState =
+
+    type Msg =
+    | UpdateShowSidebar of bool
+    | UpdateMainPage of MainPage
+    | UpdateSidebarPage of SidebarPage
 
 module FilePicker =
     type Msg =
@@ -93,30 +98,32 @@ type SettingsDataStewardMsg =
 type TopLevelMsg =
     | CloseSuggestions
 
+module History =
+
+    type Msg =
+    | UpdateAnd of LocalHistory.Model * Cmd<Messages.Msg>
+    | UpdateHistoryPosition of int
+
 type Msg =
-| UpdateModel               of Model
-| DevMsg                    of DevMsg
-| OntologyMsg               of Ontologies.Msg
-| TermSearchMsg             of TermSearch.Msg
-| AdvancedSearchMsg         of AdvancedSearch.Msg
-| OfficeInteropMsg          of OfficeInterop.Msg
-| PersistentStorageMsg      of PersistentStorage.Msg
-| FilePickerMsg             of FilePicker.Msg
-| BuildingBlockMsg          of BuildingBlock.Msg
-| ProtocolMsg               of Protocol.Msg
-// | CytoscapeMsg                  of Cytoscape.Msg
+| UpdateModel                   of Model
+| DevMsg                        of DevMsg
+| TermSearchMsg                 of TermSearch.Msg
+| AdvancedSearchMsg             of AdvancedSearch.Msg
+| OfficeInteropMsg              of OfficeInterop.Msg
+| PersistentStorageMsg          of PersistentStorage.Msg
+| FilePickerMsg                 of FilePicker.Msg
+| BuildingBlockMsg              of BuildingBlock.Msg
+| ProtocolMsg                   of Protocol.Msg
 | DataAnnotatorMsg          of DataAnnotator.Msg
 | SpreadsheetMsg            of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
-| InterfaceMsg              of SpreadsheetInterface.Msg
-| Batch                     of seq<Messages.Msg>
-| Run                       of (unit -> unit)
-| UpdateHistory             of LocalHistory.Model
-| UpdateHistoryAnd          of LocalHistory.Model * Cmd<Msg>
-| UpdateSpreadSheetModel    of Spreadsheet.Model
-| UpdateHistoryPosition     of int
+| InterfaceMsg                  of SpreadsheetInterface.Msg
+| PageStateMsg                  of PageState.Msg
+| Batch                         of seq<Messages.Msg>
+| HistoryMsg                    of History.Msg
+| UpdateModal               of Model.ModalState.ModalTypes option
 /// Top level msg to test specific api interactions, only for dev.
+| Run                           of (unit -> unit)
 | TestMyAPI
 | TestMyPostAPI
-| UpdateModal               of Model.ModalState.ModalTypes option
 | DoNothing

@@ -171,7 +171,6 @@ type Msg =
 | RemoveTable of index:int
 | RenameTable of index:int * name:string
 | UpdateTableOrder of pre_index:int * new_index:int
-| UpdateHistoryPosition of newPosition:int
 | AddRows of int
 | DeleteRow of int
 | DeleteRows of int []

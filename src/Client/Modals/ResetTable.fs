@@ -5,7 +5,7 @@ open Feliz.DaisyUI
 open Model
 open Messages
 open Shared
-open Components
+open Swate.Components
 
 
 type ResetTable =
@@ -22,7 +22,7 @@ type ResetTable =
                         prop.className "flex flex-row justify-between"
                         prop.children [
                             Html.span [prop.className "text-xl"; prop.text "Attention!"]
-                            Components.Components.DeleteButton(props=[prop.onClick rmv])
+                            Components.DeleteButton(props=[prop.onClick rmv])
                         ]
                     ]
                     Html.div [

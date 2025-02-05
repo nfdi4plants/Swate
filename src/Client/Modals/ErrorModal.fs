@@ -6,8 +6,7 @@ open Model
 open Messages
 open Feliz
 open Feliz.DaisyUI
-open Components
-
+open Swate.Components
 
 type Error =
 
