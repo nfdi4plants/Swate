@@ -396,9 +396,9 @@ module ComponentAux =
                                     button.sm
                                     prop.onClick (fun _ ->
                                         setProtocolSearch false
-                                        let importTypeState, setImportTypeState = importTypeStateData
-                                        let columns =  Array.init 1 (fun _ -> Set.empty<int>)
-                                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
+                                        //let importTypeState, setImportTypeState = importTypeStateData
+                                        //let columns =  Array.init 1 (fun _ -> Set.empty<int>)
+                                        //{importTypeState with DeSelectedColumns = columns} |> setImportTypeState
                                         SelectProtocols [template] |> ProtocolMsg |> dispatch
                                     )
                                     button.success
@@ -575,8 +575,8 @@ type Search =
                     button.sm
                     prop.onClick (fun _ ->
                         setProtocolSearch false
-                        let columns = Array.init model.ProtocolState.TemplatesSelected.Length (fun _ -> Set.empty<int>)
-                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
+                        //let columns = Array.init model.ProtocolState.TemplatesSelected.Length (fun _ -> Set.empty<int>)
+                        //{importTypeState with DeSelectedColumns = columns} |> setImportTypeState
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                     )
                     button.wide

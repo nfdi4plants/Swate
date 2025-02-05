@@ -37,13 +37,13 @@ type SelectiveImportModal =
                         style.height(length.perc 100)
                     ]
                     prop.isChecked
-                        (if selectionInformation.SelectedColumns.Length > 0 then
-                            not (Set.contains columnIndex selectionInformation.SelectedColumns.[tableIndex])
+                        (if not selectionInformation.DeSelectedColumns.IsEmpty then
+                            not (Set.contains (columnIndex, tableIndex) selectionInformation.DeSelectedColumns)
                         else true)
                     prop.onChange (fun (b: bool) ->
                         if columns.Length > 0 then
-                            let selectedData = SelectiveImportModalState.updateSelectedColumns(selectionInformation.SelectedColumns, tableIndex, columnIndex)
-                            {selectionInformation with SelectedColumns = selectedData} |> setSelectedColumns)
+                            let selectedData = SelectiveImportModalState.updateDeSelectedColumns(selectionInformation.DeSelectedColumns, tableIndex, columnIndex)
+                            {selectionInformation with DeSelectedColumns = selectedData} |> setSelectedColumns)
                 ]
             ]
         ]
@@ -69,8 +69,8 @@ type SelectiveImportModal =
                                         Html.div [
                                             prop.onClick (fun _ ->
                                                 if columns.Length > 0 && selectionInformation.IsSome then
-                                                    let selectedData = SelectiveImportModalState.updateSelectedColumns(selectionInformation.Value.SelectedColumns, tableIndex, columnIndex)
-                                                    {selectionInformation.Value with SelectedColumns = selectedData} |> setSelectedColumns.Value)
+                                                    let selectedData = SelectiveImportModalState.updateDeSelectedColumns(selectionInformation.Value.DeSelectedColumns, tableIndex, columnIndex)
+                                                    {selectionInformation.Value with DeSelectedColumns = selectedData} |> setSelectedColumns.Value)
                                         ]
                                     ]
                                 ]
@@ -119,7 +119,7 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns, ?templateName) =
+    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, deSelectedColumns, setSelectedColumns, ?templateName) =
         let name = defaultArg templateName table0.Name
         let guid = React.useMemo(fun () -> System.Guid.NewGuid().ToString())
         let radioGroup = "radioGroup_" + guid
@@ -154,7 +154,7 @@ type SelectiveImportModal =
                     prop.className "overflow-x-auto"
                     prop.children [
                         if isActive then
-                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, tableIndex, selectedColumns, setSelectedColumns)
+                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, tableIndex, deSelectedColumns, setSelectedColumns)
                         else
                             SelectiveImportModal.TableWithImportColumnCheckboxes(table0)
                     ]
@@ -171,7 +171,7 @@ type SelectiveImportModal =
             | Study (s,_) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init(tables.Count))
+        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init())
         let setMetadataImport = fun b ->
             if b then
                 {
@@ -180,7 +180,7 @@ type SelectiveImportModal =
                         ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
                 } |> setImportDataState
             else
-                SelectiveImportModalState.init(tables.Count) |> setImportDataState
+                SelectiveImportModalState.init() |> setImportDataState
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
@@ -222,7 +222,7 @@ type SelectiveImportModal =
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
                                 prop.onClick(fun e ->
-                                    {| importState = importDataState; importedFile = import; selectedColumns = importDataState.SelectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                                    {| importState = importDataState; importedFile = import; deSelectedColumns = importDataState.DeSelectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )
                             ]

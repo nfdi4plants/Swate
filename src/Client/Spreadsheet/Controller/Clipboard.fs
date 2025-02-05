@@ -22,12 +22,12 @@ let copyCellsByIndex (indices: (int*int) []) (state: Spreadsheet.Model) : JS.Pro
 
 let copySelectedCell (state: Spreadsheet.Model) : JS.Promise<unit> =
     /// Array.head is used until multiple cells are supported, should this ever be intended
-    let index = state.SelectedCells |> Set.toArray |> Array.min
+    let index = state.DeSelectedCells |> Set.toArray |> Array.min
     copyCellByIndex index state
 
 let copySelectedCells (state: Spreadsheet.Model) : JS.Promise<unit> =
     /// Array.head is used until multiple cells are supported, should this ever be intended
-    let indices = state.SelectedCells |> Set.toArray
+    let indices = state.DeSelectedCells |> Set.toArray
     copyCellsByIndex indices state
 
 let cutCellByIndex (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -51,12 +51,12 @@ let cutCellsByIndices (indices: (int*int) []) (state: Spreadsheet.Model) : Sprea
 
 let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.min is used until multiple cells are supported, should this ever be intended
-    let index = state.SelectedCells |> Set.toArray |> Array.min
+    let index = state.DeSelectedCells |> Set.toArray |> Array.min
     cutCellByIndex index state
 
 let cutSelectedCells (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.min is used until multiple cells are supported, should this ever be intended
-    let indices = state.SelectedCells |> Set.toArray 
+    let indices = state.DeSelectedCells |> Set.toArray 
     cutCellsByIndices indices state
 
 let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
@@ -80,18 +80,18 @@ let pasteCellsByIndexExtend (index: int*int) (state: Spreadsheet.Model) : JS.Pro
     }
 
 let pasteCellIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
-    if state.SelectedCells.IsEmpty then
+    if state.DeSelectedCells.IsEmpty then
         promise {return state}
     else
-        let minIndex = state.SelectedCells |> Set.toArray |> Array.min
+        let minIndex = state.DeSelectedCells |> Set.toArray |> Array.min
         pasteCellByIndex minIndex state
 
 let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
-    if state.SelectedCells.IsEmpty then
+    if state.DeSelectedCells.IsEmpty then
         promise {return state}
     else
-        let columnIndex = state.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
-        let selectedSingleColumnCells = state.SelectedCells |> Set.filter (fun index -> fst index = columnIndex)
+        let columnIndex = state.DeSelectedCells |> Set.toArray |> Array.minBy fst |> fst
+        let selectedSingleColumnCells = state.DeSelectedCells |> Set.filter (fun index -> fst index = columnIndex)
         promise {
             let! tab = navigator.clipboard.readText()
             let header = Generic.getHeader columnIndex state

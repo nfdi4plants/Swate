@@ -236,7 +236,7 @@ type Cell =
         let readonly = defaultArg readonly false
         let columnIndex, rowIndex = index
         let state = model.SpreadsheetModel
-        let isSelected = state.SelectedCells.Contains index
+        let isSelected = state.DeSelectedCells.Contains index
         let isIdle = state.CellIsIdle (!^index, columnType)
         let isActive = not isIdle
         let displayValue = defaultArg displayValue cellValue
@@ -284,7 +284,7 @@ type Cell =
                     if isIdle then makeActive()
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
                 )
-                if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
+                if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.DeSelectedCells, model, dispatch)
             prop.onMouseDown(fun e -> if isIdle && e.shiftKey then e.preventDefault())
             prop.children [
                 if isActive then

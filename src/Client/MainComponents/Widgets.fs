@@ -214,9 +214,9 @@ type Widget =
         let config, setConfig = React.useState(TemplateFilterConfig.init)
         let isProtocolSearch, setProtocolSearch = React.useState(true)
         let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
-        if model.ProtocolState.TemplatesSelected.Length > 0 && (fst importTypeStateData).SelectedColumns.Length = 0 then
-            let columns = Array.init model.ProtocolState.TemplatesSelected.Length (fun _ -> Set.empty<int>)
-            {fst importTypeStateData with SelectedColumns = columns} |> snd importTypeStateData
+        //if model.ProtocolState.TemplatesSelected.Length > 0 && (fst importTypeStateData).DeSelectedColumns.Length = 0 then
+        //    let columns = Array.init model.ProtocolState.TemplatesSelected.Length (fun _ -> Set.empty<int>)
+        //    {fst importTypeStateData with DeSelectedColumns = columns} |> snd importTypeStateData
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         let selectContent() =
             [

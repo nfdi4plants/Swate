@@ -73,7 +73,7 @@ module ActivePattern =
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
 type Model = {
     ActiveView: ActiveView
-    SelectedCells: Set<int*int>
+    DeSelectedCells: Set<int*int>
     ActiveCell: (U2<int,(int*int)> * ColumnType) option
     ArcFile: ArcFiles option
 } with
@@ -83,13 +83,13 @@ type Model = {
         | Some (U2.Case2 (ci, ri), ct), U2.Case2 targetIndex -> (ci,ri) = targetIndex && ct = columnType
         | _ -> false
     member this.CellIsSelected(index: int*int) =
-        this.SelectedCells.Contains((index))
+        this.DeSelectedCells.Contains((index))
     member this.CellIsIdle(index: U2<int, int*int>, columnType) =
         this.CellIsActive(index, columnType) |> not
     static member init() =
         {
             ActiveView = ActiveView.Metadata
-            SelectedCells = Set.empty
+            DeSelectedCells = Set.empty
             ActiveCell = None
             ArcFile = None
         }
@@ -104,7 +104,7 @@ type Model = {
     static member init(arcFile: ArcFiles) =
         {
             ActiveView = ActiveView.Metadata
-            SelectedCells = Set.empty
+            DeSelectedCells = Set.empty
             ActiveCell = None
             ArcFile = Some arcFile
         }
@@ -202,8 +202,8 @@ type Msg =
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
 | AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
-| AddTemplate of ArcTable * Set<int> * SelectiveImportModalState * string option
-| AddTemplates of ArcTable[] * Set<int>[] * SelectiveImportModalState
+| AddTemplate of ArcTable * int list * SelectiveImportModalState * string option
+| AddTemplates of ArcTable[] * Set<int*int> * SelectiveImportModalState
 | JoinTable of ArcTable * index: int option * options: TableJoinOptions option * string option
 | UpdateArcFile of ArcFiles
 | InitFromArcFile of ArcFiles

@@ -119,19 +119,19 @@ module Spreadsheet =
                     | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
-            | AddTemplate (table, selectedColumns, importType, templateName) ->
+            | AddTemplate (table, deSelectedColumns, importType, templateName) ->
                 let index = Some (Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel)
                 /// Filter out existing building blocks and keep input/output values.
                 let msg = fun table -> JoinTable(table, index, Some importType.ImportType, templateName) |> SpreadsheetMsg
-                let selectedColumnsIndices = selectedColumns |> List.ofSeq
+                let deSelectedColumnsIndices = deSelectedColumns |> List.ofSeq
                 let cmd =
-                    Table.selectiveTablePrepare state.ActiveTable table selectedColumnsIndices
+                    Table.selectiveTablePrepare state.ActiveTable table deSelectedColumnsIndices
                     |> msg
                     |> Cmd.ofMsg
                 state, model, cmd
-            | AddTemplates (tables, selectedColumns, importType) ->
+            | AddTemplates (tables, deSelectedColumns, importType) ->
                 let arcFile = model.SpreadsheetModel.ArcFile
-                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile selectedColumns
+                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile deSelectedColumns
                 let nextState = {state with ArcFile = Some updatedArcFile}
                 nextState, model, Cmd.none
             | JoinTable (table, index, options, templateName) ->
@@ -176,7 +176,7 @@ module Spreadsheet =
                 let nextState = {
                     state with
                         ActiveView = nextView
-                        SelectedCells = Set.empty
+                        DeSelectedCells = Set.empty
                 }
                 nextState, model, Cmd.none
             | RemoveTable removeIndex ->
@@ -238,11 +238,11 @@ module Spreadsheet =
                 let nextState = Controller.Table.moveColumn current next state
                 nextState, model, Cmd.none
             | UpdateSelectedCells nextSelectedCells ->
-                let nextState = {state with SelectedCells = nextSelectedCells}
+                let nextState = {state with DeSelectedCells = nextSelectedCells}
                 nextState, model, Cmd.none
             | MoveSelectedCell keypressed ->
                 let cmd =
-                    match state.SelectedCells.IsEmpty with
+                    match state.DeSelectedCells.IsEmpty with
                     | true -> Cmd.none
                     | false ->
                         let moveBy =
@@ -256,7 +256,7 @@ module Spreadsheet =
                             | ActiveView.Table _ -> (state.ActiveTable.ColumnCount-1), (state.ActiveTable.RowCount-1)
                             | ActiveView.DataMap -> DataMap.ColumnCount-1 , state.DataMapOrDefault.DataContexts.Count-1
                             | _ -> (state.ActiveTable.ColumnCount-1), (state.ActiveTable.RowCount-1) // This does not matter
-                        let nextIndex = Controller.Table.selectRelativeCell state.SelectedCells.MinimumElement moveBy maxColIndex maxRowIndex
+                        let nextIndex = Controller.Table.selectRelativeCell state.DeSelectedCells.MinimumElement moveBy maxColIndex maxRowIndex
                         let s = Set([nextIndex])
                         let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
                         match Browser.Dom.document.getElementById cellId with
@@ -266,10 +266,10 @@ module Spreadsheet =
                 state, model, cmd
             | SetActiveCellFromSelected ->
                 let cmd =
-                    if state.SelectedCells.IsEmpty then
+                    if state.DeSelectedCells.IsEmpty then
                         Cmd.none
                     else
-                        let min = state.SelectedCells.MinimumElement
+                        let min = state.DeSelectedCells.MinimumElement
                         let cmd = (Fable.Core.U2.Case2 min, ColumnType.Main) |> Some |> UpdateActiveCell |> SpreadsheetMsg
                         Cmd.ofMsg cmd
                 state, model, cmd
@@ -309,12 +309,12 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | CutSelectedCell ->
                 let nextState =
-                    if state.SelectedCells.IsEmpty then state else
+                    if state.DeSelectedCells.IsEmpty then state else
                         Controller.Clipboard.cutSelectedCell state
                 nextState, model, Cmd.none
             | CutSelectedCells ->
                 let nextState =
-                    if state.SelectedCells.IsEmpty then state else
+                    if state.DeSelectedCells.IsEmpty then state else
                         Controller.Clipboard.cutSelectedCells state
                 nextState, model, Cmd.none
             | PasteCell index ->
@@ -353,7 +353,7 @@ module Spreadsheet =
                 let nextState = Controller.Table.clearCells indices state
                 nextState, model, Cmd.none
             | ClearSelected ->
-                let indices = state.SelectedCells |> Set.toArray
+                let indices = state.DeSelectedCells |> Set.toArray
                 let nextState = Controller.Table.clearCells indices state
                 nextState, model, Cmd.none
             | FillColumnWithTerm index ->

@@ -197,16 +197,6 @@ let tryGetPrevTableOutput (prevArcTable: ArcTable option) =
             return None
     }
 
-/// <summary>
-/// Prepare the given table to be joined with the currently active annotation table
-/// </summary>
-/// <param name="tableToAdd"></param>
-let prepareTemplateInMemory (originTable: ArcTable) (tableToAdd: ArcTable) (selectedColumns: Set<int>) =
-    let selectedColumnIndices = selectedColumns |> List.ofSeq            
-    let finalTable = Table.selectiveTablePrepare originTable tableToAdd selectedColumnIndices
-
-    finalTable
-
 [<AutoOpen>]
 module ARCtrlExtensions =
 

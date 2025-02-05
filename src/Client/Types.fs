@@ -16,25 +16,29 @@ module JsonImport =
         ImportType: ARCtrl.TableJoinOptions
         ImportMetadata: bool
         ImportTables: ImportTable list
-        SelectedColumns: int Set []
+        DeSelectedColumns: Set<int*int>
         TemplateName: string option
     } with
-        static member init(tablesCount: int) =
+        static member init() =
             {
                 ImportType = ARCtrl.TableJoinOptions.Headers
                 ImportMetadata = false
                 ImportTables = []
-                SelectedColumns = Array.init tablesCount (fun _ -> Set.empty<int>)
+                DeSelectedColumns = Set.empty
                 TemplateName = None
             }
 
-        static member updateSelectedColumns(selectedColumns: int Set [], tableIndex: int, columnIndex: int) =
-            let selectedData = selectedColumns
-            if Set.contains columnIndex selectedColumns.[tableIndex] then
-                selectedColumns.[tableIndex] <- Set.remove columnIndex selectedColumns.[tableIndex]
+        static member updateDeSelectedColumns(deSelectedColumns: Set<int*int>, tableIndex: int, columnIndex: int) =
+            if Set.contains (columnIndex, tableIndex) deSelectedColumns then
+                Set.remove (columnIndex, tableIndex) deSelectedColumns
             else
-                selectedColumns.[tableIndex] <- Set.add columnIndex selectedColumns.[tableIndex]
-            selectedData
+                Set.add (columnIndex, tableIndex) deSelectedColumns
+
+        static member getDeSelectedTableColumns (deSelectedColumns: Set<int*int>, tableIndex: int) =
+            deSelectedColumns
+            |> List.ofSeq
+            |> List.map (fun item -> if (fst item) = tableIndex then Some (snd item) else None)
+            |> List.choose (fun item -> item)
 
 open Fable.Core
 
