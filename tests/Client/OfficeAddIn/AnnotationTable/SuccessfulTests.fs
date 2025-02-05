@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Fable.Mocha
 
 open ExcelJS.Fable.Excel
-open Shared.ARCtrlHelper
 
 open ARCtrl
 

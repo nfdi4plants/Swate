@@ -3,14 +3,12 @@ namespace Shared
 open System
 open Shared
 open Database
-open DTOs.TermQuery
-open DTOs.ParentTermQuery
 
 [<AutoOpen>]
 module Regex =
 
     open System.Text.RegularExpressions
-    
+
     /// (|Regex|_|) pattern input
     let (|Regex|_|) pattern input =
         let m = Regex.Match(input, pattern)
@@ -20,15 +18,21 @@ module Regex =
 module Route =
 
     let builder typeName methodName =
-        sprintf "/api/%s/%s" typeName methodName
+        let prefix = // This is required to publishing components with production url while maintaining flexible approach in full stack environment
+            #if PUBLISH_COMPONENTS
+            URLs.PRODUCTION_URL
+            #else
+            ""
+            #endif
+        sprintf "%s/api/%s/%s" prefix typeName methodName
 
 module SorensenDice =
-    
+
     let inline calculateDistance (x : Set<'T>) (y : Set<'T>) =
         match  (x.Count, y.Count) with
         | (0, 0) -> 1.
         | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
-    
+
     let createBigrams (s:string) =
         s
             .ToUpperInvariant()
@@ -45,14 +49,16 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
+open Shared.DTOs
+
 type IOntologyAPIv3 = {
     // Development
     getTestNumber           : unit                  -> Async<int>
-    searchTerm              : TermQueryDto          -> Async<Term []>
-    searchTerms             : TermQueryDto[]        -> Async<TermQueryDtoResults[]>
+    searchTerm              : TermQuery          -> Async<Term []>
+    searchTerms             : TermQuery[]        -> Async<TermQueryResults[]>
     getTermById             : string                -> Async<Term option>
-    findAllChildTerms       : ParentTermQueryDto    -> Async<ParentTermQueryDtoResults>
-
+    searchChildTerms        : ParentTermQuery    -> Async<ParentTermQueryResults>
+    searchTermAdvanced      : AdvancedSearchQuery -> Async<Term []>
 }
 
 /// Development api
@@ -82,7 +88,7 @@ module SwateObsolete =
         module Pattern =
 
             module MatchGroups =
-        
+
                 [<Literal>]
                 let numberFormat = "numberFormat"
 
@@ -149,7 +155,7 @@ module SwateObsolete =
                 value.Value.Trim().[1..value.Length-2]
                 // remove #id pattern
                 |> fun str -> Regex.Replace(str, IdPattern, "")
-                |> Some 
+                |> Some
             | _ ->
                 None
 
@@ -237,9 +243,9 @@ type IOntologyAPIv1 = {
     getTermSuggestionsByParentTerm      : (int*string*SwateObsolete.TermMinimal)                        -> Async<Term []>
     getAllTermsByParentTerm             : SwateObsolete.TermMinimal                                     -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*SwateObsolete.TermMinimal)                        -> Async<Term []>
-    getAllTermsByChildTerm              : SwateObsolete.TermMinimal                                     -> Async<Term []>
-    getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions)                   -> Async<Term []>
+    getTermSuggestionsByChildTerm       : (int*string*SwateObsolete.TermMinimal)                                      -> Async<Term []>
+    getAllTermsByChildTerm              : SwateObsolete.TermMinimal                                                   -> Async<Term []>
+    getTermsForAdvancedSearch           : (AdvancedSearchQuery)                   -> Async<Term []>
     getUnitTermSuggestions              : (int*string)                                                  -> Async<Term []>
     getTermsByNames                     : SwateObsolete.TermSearchable []                               -> Async<SwateObsolete.TermSearchable []>
 
@@ -267,7 +273,7 @@ type IOntologyAPIv2 = {
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
     getTermSuggestionsByChildTerm       : {| n: int; query: string; child_term: SwateObsolete.TermMinimal |} -> Async<Term []>
     getAllTermsByChildTerm              : SwateObsolete.TermMinimal -> Async<Term []>
-    getTermsForAdvancedSearch           : (AdvancedSearchTypes.AdvancedSearchOptions) -> Async<Term []>
+    getTermsForAdvancedSearch           : (AdvancedSearchQuery) -> Async<Term []>
     getUnitTermSuggestions              : {| n: int; query: string|} -> Async<Term []>
     getTermsByNames                     : SwateObsolete.TermSearchable []   -> Async<SwateObsolete.TermSearchable []>
 

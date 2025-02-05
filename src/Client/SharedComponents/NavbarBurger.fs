@@ -2,6 +2,7 @@ namespace Components
 
 open Feliz
 open Feliz.DaisyUI
+open Swate.Components
 
 type NavbarBurger =
 
@@ -77,4 +78,4 @@ type NavbarBurger =
             "More",
             NavbarBurger.Dropdown(isOpen, setIsOpen, model, dispatch),
             (fun _ -> setIsOpen (not isOpen))
-        ) |> toReact
+        )

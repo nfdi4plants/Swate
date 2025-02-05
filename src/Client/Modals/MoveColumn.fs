@@ -7,7 +7,7 @@ open Messages
 open Shared
 
 open ARCtrl
-open Components
+open Swate.Components
 
 type MoveColumn =
 

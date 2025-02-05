@@ -1,0 +1,53 @@
+name: Publish NPM Package
+
+on:
+  push:
+    branches: ['nightly']
+  workflow_dispatch: # Allows manual runs from the Actions tab
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure all tags are fetched
+
+      - name: Extract Latest Tag as Version
+        id: get_version
+        run: echo "PACKAGE_VERSION=$(git describe --tags --always --dirty)" >> $GITHUB_ENV
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      - name: Install NPM Dependencies
+        run: npm install
+        working-directory: src/Components
+
+      - name: Set Package Version
+        run: npm version --no-git-tag-version $PACKAGE_VERSION
+        working-directory: src/Componentes
+
+      - name: Build Package
+        run: npm run build
+        working-directory: src/Componentes
+      # - name: Publish to NPM
+      #   run: npm publish --access public
+      #   working-directory: src/Components
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -74,11 +74,18 @@ type Settings =
             ]
         )
 
+    static member SearchConfig (model, dispatch) =
+        Components.Forms.Generic.BoxedField("Term Search Configuration",
+            content = [
+                Settings.SearchConfig.Main(model, dispatch)
+            ]
+        )
+
     static member ActivityLog(model) =
         Components.Forms.Generic.BoxedField("Activity Log", "Display all recorded activities of this session.",
             content = [
                 Html.div [
-                    prop.className "overflow-y-auto max-h-600px"
+                    prop.className "overflow-y-auto max-h-[600px]"
                     prop.children [
                         ActivityLog.Main model
                     ]
@@ -89,6 +96,8 @@ type Settings =
     static member Main(model: Model.Model, dispatch) =
         Components.Forms.Generic.Section [
             Settings.Appearance ()
+
+            Settings.SearchConfig (model, dispatch)
 
             Settings.ActivityLog model
             //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then

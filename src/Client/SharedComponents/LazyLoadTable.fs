@@ -20,6 +20,7 @@ type LazyLoadTable =
         let displayStart, setDisplayStart = React.useState(0)
         let displayEnd, setDisplayEnd = React.useState(0)
         let scrollPosition, setScrollPosition = React.useState(0.)
+        let ref = React.useElementRef()
         let RowHeight = defaultArg rowHeight 57.
         let ScreenHeight = Math.Max(Browser.Dom.document.documentElement.clientHeight, Browser.Dom.window.innerHeight)
         let Offset = ScreenHeight  // We want to render more than we see, or else we will see nothing when scrolling fast
@@ -38,7 +39,6 @@ type LazyLoadTable =
             ),
             [|box data.Length|]
         )
-        let ref = React.useElementRef()
         //Attach a listener to the scroll event on the window. This function will run every time the scroll changes.
         React.useEffect((fun () ->
             if ref.current.IsSome then

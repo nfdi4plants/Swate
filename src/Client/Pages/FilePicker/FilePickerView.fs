@@ -7,6 +7,7 @@ open Messages.FilePicker
 open Messages
 open Feliz
 open Feliz.DaisyUI
+open Swate
 
 let update (filePickerMsg:FilePicker.Msg) (state: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with

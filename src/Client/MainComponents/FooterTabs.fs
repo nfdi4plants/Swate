@@ -196,11 +196,11 @@ let MainPlus(model: Model, dispatch: Messages.Msg -> unit) =
     ]
 
 let ToggleSidebar(model: Model, dispatch: Messages.Msg -> unit) =
-    let show = model.PersistentStorageState.ShowSideBar
+    let show = model.PageState.ShowSideBar
     let id = "toggle-sidebar-button"
     Html.div [
         prop.id id
-        prop.onClick (fun _ -> Messages.PersistentStorage.UpdateShowSidebar (not show) |> Messages.PersistentStorageMsg |> dispatch)
+        prop.onClick (fun _ -> Messages.PageState.UpdateShowSidebar (not show) |> Messages.PageStateMsg |> dispatch)
         prop.className "h-full cursor-pointer ml-auto"
         prop.children [
             Html.label [

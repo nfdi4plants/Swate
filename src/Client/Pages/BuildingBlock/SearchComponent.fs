@@ -44,12 +44,28 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                 prop.children [
                     termOrUnitizedSwitch model dispatch
                     // helper for setting the body cell type
-                    let setter (oaOpt: OntologyAnnotation option) =
-                        let case = oaOpt |> Option.map (fun oa -> !^oa)
+                    let setter (termOpt: Swate.Components.Term option) =
+                        let oa = termOpt |> Option.map OntologyAnnotation.fromTerm
+                        let case = oa |> Option.map (fun oa -> !^oa)
                         BuildingBlock.UpdateBodyArg case |> BuildingBlockMsg |> dispatch
                     let parent = model.AddBuildingBlockState.TryHeaderOA()
                     let input = model.AddBuildingBlockState.TryBodyOA()
-                    Components.TermSearch.Input(setter, fullwidth=true, ?input=input, ?parent=parent, displayParent=false, ?portalTermSelectArea=element.current, isjoin=true, classes="border-current")
+                    Swate.Components.TermSearch.TermSearch(
+                            setter,
+                            (input |> Option.map _.ToTerm()),
+                            ?parentId=(parent |> Option.map _.TermAccessionShort),
+                            portalTermSelectArea=element,
+                            fullwidth=true,
+                            classNames = Swate.Components.TermSearchStyle(!^"border-current join-item"),
+                            advancedSearch = !^true,
+                            showDetails = true,
+                            disableDefaultSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultAllChildrenSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultParentSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
+                            parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
+                            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
+                        )
                 ]
             ]
         ]
@@ -71,12 +87,26 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                     Dropdown.Main(ui, setUi, model, dispatch)
                     // Term search field
                     if state.HeaderCellType.HasOA() then
-                        let setter (oaOpt: OntologyAnnotation option) =
-                            let case = oaOpt |> Option.map (fun oa -> !^oa)
+                        let setter (oaOpt: Swate.Components.Term option) =
+                            let case = oaOpt |> Option.map (fun oa -> OntologyAnnotation.fromTerm >> U2.Case1 <| oa)
                             BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                             //selectHeader ui setUi h |> dispatch
                         let input = model.AddBuildingBlockState.TryHeaderOA()
-                        Components.TermSearch.Input(setter, fullwidth=true, ?input=input, isjoin=true, ?portalTermSelectArea=element.current, classes="border-current")
+                        Swate.Components.TermSearch.TermSearch(
+                            setter,
+                            (input |> Option.map _.ToTerm() ),
+                            portalTermSelectArea=element,
+                            fullwidth=true,
+                            classNames = Swate.Components.TermSearchStyle(!^"border-current join-item"),
+                            advancedSearch = !^true,
+                            showDetails = true,
+                            disableDefaultSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultAllChildrenSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            disableDefaultParentSearch = model.PersistentStorageState.DisableSwateDefaultSearch,
+                            termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
+                            parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
+                            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
+                        )
                     elif state.HeaderCellType.HasIOType() then
                         Daisy.input [
                             prop.readOnly true

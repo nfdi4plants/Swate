@@ -33,6 +33,17 @@ module AdvancedSearch =
 
             model, cmd
 
+module PageState =
+
+    let update (msg: PageState.Msg) (model:Model.Model) : Model * Cmd<Messages.Msg> =
+        match msg with
+        | PageState.UpdateShowSidebar show ->
+            {model with Model.Model.PageState.ShowSideBar = show}, Cmd.none
+        | PageState.UpdateMainPage mainPage ->
+            {model with Model.Model.PageState.MainPage = mainPage}, Cmd.none
+        | PageState.UpdateSidebarPage sidebarPage ->
+            {model with Model.Model.PageState.SidebarPage = sidebarPage}, Cmd.none
+
 module Dev =
 
     let update (devMsg: DevMsg) (currentState:DevState) : DevState * Cmd<Messages.Msg> =
@@ -87,34 +98,42 @@ module Dev =
 
 let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (currentState:PersistentStorageState) : PersistentStorageState * Cmd<Msg> =
     match persistentStorageMsg with
-    | PersistentStorage.NewSearchableOntologies onts ->
-        let nextState = {
-            currentState with
-                SearchableOntologies    = onts |> Array.map (fun ont -> ont.Name |> SorensenDice.createBigrams, ont)
-                HasOntologiesLoaded     = true
-        }
-
-        nextState,Cmd.none
     | PersistentStorage.UpdateAppVersion appVersion ->
         let nextState = {
             currentState with
                 AppVersion = appVersion
         }
         nextState,Cmd.none
-    | PersistentStorage.UpdateShowSidebar show ->
-        {currentState with ShowSideBar = show}, Cmd.none
-
-module Ontologies =
-    let update (omsg: Ontologies.Msg) (model: Model) =
-        match omsg with
-        | Ontologies.GetOntologies ->
-            let cmd =
-                Cmd.OfAsync.either
-                    Api.api.getAllOntologies
-                    ()
-                    (PersistentStorage.NewSearchableOntologies >> PersistentStorageMsg)
-                    (curry GenericError Cmd.none >> DevMsg)
-            model, cmd
+    | PersistentStorage.UpdateSwateDefaultSearch swateDefaultSearch ->
+        let nextState = {
+            currentState with
+                SwateDefaultSearch = swateDefaultSearch
+        }
+        LocalStorage.SwateSearchConfig.SwateDefaultSearch.Set swateDefaultSearch
+        nextState,Cmd.none
+    | PersistentStorage.AddTIBSearchCatalogue catalogue ->
+        let nextCata = currentState.TIBSearchCatalogues.Add(catalogue)
+        let nextState = {
+            currentState with
+                TIBSearchCatalogues = nextCata
+        }
+        LocalStorage.SwateSearchConfig.TIBSearch.Set (Set.toArray nextCata)
+        nextState,Cmd.none
+    | PersistentStorage.RemoveTIBSearchCatalogue catalogue ->
+        let nextCata = currentState.TIBSearchCatalogues.Remove(catalogue)
+        let nextState = {
+            currentState with
+                TIBSearchCatalogues = nextCata
+        }
+        LocalStorage.SwateSearchConfig.TIBSearch.Set (Set.toArray nextCata)
+        nextState,Cmd.none
+    | PersistentStorage.SetTIBSearchCatalogues catalogues ->
+        let nextState = {
+            currentState with
+                TIBSearchCatalogues = catalogues
+        }
+        LocalStorage.SwateSearchConfig.TIBSearch.Set (Set.toArray catalogues)
+        nextState,Cmd.none
 
 module DataAnnotator =
     let update (msg: DataAnnotator.Msg) (state: DataAnnotator.Model) (model: Model.Model) =
@@ -143,6 +162,25 @@ module DataAnnotator =
             }
             nextState, model, Cmd.none
 
+module History =
+    let update (msg: History.Msg) (model: Model) : Model * Cmd<Msg> =
+        match msg with
+        | History.UpdateAnd (newHistory, cmd) -> {model with History = newHistory}, cmd
+        | History.UpdateHistoryPosition newPosition ->
+            match newPosition with
+            | _ when model.History.NextPositionIsValid(newPosition) |> not ->
+                model, Cmd.none
+            | _ ->
+                let nextModel = {model with History.HistoryCurrentPosition = newPosition}
+                let cmd =
+                    Cmd.OfPromise.either
+                        LocalHistory.Model.fromIndexedDBByKeyPosition
+                        (newPosition)
+                        (fun nextState -> Messages.UpdateModel { nextModel with SpreadsheetModel = nextState })
+                        (curry GenericError Cmd.none >> DevMsg)
+                model, cmd
+
+
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     let innerUpdate (msg: Msg) (currentModel: Model) =
         match msg with
@@ -152,17 +190,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             model, Cmd.none
         | UpdateModal modal ->
             {model with Model.ModalState.ActiveModal = modal}, Cmd.none
-        | UpdateHistory next -> {model with History = next}, Cmd.none
-        | UpdateHistoryAnd (newHistory, cmd) -> {model with History = newHistory}, cmd
-        | UpdateSpreadSheetModel nextState -> {model with SpreadsheetModel = nextState}, Cmd.none
-        | UpdateHistoryPosition newPosition ->
-            let cmd =
-                Cmd.OfPromise.either
-                    LocalHistory.Model.fromIndexedDBByKeyPosition
-                    (newPosition)
-                    (fun nextState -> Messages.UpdateSpreadSheetModel nextState)
-                    (curry GenericError Cmd.none >> DevMsg)
-            {model with History.HistoryCurrentPosition = newPosition}, cmd
         | TestMyAPI ->
             let cmd =
                 Cmd.OfAsync.either
@@ -188,10 +215,6 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             currentModel, cmd
         | UpdateModel nextModel ->
             nextModel, Cmd.none
-
-        | OntologyMsg msg ->
-            let nextModel, cmd = Ontologies.update msg model
-            nextModel, cmd
 
         | OfficeInteropMsg excelMsg ->
             let nextState,nextModel0, nextCmd = Update.OfficeInterop.update model.ExcelState currentModel excelMsg
@@ -285,6 +308,14 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
         | DataAnnotatorMsg msg ->
             let nextState, nextModel0, nextCmd = DataAnnotator.update msg currentModel.DataAnnotatorModel currentModel
             let nextModel = {nextModel0 with DataAnnotatorModel = nextState}
+            nextModel, nextCmd
+
+        | PageStateMsg msg ->
+            let nextModel, nextCmd = PageState.update msg currentModel
+            nextModel, nextCmd
+
+        | HistoryMsg msg ->
+            let nextModel, nextCmd = History.update msg currentModel
             nextModel, nextCmd
 
     /// This function is used to determine which msg should be logged to activity log.
