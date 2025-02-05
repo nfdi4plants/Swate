@@ -50,8 +50,13 @@ jobs:
         run: npm run build
         working-directory: src/Components
 
-      # - name: Publish to NPM
-      #   run: npm publish --access public
-      #   working-directory: src/Components
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish to NPM
+        run: |
+          if [ "$GITHUB_REF_NAME" = "nightly" ]; then
+            npm publish --access public --tag next
+          else
+            npm publish --access public
+          fi
+        working-directory: src/Components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}

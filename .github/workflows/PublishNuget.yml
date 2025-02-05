@@ -1,4 +1,4 @@
-name: Publish Nightly NuGet Package
+name: Publish NuGet Package
 
 on:
   push:
