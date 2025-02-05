@@ -3,6 +3,7 @@ module Update.UpdateUtil
 open ARCtrl
 open Shared
 open Fable.Remoting.Client
+open OfficeInterop.Core
 
 let download(filename, bytes:byte []) = bytes.SaveFileAs(filename)
 
@@ -20,24 +21,18 @@ module JsonImportHelper =
     /// </summary>
     /// <param name="arcTables"></param>
     /// <param name="state"></param>
-    /// <param name="selectedColumns"></param>
+    /// <param name="deselectedColumns"></param>
     /// <param name="fullImport"></param>
-    let createUpdatedTables (arcTables: ResizeArray<ArcTable>) (state: SelectiveImportModalState) (selectedColumns: bool [] []) fullImport =
+    let createUpdatedTables (arcTables: ResizeArray<ArcTable>) (state: SelectiveImportModalState) (deselectedColumns: Set<int*int>) fullImport =
         [
             for importTable in state.ImportTables do
                 let fullImport = defaultArg fullImport importTable.FullImport
                 if importTable.FullImport = fullImport then
-                    let selectedColumn = selectedColumns.[importTable.Index]
-                    let selectedColumnIndices =
-                        selectedColumn
-                        |> Array.mapi (fun i item -> if item = false then Some i else None)
-                        |> Array.choose (fun x -> x)
-                        |> List.ofArray
-
+                    let deselectedColumnIndices = getDeSelectedTableColumns deselectedColumns importTable.Index
                     let sourceTable = arcTables.[importTable.Index]
                     let appliedTable = ArcTable.init(sourceTable.Name)
 
-                    let finalTable = Table.selectiveTablePrepare appliedTable sourceTable selectedColumnIndices
+                    let finalTable = Table.selectiveTablePrepare appliedTable sourceTable deselectedColumnIndices
                     appliedTable.Join(finalTable, joinOptions=state.ImportType)
                     appliedTable
         ]
@@ -48,22 +43,22 @@ module JsonImportHelper =
     /// </summary>
     /// <param name="uploadedFile"></param>
     /// <param name="state"></param>
-    /// <param name="selectedColumns"></param>
-    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (selectedColumns: bool [] []) =
+    /// <param name="deselectedColumns"></param>
+    let updateWithMetadata (uploadedFile: ArcFiles) (state: SelectiveImportModalState) (deselectedColumns: Set<int*int>) =
         if not state.ImportMetadata then failwith "Metadata must be imported"
         /// This updates the existing tables based on import config (joinOptions)
         let arcFile =
             match uploadedFile with
             | Assay a as arcFile ->
-                let tables = createUpdatedTables a.Tables state selectedColumns None
+                let tables = createUpdatedTables a.Tables state deselectedColumns None
                 a.Tables <- tables
                 arcFile
             | Study (s,_) as arcFile ->
-                let tables = createUpdatedTables s.Tables state selectedColumns None
+                let tables = createUpdatedTables s.Tables state deselectedColumns None
                 s.Tables <- tables
                 arcFile
             | Template t as arcFile ->
-                let table = createUpdatedTables (ResizeArray[t.Table]) state selectedColumns None
+                let table = createUpdatedTables (ResizeArray[t.Table]) state deselectedColumns None
                 t.Table <- table.[0]
                 arcFile
             | Investigation _ as arcFile ->
@@ -77,8 +72,8 @@ module JsonImportHelper =
     /// <param name="importState"></param>
     /// <param name="activeTableIndex"></param>
     /// <param name="existingOpt"></param>
-    /// <param name="selectedColumns"></param>
-    let updateTables (importTables: ResizeArray<ArcTable>) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (selectedColumns: bool [] []) =
+    /// <param name="deselectedColumns"></param>
+    let updateTables (importTables: ResizeArray<ArcTable>) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (deselectedColumns: Set<int*int>) =
         match existingOpt with
         | Some existing ->
             let existingTables =
@@ -92,7 +87,7 @@ module JsonImportHelper =
                 match activeTableIndex with
                 | Some i when i >= 0 && i < existingTables.Count ->
                     let activeTable = existingTables.[i]
-                    let selectedColumnTables = createUpdatedTables importTables importState selectedColumns (Some false) |> Array.ofSeq |> Array.rev
+                    let selectedColumnTables = createUpdatedTables importTables importState deselectedColumns (Some false) |> Array.ofSeq |> Array.rev
                     /// Everything will be appended against this table, which in the end will be appended to the main table
                     let tempTable = activeTable.Copy()
                     for table in selectedColumnTables do
@@ -101,7 +96,7 @@ module JsonImportHelper =
                     existingTables.[i] <- tempTable
                 | _ -> ()
             let addTables =
-                let selectedColumnTables = createUpdatedTables importTables importState selectedColumns (Some true) |> Array.ofSeq |> Array.rev
+                let selectedColumnTables = createUpdatedTables importTables importState deselectedColumns (Some true) |> Array.ofSeq |> Array.rev
                 selectedColumnTables
                 |> Seq.map (fun table -> // update tables based on joinOptions
                     let nTable = ArcTable.init(table.Name)
@@ -115,20 +110,21 @@ module JsonImportHelper =
             failwith "Error! Can only append information if metadata sheet exists!"
             
     /// <summary>
-    ///
+    /// 
     /// </summary>
     /// <param name="import"></param>
     /// <param name="importState"></param>
-    /// <param name="activeTableIndex">Required to append imported tables to the active table.</param>
-    /// <param name="existing"></param>
-    let updateArcFileTables (import: ArcFiles) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (selectedColumns: bool [] []) =
+    /// <param name="activeTableIndex"></param>
+    /// <param name="existingOpt"></param>
+    /// <param name="deselectedColumns"></param>
+    let updateArcFileTables (import: ArcFiles) (importState: SelectiveImportModalState) (activeTableIndex: int option) (existingOpt: ArcFiles option) (deselectedColumns: Set<int*int>) =
         let importTables =
             match import with
             | Assay a -> a.Tables
             | Study (s,_) -> s.Tables
             | Template t -> ResizeArray([t.Table])
             | Investigation _ -> ResizeArray()
-        updateTables importTables importState activeTableIndex existingOpt selectedColumns
+        updateTables importTables importState activeTableIndex existingOpt deselectedColumns
 
 module JsonExportHelper =
     open ARCtrl

@@ -1,9 +1,7 @@
 module Spreadsheet.Cells
-
 open Feliz
 open Feliz.DaisyUI
 open Fable.Core
-
 open Spreadsheet
 open MainComponents
 open Messages
@@ -11,9 +9,7 @@ open Shared
 open ARCtrl
 open Components
 open Model
-
 module private CellAux =
-
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
         log (s, header)
         match header.TryOA(), s with
@@ -24,7 +20,6 @@ module private CellAux =
         |> Option.map header.UpdateWithOA
         |> fun s -> log s; s
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
-
     let headerTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
         match header.TryOA(), s with
         | Some oa, "" -> oa.TermAccessionNumber <- None;  Some oa
@@ -32,17 +27,11 @@ module private CellAux =
         | None, _ -> None
         |> Option.map header.UpdateWithOA
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
-
     let oasetter (index, nextCell: CompositeCell, dispatch) = Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
-
     let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, dispatch) else ContextMenu.DataMap.onContextMenu (index, dispatch)
-
 open CellAux
-
 module private EventPresets =
-
     open Shared
-
     let onClickSelect (index: int*int, isIdle:bool, selectedCells: Set<int*int>, model:Model, dispatch)=
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
@@ -124,7 +113,6 @@ type Cell =
                     Daisy.loading []
             ]
         ]
-
     [<ReactComponent>]
     static member HeaderBase(columnType: ColumnType, setter: string -> unit, cellValue: string, columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly: bool) =
         let readonly = defaultArg readonly false
@@ -170,7 +158,6 @@ type Cell =
                 ]
             ]
         ]
-
     static member Header(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly: bool) =
         let cellValue = header.ToString()
         let setter =
@@ -185,34 +172,28 @@ type Cell =
                     nextHeader <- nextHeader.UpdateWithOA updatedOA
                 Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch
         Cell.HeaderBase(Main, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
-
     static member HeaderUnit(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
         let cellValue = "Unit"
         let setter = fun (s: string) -> ()
         Cell.HeaderBase(Unit, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
-
     static member HeaderTSR(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
         let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermSourceREF) |> Option.flatten |> Option.defaultValue ""
         let setter = fun (s: string) -> headerTSRSetter(columnIndex, s, header, dispatch)
         Cell.HeaderBase(TSR, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
-
     static member HeaderTAN(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch, ?readonly) =
         let cellValue = header.TryOA() |> Option.map (fun oa -> oa.TermAccessionShort) |> Option.defaultValue ""
         let setter = fun (s: string) -> headerTANSetter(columnIndex, s, header, dispatch)
         Cell.HeaderBase(TAN, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, ?readonly=readonly)
-
     static member HeaderDataSelector(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let ct = ColumnType.DataSelector
         let cellValue = ct.ToColumnHeader()
         let setter = fun _ -> ()
         Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
-
     static member HeaderDataFormat(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let ct = ColumnType.DataFormat
         let cellValue = ct.ToColumnHeader()
         let setter = fun _ -> ()
         Cell.HeaderBase(ct, setter, cellValue, columnIndex, header, state_extend, setState_extend, model, dispatch, true)
-
     static member HeaderDataSelectorFormat(columnIndex: int, header: CompositeHeader, state_extend: Set<int>, setState_extend, model: Model, dispatch) =
         let ct = ColumnType.DataSelectorFormat
         let cellValue = ct.ToColumnHeader()
@@ -229,7 +210,6 @@ type Cell =
                 ]
             ]
         ]]
-
     [<ReactComponent>]
     static member BodyBase(columnType: ColumnType, cellValue: string, setter: string -> unit, index: (int*int), model: Model, dispatch, ?oasetter: {|oa: OntologyAnnotation; setter: OntologyAnnotation -> unit|}, ?displayValue, ?readonly: bool, ?tooltip: string) =
         let readonly = defaultArg readonly false
@@ -349,7 +329,6 @@ type Cell =
                 ]
             ]
         ]
-
     static member Body(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.GetContentSwate().[0]
         let setter = fun (s: string) ->
@@ -369,7 +348,6 @@ type Cell =
                 None
         let displayValue = cell.ToString()
         Cell.BodyBase(Main, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
-
     static member BodyUnit(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().NameText
         let setter = fun (s: string) ->
@@ -392,7 +370,6 @@ type Cell =
                 None
         let displayValue = cell.ToString()
         Cell.BodyBase(Unit, cellValue, setter, index, model, dispatch, ?oasetter=oasetter, displayValue=displayValue)
-
     static member BodyTSR(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().TermSourceREF |> Option.defaultValue ""
         let setter = fun (s: string) ->
@@ -402,7 +379,6 @@ type Cell =
             let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(TSR, cellValue, setter, index, model, dispatch)
-
     static member BodyTAN(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().TermAccessionNumber |> Option.defaultValue ""
         let setter = fun (s: string) ->
@@ -412,7 +388,6 @@ type Cell =
             let nextCell = cell.UpdateWithOA oa
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(TAN, cellValue, setter, index, model, dispatch)
-
     static member BodyDataSelector(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let data = cell.AsData
         let cellValue = data.Selector |> Option.defaultValue ""
@@ -422,7 +397,6 @@ type Cell =
             let nextCell = cell.UpdateWithData data
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(ColumnType.DataSelector, cellValue, setter, index, model, dispatch)
-
     static member BodyDataFormat(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let data = cell.AsData
         let cellValue = data.Format |> Option.defaultValue ""
@@ -432,7 +406,6 @@ type Cell =
             let nextCell = cell.UpdateWithData data
             Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         Cell.BodyBase(ColumnType.DataFormat, cellValue, setter, index, model, dispatch)
-
     static member BodyDataSelectorFormat(index: (int*int), cell: CompositeCell, model: Model, dispatch) =
         let data = cell.AsData
         let cellValue = data.SelectorFormat |> Option.defaultValue ""

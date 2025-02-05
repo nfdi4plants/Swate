@@ -201,8 +201,8 @@ type Msg =
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
 | AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
-| AddTemplate of ArcTable * bool[] * SelectiveImportModalState * string option
-| AddTemplates of ArcTable[] * bool[][] * SelectiveImportModalState
+| AddTemplate of ArcTable * int list * SelectiveImportModalState * string option
+| AddTemplates of ArcTable[] * Set<int*int> * SelectiveImportModalState
 | JoinTable of ArcTable * index: int option * options: TableJoinOptions option * string option
 | UpdateArcFile of ArcFiles
 | InitFromArcFile of ArcFiles

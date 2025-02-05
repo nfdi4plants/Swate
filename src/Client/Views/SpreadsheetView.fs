@@ -36,7 +36,7 @@ open JsonImport
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
     let widgets, setWidgets = React.useState([])
-    let importTypeStateData = React.useState(SelectiveImportModalState.init([]))
+    let importTypeStateData = React.useState(SelectiveImportModalState.init())
     let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
     let bringWidgetToFront (widget: Widget) =
         let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
