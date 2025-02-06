@@ -29,9 +29,6 @@ type Templates =
     static member Main (model: Model, dispatch) =
         let isProtocolSearch, setProtocolSearch = React.useState(false)
         let importTypeStateData = React.useState(SelectiveImportModalState.init())
-        //if model.ProtocolState.TemplatesSelected.Length > 0 && (fst importTypeStateData).DeSelectedColumns.IsEmpty then
-        //    let columns = Array.init model.ProtocolState.TemplatesSelected.Length (fun _ -> Set.empty<int>)
-        //    {fst importTypeStateData with DeSelectedColumns = columns} |> snd importTypeStateData
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"
 
@@ -43,11 +40,9 @@ type Templates =
                     prop.text "Only missing building blocks will be added."
                 ]
             ])
-            // Box 1
-            SidebarComponents.SidebarLayout.Description "Add template from database."
 
             if isProtocolSearch then
-                Protocol.SearchContainer.Main model setProtocolSearch importTypeStateData dispatch
+                Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch, true)
             else
                 SidebarComponents.SidebarLayout.LogicContainer [
                     Modals.SelectiveTemplateFromDB.Main(model, false, setProtocolSearch, importTypeStateData, dispatch)

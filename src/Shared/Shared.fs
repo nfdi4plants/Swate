@@ -243,8 +243,8 @@ type IOntologyAPIv1 = {
     getTermSuggestionsByParentTerm      : (int*string*SwateObsolete.TermMinimal)                        -> Async<Term []>
     getAllTermsByParentTerm             : SwateObsolete.TermMinimal                                     -> Async<Term []>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*SwateObsolete.TermMinimal)                                      -> Async<Term []>
-    getAllTermsByChildTerm              : SwateObsolete.TermMinimal                                                   -> Async<Term []>
+    getTermSuggestionsByChildTerm       : (int*string*SwateObsolete.TermMinimal)                        -> Async<Term []>
+    getAllTermsByChildTerm              : SwateObsolete.TermMinimal                                     -> Async<Term []>
     getTermsForAdvancedSearch           : (AdvancedSearchQuery)                   -> Async<Term []>
     getUnitTermSuggestions              : (int*string)                                                  -> Async<Term []>
     getTermsByNames                     : SwateObsolete.TermSearchable []                               -> Async<SwateObsolete.TermSearchable []>

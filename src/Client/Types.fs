@@ -29,10 +29,10 @@ module JsonImport =
             }
 
         member this.toggleDeselectedColumns(tableIndex: int, columnIndex: int) =
-            if Set.contains (columnIndex, tableIndex) this.DeselectedColumns then
-                Set.remove (columnIndex, tableIndex) this.DeselectedColumns
+            if Set.contains (tableIndex, columnIndex) this.DeselectedColumns then
+                Set.remove (tableIndex, columnIndex) this.DeselectedColumns
             else
-                Set.add (columnIndex, tableIndex) this.DeselectedColumns
+                Set.add (tableIndex, columnIndex) this.DeselectedColumns
 
 open Fable.Core
 
