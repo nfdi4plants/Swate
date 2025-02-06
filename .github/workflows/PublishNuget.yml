@@ -28,7 +28,7 @@ jobs:
         run: echo "Version extracted; $GIT_TAG_LATEST"
 
       - name: Restore Dependencies
-        run: dotnet restore src/Components/src/Components.fsproj
+        run: dotnet restore src/Components/src/Swate.Components.fsproj
 
       - name: Install NPM Dependencies
         run: npm install
@@ -40,16 +40,16 @@ jobs:
         working-directory: src/Components
 
       - name: Build Components Project
-        run: dotnet build src/Components/src/Components.fsproj --configuration Release /p:GitTag=$GIT_TAG_LATEST
+        run: dotnet build src/Components/src/Swate.Components.fsproj --configuration Release /p:GitTag=$GIT_TAG_LATEST
 
       - name: Build Shared Project
-        run: dotnet build src/Shared/Shared.fsproj --configuration Release /p:GitTag=$GIT_TAG_LATEST
+        run: dotnet build src/Shared/Swate.Components.Core.fsproj --configuration Release /p:GitTag=$GIT_TAG_LATEST
 
       - name: Pack Components NuGet Package
-        run: dotnet pack src/Components/src/Components.fsproj --configuration Release --output nupkgs /p:GitTag=$GIT_TAG_LATEST
+        run: dotnet pack src/Components/src/Swate.Components.fsproj --configuration Release --output nupkgs /p:GitTag=$GIT_TAG_LATEST
 
       - name: Pack Shared NuGet Package
-        run: dotnet pack src/Shared/Shared.fsproj --configuration Release --output nupkgs /p:GitTag=$GIT_TAG_LATEST
+        run: dotnet pack src/Shared/Swate.Components.Core.fsproj --configuration Release --output nupkgs /p:GitTag=$GIT_TAG_LATEST
 
       - name: Publish to NuGet
         run: dotnet nuget push nupkgs/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
