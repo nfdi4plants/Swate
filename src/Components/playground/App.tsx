@@ -1,5 +1,5 @@
 import React from 'react';
-import TermSearch from '../src/TermSearch/TermSearchV2.fs.ts';
+import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 
 const App = () => {
     const [term, setTerm] = React.useState(undefined);
