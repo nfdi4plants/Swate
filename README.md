@@ -29,7 +29,15 @@ To get started with Swate, choose your preferred platform:
 3. **Electron App**: Download and install the app from the [GitHub Releases Page](https://github.com/nfdi4plants/ARCitect/releases)
 4. **Excel Add-In**: Find installation instructions in the [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/annotate-in-excel/)
 
-### 🛠 Installation for Developers
+If you choose to use the ARCitect you can also follow along our Tutorial [Violas Journey](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/start-here/) 🪻
+
+### 📖 Documentation
+
+You can find indepth documentation on how to use Swate on our [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/).
+
+Most information based on ARCitect can be transferred to other Swate platforms.
+
+### 🔨⛏️ Installation for Developers
 
 #### React Components
 
