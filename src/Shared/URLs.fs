@@ -2,6 +2,9 @@ namespace Shared
 
 module URLs =
 
+    [<Literal>]
+    let PRODUCTION_URL = @"https://swate-alpha.nfdi4plants.org"
+
     module Data =
 
         module SelectorFormat =

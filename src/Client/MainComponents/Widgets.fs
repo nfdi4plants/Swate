@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
+open Swate
 open Modals
 open Types.JsonImport
 
@@ -211,12 +212,6 @@ type Widget =
     [<ReactComponent>]
     static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
         let isProtocolSearch, setProtocolSearch = React.useState(true)
-        if model.ProtocolState.TemplatesSelected.Length > 0 && (fst importTypeStateData).SelectedColumns.Length = 0 then
-            let columns =
-                model.ProtocolState.TemplatesSelected
-                |> List.map (fun template -> Array.init template.Table.Columns.Length (fun _ -> true))
-                |> Array.ofList
-            {fst importTypeStateData with SelectedColumns = columns} |> snd importTypeStateData
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         let selectContent() =
             [

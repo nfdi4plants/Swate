@@ -19,5 +19,8 @@
         "**/bin": true,
         "**/obj": true,
         "**/deploy": true,
+    },
+    "[fsharp]": {
+        "editor.inlayHints.enabled": "off"
     }
 }

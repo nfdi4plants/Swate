@@ -6,6 +6,7 @@ open Messages
 open Shared
 open Spreadsheet
 open Model
+open Swate
 
 open ARCtrl
 

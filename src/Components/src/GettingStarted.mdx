@@ -1,0 +1,62 @@
+# Getting Started
+
+## Install
+
+### JavaScript
+
+#### Install component library
+
+`npm i @nfdi4plants/swate-components`
+
+#### Import the components you want to use:
+
+```jsx
+
+import '@nfdi4plants/swate-components/style.css' // Import minified tailwind and daisyui style
+import '@fortawesome/fontawesome-free/css/all.css' // Import icons
+import { TermSearch } from '@nfdi4plants/swate-components'
+
+<TermSearch
+    onTermSelect={(term) => console.log(term)}
+    term={undefined}
+    parentId='TEST:1298'
+/>
+
+```
+
+### .NET
+
+#### Install with **Femto**
+
+`dotnet femto install Swate.Components <path/to/.fsproj>`
+
+#### Install **Manually**:
+
+Install [nuget package](www.nuget.org/packages/Swate.Components).
+
+```
+<PackageReference Include="Swate.Components" Version="1.0.0-alpha.3" />
+
+paket add Swate.Components --version 1.0.0-alpha.3
+```
+
+Install npm dependencies
+
+```bash
+npm i @fortawesome/fontawesome-free
+```
+
+#### Import the components you want to use:
+
+
+```fsharp
+open Fable.Core.JsInterop
+
+Swate.Components.Style.import
+importSideEffects "@fortawesome/fontawesome-free/css/all.min.css"
+
+Swate.Components.TermSearchV2.TermSearch(
+    (fun term -> Browser.Dom.console.log term),
+    None
+)
+```

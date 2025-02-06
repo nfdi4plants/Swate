@@ -14,7 +14,7 @@ type private FunctionPage =
 | Create
 | Update
 
-open Components
+open Swate.Components
 
 module private Components =
 

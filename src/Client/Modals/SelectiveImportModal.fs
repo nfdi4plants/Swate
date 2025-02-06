@@ -8,7 +8,7 @@ open Shared
 
 open ARCtrl
 open JsonImport
-open Components
+open Swate.Components
 
 type SelectiveImportModal =
 
@@ -36,25 +36,21 @@ type SelectiveImportModal =
                     prop.style [
                         style.height(length.perc 100)
                     ]
-                    prop.isChecked
-                        (if selectionInformation.SelectedColumns.Length > 0 then
-                            selectionInformation.SelectedColumns.[tableIndex].[columnIndex]
-                        else true)
+                    prop.isChecked (not (Set.contains (tableIndex, columnIndex) selectionInformation.DeselectedColumns))
                     prop.onChange (fun (b: bool) ->
                         if columns.Length > 0 then
-                            let selectedData = selectionInformation.SelectedColumns
-                            selectedData.[tableIndex].[columnIndex] <- b
-                            {selectionInformation with SelectedColumns = selectedData} |> setSelectedColumns)
+                            let selectedData = selectionInformation.toggleDeselectedColumns(tableIndex, columnIndex)
+                            {selectionInformation with DeselectedColumns = selectedData} |> setSelectedColumns)
                 ]
             ]
         ]
 
-    static member TableWithImportColumnCheckboxes(table: ArcTable, ?tableIndex, ?selectionInformation: SelectiveImportModalState, ?setSelectedColumns: SelectiveImportModalState -> unit) =
+    static member TableWithImportColumnCheckboxes(table: ArcTable, ?tableIndex, ?selectionInformation: SelectiveImportModalState, ?setDeselectedColumns: SelectiveImportModalState -> unit) =
         let columns = table.Columns
         let tableIndex = defaultArg tableIndex 0
         let displayCheckBox =
             //Determine whether to display checkboxes or not
-            selectionInformation.IsSome && setSelectedColumns.IsSome
+            selectionInformation.IsSome && setDeselectedColumns.IsSome
         Daisy.table [
             prop.children [
                 Html.thead [
@@ -65,21 +61,13 @@ type SelectiveImportModal =
                                     prop.className "join flex flex-row centered gap-2"
                                     prop.children [
                                         if displayCheckBox then
-                                            SelectiveImportModal.CheckBoxForTableColumnSelection(columns, tableIndex, columnIndex, selectionInformation.Value, setSelectedColumns.Value)
+                                            SelectiveImportModal.CheckBoxForTableColumnSelection(columns, tableIndex, columnIndex, selectionInformation.Value, setDeselectedColumns.Value)
                                         Html.text (columns.[columnIndex].Header.ToString())
-                                        Html.div [
-                                            prop.onClick (fun _ ->
-                                                if columns.Length > 0 && selectionInformation.IsSome then
-                                                    let selectedData = selectionInformation.Value.SelectedColumns
-                                                    selectedData.[tableIndex].[columnIndex] <- not selectedData.[tableIndex].[columnIndex]
-                                                    {selectionInformation.Value with SelectedColumns = selectedData} |> setSelectedColumns.Value)
-                                        ]
                                     ]
                                 ]
                             ]
                     ]
                 ]
-
                 Html.tbody [
                     for ri in 0 .. (table.RowCount-1) do
                         let row = table.GetRow(ri, true)
@@ -121,7 +109,7 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, selectedColumns, setSelectedColumns, ?templateName) =
+    static member TableImport(tableIndex: int, table0: ArcTable, state: SelectiveImportModalState, addTableImport: int -> bool -> unit, rmvTableImport: int -> unit, deselectedColumns, setSelectedColumns, ?templateName) =
         let name = defaultArg templateName table0.Name
         let guid = React.useMemo(fun () -> System.Guid.NewGuid().ToString())
         let radioGroup = "radioGroup_" + guid
@@ -160,7 +148,7 @@ type SelectiveImportModal =
                     prop.className "overflow-x-auto"
                     prop.children [
                         if isActive then
-                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, tableIndex, selectedColumns, setSelectedColumns)
+                            SelectiveImportModal.TableWithImportColumnCheckboxes(table0, tableIndex, deselectedColumns, setSelectedColumns)
                         else
                             SelectiveImportModal.TableWithImportColumnCheckboxes(table0)
                     ]
@@ -177,7 +165,7 @@ type SelectiveImportModal =
             | Study (s,_) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init(tables))
+        let importDataState, setImportDataState = React.useState(SelectiveImportModalState.init())
         let setMetadataImport = fun b ->
             if b then
                 {
@@ -186,7 +174,7 @@ type SelectiveImportModal =
                         ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
                 } |> setImportDataState
             else
-                SelectiveImportModalState.init(tables) |> setImportDataState
+                SelectiveImportModalState.init() |> setImportDataState
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
             let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
@@ -227,8 +215,8 @@ type SelectiveImportModal =
                                 button.info
                                 prop.style [style.marginLeft length.auto]
                                 prop.text "Submit"
-                                prop.onClick( fun e ->
-                                    {| importState = importDataState; importedFile = import; selectedColumns = importDataState.SelectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                                prop.onClick(fun e ->
+                                    {| importState = importDataState; importedFile = import; deselectedColumns = importDataState.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )
                             ]

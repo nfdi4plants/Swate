@@ -564,11 +564,6 @@ type Search =
                     button.wide
                     prop.onClick (fun _ ->
                         setProtocolSearch false
-                        let columns =
-                            model.ProtocolState.TemplatesSelected
-                            |> Array.ofSeq
-                            |> Array.map (fun t -> Array.init t.Table.Columns.Length (fun _ -> true))
-                        {importTypeState with SelectedColumns = columns} |> setImportTypeState
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                     )
                     if model.ProtocolState.TemplatesSelected.Length > 0 then

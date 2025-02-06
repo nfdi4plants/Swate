@@ -1,0 +1,65 @@
+name: Publish NPM Package
+
+on:
+  push:
+    branches: ['nightly']
+  workflow_dispatch: # Allows manual runs from the Actions tab
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure all tags are fetched
+
+      - name: Extract Latest Tag as Version
+        id: get_version
+        run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> "$GITHUB_ENV"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      - name: Install root NPM Dependencies
+        run: npm install
+
+      - name: Install NPM Dependencies
+        run: npm install
+        working-directory: src/Components
+
+      - name: Set Package Version
+        run: npm version --no-git-tag-version $GIT_TAG_LATEST
+        working-directory: src/Components
+
+      - name: Build Package
+        run: npm run build
+        working-directory: src/Components
+
+      - name: Publish to NPM (Latest)
+        if: github.ref_name == 'release'
+        run: echo "non prerelase not configured for npm release."
+        working-directory: src/Components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
+
+      - name: Publish to NPM (Next)
+        if: github.ref_name == 'nightly' || github.ref_name == 'gh-action-test-branch'
+        run: npm publish --access public --tag next
+        working-directory: src/Components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}

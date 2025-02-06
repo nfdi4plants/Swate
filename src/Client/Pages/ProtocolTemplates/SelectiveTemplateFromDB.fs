@@ -6,6 +6,7 @@ open Model
 open Messages
 open ARCtrl
 open JsonImport
+open OfficeInterop.Core
 
 type SelectiveTemplateFromDB =
 
@@ -34,12 +35,13 @@ type SelectiveTemplateFromDB =
     /// </summary>
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
-    static member ToProtocolSearchElement (model: Model, setProtocolSearch, importTypeState, setImportTypeState, dispatch) =
+    static member ToProtocolSearchElement (model: Model, setProtocolSearch, dispatch) =
         Daisy.button.button [
             prop.onClick(fun _ ->
                 setProtocolSearch true
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
-                    {importTypeState with SelectedColumns = Array.empty} |> setImportTypeState
+                    Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
+                    //{importTypeState with DeSelectedColumns = Array.empty} |> setImportTypeState
                 else
                     UpdateModel model |> dispatch)
             button.primary
@@ -75,67 +77,25 @@ type SelectiveTemplateFromDB =
     /// </summary>
     /// <param name="name"></param>
     /// <param name="model"></param>
-    /// <param name="selectionInformation"></param>
-    /// <param name="importType"></param>
-    /// <param name="useTemplateName"></param>
-    /// <param name="dispatch"></param>
-    static member AddFromDBToTableButton(name, model: Model, importType, setImportType, useTemplateName, protocolSearchState, setProtocolSearch, dispatch) =
-        let addTemplate (model: Model, selectedColumns) =
-            let template =
-                if model.ProtocolState.TemplatesSelected.Length = 0 then
-                    failwith "No template selected!"
-                else
-                    model.ProtocolState.TemplatesSelected.Head
-            SpreadsheetInterface.AddTemplate(template.Table, selectedColumns, importType, useTemplateName) |> InterfaceMsg |> dispatch
-        Html.div [
-            prop.className "flex flex-row justify-center gap-2"
-            prop.children [
-                let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
-                ModalElements.Button(name, addTemplate, (model, importType.SelectedColumns.[0]), isDisabled)
-                if model.ProtocolState.TemplatesSelected.Length > 0 then
-                    Daisy.button.a [
-                        button.outline
-                        prop.onClick (fun _ ->
-                            Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
-                            {importType with SelectedColumns = Array.empty} |> setImportType
-                            setProtocolSearch protocolSearchState)
-                        button.error
-                        Html.i [prop.className "fa-solid fa-times"] |> prop.children
-                    ]
-            ]
-        ]
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="name"></param>
-    /// <param name="model"></param>
     /// <param name="importType"></param>
     /// <param name="dispatch"></param>
     static member AddTemplatesFromDBToTableButton(name, model: Model, importType, setImportType, protocolSearchState, setProtocolSearch, dispatch) =
-        let addTemplates (model: Model, selectedColumns) =
+        let addTemplates (model: Model, deselectedColumns) =
             let templates = model.ProtocolState.TemplatesSelected
             if templates.Length = 0 then
                 failwith "No template selected!"
-            if model.ProtocolState.TemplatesSelected.Length > 1 then
+            if model.ProtocolState.TemplatesSelected.Length > 0 then
                 let importTables = templates |> List.map (fun item -> item.Table) |> Array.ofList
-                SpreadsheetInterface.AddTemplates(importTables, selectedColumns, importType) |> InterfaceMsg |> dispatch
+                SpreadsheetInterface.AddTemplates(importTables, deselectedColumns, importType) |> InterfaceMsg |> dispatch
+                Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
+                setProtocolSearch protocolSearchState
+                { importType with DeselectedColumns = Set.empty } |> setImportType
+
         Html.div [
             prop.className "join flex flex-row justify-center gap-2"
             prop.children [
                 let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
-                let selectedColumnValues = importType.SelectedColumns
-                ModalElements.Button(name, addTemplates, (model, selectedColumnValues), isDisabled)
-                if model.ProtocolState.TemplatesSelected.Length > 0 then
-                    Daisy.button.a [
-                        button.outline
-                        prop.onClick (fun _ ->
-                            Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
-                            {importType with SelectedColumns = Array.empty} |> setImportType
-                            setProtocolSearch protocolSearchState)
-                        button.error
-                        Html.i [prop.className "fa-solid fa-times"] |> prop.children
-                    ]
+                ModalElements.Button(name, addTemplates, (model, importType.DeselectedColumns), isDisabled)
             ]
         ]
 
@@ -155,7 +115,7 @@ type SelectiveTemplateFromDB =
             {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> index)} |> setImportTypeState
         React.fragment [
             Html.div [
-                SelectiveTemplateFromDB.ToProtocolSearchElement(model, setProtocolSearch, importTypeState, setImportTypeState, dispatch)
+                SelectiveTemplateFromDB.ToProtocolSearchElement(model, setProtocolSearch, dispatch)
             ]
             if model.ProtocolState.TemplatesSelected.Length > 0 then
                 SelectiveImportModal.RadioPluginsBox(

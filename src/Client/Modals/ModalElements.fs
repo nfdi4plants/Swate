@@ -8,7 +8,6 @@ open Shared
 
 open ARCtrl
 open JsonImport
-open Components
 open Fable.React.Helpers
 
 type ModalElements =

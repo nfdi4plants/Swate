@@ -28,13 +28,7 @@ type Templates =
     [<ReactComponent>]
     static member Main (model: Model, dispatch) =
         let isProtocolSearch, setProtocolSearch = React.useState(false)
-        let importTypeStateData = React.useState(SelectiveImportModalState.init([]))
-        if model.ProtocolState.TemplatesSelected.Length > 0 && (fst importTypeStateData).SelectedColumns.Length = 0 then
-            let columns =
-                model.ProtocolState.TemplatesSelected
-                |> List.map (fun template -> Array.init template.Table.Columns.Length (fun _ -> true))
-                |> Array.ofList
-            {fst importTypeStateData with SelectedColumns = columns} |> snd importTypeStateData
+        let importTypeStateData = React.useState(SelectiveImportModalState.init())
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"
 

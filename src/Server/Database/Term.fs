@@ -7,6 +7,7 @@ open Helper
 open System.Text
 open System
 open System.Collections.Generic
+open Shared.DTOs
 
 /// <summary> This type is used to allow searching through only one ontology or multiple ontologies </summary>
 [<RequireQualifiedAccess>]
@@ -199,15 +200,15 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
         let config = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(0.5)) |> ignore)
         use session = if session.IsSome then session.Value else Neo4j.establishConnection(credentials.Value)
-        let main = 
+        let main =
             task {
-                let! tree_query = 
+                let! tree_query =
                     let parameters = System.Collections.Generic.Dictionary<string,obj>([
                         KeyValuePair("Parent", box parentId);
                         KeyValuePair("Limit", box limit)
                     ])
                     session.RunAsync(query, parameters, config)
-        
+
                 let! tree_records = tree_query.ToListAsync()
                 let tree_results =
                     [|
@@ -219,7 +220,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
         try
             main.Result
         with
-            | exn -> 
+            | exn ->
             printfn "%s" exn.Message
             [||]
 
@@ -227,7 +228,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
 
     /// This function will allow for raw apache lucene input. It is possible to search either term name or description or both.
     /// The function will error if both term name and term description are None.
-    member this.getByAdvancedTermSearch(advancedSearchOptions:Shared.AdvancedSearchTypes.AdvancedSearchOptions) =
+    member this.getByAdvancedTermSearch(advancedSearchOptions: AdvancedSearchQuery) =
         let termName = if advancedSearchOptions.TermName = "" then None else Some advancedSearchOptions.TermName
         let termDescription = if advancedSearchOptions.TermDefinition = "" then None else Some advancedSearchOptions.TermDefinition
         let indexName, queryInsert =
@@ -341,18 +342,18 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
                 (if limit.IsSome then "LIMIT $Limit" else "")
         let param =
             Map [
-                /// need to box values, because limit.Value will error if parsed as string
+                // need to box values, because limit.Value will error if parsed as string
                 "Accession", box parentAccession.TermAccession
                 if limit.IsSome then "Limit", box limit.Value
             ] |> Some
         Neo4j.runQuery(query,param,(Term.asTerm("child")),?session=session,?credentials=credentials)
 
     static member private byParentQuery_Accession =
-        /// 1. Search for fitting terms first (db.index.fulltext.queryNodes, TermName)
-        /// 2. Limit search results by 10. If there are too many results it will reduce kill searchspeed when checking for relationship per searchresult (example: "growth", parent: "NFDI4PSO:1000161")
-        /// 2.5 It is possible to do (:Term {accession: $Accession})<-[*1..]-(node) but this will die whenever there are too many relationships (example: "arabidopsis", parent: "OBI:0100026")
-        /// - (example: "neural", parent: "NCIT:C16275")
-        /// Therefore i follow the assumption to limit n of searchresult, as they are sorted by best fit already, so whenever the user is close to the result he will get the desired search results.
+        // 1. Search for fitting terms first (db.index.fulltext.queryNodes, TermName)
+        // 2. Limit search results by 10. If there are too many results it will reduce kill searchspeed when checking for relationship per searchresult (example: "growth", parent: "NFDI4PSO:1000161")
+        // 2.5 It is possible to do (:Term {accession: $Accession})<-[*1..]-(node) but this will die whenever there are too many relationships (example: "arabidopsis", parent: "OBI:0100026")
+        // - (example: "neural", parent: "NCIT:C16275")
+        // Therefore i follow the assumption to limit n of searchresult, as they are sorted by best fit already, so whenever the user is close to the result he will get the desired search results.
         """CALL db.index.fulltext.queryNodes("TermName", $Search)
         YIELD node
         WITH node LIMIT 50

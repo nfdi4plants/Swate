@@ -10,7 +10,7 @@ open SpreadsheetInterface
 
 open Elmish
 open Model
-open Shared
+open ARCtrl
 open Fable.Core.JsInterop
 
 open ARCtrl
@@ -23,6 +23,14 @@ module private ModelUtil =
 
     type Model.Model with
         member this.UpdateFromLocalStorage() =
+            let updateSearch (model:Model.Model) =
+                let swateDefaultSearch = LocalStorage.SwateSearchConfig.SwateDefaultSearch.Get()
+                let tibSearch = LocalStorage.SwateSearchConfig.TIBSearch.Get()
+                {
+                    model with
+                        Model.Model.PersistentStorageState.SwateDefaultSearch = swateDefaultSearch
+                        Model.Model.PersistentStorageState.TIBSearchCatalogues = Set.ofArray tibSearch
+                }
             match this.PersistentStorageState.Host with
             | Some Swatehost.Browser ->
                 let dt = LocalStorage.Darkmode.DataTheme.GET()
@@ -34,6 +42,7 @@ module private ModelUtil =
                 }
             | _ ->
                 this
+            |> updateSearch
 
 open ModelUtil
 
@@ -91,7 +100,6 @@ module Interface =
             | Initialize host ->
                 let cmd =
                     Cmd.batch [
-                        Cmd.ofMsg (Ontologies.GetOntologies |> OntologyMsg)
                         match host with
                         | Swatehost.Excel ->
                             ExcelHelper.officeload() |> Async.StartImmediate
@@ -172,22 +180,22 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
 
-            | AddTemplate (table, selectedColumns, importType, templateName) ->
+            | AddTemplate (table, deselectedColumnIndices, importType, templateName) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.AddTemplate (table, selectedColumns, importType, templateName) |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.AddTemplate (table, deselectedColumnIndices, importType, templateName) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.AddTemplate (table, selectedColumns, importType, templateName) |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.AddTemplate (table, deselectedColumnIndices, importType, templateName) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | AddTemplates (tables, selectedColumns, importType) ->
+            | AddTemplates (tables, deselectedColumns, importType) ->
                 match host with
                 | Some Swatehost.Excel ->
-                    let cmd = OfficeInterop.AddTemplates (tables, selectedColumns, importType) |> OfficeInteropMsg |> Cmd.ofMsg
+                    let cmd = OfficeInterop.AddTemplates (tables, deselectedColumns, importType) |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
-                    let cmd = Spreadsheet.AddTemplates (tables, selectedColumns, importType) |> SpreadsheetMsg |> Cmd.ofMsg
+                    let cmd = Spreadsheet.AddTemplates (tables, deselectedColumns, importType) |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
             | JoinTable (table, index, options) ->
@@ -218,7 +226,7 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
             | ImportJson data ->
-                let selectedColumns = data.selectedColumns
+                let deselectedColumns = data.deselectedColumns
                 match host with
                 | Some Swatehost.Excel ->
                     /// In Excel we must get the current information from worksheets and update them with the imported information
@@ -226,7 +234,7 @@ module Interface =
                         promise {
                             match data.importState.ImportMetadata with
                             | true -> // full import, does not require additional information
-                                return UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState selectedColumns
+                                return UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState deselectedColumns
                             | false -> // partial import, requires additional information
                                 let! arcfile = OfficeInterop.Core.Main.tryParseToArcFile()
                                 let arcfileOpt = arcfile |> Result.toOption
@@ -237,7 +245,7 @@ module Interface =
                                     match arcfileOpt, activeTable with
                                     | Some arcfile, Ok activeTable -> arcfile.Tables() |> Seq.tryFindIndex (fun table -> table = activeTable)
                                     | _ -> None
-                                return UpdateUtil.JsonImportHelper.updateArcFileTables data.importedFile data.importState activeTableIndex arcfileOpt selectedColumns
+                                return UpdateUtil.JsonImportHelper.updateArcFileTables data.importedFile data.importState activeTableIndex arcfileOpt deselectedColumns
                         }
                     let updateArcFile (arcFile: ArcFiles) = SpreadsheetInterface.UpdateArcFile arcFile |> InterfaceMsg
                     let cmd =
@@ -250,8 +258,8 @@ module Interface =
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     let cmd =
                         match data.importState.ImportMetadata with
-                        | true -> UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState selectedColumns
-                        | false -> UpdateUtil.JsonImportHelper.updateArcFileTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile selectedColumns
+                        | true -> UpdateUtil.JsonImportHelper.updateWithMetadata data.importedFile data.importState deselectedColumns
+                        | false -> UpdateUtil.JsonImportHelper.updateArcFileTables data.importedFile data.importState model.SpreadsheetModel.ActiveView.TryTableIndex model.SpreadsheetModel.ArcFile deselectedColumns
                         |> SpreadsheetInterface.UpdateArcFile |> InterfaceMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
@@ -294,8 +302,8 @@ module Interface =
                     model, cmd
                 | Some Swatehost.Browser | Some Swatehost.ARCitect ->
                     if Set.isEmpty model.SpreadsheetModel.SelectedCells then failwith "No column selected"
-                    let selectedColumns, _ = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.unzip
-                    let distinct = selectedColumns |> Array.distinct
+                    let deselectedColumns, _ = model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.unzip
+                    let distinct = deselectedColumns |> Array.distinct
                     let cmd =
                         if distinct.Length <> 1 then
                             let msg = Failure("Please select one column only if you want to use `Remove Building Block`.")
