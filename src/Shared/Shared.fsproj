@@ -3,6 +3,20 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Swate.Components.Core</PackageId>
+    <PackageVersion>$(GitTag)</PackageVersion>
+    <Authors>Kevin Frey</Authors>
+    <Description>Types for Swate.Components</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>F# fable rdm react fable-library fable-javascript</PackageTags>
+    <PackageProjectUrl>https://github.com/nfdi4plants/Swate</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/Swate</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="Database.fs" />
     <Compile Include="DTOs\AdvancedSearch.fs" />
@@ -11,5 +25,12 @@
     <Compile Include="Extensions.fs" />
     <Compile Include="URLs.fs" />
     <Compile Include="Shared.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include all files that are compiled with this project -->
+    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
+    <!-- Include the project file itself as well -->
+    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
   </ItemGroup>
 </Project>
