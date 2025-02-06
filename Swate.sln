@@ -30,7 +30,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Client", "src\Client\Client
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Server", "src\Server\Server.fsproj", "{80E327F3-FF3C-4634-954D-57504F7E139C}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Shared", "src\Shared\Shared.fsproj", "{01C323A6-F047-45F4-B6BB-D7709335D2B5}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Swate.Components.Core", "src\Shared\Swate.Components.Core.fsproj", "{01C323A6-F047-45F4-B6BB-D7709335D2B5}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Build", "build\Build.fsproj", "{C9453B5A-0A1A-4A27-8F88-5E4804FBF773}"
 EndProject
@@ -42,7 +42,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Server.Tests", "tests\Serve
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Shared.Tests", "tests\Shared\Shared.Tests.fsproj", "{1B60E927-B1B4-4DC7-81D2-8A439E1F1FD9}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Components", "src\Components\src\Components.fsproj", "{90F659B8-B8EB-4A3F-BDB2-E761B1F0811D}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Swate.Components", "src\Components\src\Swate.Components.fsproj", "{90F659B8-B8EB-4A3F-BDB2-E761B1F0811D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

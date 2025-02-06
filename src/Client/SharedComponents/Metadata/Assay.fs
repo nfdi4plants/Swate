@@ -1,5 +1,6 @@
 module Components.Metadata.Assay
 
+open Swate.Components.Shared
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl

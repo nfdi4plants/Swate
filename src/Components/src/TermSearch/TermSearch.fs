@@ -1,9 +1,12 @@
 namespace Swate.Components
 
+open Swate.Components.Shared
+open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
+
 
 type private Modals =
 | AdvancedSearch
@@ -842,8 +845,8 @@ type TermSearch =
         // keyboard navigation
         React.useListener.on("keydown", (fun (e:Browser.Types.KeyboardEvent) ->
             if focused then // only run when focused
-                match searchResults, e.which with
-                | SearchState.SearchDone res, 38. when res.Count > 0 -> // up
+                match searchResults, e.code with
+                | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
                     setKeyboardNavState(
                         match keyboardNavState.SelectedTermSearchResult with
                         | Some 0 -> None
@@ -851,16 +854,16 @@ type TermSearch =
                         | _ -> None
                         |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
                     )
-                | SearchState.SearchDone res, 40. when res.Count > 0 -> // down
+                | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
                     setKeyboardNavState(
                         match keyboardNavState.SelectedTermSearchResult with
                         | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
                         | _ -> Some(0)
                         |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
                     )
-                | SearchState.Idle, 40. when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
+                | SearchState.Idle, kbdEventCode.arrowDown when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
                     startSearch inputRef.current.Value.value
-                | SearchState.SearchDone res, 13. when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
+                | SearchState.SearchDone res, kbdEventCode.enter when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
                     onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
                     cancel()
                 | _ ->
@@ -979,8 +982,8 @@ type TermSearch =
                                             startSearch inputRef.current.Value.value
                                     )
                                     prop.onKeyDown (fun e ->
-                                        match e.which with
-                                        | 27. -> // escape
+                                        match e.code with
+                                        | kbdEventCode.escape ->
                                             cancel()
                                         | _ -> ()
                                         if onKeyDown.IsSome then

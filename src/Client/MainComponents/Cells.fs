@@ -1,4 +1,5 @@
 module Spreadsheet.Cells
+
 open Feliz
 open Feliz.DaisyUI
 open Fable.Core
@@ -9,6 +10,7 @@ open Swate.Components.Shared
 open ARCtrl
 open Components
 open Model
+
 module private CellAux =
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
         log (s, header)
@@ -94,12 +96,12 @@ type Cell =
                     )
                     prop.onKeyDown(fun e ->
                         e.stopPropagation()
-                        match e.which with
-                        | 13. -> //enter
+                        match e.code with
+                        | Swate.Components.kbdEventCode.enter -> //enter
                             if isHeader then setter state
                             debounceStorage.current.ClearAndRun()
                             makeIdle()
-                        | 27. -> //escape
+                        | Swate.Components.kbdEventCode.escape -> //escape
                             debounceStorage.current.Clear()
                             makeIdle()
                         | _ -> ()
@@ -253,9 +255,9 @@ type Cell =
                         let onBlur = fun e -> promise { makeIdle() };
                         let onKeyDown = fun (e: Browser.Types.KeyboardEvent) ->
                             promise {
-                                match e.which with
-                                | 13. //enter
-                                | 27. -> //escape
+                                match e.code with
+                                | Swate.Components.kbdEventCode.enter //enter
+                                | Swate.Components.kbdEventCode.escape -> //escape
                                     makeIdle()
                                 | _ -> ()
                             };

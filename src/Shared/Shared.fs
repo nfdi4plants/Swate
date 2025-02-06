@@ -21,7 +21,7 @@ module Route =
             #if PUBLISH_COMPONENTS
             URLs.PRODUCTION_URL
             #else
-            ""
+            Config.URL_PREFIX
             #endif
         sprintf "%s/api/%s/%s" prefix typeName methodName
 

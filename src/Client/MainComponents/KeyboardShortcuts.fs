@@ -1,31 +1,37 @@
 module Spreadsheet.KeyboardShortcuts
 
+open Swate.Components
+
 let onKeydownEvent (dispatch: Messages.Msg -> unit) =
     fun (e: Browser.Types.Event) ->
         let e = e :?> Browser.Types.KeyboardEvent
-        match (e.ctrlKey || e.metaKey), e.which with
-        | false, 27. | false, 13. | false, 9. | false, 16.  -> // escape, enter, tab, shift
+        match (e.ctrlKey || e.metaKey), e.code with
+        // escape, enter, tab, shift
+        | false, kbdEventCode.escape
+        | false, kbdEventCode.enter
+        | false, kbdEventCode.tab
+        | false, kbdEventCode.shift  ->
             ()
-        | false, 46. -> // del
+        | false, kbdEventCode.delete -> // del
             Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
-        | false, 37. -> // arrow left
+        | false, kbdEventCode.arrowLeft -> // arrow left
             MoveSelectedCell Key.Left |> Messages.SpreadsheetMsg |> dispatch
-        | false, 38. -> // arrow up
+        | false, kbdEventCode.arrowUp -> // arrow up
             MoveSelectedCell Key.Up |> Messages.SpreadsheetMsg |> dispatch
-        | false, 39. -> // arrow right
+        | false, kbdEventCode.arrowRight -> // arrow right
             MoveSelectedCell Key.Right |> Messages.SpreadsheetMsg |> dispatch
-        | false, 40. -> // arrow down
+        | false, kbdEventCode.arrowDown -> // arrow down
             MoveSelectedCell Key.Down |> Messages.SpreadsheetMsg |> dispatch
-        | false, key -> 
+        | false, key ->
             SetActiveCellFromSelected |> Messages.SpreadsheetMsg |> dispatch
         // Ctrl + c
         | true, _ ->
-            match e.which with
-            | 67. -> // Ctrl + c
+            match e.code with
+            | "KeyC" -> // Ctrl + c
                 Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
-            | 88. -> // Ctrl + x
+            | "KeyX" -> // Ctrl + x
                 Spreadsheet.CutSelectedCells |> Messages.SpreadsheetMsg |> dispatch
-            |  86. -> // Ctrl + v
+            |  "KeyV" -> // Ctrl + v
                 Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
             | _ -> ()
 

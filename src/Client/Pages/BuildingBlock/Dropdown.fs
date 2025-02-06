@@ -87,7 +87,8 @@ module private DropdownElements =
                 Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
             )
             prop.onKeyDown(fun k ->
-                if (int k.which) = 13 then Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
+                if k.code = Swate.Components.kbdEventCode.enter then
+                    Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
             )
             prop.text (headerType.ToString())
         ]]
@@ -106,7 +107,7 @@ module private DropdownElements =
                 prop.children [FreeTextInputElement onSubmit]
             | _ ->
                 prop.onClick (fun e -> e.stopPropagation(); setIO iotype)
-                prop.onKeyDown(fun k -> if (int k.which) = 13 then setIO iotype)
+                prop.onKeyDown(fun k -> if k.code = Swate.Components.kbdEventCode.enter then setIO iotype)
                 prop.children [
                     Html.div [prop.text (iotype.ToString())]
                 ]

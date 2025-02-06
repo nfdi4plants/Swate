@@ -6,7 +6,7 @@
     <Compile Include="Shared.Tests.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Shared\Shared.fsproj" />
+    <ProjectReference Include="..\..\src\Shared\Swate.Components.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Fable.Mocha" Version="2.17.0" />

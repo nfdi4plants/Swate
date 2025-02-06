@@ -1,5 +1,6 @@
 module Components.Metadata.Investigation
 
+open Swate.Components.Shared
 open System
 open Feliz
 open Feliz.DaisyUI
