@@ -1,7 +1,6 @@
-namespace Shared
+namespace Swate.Components.Shared
 
 open System
-open Shared
 open Database
 
 [<AutoOpen>]
@@ -49,7 +48,7 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
-open Shared.DTOs
+open Swate.Components.Shared.DTOs
 
 type IOntologyAPIv3 = {
     // Development

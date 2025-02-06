@@ -2,7 +2,7 @@ module Spreadsheet.Controller.Clipboard
 
 open Fable.Core
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 
 let copyCell (cell: CompositeCell) : JS.Promise<unit> =
     let tab = cell.ToTabStr()
@@ -56,7 +56,7 @@ let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
 
 let cutSelectedCells (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.min is used until multiple cells are supported, should this ever be intended
-    let indices = state.SelectedCells |> Set.toArray 
+    let indices = state.SelectedCells |> Set.toArray
     cutCellsByIndices indices state
 
 let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
@@ -69,14 +69,14 @@ let pasteCellByIndex (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Sp
     }
 
 let pasteCellsByIndexExtend (index: int*int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
-    promise { 
+    promise {
         let! tab = navigator.clipboard.readText()
         let header = Generic.getHeader (fst index) state
         let cells = CompositeCell.fromTabTxt tab header
         let columnIndex, rowIndex = fst index, snd index
         let indexedCells = cells |> Array.indexed |> Array.map (fun (i,c) -> (columnIndex, rowIndex + i), c)
         Generic.setCells indexedCells state
-        return state 
+        return state
     }
 
 let pasteCellIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =

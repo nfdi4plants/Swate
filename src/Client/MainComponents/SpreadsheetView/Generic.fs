@@ -7,7 +7,7 @@ open Spreadsheet
 open Messages
 open Spreadsheet.Cells
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 open Model
 
 

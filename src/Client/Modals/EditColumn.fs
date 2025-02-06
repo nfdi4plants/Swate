@@ -3,7 +3,7 @@ module Modals.EditColumn
 open Feliz
 open Feliz.DaisyUI
 open Messages
-open Shared
+open Swate.Components.Shared
 open Spreadsheet
 open Model
 open Swate

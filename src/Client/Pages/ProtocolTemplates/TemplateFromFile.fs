@@ -15,7 +15,7 @@ open Elmish
 
 open Feliz
 open Feliz.DaisyUI
-open Shared
+open Swate.Components.Shared
 open ARCtrl
 open Fable.Core.JsInterop
 

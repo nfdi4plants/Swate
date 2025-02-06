@@ -1,6 +1,6 @@
 namespace Protocol
 
-open Shared
+open Swate.Components.Shared
 open Model
 open Messages.Protocol
 open Messages
@@ -164,13 +164,13 @@ module ComponentAux =
         let hitTagList, hitErTagList =
             if state.ProtocolTagSearchQuery <> ""
             then
-                let queryBigram = state.ProtocolTagSearchQuery |> Shared.SorensenDice.createBigrams
+                let queryBigram = state.ProtocolTagSearchQuery |> Swate.Components.Shared.SorensenDice.createBigrams
                 let getMatchingTags (allTags: OntologyAnnotation []) =
                     allTags
                     |> Array.map (fun x ->
                         x.NameText
-                        |> Shared.SorensenDice.createBigrams
-                        |> Shared.SorensenDice.calculateDistance queryBigram
+                        |> Swate.Components.Shared.SorensenDice.createBigrams
+                        |> Swate.Components.Shared.SorensenDice.calculateDistance queryBigram
                         , x
                     )
                     |> Array.filter (fun x -> fst x >= 0.3 || (snd x).TermAccessionShort = state.ProtocolTagSearchQuery)
@@ -441,11 +441,11 @@ module FilterHelper =
         if query <> "" && query.StartsWith("/") |> not
         then
             let query = query.ToLower()
-            let queryBigram = query |> Shared.SorensenDice.createBigrams
+            let queryBigram = query |> Swate.Components.Shared.SorensenDice.createBigrams
             let createScore (str: string) =
                 str
-                |> Shared.SorensenDice.createBigrams
-                |> Shared.SorensenDice.calculateDistance queryBigram
+                |> Swate.Components.Shared.SorensenDice.createBigrams
+                |> Swate.Components.Shared.SorensenDice.calculateDistance queryBigram
             // https://github.com/nfdi4plants/Swate/issues/490
             let adjustScore (compareString: string) (score: float) =
                 let compareString = compareString.ToLower()
@@ -512,7 +512,7 @@ type Search =
                 Html.p [
                     Html.b "Search for templates."
                     Html.text " For more information you can look "
-                    Html.a [ prop.href Shared.URLs.SWATE_WIKI; prop.target "_Blank"; prop.text "here"]
+                    Html.a [ prop.href Swate.Components.Shared.URLs.SWATE_WIKI; prop.target "_Blank"; prop.text "here"]
                     Html.text ". If you find any problems with a template or have other suggestions you can contact us "
                     Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.text "here"]
                     Html.text "."

@@ -62,7 +62,7 @@ module IndexedDB =
         [<Literal>]
         let swate_history_position = "swate_history_position"
 
-module Keys = 
+module Keys =
 
     [<Literal>]
     let swate_local_spreadsheet_key = "swate_local_spreadsheet_key"
@@ -77,7 +77,7 @@ module Keys =
     let swate_session_history_position = "swate_session_history_position"
 
     let create_swate_session_history_table_key (tableGuid: System.Guid) = swate_session_history_table_prefix + tableGuid.ToString()
-    
+
 module HistoryOrder =
 
     let ofJson (json: string) = Json.parseAs<System.Guid list>(json)
@@ -96,7 +96,7 @@ module HistoryOrder =
             | Some historyJson -> return (ofJson historyJson |> Some)
             | None -> return None
         }
-        
+
 //type OrderList = {
 //    guids: System.Guid list
 //} with
@@ -111,10 +111,10 @@ module HistoryOrder =
 //        | None -> failwith "Could not find any history."
 //    member this.toJson() = Json.serialize this
 
-module ConversionTypes =  
+module ConversionTypes =
     open ARCtrl
     open ARCtrl.Json
-    open Shared
+    open Swate.Components.Shared
     open Fable.Core
 
     [<RequireQualifiedAccess>]
@@ -141,12 +141,12 @@ module ConversionTypes =
 
             let compressedJsonString = GeneralHelpers.compressJsonToBase64String jsonString
             {
-                JsonArcFiles    = jsonArcFile 
+                JsonArcFiles    = jsonArcFile
                 JsonString      = compressedJsonString
                 ActiveView      = model.ActiveView
             }
 
-        member this.ToSpreadsheetModel() = 
+        member this.ToSpreadsheetModel() =
             let init = Spreadsheet.Model.init()
             try
                 let arcFile =
@@ -179,11 +179,11 @@ type Spreadsheet.Model with
     /// Create model from Json string
     /// </summary>
     /// <param name="json"></param>
-    static member fromJsonString (json: string) = 
+    static member fromJsonString (json: string) =
         let conversionModel = Json.tryParseAs<ConversionTypes.SessionStorage>(json)
         match conversionModel with
         | Ok m    -> m.ToSpreadsheetModel()
-        | Error e -> 
+        | Error e ->
             log ("Error trying to read Spreadsheet.Model from local storage: ", e)
             Spreadsheet.Model.init()
 
@@ -204,7 +204,7 @@ type Spreadsheet.Model with
     /// <summary>
     /// This function tries to get the data model from local storage saved under "swate_spreadsheet_key"
     /// </summary>
-    static member fromLocalStorage() = 
+    static member fromLocalStorage() =
         let snapshotJsonString = GeneralHelpers.tryGetLocalItem(Keys.swate_local_spreadsheet_key)
         match snapshotJsonString with
         | Some j -> Spreadsheet.Model.fromJsonString j
@@ -237,7 +237,7 @@ type Spreadsheet.Model with
             let! indexedDB = openDatabase database tableKey
             do! addItem indexedDB tableKey snapshotJsonString key
             IndexedDB.closeDatabase indexedDB
-        }    
+        }
 
     /// <summary>
     /// Tries to get the data model from indexed db saved under "swate_spreadsheet_key"
@@ -279,7 +279,7 @@ type Spreadsheet.Model with
 /// <summary>
 /// This type is used to store information about local history. Can be used to revert changes.
 /// </summary>
-type Model = 
+type Model =
     {
         HistoryItemCountLimit: int
         HistoryCurrentPosition: int
@@ -287,7 +287,7 @@ type Model =
         HistoryOrder: System.Guid list
     }
 
-    static member init() = 
+    static member init() =
         {
             HistoryItemCountLimit = 31
             HistoryCurrentPosition = 0
@@ -299,7 +299,7 @@ type Model =
         let position = GeneralHelpers.tryGetSessionItem(Keys.swate_session_history_position) |> Option.map int
         let history = HistoryOrder.tryFromSession()
         match position, history with
-        | Some p, Some h -> 
+        | Some p, Some h ->
             { this with HistoryCurrentPosition = p; HistoryOrder = h; HistoryExistingItemCount = h.Length }
         | _, _ -> this
 
@@ -340,7 +340,7 @@ type Model =
     static member fromSessionStorage (position: int) =
         let history = HistoryOrder.tryFromSession()
         let guid = history |> Option.map (List.tryItem position) |> Option.flatten
-        if guid.IsNone then 
+        if guid.IsNone then
             failwith "Not enough items in history list."
         let tryState = GeneralHelpers.tryGetSessionItem (Keys.create_swate_session_history_table_key guid.Value)
         match tryState with
@@ -355,7 +355,7 @@ type Model =
         promise {
             let! history = HistoryOrder.tryGetHistoryKeys()
             let key = history |> Option.map (List.tryItem position) |> Option.flatten
-            if key.IsNone then 
+            if key.IsNone then
                 failwith "Not enough items in history list."
             let! tryState = Spreadsheet.Model.tryFromIndexedDB(IndexedDB.swate_history_table, IndexedDB.LocalStorage.swate_history_items, key.ToString())
             match tryState with

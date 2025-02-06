@@ -3,7 +3,7 @@ module Update.Update
 
 open Elmish
 
-open Shared
+open Swate.Components.Shared
 open Database
 open Routing
 open Messages

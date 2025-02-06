@@ -4,7 +4,7 @@ open System
 open Fable.Core.JsInterop
 open Elmish
 
-open Shared
+open Swate.Components.Shared
 
 open Model
 

@@ -3,7 +3,7 @@ namespace Modals.ContextMenus
 open ARCtrl
 open Feliz
 open Feliz.DaisyUI
-open Shared
+open Swate.Components.Shared
 
 type FooterTabs =
     static member Table (mouseX, mouseY, tableIndex: int, startEdit: _ -> unit, dispatch: Messages.Msg -> unit) =

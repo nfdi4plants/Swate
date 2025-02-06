@@ -3,7 +3,7 @@ module Spreadsheet.Controller.BuildingBlocks
 open Spreadsheet
 open Types
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 
 open ExcelJS.Fable
 open Excel
@@ -92,14 +92,14 @@ let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; 
             d.FilePath <- Some data.fileName
             d.Selector <- Some selector
             d.Format <- Some data.fileType
-            d.SelectorFormat <- Some Shared.URLs.Data.SelectorFormat.csv
+            d.SelectorFormat <- Some Swate.Components.Shared.URLs.Data.SelectorFormat.csv
             CompositeCell.createData d
     |]
     state.ActiveTable.AddColumn(newHeader, values, forceReplace=true)
     {state with ArcFile = state.ArcFile}
 
 let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) (templateName:string option): Spreadsheet.Model =
-    
+
     if templateName.IsSome then
         //Should be updated to remove all kinds of extra symbols
         let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")

@@ -1,6 +1,6 @@
 module Swate.Components.Api
 
-open Shared
+open Swate.Components.Shared
 open Fable.Core
 open Fable.Remoting.Client
 

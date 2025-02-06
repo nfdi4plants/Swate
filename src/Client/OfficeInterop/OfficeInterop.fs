@@ -5,8 +5,8 @@ open ExcelJS.Fable
 open Excel
 open GlobalBindings
 
-open Shared
-open Shared.DTOs
+open Swate.Components.Shared
+open Swate.Components.Shared.DTOs
 open Database
 
 open OfficeInterop

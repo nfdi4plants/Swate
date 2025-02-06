@@ -9,7 +9,7 @@ open Messages
 open Components
 open MainComponents
 open Model
-open Shared
+open Swate.Components.Shared
 open Swate.Components
 open ARCtrl
 

@@ -1,4 +1,4 @@
-module Shared.Tests
+module Swate.Components.Shared.Tests
 
 #if FABLE_COMPILER
 open Fable.Mocha

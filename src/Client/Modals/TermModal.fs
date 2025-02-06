@@ -1,11 +1,11 @@
 namespace Modals
 
-open Shared.Database
+open Swate.Components.Shared.Database
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl
 open Swate.Components
-open Shared
+open Swate.Components.Shared
 
 
 module private TermModalUtil =

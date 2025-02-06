@@ -5,7 +5,7 @@ open Fable.Core
 open Spreadsheet
 open MainComponents
 open Messages
-open Shared
+open Swate.Components.Shared
 open ARCtrl
 open Components
 open Model
@@ -31,7 +31,7 @@ module private CellAux =
     let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, dispatch) else ContextMenu.DataMap.onContextMenu (index, dispatch)
 open CellAux
 module private EventPresets =
-    open Shared
+    open Swate.Components.Shared
     let onClickSelect (index: int*int, isIdle:bool, selectedCells: Set<int*int>, model:Model, dispatch)=
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
@@ -67,7 +67,7 @@ module private EventPresets =
                             None
                     TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
 
-open Shared
+open Swate.Components.Shared
 open Fable.Core.JsInterop
 
 type Cell =

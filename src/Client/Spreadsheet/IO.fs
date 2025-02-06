@@ -2,7 +2,7 @@ module Spreadsheet.IO
 
 open ARCtrl
 open ARCtrl.Spreadsheet
-open Shared
+open Swate.Components.Shared
 
 module Xlsx =
 

@@ -6,7 +6,7 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 
 
 [<ReactComponent>]
@@ -39,7 +39,7 @@ let FreeTextInputElement(onSubmit: string -> unit) =
 module private DropdownElements =
 
     let divider = Daisy.divider [prop.className "mx-2 my-0"]
-    let private annotationsPrinciplesLink = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.className "ml-auto link-info"; prop.text "info"]
+    let private annotationsPrinciplesLink = Html.a [prop.href Swate.Components.Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.className "ml-auto link-info"; prop.text "info"]
 
     let createSubBuildingBlockDropdownLink (state:BuildingBlockUIState) setState (subpage: Model.BuildingBlock.DropdownPage) =
         Html.li [

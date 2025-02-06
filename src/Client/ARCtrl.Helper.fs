@@ -1,6 +1,6 @@
 namespace ARCtrl
 
-open Shared
+open Swate.Components.Shared
 open ARCtrl
 open Database
 open System.Collections.Generic
@@ -159,7 +159,7 @@ module Table =
         let columnsToRemove = columnsToRemove |> Set.ofList |> Set.toList
 
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
-        
+
         tablecopy.IteriColumns(fun i c0 ->
             let c1 = {c0 with Cells = tablecopy.Columns.[i].Cells}
             let c2 =

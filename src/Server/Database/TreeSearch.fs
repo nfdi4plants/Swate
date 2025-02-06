@@ -3,9 +3,9 @@ module Database.TreeSearch
 open System
 open Neo4j.Driver
 
-open Shared.DTOs
-open Shared.Database
-open Shared.Database.TreeTypes
+open Swate.Components.Shared.DTOs
+open Swate.Components.Shared.Database
+open Swate.Components.Shared.Database.TreeTypes
 
 open Helper
 
@@ -43,7 +43,7 @@ type Tree(credentials:Neo4JCredentials) =
             [startNode; endNode], relationship
 
     member this.getByAccession(accession: string) =
-        let query = 
+        let query =
             """MATCH (t:Term {accession: $Accession})
             CALL apoc.path.spanningTree(t, {
                 labelFilter: "+Term",

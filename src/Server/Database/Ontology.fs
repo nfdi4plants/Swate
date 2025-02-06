@@ -2,13 +2,13 @@ module Database.Ontology
 
 open Neo4j.Driver
 open Helper
-open Shared.Database
+open Swate.Components.Shared.Database
 
 type Ontology(credentials:Neo4JCredentials) =
 
-    static member private asOntology : IRecord -> Shared.Database.Ontology =
+    static member private asOntology : IRecord -> Swate.Components.Shared.Database.Ontology =
         fun (record:IRecord) ->
-            let (ontology:Shared.Database.Ontology) = {
+            let (ontology:Swate.Components.Shared.Database.Ontology) = {
                 Name        = record.["o.name"].As<string>()
                 Version     = record.["o.version"] |> defaultOutputWith<string> ""
                 LastUpdated = record.["o.lastUpdated"].As<string>() |> System.DateTime.Parse
@@ -16,10 +16,10 @@ type Ontology(credentials:Neo4JCredentials) =
             }
             ontology
 
-    member this.getAll() = 
-        let query = 
+    member this.getAll() =
+        let query =
             @"MATCH (o:Ontology)
-            RETURN o.name, o.lastUpdated, o.version, o.author" 
+            RETURN o.name, o.lastUpdated, o.version, o.author"
         Neo4j.runQuery(
             query,
             None,
@@ -27,10 +27,10 @@ type Ontology(credentials:Neo4JCredentials) =
             credentials
         )
 
-    member this.getByName(name: string) = 
-        let query = 
+    member this.getByName(name: string) =
+        let query =
             @"MATCH (o:Ontology {name: $Name})
-            RETURN o.name, o.lastUpdated, o.version, o.author" 
+            RETURN o.name, o.lastUpdated, o.version, o.author"
         let param =
             Map ["Name",name] |> Some
         Neo4j.runQuery(

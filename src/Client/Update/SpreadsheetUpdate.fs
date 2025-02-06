@@ -5,7 +5,7 @@ open Elmish
 open Spreadsheet
 open LocalHistory
 open Model
-open Shared
+open Swate.Components.Shared
 open Fable.Remoting.Client
 open FsSpreadsheet.Js
 open ARCtrl

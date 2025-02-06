@@ -14,7 +14,7 @@ module private APIExtentions =
     let private optionOfString (str:string) =
         Option.whereNot System.String.IsNullOrWhiteSpace str
 
-    type Shared.Database.Term with
+    type Swate.Components.Shared.Database.Term with
         member this.ToComponentTerm() =
             Term(
                 ?name = optionOfString this.Name,
@@ -114,7 +114,7 @@ module private API =
             }
 
     let callSearch = fun (query: string) ->
-        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, 10))
+        Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create(query, 10))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -123,7 +123,7 @@ module private API =
         )
 
     let callParentSearch = fun (parent: string, query: string) ->
-        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, 10, parentTermId = parent))
+        Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create(query, 10, parentTermId = parent))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -132,7 +132,7 @@ module private API =
         )
 
     let callAllChildSearch = fun (parent: string) ->
-        Api.SwateApi.searchChildTerms (Shared.DTOs.ParentTermQuery.create(parent, 300))
+        Api.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create(parent, 300))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results.results
@@ -447,7 +447,7 @@ type TermSearch =
         ]
         TermSearch.BaseModal("Details", content, rvm)
 
-    static member private AdvancedSearchDefault(advancedSearchState: Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState) = fun (cc: AdvancedSearchController) ->
+    static member private AdvancedSearchDefault(advancedSearchState: Swate.Components.Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState) = fun (cc: AdvancedSearchController) ->
         React.fragment [
             Html.div [
                 prop.className "prose"
@@ -535,7 +535,7 @@ type TermSearch =
         let pagination, setPagination = React.useState(0)
 
         // Only used if advancedSearch is set to default
-        let advancedSearchState, setAdvancedSearchState = React.useState (Shared.DTOs.AdvancedSearchQuery.init)
+        let advancedSearchState, setAdvancedSearchState = React.useState (Swate.Components.Shared.DTOs.AdvancedSearchQuery.init)
 
         let advancedSearch =
             match advancedSearch0 with
