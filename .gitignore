@@ -29,6 +29,7 @@ release.sh
 */**/fable_modules
 */**/*.fs.ts
 dist/
+output/
 
 *storybook.log
 storybook-static/

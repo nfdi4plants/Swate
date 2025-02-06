@@ -14,7 +14,7 @@ let all =
     testList "All"
         [
 #if FABLE_COMPILER // This preprocessor directive makes editor happy
-            Shared.Tests.shared
+            Swate.Components.Shared.Tests.shared
 #endif
             OfficeAddIn.AnnotationTable.Successful.Main
             client
