@@ -2,7 +2,7 @@ name: Publish NuGet Package
 
 on:
   push:
-    branches: ['nightly', "publish_bugfixes"]  # Only runs on pushes to the 'nightly' branch
+    branches: ['nightly']  # Only runs on pushes to the 'nightly' branch
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 jobs:
