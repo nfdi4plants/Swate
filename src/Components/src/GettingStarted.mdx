@@ -32,12 +32,12 @@ import { TermSearch } from '@nfdi4plants/swate-components'
 
 #### Install **Manually**:
 
-Install [nuget package](www.nuget.org/packages/Swate.Components).
+Install [nuget package](https://www.nuget.org/packages/Swate.Components).
 
 ```
-<PackageReference Include="Swate.Components" Version="1.0.0-alpha.3" />
+<PackageReference Include="Swate.Components" Version="1.0.0" />
 
-paket add Swate.Components --version 1.0.0-alpha.3
+paket add Swate.Components
 ```
 
 Install npm dependencies
@@ -52,10 +52,10 @@ npm i @fortawesome/fontawesome-free
 ```fsharp
 open Fable.Core.JsInterop
 
-Swate.Components.Style.import
+Swate.Components.SwateStyle.import
 importSideEffects "@fortawesome/fontawesome-free/css/all.min.css"
 
-Swate.Components.TermSearchV2.TermSearch(
+Swate.Components.TermSearch.TermSearch(
     (fun term -> Browser.Dom.console.log term),
     None
 )
