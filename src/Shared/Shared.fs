@@ -17,12 +17,7 @@ module Regex =
 module Route =
 
     let builder typeName methodName =
-        let prefix = // This is required to publishing components with production url while maintaining flexible approach in full stack environment
-            #if PUBLISH_COMPONENTS
-            URLs.PRODUCTION_URL
-            #else
-            Config.URL_PREFIX
-            #endif
+        let prefix = Config.URL_PREFIX
         sprintf "%s/api/%s/%s" prefix typeName methodName
 
 module SorensenDice =
