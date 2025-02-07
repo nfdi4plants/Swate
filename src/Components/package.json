@@ -18,7 +18,7 @@
     "./style.css": "./dist/swate-components.css"
   },
   "scripts": {
-    "fable": "dotnet fable ./src/Swate.Components.fsproj --define PUBLISH_COMPONENTS --lang ts",
+    "fable": "dotnet fable ./src/Swate.Components.fsproj --lang ts",
     "start": "npm run fable -- --watch --run vite",
     "test": "npm run fable -- --watch --run npx vitest --project=storybook",
     "test:run": "npm run fable -- --run npx vitest run --project=storybook",

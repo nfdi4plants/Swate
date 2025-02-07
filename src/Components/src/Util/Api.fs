@@ -7,7 +7,7 @@ open Fable.Remoting.Client
 
 let SwateApi : IOntologyAPIv3 =
     Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.withRouteBuilder Route.frontendBuilder
     |> Remoting.buildProxy<IOntologyAPIv3>
 
 // https://api.terminology.tib.eu/swagger-ui/index.html

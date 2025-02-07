@@ -71,7 +71,7 @@ let testApi (ctx: HttpContext): ITestAPI = {
 
 let createITemplateApiv1 credentials =
     Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.withRouteBuilder Route.backendBuilder
     |> Remoting.fromValue (templateApi credentials)
     |> Remoting.withDiagnosticsLogger(printfn "%A")
     |> Remoting.withErrorHandler API.Helper.errorHandler
@@ -79,7 +79,7 @@ let createITemplateApiv1 credentials =
 
 let createIServiceAPIv1 =
     Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.withRouteBuilder Route.backendBuilder
     |> Remoting.fromValue serviceApi
     //|> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")
@@ -88,7 +88,7 @@ let createIServiceAPIv1 =
 
 let createTestApi =
     Remoting.createApi()
-    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.withRouteBuilder Route.backendBuilder
     |> Remoting.fromContext testApi
     //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger(printfn "%A")

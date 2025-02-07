@@ -16,8 +16,22 @@ module Regex =
 
 module Route =
 
-    let builder typeName methodName =
-        let prefix = Config.URL_PREFIX
+    /// No idea how to toggle `SWATE_ENVIRONMENT` nicely in the backend, so i'll just add an alternative route builder without it.
+    let backendBuilder typeName methodName =
+        sprintf "/api/%s/%s" typeName methodName
+
+    let frontendBuilder typeName methodName =
+        let prefix =
+            // Why the #if...#else...#endif?
+            // -> We want to keep fable-remoting's flexible for development and production.
+            //      When we publish the components, we want to use the production URL.
+            //      Both for npm and nuget packages.
+            #if SWATE_ENVIRONMENT
+            ""
+            #else
+            URLs.PRODUCTION_URL
+            #endif
+
         sprintf "%s/api/%s/%s" prefix typeName methodName
 
 module SorensenDice =

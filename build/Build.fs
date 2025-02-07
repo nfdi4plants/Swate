@@ -7,6 +7,8 @@ open Fake.Tools
 
 initializeContext()
 
+let DEFINE_SWATE_ENVIRONMENT_FABLE = ["--define"; "SWATE_ENVIRONMENT" ]
+
 let sharedPath = Path.getFullName "src/Shared"
 let serverPath = Path.getFullName "src/Server"
 let clientPath = Path.getFullName "src/Client"
@@ -317,13 +319,13 @@ let InstallClient() =
 let Bundle() =
     [
         "server", dotnet [ "publish"; "-c"; "Release"; "-o"; deployPath ] serverPath
-        "client", dotnet [ "fable"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite"; "build" ] clientPath
+        "client", dotnet [ "fable"; "-o"; "output"; "-s"; "-e"; "fs.js"; yield! DEFINE_SWATE_ENVIRONMENT_FABLE; "--run"; "npx"; "vite"; "build" ] clientPath
     ]
     |> runParallel
 
 let Run(db: bool) =
     [ "server", dotnet [ "watch"; "run" ] serverPath
-      "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "-e"; "fs.js"; "--run"; "npx"; "vite" ] clientPath
+      "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "-e"; "fs.js"; yield! DEFINE_SWATE_ENVIRONMENT_FABLE; "--run"; "npx"; "vite" ] clientPath
       if db then
         "database", dockerCompose ["-f"; dockerComposePath; "up"; "-d"] __SOURCE_DIRECTORY__
     ] |> runParallel
@@ -357,7 +359,7 @@ module Tests =
         [
             "server", dotnet [ "watch"; "run" ] serverTestsPath
             // This below will start web ui for tests, but cannot execute due to office-addin-mock
-            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js"; "--watch" ] clientTestsPath
+            "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; yield! DEFINE_SWATE_ENVIRONMENT_FABLE; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js"; "--watch" ] clientTestsPath
             "components", npm [ "run"; "test" ] componentTestsPath
         ]
         |> runParallel
@@ -365,7 +367,7 @@ module Tests =
     let Run() =
         [
             "server", dotnet [ "run" ] serverTestsPath
-            "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
+            "client", dotnet [ "fable"; "-o"; "output"; "-s"; yield! DEFINE_SWATE_ENVIRONMENT_FABLE; "--run"; "npx"; "mocha"; $"{clientTestsPath}/output/Client.Tests.js" ] clientTestsPath
             "components", npm [ "run"; "test:run" ] componentTestsPath
         ] |> runParallel
 

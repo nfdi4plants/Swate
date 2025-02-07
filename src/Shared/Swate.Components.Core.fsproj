@@ -23,17 +23,10 @@
     <Compile Include="DTOs\TermQuery.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="URLs.fs" />
-    <Compile Include="routebuilder.config.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Exclude routebuilder.config.fs from packaging -->
-    <None Remove="routebuilder.config.fs" />
-
-    <!-- Include routebuilder.npkg.config.fs but rename it to routebuilder.config.fs in the package -->
-    <Content Include="routebuilder.nupkg.config.fs" Pack="true" PackagePath="fable/routebuilder.config.fs" />
-
     <!-- Include all files that are compiled with this project -->
     <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <!-- Include the project file itself as well -->
