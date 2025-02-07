@@ -103,7 +103,7 @@ module V3 =
 
     let createIOntologyApi credentials =
         Remoting.createApi()
-        |> Remoting.withRouteBuilder Route.backendBuilder
+        |> Remoting.withRouteBuilder Route.builder
         |> Remoting.fromValue (ontologyApi credentials)
         |> Remoting.withDiagnosticsLogger(printfn "%A")
         |> Remoting.withErrorHandler Helper.errorHandler
@@ -279,7 +279,7 @@ module V1 =
 
     let createIOntologyApi credentials =
         Remoting.createApi()
-        |> Remoting.withRouteBuilder Route.backendBuilder
+        |> Remoting.withRouteBuilder Route.builder
         |> Remoting.fromValue (ontologyApi credentials)
         |> Remoting.withDiagnosticsLogger(printfn "%A")
         |> Remoting.withErrorHandler errorHandler
@@ -462,7 +462,7 @@ module V2 =
 
     let createIOntologyApi credentials =
         Remoting.createApi()
-        |> Remoting.withRouteBuilder Route.backendBuilder
+        |> Remoting.withRouteBuilder Route.builder
         |> Remoting.fromValue (ontologyApi credentials)
         |> Remoting.withDiagnosticsLogger(printfn "%A")
         |> Remoting.withErrorHandler errorHandler
