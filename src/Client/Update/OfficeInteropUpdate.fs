@@ -74,16 +74,6 @@ module OfficeInterop =
                 let jsonExport = UpdateUtil.JsonExportHelper.parseToJsonString(arcfile, jef)
                 UpdateUtil.downloadFromString (jsonExport)
                 state, model, Cmd.none
-
-            | AddTemplate (table, deselectedColumnIndices, importType, templateName) ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        Main.joinTable
-                        (table, deselectedColumnIndices, Some importType.ImportType, templateName)
-                        (curry GenericInteropLogs Cmd.none >> DevMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-                state, model, cmd
-
             | AddTemplates (tables, deselectedColumns, importType) ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -92,7 +82,6 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-
             | JoinTable (table, options) ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -101,7 +90,6 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-
             | RemoveBuildingBlock ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -110,7 +98,6 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-
             | UpdateUnitForCells ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -119,7 +106,6 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-
             | CreateAnnotationTable tryUsePrevOutput ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -136,11 +122,9 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-
             | SendErrorsToFront msgs ->
                 let cmd = Cmd.ofMsg(curry GenericInteropLogs Cmd.none msgs |> DevMsg)
                 state, model, cmd
-
             | RectifyTermColumns ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -149,14 +133,12 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-
             | UpdateFillHiddenColsState newState ->
                 let nextState = {
                     model.ExcelState with
                         FillHiddenColsStateStore = newState
                 }
                 nextState, model, Cmd.none
-            //
             | InsertFileNames fileNameList ->
                 let cmd =
                     Cmd.OfPromise.either
@@ -165,7 +147,6 @@ module OfficeInterop =
                         (curry GenericLog Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
-
             | UpdateTopLevelMetadata arcFiles ->
                 let cmd =
                     Cmd.OfPromise.either

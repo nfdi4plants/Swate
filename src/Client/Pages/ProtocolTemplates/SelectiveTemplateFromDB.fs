@@ -75,6 +75,29 @@ type SelectiveTemplateFromDB =
     /// <summary>
     /// 
     /// </summary>
+    /// <param name="importState"></param>
+    /// <param name="activeTableIndex"></param>
+    /// <param name="existingOpt"></param>
+    /// <param name="appendTables"></param>
+    /// <param name="joinTables"></param>
+    static member CreateUpdatedTables (arcTables: ResizeArray<ArcTable>) (state: SelectiveImportModalState) (deselectedColumns: Set<int*int>) fullImport =
+        [
+            for importTable in state.ImportTables do
+                let fullImport = defaultArg fullImport importTable.FullImport
+                if importTable.FullImport = fullImport then
+                    let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumns importTable.Index
+                    let sourceTable = arcTables.[importTable.Index]
+                    let appliedTable = ArcTable.init(sourceTable.Name)
+
+                    let finalTable = Table.selectiveTablePrepare appliedTable sourceTable deselectedColumnIndices
+                    appliedTable.Join(finalTable, joinOptions=state.ImportType)
+                    appliedTable
+        ]
+        |> ResizeArray
+
+    /// <summary>
+    /// 
+    /// </summary>
     /// <param name="name"></param>
     /// <param name="model"></param>
     /// <param name="importType"></param>

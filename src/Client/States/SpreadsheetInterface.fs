@@ -16,8 +16,7 @@ type Msg =
 | AddAnnotationBlock of CompositeColumn
 | AddAnnotationBlocks of CompositeColumn []
 | AddDataAnnotation of {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}
-/// This function will do preprocessing on the table to join
-| AddTemplate           of ArcTable * int list * SelectiveImportModalState * string option
+/// This function will do preprocessing on the tables to join
 | AddTemplates          of ArcTable[] * Set<int*int> * SelectiveImportModalState
 | JoinTable             of ArcTable * columnIndex: int option * options: TableJoinOptions option
 | UpdateArcFile         of ArcFiles
