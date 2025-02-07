@@ -56,7 +56,7 @@ module Protocol =
         | SelectProtocols prots ->
             let nextModel = {
                 model with
-                    Model.ProtocolState.TemplatesSelected   = prots
+                    Model.ProtocolState.TemplatesSelected = prots
             }
             state, Cmd.ofMsg (UpdateModel nextModel)
         | AddProtocol prot ->

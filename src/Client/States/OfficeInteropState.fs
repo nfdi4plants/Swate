@@ -31,7 +31,6 @@ type Msg =
     | ValidateBuildingBlock
     | AddAnnotationBlock                    of CompositeColumn
     | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | AddTemplate                           of ArcTable * int list * SelectiveImportModalState * string option
     | AddTemplates                          of ArcTable[] * Set<int*int> * SelectiveImportModalState
     | JoinTable                             of ArcTable * options: TableJoinOptions option
     | RemoveBuildingBlock

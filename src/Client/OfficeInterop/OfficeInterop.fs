@@ -194,7 +194,7 @@ module GetHandler =
     /// </summary>
     /// <param name="deselectedColumns"></param>
     /// <param name="tableIndex"></param>
-    let getDeSelectedTableColumns (deselectedColumns: Set<int*int>) (tableIndex: int) =
+    let getDeselectedTableColumnIndices (deselectedColumns: Set<int*int>) (tableIndex: int) =
         deselectedColumns
         |> List.ofSeq
         |> List.choose (fun item -> if (fst item) = tableIndex then Some (snd item) else None)
@@ -211,8 +211,7 @@ module GetHandler =
             importTables
             |> List.map (fun importTable -> tablesToAdd.[importTable.Index], importTable.FullImport)
 
-        let mutable tablesToAdd, selectedColumnsCollectionToAdd, tablesToJoin, selectedColumnsCollectionToJoin =
-            list.Empty, list.Empty, list.Empty, list.Empty
+        let mutable tablesToAdd, tablesToJoin = list.Empty, list.Empty
 
         importData
         |> List.iter (fun (table, importType) ->
@@ -223,7 +222,6 @@ module GetHandler =
         )
 
         tablesToAdd |> Array.ofList,
-        selectedColumnsCollectionToAdd |> Array.ofList,
         tablesToJoin |> Array.ofList
 
     /// <summary>
@@ -466,22 +464,22 @@ module UpdateHandler =
     /// <param name="selectedColumnsCollection"></param>
     /// <param name="options"></param>
     /// <param name="context"></param>
-    let addTemplates (tablesToAdd: ArcTable[]) (selectedColumnsCollection: Set<int>[]) (options: TableJoinOptions option) (context: RequestContext) =
+    let addTemplates (tablesToAdd: ArcTable[]) (deselectedColumnsCollection: Set<int*int>) (options: TableJoinOptions option) (context: RequestContext) =
         promise {
             let! result = tryGetActiveExcelTable context
 
-            for i in 0..tablesToAdd.Length - 1 do
-                let tableToAdd = tablesToAdd.[i]
-                let selectedColumnCollection = selectedColumnsCollection.[i] |> List.ofSeq
+            for tableIndex in 0..tablesToAdd.Length - 1 do
+                let tableToAdd = tablesToAdd.[tableIndex]
+                let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumnsCollection tableIndex
                 let newName = createNewTableName()
                 let originTable = ArcTable.init(newName)
                 let finalTable =
-                    let endTable = Table.selectiveTablePrepare originTable tableToAdd selectedColumnCollection
+                    let endTable = Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
                     originTable.Join(endTable, ?joinOptions = options)
                     originTable
 
                 let! activeWorksheet =
-                    if i = 0 && result.IsNone then
+                    if tableIndex = 0 && result.IsNone then
                         promise { return context.workbook.worksheets.getActiveWorksheet() }
                     else
                         promise {
@@ -949,7 +947,7 @@ module UpdateHandler =
             //Loop over all tables to be added and add them to the origin table
             let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (deselectedColumns: Set<int*int>) (options: TableJoinOptions option) i =
                 let tableToAdd = tablesToAdd.[i]
-                let deselectedColumnIndices = getDeSelectedTableColumns deselectedColumns i
+                let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumns i
                 let refinedTableToAdd = Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
 
                 let newTable =
@@ -1180,12 +1178,12 @@ type Main =
     /// <param name="tableToAdd"></param>
     /// <param name="index"></param>
     /// <param name="options"></param>
-    static member joinTables (tablesToAdd: ArcTable [], selectedColumnsCollection: Set<int*int>, options: TableJoinOptions option, importTables: JsonImport.ImportTable list, ?context0) =
+    static member joinTables (tablesToAdd: ArcTable [], deselectedColumnsCollection: Set<int*int>, options: TableJoinOptions option, importTables: JsonImport.ImportTable list, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 //When a name is available get the annotation and arctable for easy access of indices and value adaption
                 //Annotation table enables a easy way to adapt the table, updating existing and adding new columns
-                let tablesToAdd, selectedColumnsCollectionToAdd, tablesToJoin =
+                let tablesToAdd, tablesToJoin =
                     selectTablesToAdd tablesToAdd importTables
                 let! result = tryGetActiveExcelTable context
                 match result with
@@ -1197,12 +1195,12 @@ type Main =
                     | Result.Ok originTable ->
                         let! msgJoin =
                             if tablesToJoin.Length > 0 then
-                                joinTemplatesToTable originTable excelTable tablesToJoin selectedColumnsCollection options context
+                                joinTemplatesToTable originTable excelTable tablesToJoin deselectedColumnsCollection options context
                             else
                                 promise {return []}
 
                         let! msgAdd =
-                            addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
+                            addTemplates tablesToAdd deselectedColumnsCollection options context
 
                         if msgAdd.IsEmpty then
                             return msgJoin
@@ -1214,7 +1212,7 @@ type Main =
                     if tablesToJoin.Length > 0 then
                         return [InteropLogging.NoActiveTableMsg]
                     else
-                        let! msgAdd = addTemplates tablesToAdd selectedColumnsCollectionToAdd options context
+                        let! msgAdd = addTemplates tablesToAdd deselectedColumnsCollection options context
                         return msgAdd
             }
 

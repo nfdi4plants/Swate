@@ -28,7 +28,7 @@ module JsonImportHelper =
             for importTable in state.ImportTables do
                 let fullImport = defaultArg fullImport importTable.FullImport
                 if importTable.FullImport = fullImport then
-                    let deselectedColumnIndices = getDeSelectedTableColumns deselectedColumns importTable.Index
+                    let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumns importTable.Index
                     let sourceTable = arcTables.[importTable.Index]
                     let appliedTable = ArcTable.init(sourceTable.Name)
 

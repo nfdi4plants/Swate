@@ -36,7 +36,7 @@ type SelectiveImportModal =
                     prop.style [
                         style.height(length.perc 100)
                     ]
-                    prop.isChecked (not (Set.contains (columnIndex, tableIndex) selectionInformation.DeselectedColumns))
+                    prop.isChecked (not (Set.contains (tableIndex, columnIndex) selectionInformation.DeselectedColumns))
                     prop.onChange (fun (b: bool) ->
                         if columns.Length > 0 then
                             let selectedData = selectionInformation.toggleDeselectedColumns(tableIndex, columnIndex)
@@ -45,12 +45,12 @@ type SelectiveImportModal =
             ]
         ]
 
-    static member TableWithImportColumnCheckboxes(table: ArcTable, ?tableIndex, ?selectionInformation: SelectiveImportModalState, ?setSelectedColumns: SelectiveImportModalState -> unit) =
+    static member TableWithImportColumnCheckboxes(table: ArcTable, ?tableIndex, ?selectionInformation: SelectiveImportModalState, ?setDeselectedColumns: SelectiveImportModalState -> unit) =
         let columns = table.Columns
         let tableIndex = defaultArg tableIndex 0
         let displayCheckBox =
             //Determine whether to display checkboxes or not
-            selectionInformation.IsSome && setSelectedColumns.IsSome
+            selectionInformation.IsSome && setDeselectedColumns.IsSome
         Daisy.table [
             prop.children [
                 Html.thead [
@@ -61,20 +61,13 @@ type SelectiveImportModal =
                                     prop.className "join flex flex-row centered gap-2"
                                     prop.children [
                                         if displayCheckBox then
-                                            SelectiveImportModal.CheckBoxForTableColumnSelection(columns, tableIndex, columnIndex, selectionInformation.Value, setSelectedColumns.Value)
+                                            SelectiveImportModal.CheckBoxForTableColumnSelection(columns, tableIndex, columnIndex, selectionInformation.Value, setDeselectedColumns.Value)
                                         Html.text (columns.[columnIndex].Header.ToString())
-                                        Html.div [
-                                            prop.onClick (fun _ ->
-                                                if columns.Length > 0 && selectionInformation.IsSome then
-                                                    let selectedData = selectionInformation.Value.toggleDeselectedColumns(tableIndex, columnIndex)
-                                                    {selectionInformation.Value with DeselectedColumns = selectedData} |> setSelectedColumns.Value)
-                                        ]
                                     ]
                                 ]
                             ]
                     ]
                 ]
-
                 Html.tbody [
                     for ri in 0 .. (table.RowCount-1) do
                         let row = table.GetRow(ri, true)
@@ -143,9 +136,13 @@ type SelectiveImportModal =
             ]
             Daisy.collapse [
                 Html.input [prop.type'.checkbox; prop.className "min-h-0 h-5"]
+                
                 Daisy.collapseTitle [
-                    prop.className "p-1 min-h-0 h-5 text-sm"
-                    prop.text (if isActive then "Select Columns" else "Preview Table")
+                    prop.className "p-1 min-h-0 h-5 text-success text-sm font-bold space-x-2"
+                    prop.children [
+                        Html.span (if isActive then "Select Columns" else "Preview Table")
+                        Html.i [prop.className "fa-solid fa-magnifying-glass"]
+                    ]
                 ]
                 Daisy.collapseContent [
                     prop.className "overflow-x-auto"

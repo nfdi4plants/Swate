@@ -103,7 +103,6 @@ type Widget =
     static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, ?help: ReactElement) =
         let position, setPosition = React.useState(fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
-        let helpIsActive, setHelpIsActive = React.useState(false)
         let element = React.useElementRef()
         React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
         let resizeElement (content: ReactElement) =
@@ -145,7 +144,7 @@ type Widget =
             ]
         resizeElement <| Html.div [
             prop.onMouseDown(fun e -> e.stopPropagation())
-            prop.className "border-b border-black cursor-default flex flex-col grow"
+            prop.className "cursor-default flex flex-col grow"
             prop.children [
                 Html.div [
                     prop.onMouseDown(fun e -> // move
@@ -172,6 +171,7 @@ type Widget =
                         content
                     ]
                 ]
+                //It is not used anymore
                 if help.IsSome then
                     Html.div [
                         prop.tabIndex 0
@@ -200,27 +200,22 @@ type Widget =
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
         let content = BuildingBlock.SearchComponent.Main model dispatch
         let help = React.fragment [
-            Html.p "Add a new Building Block."
-            Html.ul [
-                Html.li "If a cell is selected, a new Building Block is added to the right of the selected cell."
-                Html.li "If no cell is selected, a new Building Block is appended at the right end of the table."
-            ]
-        ]
+                Html.p "Add a new Building Block."
+                Html.ul [
+                        Html.li "If a cell is selected, a new Building Block is added to the right of the selected cell."
+                        Html.li "If no cell is selected, a new Building Block is appended at the right end of the table."
+                    ]
+                ]
         let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv, help)
 
     [<ReactComponent>]
     static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
-        let templates = model.ProtocolState.Templates
-        let config, setConfig = React.useState(TemplateFilterConfig.init)
         let isProtocolSearch, setProtocolSearch = React.useState(true)
-        let filteredTemplates = Protocol.Search.filterTemplates (templates, config)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         let selectContent() =
             [
-                Protocol.Search.FileSortElement(model, config, setConfig, "@md/templateWidget:grid-cols-3")
-                ModalElements.Box("Selected Templates", "fa-solid fa-cog", Search.SelectedTemplatesElement model setProtocolSearch importTypeStateData dispatch)
-                Protocol.Search.Component (filteredTemplates, model, setProtocolSearch, importTypeStateData, dispatch, length.px 350)
+                Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch)
             ]
         let insertContent() =
             [
@@ -238,13 +233,12 @@ type Widget =
                 else
                     insertContent ()
             Html.div [
-                prop.className "flex flex-col gap-4 @container/templateWidget"
+                prop.className "prose-sm prose-p:m-1 prose-ul:mt-1 max-w-none"
                 prop.children switchContent
             ]
 
-        let help = Protocol.Search.InfoField()
         let prefix = WidgetLiterals.Templates
-        Widget.Base(content, prefix, rmv, help)
+        Widget.Base(content, prefix, rmv)
 
     static member FilePicker (model, dispatch, rmv) =
         let content = Html.div [
