@@ -2,7 +2,7 @@ module Spreadsheet.Controller.Generic
 
 open Spreadsheet
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 
 let getCell ((ci,ri): int*int) (state: Spreadsheet.Model) : CompositeCell =
     match state.ActiveView with

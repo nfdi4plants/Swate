@@ -1,4 +1,4 @@
-namespace Shared
+namespace Swate.Components.Shared
 
 module URLs =
 

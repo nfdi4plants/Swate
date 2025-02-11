@@ -2,11 +2,11 @@ module Database.Helper
 
 open System
 open Neo4j.Driver
-open Shared.Database
+open Swate.Components.Shared.Database
 
 let defaultOutputWith<'a> (def:'a) (neo4jReturnVal:obj) =
     if isNull neo4jReturnVal then def else neo4jReturnVal.As<'a>()
-            
+
 type Neo4JCredentials = {
     User        : string
     Pw          : string
@@ -52,7 +52,7 @@ type FullTextSearch with
         |> fun x -> escaped, x
 
 type Neo4j =
-    
+
     static member establishConnection(c: Neo4JCredentials) =
         let driver = Neo4j.Driver.GraphDatabase.Driver(c.BoltUrl, Neo4j.Driver.AuthTokens.Basic(c.User,c.Pw), fun o ->
             o.WithMaxTransactionRetryTime(TimeSpan.FromSeconds(3))
@@ -74,8 +74,8 @@ type Neo4j =
                 if parameters.IsSome then
                     // Cast a whole lot of types to expected types by neo4j driver
                     let param =
-                        parameters.Value 
-                        |> Map.fold (fun s k v ->  
+                        parameters.Value
+                        |> Map.fold (fun s k v ->
                             let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
                             kvp::s
                         ) []
@@ -90,7 +90,7 @@ type Neo4j =
                         action = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
                     )
                 |> Async.AwaitTask
-            let! dbValues = 
+            let! dbValues =
                 executeReadQuery.ToListAsync()
                 |> Async.AwaitTask
             let parsedDbValues = dbValues |> Seq.map resultAs
@@ -102,7 +102,7 @@ type Neo4j =
     /// <param name="queryArr">Array of query information. See 'runQuery' for description of parameters.</param>
     /// <param name="credentials">Username, password, bolt-url and database name to create session with database.</param>
     static member runQueries(queryArr: (string*(Map<string,'a> option)*(IRecord -> 'T)) [], credentials:Neo4JCredentials) =
-        async { 
+        async {
             // let! transaction = currentSession.BeginTransactionAsync() |> Async.AwaitTask
             let queries =
                 queryArr
@@ -110,8 +110,8 @@ type Neo4j =
                     // Cast a whole lot of types to expected types by neo4j driver
                     if p.IsSome then
                         let param =
-                            p.Value 
-                            |> Map.fold (fun s k v ->  
+                            p.Value
+                            |> Map.fold (fun s k v ->
                                 let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
                                 kvp::s
                             ) []
@@ -120,8 +120,8 @@ type Neo4j =
                     else
                         Query(q)
                 )
-            let transactions = 
-                queries 
+            let transactions =
+                queries
                 |> Array.map (fun query ->
                     let currentSession = Neo4j.establishConnection(credentials)
                     let transaction = currentSession.ExecuteReadAsync(fun tx ->
@@ -132,10 +132,10 @@ type Neo4j =
                         |> Async.StartAsTask
                     )
                     transaction
-                ) 
+                )
             let parsedToResult =
                 transactions
-                |> Array.mapi (fun i x -> 
+                |> Array.mapi (fun i x ->
                     let _,_,resultAs = queryArr.[i]
                     Seq.map resultAs x.Result
                     |> Array.ofSeq

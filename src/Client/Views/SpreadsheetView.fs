@@ -3,9 +3,9 @@ module SpreadsheetView
 open Feliz
 open Feliz.DaisyUI
 open Messages
-open Shared
+open Swate.Components.Shared
 open MainComponents
-open Shared
+open Swate.Components.Shared
 open Fable.Core.JsInterop
 open Model
 open ARCtrl
@@ -30,7 +30,7 @@ let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactEl
 
 
 
-open Shared
+open Swate.Components.Shared
 open JsonImport
 
 [<ReactComponent>]

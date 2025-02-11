@@ -3,7 +3,7 @@ namespace Modals.ContextMenus
 open ARCtrl
 open Feliz
 open Feliz.DaisyUI
-open Shared
+open Swate.Components.Shared
 
 type DataMapCell =
     static member Main (mouseX, mouseY, ci: int, ri: int, model: Model.Model, dispatch: Messages.Msg -> unit) =

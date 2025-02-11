@@ -1,6 +1,6 @@
 module BuildingBlock.Helper
 
-open Shared
+open Swate.Components.Shared
 open Model
 open Messages
 open ARCtrl

@@ -7,7 +7,7 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 
 let private termOrUnitizedSwitch (model:Model) dispatch =
     let state = model.AddBuildingBlockState

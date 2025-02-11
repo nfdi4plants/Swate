@@ -1,4 +1,4 @@
-module Shared.Database
+module Swate.Components.Shared.Database
 
 type FullTextSearch =
 | Exact

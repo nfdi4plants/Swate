@@ -1,7 +1,6 @@
-namespace Shared
+namespace Swate.Components.Shared
 
 open System
-open Shared
 open Database
 
 [<AutoOpen>]
@@ -18,12 +17,17 @@ module Regex =
 module Route =
 
     let builder typeName methodName =
-        let prefix = // This is required to publishing components with production url while maintaining flexible approach in full stack environment
-            #if PUBLISH_COMPONENTS
-            URLs.PRODUCTION_URL
-            #else
+        let prefix =
+            // Why the #if...#else...#endif?
+            // -> We want to keep fable-remoting's flexible for development and production.
+            //      When we publish the components, we want to use the production URL.
+            //      Both for npm and nuget packages.
+            #if SWATE_ENVIRONMENT || !FABLE_COMPILER
             ""
+            #else
+            URLs.PRODUCTION_URL
             #endif
+
         sprintf "%s/api/%s/%s" prefix typeName methodName
 
 module SorensenDice =
@@ -49,7 +53,7 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
-open Shared.DTOs
+open Swate.Components.Shared.DTOs
 
 type IOntologyAPIv3 = {
     // Development

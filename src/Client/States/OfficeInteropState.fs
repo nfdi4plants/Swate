@@ -1,6 +1,6 @@
 namespace OfficeInterop
 
-open Shared
+open Swate.Components.Shared
 open ARCtrl
 open JsonImport
 

@@ -1,7 +1,7 @@
 module Update.UpdateUtil
 
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 open Fable.Remoting.Client
 open OfficeInterop.Core
 
@@ -17,7 +17,7 @@ module JsonImportHelper =
     open JsonImport
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="arcTables"></param>
     /// <param name="state"></param>
@@ -39,7 +39,7 @@ module JsonImportHelper =
         |> ResizeArray
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="uploadedFile"></param>
     /// <param name="state"></param>
@@ -66,7 +66,7 @@ module JsonImportHelper =
         arcFile
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="importTables"></param>
     /// <param name="importState"></param>
@@ -108,9 +108,9 @@ module JsonImportHelper =
             existing
         | None -> //
             failwith "Error! Can only append information if metadata sheet exists!"
-            
+
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="import"></param>
     /// <param name="importState"></param>
@@ -131,7 +131,7 @@ module JsonExportHelper =
     open ARCtrl.Json
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="arcfile"></param>
     /// <param name="jef"></param>

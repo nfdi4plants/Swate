@@ -3,7 +3,7 @@ module TermSearch
 open Fable.React
 open Fable.React.Props
 open Messages
-open Shared
+open Swate.Components.Shared
 open Elmish
 open TermSearch
 open Model

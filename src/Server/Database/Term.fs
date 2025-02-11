@@ -1,13 +1,13 @@
 module Database.Term
 
 open Neo4j.Driver
-open Shared.Database
-open Shared.SwateObsolete
+open Swate.Components.Shared.Database
+open Swate.Components.Shared.SwateObsolete
 open Helper
 open System.Text
 open System
 open System.Collections.Generic
-open Shared.DTOs
+open Swate.Components.Shared.DTOs
 
 /// <summary> This type is used to allow searching through only one ontology or multiple ontologies </summary>
 [<RequireQualifiedAccess>]
@@ -67,7 +67,7 @@ type Term(?credentials:Neo4JCredentials, ?session:IAsyncSession) =
     /// "termParamName": the query function tries to map properties of the "termParamName" to this function so depending on how the node was called in the query this needs to adapt.
     static member asTerm(termParamName) = fun (record:IRecord) ->
         let accession = record.[$"{termParamName}.accession"].As<string>()
-        let (term: Shared.Database.Term) = {
+        let (term: Swate.Components.Shared.Database.Term) = {
             Accession = accession
             FK_Ontology = Term.parseAccessionToOntologyName accession
             Name = record.[$"{termParamName}.name"] |> defaultOutputWith<string> ""

@@ -7,7 +7,7 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 open Modals
-open Shared
+open Swate.Components.Shared
 
 module private HelperProtocolSearch =
 
@@ -88,7 +88,7 @@ type SearchContainer =
                     Html.p [prop.className "text-error text-sm"; prop.text "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
 
                 Html.div [
-                    prop.className "relative flex p-4 shadow-md gap-4 flex-col !m-0 !p-0"
+                    prop.className "relative flex shadow-md gap-4 flex-col !m-0 !p-0"
                     prop.children [
                         if showTemplatesFilter then
                             Protocol.Search.FileSortElement(model, config, setConfig)

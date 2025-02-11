@@ -24,7 +24,7 @@ module private AboutHelper =
                     Html.text "ool for "
                     Html.b "E"
                     Html.text "veryone. This tool provides an easy way to annotate experimental data in an excel application that every wet lab scientist is familiar with. If you are interested check out the full "
-                    Html.a [prop.href Shared.URLs.SWATE_WIKI; prop.target.blank; prop.text "documentation"]
+                    Html.a [prop.href Swate.Components.Shared.URLs.SWATE_WIKI; prop.target.blank; prop.text "documentation"]
                     Html.text " 📚."
                 ]
             ]
@@ -80,11 +80,11 @@ module private AboutHelper =
 
                     Html.p [
                         Html.text "Got a good idea or just want to get in touch? "
-                        Html.a [prop.href Shared.URLs.Helpdesk.Url; prop.target.blank; prop.text "Reach out to us!"]
+                        Html.a [prop.href Swate.Components.Shared.URLs.Helpdesk.Url; prop.target.blank; prop.text "Reach out to us!"]
                     ]
                 ],
                 "https://raw.githubusercontent.com/nfdi4plants/Branding/refs/heads/master/logos/DataPLANT/DataPLANT_logo_minimal_rounded_bg_black.svg",
-                Shared.URLs.NfdiWebsite
+                Swate.Components.Shared.URLs.NfdiWebsite
             )
 
             MediaContainer (
@@ -92,10 +92,10 @@ module private AboutHelper =
                     Html.strong "X - @nfdi4plants"
                     Html.br []
                     Html.span "Follow us on X for more up-to-date information about research data management! "
-                    Html.a [prop.href Shared.URLs.NFDITwitterUrl; prop.target.blank; prop.text "@nfdi4plants"]
+                    Html.a [prop.href Swate.Components.Shared.URLs.NFDITwitterUrl; prop.target.blank; prop.text "@nfdi4plants"]
                 ],
                 "/x-logo-black.png",
-                Shared.URLs.NFDITwitterUrl
+                Swate.Components.Shared.URLs.NFDITwitterUrl
             )
 
             MediaContainer (
@@ -103,13 +103,13 @@ module private AboutHelper =
                     Html.strong "GitHub"
                     Html.br []
                     Html.text "You can find the Swate source code  "
-                    Html.a [prop.href Shared.URLs.SwateRepo; prop.target.blank; prop.text "here"]
+                    Html.a [prop.href Swate.Components.Shared.URLs.SwateRepo; prop.target.blank; prop.text "here"]
                     Html.text ". Our developers are always happy to get in contact with you! If you don't have a GitHub account but want to reach out or want to snitch on some nasty bugs 🐛 you can tell us "
-                    Html.a [prop.href Shared.URLs.Helpdesk.UrlSwateTopic; prop.target.blank; prop.text "here"]
+                    Html.a [prop.href Swate.Components.Shared.URLs.Helpdesk.UrlSwateTopic; prop.target.blank; prop.text "here"]
                     Html.text "."
                 ],
                 "/github-mark.png",
-                Shared.URLs.SwateRepo
+                Swate.Components.Shared.URLs.SwateRepo
             )
     ]
 

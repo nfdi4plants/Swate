@@ -1,14 +1,16 @@
 module Spreadsheet.Cells
+
 open Feliz
 open Feliz.DaisyUI
 open Fable.Core
 open Spreadsheet
 open MainComponents
 open Messages
-open Shared
+open Swate.Components.Shared
 open ARCtrl
 open Components
 open Model
+
 module private CellAux =
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
         log (s, header)
@@ -31,7 +33,7 @@ module private CellAux =
     let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, dispatch) else ContextMenu.DataMap.onContextMenu (index, dispatch)
 open CellAux
 module private EventPresets =
-    open Shared
+    open Swate.Components.Shared
     let onClickSelect (index: int*int, isIdle:bool, selectedCells: Set<int*int>, model:Model, dispatch)=
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
@@ -67,7 +69,7 @@ module private EventPresets =
                             None
                     TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
 
-open Shared
+open Swate.Components.Shared
 open Fable.Core.JsInterop
 
 type Cell =
@@ -94,12 +96,12 @@ type Cell =
                     )
                     prop.onKeyDown(fun e ->
                         e.stopPropagation()
-                        match e.which with
-                        | 13. -> //enter
+                        match e.code with
+                        | Swate.Components.kbdEventCode.enter -> //enter
                             if isHeader then setter state
                             debounceStorage.current.ClearAndRun()
                             makeIdle()
-                        | 27. -> //escape
+                        | Swate.Components.kbdEventCode.escape -> //escape
                             debounceStorage.current.Clear()
                             makeIdle()
                         | _ -> ()
@@ -253,9 +255,9 @@ type Cell =
                         let onBlur = fun e -> promise { makeIdle() };
                         let onKeyDown = fun (e: Browser.Types.KeyboardEvent) ->
                             promise {
-                                match e.which with
-                                | 13. //enter
-                                | 27. -> //escape
+                                match e.code with
+                                | Swate.Components.kbdEventCode.enter //enter
+                                | Swate.Components.kbdEventCode.escape -> //escape
                                     makeIdle()
                                 | _ -> ()
                             };

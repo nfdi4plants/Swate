@@ -8,7 +8,7 @@ open Feliz.DaisyUI
 
 open Components
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 open Components.Metadata
 open Swate.Components
 

@@ -6,7 +6,7 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 
 
 [<ReactComponent>]
@@ -39,7 +39,7 @@ let FreeTextInputElement(onSubmit: string -> unit) =
 module private DropdownElements =
 
     let divider = Daisy.divider [prop.className "mx-2 my-0"]
-    let private annotationsPrinciplesLink = Html.a [prop.href Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.className "ml-auto link-info"; prop.text "info"]
+    let private annotationsPrinciplesLink = Html.a [prop.href Swate.Components.Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.className "ml-auto link-info"; prop.text "info"]
 
     let createSubBuildingBlockDropdownLink (state:BuildingBlockUIState) setState (subpage: Model.BuildingBlock.DropdownPage) =
         Html.li [
@@ -87,7 +87,8 @@ module private DropdownElements =
                 Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
             )
             prop.onKeyDown(fun k ->
-                if (int k.which) = 13 then Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
+                if k.code = Swate.Components.kbdEventCode.enter then
+                    Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
             )
             prop.text (headerType.ToString())
         ]]
@@ -106,7 +107,7 @@ module private DropdownElements =
                 prop.children [FreeTextInputElement onSubmit]
             | _ ->
                 prop.onClick (fun e -> e.stopPropagation(); setIO iotype)
-                prop.onKeyDown(fun k -> if (int k.which) = 13 then setIO iotype)
+                prop.onKeyDown(fun k -> if k.code = Swate.Components.kbdEventCode.enter then setIO iotype)
                 prop.children [
                     Html.div [prop.text (iotype.ToString())]
                 ]

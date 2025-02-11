@@ -1,6 +1,6 @@
 {
   "name": "@nfdi4plants/swate-components",
-  "version": "1.0.0-alpha.1",
+  "version": "0.0.0",
   "description": "Customizable React components for ontology annotation, based on Swate and the ARC.",
   "main": "./dist/index.umd.js",
   "module": "./dist/index.es.js",
@@ -15,18 +15,18 @@
       "require": "./dist/index.umd.js",
       "types": "./dist/index.d.ts"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": "./dist/swate-components.css"
   },
   "scripts": {
-    "fable": "dotnet fable ./src/Components.fsproj --define PUBLISH_COMPONENTS --lang ts",
+    "fable": "dotnet fable ./src/Swate.Components.fsproj --lang ts",
     "start": "npm run fable -- --watch --run vite",
     "test": "npm run fable -- --watch --run npx vitest --project=storybook",
     "test:run": "npm run fable -- --run npx vitest run --project=storybook",
     "prelink": "npm run build",
     "storybook": "npm run fable -- --watch --run storybook dev -p 6006",
     "prebuild:net": "npx tailwindcss -o ./src/swateBundleStyle.css -m",
-    "build": "npm run fable -- --fableLib @fable-org/fable-library-js --noCache && vite build",
-    "build:net": "dotnet pack ./src/Components.fsproj",
+    "build": "dotnet fable clean -e fs.ts --yes && npm run fable -- --fableLib @fable-org/fable-library-js --noCache -e fs.ts -o src/output && vite build",
+    "build:net": "dotnet pack ./src/Swate.Components.fsproj",
     "prebuild:storybook": "npm run fable -- --noCache",
     "build:storybook": "storybook build"
   },

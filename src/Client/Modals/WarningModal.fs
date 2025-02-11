@@ -4,7 +4,7 @@ open Fable.React
 open Fable.React.Props
 open Model
 open Messages
-open Shared
+open Swate.Components.Shared
 open Feliz
 open Feliz.DaisyUI
 open Swate.Components

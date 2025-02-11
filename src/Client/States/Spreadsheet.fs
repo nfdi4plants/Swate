@@ -1,6 +1,6 @@
 namespace Spreadsheet
 
-open Shared
+open Swate.Components.Shared
 open ARCtrl
 open Fable.Core
 open JsonImport

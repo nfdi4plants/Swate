@@ -1,6 +1,6 @@
-namespace Shared.DTOs
+namespace Swate.Components.Shared.DTOs
 
-open Shared
+open Swate.Components.Shared
 
 type TermQuery = {
     query: string

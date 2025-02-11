@@ -6,7 +6,7 @@ open Feliz.DaisyUI
 open Model
 open SpreadsheetInterface
 open Messages
-open Shared
+open Swate.Components.Shared
 
 open Spreadsheet.Cells
 

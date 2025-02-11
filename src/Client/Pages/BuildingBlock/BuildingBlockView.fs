@@ -3,7 +3,7 @@ module BuildingBlock.Core
 open Model
 open Messages
 open Messages.BuildingBlock
-open Shared
+open Swate.Components.Shared
 
 open Elmish
 open ARCtrl

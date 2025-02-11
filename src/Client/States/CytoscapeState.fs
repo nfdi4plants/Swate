@@ -1,7 +1,7 @@
 namespace Cytoscape
 
-open Shared
-open Shared.Database
+open Swate.Components.Shared
+open Swate.Components.Shared.Database
 open JS
 
 type Model = {

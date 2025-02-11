@@ -2,7 +2,7 @@ namespace BuildingBlock
 
 open Feliz
 open Feliz.DaisyUI
-open Shared
+open Swate.Components.Shared
 
 open OfficeInterop.Core
 open ARCtrl

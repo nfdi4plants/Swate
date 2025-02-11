@@ -3,7 +3,7 @@ namespace Modals
 open Fable.React
 open Model
 open Messages
-open Shared
+open Swate.Components.Shared
 open Feliz
 open Feliz.DaisyUI
 open Swate.Components

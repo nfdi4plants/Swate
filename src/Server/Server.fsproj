@@ -16,7 +16,7 @@
     <Compile Include="Server.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Shared\Shared.fsproj" />
+    <ProjectReference Include="..\Shared\Swate.Components.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ARCtrl" Version="2.2.4" />

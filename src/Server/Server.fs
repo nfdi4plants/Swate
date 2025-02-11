@@ -5,7 +5,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open Saturn
-open Shared
+open Swate.Components.Shared
 
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
@@ -23,7 +23,7 @@ open Microsoft.AspNetCore.Http
 
 open Database
 
-let templateApi credentials = 
+let templateApi credentials =
     let templateUrl = @"https://github.com/nfdi4plants/Swate-templates/releases/download/latest/templates_v2.0.0.json"
     {
         getTemplates = fun () -> async {
@@ -99,7 +99,7 @@ let getMessage() = "Hello from SAFE!"
 
 let getNeo4JCredentials (ctx: HttpContext) =
     let settings = ctx.GetService<IConfiguration>()
-    try 
+    try
         let credentials : Helper.Neo4JCredentials = {
             User        = settings.[Helper.Neo4JCredentials.UserVarString]
             Pw          = settings.[Helper.Neo4JCredentials.PwVarString]
@@ -108,7 +108,7 @@ let getNeo4JCredentials (ctx: HttpContext) =
         }
         credentials
     with
-        | _ -> 
+        | _ ->
             let credentials : Helper.Neo4JCredentials = {
                 User        = settings.[System.Environment.GetEnvironmentVariable(Helper.Neo4JCredentials.UserVarString)]
                 Pw          = settings.[System.Environment.GetEnvironmentVariable(Helper.Neo4JCredentials.PwVarString)]
@@ -179,7 +179,7 @@ let config (app:IApplicationBuilder) =
         let opt = new StaticFileOptions()
         opt.ContentTypeProvider <- provider
         opt
-    ) 
+    )
 
 let app = application {
     url "http://*:5000"

@@ -7,7 +7,7 @@ open Protocol
 
 module Protocol =
 
-    open Shared
+    open Swate.Components.Shared
     open Fable.Core
 
     let update (fujMsg:Protocol.Msg) (state: Protocol.Model) (model: Model.Model) : Protocol.Model * Cmd<Messages.Msg> =

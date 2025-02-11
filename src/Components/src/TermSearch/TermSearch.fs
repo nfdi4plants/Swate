@@ -1,9 +1,12 @@
 namespace Swate.Components
 
+open Swate.Components.Shared
+open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
+
 
 type private Modals =
 | AdvancedSearch
@@ -14,7 +17,7 @@ module private APIExtentions =
     let private optionOfString (str:string) =
         Option.whereNot System.String.IsNullOrWhiteSpace str
 
-    type Shared.Database.Term with
+    type Swate.Components.Shared.Database.Term with
         member this.ToComponentTerm() =
             Term(
                 ?name = optionOfString this.Name,
@@ -114,7 +117,7 @@ module private API =
             }
 
     let callSearch = fun (query: string) ->
-        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, 10))
+        Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create(query, 10))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -123,7 +126,7 @@ module private API =
         )
 
     let callParentSearch = fun (parent: string, query: string) ->
-        Api.SwateApi.searchTerm (Shared.DTOs.TermQuery.create(query, 10, parentTermId = parent))
+        Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create(query, 10, parentTermId = parent))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results
@@ -132,7 +135,7 @@ module private API =
         )
 
     let callAllChildSearch = fun (parent: string) ->
-        Api.SwateApi.searchChildTerms (Shared.DTOs.ParentTermQuery.create(parent, 300))
+        Api.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create(parent, 300))
         |> Async.StartAsPromise
         |> Promise.map(fun results ->
             results.results
@@ -447,7 +450,7 @@ type TermSearch =
         ]
         TermSearch.BaseModal("Details", content, rvm)
 
-    static member private AdvancedSearchDefault(advancedSearchState: Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState) = fun (cc: AdvancedSearchController) ->
+    static member private AdvancedSearchDefault(advancedSearchState: Swate.Components.Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState) = fun (cc: AdvancedSearchController) ->
         React.fragment [
             Html.div [
                 prop.className "prose"
@@ -535,7 +538,7 @@ type TermSearch =
         let pagination, setPagination = React.useState(0)
 
         // Only used if advancedSearch is set to default
-        let advancedSearchState, setAdvancedSearchState = React.useState (Shared.DTOs.AdvancedSearchQuery.init)
+        let advancedSearchState, setAdvancedSearchState = React.useState (Swate.Components.Shared.DTOs.AdvancedSearchQuery.init)
 
         let advancedSearch =
             match advancedSearch0 with
@@ -647,10 +650,10 @@ type TermSearch =
     ///
     /// Customizable react component for term search. Utilizing SwateDB search by default.
     ///
-    #if PUBLISH_COMPONENTS
-    [<ExportDefaultAttribute; NamedParams>]
-    #else
+    #if SWATE_ENVIRONMENT
     [<ReactComponent>]
+    #else
+    [<ExportDefaultAttribute; NamedParams>]
     #endif
     static member TermSearch(
         onTermSelect: Term option -> unit,
@@ -842,8 +845,8 @@ type TermSearch =
         // keyboard navigation
         React.useListener.on("keydown", (fun (e:Browser.Types.KeyboardEvent) ->
             if focused then // only run when focused
-                match searchResults, e.which with
-                | SearchState.SearchDone res, 38. when res.Count > 0 -> // up
+                match searchResults, e.code with
+                | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
                     setKeyboardNavState(
                         match keyboardNavState.SelectedTermSearchResult with
                         | Some 0 -> None
@@ -851,16 +854,16 @@ type TermSearch =
                         | _ -> None
                         |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
                     )
-                | SearchState.SearchDone res, 40. when res.Count > 0 -> // down
+                | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
                     setKeyboardNavState(
                         match keyboardNavState.SelectedTermSearchResult with
                         | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
                         | _ -> Some(0)
                         |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
                     )
-                | SearchState.Idle, 40. when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
+                | SearchState.Idle, kbdEventCode.arrowDown when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
                     startSearch inputRef.current.Value.value
-                | SearchState.SearchDone res, 13. when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
+                | SearchState.SearchDone res, kbdEventCode.enter when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
                     onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
                     cancel()
                 | _ ->
@@ -979,8 +982,8 @@ type TermSearch =
                                             startSearch inputRef.current.Value.value
                                     )
                                     prop.onKeyDown (fun e ->
-                                        match e.which with
-                                        | 27. -> // escape
+                                        match e.code with
+                                        | kbdEventCode.escape ->
                                             cancel()
                                         | _ -> ()
                                         if onKeyDown.IsSome then

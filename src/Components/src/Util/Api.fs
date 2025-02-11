@@ -1,6 +1,7 @@
 module Swate.Components.Api
 
-open Shared
+open Swate.Components
+open Swate.Components.Shared
 open Fable.Core
 open Fable.Remoting.Client
 
@@ -75,7 +76,7 @@ module TIBTypesExtensions =
         member this.ToMyTerm() =
             this.response.docs
             |> Array.map (fun t ->
-                Swate.Components.Term(
+                Term(
                     t.label,
                     t.obo_id,
                     t.description |> String.concat ";",

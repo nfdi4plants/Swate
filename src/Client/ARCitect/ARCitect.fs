@@ -3,7 +3,7 @@
 open ARCitect.Interop
 open Model
 open Model.ARCitect
-open Shared
+open Swate.Components.Shared
 open Messages
 open Elmish
 open ARCtrl

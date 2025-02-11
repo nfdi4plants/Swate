@@ -1,4 +1,4 @@
-namespace Shared.DTOs
+namespace Swate.Components.Shared.DTOs
 
 type AdvancedSearchQuery = {
     OntologyName            : string option

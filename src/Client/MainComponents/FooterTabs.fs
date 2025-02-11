@@ -103,10 +103,10 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     prop.onBlur updateName
                     // .. when pressing "ENTER". "ESCAPE" will negate changes.
                     prop.onKeyDown(fun e ->
-                        match e.which with
-                        | 13. -> //enter
+                        match e.code with
+                        | Swate.Components.kbdEventCode.enter -> //enter
                             updateName e
-                        | 27. -> //escape
+                        | Swate.Components.kbdEventCode.escape -> //escape
                             setState {state with IsEditable = false; Name = table.Name}
                         | _ -> ()
                     )

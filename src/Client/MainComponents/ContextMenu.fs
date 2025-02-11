@@ -5,7 +5,7 @@ open Feliz.DaisyUI
 open Spreadsheet
 open ARCtrl
 open Model
-open Shared
+open Swate.Components.Shared
 module Table =
 
     let onContextMenu (index: int*int, dispatch) = fun (e: Browser.Types.MouseEvent) ->

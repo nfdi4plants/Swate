@@ -1,6 +1,6 @@
 namespace Model
 
-open Shared
+open Swate.Components.Shared
 open Feliz
 open Routing
 open Database

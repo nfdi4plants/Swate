@@ -13,6 +13,7 @@ open Fetch
 open ARCtrl.Json
 open Swate.Components
 open Components
+open Swate.Components.Shared
 
 module private API =
 

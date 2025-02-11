@@ -141,14 +141,12 @@
     <PackageReference Include="Fable.Elmish.Debugger" Version="4.1.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.SimpleJson" Version="3.24.0" />
-    <PackageReference Include="Feliz" Version="2.8.0" />
-    <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
     <PackageReference Include="FsSpreadsheet.Js" Version="[6.2.0]" />
     <PackageReference Include="Fable.Mocha" Version="2.17.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Components\src\Components.fsproj" />
-    <ProjectReference Include="..\Shared\Shared.fsproj" />
+    <ProjectReference Include="..\Components\src\Swate.Components.fsproj" />
+    <ProjectReference Include="..\Shared\Swate.Components.Core.fsproj" />
   </ItemGroup>
 </Project>

@@ -4,7 +4,7 @@ open System.Collections.Generic
 open Spreadsheet
 open Types
 open ARCtrl
-open Shared
+open Swate.Components.Shared
 
 module ControllerTableAux =
 
@@ -43,7 +43,7 @@ let switchTable (nextIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model 
 let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.Tables.AddTable(newTable)
     switchTable (state.Tables.TableCount - 1) state
-    
+
 
 /// <summary>This function is used to create multiple tables at once.</summary>
 let addTables (tables: ArcTable []) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -77,7 +77,7 @@ let renameTable (tableIndex:int) (newName: string) (state: Spreadsheet.Model) : 
     {state with ArcFile = state.ArcFile}
 
 let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    if state.Tables.TableCount = 0 then 
+    if state.Tables.TableCount = 0 then
         state
     else
         state.Tables.RemoveTableAt removeIndex
@@ -113,7 +113,7 @@ let deleteRows (indexArr: int []) (state: Spreadsheet.Model) : Spreadsheet.Model
     {state with
         ArcFile = state.ArcFile
         SelectedCells = Set.empty }
-    
+
 
 let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveColumn index

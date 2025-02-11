@@ -1,9 +1,9 @@
 module API.IOntologyAPI
 
-open Shared
+open Swate.Components.Shared
 open Database
 
-open Shared.DTOs
+open Swate.Components.Shared.DTOs
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open ARCtrl
@@ -109,8 +109,8 @@ module V3 =
         |> Remoting.withErrorHandler Helper.errorHandler
         |> Remoting.buildHttpHandler
 
-open Shared.SwateObsolete
-open Shared.SwateObsolete.Regex
+open Swate.Components.Shared.SwateObsolete
+open Swate.Components.Shared.SwateObsolete.Regex
 
 [<RequireQualifiedAccess>]
 module V1 =

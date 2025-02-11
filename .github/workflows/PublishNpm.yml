@@ -58,7 +58,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
 
       - name: Publish to NPM (Next)
-        if: github.ref_name == 'nightly' || github.ref_name == 'gh-action-test-branch'
+        if: github.ref_name == 'nightly' || github.ref_name == 'publish_bugfixes'
         run: npm publish --access public --tag next
         working-directory: src/Components
         env:

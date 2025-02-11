@@ -7,7 +7,7 @@ open Fable.Core.JsInterop
 open Model
 open Messages
 open Messages.BuildingBlock
-open Shared
+open Swate.Components.Shared
 open Feliz
 open Elmish
 

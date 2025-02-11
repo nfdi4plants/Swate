@@ -4,7 +4,7 @@ console.log('tailwindcss config loaded');
 module.exports = {
     mode: "jit",
     content: [
-        './src/**/*.{js,ts,jsx,tsx}', // this must be relative to root :disappointed:
+        './src/**/*.{fs,js,ts,jsx,tsx}', // this must be relative to root :disappointed:
         './playground/**/*.{js,ts,jsx,tsx}', // this must be relative to root :disappointed:
     ],
     daisyui: {

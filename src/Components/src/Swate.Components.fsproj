@@ -19,10 +19,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Remove="C:\Users\Kevin\.nuget\packages\fable.core\4.3.0\contentFiles\any\netstandard2.0\CHANGELOG.md" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
     <Compile Include="Util\Types.fs" />
@@ -40,8 +36,9 @@
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />
     <PackageReference Include="Fable.Core" Version="4.3.0" />
-    <PackageReference Include="Feliz" Version="2.8.0" />
+    <PackageReference Include="Feliz" Version="2.9.0" />
     <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
+    <PackageReference Include="Fable.Browser.Dom" Version="2.18.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -52,7 +49,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Shared\Shared.fsproj" />
+    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj" />
   </ItemGroup>
 
   <PropertyGroup>
