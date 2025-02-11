@@ -1,4 +1,4 @@
-module Modals.EditColumn
+namespace Modals
 
 open Feliz
 open Feliz.DaisyUI
@@ -12,11 +12,11 @@ open ARCtrl
 
 type private State =
     {
-        NextHeaderType: CompositeHeaderDiscriminate option
+        NextHeaderType: CompositeHeaderDiscriminate
         NextIOType: IOType option
     } with
-        static member init() = {
-            NextHeaderType = None
+        static member init(current) = {
+            NextHeaderType = current
             NextIOType = None
         }
 
@@ -31,7 +31,7 @@ module private EditColumnComponents =
 
     let SubmitButton(submit) =
         Daisy.button.button [
-            button.success
+            button.primary
             prop.text "Submit"
             prop.onClick submit
         ]
@@ -43,20 +43,30 @@ module private EditColumnComponents =
             prop.text txt
         ]
 
-    let SelectHeaderType(header, state, setState) =
-        Daisy.select [
-            select.bordered
-            prop.value (header.ToString())
-            prop.onChange (fun (e: string) -> {state with NextHeaderType = Some (CompositeHeaderDiscriminate.fromString e)} |> setState )
+    let SelectHeaderType(state, setState) =
+        Html.select [
+            prop.className "select select-bordered join-item"
+            prop.value (state.NextHeaderType.ToString())
+            prop.onChange (fun (e: string) -> {state with NextHeaderType = CompositeHeaderDiscriminate.fromString e} |> setState )
             prop.children [
                 // -- term columns --
-                SelectHeaderTypeOption CompositeHeaderDiscriminate.Characteristic
-                SelectHeaderTypeOption CompositeHeaderDiscriminate.Component
-                SelectHeaderTypeOption CompositeHeaderDiscriminate.Factor
-                SelectHeaderTypeOption CompositeHeaderDiscriminate.Parameter
+                Html.optgroup [
+                    prop.label "Term Columns"
+                    prop.children [
+                        SelectHeaderTypeOption CompositeHeaderDiscriminate.Characteristic
+                        SelectHeaderTypeOption CompositeHeaderDiscriminate.Component
+                        SelectHeaderTypeOption CompositeHeaderDiscriminate.Factor
+                        SelectHeaderTypeOption CompositeHeaderDiscriminate.Parameter
+                    ]
+                ]
                 // -- io columns --
-                SelectHeaderTypeOption CompositeHeaderDiscriminate.Input
-                SelectHeaderTypeOption CompositeHeaderDiscriminate.Output
+                Html.optgroup [
+                    prop.label "IO Columns"
+                    prop.children [
+                        SelectHeaderTypeOption CompositeHeaderDiscriminate.Input
+                        SelectHeaderTypeOption CompositeHeaderDiscriminate.Output
+                    ]
+                ]
                 // -- single columns --
                 SelectHeaderTypeOption CompositeHeaderDiscriminate.Date
                 SelectHeaderTypeOption CompositeHeaderDiscriminate.Performer
@@ -76,7 +86,9 @@ module private EditColumnComponents =
         ]
 
     let SelectIOType(state, setState) =
-        Daisy.select [
+        Html.select [
+            prop.className "select select-bordered join-item"
+            prop.value (state.NextIOType |> Option.defaultValue IOType.Sample |> _.ToString())
             prop.onChange (fun (e: string) -> {state with NextIOType = Some (IOType.ofString e)} |> setState )
             prop.children [
                 SelectIOTypeOption IOType.Source
@@ -125,112 +137,113 @@ module private EditColumnComponents =
             ]
         ]
 
-
-
-
 open EditColumnComponents
 
-[<ReactComponent>]
-let Main (columnIndex: int) (model: Model) (dispatch) =
-    let column0 = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
-    let state, setState = React.useState(State.init)
-    let rmv = Util.RMV_MODAL dispatch
-    let cellsToTermCells(column:CompositeColumn) =
-        [|for c in column.Cells do if c.isUnitized || c.isTerm then c else c.ToTermCell()|]
-    let cellsToFreeText(column) =
-        [|for c in column.Cells do if c.isFreeText then c else c.ToFreeTextCell()|]
-    let cellsToDataOrFreeText(column) =
-        [|for c in column.Cells do if c.isFreeText || c.isData then c else c.ToDataCell()|]
-    let updateColumn (column: CompositeColumn) =
-        let header = column0.Header
-        match state.NextHeaderType, state.NextIOType with
-        | None, _ -> column
-        // -- term columns --
-        | Some CompositeHeaderDiscriminate.Characteristic, _  ->
-            CompositeColumn.create(CompositeHeader.Characteristic (header.ToTerm()), cellsToTermCells(column))
-        | Some CompositeHeaderDiscriminate.Parameter, _ ->
-            CompositeColumn.create(CompositeHeader.Parameter (header.ToTerm()), cellsToTermCells(column))
-        | Some CompositeHeaderDiscriminate.Component, _ ->
-            CompositeColumn.create(CompositeHeader.Component (header.ToTerm()), cellsToTermCells(column))
-        | Some CompositeHeaderDiscriminate.Factor, _ ->
-            CompositeColumn.create(CompositeHeader.Factor (header.ToTerm()), cellsToTermCells(column))
-        // -- input columns --
-        | Some CompositeHeaderDiscriminate.Input, Some IOType.Data ->
-            CompositeColumn.create(CompositeHeader.Input IOType.Data, cellsToDataOrFreeText(column))
-        | Some CompositeHeaderDiscriminate.Input, Some io ->
-            CompositeColumn.create(CompositeHeader.Input io, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.Input, None ->
-            CompositeColumn.create(CompositeHeader.Input IOType.Sample, cellsToFreeText(column))
-        // -- output columns --
-        | Some CompositeHeaderDiscriminate.Output, Some IOType.Data ->
-            CompositeColumn.create(CompositeHeader.Output IOType.Data, cellsToDataOrFreeText(column))
-        | Some CompositeHeaderDiscriminate.Output, Some io ->
-            CompositeColumn.create(CompositeHeader.Output io, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.Output, None ->
-            CompositeColumn.create(CompositeHeader.Output IOType.Sample, cellsToFreeText(column))
-        // -- single columns --
-        | Some CompositeHeaderDiscriminate.ProtocolREF, _ ->
-            CompositeColumn.create(CompositeHeader.ProtocolREF, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.Date, _ ->
-            CompositeColumn.create(CompositeHeader.Date, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.Performer, _ ->
-            CompositeColumn.create(CompositeHeader.Performer, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.ProtocolDescription, _ ->
-            CompositeColumn.create(CompositeHeader.ProtocolDescription, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.ProtocolType, _ ->
-            CompositeColumn.create(CompositeHeader.ProtocolType, cellsToTermCells(column))
-        | Some CompositeHeaderDiscriminate.ProtocolUri, _ ->
-            CompositeColumn.create(CompositeHeader.ProtocolUri, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.ProtocolVersion, _ ->
-            CompositeColumn.create(CompositeHeader.ProtocolVersion, cellsToFreeText(column))
-        | Some CompositeHeaderDiscriminate.Comment, _ -> failwith "Comment header type is not yet implemented"
-        | Some CompositeHeaderDiscriminate.Freetext, _ -> failwith "Freetext header type is not yet implemented"
-    let submit (e) =
-        let nxtCol = updateColumn column0
-        Spreadsheet.SetColumn (columnIndex, nxtCol) |> SpreadsheetMsg |> dispatch
-        rmv(e)
-    let previewColumn =
-        let cells = Array.takeSafe 10 column0.Cells
-        updateColumn {column0 with Cells = cells}
+type EditColumn =
 
-    Daisy.modal.div [
-        modal.open'
-        prop.children [
-            Daisy.modalBackdrop [ prop.onClick rmv ]
-            Daisy.modalBox.div [
-                prop.className "lg:max-w-[600px]"
-                prop.style [style.maxHeight(length.percent 70)]
-                prop.children [
-                    Daisy.cardBody [
-                        Daisy.cardTitle [
-                            prop.className "flex flex-row justify-between"
-                            prop.children [
-                                Html.span "Update Column"
-                                Components.Components.DeleteButton(props=[prop.onClick rmv])
+    [<ReactComponent>]
+    static member Main (columnIndex: int, model: Model, dispatch) =
+        let column0 = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
+        let state, setState = React.useState(State.init column0.Header.AsDiscriminate)
+        let rmv = Util.RMV_MODAL dispatch
+        let cellsToTermCells(column:CompositeColumn) =
+            [|for c in column.Cells do if c.isUnitized || c.isTerm then c else c.ToTermCell()|]
+        let cellsToFreeText(column) =
+            [|for c in column.Cells do if c.isFreeText then c else c.ToFreeTextCell()|]
+        let cellsToDataOrFreeText(column) =
+            [|for c in column.Cells do if c.isFreeText || c.isData then c else c.ToDataCell()|]
+        let updateColumn (column: CompositeColumn) =
+            let header = column0.Header
+            match state.NextHeaderType, state.NextIOType with
+            // -- term columns --
+            | CompositeHeaderDiscriminate.Characteristic, _  ->
+                CompositeColumn.create(CompositeHeader.Characteristic (header.ToTerm()), cellsToTermCells(column))
+            | CompositeHeaderDiscriminate.Parameter, _ ->
+                CompositeColumn.create(CompositeHeader.Parameter (header.ToTerm()), cellsToTermCells(column))
+            | CompositeHeaderDiscriminate.Component, _ ->
+                CompositeColumn.create(CompositeHeader.Component (header.ToTerm()), cellsToTermCells(column))
+            | CompositeHeaderDiscriminate.Factor, _ ->
+                CompositeColumn.create(CompositeHeader.Factor (header.ToTerm()), cellsToTermCells(column))
+            // -- input columns --
+            | CompositeHeaderDiscriminate.Input, Some IOType.Data ->
+                CompositeColumn.create(CompositeHeader.Input IOType.Data, cellsToDataOrFreeText(column))
+            | CompositeHeaderDiscriminate.Input, Some io ->
+                CompositeColumn.create(CompositeHeader.Input io, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.Input, None ->
+                CompositeColumn.create(CompositeHeader.Input IOType.Sample, cellsToFreeText(column))
+            // -- output columns --
+            | CompositeHeaderDiscriminate.Output, Some IOType.Data ->
+                CompositeColumn.create(CompositeHeader.Output IOType.Data, cellsToDataOrFreeText(column))
+            | CompositeHeaderDiscriminate.Output, Some io ->
+                CompositeColumn.create(CompositeHeader.Output io, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.Output, None ->
+                CompositeColumn.create(CompositeHeader.Output IOType.Sample, cellsToFreeText(column))
+            // -- single columns --
+            | CompositeHeaderDiscriminate.ProtocolREF, _ ->
+                CompositeColumn.create(CompositeHeader.ProtocolREF, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.Date, _ ->
+                CompositeColumn.create(CompositeHeader.Date, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.Performer, _ ->
+                CompositeColumn.create(CompositeHeader.Performer, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.ProtocolDescription, _ ->
+                CompositeColumn.create(CompositeHeader.ProtocolDescription, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.ProtocolType, _ ->
+                CompositeColumn.create(CompositeHeader.ProtocolType, cellsToTermCells(column))
+            | CompositeHeaderDiscriminate.ProtocolUri, _ ->
+                CompositeColumn.create(CompositeHeader.ProtocolUri, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.ProtocolVersion, _ ->
+                CompositeColumn.create(CompositeHeader.ProtocolVersion, cellsToFreeText(column))
+            | CompositeHeaderDiscriminate.Comment, _ -> failwith "Comment header type is not yet implemented"
+            | CompositeHeaderDiscriminate.Freetext, _ -> failwith "Freetext header type is not yet implemented"
+        let submit (e) =
+            let nxtCol = updateColumn column0
+            Spreadsheet.SetColumn (columnIndex, nxtCol) |> SpreadsheetMsg |> dispatch
+            rmv(e)
+        let previewColumn =
+            let cells = Array.takeSafe 10 column0.Cells
+            updateColumn {column0 with Cells = cells}
+
+        Daisy.modal.div [
+            modal.open'
+            prop.children [
+                Daisy.modalBackdrop [ prop.onClick rmv ]
+                Daisy.modalBox.div [
+                    prop.className "lg:max-w-[600px]"
+                    prop.style [style.maxHeight(length.percent 70)]
+                    prop.children [
+                        Daisy.cardBody [
+                            Daisy.cardTitle [
+                                prop.className "flex flex-row justify-between"
+                                prop.children [
+                                    Html.span "Update Column"
+                                    Components.Components.DeleteButton(props=[prop.onClick rmv])
+                                ]
                             ]
-                        ]
-                        Html.div [
-                            SelectHeaderType(column0.Header.AsDiscriminate, state, setState)
-                            match state.NextHeaderType with
-                            | Some CompositeHeaderDiscriminate.Output | Some CompositeHeaderDiscriminate.Input ->
-                                SelectIOType(state, setState)
-                            | _ -> Html.none
-                        ]
-                        Html.div [
-                            prop.style [style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex]
-                            prop.children [
-                                Preview(previewColumn)
+                            Html.div [
+                                prop.className "join"
+                                prop.children [
+                                    SelectHeaderType(state, setState)
+                                    match state.NextHeaderType with
+                                    | CompositeHeaderDiscriminate.Output | CompositeHeaderDiscriminate.Input ->
+                                        SelectIOType(state, setState)
+                                    | _ -> Html.none
+                                ]
                             ]
-                        ]
-                        Daisy.cardActions [
-                            prop.className "justify-end"
-                            prop.children [
-                                BackButton rmv
-                                SubmitButton submit
+                            Html.div [
+                                prop.style [style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex]
+                                prop.children [
+                                    Preview(previewColumn)
+                                ]
+                            ]
+                            Daisy.cardActions [
+                                prop.className "justify-end"
+                                prop.children [
+                                    BackButton rmv
+                                    SubmitButton submit
+                                ]
                             ]
                         ]
                     ]
                 ]
             ]
         ]
-    ]
