@@ -98,7 +98,6 @@ type TIBApi =
         |> Promise.bind(fun response ->
             response.json<TIBTypes.TermApi>()
             |> Promise.map(fun termApi ->
-                Browser.Dom.console.log("OBO_ID:" + oboId, response)
                 termApi._embedded.terms
                 |> Array.tryFind (fun term -> term.obo_id = oboId)
                 |> Option.map (fun term -> term.iri)
