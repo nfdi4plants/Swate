@@ -105,7 +105,7 @@ type PersistentStorageState = {
             ParentSearch = ResizeArray [
                 for c in this.TIBSearchCatalogues do
                     let n = "TIB_" + c
-                    let query: Swate.Components.ParentSearchCall = fun (q: string, p: string) -> Swate.Components.Api.TIBApi.searchChildrenOf(q, p, 10, c)
+                    let query: Swate.Components.ParentSearchCall = fun (parent: string, query: string) -> Swate.Components.Api.TIBApi.searchChildrenOf(query, parent, 10, c)
                     yield (n, query)
             ];
             AllChildrenSearch = ResizeArray [
