@@ -160,13 +160,6 @@ type Widget =
 
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
         let content = BuildingBlock.SearchComponent.Main model dispatch
-        let help = React.fragment [
-                Html.p "Add a new Building Block."
-                Html.ul [
-                        Html.li "If a cell is selected, a new Building Block is added to the right of the selected cell."
-                        Html.li "If no cell is selected, a new Building Block is appended at the right end of the table."
-                    ]
-                ]
         let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv)
 
