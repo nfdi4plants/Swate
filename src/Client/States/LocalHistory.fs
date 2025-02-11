@@ -164,8 +164,8 @@ module ConversionTypes =
                     | JsonArcFiles.None -> None
                 {
                     init with
-                        ActiveView = this.ActiveView
-                        ArcFile = arcFile
+                        ActiveView  = this.ActiveView
+                        ArcFile     = arcFile
                 }
             with
                 | _ -> init

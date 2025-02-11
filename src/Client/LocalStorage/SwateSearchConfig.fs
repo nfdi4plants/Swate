@@ -15,7 +15,7 @@ module SwateDefaultSearch =
         try
             let v = Browser.WebStorage.localStorage.getItem(KEY)
             match v.ToLower() with
-            | "true" | "1" -> true
+            | "true"  | "1" -> true
             | "false" | "0" -> false
             | _ -> true
         with
@@ -42,4 +42,3 @@ module TIBSearch =
     let Set(v: string []) =
         let s = Json.serialize v
         Browser.WebStorage.localStorage.setItem(KEY, s)
-

@@ -23,7 +23,7 @@ module private ModelUtil =
 
     type Model.Model with
         member this.UpdateFromLocalStorage() =
-            let updateSearch (model:Model.Model) =
+            let updateSearch (model: Model.Model) =
                 let swateDefaultSearch = LocalStorage.SwateSearchConfig.SwateDefaultSearch.Get()
                 let tibSearch = LocalStorage.SwateSearchConfig.TIBSearch.Get()
                 {
@@ -35,7 +35,6 @@ module private ModelUtil =
             | Some Swatehost.Browser ->
                 let dt = LocalStorage.Darkmode.DataTheme.GET()
                 LocalStorage.Darkmode.DataTheme.SET dt
-                let model = Spreadsheet.Model.fromLocalStorage()
                 { this with
                     Model.SpreadsheetModel = Spreadsheet.Model.fromLocalStorage()
                     Model.History = this.History.UpdateFromSessionStorage()

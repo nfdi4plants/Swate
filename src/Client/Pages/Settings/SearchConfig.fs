@@ -32,7 +32,7 @@ type SearchConfig =
                                 prop.text "Use Swate Default Search"
                             ]
                             Html.input [
-                                prop.onChange (fun (b:bool) -> Messages.PersistentStorage.UpdateSwateDefaultSearch b |> PersistentStorageMsg |> dispatch)
+                                prop.onChange (fun (b: bool) -> Messages.PersistentStorage.UpdateSwateDefaultSearch b |> PersistentStorageMsg |> dispatch)
                                 prop.className "checkbox checkbox-primary"
                                 prop.type'.checkbox
                                 prop.isChecked model.PersistentStorageState.SwateDefaultSearch

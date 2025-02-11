@@ -96,21 +96,21 @@ module Dev =
                     (curry GenericError Cmd.none >> DevMsg)
             currentState, cmd
 
-let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (currentState:PersistentStorageState) : PersistentStorageState * Cmd<Msg> =
+let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (currentState: PersistentStorageState) : PersistentStorageState * Cmd<Msg> =
     match persistentStorageMsg with
     | PersistentStorage.UpdateAppVersion appVersion ->
         let nextState = {
             currentState with
                 AppVersion = appVersion
         }
-        nextState,Cmd.none
+        nextState, Cmd.none
     | PersistentStorage.UpdateSwateDefaultSearch swateDefaultSearch ->
         let nextState = {
             currentState with
                 SwateDefaultSearch = swateDefaultSearch
         }
         LocalStorage.SwateSearchConfig.SwateDefaultSearch.Set swateDefaultSearch
-        nextState,Cmd.none
+        nextState, Cmd.none
     | PersistentStorage.AddTIBSearchCatalogue catalogue ->
         let nextCata = currentState.TIBSearchCatalogues.Add(catalogue)
         let nextState = {
@@ -118,7 +118,7 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (cur
                 TIBSearchCatalogues = nextCata
         }
         LocalStorage.SwateSearchConfig.TIBSearch.Set (Set.toArray nextCata)
-        nextState,Cmd.none
+        nextState, Cmd.none
     | PersistentStorage.RemoveTIBSearchCatalogue catalogue ->
         let nextCata = currentState.TIBSearchCatalogues.Remove(catalogue)
         let nextState = {
@@ -126,14 +126,20 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (cur
                 TIBSearchCatalogues = nextCata
         }
         LocalStorage.SwateSearchConfig.TIBSearch.Set (Set.toArray nextCata)
-        nextState,Cmd.none
+        nextState, Cmd.none
     | PersistentStorage.SetTIBSearchCatalogues catalogues ->
         let nextState = {
             currentState with
                 TIBSearchCatalogues = catalogues
         }
         LocalStorage.SwateSearchConfig.TIBSearch.Set (Set.toArray catalogues)
-        nextState,Cmd.none
+        nextState, Cmd.none
+    | PersistentStorage.UpdateAutosave autosave ->
+        let nextState = {
+            currentState with
+                Autosave = autosave
+        }
+        nextState, Cmd.none
 
 module DataAnnotator =
     let update (msg: DataAnnotator.Msg) (state: DataAnnotator.Model) (model: Model.Model) =

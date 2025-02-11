@@ -14,17 +14,18 @@ open Feliz.DaisyUI
 open LocalStorage.Darkmode
 
 type Settings =
+
     [<ReactComponent>]
     static member ThemeToggle () =
-        let state = React.useContext(LocalStorage.Darkmode.themeContext)
-        let isDark = state.Theme = Dark
+        let darkmodeState = React.useContext(LocalStorage.Darkmode.themeContext)
+        let isDark = darkmodeState.Theme = Dark
         Html.label [
             prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
             prop.onClick (fun e ->
                 e.preventDefault()
                 let next = if isDark then Light else Dark
                 DataTheme.SET next
-                state.SetTheme {state with Theme = next}
+                darkmodeState.SetTheme {darkmodeState with Theme = next}
             )
             prop.children [
                 Html.p [
@@ -81,13 +82,13 @@ type Settings =
             ]
         )
 
-    static member ActivityLog(model) =
+    static member ActivityLog (model, dispatch) =
         Components.Forms.Generic.BoxedField("Activity Log", "Display all recorded activities of this session.",
             content = [
                 Html.div [
                     prop.className "overflow-y-auto max-h-[600px]"
                     prop.children [
-                        ActivityLog.Main model
+                        ActivityLog.Main(model, dispatch)
                     ]
                 ]
             ]
@@ -99,7 +100,7 @@ type Settings =
 
             Settings.SearchConfig (model, dispatch)
 
-            Settings.ActivityLog model
+            Settings.ActivityLog(model, dispatch)
             //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
             //    toggleRgbModeElement model dispatch
 
