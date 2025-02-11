@@ -12,6 +12,7 @@
     <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Helper.fs" />
+    <Compile Include="LocalStorage\AutosaveConfig.fs" />
     <Compile Include="LocalStorage\SwateSearchConfig.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />

@@ -13,6 +13,8 @@ open Feliz
 open Feliz.DaisyUI
 open LocalStorage.Darkmode
 
+open AutosaveConfig
+
 type Settings =
 
     [<ReactComponent>]
@@ -63,13 +65,41 @@ type Settings =
             ]
         ]
 
-    static member Appearance () =
-        Components.Forms.Generic.BoxedField("Appearance",
+    static member ToggleAutosaveConfig(model, dispatch) =
+        Html.label [
+            prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
+            prop.children [
+                Html.p [
+                    prop.className "select-none text-xl py-2"
+                    prop.text "Autsave"
+                ]
+                Daisy.toggle [
+                    let autosaveConfig = getAutosaveConfiguration()
+
+                    if autosaveConfig.IsSome && autosaveConfig.Value <> model.PersistentStorageState.Autosave then
+                        PersistentStorage.UpdateAutosave autosaveConfig.Value |> PersistentStorageMsg |> dispatch
+
+                    prop.isChecked model.PersistentStorageState.Autosave
+
+                    toggle.primary
+
+                    prop.onChange (fun (b: bool) ->
+                        PersistentStorage.UpdateAutosave (model.PersistentStorageState.Autosave) |> PersistentStorageMsg |> dispatch
+                        setAutosaveConfiguration(b)
+                        if not b then LocalHistory.Model.ResetHistoryWebStorage()
+                    )
+                ]
+            ]
+        ]
+
+    static member General(model, dispatch) =
+        Components.Forms.Generic.BoxedField("General",
             content = [
                 Html.div [
                     prop.className "grid grid-cols-1 gap-4 lg:grid-cols-2"
                     prop.children [
-                        Settings.ThemeToggle ()
+                        Settings.ThemeToggle()
+                        Settings.ToggleAutosaveConfig(model, dispatch)
                     ]
                 ]
             ]
@@ -82,13 +112,13 @@ type Settings =
             ]
         )
 
-    static member ActivityLog (model, dispatch) =
+    static member ActivityLog model =
         Components.Forms.Generic.BoxedField("Activity Log", "Display all recorded activities of this session.",
             content = [
                 Html.div [
                     prop.className "overflow-y-auto max-h-[600px]"
                     prop.children [
-                        ActivityLog.Main(model, dispatch)
+                        ActivityLog.Main(model)
                     ]
                 ]
             ]
@@ -96,11 +126,12 @@ type Settings =
 
     static member Main(model: Model.Model, dispatch) =
         Components.Forms.Generic.Section [
-            Settings.Appearance ()
+            Settings.General(model, dispatch)
 
             Settings.SearchConfig (model, dispatch)
 
-            Settings.ActivityLog(model, dispatch)
+            Settings.ActivityLog(model)
+
             //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
             //    toggleRgbModeElement model dispatch
 
