@@ -70,12 +70,18 @@ type Settings =
                     prop.className "select-none text-xl"
                     prop.text "Autosave"
                 ]
-                Daisy.toggle [
-                    prop.isChecked model.PersistentStorageState.Autosave
-                    toggle.primary
-                    prop.onChange (fun (b: bool) ->
-                        PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch
-                    )
+                Html.div [
+                    prop.className "flex items-center pl-10"
+                    prop.children [
+                        Daisy.toggle [
+                            prop.className "ml-14"
+                            prop.isChecked model.PersistentStorageState.Autosave
+                            toggle.primary
+                            prop.onChange (fun (b: bool) ->
+                                PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch
+                            )
+                        ]
+                    ]
                 ]
                 Html.p [
                     prop.className "text-sm text-gray-500"
