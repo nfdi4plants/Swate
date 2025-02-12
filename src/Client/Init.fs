@@ -6,6 +6,7 @@ open LocalHistory
 open Model
 open Messages
 open Update
+open LocalStorage.AutosaveConfig
 
 let initialModel =
     {
@@ -28,4 +29,12 @@ let initialModel =
 // defines the initial state and initial command (= side-effect) of the application
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let model, cmd = urlUpdate pageOpt initialModel
-    model, cmd
+
+    let autosaveConfig = getAutosaveConfiguration()
+
+    let newModel =
+        if autosaveConfig.IsSome && autosaveConfig.Value <> model.PersistentStorageState.Autosave then
+            {model with Model.PersistentStorageState.Autosave = autosaveConfig.Value}
+        else model
+
+    newModel, cmd

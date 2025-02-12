@@ -14,17 +14,17 @@ open Feliz.DaisyUI
 open LocalStorage.Darkmode
 
 type Settings =
-    [<ReactComponent>]
+
     static member ThemeToggle () =
-        let state = React.useContext(LocalStorage.Darkmode.themeContext)
-        let isDark = state.Theme = Dark
+        let darkmodeState = React.useContext(LocalStorage.Darkmode.themeContext)
+        let isDark = darkmodeState.Theme = Dark
         Html.label [
             prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
             prop.onClick (fun e ->
                 e.preventDefault()
                 let next = if isDark then Light else Dark
                 DataTheme.SET next
-                state.SetTheme {state with Theme = next}
+                darkmodeState.SetTheme {darkmodeState with Theme = next}
             )
             prop.children [
                 Html.p [
@@ -62,13 +62,42 @@ type Settings =
             ]
         ]
 
-    static member Appearance () =
-        Components.Forms.Generic.BoxedField("Appearance",
+    static member ToggleAutosaveConfig(model, dispatch) =
+        Html.label [
+            prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
+            prop.children [
+                Html.p [
+                    prop.className "select-none text-xl"
+                    prop.text "Autosave"
+                ]
+                Html.div [
+                    prop.className "flex items-center pl-10"
+                    prop.children [
+                        Daisy.toggle [
+                            prop.className "ml-14"
+                            prop.isChecked model.PersistentStorageState.Autosave
+                            toggle.primary
+                            prop.onChange (fun (b: bool) ->
+                                PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch
+                            )
+                        ]
+                    ]
+                ]
+                Html.p [
+                    prop.className "text-sm text-gray-500"
+                    prop.text "When you deactivate autosave, your local history will be deleted."
+                ]
+            ]
+        ]
+
+    static member General(model, dispatch) =
+        Components.Forms.Generic.BoxedField("General",
             content = [
                 Html.div [
                     prop.className "grid grid-cols-1 gap-4 lg:grid-cols-2"
                     prop.children [
-                        Settings.ThemeToggle ()
+                        Settings.ThemeToggle()
+                        Settings.ToggleAutosaveConfig(model, dispatch)
                     ]
                 ]
             ]
@@ -81,13 +110,13 @@ type Settings =
             ]
         )
 
-    static member ActivityLog(model) =
+    static member ActivityLog model =
         Components.Forms.Generic.BoxedField("Activity Log", "Display all recorded activities of this session.",
             content = [
                 Html.div [
                     prop.className "overflow-y-auto max-h-[600px]"
                     prop.children [
-                        ActivityLog.Main model
+                        ActivityLog.Main(model)
                     ]
                 ]
             ]
@@ -95,11 +124,12 @@ type Settings =
 
     static member Main(model: Model.Model, dispatch) =
         Components.Forms.Generic.Section [
-            Settings.Appearance ()
+            Settings.General(model, dispatch)
 
             Settings.SearchConfig (model, dispatch)
 
-            Settings.ActivityLog model
+            Settings.ActivityLog(model)
+
             //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
             //    toggleRgbModeElement model dispatch
 

@@ -53,11 +53,14 @@ module Spreadsheet =
                 state, model, cmd
             | _ ->
                 let newCmd =
-                    Cmd.OfPromise.either
-                        model.History.SaveSessionSnapshotIndexedDB
-                        (snapshotJsonString)
-                        (fun newHistory -> Messages.History.UpdateAnd (newHistory, cmd) |> HistoryMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
+                    if model.PersistentStorageState.Autosave then
+                        Cmd.OfPromise.either
+                            model.History.SaveSessionSnapshotIndexedDB
+                            (snapshotJsonString)
+                            (fun newHistory -> Messages.History.UpdateAnd (newHistory, cmd) |> HistoryMsg)
+                            (curry GenericError Cmd.none >> DevMsg)
+                    else
+                        Cmd.none
 
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.

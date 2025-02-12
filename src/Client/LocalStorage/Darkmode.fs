@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 
 [<RequireQualifiedAccess>]
 module private Attribute =
+
     let getDataTheme() =
         let v = Browser.Dom.document.documentElement.getAttribute("data-theme")
         if isNull v then
@@ -17,6 +18,7 @@ module private Attribute =
 
 [<RequireQualifiedAccess>]
 module private BrowserSetting =
+
     let getDefault() =
         let m : bool = Browser.Dom.window?matchMedia("(prefers-color-scheme: dark)")?matches
         if m then Dark else Light
@@ -38,7 +40,7 @@ module private LocalStorage =
             |> DataTheme.ofString
             |> Some
         with
-            |_ ->
+            | _ ->
                 WebStorage.localStorage.removeItem(DataTheme_Key)
                 printfn "Could not find %s" DataTheme_Key
                 None
@@ -48,10 +50,10 @@ type DataTheme =
 | Light
     static member ofString (str: string) =
         match str.ToLower() with
-        | "dark" -> Dark
-        | "light" | _ -> Light
+        | "dark"        -> Dark
+        | "light" | _   -> Light
 
-    static member SET(theme:DataTheme) =
+    static member SET(theme: DataTheme) =
         Attribute.setDataTheme <| string theme
         LocalStorage.write <| theme // This helps remember
 
@@ -61,20 +63,21 @@ type DataTheme =
         // check data theme attribute
         let dataTheme = Attribute.getDataTheme()
         match localStorage, dataTheme with
-        | _, Some dt -> dt // this value actually decides the theme via styles.scss
-        | Some dt, _ -> dt // this value is set by website but does not reflect actual styling directly
-        | _, _ -> BrowserSetting.getDefault() // if all fails we check for the browser setting
+        | _, Some dt    -> dt // this value actually decides the theme via styles.scss
+        | Some dt, _    -> dt // this value is set by website but does not reflect actual styling directly
+        | _, _          -> BrowserSetting.getDefault() // if all fails we check for the browser setting
 
 [<RequireQualifiedAccess>]
 type State = {
-    Theme: DataTheme
+    Theme:    DataTheme
     SetTheme: State -> unit
 } with
     static member init() =
         {
-            Theme = DataTheme.Light
-            SetTheme = fun (state) -> failwith "This is not implemented and serves as placeholder"
+            Theme    = DataTheme.Light
+            SetTheme = fun _ -> failwith "This is not implemented and serves as placeholder"
         }
+
     member this.Update() =
         let dt = DataTheme.GET()
         DataTheme.SET dt

@@ -9,7 +9,7 @@ open Feliz
 open Feliz.DaisyUI
 open Swate
 
-let update (filePickerMsg:FilePicker.Msg) (state: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
+let update (filePickerMsg: FilePicker.Msg) (state: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
     match filePickerMsg with
     | LoadNewFiles fileNames ->
         let nextModel = {
@@ -26,7 +26,7 @@ let update (filePickerMsg:FilePicker.Msg) (state: FilePicker.Model) (model: Mode
         nextState, Cmd.none
 
 /// "parentContainerResizeClass": uses tailwind container queries. Expects a string like "@md/parentId:flex-row"
-let uploadButton (model:Model) dispatch (parentContainerResizeClass: string) =
+let uploadButton (model: Model) dispatch (parentContainerResizeClass: string) =
     let inputId = "filePicker_OnFilePickerMainFunc"
     Html.div [
         prop.className [
@@ -83,7 +83,7 @@ let uploadButton (model:Model) dispatch (parentContainerResizeClass: string) =
         ]
     ]
 
-let insertButton (model:Model) dispatch =
+let insertButton (model: Model) dispatch =
     Html.div [
         prop.className "flex flex-row justify-center"
         prop.children [
@@ -109,7 +109,7 @@ let sortButton icon msg =
         ]
     ]
 
-let fileSortElements (model:Model) dispatch =
+let fileSortElements (model: Model) dispatch =
     Html.div [
         Daisy.join [
             prop.children [

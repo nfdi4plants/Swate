@@ -11,17 +11,17 @@ type LogItem =
     | Error     of (System.DateTime*string)
     | Warning   of (System.DateTime*string)
 
-    static member ofInteropLogginMsg (msg:InteropLogging.Msg) =
+    static member ofInteropLogginMsg (msg: InteropLogging.Msg) =
         match msg.LogIdentifier with
-        | InteropLogging.Info   -> Info (System.DateTime.UtcNow,msg.MessageTxt)
-        | InteropLogging.Debug  -> Debug(System.DateTime.UtcNow,msg.MessageTxt)
-        | InteropLogging.Error  -> Error(System.DateTime.UtcNow,msg.MessageTxt)
-        | InteropLogging.Warning -> Warning(System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Info       -> Info (System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Debug      -> Debug(System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Error      -> Error(System.DateTime.UtcNow,msg.MessageTxt)
+        | InteropLogging.Warning    -> Warning(System.DateTime.UtcNow,msg.MessageTxt)
 
-    static member private DebugCell = Html.td [prop.className "bg-info text-info-content font-semibold"; prop.text "Debug"]
-    static member private InfoCell = Html.td [prop.className "bg-primary text-primary-content font-semibold"; prop.text "Info"]
-    static member private ErrorCell = Html.td [prop.className "bg-error text-error-content font-semibold"; prop.text "ERROR"]
-    static member private WarningCell = Html.td [prop.className "bg-warning text-warning-content font-semibold"; prop.text "Warning"]
+    static member private DebugCell     = Html.td [prop.className "bg-info text-info-content font-semibold"; prop.text "Debug"]
+    static member private InfoCell      = Html.td [prop.className "bg-primary text-primary-content font-semibold"; prop.text "Info"]
+    static member private ErrorCell     = Html.td [prop.className "bg-error text-error-content font-semibold"; prop.text "ERROR"]
+    static member private WarningCell   = Html.td [prop.className "bg-warning text-warning-content font-semibold"; prop.text "Warning"]
 
     static member toTableRow = function
         | Debug (t, m) ->
@@ -49,13 +49,13 @@ type LogItem =
                 Html.td m
             ]
 
-    static member ofStringNow (level:string) (message: string) =
+    static member ofStringNow (level: string) (message: string) =
         match level with
-        | "Debug"| "debug"  -> Debug(System.DateTime.UtcNow,message)
-        | "Info" | "info"   -> Info (System.DateTime.UtcNow,message)
-        | "Error" | "error" -> Error(System.DateTime.UtcNow,message)
+        | "Debug"| "debug"      -> Debug(System.DateTime.UtcNow,message)
+        | "Info" | "info"       -> Info (System.DateTime.UtcNow,message)
+        | "Error" | "error"     -> Error(System.DateTime.UtcNow,message)
         | "Warning" | "warning" -> Warning(System.DateTime.UtcNow,message)
-        | others -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
+        | others                -> Error(System.DateTime.UtcNow,sprintf "Swate found an unexpected log identifier: %s" others)
 
 module TermSearch =
 
@@ -81,17 +81,18 @@ type DevState = {
     }
 
 type PersistentStorageState = {
-    AppVersion              : string
-    Host                    : Swatehost option
-    SwateDefaultSearch      : bool
-    TIBSearchCatalogues     : Set<string>
-
+    AppVersion          : string
+    Host                : Swatehost option
+    SwateDefaultSearch  : bool
+    TIBSearchCatalogues : Set<string>
+    Autosave            : bool
 } with
     static member init () = {
-        Host                    = Some Swatehost.Browser
-        AppVersion              = ""
-        SwateDefaultSearch      = true
-        TIBSearchCatalogues     = Set.empty
+        Host                = Some Swatehost.Browser
+        AppVersion          = ""
+        SwateDefaultSearch  = true
+        TIBSearchCatalogues = Set.empty
+        Autosave            = true
     }
 
     member this.TIBQueries =
@@ -115,7 +116,9 @@ type PersistentStorageState = {
                     yield (n, query)
             ]
         |}
-    member this.DisableSwateDefaultSearch = not this.SwateDefaultSearch
+
+    member this.IsDisabledSwateDefaultSearch = not this.SwateDefaultSearch
+
 type PageState = {
     SidebarPage : Routing.SidebarPage
     MainPage: Routing.MainPage
@@ -124,17 +127,19 @@ type PageState = {
     static member init () =
         {
             SidebarPage = SidebarPage.BuildingBlock
-            MainPage = MainPage.Default
+            MainPage    = MainPage.Default
             ShowSideBar = false
         }
+
     member this.IsHome =
         match this.MainPage with
-        | MainPage.Default -> true
-        | _ -> false
+        | MainPage.Default  -> true
+        | _                 -> false
 
 module FilePicker =
+
     type Model = {
-        FileNames   : (int*string) list
+        FileNames : (int*string) list
     } with
         static member init () = {
             FileNames = []
@@ -174,15 +179,12 @@ module BuildingBlock =
         }
 
     type Model = {
-
         HeaderCellType  : CompositeHeaderDiscriminate
         HeaderArg       : U2<OntologyAnnotation,IOType> option
         BodyCellType    : CompositeCellDiscriminate
         BodyArg         : U2<string, OntologyAnnotation> option
-
     } with
         static member init () = {
-
             HeaderCellType  = CompositeHeaderDiscriminate.Parameter
             HeaderArg       = None
             BodyCellType    = CompositeCellDiscriminate.Term
@@ -216,6 +218,7 @@ module Protocol =
     | All
     | OnlyCurated
     | Community of string
+
         member this.ToStringRdb() =
             match this with
             | All               -> "All"
@@ -224,13 +227,13 @@ module Protocol =
 
         static member fromString(str: string) =
             match str with
-            | "All" -> All
-            | "DataPLANT official" -> OnlyCurated
-            | anyElse -> Community anyElse
+            | "All"                 -> All
+            | "DataPLANT official"  -> OnlyCurated
+            | anyElse               -> Community anyElse
 
         static member CommunityFromOrganisation(org: ARCtrl.Organisation) =
             match org with
-            | ARCtrl.Organisation.DataPLANT -> None
+            | ARCtrl.Organisation.DataPLANT  -> None
             | ARCtrl.Organisation.Other name -> Some <| Community name
 
     /// This model is used for both protocol insert and protocol search
@@ -259,7 +262,7 @@ type RequestBuildingBlockInfoStates =
         match this with
         | Inactive                      -> ""
         | RequestExcelInformation       -> "Check Columns"
-        | RequestDataBaseInformation    -> "Search Database "
+        | RequestDataBaseInformation    -> "Search Database"
 
 type Model = {
     ///PageState

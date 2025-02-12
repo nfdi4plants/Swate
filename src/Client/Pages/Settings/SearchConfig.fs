@@ -4,6 +4,8 @@ open Fable
 open Feliz
 open Messages
 
+open Feliz.DaisyUI
+
 type private Catalogues = {
     FoundOnTIB: Set<string>
     Selected: Set<string>
@@ -17,6 +19,7 @@ type private Catalogues = {
     member this.AllCatalogues = Set.union this.FoundOnTIB this.Selected
 
 type SearchConfig =
+
     static member private SwateDefaultSearch(model: Model.Model, dispatch) =
         Html.div [
             Html.h2 [ prop.text "Swate Default Search" ]
@@ -31,12 +34,14 @@ type SearchConfig =
                                 prop.className "label-text"
                                 prop.text "Use Swate Default Search"
                             ]
-                            Html.input [
-                                prop.onChange (fun (b:bool) -> Messages.PersistentStorage.UpdateSwateDefaultSearch b |> PersistentStorageMsg |> dispatch)
-                                prop.className "checkbox checkbox-primary"
-                                prop.type'.checkbox
+                            Daisy.toggle [
                                 prop.isChecked model.PersistentStorageState.SwateDefaultSearch
                                 prop.id "swateDefaultSearch"
+
+                                toggle.primary
+
+                                prop.onChange (fun (b: bool) ->
+                                    Messages.PersistentStorage.UpdateSwateDefaultSearch b |> PersistentStorageMsg |> dispatch)
                             ]
                         ]
                     ]

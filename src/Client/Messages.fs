@@ -47,17 +47,18 @@ type DevMsg =
 
 module PersistentStorage =
     type Msg =
-    | UpdateAppVersion of string
-    | UpdateSwateDefaultSearch of bool
-    | AddTIBSearchCatalogue of string
-    | RemoveTIBSearchCatalogue of string
-    | SetTIBSearchCatalogues of Set<string>
+    | UpdateAppVersion          of string
+    | UpdateSwateDefaultSearch  of bool
+    | AddTIBSearchCatalogue     of string
+    | RemoveTIBSearchCatalogue  of string
+    | SetTIBSearchCatalogues    of Set<string>
+    | UpdateAutosave            of bool
 
 module PageState =
 
     type Msg =
     | UpdateShowSidebar of bool
-    | UpdateMainPage of MainPage
+    | UpdateMainPage    of MainPage
     | UpdateSidebarPage of SidebarPage
 
 module FilePicker =
@@ -105,25 +106,25 @@ module History =
     | UpdateHistoryPosition of int
 
 type Msg =
-| UpdateModel                   of Model
-| DevMsg                        of DevMsg
-| TermSearchMsg                 of TermSearch.Msg
-| AdvancedSearchMsg             of AdvancedSearch.Msg
-| OfficeInteropMsg              of OfficeInterop.Msg
-| PersistentStorageMsg          of PersistentStorage.Msg
-| FilePickerMsg                 of FilePicker.Msg
-| BuildingBlockMsg              of BuildingBlock.Msg
-| ProtocolMsg                   of Protocol.Msg
-| DataAnnotatorMsg          of DataAnnotator.Msg
-| SpreadsheetMsg            of Spreadsheet.Msg
+| UpdateModel           of Model
+| DevMsg                of DevMsg
+| TermSearchMsg         of TermSearch.Msg
+| AdvancedSearchMsg     of AdvancedSearch.Msg
+| OfficeInteropMsg      of OfficeInterop.Msg
+| PersistentStorageMsg  of PersistentStorage.Msg
+| FilePickerMsg         of FilePicker.Msg
+| BuildingBlockMsg      of BuildingBlock.Msg
+| ProtocolMsg           of Protocol.Msg
+| DataAnnotatorMsg      of DataAnnotator.Msg
+| SpreadsheetMsg        of Spreadsheet.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
-| InterfaceMsg                  of SpreadsheetInterface.Msg
-| PageStateMsg                  of PageState.Msg
-| Batch                         of seq<Messages.Msg>
-| HistoryMsg                    of History.Msg
-| UpdateModal               of Model.ModalState.ModalTypes option
+| InterfaceMsg          of SpreadsheetInterface.Msg
+| PageStateMsg          of PageState.Msg
+| Batch                 of seq<Messages.Msg>
+| HistoryMsg            of History.Msg
+| UpdateModal           of Model.ModalState.ModalTypes option
 /// Top level msg to test specific api interactions, only for dev.
-| Run                           of (unit -> unit)
+| Run                   of (unit -> unit)
 | TestMyAPI
 | TestMyPostAPI
 | DoNothing
