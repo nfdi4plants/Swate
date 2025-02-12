@@ -41,7 +41,7 @@ let Main (data, createCell, headers, createHeaderCell, model:Model, dispatch: Ms
                     // sticky row
                     "[&_tbody_>_tr_>_th]:sticky [&_tbody_>_tr_>_th]:left-0 [&_tbody_>_tr_>_th]:bg-base-100"
                     |],
-                containerClasses=[|"pr-[10vw]"|],
+                containerClasses=[|"pr-[10vw] pb-[20vw]"|],
                 rowLabel={|styling=Some createRowLabel|}
             )
         ]

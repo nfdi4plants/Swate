@@ -56,7 +56,8 @@ type TableCell =
                     elif header.IsDataColumn then
                         let text = if cell.Value.isFreeText then "As Data Cell" else "As Free Text Cell"
                         Modals.ContextMenus.Base.Item (text, transFormCell >> rmv, "fa-solid fa-arrow-right-arrow-left")
-                    Modals.ContextMenus.Base.Item ("Update Column", triggerUpdateColumnModal, "fa-solid fa-ellipsis-vertical")
+                    if not isUnitOrTermCell then
+                        Modals.ContextMenus.Base.Item ("Update Column", triggerUpdateColumnModal, "fa-solid fa-ellipsis-vertical")
                     Modals.ContextMenus.Base.Item ("Clear", clear >> rmv, "fa-solid fa-eraser")
                     Modals.ContextMenus.Base.Divider()
                     Modals.ContextMenus.Base.Item ("Copy", copy >> rmv, "fa-solid fa-copy")

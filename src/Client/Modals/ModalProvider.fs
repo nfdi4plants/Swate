@@ -15,7 +15,7 @@ type ModalProvider =
     static member TableModal (modal: TableModals, model, dispatch) =
         match modal with
         | TableModals.EditColumn columnIndex ->
-            Modals.EditColumn.Main columnIndex model dispatch
+            Modals.EditColumn.Main (columnIndex, model, dispatch)
         | TableModals.MoveColumn columnIndex ->
             Modals.MoveColumn.Main (columnIndex, model, dispatch)
         | TableModals.ResetTable ->

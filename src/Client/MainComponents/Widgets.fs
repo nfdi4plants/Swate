@@ -78,20 +78,6 @@ module private ResizeEventListener =
         if element.current.IsSome then
             Size.write(prefix, {X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
-module private Elements =
-
-    let helpExtendButton (extendToggle: unit -> unit) =
-        Html.p [
-            prop.className "w-full text-sm"
-            prop.children [
-                Html.a [
-                    prop.text "Help";
-                    prop.style [style.marginLeft length.auto; style.userSelect.none]
-                    prop.onClick (fun e -> e.preventDefault(); e.stopPropagation(); extendToggle())
-                ]
-            ]
-        ]
-
 [<RequireQualifiedAccess>]
 type Widget =
     | _BuildingBlock
@@ -100,7 +86,7 @@ type Widget =
     | _DataAnnotator
 
     [<ReactComponent>]
-    static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, ?help: ReactElement) =
+    static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit) =
         let position, setPosition = React.useState(fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
         let element = React.useElementRef()
@@ -125,8 +111,6 @@ type Widget =
                     style.zIndex 40
                     style.cursor.eastWestResize//style.cursor.northWestSouthEastResize ;
                     style.display.flex
-                    // style.paddingRight(2);
-                    style.overflow.visible
                     style.position.fixedRelativeToWindow
                     style.minWidth.minContent
                     if size.IsSome then
@@ -144,7 +128,7 @@ type Widget =
             ]
         resizeElement <| Html.div [
             prop.onMouseDown(fun e -> e.stopPropagation())
-            prop.className "cursor-default flex flex-col grow"
+            prop.className "cursor-default flex flex-col grow max-h-[60%] overflow-y-auto"
             prop.children [
                 Html.div [
                     prop.onMouseDown(fun e -> // move
@@ -166,75 +150,40 @@ type Widget =
                     ]
                 ]
                 Html.div [
-                    prop.className "p-2"
+                    prop.className "p-2 max-h-[80vh] overflow-y-auto"
                     prop.children [
                         content
                     ]
                 ]
-                //It is not used anymore
-                if help.IsSome then
-                    Html.div [
-                        prop.tabIndex 0
-                        prop.className "text-primary collapse bg-opacity-50 rounded-none max-w-none
-                        focus:bg-primary focus:text-primary-content
-                        prose prose-a:text-primary-content
-                        prose-code:text-base-content prose-code:bg-base-200 prose-code:rounded-none"
-                        prop.children [
-                            Daisy.collapseTitle [
-                                prop.className "px-2 py-1 min-h-0 flex"
-                                prop.children [
-                                    Html.div [prop.text "Help"; prop.className "text-sm font-light ml-auto"]
-                                ]
-                            ]
-                            Daisy.collapseContent [
-                                prop.className "marker:text-primary-content"
-                                prop.children [
-                                    help.Value
-                                ]
-                            ]
-                        ]
-                    ]
             ]
         ]
 
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
         let content = BuildingBlock.SearchComponent.Main model dispatch
-        let help = React.fragment [
-                Html.p "Add a new Building Block."
-                Html.ul [
-                        Html.li "If a cell is selected, a new Building Block is added to the right of the selected cell."
-                        Html.li "If no cell is selected, a new Building Block is appended at the right end of the table."
-                    ]
-                ]
         let prefix = WidgetLiterals.BuildingBlock
-        Widget.Base(content, prefix, rmv, help)
+        Widget.Base(content, prefix, rmv)
 
     [<ReactComponent>]
     static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
         let isProtocolSearch, setProtocolSearch = React.useState(true)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
         let selectContent() =
-            [
-                Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch)
-            ]
+            Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch)
         let insertContent() =
-            [
-                Html.div [
-                    prop.style [style.maxHeight (length.px 350); style.overflow.auto]
-                    prop.className "flex flex-col gap-2"
-                    prop.children (SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch))
-                ]
+            Html.div [
+                prop.style [style.maxHeight (length.px 350); style.overflow.auto]
+                prop.className "flex flex-col gap-2"
+                prop.children (SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch))
             ]
 
         let content =
-            let switchContent =
-                if isProtocolSearch then
-                    selectContent ()
-                else
-                    insertContent ()
             Html.div [
-                prop.className "prose-sm prose-p:m-1 prose-ul:mt-1 max-w-none"
-                prop.children switchContent
+                prop.children [
+                    if isProtocolSearch then
+                        selectContent ()
+                    else
+                        insertContent ()
+                ]
             ]
 
         let prefix = WidgetLiterals.Templates
