@@ -19,6 +19,7 @@ type private Catalogues = {
     member this.AllCatalogues = Set.union this.FoundOnTIB this.Selected
 
 type SearchConfig =
+
     static member private SwateDefaultSearch(model: Model.Model, dispatch) =
         Html.div [
             Html.h2 [ prop.text "Swate Default Search" ]

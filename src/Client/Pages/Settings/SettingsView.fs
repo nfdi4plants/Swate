@@ -13,11 +13,8 @@ open Feliz
 open Feliz.DaisyUI
 open LocalStorage.Darkmode
 
-open AutosaveConfig
-
 type Settings =
 
-    [<ReactComponent>]
     static member ThemeToggle () =
         let darkmodeState = React.useContext(LocalStorage.Darkmode.themeContext)
         let isDark = darkmodeState.Theme = Dark
@@ -70,24 +67,19 @@ type Settings =
             prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
             prop.children [
                 Html.p [
-                    prop.className "select-none text-xl py-2"
-                    prop.text "Autsave"
+                    prop.className "select-none text-xl"
+                    prop.text "Autosave"
                 ]
                 Daisy.toggle [
-                    let autosaveConfig = getAutosaveConfiguration()
-
-                    if autosaveConfig.IsSome && autosaveConfig.Value <> model.PersistentStorageState.Autosave then
-                        PersistentStorage.UpdateAutosave autosaveConfig.Value |> PersistentStorageMsg |> dispatch
-
                     prop.isChecked model.PersistentStorageState.Autosave
-
                     toggle.primary
-
                     prop.onChange (fun (b: bool) ->
-                        PersistentStorage.UpdateAutosave (model.PersistentStorageState.Autosave) |> PersistentStorageMsg |> dispatch
-                        setAutosaveConfiguration(b)
-                        if not b then LocalHistory.Model.ResetHistoryWebStorage()
+                        PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch
                     )
+                ]
+                Html.p [
+                    prop.className "text-sm text-gray-500"
+                    prop.text "When you deactivate autosave, your local history will be deleted."
                 ]
             ]
         ]

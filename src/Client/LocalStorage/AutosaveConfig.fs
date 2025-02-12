@@ -1,5 +1,5 @@
 
-module AutosaveConfig
+module LocalStorage.AutosaveConfig
 
 open Browser
 

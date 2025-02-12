@@ -9,6 +9,8 @@ open Routing
 open Messages
 open Model
 
+open LocalStorage.AutosaveConfig
+
 let urlUpdate (route: Route option) (model:Model) : Model * Cmd<Messages.Msg> =
     let cmd (host: Swatehost) = SpreadsheetInterface.Initialize host |> InterfaceMsg |> Cmd.ofMsg
     let host =
@@ -139,6 +141,8 @@ let handlePersistenStorageMsg (persistentStorageMsg: PersistentStorage.Msg) (cur
             currentState with
                 Autosave = autosave
         }
+        setAutosaveConfiguration(nextState.Autosave)
+        if not nextState.Autosave then LocalHistory.Model.ResetHistoryWebStorage()
         nextState, Cmd.none
 
 module DataAnnotator =
