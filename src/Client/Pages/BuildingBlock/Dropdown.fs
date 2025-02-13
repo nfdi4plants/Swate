@@ -122,7 +122,7 @@ module private DropdownElements =
             CompositeHeaderDiscriminate.Factor         |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Characteristic |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Component      |> createBuildingBlockDropdownItem model dispatch setState close
-            Model.BuildingBlock.DropdownPage.More       |> createSubBuildingBlockDropdownLink state setState
+            Model.BuildingBlock.DropdownPage.More      |> createSubBuildingBlockDropdownLink state setState
             divider
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Output |> createSubBuildingBlockDropdownLink state setState
             DropdownContentInfoFooter setState false
@@ -131,6 +131,7 @@ module private DropdownElements =
     /// Protocol Type subpage for dropdown
     let dropdownContentProtocolTypeColumns state setState close (model:Model) dispatch =
         React.fragment [
+            CompositeHeaderDiscriminate.Comment             |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Date                |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Performer           |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState close

@@ -17,7 +17,7 @@ let selectCompositeHeaderDiscriminate (hct: CompositeHeaderDiscriminate) setUiSt
 
 open Fable.Core
 
-let createCompositeHeaderFromState (state: BuildingBlock.Model) =
+let createCompositeHeaderFromState (state: BuildingBlock.Model) inputValue =
     let getOA() = state.TryHeaderOA() |> Option.defaultValue (OntologyAnnotation.empty())
     let getIOType() = state.TryHeaderIO() |> Option.defaultValue (IOType.FreeText "")
     match state.HeaderCellType with
@@ -34,7 +34,7 @@ let createCompositeHeaderFromState (state: BuildingBlock.Model) =
     | CompositeHeaderDiscriminate.Date -> CompositeHeader.Date
     | CompositeHeaderDiscriminate.Input -> CompositeHeader.Input <| getIOType()
     | CompositeHeaderDiscriminate.Output -> CompositeHeader.Output <| getIOType()
-    | CompositeHeaderDiscriminate.Comment -> failwith "Comment header type is not yet implemented"
+    | CompositeHeaderDiscriminate.Comment -> CompositeHeader.Comment inputValue
     | CompositeHeaderDiscriminate.Freetext -> failwith "Freetext header type is not yet implemented"
 
 let tryCreateCompositeCellFromState (state: BuildingBlock.Model) =
