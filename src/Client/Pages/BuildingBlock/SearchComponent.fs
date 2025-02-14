@@ -72,7 +72,7 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
     ]
 
 [<ReactComponent>]
-let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, setCommentHeader, model: Model, dispatch) =
+let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, model: Model, dispatch) =
     let state = model.AddBuildingBlockState
     let element = React.useElementRef()
     Html.div [
@@ -89,11 +89,10 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, s
                     if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                         Daisy.input [
                             prop.readOnly false
-                            prop.defaultValue (model.AddBuildingBlockState.CommentHeader)
+                            prop.valueOrDefault (model.AddBuildingBlockState.CommentHeader)
                             prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
                             prop.onChange (fun (ev:string) ->
-                                BuildingBlock.UpdateCommentHeader ev |> BuildingBlockMsg |> dispatch
-                                setCommentHeader ev)
+                                BuildingBlock.UpdateCommentHeader ev |> BuildingBlockMsg |> dispatch)
                         ]
                     elif state.HeaderCellType.HasOA() then
                         let setter (oaOpt: Swate.Components.Term option) =
@@ -152,13 +151,13 @@ let private scrollIntoViewRetry (id: string) =
                 headerelement.scrollIntoView(config)
     loop 0
 
-let private AddBuildingBlockButton (model: Model) inputValue dispatch =
+let private AddBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
     Html.div [
         prop.className "flex justify-center"
         prop.children [
             Daisy.button.button  [
-                let header = Helper.createCompositeHeaderFromState state inputValue
+                let header = Helper.createCompositeHeaderFromState state
                 let body = Helper.tryCreateCompositeCellFromState state
                 let isValid = Helper.isValidColumn header
                 button.wide
@@ -188,15 +187,14 @@ let private AddBuildingBlockButton (model: Model) inputValue dispatch =
 [<ReactComponent>]
 let Main (model: Model) dispatch =
     let state_bb, setState_bb = React.useState(BuildingBlockUIState.init)
-    let commentHeader, setCommentHeader = React.useState model.AddBuildingBlockState.CommentHeader
     //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
     //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
-            SearchBuildingBlockHeaderElement (state_bb, setState_bb, setCommentHeader, model, dispatch)
+            SearchBuildingBlockHeaderElement (state_bb, setState_bb, model, dispatch)
             if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
                 SearchBuildingBlockBodyElement (model, dispatch)
-            AddBuildingBlockButton model commentHeader dispatch
+            AddBuildingBlockButton model dispatch
         ]
     ]
