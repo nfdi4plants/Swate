@@ -95,7 +95,6 @@ let Main (model:Model, dispatch) =
                 }
             |> Some
         | _ -> None
-
     SidebarComponents.SidebarLayout.Container  [
         SidebarComponents.SidebarLayout.Header "Ontology term search"
 

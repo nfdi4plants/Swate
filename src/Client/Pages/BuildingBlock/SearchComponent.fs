@@ -86,7 +86,15 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                     // Dropdown building block type choice
                     Dropdown.Main(ui, setUi, model, dispatch)
                     // Term search field
-                    if state.HeaderCellType.HasOA() then
+                    if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
+                        Daisy.input [
+                            prop.readOnly false
+                            prop.valueOrDefault (model.AddBuildingBlockState.CommentHeader)
+                            prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
+                            prop.onChange (fun (ev:string) ->
+                                BuildingBlock.UpdateCommentHeader ev |> BuildingBlockMsg |> dispatch)
+                        ]
+                    elif state.HeaderCellType.HasOA() then
                         let setter (oaOpt: Swate.Components.Term option) =
                             let case = oaOpt |> Option.map (fun oa -> OntologyAnnotation.fromTerm >> U2.Case1 <| oa)
                             BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
@@ -161,7 +169,7 @@ let private AddBuildingBlockButton (model: Model) dispatch =
                 prop.onClick (fun _ ->
                     let bodyCells =
                         if body.IsSome then // create as many body cells as there are rows in the active table
-                            let rowCount = System.Math.Max(1,model.SpreadsheetModel.ActiveTable.RowCount)
+                            let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
                             Array.init rowCount (fun _ -> body.Value.Copy())
                         else
                             Array.empty

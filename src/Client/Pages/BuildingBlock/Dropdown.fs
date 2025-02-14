@@ -39,7 +39,13 @@ let FreeTextInputElement(onSubmit: string -> unit) =
 module private DropdownElements =
 
     let divider = Daisy.divider [prop.className "mx-2 my-0"]
-    let private annotationsPrinciplesLink = Html.a [prop.href Swate.Components.Shared.URLs.AnnotationPrinciplesUrl; prop.target.blank; prop.className "ml-auto link-info"; prop.text "info"]
+    let private annotationsPrinciplesLink =
+        Html.a [
+            prop.href "#"
+            prop.onClick (fun _ -> Browser.Dom.window.``open``(Swate.Components.Shared.URLs.AnnotationPrinciplesUrl, "_blank") |> ignore)
+            prop.className "ml-auto link-info"
+            prop.text "info"
+        ]
 
     let createSubBuildingBlockDropdownLink (state:BuildingBlockUIState) setState (subpage: Model.BuildingBlock.DropdownPage) =
         Html.li [
@@ -122,7 +128,7 @@ module private DropdownElements =
             CompositeHeaderDiscriminate.Factor         |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Characteristic |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Component      |> createBuildingBlockDropdownItem model dispatch setState close
-            Model.BuildingBlock.DropdownPage.More       |> createSubBuildingBlockDropdownLink state setState
+            Model.BuildingBlock.DropdownPage.More      |> createSubBuildingBlockDropdownLink state setState
             divider
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Output |> createSubBuildingBlockDropdownLink state setState
             DropdownContentInfoFooter setState false
@@ -131,6 +137,7 @@ module private DropdownElements =
     /// Protocol Type subpage for dropdown
     let dropdownContentProtocolTypeColumns state setState close (model:Model) dispatch =
         React.fragment [
+            CompositeHeaderDiscriminate.Comment             |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Date                |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Performer           |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.ProtocolDescription |> createBuildingBlockDropdownItem model dispatch setState close

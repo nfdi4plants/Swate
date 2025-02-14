@@ -183,12 +183,14 @@ module BuildingBlock =
         HeaderArg       : U2<OntologyAnnotation,IOType> option
         BodyCellType    : CompositeCellDiscriminate
         BodyArg         : U2<string, OntologyAnnotation> option
+        CommentHeader   : string
     } with
         static member init () = {
             HeaderCellType  = CompositeHeaderDiscriminate.Parameter
             HeaderArg       = None
             BodyCellType    = CompositeCellDiscriminate.Term
             BodyArg         = None
+            CommentHeader   = ""
         }
 
         member this.TryHeaderOA() =

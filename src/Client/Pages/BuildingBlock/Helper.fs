@@ -34,7 +34,7 @@ let createCompositeHeaderFromState (state: BuildingBlock.Model) =
     | CompositeHeaderDiscriminate.Date -> CompositeHeader.Date
     | CompositeHeaderDiscriminate.Input -> CompositeHeader.Input <| getIOType()
     | CompositeHeaderDiscriminate.Output -> CompositeHeader.Output <| getIOType()
-    | CompositeHeaderDiscriminate.Comment -> failwith "Comment header type is not yet implemented"
+    | CompositeHeaderDiscriminate.Comment -> CompositeHeader.Comment state.CommentHeader
     | CompositeHeaderDiscriminate.Freetext -> failwith "Freetext header type is not yet implemented"
 
 let tryCreateCompositeCellFromState (state: BuildingBlock.Model) =
