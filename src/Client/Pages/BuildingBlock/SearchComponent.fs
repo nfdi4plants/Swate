@@ -72,7 +72,7 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
     ]
 
 [<ReactComponent>]
-let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, setInputValue, model: Model, dispatch) =
+let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, setCommentHeader, model: Model, dispatch) =
     let state = model.AddBuildingBlockState
     let element = React.useElementRef()
     Html.div [
@@ -89,8 +89,11 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, s
                     if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                         Daisy.input [
                             prop.readOnly false
-                            prop.onChange (fun (ev:string) -> setInputValue ev)
+                            prop.defaultValue (model.AddBuildingBlockState.CommentHeader)
                             prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
+                            prop.onChange (fun (ev:string) ->
+                                BuildingBlock.UpdateCommentHeader ev |> BuildingBlockMsg |> dispatch
+                                setCommentHeader ev)
                         ]
                     elif state.HeaderCellType.HasOA() then
                         let setter (oaOpt: Swate.Components.Term option) =
@@ -167,7 +170,7 @@ let private AddBuildingBlockButton (model: Model) inputValue dispatch =
                 prop.onClick (fun _ ->
                     let bodyCells =
                         if body.IsSome then // create as many body cells as there are rows in the active table
-                            let rowCount = System.Math.Max(1,model.SpreadsheetModel.ActiveTable.RowCount)
+                            let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
                             Array.init rowCount (fun _ -> body.Value.Copy())
                         else
                             Array.empty
@@ -185,15 +188,15 @@ let private AddBuildingBlockButton (model: Model) inputValue dispatch =
 [<ReactComponent>]
 let Main (model: Model) dispatch =
     let state_bb, setState_bb = React.useState(BuildingBlockUIState.init)
-    let inputValue, setInputValue = React.useState ""
+    let commentHeader, setCommentHeader = React.useState model.AddBuildingBlockState.CommentHeader
     //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
     //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
     Html.div [
         prop.className "flex flex-col gap-4"
         prop.children [
-            SearchBuildingBlockHeaderElement (state_bb, setState_bb, setInputValue, model, dispatch)
+            SearchBuildingBlockHeaderElement (state_bb, setState_bb, setCommentHeader, model, dispatch)
             if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
                 SearchBuildingBlockBodyElement (model, dispatch)
-            AddBuildingBlockButton model inputValue dispatch
+            AddBuildingBlockButton model commentHeader dispatch
         ]
     ]

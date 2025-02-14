@@ -13,6 +13,9 @@ let update (addBuildingBlockMsg:BuildingBlock.Msg) (state: BuildingBlock.Model) 
     | UpdateBodyArg next ->
         let nextState = { state with BodyArg = next }
         nextState, Cmd.none
+    | UpdateCommentHeader header ->
+        let nextState = { state with CommentHeader = header }
+        nextState, Cmd.none
     | UpdateHeaderArg next ->
         let nextState = { state with HeaderArg = next}
         nextState, Cmd.none

@@ -76,6 +76,7 @@ module BuildingBlock =
     | UpdateHeaderArg       of U2<OntologyAnnotation,IOType> option
     | UpdateBodyCellType    of CompositeCellDiscriminate
     | UpdateBodyArg         of U2<string, OntologyAnnotation> option
+    | UpdateCommentHeader   of string
 
 module Protocol =
 
