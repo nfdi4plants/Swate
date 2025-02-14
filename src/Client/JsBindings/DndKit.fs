@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Browser.Types
 
-type IObject = 
+type IObject =
 
   [<Emit("$0[$1]")>]
   member this.get (fieldName: string) : obj = jsNative
@@ -23,7 +23,7 @@ module DndKit =
     type ITransform =
       abstract member toString: obj -> string
 
-    type ICSS = 
+    type ICSS =
       abstract member Transform: ITransform
 
     type ISortable =
@@ -77,13 +77,12 @@ type DndKit =
     static member useSensors ([<ParamSeqAttribute>] sensors: ISensor []) : obj = jsNative
 
     [<ReactComponent("DndContext", "@dnd-kit/core")>]
-    static member DndContext (?onDragEnd, ?sensors, ?collisionDetection, ?children: seq<ReactElement>) = React.imported()
-    
+    static member DndContext (?onDragEnd, ?sensors, ?collisionDetection, ?children: ReactElement, ?key) = React.imported()
+
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
-    static member SortableContext(items:ResizeArray<string>, strategy, children: seq<ReactElement>) = React.imported()
+    static member SortableContext(items:ResizeArray<string>, strategy, children: ReactElement) = React.imported()
       // Interop.reactApi.createElement (import "SortableContext" "@dnd-kit/sortable", props, children)
 
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
-    static member SortableContext(items:ResizeArray<System.Guid>, strategy, children: seq<ReactElement>) = React.imported()
+    static member SortableContext(items:ResizeArray<System.Guid>, strategy, children: ReactElement) = React.imported()
       // Interop.reactApi.createElement (import "SortableContext" "@dnd-kit/sortable", props, children)
-    

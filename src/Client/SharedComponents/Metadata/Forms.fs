@@ -320,7 +320,7 @@ type FormComponents =
     /// <param name="inputComponent"></param>
     /// <param name="label"></param>
     [<ReactComponent>]
-    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, ?label: string) =
+    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, inputEquality: 'A -> 'A -> bool, ?label: string) =
         // dnd-kit requires an id for each element in the list.
         // The id is used to keep track of the order of the elements in the list.
         // Because most of our classes do not have a unique id, we generate a new guid for each element in the list.
@@ -350,6 +350,14 @@ type FormComponents =
                 // trigger rerender
                 OrderId.current <- System.Guid.NewGuid()
             ()
+        let equalityFunc (props1: 'A  * ('A -> unit) * (MouseEvent -> unit)) (props2: 'A * ('A -> unit) * (MouseEvent -> unit)) =
+            let (a1,_,_) = props1
+            let (a2,_,_) = props2
+            inputEquality a1 a2
+        let memoizedInputs = React.memo (
+            inputComponent,
+            areEqual = equalityFunc
+        )
         Html.div [
             prop.children [
                 if label.IsSome then
@@ -358,11 +366,11 @@ type FormComponents =
                     sensors = sensors,
                     onDragEnd = handleDragEnd,
                     collisionDetection = DndKit.closestCenter,
-                    children = [
+                    children =
                         DndKit.SortableContext(
                             items = guids,
                             strategy = DndKit.verticalListSortingStrategy,
-                            children = ResizeArray [
+                            children =
                                 Html.div [
                                     prop.className "space-y-2"
                                     prop.children [
@@ -373,7 +381,7 @@ type FormComponents =
                                                 id,
                                                 id,
                                                 (
-                                                    inputComponent(
+                                                    memoizedInputs(
                                                         item,
                                                         (fun v ->
                                                             inputs.[i] <- v
@@ -388,9 +396,7 @@ type FormComponents =
                                             )
                                     ]
                                 ]
-                            ]
                         )
-                    ]
                 )
                 Html.div [
                     prop.className "flex justify-center w-full mt-2"
@@ -546,6 +552,7 @@ type FormComponents =
                     rmv=rmv
                 )
             ),
+            (fun oa1 oa2 -> oa1.Equals oa2),
             ?label=label
         )
 
@@ -594,7 +601,6 @@ type FormComponents =
 
     [<ReactComponent>]
     static member PersonInput(input: Person, setter: Person -> unit, ?rmv: MouseEvent -> unit) =
-        log ("rerender", input)
         let nameStr =
             let fn = Option.defaultValue "" input.FirstName
             let ln = Option.defaultValue "" input.LastName
@@ -681,6 +687,7 @@ type FormComponents =
             Person,
             setter,
             (fun (v, setV, rmv) -> FormComponents.PersonInput(v, setV, rmv)),
+            (fun person1 person2 -> person1.Equals person2),
             ?label=label
         )
 
@@ -828,6 +835,7 @@ type FormComponents =
             Comment,
             setter,
             (fun (v, setV, rmv) -> FormComponents.CommentInput(v, setV, rmv=rmv)),
+            (fun c1 c2 -> c1.Equals c2),
             ?label=label
         )
 
@@ -909,6 +917,7 @@ type FormComponents =
             Publication,
             setter,
             (fun (a,b,c) -> FormComponents.PublicationInput(a,b,rmv=c)),
+            (fun p1 p2 -> p1.Equals p2),
             label
         )
 
@@ -971,5 +980,6 @@ type FormComponents =
             OntologySourceReference,
             setter,
             (fun (a,b,c) -> FormComponents.OntologySourceReferenceInput(a,b,c)),
+            (fun o1 o2 -> o1.Equals o2),
             label
         )

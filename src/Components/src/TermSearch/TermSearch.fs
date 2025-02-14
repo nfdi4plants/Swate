@@ -649,12 +649,13 @@ type TermSearch =
 
     ///
     /// Customizable react component for term search. Utilizing SwateDB search by default.
-    ///
-    #if SWATE_ENVIRONMENT
-    [<ReactComponent>]
-    #else
-    [<ExportDefaultAttribute; NamedParams>]
-    #endif
+    //
+    // #if SWATE_ENVIRONMENT
+    // [<ReactComponent>]
+    // #else
+    // [<ExportDefaultAttribute; NamedParams>]
+    // #endif
+    [<ReactComponent(true)>]
     static member TermSearch(
         onTermSelect: Term option -> unit,
         term: Term option,
