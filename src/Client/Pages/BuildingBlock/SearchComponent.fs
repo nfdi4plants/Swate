@@ -88,6 +88,7 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                     // Term search field
                     if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                         Daisy.input [
+                            prop.className "join-item flex-grow"
                             prop.readOnly false
                             prop.valueOrDefault (model.AddBuildingBlockState.CommentHeader)
                             prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
