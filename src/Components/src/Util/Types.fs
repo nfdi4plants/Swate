@@ -1,20 +1,18 @@
 namespace Swate.Components
 
 open Fable.Core
+open Fable.Core.JS
 open Feliz
 
-[<AllowNullLiteral>]
-[<Global>]
-type Term
-    [<ParamObjectAttribute; Emit("$0")>]
-    (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
-    member val name: string option = jsNative with get, set
-    member val id: string option = jsNative with get, set
-    member val description: string option = jsNative with get, set
-    member val source: string option = jsNative with get, set
-    member val href: string option = jsNative with get, set
-    member val isObsolete: bool option = jsNative with get, set
-    member val data: obj option = jsNative with get, set
+[<Pojo; AllowNullLiteral>]
+type Term (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
+    member val name: string option = name with get, set
+    member val id: string option = id with get, set
+    member val description: string option = description with get, set
+    member val source: string option = source with get, set
+    member val href: string option = href with get, set
+    member val isObsolete: bool option = isObsolete with get, set
+    member val data: obj option = data with get, set
 
 module Term =
 
@@ -55,12 +53,9 @@ module Term =
             ?data = data
         )
 
-[<AllowNullLiteral>]
-[<Global>]
-type TermSearchStyle
-    [<ParamObjectAttribute; Emit("$0")>]
-    (?inputLabel: U2<string, ResizeArray<string>>) =
-    member val inputLabel: U2<string, ResizeArray<string>> option = jsNative with get, set
+[<Pojo; AllowNullLiteral>]
+type TermSearchStyle (?inputLabel: U2<string, ResizeArray<string>>) =
+    member val inputLabel: U2<string, ResizeArray<string>> option = inputLabel
 
 module TermSearchStyle =
     let resolveStyle (style: U2<string, ResizeArray<string>>) =
