@@ -10,6 +10,7 @@
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
     <Compile Include="Types.fs" />
+    <Compile Include="Util\MessageInterop.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\Helper.fs" />
     <Compile Include="LocalStorage\AutosaveConfig.fs" />
