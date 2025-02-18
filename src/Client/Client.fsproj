@@ -9,16 +9,15 @@
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
-    <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="Helper.fs" />
+    <Compile Include="Util\ARCtrl.Helper.fs" />
+    <Compile Include="Util\Helper.fs" />
     <Compile Include="LocalStorage\AutosaveConfig.fs" />
     <Compile Include="LocalStorage\SwateSearchConfig.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
     <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Cytoscape.fs" />
-    <Compile Include="Host.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Routing.fs" />
     <Compile Include="OfficeInterop\InteropLogging.fs" />
