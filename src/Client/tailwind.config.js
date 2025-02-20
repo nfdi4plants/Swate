@@ -4,6 +4,7 @@ module.exports = {
     content: [
         "./index.html",
         "./**/*.{fs,js,ts,jsx,tsx}",
+/*        '../../node_modules/flyonui/dist/js/*.js',*/
     ],
     daisyui: {
         themes: [
@@ -48,6 +49,8 @@ module.exports = {
         require('@tailwindcss/container-queries'),
         require('@tailwindcss/typography'),
         require('daisyui'),
+        //require('flyonui'),
+        //require('flyonui/plugin')
     ],
     darkMode: ['selector', '[data-theme="dark"]']
 }

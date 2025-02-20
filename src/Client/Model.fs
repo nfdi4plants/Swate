@@ -288,5 +288,6 @@ type Model = {
     /// Contains all information about spreadsheet view
     SpreadsheetModel        : Spreadsheet.Model
     History                 : LocalHistory.Model
+    ARCitectState           : ARCitect.Model
     ModalState              : ModalState
 }

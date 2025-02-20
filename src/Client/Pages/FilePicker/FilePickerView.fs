@@ -58,7 +58,7 @@ let uploadButton (model: Model) dispatch (parentContainerResizeClass: string) =
                     button.primary
                     button.block
                     prop.onClick(fun _ ->
-                        ARCitect.RequestPaths false |> ARCitect.ARCitect.send
+                        Start false |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
                     )
                     prop.text "Pick Files"
                 ]
@@ -66,7 +66,7 @@ let uploadButton (model: Model) dispatch (parentContainerResizeClass: string) =
                     button.primary
                     button.block
                     prop.onClick(fun _ ->
-                        ARCitect.RequestPaths true |> ARCitect.ARCitect.send
+                        Start true |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
                     )
                     prop.text "Pick Directories"
                 ]
@@ -229,7 +229,16 @@ let fileContainer (model:Model) dispatch =
             insertButton model dispatch
     ]
 
-let filePickerComponent (model:Model) (dispatch:Messages.Msg -> unit) =
+[<ReactComponent>]
+let Main (model:Model) (dispatch:Messages.Msg -> unit) =
+
+    React.useEffect (
+        (fun _ ->
+            model.ARCitectState.Paths |> List.ofArray |> LoadNewFiles |> FilePickerMsg |> dispatch
+        ),
+        [|box model.ARCitectState.Paths|]
+    )
+
     SidebarComponents.SidebarLayout.Container [
         SidebarComponents.SidebarLayout.Header "File Picker"
 

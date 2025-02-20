@@ -328,6 +328,11 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
             let nextModel, nextCmd = History.update msg currentModel
             nextModel, nextCmd
 
+        | ARCitectMsg msg ->
+            let nextState, nextModel0, nextCmd = ARCitect.update model.ARCitectState currentModel msg
+            let nextModel = {nextModel0 with ARCitectState = nextState}
+            nextModel, nextCmd
+
     /// This function is used to determine which msg should be logged to activity log.
     /// The function is exception based, so msg which should not be logged needs to be added here.
     let matchMsgToLog (msg: Msg) =

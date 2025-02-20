@@ -10,9 +10,11 @@
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
     <Compile Include="Types.fs" />
+    <Compile Include="Util\ElmishHelper.fs" />
     <Compile Include="Util\MessageInterop.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\Helper.fs" />
+    <Compile Include="Util\SwateHost.fs" />
     <Compile Include="LocalStorage\AutosaveConfig.fs" />
     <Compile Include="LocalStorage\SwateSearchConfig.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
@@ -37,8 +39,6 @@
     <Compile Include="States\ModalState.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Messages.fs" />
-    <Compile Include="ARCitect\Interop.fs" />
-    <Compile Include="ARCitect\ARCitect.fs" />
     <Compile Include="Modals\ModalElements.fs" />
     <Compile Include="Modals\Util.fs" />
     <Compile Include="Modals\ContextMenus\Util.fs" />
@@ -125,6 +125,7 @@
     <Compile Include="Update\SpreadsheetUpdate.fs" />
     <Compile Include="Update\OfficeInteropUpdate.fs" />
     <Compile Include="Update\InterfaceUpdate.fs" />
+    <Compile Include="Update\ARCitectUpdate.fs" />
     <Compile Include="Update.fs" />
     <Compile Include="Init.fs" />
     <Compile Include="Index.fs" />

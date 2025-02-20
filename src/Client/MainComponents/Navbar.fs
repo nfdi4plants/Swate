@@ -79,12 +79,14 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                     Html.i [prop.className "fa-solid fa-floppy-disk";]
                 ],
                 (fun _ ->
-                    Spreadsheet.ManualSave |> SpreadsheetMsg |> dispatch
                     match model.PersistentStorageState.Host with
                     | Some (Swatehost.Browser) ->
                         Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value |> SpreadsheetMsg |> dispatch
+                    | Some (Swatehost.ARCitect) ->
+                        ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
                     | _ -> ()
-                )
+                ),
+                isDisabled = model.SpreadsheetModel.ArcFile.IsNone
             )
             match model.PersistentStorageState.Host with
             | Some Swatehost.Browser ->
