@@ -3,6 +3,15 @@ module Types
 
 open ARCtrl
 
+module Feliz =
+
+    [<RequireQualifiedAccess>]
+    type GenericApiState<'s> =
+    | Idle
+    | Loading
+    | Ok of 's
+    | Error of exn
+
 module JsonImport =
 
     [<RequireQualifiedAccess>]

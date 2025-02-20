@@ -41,6 +41,7 @@ let Main(study: ArcStudy, assignedAssays: ArcAssay list, setArcStudy: (ArcStudy 
                     (fun persons ->
                         study.Contacts <- ResizeArray(persons)
                         setArcStudy (study , assignedAssays)),
+                    model.PersistentStorageState.IsARCitect,
                     "Contacts"
                 )
                 FormComponents.PublicationsInput (

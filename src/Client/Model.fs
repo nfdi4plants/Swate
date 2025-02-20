@@ -95,6 +95,11 @@ type PersistentStorageState = {
         Autosave            = true
     }
 
+    member this.IsARCitect =
+        match this.Host with
+        | Some Swatehost.ARCitect -> true
+        | _ -> false
+
     member this.TIBQueries =
         {|
             TermSearch = ResizeArray [
