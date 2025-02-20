@@ -81,6 +81,7 @@ module ARCitect =
                 state, model, cmd
 
         | ARCitect.ResponsePaths paths ->
+            log (sprintf "ResponsePaths: %A" paths)
             {state with Paths = paths}, model, Cmd.none
 
         | ARCitect.RequestPersons msg ->

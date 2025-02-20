@@ -26,7 +26,16 @@ let update (filePickerMsg: FilePicker.Msg) (state: FilePicker.Model) (model: Mod
         nextState, Cmd.none
 
 /// "parentContainerResizeClass": uses tailwind container queries. Expects a string like "@md/parentId:flex-row"
-let uploadButton (model: Model) dispatch (parentContainerResizeClass: string) =
+[<ReactComponent>]
+let UploadButton (model: Model, dispatch, parentContainerResizeClass: string) =
+
+    React.useEffect (
+        (fun _ ->
+            model.ARCitectState.Paths |> List.ofArray |> LoadNewFiles |> FilePickerMsg |> dispatch
+        ),
+        [|box model.ARCitectState.Paths|]
+    )
+
     let inputId = "filePicker_OnFilePickerMainFunc"
     Html.div [
         prop.className [
@@ -216,10 +225,11 @@ module FileNameTable =
         ]
 
 
-let fileContainer (model:Model) dispatch =
+let FileContainer (model:Model) dispatch =
+
     SidebarComponents.SidebarLayout.LogicContainer [
 
-        uploadButton model dispatch "@md/sidebar:flex-row"
+        UploadButton(model, dispatch, "@md/sidebar:flex-row")
 
         if model.FilePickerState.FileNames <> [] then
             fileSortElements model dispatch
@@ -229,15 +239,7 @@ let fileContainer (model:Model) dispatch =
             insertButton model dispatch
     ]
 
-[<ReactComponent>]
 let Main (model:Model) (dispatch:Messages.Msg -> unit) =
-
-    React.useEffect (
-        (fun _ ->
-            model.ARCitectState.Paths |> List.ofArray |> LoadNewFiles |> FilePickerMsg |> dispatch
-        ),
-        [|box model.ARCitectState.Paths|]
-    )
 
     SidebarComponents.SidebarLayout.Container [
         SidebarComponents.SidebarLayout.Header "File Picker"
@@ -245,5 +247,5 @@ let Main (model:Model) (dispatch:Messages.Msg -> unit) =
         SidebarComponents.SidebarLayout.Description "Select files from your computer and insert their names into Excel"
 
         // Colored container element for all uploaded file names and sort elements
-        fileContainer model dispatch
+        FileContainer model dispatch
     ]

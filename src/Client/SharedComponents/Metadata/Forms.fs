@@ -792,7 +792,7 @@ type FormComponents =
                     | GenericApiState.Idle -> Html.none
                     | GenericApiState.Error e -> Helper.errorModal(e, (fun _ -> setExternalPersons GenericApiState.Idle))
                     | GenericApiState.Loading -> Modals.Loading.Modal(rmv=(fun _ -> setExternalPersons GenericApiState.Idle))
-                    | GenericApiState.Ok externalPersons -> :
+                    | GenericApiState.Ok externalPersons ->
                         Helper.PersonsModal(
                             persons,
                             externalPersons,

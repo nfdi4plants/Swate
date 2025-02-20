@@ -193,8 +193,8 @@ type Widget =
         let content = Html.div [
             prop.className "@container/filePickerWidget min-w-32"
             prop.children [
-                FilePicker.uploadButton model dispatch "@md/filePickerWidget:flex-row"
-                if model.FilePickerState.FileNames <> [] then
+                FilePicker.UploadButton(model, dispatch, "@md/filePickerWidget:flex-row")
+                if model.FilePickerState.FileNames <> [] || model.ARCitectState.Paths <> [||] then
                     FilePicker.fileSortElements model dispatch
 
                     Html.div [
