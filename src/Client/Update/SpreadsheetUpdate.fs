@@ -33,7 +33,7 @@ module Spreadsheet =
 
             //This matchcase handles undo / redo functionality
             match msg with
-            | UpdateActiveView _  | Reset | UpdateSelectedCells _
+            | UpdateActiveView _  | Reset | UpdateSelectedCells _ | InitFromArcFile _
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
                 state, model, cmd
             | _ ->
