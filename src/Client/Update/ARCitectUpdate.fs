@@ -85,7 +85,6 @@ module ARCitect =
             state, {model with FilePickerState.FileNames = paths}, Cmd.none
 
         | ARCitect.RequestFile msg ->
-            log "Starting RequestFile"
             match msg with
             | Start () ->
                 let cmd =
@@ -94,19 +93,22 @@ module ARCitect =
                         ()
                         (Finished >> ARCitect.RequestFile >> ARCitectMsg)
                         (curry GenericError Cmd.none >> DevMsg)
-                state, model, cmd
+                let nextModel =
+                    {model with DataAnnotatorModel.Loading = true; DataAnnotatorModel.DataFile = None; DataAnnotatorModel.ParsedFile = None}
+                state, nextModel, cmd
             | ApiCall.Finished wasSuccessful ->
+                let nextModel = {model with DataAnnotatorModel.Loading = false}
                 let cmd =
                     if wasSuccessful then
                         Cmd.none
                     else
                         GenericError (Cmd.none, exn("RequestFile failed")) |> DevMsg |> Cmd.ofMsg
-                state, model, cmd
+                state, nextModel, cmd
 
         | ARCitect.ResponseFile file ->
             let dataFile = DataAnnotator.DataFile.create(file.name, file.mimetype, file.content, file.size)
             let msg = dataFile |> Some |> DataAnnotator.UpdateDataFile |> DataAnnotatorMsg
-            state, model , Cmd.ofMsg msg
+            state, {model with DataAnnotatorModel.Loading = true} , Cmd.ofMsg msg
 
         | ARCitect.RequestPersons msg ->
             match msg with

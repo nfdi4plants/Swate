@@ -154,8 +154,10 @@ module DataAnnotator =
                 DataAnnotator.ParsedDataFile.fromFileBySeparator s file
             )
             let nextState: DataAnnotator.Model = {
-                DataFile = dataFile
-                ParsedFile = parsedFile
+                state with
+                    DataFile = dataFile
+                    ParsedFile = parsedFile
+                    Loading = false
             }
             nextState, model, Cmd.none
         | DataAnnotator.ToggleHeader ->

@@ -101,11 +101,11 @@ module private DataAnnotatorHelper =
                 ]
             ]
 
-        let RequestPathButton (fileName: string option, requestPath) =
+        let RequestPathButton (fileName: string option, requestPath, isLoading: bool) =
             let fileName = defaultArg fileName "Choose File"
             Html.label [
-                prop.className "join flex"
                 prop.onClick requestPath
+                prop.className "join flex"
                 prop.children [
                     Html.button [
                         prop.className "btn btn-primary join-item"
@@ -116,6 +116,13 @@ module private DataAnnotatorHelper =
                         prop.className "input input-bordered input-disabled join-item grow"
                         prop.value fileName
                         prop.readOnly true
+                    ]
+                    Html.span [
+                        prop.className "btn btn-primary join-item btn-disabled"
+                        prop.children [
+                            if isLoading then
+                                Daisy.loading []
+                        ]
                     ]
                 ]
             ]
@@ -346,7 +353,6 @@ type DataAnnotator =
             promise {
                 let! content = e.text()
                 let dtf = DataFile.create(e.name, e.``type``, content, e.size)
-                setShowModal true
                 dtf |> Some |> UpdateDataFile |> DataAnnotatorMsg |> dispatch
             }
             |> Async.AwaitPromise
@@ -355,9 +361,9 @@ type DataAnnotator =
             UpdateDataFile None |> DataAnnotatorMsg |> dispatch
             if ref.current.IsSome then
                 ref.current.Value.value <- null
-        let requestFileFromARCitect = fun _ ->
+        let requestFileFromARCitect = fun (e: Browser.Types.MouseEvent) ->
+            e.preventDefault()
             if model.PersistentStorageState.IsARCitect then
-                setShowModal true
                 Elmish.ApiCall.Start ()
                 |> ARCitect.RequestFile
                 |> ARCitectMsg
@@ -371,7 +377,8 @@ type DataAnnotator =
                 | true ->
                     DataAnnotatorHelper.DataAnnotatorButtons.RequestPathButton(
                         model.DataAnnotatorModel.DataFile |> Option.map _.DataFileName,
-                        requestFileFromARCitect
+                        requestFileFromARCitect,
+                        model.DataAnnotatorModel.Loading
                     )
                 | false ->
                     DataAnnotatorHelper.DataAnnotatorButtons.UploadButton ref model uploadFileOnChange
