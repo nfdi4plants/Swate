@@ -82,11 +82,11 @@ module MessageInteropHelper =
 
         fun arg0 ->
 
-            let data: obj[] =
+            let data: obj =
                 match argumentType with
                 | TypeInfo.Unit -> [||]
-                | TypeInfo.Tuple _ -> arg0 
-                | _ -> [|arg0|]
+                | TypeInfo.Tuple _ -> arg0
+                | _ -> arg0
 
             let requestBody: IMessagePayload =
                 {| swate = true; api = Some func.FieldName; data = Some data; requestId = System.Guid.NewGuid().ToString(); error = None |}
@@ -95,7 +95,7 @@ module MessageInteropHelper =
 
         // Function to generate a new instance dynamically
     let buildOutProxyInner (target: Browser.Types.Window, resolvedType: Type) : 'T =
-    
+
         if not (FSharpType.IsRecord resolvedType) then
             failwithf "MessageInterop-Error: Provided type is not a record. %s" resolvedType.FullName
 
@@ -180,7 +180,7 @@ module MessageInteropHelper =
             match content.api with
             | Some api ->
                 promise {
-                    let! payload = 
+                    let! payload =
                         try
                             promise {
                                 let! r = runApiFromName apiHandler api content.data
@@ -195,7 +195,7 @@ module MessageInteropHelper =
                             let result: IMessagePayload = {| payload with api = None |}
                             result
                         )
-                    
+
                     target.postMessage(payload, "*")
                 }
                 |> Promise.start
@@ -204,7 +204,7 @@ module MessageInteropHelper =
                     {| content with error = Some "No API name given!"|}
                 target.postMessage(payload, "*")
 
-        let handle = 
+        let handle =
             fun (e: Browser.Types.Event) ->
                 let e = e :?> Browser.Types.MessageEvent
                 match verifyMsg e with
