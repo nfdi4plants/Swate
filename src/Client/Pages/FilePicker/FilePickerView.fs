@@ -1,4 +1,4 @@
-module FilePicker
+namespace Pages
 
 open Model
 open Browser.Types
@@ -9,134 +9,138 @@ open Feliz
 open Feliz.DaisyUI
 open Swate
 
-let update (filePickerMsg: FilePicker.Msg) (state: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
-    match filePickerMsg with
-    | LoadNewFiles fileNames ->
-        let nextModel = {
-            model with
-                Model.FilePickerState.FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
-                Model.PageState.SidebarPage = Routing.SidebarPage.FilePicker
-        }
-        let nextCmd = UpdateModel nextModel|> Cmd.ofMsg
-        state, nextCmd
-    | UpdateFileNames newFileNames ->
-        let nextState : FilePicker.Model = {
-            FileNames = newFileNames
-        }
-        nextState, Cmd.none
+module FilePicker =
 
-/// "parentContainerResizeClass": uses tailwind container queries. Expects a string like "@md/parentId:flex-row"
-[<ReactComponent>]
-let UploadButton (model: Model, dispatch, parentContainerResizeClass: string) =
+    let update (filePickerMsg: FilePicker.Msg) (state: FilePicker.Model) (model: Model.Model) : FilePicker.Model * Cmd<Messages.Msg> =
+        match filePickerMsg with
+        | LoadNewFiles fileNames ->
+            let nextModel = {
+                model with
+                    Model.FilePickerState.FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
+                    Model.PageState.SidebarPage = Routing.SidebarPage.FilePicker
+            }
+            let nextCmd = UpdateModel nextModel|> Cmd.ofMsg
+            state, nextCmd
+        | UpdateFileNames newFileNames ->
+            let nextState : FilePicker.Model = {
+                FileNames = newFileNames
+            }
+            nextState, Cmd.none
 
-    React.useEffect (
-        (fun _ ->
-            model.ARCitectState.Paths |> List.ofArray |> LoadNewFiles |> FilePickerMsg |> dispatch
-        ),
-        [|box model.ARCitectState.Paths|]
-    )
+type FilePicker =
 
-    let inputId = "filePicker_OnFilePickerMainFunc"
-    Html.div [
-        prop.className [
-            "flex flex-col gap-2"
-            parentContainerResizeClass
-        ]
-        prop.children [
-            Html.input [
-                prop.style [style.display.none]
-                prop.id inputId
-                prop.multiple true
-                prop.type'.file
-                prop.onChange (fun (ev: File list) ->
-                    let files = ev //ev.target?files
 
-                    let fileNames =
-                        files |> List.map (fun f -> f.name)
+    /// "parentContainerResizeClass": uses tailwind container queries. Expects a string like "@md/parentId:flex-row"
+    static member private UploadButtons (model: Model, dispatch, parentContainerResizeClass: string) =
 
-                    fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
-
-                    //let picker = Browser.Dom.document.getElementById(inputId)
-                    //// https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
-                    //picker?value <- null
-                )
+        let inputId = "filePicker_OnFilePickerMainFunc"
+        Html.div [
+            prop.className [
+                "flex flex-col gap-2"
+                parentContainerResizeClass
             ]
-            match model.PersistentStorageState.Host with
-            | Some (Swatehost.ARCitect) ->
-                Daisy.button.button [
-                    button.primary
-                    button.block
-                    prop.onClick(fun _ ->
-                        Start false |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
-                    )
-                    prop.text "Pick Files"
-                ]
-                Daisy.button.button [
-                    button.primary
-                    button.block
-                    prop.onClick(fun _ ->
-                        Start true |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
-                    )
-                    prop.text "Pick Directories"
-                ]
-            | _ ->
-                Daisy.button.button [
-                    button.primary
-                    button.block
-                    prop.onClick(fun _ ->
-                        let getUploadElement = Browser.Dom.document.getElementById inputId
-                        getUploadElement.click()
-                    )
-                    prop.text "Pick file names"
-                ]
-        ]
-    ]
-
-let insertButton (model: Model) dispatch =
-    Html.div [
-        prop.className "flex flex-row justify-center"
-        prop.children [
-
-            Daisy.button.button [
-                button.success
-                button.wide
-                prop.onClick (fun _ ->
-                    let fileNames = model.FilePickerState.FileNames |> List.map snd
-                    SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
-                )
-                prop.text "Insert file names"
-            ]
-        ]
-    ]
-
-let sortButton icon msg =
-    Daisy.button.a [
-        join.item
-        prop.onClick msg
-        prop.children [
-            Html.i [prop.classes ["fa-lg"; icon]]
-        ]
-    ]
-
-let fileSortElements (model: Model) dispatch =
-    Html.div [
-        Daisy.join [
             prop.children [
-                sortButton "fa-solid fa-arrow-down-a-z" (fun _ ->
-                    let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
-                    UpdateFileNames sortedList |> FilePickerMsg |> dispatch
-                )
-                sortButton "fa-solid fa-arrow-down-z-a" (fun _ ->
-                    let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
-                    UpdateFileNames sortedList |> FilePickerMsg |> dispatch
-                )
+                Html.input [
+                    prop.style [style.display.none]
+                    prop.id inputId
+                    prop.multiple true
+                    prop.type'.file
+                    prop.onChange (fun (ev: File list) ->
+                        let files = ev //ev.target?files
+
+                        let fileNames =
+                            files |> List.map (fun f -> f.name)
+
+                        fileNames |> LoadNewFiles |> FilePickerMsg |> dispatch
+
+                        //let picker = Browser.Dom.document.getElementById(inputId)
+                        //// https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
+                        //picker?value <- null
+                    )
+                ]
+                match model.PersistentStorageState.Host with
+                | Some Swatehost.ARCitect ->
+                    let target = ARCitect.Interop.InteropTypes.ARCitectPathsTarget.FilePicker
+                    Daisy.button.button [
+                        button.primary
+                        button.block
+                        prop.onClick(fun _ ->
+                            Start {|target = target; dictionaries = false |} |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
+                        )
+                        prop.text "Pick Files"
+                    ]
+                    Daisy.button.button [
+                        button.primary
+                        button.block
+                        prop.onClick(fun _ ->
+                            Start {|target = target; dictionaries = true |} |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
+                        )
+                        prop.text "Pick Directories"
+                    ]
+                | _ ->
+                    Daisy.button.button [
+                        button.primary
+                        button.block
+                        prop.onClick(fun _ ->
+                            let getUploadElement = Browser.Dom.document.getElementById inputId
+                            getUploadElement.click()
+                        )
+                        prop.text "Pick file names"
+                    ]
             ]
         ]
-    ]
 
-module FileNameTable =
+    static member private ActionButtons (model: Model) dispatch =
+        Html.div [
+            prop.className "flex flex-row justify-center gap-2"
+            prop.children [
 
-    let deleteFromTable (id,fileName) (model:Model) dispatch =
+                Daisy.button.button [
+                    button.neutral
+                    button.outline
+                    prop.onClick (fun _ ->
+                        Messages.FilePicker.UpdateFileNames [] |> FilePickerMsg |> dispatch
+                    )
+                    prop.text "Cancel"
+                ]
+
+                Daisy.button.button [
+                    button.primary
+                    prop.onClick (fun _ ->
+                        let fileNames = model.FilePickerState.FileNames |> List.map snd
+                        SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch
+                    )
+                    prop.text "Insert file names"
+                ]
+            ]
+        ]
+
+    static member private SortButton icon msg =
+        Daisy.button.a [
+            join.item
+            prop.onClick msg
+            prop.children [
+                Html.i [prop.classes ["fa-lg"; icon]]
+            ]
+        ]
+
+    static member private FileSortElements (model: Model) dispatch =
+        Html.div [
+            Daisy.join [
+                prop.children [
+                    FilePicker.SortButton "fa-solid fa-arrow-down-a-z" (fun _ ->
+                        let sortedList = model.FilePickerState.FileNames |> List.sortBy snd |> List.mapi (fun i x -> i+1,snd x)
+                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                    )
+                    FilePicker.SortButton "fa-solid fa-arrow-down-z-a" (fun _ ->
+                        let sortedList = model.FilePickerState.FileNames |> List.sortByDescending snd |> List.mapi (fun i x -> i+1,snd x)
+                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                    )
+                ]
+            ]
+        ]
+
+    static member private DeleteFromTable (id,fileName) (model:Model) dispatch =
         Components.Components.DeleteButton (props = [
             prop.onClick (fun _ ->
                 let newList =
@@ -150,7 +154,7 @@ module FileNameTable =
             button.outline
         ])
 
-    let moveUpButton (id,fileName) (model:Model) dispatch =
+    static member private MoveUpButton (id,fileName) (model:Model) dispatch =
         Daisy.button.a [
             button.xs
             join.item
@@ -175,7 +179,7 @@ module FileNameTable =
             ]
         ]
 
-    let moveDownButton (id,fileName) (model:Model) dispatch =
+    static member private MoveDownButton (id,fileName) (model:Model) dispatch =
         Daisy.button.a [
             button.xs
             join.item
@@ -200,14 +204,14 @@ module FileNameTable =
             ]
         ]
 
-    let moveButtonList (id,fileName) (model:Model) dispatch =
+    static member private MoveButtonList (id,fileName) (model:Model) dispatch =
         Daisy.join [
-            moveUpButton (id,fileName) model dispatch
-            moveDownButton (id,fileName) model dispatch
+            FilePicker.MoveUpButton (id,fileName) model dispatch
+            FilePicker.MoveDownButton (id,fileName) model dispatch
         ]
 
 
-    let table (model:Model) dispatch =
+    static member private FileViewTable (model:Model) dispatch =
         Daisy.table [
             table.zebra
             table.xs
@@ -217,35 +221,37 @@ module FileNameTable =
                         Html.tr [
                             Html.td [Html.b $"{index}"]
                             Html.td fileName
-                            Html.td [moveButtonList (index,fileName) model dispatch]
-                            Html.td [prop.style [style.textAlign.right]; prop.children [deleteFromTable (index,fileName) model dispatch]]
+                            Html.td [FilePicker.MoveButtonList (index,fileName) model dispatch]
+                            Html.td [prop.style [style.textAlign.right]; prop.children [FilePicker.DeleteFromTable (index,fileName) model dispatch]]
                         ]
                 ]
             ]
         ]
 
 
-let FileContainer (model:Model) dispatch =
+    static member Main (model:Model, dispatch, containerQueryClass: string) =
 
-    SidebarComponents.SidebarLayout.LogicContainer [
+        React.fragment [
 
-        UploadButton(model, dispatch, "@md/sidebar:flex-row")
+            match model.FilePickerState.FileNames with
+            | [] ->
 
-        if model.FilePickerState.FileNames <> [] then
-            fileSortElements model dispatch
+                FilePicker.UploadButtons(model, dispatch, containerQueryClass)
+            | _ ->
+                FilePicker.FileSortElements model dispatch
 
-            FileNameTable.table model dispatch
-            //fileNameElements model dispatch
-            insertButton model dispatch
-    ]
+                FilePicker.FileViewTable model dispatch
+                //fileNameElements model dispatch
+                FilePicker.ActionButtons model dispatch
+        ]
 
-let Main (model:Model) (dispatch:Messages.Msg -> unit) =
+    static member Sidebar (model:Model, dispatch:Messages.Msg -> unit) =
 
-    SidebarComponents.SidebarLayout.Container [
-        SidebarComponents.SidebarLayout.Header "File Picker"
+        SidebarComponents.SidebarLayout.Container [
+            SidebarComponents.SidebarLayout.Header "File Picker"
 
-        SidebarComponents.SidebarLayout.Description "Select files from your computer and insert their names into Excel"
+            SidebarComponents.SidebarLayout.Description "Select files from your computer and insert their names into Excel"
 
-        // Colored container element for all uploaded file names and sort elements
-        FileContainer model dispatch
-    ]
+            // Colored container element for all uploaded file names and sort elements
+            FilePicker.Main (model, dispatch, "@md/sidebar:flex-row")
+        ]

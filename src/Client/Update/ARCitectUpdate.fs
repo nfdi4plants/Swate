@@ -64,11 +64,11 @@ module ARCitect =
 
         | ARCitect.RequestPaths msg ->
             match msg with
-            | Start selectDirectories ->
+            | Start pojo ->
                 let cmd =
                     Cmd.OfPromise.either
                         api.RequestPaths
-                        (selectDirectories)
+                        pojo
                         (Finished >> ARCitect.RequestPaths >> ARCitectMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
@@ -80,9 +80,14 @@ module ARCitect =
                         GenericError (Cmd.none, exn("RequestPaths failed")) |> DevMsg |> Cmd.ofMsg
                 state, model, cmd
 
-        | ARCitect.ResponsePaths paths ->
-            log (sprintf "ResponsePaths: %A" paths)
-            {state with Paths = paths}, model, Cmd.none
+        | ARCitect.ResponsePaths pojo ->
+            match pojo.target with
+            | ARCitect.Interop.InteropTypes.ARCitectPathsTarget.FilePicker ->
+                let paths = Array.indexed pojo.paths |> List.ofArray
+                state, {model with FilePickerState.FileNames = paths}, Cmd.none
+            | _ ->
+                Browser.Dom.console.error("ResponsePaths: target not implemented:", pojo.target)
+                state, model, Cmd.none
 
         | ARCitect.RequestPersons msg ->
             match msg with

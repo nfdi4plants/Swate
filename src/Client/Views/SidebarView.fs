@@ -22,7 +22,7 @@ type SidebarView =
                     TermSearch.Main (model, dispatch)
 
                 | {SidebarPage = Routing.SidebarPage.FilePicker } ->
-                    FilePicker.Main model dispatch
+                    Pages.FilePicker.Sidebar (model, dispatch)
 
                 | {SidebarPage = Routing.SidebarPage.Protocol } ->
                     Protocol.Templates.Main (model, dispatch)

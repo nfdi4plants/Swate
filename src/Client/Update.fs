@@ -277,7 +277,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
 
         | FilePickerMsg filePickerMsg ->
             let nextFilePickerState, nextCmd =
-                FilePicker.update filePickerMsg currentModel.FilePickerState model
+                Pages.FilePicker.update filePickerMsg currentModel.FilePickerState model
 
             let nextModel = {
                 currentModel with
