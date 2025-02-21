@@ -28,7 +28,7 @@ type private PendingRequests = Dictionary<string, (obj -> unit) * (exn -> unit)>
 let private PendingRequests = PendingRequests()
 
 type InteropOptions = {
-    Target: Browser.Types.Window
+    Target: unit -> Browser.Types.Window
     GenericErrorHandler: exn -> unit
 }
 
@@ -40,7 +40,7 @@ open Browser.Types
 
 module MessageInteropHelper =
 
-    let private sendMsgWithResponse (target: Browser.Types.Window) (payload: IMessagePayload) =
+    let private sendMsgWithResponse (target: unit -> Browser.Types.Window) (payload: IMessagePayload) =
         Promise.create (fun resolve reject ->
             // create timeout for response
             let timeout =
@@ -51,7 +51,7 @@ module MessageInteropHelper =
                     )
                     5000
             PendingRequests.Add(payload.requestId, (resolve, reject))
-            target.postMessage(payload, "*")
+            target().postMessage(payload, "*")
         )
 
     let rec private getReturnType typ =
@@ -63,7 +63,7 @@ module MessageInteropHelper =
         else
             typ
 
-    let private proxyCall (target: Browser.Types.Window) (func: RecordField) =
+    let private proxyCall (target: unit -> Browser.Types.Window) (func: RecordField) =
 
         let argumentType : TypeInfo =
             match func.FieldType with
@@ -94,7 +94,7 @@ module MessageInteropHelper =
             executeRequest requestBody
 
         // Function to generate a new instance dynamically
-    let buildOutProxyInner (target: Browser.Types.Window, resolvedType: Type) : 'T =
+    let buildOutProxyInner (target: unit -> Browser.Types.Window, resolvedType: Type) : 'T =
 
         if not (FSharpType.IsRecord resolvedType) then
             failwithf "MessageInterop-Error: Provided type is not a record. %s" resolvedType.FullName
@@ -133,7 +133,7 @@ module MessageInteropHelper =
         | _ ->
             failwithf "MessageInterop-Error: Cannot build proxy. Exepected type %s to be a valid protocol definition which is a record of functions" resolvedType.FullName
 
-    let buildInProxyInner(recordType: 'i, recordTypeType: Type, target: Browser.Types.Window, handleGenericError) =
+    let buildInProxyInner(recordType: 'i, recordTypeType: Type, target: unit -> Browser.Types.Window, handleGenericError) =
 
         let schemaType = createTypeInfo recordTypeType
         match schemaType with
@@ -196,13 +196,13 @@ module MessageInteropHelper =
                             result
                         )
 
-                    target.postMessage(payload, "*")
+                    target().postMessage(payload, "*")
                 }
                 |> Promise.start
             | None ->
                 let payload: IMessagePayload =
                     {| content with error = Some "No API name given!"|}
-                target.postMessage(payload, "*")
+                target().postMessage(payload, "*")
 
         let handle =
             fun (e: Browser.Types.Event) ->
@@ -235,7 +235,7 @@ module MessageInteropHelper =
 module MessageInterop =
 
     let createApi() : InteropOptions = {
-        Target = Browser.Dom.window.parent
+        Target = fun () -> Browser.Dom.window.parent
         GenericErrorHandler = fun exn -> Browser.Dom.console.error($"Proxy Error: {exn.Message}")
     }
 
