@@ -19,6 +19,11 @@ module Subscriptions =
                 Model.ARCitect.ResponsePaths paths |> Messages.ARCitectMsg |> dispatch
                 return true
             }
+        ResponseFile = fun file ->
+            promise {
+                Model.ARCitect.ResponseFile file |> Messages.ARCitectMsg |> dispatch
+                return true
+            }
     }
 
     let subscription (initial: Model.Model) : (SubId * Subscribe<Messages.Msg>) list =

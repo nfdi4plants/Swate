@@ -60,12 +60,11 @@ type FilePicker =
                 ]
                 match model.PersistentStorageState.Host with
                 | Some Swatehost.ARCitect ->
-                    let target = ARCitect.Interop.InteropTypes.ARCitectPathsTarget.FilePicker
                     Daisy.button.button [
                         button.primary
                         button.block
                         prop.onClick(fun _ ->
-                            Start {|target = target; dictionaries = false |} |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
+                            Start false |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
                         )
                         prop.text "Pick Files"
                     ]
@@ -73,7 +72,7 @@ type FilePicker =
                         button.primary
                         button.block
                         prop.onClick(fun _ ->
-                            Start {|target = target; dictionaries = true |} |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
+                            Start true|> ARCitect.RequestPaths |> ARCitectMsg |> dispatch
                         )
                         prop.text "Pick Directories"
                     ]

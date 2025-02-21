@@ -28,7 +28,7 @@ type SidebarView =
                     Protocol.Templates.Main (model, dispatch)
 
                 | {SidebarPage = Routing.SidebarPage.DataAnnotator } ->
-                    Pages.DataAnnotator.Main(model, dispatch)
+                    Pages.DataAnnotator.Sidebar(model, dispatch)
 
                 | {SidebarPage = Routing.SidebarPage.JsonExport } ->
                     JsonExporter.Core.FileExporter.Main(model, dispatch)

@@ -17,20 +17,20 @@ module Interop =
             | Assay
             | Template
 
-        [<RequireQualifiedAccessAttribute>]
-        [<StringEnum>]
-        type ARCitectPathsTarget =
-            | FilePicker
-            | DataAnnotator
-
-    type RequestPathsPojo = {| target: InteropTypes.ARCitectPathsTarget; dictionaries: bool|}
-
-    type ResponsePathsPojo = {| target: InteropTypes.ARCitectPathsTarget; paths: string []|}
+        type ARCitectFile = {|
+            mimetype: string
+            content: string
+            size: int
+            name: string
+        |}
 
     type IARCitectOutAPI = {
         Init: unit -> JS.Promise<InteropTypes.ARCFile * string>
         Save: InteropTypes.ARCFile * string -> JS.Promise<unit>
-        RequestPaths: RequestPathsPojo -> JS.Promise<bool>
+        /// selectDictionaries:bool -> JS.Promise<wasSuccessful: bool>
+        RequestPaths: bool -> JS.Promise<bool>
+        /// () -> JS.Promise<wasSuccessful: bool>
+        RequestFile: unit -> JS.Promise<bool>
         /// returns person jsons
         RequestPersons: unit -> JS.Promise<string []>
     }
@@ -38,7 +38,8 @@ module Interop =
     type IARCitectInAPI = {
         TestHello: string -> JS.Promise<string>
         /// JS.Promise<wasSuccessful: bool>
-        ResponsePaths: ResponsePathsPojo -> JS.Promise<bool>
+        ResponsePaths: string [] -> JS.Promise<bool>
+        ResponseFile: InteropTypes.ARCitectFile -> JS.Promise<bool>
     }
 
 
@@ -52,13 +53,15 @@ type Msg =
     | Init of ApiCall<unit, (Interop.InteropTypes.ARCFile * string)>
     | Save of ArcFiles
     /// ApiCall<selectDirectories: bool, wasSuccessful: bool>
-    | RequestPaths of ApiCall<Interop.RequestPathsPojo, bool>
+    | RequestPaths of ApiCall<bool, bool>
     /// Selecting paths requires user input, which we cannot await.
     /// To avoid timeout `RequestPaths` simply returns true if call was successful,
     /// ... and `ResponsePaths` will be sent as soon as user selected the directories
-    | ResponsePaths of Interop.ResponsePathsPojo
+    | ResponsePaths of string []
     /// expects person jsons
     | RequestPersons of ApiCall<unit, string []>
+    | RequestFile of ApiCall<unit, bool>
+    | ResponseFile of Interop.InteropTypes.ARCitectFile
 
 type Model =
     {

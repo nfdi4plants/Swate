@@ -14,6 +14,7 @@ module private DataAnnotatorHelper =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
             Daisy.button.button [
+                prop.className "grow"
                 prop.onClick rmvFile
                 button.outline
                 if model.DataAnnotatorModel.DataFile.IsNone then
@@ -99,6 +100,26 @@ module private DataAnnotatorHelper =
                     ]
                 ]
             ]
+
+        let RequestPathButton (fileName: string option, requestPath) =
+            let fileName = defaultArg fileName "Choose File"
+            Html.label [
+                prop.className "join flex"
+                prop.onClick requestPath
+                prop.children [
+                    Html.button [
+                        prop.className "btn btn-primary join-item"
+                        prop.text "Choose File"
+                    ]
+                    Html.input [
+                        prop.title fileName
+                        prop.className "input input-bordered input-disabled join-item grow"
+                        prop.value fileName
+                        prop.readOnly true
+                    ]
+                ]
+            ]
+
         let UploadButton (ref: IRefValue<#Browser.Types.HTMLElement option>) (model: Model) (uploadFile: Browser.Types.File -> unit) =
             Daisy.file [
                 prop.className "col-span-2"
@@ -111,6 +132,7 @@ module private DataAnnotatorHelper =
         let OpenModalButton model mkOpen =
             Daisy.button.button [
                 button.primary
+                prop.className "grow"
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     button.disabled
                 prop.text "Open Annotator"
@@ -120,14 +142,10 @@ module private DataAnnotatorHelper =
     open DataAnnotatorButtons
 
 
-    let ModalMangementComponent ref (model: Model) (openModal: Browser.Types.Event -> unit) rmvFile uploadFile =
+    let ModalMangementContainer (children: ReactElement list) =
         Html.div [
-            prop.className "grid grid-cols-2 gap-4"
-            prop.children [
-                UploadButton ref model uploadFile
-                ResetButton model rmvFile
-                OpenModalButton model openModal
-            ]
+            prop.className "flex flex-col gap-4"
+            prop.children children
         ]
 
     let DataFileConfigComponent model rmvFile target setTarget dispatch =
@@ -324,7 +342,7 @@ type DataAnnotator =
     static member Main(model: Model, dispatch: Msg -> unit) =
         let showModal, setShowModal = React.useState(false)
         let ref = React.useInputRef()
-        let uploadFile = fun (e: Browser.Types.File) ->
+        let uploadFileOnChange = fun (e: Browser.Types.File) ->
             promise {
                 let! content = e.text()
                 let dtf = DataFile.create(e.name, e.``type``, content, e.size)
@@ -337,6 +355,40 @@ type DataAnnotator =
             UpdateDataFile None |> DataAnnotatorMsg |> dispatch
             if ref.current.IsSome then
                 ref.current.Value.value <- null
+        let requestFileFromARCitect = fun _ ->
+            if model.PersistentStorageState.IsARCitect then
+                setShowModal true
+                Elmish.ApiCall.Start ()
+                |> ARCitect.RequestFile
+                |> ARCitectMsg
+                |> dispatch
+
+        let activateModal = fun _ -> setShowModal true
+
+        React.fragment [
+            ModalMangementContainer [
+                match model.PersistentStorageState.IsARCitect with
+                | true ->
+                    DataAnnotatorHelper.DataAnnotatorButtons.RequestPathButton(
+                        model.DataAnnotatorModel.DataFile |> Option.map _.DataFileName,
+                        requestFileFromARCitect
+                    )
+                | false ->
+                    DataAnnotatorHelper.DataAnnotatorButtons.UploadButton ref model uploadFileOnChange
+                Html.div [
+                    prop.className "flex flex-row gap-4"
+                    prop.children [
+                        DataAnnotatorHelper.DataAnnotatorButtons.ResetButton model rmvFile
+                        DataAnnotatorHelper.DataAnnotatorButtons.OpenModalButton model activateModal
+                    ]
+                ]
+            ]
+            match model.DataAnnotatorModel, showModal with
+            | { DataFile = Some _; ParsedFile = Some _ }, true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)
+            | _, _ -> Html.none
+        ]
+
+    static member Sidebar(model, dispatch) =
         SidebarComponents.SidebarLayout.Container [
 
             SidebarComponents.SidebarLayout.Header "Data Annotator"
@@ -344,10 +396,8 @@ type DataAnnotator =
             SidebarComponents.SidebarLayout.Description "Specify exact data points for annotation."
 
             SidebarComponents.SidebarLayout.LogicContainer [
-                ModalMangementComponent ref model (fun _ -> setShowModal true) rmvFile uploadFile
-                match model.DataAnnotatorModel, showModal with
-                | { DataFile = Some _; ParsedFile = Some _ }, true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)
-                | _, _ -> Html.none
+                DataAnnotator.Main(model, dispatch)
             ]
+
         ]
 

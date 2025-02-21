@@ -80,14 +80,33 @@ module ARCitect =
                         GenericError (Cmd.none, exn("RequestPaths failed")) |> DevMsg |> Cmd.ofMsg
                 state, model, cmd
 
-        | ARCitect.ResponsePaths pojo ->
-            match pojo.target with
-            | ARCitect.Interop.InteropTypes.ARCitectPathsTarget.FilePicker ->
-                let paths = Array.indexed pojo.paths |> List.ofArray
-                state, {model with FilePickerState.FileNames = paths}, Cmd.none
-            | _ ->
-                Browser.Dom.console.error("ResponsePaths: target not implemented:", pojo.target)
-                state, model, Cmd.none
+        | ARCitect.ResponsePaths paths ->
+            let paths = Array.indexed paths |> List.ofArray
+            state, {model with FilePickerState.FileNames = paths}, Cmd.none
+
+        | ARCitect.RequestFile msg ->
+            log "Starting RequestFile"
+            match msg with
+            | Start () ->
+                let cmd =
+                    Cmd.OfPromise.either
+                        api.RequestFile
+                        ()
+                        (Finished >> ARCitect.RequestFile >> ARCitectMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+                state, model, cmd
+            | ApiCall.Finished wasSuccessful ->
+                let cmd =
+                    if wasSuccessful then
+                        Cmd.none
+                    else
+                        GenericError (Cmd.none, exn("RequestFile failed")) |> DevMsg |> Cmd.ofMsg
+                state, model, cmd
+
+        | ARCitect.ResponseFile file ->
+            let dataFile = DataAnnotator.DataFile.create(file.name, file.mimetype, file.content, file.size)
+            let msg = dataFile |> Some |> DataAnnotator.UpdateDataFile |> DataAnnotatorMsg
+            state, model , Cmd.ofMsg msg
 
         | ARCitect.RequestPersons msg ->
             match msg with

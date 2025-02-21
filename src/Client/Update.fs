@@ -171,7 +171,6 @@ module DataAnnotator =
                     ParsedFile = parsedFile
             }
             nextState, model, Cmd.none
-
 module History =
     let update (msg: History.Msg) (model: Model) : Model * Cmd<Msg> =
         match msg with
