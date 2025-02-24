@@ -36,7 +36,7 @@ module private MoveEventListener =
     let ensurePositionInsideWindow (element: IRefValue<HTMLElement option>) (position: Rect) =
         let maxX = Browser.Dom.window.innerWidth - element.current.Value.offsetWidth;
         let tempX = position.X
-        let newX = System.Math.Min(System.Math.Max(tempX,0),int maxX)
+        let newX = System.Math.Min(System.Math.Max(tempX, 0), int maxX)
         let maxY = Browser.Dom.window.innerHeight - element.current.Value.offsetHeight;
         let tempY = position.Y
         let newY = System.Math.Min(System.Math.Max(tempY,0),int maxY)
@@ -64,6 +64,15 @@ module private ResizeEventListener =
 
     open Fable.Core.JsInterop
 
+    let adaptElement (size: Rect) (position: Rect) setWidth setPosition =
+        let innerWidth = int Browser.Dom.window.innerWidth
+        let combinedWidth = size.X + position.X
+        if innerWidth <= combinedWidth then
+            (Some {X = 0; Y = position.Y}) |> setPosition
+        if innerWidth <= size.X then
+            (Some {X = innerWidth; Y = size.Y}) |> setWidth
+            
+
     let onmousemove (startPosition: Rect) (startSize: Rect) setSize = fun (e: Event) ->
         let e : MouseEvent = !!e
         let width = int e.clientX - startPosition.X + startSize.X
@@ -78,6 +87,18 @@ module private ResizeEventListener =
         if element.current.IsSome then
             Size.write(prefix, {X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
+    let windowSizeChange setInnerWidth =
+        React.useEffect(fun () ->
+            let onResize _ =
+                setInnerWidth Browser.Dom.window.innerWidth
+            setInnerWidth Browser.Dom.window.innerWidth
+            Browser.Dom.window.addEventListener("resize", onResize)
+            // Cleanup function to remove event listener when the component unmounts
+            React.createDisposable(fun () ->
+                Browser.Dom.window.removeEventListener("resize", onResize)
+            )
+        )
+
 [<RequireQualifiedAccess>]
 type Widget =
     | _BuildingBlock
@@ -89,7 +110,30 @@ type Widget =
     static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit) =
         let position, setPosition = React.useState(fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
+        let innerWidth, setInnerWidth = React.useState(fun _ -> Browser.Dom.window.innerWidth)
         let element = React.useElementRef()
+
+        ResizeEventListener.windowSizeChange setInnerWidth
+
+        React.useEffectOnce(fun _ ->
+            position |> Option.iter (fun position ->
+                    if size.IsSome then
+                        ResizeEventListener.adaptElement size.Value position setSize setPosition
+                )
+        )
+
+        React.useEffect(
+            (fun () ->
+                //Adapt position when the size of the element is changed so that it is visible
+                position |> Option.iter (fun position ->
+                    if size.IsSome then
+                        ResizeEventListener.adaptElement size.Value position setSize setPosition
+                )
+                ()
+                //React shall only be used, when the size of the element is changed
+            ), [| Browser.Dom.window.innerWidth :> obj |]
+        )
+
         React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
         let resizeElement (content: ReactElement) =
             Html.div [
@@ -138,7 +182,7 @@ type Widget =
                         let y = e.clientY - element.current.Value.offsetTop;
                         let startPosition = {X = int x; Y = int y}
                         let onmousemove = MoveEventListener.onmousemove element startPosition setPosition
-                        let onmouseup = fun e -> MoveEventListener.onmouseup (prefix, element) onmousemove
+                        let onmouseup = fun _ -> MoveEventListener.onmouseup (prefix, element) onmousemove
                         Browser.Dom.document.addEventListener("mousemove", onmousemove)
                         let config = createEmpty<AddEventListenerOptions>
                         config.once <- true
