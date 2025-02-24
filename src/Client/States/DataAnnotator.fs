@@ -100,10 +100,12 @@ type Model =
     {
         DataFile: DataFile option
         ParsedFile: ParsedDataFile option
+        Loading: bool
     }
     static member init () = {
         DataFile = None
         ParsedFile = None
+        Loading = false
     }
 
 type Msg =

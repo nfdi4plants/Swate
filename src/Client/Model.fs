@@ -95,6 +95,11 @@ type PersistentStorageState = {
         Autosave            = true
     }
 
+    member this.IsARCitect =
+        match this.Host with
+        | Some Swatehost.ARCitect -> true
+        | _ -> false
+
     member this.TIBQueries =
         {|
             TermSearch = ResizeArray [
@@ -288,5 +293,6 @@ type Model = {
     /// Contains all information about spreadsheet view
     SpreadsheetModel        : Spreadsheet.Model
     History                 : LocalHistory.Model
+    ARCitectState           : ARCitect.Model
     ModalState              : ModalState
 }

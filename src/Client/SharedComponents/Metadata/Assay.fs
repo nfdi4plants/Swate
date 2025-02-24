@@ -53,6 +53,7 @@ let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay ->
                     (fun persons ->
                         assay.Performers <- persons
                         setArcAssay assay),
+                    model.PersistentStorageState.IsARCitect,
                     "Performers"
                 )
                 FormComponents.CommentsInput(

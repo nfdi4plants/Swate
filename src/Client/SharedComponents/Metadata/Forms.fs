@@ -17,13 +17,6 @@ open Swate.Components.Shared
 
 module private API =
 
-    [<RequireQualifiedAccess>]
-    type Request<'A> =
-    | Ok of 'A
-    | Error of exn
-    | Loading
-    | Idle
-
     module Null =
         let defaultValue (def:'A) (x:'A) = if isNull x then def else x
 
@@ -218,6 +211,82 @@ module private Helper =
             ]
         ]
 
+    let PersonsModal (existingPersons: ResizeArray<Person>, externalPersons: Person [], select: Person -> unit, back) =
+        Daisy.modal.div [
+            modal.active
+            prop.children [
+                Daisy.modalBackdrop []
+                Daisy.modalBox.div [
+                    prop.className "max-h-[80%] overflow-y-hidden flex flex-col space-y-2"
+                    prop.children [
+                        Html.div [
+                            prop.className "space-y-2 overflow-y-auto max-h-fit overflow-x-auto"
+                            prop.children [
+                                Html.table [
+                                    prop.className "table"
+                                    prop.children [
+                                        Html.thead [
+                                            Html.tr [
+                                                Html.th [] // Select
+                                                Html.th "Name"
+                                                Html.th "Affiliation"
+                                                Html.th "Orcid"
+                                                Html.th "Address"
+                                                Html.th "Contact"
+                                                Html.th "Roles"
+                                                Html.th "Comments"
+                                            ]
+                                        ]
+                                        Html.tbody [
+                                            for person in externalPersons do
+                                                let isSelected = existingPersons |> Seq.exists (fun x -> x.Equals person)
+                                                Html.tr [
+                                                    Html.td [
+                                                        Html.button [
+                                                            prop.className "btn btn-primary"
+                                                            prop.disabled isSelected
+                                                            prop.text "Add"
+                                                            prop.onClick (fun _ ->
+                                                                if not isSelected then
+                                                                    select person
+                                                            )
+                                                        ]
+                                                    ]
+                                                    Html.td [
+                                                        prop.className "no-wrap"
+                                                        prop.text ([person.FirstName; person.MidInitials; person.LastName] |> List.choose id |> String.concat " ")
+                                                    ]
+                                                    Html.td (person.Affiliation |> Option.defaultValue "")
+                                                    Html.td (person.ORCID |> Option.defaultValue "")
+                                                    Html.td (person.Address |> Option.defaultValue "")
+                                                    Html.td ([person.EMail; person.Phone; person.Fax] |> List.choose id |> String.concat "; ")
+                                                    Html.td [
+                                                        prop.title (person.Roles |> Seq.map _.ToJsonString() |> String.concat "; ")
+                                                        prop.text (person.Roles |> Seq.map _.NameText |> String.concat "; ")
+                                                    ]
+                                                    Html.td (person.Comments |> Seq.map _.toJsonString() |> String.concat "; ")
+                                                ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                        Html.div [
+                            prop.className "flex justify-end gap-4"
+                            prop.style [style.gap (length.rem 1)]
+                            prop.children [
+                                Daisy.button.button [
+                                    prop.text "back"
+                                    button.outline
+                                    prop.onClick back
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
     let publicationModal (pub: Publication, confirm, back) =
         Daisy.modal.div [
             modal.active
@@ -320,7 +389,7 @@ type FormComponents =
     /// <param name="inputComponent"></param>
     /// <param name="label"></param>
     [<ReactComponent>]
-    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, inputEquality: 'A -> 'A -> bool, ?label: string) =
+    static member InputSequence<'A>(inputs: ResizeArray<'A>, constructor: unit -> 'A, setter: ResizeArray<'A> -> unit, inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement, inputEquality: 'A -> 'A -> bool, ?label: string, ?extendedElements: ReactElement) =
         // dnd-kit requires an id for each element in the list.
         // The id is used to keep track of the order of the elements in the list.
         // Because most of our classes do not have a unique id, we generate a new guid for each element in the list.
@@ -359,9 +428,12 @@ type FormComponents =
             areEqual = equalityFunc
         )
         Html.div [
+            prop.className "space-y-2"
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
+                if extendedElements.IsSome then
+                    extendedElements.Value
                 DndKit.DndContext(
                     sensors = sensors,
                     onDragEnd = handleDragEnd,
@@ -559,15 +631,15 @@ type FormComponents =
     [<ReactComponent>]
     static member PersonRequestInput (orcid: string option, doisetter, searchsetter: Person -> unit, ?label:string) =
         let orcid = defaultArg orcid ""
-        let state, setState = React.useState(API.Request<Person>.Idle)
-        let resetState = fun _ -> setState API.Request.Idle
+        let state, setState = React.useState(GenericApiState<Person>.Idle)
+        let resetState = fun _ -> setState GenericApiState.Idle
         Html.div [
             prop.className "grow cursor-auto"
             prop.children [
                 match state with
-                | API.Request.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)
-                | API.Request.Error e -> Helper.errorModal(e, resetState)
-                | API.Request.Loading -> Modals.Loading.Modal(rmv=resetState)
+                | GenericApiState.Ok p -> Helper.personModal (p, (fun _ -> searchsetter p; resetState()), resetState)
+                | GenericApiState.Error e -> Helper.errorModal(e, resetState)
+                | GenericApiState.Loading -> Modals.Loading.Modal(rmv=resetState)
                 | _ -> Html.none
                 if label.IsSome then Generic.FieldTitle label.Value
                 Daisy.join [
@@ -584,14 +656,14 @@ type FormComponents =
                             button.info
                             prop.text "Search"
                             prop.onClick (fun _ ->
-                                setState API.Request.Loading
+                                setState GenericApiState.Loading
                                 // setState <| API.Request.Error (new Exception("Not implemented"))
                                 // setState <| (API.Request.Ok (Person.create(orcid=orcid,firstName="John",lastName="Doe")))
                                 API.start
                                     API.requestByORCID
                                     orcid
-                                    (API.Request.Ok >> setState)
-                                    (API.Request.Error >> setState)
+                                    (GenericApiState.Ok >> setState)
+                                    (GenericApiState.Error >> setState)
                             )
                         ]
                     ]
@@ -681,15 +753,66 @@ type FormComponents =
                     Helper.deleteButton rmv.Value
             ]
 
-    static member PersonsInput (persons: ResizeArray<Person>, setter: ResizeArray<Person> -> unit, ?label: string) =
+    [<ReactComponent>]
+    static member PersonsInput (persons: ResizeArray<Person>, setter: ResizeArray<Person> -> unit, ?isARCitect: bool, ?label: string) =
+        let isARCitect = defaultArg isARCitect false
+        let (externalPersons: GenericApiState<Person []>), setExternalPersons = React.useState(GenericApiState.Idle)
+        let extendedElements =
+            match isARCitect with
+            | true ->
+                React.fragment [
+                    Html.div [
+                        prop.className "flex justify-center"
+                        prop.children [
+                            Html.button [
+                                prop.className "btn btn-primary btn-wide"
+                                prop.text "Import Persons"
+                                prop.onClick (fun _ ->
+                                    promise {
+                                        setExternalPersons GenericApiState.Loading
+                                        let! personsJson = Model.ARCitect.api.RequestPersons()
+                                        let persons =
+                                            personsJson
+                                            |> Array.map ARCtrl.Person.fromJsonString
+                                            |> Array.sortBy _.LastName
+
+                                        GenericApiState.Ok persons
+                                        |> setExternalPersons
+                                    }
+                                    |> Promise.catch (fun e ->
+                                        GenericApiState.Error e
+                                        |> setExternalPersons
+                                    )
+                                    |> Promise.start
+                                )
+                            ]
+                        ]
+                    ]
+                    match externalPersons with
+                    | GenericApiState.Idle -> Html.none
+                    | GenericApiState.Error e -> Helper.errorModal(e, (fun _ -> setExternalPersons GenericApiState.Idle))
+                    | GenericApiState.Loading -> Modals.Loading.Modal(rmv=(fun _ -> setExternalPersons GenericApiState.Idle))
+                    | GenericApiState.Ok externalPersons ->
+                        Helper.PersonsModal(
+                            persons,
+                            externalPersons,
+                            (fun person -> persons.Add(person); persons |> setter),
+                            (fun _ -> setExternalPersons GenericApiState.Idle)
+                        )
+                ]
+                |> Some
+            | false -> None
+
         FormComponents.InputSequence(
             persons,
             Person,
             setter,
             (fun (v, setV, rmv) -> FormComponents.PersonInput(v, setV, rmv)),
             (fun person1 person2 -> person1.Equals person2),
-            ?label=label
+            ?label=label,
+            ?extendedElements = extendedElements
         )
+
 
     [<ReactComponent>]
     static member DateTimeInput (input_: string, setter: string -> unit, ?label: string) =
@@ -745,17 +868,17 @@ type FormComponents =
     [<ReactComponent>]
     static member PublicationRequestInput (id: string option, searchAPI: string -> Fable.Core.JS.Promise<Publication>, doisetter, searchsetter: Publication -> unit, ?label:string) =
         let id = defaultArg id ""
-        let state, setState = React.useState(API.Request<Publication>.Idle)
-        let resetState = fun _ -> setState API.Request.Idle
+        let state, setState = React.useState(GenericApiState<Publication>.Idle)
+        let resetState = fun _ -> setState GenericApiState.Idle
         Html.div [
             prop.className "grow"
             prop.children [
                 if label.IsSome then Generic.FieldTitle label.Value
                 //if state.IsSome || error.IsSome then
                 match state with
-                | API.Request.Ok pub -> Helper.publicationModal(pub,(fun _ -> searchsetter pub; resetState()), resetState)
-                | API.Request.Error e -> Helper.errorModal(e, resetState)
-                | API.Request.Loading -> Modals.Loading.Modal(rmv=resetState)
+                | GenericApiState.Ok pub -> Helper.publicationModal(pub,(fun _ -> searchsetter pub; resetState()), resetState)
+                | GenericApiState.Error e -> Helper.errorModal(e, resetState)
+                | GenericApiState.Loading -> Modals.Loading.Modal(rmv=resetState)
                 | _ -> Html.none
                 Daisy.join [
                     prop.className "w-full"
@@ -770,12 +893,12 @@ type FormComponents =
                             join.item
                             prop.text "Search"
                             prop.onClick (fun _ ->
-                                setState API.Request.Loading
+                                setState GenericApiState.Loading
                                 API.start
                                     searchAPI
                                     id
-                                    (API.Request.Ok >> setState)
-                                    (API.Request.Error >> setState)
+                                    (GenericApiState.Ok >> setState)
+                                    (GenericApiState.Error >> setState)
                             )
                         ]
                     ]

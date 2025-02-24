@@ -154,8 +154,10 @@ module DataAnnotator =
                 DataAnnotator.ParsedDataFile.fromFileBySeparator s file
             )
             let nextState: DataAnnotator.Model = {
-                DataFile = dataFile
-                ParsedFile = parsedFile
+                state with
+                    DataFile = dataFile
+                    ParsedFile = parsedFile
+                    Loading = false
             }
             nextState, model, Cmd.none
         | DataAnnotator.ToggleHeader ->
@@ -171,7 +173,6 @@ module DataAnnotator =
                     ParsedFile = parsedFile
             }
             nextState, model, Cmd.none
-
 module History =
     let update (msg: History.Msg) (model: Model) : Model * Cmd<Msg> =
         match msg with
@@ -277,7 +278,7 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
 
         | FilePickerMsg filePickerMsg ->
             let nextFilePickerState, nextCmd =
-                FilePicker.update filePickerMsg currentModel.FilePickerState model
+                Pages.FilePicker.update filePickerMsg currentModel.FilePickerState model
 
             let nextModel = {
                 currentModel with
@@ -326,6 +327,11 @@ let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
 
         | HistoryMsg msg ->
             let nextModel, nextCmd = History.update msg currentModel
+            nextModel, nextCmd
+
+        | ARCitectMsg msg ->
+            let nextState, nextModel0, nextCmd = ARCitect.update model.ARCitectState currentModel msg
+            let nextModel = {nextModel0 with ARCitectState = nextState}
             nextModel, nextCmd
 
     /// This function is used to determine which msg should be logged to activity log.

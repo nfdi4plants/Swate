@@ -41,6 +41,7 @@ let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> 
                     (fun i ->
                         investigation.Contacts <- ResizeArray i
                         setInvestigation investigation),
+                    model.PersistentStorageState.IsARCitect,
                     "Contacts"
                 )
                 FormComponents.PublicationsInput(

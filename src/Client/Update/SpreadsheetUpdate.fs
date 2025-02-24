@@ -16,21 +16,6 @@ module Spreadsheet =
 
     module Helper =
 
-        let fullSaveModel (state: Spreadsheet.Model) (model:Model) =
-            let snapshotJsonString = state.ToJsonString()
-            Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString) // This will cache the most up to date table state to local storage.
-            let nextHistory = model.History.SaveSessionSnapshot state // this will cache the table state for certain operations in session storage.
-            if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
-                match state.ArcFile with // model is not yet updated at this position.
-                | Some (Assay assay) ->
-                    ARCitect.ARCitect.send(ARCitect.AssayToARCitect assay)
-                | Some (Study (study,_)) ->
-                    ARCitect.ARCitect.send(ARCitect.StudyToARCitect study)
-                | Some (Investigation inv) ->
-                    ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
-                | _ -> ()
-            ()
-
         /// <summary>
         /// This function will store the information correctly.
         /// Can return save information to local storage (persistent between browser sessions) and session storage.
@@ -48,7 +33,7 @@ module Spreadsheet =
 
             //This matchcase handles undo / redo functionality
             match msg with
-            | UpdateActiveView _  | Reset | UpdateSelectedCells _
+            | UpdateActiveView _  | Reset | UpdateSelectedCells _ | InitFromArcFile _
             | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
                 state, model, cmd
             | _ ->
@@ -65,11 +50,21 @@ module Spreadsheet =
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some (Assay assay) ->
-                        ARCitect.ARCitect.send(ARCitect.AssayToARCitect assay)
+                        let json = assay.ToJsonString()
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, json)
+                        |> Promise.start
                     | Some (Study (study,_)) ->
-                        ARCitect.ARCitect.send(ARCitect.StudyToARCitect study)
+                        let json = study.ToJsonString()
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, json)
+                        |> Promise.start
                     | Some (Investigation inv) ->
-                        ARCitect.ARCitect.send(ARCitect.InvestigationToARCitect inv)
+                        let json = inv.ToJsonString()
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Investigation, json)
+                        |> Promise.start
+                    | Some (Template template) ->
+                        let json = template.toJsonString()
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
+                        |> Promise.start
                     | _ -> ()
 
                 state, model, newCmd
@@ -91,9 +86,6 @@ module Spreadsheet =
 
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
-            | ManualSave ->
-                Helper.fullSaveModel state model
-                state, model, Cmd.none
             | UpdateState nextState ->
                 nextState, model, Cmd.none
             | UpdateDatamap datamapOption ->

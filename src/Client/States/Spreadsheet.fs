@@ -153,7 +153,6 @@ type Key =
 
 
 type Msg =
-| ManualSave
 // <--> UI <-->
 | UpdateState of Model
 | UpdateCell of (int*int) * CompositeCell

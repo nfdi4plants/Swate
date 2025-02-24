@@ -98,21 +98,17 @@ module Interface =
             match msg with
             | Initialize host ->
                 let cmd =
-                    Cmd.batch [
-                        match host with
-                        | Swatehost.Excel ->
-                            ExcelHelper.officeload() |> Async.StartImmediate
-                            Cmd.none
-                        | Swatehost.Browser ->
-                            Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
-                            Cmd.none
-                        | Swatehost.ARCitect ->
-                            Cmd.ofEffect (fun _ ->
-                                LocalHistory.Model.ResetHistoryWebStorage()
-                                Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
-                                ARCitect.ARCitect.send ARCitect.Init
-                            )
-                    ]
+                    match host with
+                    | Swatehost.Excel ->
+                        ExcelHelper.officeload() |> Async.StartImmediate
+                        Cmd.none
+                    | Swatehost.Browser ->
+                        Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
+                        Cmd.none
+                    | Swatehost.ARCitect ->
+                        LocalHistory.Model.ResetHistoryWebStorage()
+                        Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
+                        Start() |> ARCitect.Init |> ARCitectMsg |> Cmd.ofMsg
                 /// Updates from local storage if standalone in browser
                 let nextModel = model.UpdateFromLocalStorage()
                 nextModel, cmd
@@ -295,7 +291,7 @@ module Interface =
                     let distinct = deselectedColumns |> Array.distinct
                     let cmd =
                         if distinct.Length <> 1 then
-                            let msg = Failure("Please select one column only if you want to use `Remove Building Block`.")
+                            let msg = exn "Please select one column only if you want to use `Remove Building Block`."
                             GenericError (Cmd.none,msg) |> DevMsg |> Cmd.ofMsg
                         else
                             Spreadsheet.DeleteColumn (distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg

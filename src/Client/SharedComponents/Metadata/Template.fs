@@ -81,7 +81,7 @@ let Main(template: Template, setTemplate: Template -> unit) =
                         template.Authors <-ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                         setTemplate template),
-                    "Authors"
+                    label="Authors"
                 )
             ]
         )

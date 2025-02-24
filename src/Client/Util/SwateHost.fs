@@ -15,3 +15,4 @@ with
 
     member this.IsStandalone =
         this = Swatehost.Browser || this = Swatehost.ARCitect
+

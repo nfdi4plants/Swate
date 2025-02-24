@@ -118,6 +118,7 @@ type Msg =
 | ProtocolMsg           of Protocol.Msg
 | DataAnnotatorMsg      of DataAnnotator.Msg
 | SpreadsheetMsg        of Spreadsheet.Msg
+| ARCitectMsg           of ARCitect.Msg
 /// This is used to forward Msg to SpreadsheetMsg/OfficeInterop
 | InterfaceMsg          of SpreadsheetInterface.Msg
 | PageStateMsg          of PageState.Msg
