@@ -116,12 +116,6 @@ module Table =
             let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
             if containsAtIndex.IsSome then
                 columnsToRemove <- containsAtIndex.Value::columnsToRemove
-        tablecopy.RemoveColumns (Array.ofList columnsToRemove)
-        tablecopy
-
-    let removeUniqueColumDuplicates (activeTable: ArcTable) (toJoinTable: ArcTable) : ArcTable =
-        // Remove existing columns
-        let mutable columnsToRemove = []
 
         let tablecopy = toJoinTable.Copy()
         let joinInput = tablecopy.TryGetInputColumn()
@@ -137,6 +131,7 @@ module Table =
             let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = joinOutput.Value.Header)
             if containsAtIndex.IsSome then
                 columnsToRemove <- containsAtIndex.Value::columnsToRemove
+
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
         tablecopy
 

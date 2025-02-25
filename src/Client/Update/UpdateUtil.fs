@@ -93,9 +93,7 @@ module JsonImportHelper =
                     // Keep input & output columns of active table or first table that had them when appending
                     let tempTable = activeTable.Copy()
                     for table in selectedColumnTables do
-                        let preparedTemplate =
-                            Table.distinctByHeader tempTable table
-                            |> Table.removeUniqueColumDuplicates tempTable
+                        let preparedTemplate = Table.distinctByHeader tempTable table
                         tempTable.Join(preparedTemplate, joinOptions=importState.ImportType)
                     existingTables.[i] <- tempTable
                 | _ -> ()

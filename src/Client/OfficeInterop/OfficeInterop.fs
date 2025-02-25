@@ -949,7 +949,7 @@ module UpdateHandler =
                 let tableToAdd = tablesToAdd.[i]
                 let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumns i
                 let refinedTableToAdd =
-                    let temp = Table.removeUniqueColumDuplicates originTable tableToAdd
+                    let temp = Table.distinctByHeader originTable tableToAdd
                     Table.selectiveTablePrepare originTable temp deselectedColumnIndices
                 let newTable =
                     if i > 0 then
