@@ -26,8 +26,10 @@ module Spreadsheet =
         /// <param name="cmd"></param>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
 
+            let mutable snapshotJsonString = ""
+
             if model.PersistentStorageState.Autosave then
-                let snapshotJsonString = state.ToJsonString()
+                snapshotJsonString <- state.ToJsonString()
                 //This will cache the most up to date table state to local storage.
                 //This is used as a simple autosave feature.
                 Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
@@ -40,7 +42,6 @@ module Spreadsheet =
             | _ ->
                 let newCmd =
                     if model.PersistentStorageState.Autosave then
-                        let snapshotJsonString = state.ToJsonString()
                         Cmd.OfPromise.either
                             model.History.SaveSessionSnapshotIndexedDB
                             (snapshotJsonString)
