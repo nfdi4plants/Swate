@@ -11,7 +11,6 @@ open FsSpreadsheet.Js
 open ARCtrl
 open ARCtrl.Spreadsheet
 open ARCtrl.Json
-
 module Spreadsheet =
 
     module Helper =
@@ -26,10 +25,12 @@ module Spreadsheet =
         /// <param name="model"></param>
         /// <param name="cmd"></param>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
-            //This will cache the most up to date table state to local storage.
-            //This is used as a simple autosave feature.
-            let snapshotJsonString = state.ToJsonString()
-            Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
+
+            if model.PersistentStorageState.Autosave then
+                let snapshotJsonString = state.ToJsonString()
+                //This will cache the most up to date table state to local storage.
+                //This is used as a simple autosave feature.
+                Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
 
             //This matchcase handles undo / redo functionality
             match msg with
@@ -39,6 +40,7 @@ module Spreadsheet =
             | _ ->
                 let newCmd =
                     if model.PersistentStorageState.Autosave then
+                        let snapshotJsonString = state.ToJsonString()
                         Cmd.OfPromise.either
                             model.History.SaveSessionSnapshotIndexedDB
                             (snapshotJsonString)
@@ -70,7 +72,6 @@ module Spreadsheet =
                 state, model, newCmd
 
     let update (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
-
         //let createPromiseCmd (func: unit -> Spreadsheet.Model) =
         //    let nextState() = promise {
         //        return func()
