@@ -89,9 +89,13 @@ module JsonImportHelper =
                     let activeTable = existingTables.[i]
                     let selectedColumnTables = createUpdatedTables importTables importState deselectedColumns (Some false) |> Array.ofSeq |> Array.rev
                     /// Everything will be appended against this table, which in the end will be appended to the main table
+                    // Remove duplicate unique columns Input & Output
+                    // Keep input & output columns of active table or first table that had them when appending
                     let tempTable = activeTable.Copy()
                     for table in selectedColumnTables do
-                        let preparedTemplate = Table.distinctByHeader tempTable table
+                        let preparedTemplate =
+                            Table.distinctByHeader tempTable table
+                            |> Table.removeUniqueColumDuplicates tempTable
                         tempTable.Join(preparedTemplate, joinOptions=importState.ImportType)
                     existingTables.[i] <- tempTable
                 | _ -> ()

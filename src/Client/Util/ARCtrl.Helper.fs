@@ -119,6 +119,27 @@ module Table =
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
         tablecopy
 
+    let removeUniqueColumDuplicates (activeTable: ArcTable) (toJoinTable: ArcTable) : ArcTable =
+        // Remove existing columns
+        let mutable columnsToRemove = []
+
+        let tablecopy = toJoinTable.Copy()
+        let joinInput = tablecopy.TryGetInputColumn()
+        let joinOutput = tablecopy.TryGetOutputColumn()
+        let activeInput = activeTable.TryGetInputColumn()
+        let activeOutput = activeTable.TryGetOutputColumn()
+
+        if activeInput.IsSome && joinInput.IsSome then
+            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = joinInput.Value.Header)
+            if containsAtIndex.IsSome then
+                columnsToRemove <- containsAtIndex.Value::columnsToRemove
+        if activeOutput.IsSome && joinOutput.IsSome then
+            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = joinOutput.Value.Header)
+            if containsAtIndex.IsSome then
+                columnsToRemove <- containsAtIndex.Value::columnsToRemove
+        tablecopy.RemoveColumns (Array.ofList columnsToRemove)
+        tablecopy
+
     /// <summary>
     /// Convert one array of cell types to another one, based on the first array of cell types
     /// </summary>
@@ -150,14 +171,13 @@ module Table =
         let mutable columnsToRemove = removeColumns
         // find duplicate columns
         let tablecopy = toJoinTable.Copy()
+
         for header in activeTable.Headers do
             let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
             if containsAtIndex.IsSome then
                 columnsToRemove <- containsAtIndex.Value::columnsToRemove
 
         //Remove duplicates because unselected and already existing columns can overlap
-        let columnsToRemove = columnsToRemove |> Set.ofList |> Set.toList
-
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
 
         tablecopy.IteriColumns(fun i c0 ->
