@@ -21,14 +21,12 @@ open Feliz
 open Feliz.DaisyUI
 open ARCtrl
 
-open JsonImport
+open FileImport
 
 type Templates =
 
     [<ReactComponent>]
     static member Main (model: Model, dispatch) =
-        let isProtocolSearch, setProtocolSearch = React.useState(false)
-        let importTypeStateData = React.useState(SelectiveImportModalState.init())
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"
 
@@ -41,12 +39,12 @@ type Templates =
                 ]
             ])
 
-            if isProtocolSearch then
-                Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch, true)
-            else
-                SidebarComponents.SidebarLayout.LogicContainer [
-                    Modals.SelectiveTemplateFromDB.Main(model, false, setProtocolSearch, importTypeStateData, dispatch)
-                ]
+            SidebarComponents.SidebarLayout.LogicContainer [
+                if model.ProtocolState.ShowSearch then
+                    Protocol.SearchContainer.Main(model, dispatch)
+                else
+                    Modals.SelectiveTemplateFromDB.Main(model, dispatch)
+            ]
 
             // Box 2
             SidebarComponents.SidebarLayout.Description (Html.p [

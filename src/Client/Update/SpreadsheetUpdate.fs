@@ -116,9 +116,9 @@ module Spreadsheet =
                     | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
                 nextState, model, Cmd.none
-            | AddTemplates (tables, deselectedColumns, importType) ->
+            | AddTemplates (tables, importType) ->
                 let arcFile = model.SpreadsheetModel.ArcFile
-                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile deselectedColumns
+                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile
                 let nextState = {state with ArcFile = Some updatedArcFile}
                 nextState, model, Cmd.none
             | JoinTable (table, index, options, templateName) ->

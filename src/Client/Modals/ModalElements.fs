@@ -7,18 +7,19 @@ open Messages
 open Swate.Components.Shared
 
 open ARCtrl
-open JsonImport
+open FileImport
 open Fable.React.Helpers
 
 type ModalElements =
 
-    static member Button(text: string, onClickAction, buttonInput, ?isDisabled: bool) =
+    static member Button(text: string, onClickAction, buttonInput, ?isDisabled: bool, ?className: string) =
         let isDisabled = defaultArg isDisabled false
         Daisy.button.a [
             button.primary
-            button.wide
             if isDisabled then
                 button.error
+            if className.IsSome then
+                prop.className className.Value
             prop.disabled isDisabled
             prop.onClick (fun _ -> onClickAction buttonInput)
             prop.text text

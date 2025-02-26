@@ -248,14 +248,18 @@ module Protocol =
         // Client
         Loading             : bool
         LastUpdated         : System.DateTime option
-        // ------ Protocol from Database ------
+        ShowSearch          : bool
+        ImportConfig        : FileImport.SelectiveImportConfig
         TemplatesSelected   : ARCtrl.Template list
+        // ------ Protocol from Database ------
         Templates           : ARCtrl.Template []
     } with
         static member init () = {
             // Client
             Loading             = false
             LastUpdated         = None
+            ShowSearch          = false
+            ImportConfig        = FileImport.SelectiveImportConfig.init()
             TemplatesSelected   = []
             // ------ Protocol from Database ------
             Templates           = [||]

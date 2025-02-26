@@ -2,7 +2,7 @@ namespace OfficeInterop
 
 open Swate.Components.Shared
 open ARCtrl
-open JsonImport
+open FileImport
 
 type FillHiddenColsState =
 | Inactive
@@ -31,7 +31,7 @@ type Msg =
     | ValidateBuildingBlock
     | AddAnnotationBlock                    of CompositeColumn
     | AddAnnotationBlocks                   of CompositeColumn [] //* OfficeInterop.Types.Xml.ValidationTypes.TableValidation option
-    | AddTemplates                          of ArcTable[] * Set<int*int> * SelectiveImportModalState
+    | AddTemplates                          of ArcTable[] * SelectiveImportConfig
     | JoinTable                             of ArcTable * options: TableJoinOptions option
     | RemoveBuildingBlock
     | UpdateUnitForCells

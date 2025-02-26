@@ -6,7 +6,8 @@ open Browser.Types
 open LocalStorage.Widgets
 open Swate
 open Modals
-open Types.JsonImport
+open Types.FileImport
+open Swate.Components
 
 module private InitExtensions =
 
@@ -64,14 +65,23 @@ module private ResizeEventListener =
 
     open Fable.Core.JsInterop
 
-    let adaptElement (size: Rect) (position: Rect) setWidth setPosition =
-        let innerWidth = int Browser.Dom.window.innerWidth
+    let adaptElement (innerWidth: int) (innerHeight: int) (size: Rect) (position: Rect) setWidth setPosition =
         let combinedWidth = size.X + position.X
-        if innerWidth <= combinedWidth then
-            (Some {X = 0; Y = position.Y}) |> setPosition
+        let combinedHeight = size.Y + position.Y
         if innerWidth <= size.X then
             (Some {X = innerWidth; Y = size.Y}) |> setWidth
-            
+        let newXPosition =
+            if innerWidth <= combinedWidth then
+                System.Math.Max(0,innerWidth - size.X)
+            else
+                position.X
+        let newYPosition =
+            if innerHeight <= combinedHeight then
+                System.Math.Max(0,innerHeight - size.Y)
+            else
+                position.Y
+        setPosition (Some {X = newXPosition; Y = newYPosition})
+
 
     let onmousemove (startPosition: Rect) (startSize: Rect) setSize = fun (e: Event) ->
         let e : MouseEvent = !!e
@@ -87,11 +97,11 @@ module private ResizeEventListener =
         if element.current.IsSome then
             Size.write(prefix, {X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
-    let windowSizeChange setInnerWidth =
+    let windowSizeChange setInnerWidth setInnerHeight =
         React.useEffect(fun () ->
             let onResize _ =
                 setInnerWidth Browser.Dom.window.innerWidth
-            setInnerWidth Browser.Dom.window.innerWidth
+                setInnerHeight Browser.Dom.window.innerHeight
             Browser.Dom.window.addEventListener("resize", onResize)
             // Cleanup function to remove event listener when the component unmounts
             React.createDisposable(fun () ->
@@ -107,31 +117,33 @@ type Widget =
     | _DataAnnotator
 
     [<ReactComponent>]
-    static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit) =
+    static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, key: string) =
         let position, setPosition = React.useState(fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
         let innerWidth, setInnerWidth = React.useState(fun _ -> Browser.Dom.window.innerWidth)
+        let innerHeight, setInnerHeight = React.useState(fun _ -> Browser.Dom.window.innerHeight)
         let element = React.useElementRef()
 
-        ResizeEventListener.windowSizeChange setInnerWidth
+        ResizeEventListener.windowSizeChange setInnerWidth setInnerHeight
+
+        let debouncedAdaptElement =
+            React.useDebouncedCallback(fun () ->
+                match position, size with
+                | Some position, Some size ->
+                    ResizeEventListener.adaptElement (int innerWidth) (int innerHeight) size position setSize setPosition
+                | _, _ -> ()
+            , 100)
 
         React.useEffectOnce(fun _ ->
-            position |> Option.iter (fun position ->
-                    if size.IsSome then
-                        ResizeEventListener.adaptElement size.Value position setSize setPosition
-                )
+            debouncedAdaptElement()
         )
 
         React.useEffect(
             (fun () ->
                 //Adapt position when the size of the element is changed so that it is visible
-                position |> Option.iter (fun position ->
-                    if size.IsSome then
-                        ResizeEventListener.adaptElement size.Value position setSize setPosition
-                )
-                ()
+                debouncedAdaptElement()
                 //React shall only be used, when the size of the element is changed
-            ), [| Browser.Dom.window.innerWidth :> obj |]
+            ), [| box innerWidth; box innerHeight |]
         )
 
         React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
@@ -172,7 +184,7 @@ type Widget =
             ]
         resizeElement <| Html.div [
             prop.onMouseDown(fun e -> e.stopPropagation())
-            prop.className "cursor-default flex flex-col grow max-h-[60%] overflow-y-auto"
+            prop.className "cursor-default flex flex-col grow max-h-[60%] overflow-visible"
             prop.children [
                 Html.div [
                     prop.onMouseDown(fun e -> // move
@@ -194,7 +206,7 @@ type Widget =
                     ]
                 ]
                 Html.div [
-                    prop.className "p-2 max-h-[80vh] overflow-y-auto"
+                    prop.className "p-2 max-h-[80vh] overflow-visible flex flex-col"
                     prop.children [
                         content
                     ]
@@ -205,33 +217,20 @@ type Widget =
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
         let content = BuildingBlock.SearchComponent.Main model dispatch
         let prefix = WidgetLiterals.BuildingBlock
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)
 
     [<ReactComponent>]
-    static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
-        let isProtocolSearch, setProtocolSearch = React.useState(true)
+    static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
-        let selectContent() =
-            Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch)
-        let insertContent() =
-            Html.div [
-                prop.style [style.maxHeight (length.px 350); style.overflow.auto]
-                prop.className "flex flex-col gap-2"
-                prop.children (SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch))
-            ]
 
         let content =
-            Html.div [
-                prop.children [
-                    if isProtocolSearch then
-                        selectContent ()
-                    else
-                        insertContent ()
-                ]
-            ]
+            if model.ProtocolState.ShowSearch then
+                Protocol.SearchContainer.Main(model, dispatch)
+            else
+                SelectiveTemplateFromDB.Main(model, dispatch)
 
         let prefix = WidgetLiterals.Templates
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)
 
     static member FilePicker (model, dispatch, rmv) =
         let content = Html.div [
@@ -241,11 +240,14 @@ type Widget =
             ]
         ]
         let prefix = WidgetLiterals.FilePicker
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)
 
     static member DataAnnotator (model, dispatch, rmv) =
         let content = Html.div [
-            Pages.DataAnnotator.Main(model, dispatch)
+            prop.className "min-w-80"
+            prop.children [
+                Pages.DataAnnotator.Main(model, dispatch)
+            ]
         ]
         let prefix = WidgetLiterals.DataAnnotator
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)

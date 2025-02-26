@@ -10,7 +10,7 @@ open Feliz.DaisyUI
 
 open Modals
 
-open JsonImport
+open FileImport
 
 /// Fields of Template that can be searched
 [<RequireQualifiedAccess>]
@@ -391,7 +391,7 @@ module ComponentAux =
                             prop.children [
                                 if List.contains template model.ProtocolState.TemplatesSelected then
                                     let templates = model.ProtocolState.TemplatesSelected |> Array.ofSeq
-                                    let templateIndex = Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates                                    
+                                    let templateIndex = Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates
                                     Daisy.button.a [
                                         button.sm
                                         prop.onClick (fun _ ->
@@ -555,15 +555,13 @@ type Search =
                 ]
         ]
 
-    static member SelectTemplatesButton(model, setProtocolSearch, importTypeStateData, dispatch) =
-        let importTypeState, setImportTypeState = importTypeStateData
+    static member SelectTemplatesButton(model: Model.Model, dispatch) =
         Html.div [
             prop.className "flex justify-center gap-2"
             prop.children [
                 Daisy.button.a [
                     button.wide
                     prop.onClick (fun _ ->
-                        setProtocolSearch false
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                     )
                     if model.ProtocolState.TemplatesSelected.Length > 0 then
@@ -580,7 +578,8 @@ type Search =
         let maxheight = defaultArg maxheight (length.px 600)
         let showIds, setShowIds = React.useState(fun _ -> [])
         Html.div [
-            prop.style [style.overflow.auto; style.maxHeight maxheight]
+            prop.style [style.maxHeight maxheight]
+            prop.className "shrink overflow-y-auto"
             prop.children [
                 Daisy.table [
                     table.zebra

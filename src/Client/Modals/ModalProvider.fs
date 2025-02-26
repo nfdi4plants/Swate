@@ -23,7 +23,7 @@ type ModalProvider =
         | TableModals.TermDetails term ->
             Modals.TermModal.Main (term, dispatch)
         | TableModals.SelectiveFileImport arcfile ->
-            Modals.SelectiveImportModal.Main (arcfile, dispatch)
+            Modals.SelectiveImportModal.Main (arcfile, model, dispatch)
         | TableModals.BatchUpdateColumnValues (columnIndex, column) ->
             Modals.UpdateColumn.Main (columnIndex, column, dispatch)
         | TableModals.TableCellContext (mouseX, mouseY, ci, ri) ->

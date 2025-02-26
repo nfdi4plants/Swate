@@ -396,15 +396,15 @@ type FormComponents =
         let sensors = DndKit.useSensors [|
             DndKit.useSensor(DndKit.PointerSensor)
         |]
-        /// This is guid is used to force a rerender of the list when the order of the elements changes.
-        let OrderId = React.useRef (System.Guid.NewGuid())
         /// This is a list of guids that are used to keep track of the order of the elements in the list.
         /// We use "React.useMemo" to keep the guids stable unless items are added/removed or reorder happens.
         /// Without this children would be rerendered on every change (e.g. expanded publications close on publication change).
         let guids = React.useMemo (
             (fun () ->
                 ResizeArray [for _ in inputs do Guid.NewGuid()]),
-            [|box inputs.Count; box OrderId.current|]
+            [|
+                box inputs.Count
+            |]
         )
         let mkId index = guids.[index].ToString()
         let getIndexFromId (id:string) = guids.FindIndex (fun x -> x = Guid(id))
@@ -416,17 +416,15 @@ type FormComponents =
                 let newIndex = getIndexFromId (over.id)
                 DndKit.arrayMove(inputs, oldIndex, newIndex)
                 |> setter
-                // trigger rerender
-                OrderId.current <- System.Guid.NewGuid()
             ()
         let equalityFunc (props1: 'A  * ('A -> unit) * (MouseEvent -> unit)) (props2: 'A * ('A -> unit) * (MouseEvent -> unit)) =
             let (a1,_,_) = props1
             let (a2,_,_) = props2
             inputEquality a1 a2
-        let memoizedInputs = React.memo (
-            inputComponent,
-            areEqual = equalityFunc
-        )
+        // let memoizeInputs = React.memo (
+        //     inputComponent,
+        //     areEqual = equalityFunc
+        // )
         Html.div [
             prop.className "space-y-2"
             prop.children [
@@ -453,7 +451,7 @@ type FormComponents =
                                                 id,
                                                 id,
                                                 (
-                                                    memoizedInputs(
+                                                    inputComponent(
                                                         item,
                                                         (fun v ->
                                                             inputs.[i] <- v
@@ -538,7 +536,7 @@ type FormComponents =
                             Html.input [
                                 prop.disabled disabled
                                 prop.readOnly disabled
-                                prop.className "trunacte w-full"
+                                prop.className "truncate w-full"
                                 if placeholder.IsSome then prop.placeholder placeholder.Value
                                 prop.ref ref
                                 prop.onChange onChange
@@ -559,7 +557,6 @@ type FormComponents =
 
     [<ReactComponent>]
     static member OntologyAnnotationInput (input: OntologyAnnotation option, setter: OntologyAnnotation option -> unit, ?label: string, ?parent: OntologyAnnotation, ?rmv: MouseEvent -> unit) =
-        let isExtended, setIsExtended = React.useState(false)
         let portal = React.useElementRef()
         Html.div [
             prop.className "space-y-2"
@@ -578,35 +575,10 @@ type FormComponents =
                             advancedSearch = !^true,
                             fullwidth = true
                         )
-                        Components.CollapseButton(isExtended, setIsExtended)
                         if rmv.IsSome then
                             Helper.deleteButton rmv.Value
                     ]
                 ]
-                if isExtended then
-                    Html.div [
-                        prop.className "flex flex-col @md/main:flex-row gap-2"
-                        prop.children [
-                            FormComponents.TextInput(
-                                input|> (Option.bind _.TermSourceREF >> Option.defaultValue ""),
-                                (fun (s: string) ->
-                                    let s = s |> Option.whereNot String.IsNullOrWhiteSpace
-                                    let input = input
-                                    input |> Option.iter (fun x -> x.TermSourceREF <- s)
-                                    input |> setter),
-                                placeholder="term source ref"
-                            )
-                            FormComponents.TextInput(
-                                input|> (Option.bind _.TermAccessionNumber >> Option.defaultValue ""),
-                                (fun s0 ->
-                                    let s = s0 |> Option.whereNot String.IsNullOrWhiteSpace
-                                    input |> Option.iter (fun x -> x.TermAccessionNumber <- s)
-                                    input |> setter
-                                ),
-                                placeholder="term accession number"
-                            )
-                        ]
-                    ]
             ]
         ]
 

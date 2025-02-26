@@ -113,7 +113,7 @@ module private DataAnnotatorHelper =
                     ]
                     Html.input [
                         prop.title fileName
-                        prop.className "input input-bordered input-disabled join-item grow"
+                        prop.className "input input-bordered input-disabled join-item grow w-full"
                         prop.value fileName
                         prop.readOnly true
                     ]

@@ -76,24 +76,27 @@ module private Components =
 
     let PreviewTable(column: CompositeColumn, cellValues: string [], regex) =
         Html.div [
-            Daisy.label [
-                Daisy.labelText "Preview"
-            ]
-            Html.div [
-                prop.className "overflow-x-auto grow"
-                prop.children [
-                    Daisy.table [
-                        Html.thead [
-                            Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
-                        ]
-                        Html.tbody [
-                            let previewCount = 5
-                            let preview = Array.takeSafe previewCount cellValues
-                            for i in 0 .. (preview.Length-1) do
-                                let cell0 = column.Cells.[i].ToString()
-                                let cell = preview.[i]
-                                let regexMarkedIndex = calculateRegex regex cell0
-                                PreviewRow(i,cell0,cell,regexMarkedIndex)
+            prop.className "shrink-1 overflow-y-auto"
+            prop.children [
+                Daisy.label [
+                    Daisy.labelText "Preview"
+                ]
+                Html.div [
+                    prop.className "overflow-x-auto grow"
+                    prop.children [
+                        Daisy.table [
+                            Html.thead [
+                                Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
+                            ]
+                            Html.tbody [
+                                let previewCount = 5
+                                let preview = Array.takeSafe previewCount cellValues
+                                for i in 0 .. (preview.Length-1) do
+                                    let cell0 = column.Cells.[i].ToString()
+                                    let cell = preview.[i]
+                                    let regexMarkedIndex = calculateRegex regex cell0
+                                    PreviewRow(i,cell0,cell,regexMarkedIndex)
+                            ]
                         ]
                     ]
                 ]
@@ -121,6 +124,7 @@ type UpdateColumn =
                 ]
                 Daisy.input [
                     input.bordered
+                    prop.className "input-xs sm:input-sm md:input-md"
                     prop.autoFocus true
                     prop.valueOrDefault baseStr
                     prop.onChange(fun s ->
@@ -178,6 +182,7 @@ type UpdateColumn =
                     Daisy.input [
                         prop.autoFocus true
                         input.bordered
+                        prop.className "input-xs sm:input-sm md:input-md"
                         prop.valueOrDefault regex
                         prop.onChange (fun s ->
                             setRegex s;
@@ -191,6 +196,7 @@ type UpdateColumn =
                     ]
                     Daisy.input [
                         input.bordered
+                        prop.className "input-xs sm:input-sm md:input-md"
                         prop.valueOrDefault replacement
                         prop.onChange (fun s ->
                             setReplacement s;
@@ -226,32 +232,37 @@ type UpdateColumn =
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
                 Daisy.modalBox.div [
-                    prop.style [style.maxHeight(length.percent 70); style.maxWidth(length.px 900); style.overflowY.hidden]
+                    prop.className "max-h-screen max-w-4xl flex"
                     prop.children [
                         Daisy.card [
+                            prop.className "flex"
+                            card.compact
                             prop.children [
                                 Daisy.cardBody [
-                                    Daisy.cardTitle [
-                                        prop.className "flex flex-row justify-between"
-                                        prop.children [
-                                            Html.p "Update Column"
-                                            Components.DeleteButton(props=[prop.onClick rmv])
+                                    prop.className "overflow-y-hidden"
+                                    prop.children [
+                                        Daisy.cardTitle [
+                                            prop.className "flex flex-row justify-between"
+                                            prop.children [
+                                                Html.p "Update Column"
+                                                Components.DeleteButton(props=[prop.onClick rmv])
+                                            ]
                                         ]
-                                    ]
-                                    Components.TabNavigation(currentPage, setPage)
-                                    match currentPage with
-                                    | FunctionPage.Create -> UpdateColumn.CreateForm(getCellStrings(), setPreview)
-                                    | FunctionPage.Update -> UpdateColumn.UpdateForm(getCellStrings(), setPreview, regex, setRegex)
-                                    Components.PreviewTable(column, preview, regex)
-                                    Daisy.cardActions [
-                                        Daisy.button.button [
-                                            button.info
-                                            prop.style [style.marginLeft length.auto]
-                                            prop.text "Submit"
-                                            prop.onClick(fun e ->
-                                                submit()
-                                                rmv e
-                                            )
+                                        Components.TabNavigation(currentPage, setPage)
+                                        match currentPage with
+                                        | FunctionPage.Create -> UpdateColumn.CreateForm(getCellStrings(), setPreview)
+                                        | FunctionPage.Update -> UpdateColumn.UpdateForm(getCellStrings(), setPreview, regex, setRegex)
+                                        Components.PreviewTable(column, preview, regex)
+                                        Daisy.cardActions [
+                                            Daisy.button.button [
+                                                button.info
+                                                prop.style [style.marginLeft length.auto]
+                                                prop.text "Submit"
+                                                prop.onClick(fun e ->
+                                                    submit()
+                                                    rmv e
+                                                )
+                                            ]
                                         ]
                                     ]
                                 ]
