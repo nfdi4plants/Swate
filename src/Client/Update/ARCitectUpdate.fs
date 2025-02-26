@@ -19,6 +19,7 @@ module ARCitect =
         | ARCitect.Init msg ->
             match msg with
             | Start () ->
+                log "ARCitect.Init.Start"
                 let cmd =
                     Cmd.OfPromise.either
                         api.Init

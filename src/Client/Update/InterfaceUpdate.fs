@@ -107,7 +107,6 @@ module Interface =
                         Cmd.none
                     | Swatehost.ARCitect ->
                         LocalHistory.Model.ResetHistoryWebStorage()
-                        Spreadsheet.Model.initHistoryIndexedDB() |> Promise.start
                         Start() |> ARCitect.Init |> ARCitectMsg |> Cmd.ofMsg
                 /// Updates from local storage if standalone in browser
                 let nextModel = model.UpdateFromLocalStorage()
