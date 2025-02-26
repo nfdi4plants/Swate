@@ -64,14 +64,13 @@ module private ResizeEventListener =
 
     open Fable.Core.JsInterop
 
-    let adaptElement (size: Rect) (position: Rect) setWidth setPosition =
-        let innerWidth = int Browser.Dom.window.innerWidth
+    let adaptElement (innerWidth: int) (size: Rect) (position: Rect) setWidth setPosition =
         let combinedWidth = size.X + position.X
-        if innerWidth <= combinedWidth then
-            (Some {X = 0; Y = position.Y}) |> setPosition
         if innerWidth <= size.X then
             (Some {X = innerWidth; Y = size.Y}) |> setWidth
-            
+        if innerWidth <= combinedWidth then
+            (Some {X = System.Math.Max(0,innerWidth - size.X); Y = position.Y}) |> setPosition
+
 
     let onmousemove (startPosition: Rect) (startSize: Rect) setSize = fun (e: Event) ->
         let e : MouseEvent = !!e
@@ -107,7 +106,7 @@ type Widget =
     | _DataAnnotator
 
     [<ReactComponent>]
-    static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit) =
+    static member Base(content: ReactElement, prefix: string, rmv: MouseEvent -> unit, key: string) =
         let position, setPosition = React.useState(fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
         let innerWidth, setInnerWidth = React.useState(fun _ -> Browser.Dom.window.innerWidth)
@@ -117,9 +116,9 @@ type Widget =
 
         React.useEffectOnce(fun _ ->
             position |> Option.iter (fun position ->
-                    if size.IsSome then
-                        ResizeEventListener.adaptElement size.Value position setSize setPosition
-                )
+                if size.IsSome then
+                    ResizeEventListener.adaptElement (int innerWidth) size.Value position setSize setPosition
+            )
         )
 
         React.useEffect(
@@ -127,11 +126,11 @@ type Widget =
                 //Adapt position when the size of the element is changed so that it is visible
                 position |> Option.iter (fun position ->
                     if size.IsSome then
-                        ResizeEventListener.adaptElement size.Value position setSize setPosition
+                        ResizeEventListener.adaptElement (int innerWidth) size.Value position setSize setPosition
                 )
                 ()
                 //React shall only be used, when the size of the element is changed
-            ), [| Browser.Dom.window.innerWidth :> obj |]
+            ), [| box innerWidth |]
         )
 
         React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
@@ -172,7 +171,7 @@ type Widget =
             ]
         resizeElement <| Html.div [
             prop.onMouseDown(fun e -> e.stopPropagation())
-            prop.className "cursor-default flex flex-col grow max-h-[60%] overflow-y-auto"
+            prop.className "cursor-default flex flex-col grow max-h-[60%] overflow-visible"
             prop.children [
                 Html.div [
                     prop.onMouseDown(fun e -> // move
@@ -194,7 +193,7 @@ type Widget =
                     ]
                 ]
                 Html.div [
-                    prop.className "p-2 max-h-[80vh] overflow-y-auto"
+                    prop.className "p-2 max-h-[80vh] overflow-visible"
                     prop.children [
                         content
                     ]
@@ -205,7 +204,7 @@ type Widget =
     static member BuildingBlock (model, dispatch, rmv: MouseEvent -> unit) =
         let content = BuildingBlock.SearchComponent.Main model dispatch
         let prefix = WidgetLiterals.BuildingBlock
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)
 
     [<ReactComponent>]
     static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
@@ -231,7 +230,7 @@ type Widget =
             ]
 
         let prefix = WidgetLiterals.Templates
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)
 
     static member FilePicker (model, dispatch, rmv) =
         let content = Html.div [
@@ -241,11 +240,11 @@ type Widget =
             ]
         ]
         let prefix = WidgetLiterals.FilePicker
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)
 
     static member DataAnnotator (model, dispatch, rmv) =
         let content = Html.div [
             Pages.DataAnnotator.Main(model, dispatch)
         ]
         let prefix = WidgetLiterals.DataAnnotator
-        Widget.Base(content, prefix, rmv)
+        Widget.Base(content, prefix, rmv, prefix)
