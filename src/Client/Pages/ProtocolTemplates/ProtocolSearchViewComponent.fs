@@ -555,7 +555,7 @@ type Search =
                 ]
         ]
 
-    static member SelectTemplatesButton(model, setProtocolSearch, importTypeStateData, dispatch) =
+    static member SelectTemplatesButton(model, setProtocolSearch, (importTypeStateData: SelectiveImportModalState * (SelectiveImportModalState -> unit)), dispatch) =
         let importTypeState, setImportTypeState = importTypeStateData
         Html.div [
             prop.className "flex justify-center gap-2"
@@ -564,6 +564,12 @@ type Search =
                     button.wide
                     prop.onClick (fun _ ->
                         setProtocolSearch false
+                        let mutable temp = []
+                        for templateIndex in 0..model.ProtocolState.TemplatesSelected.Length-1 do
+                            //Add all tables that could be imported to the list
+                            let newImportTable: ImportTable = {Index = templateIndex; FullImport = false}
+                            temp <- newImportTable :: temp
+                        {importTypeState with ImportTables = temp} |> setImportTypeState
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
                     )
                     if model.ProtocolState.TemplatesSelected.Length > 0 then

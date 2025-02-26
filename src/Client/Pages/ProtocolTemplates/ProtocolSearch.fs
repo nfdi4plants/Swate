@@ -9,6 +9,8 @@ open Feliz.DaisyUI
 open Modals
 open Swate.Components.Shared
 
+open JsonImport
+
 module private HelperProtocolSearch =
 
     let breadcrumbEle (model: Model) setIsProtocolSearch dispatch =
@@ -30,7 +32,7 @@ open Fable.Core
 type SearchContainer =
 
     [<ReactComponent>]
-    static member Main(model:Model, setProtocolSearch, importTypeStateData, dispatch, ?hasBreadCrumps) =
+    static member Main(model:Model, setProtocolSearch, (importTypeStateData: SelectiveImportModalState * (SelectiveImportModalState -> unit)), dispatch, ?hasBreadCrumps) =
         let hasBreadCrumps = defaultArg hasBreadCrumps false
         let templates, setTemplates = React.useState(model.ProtocolState.Templates)
         let config, setConfig = React.useState(TemplateFilterConfig.init)
