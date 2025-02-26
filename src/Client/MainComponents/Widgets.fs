@@ -245,7 +245,10 @@ type Widget =
 
     static member DataAnnotator (model, dispatch, rmv) =
         let content = Html.div [
-            Pages.DataAnnotator.Main(model, dispatch)
+            prop.className "min-w-80"
+            prop.children [
+                Pages.DataAnnotator.Main(model, dispatch)
+            ]
         ]
         let prefix = WidgetLiterals.DataAnnotator
         Widget.Base(content, prefix, rmv, prefix)
