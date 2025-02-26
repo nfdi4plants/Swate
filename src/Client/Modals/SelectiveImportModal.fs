@@ -114,6 +114,7 @@ type SelectiveImportModal =
         let guid = React.useMemo(fun () -> System.Guid.NewGuid().ToString())
         let radioGroup = "radioGroup_" + guid
         let import = state.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
+        log("state.ImportTables", state.ImportTables.Length)
         let isActive = import.IsSome
         let isDisabled = state.ImportMetadata
         ModalElements.Box (name, "fa-solid fa-table", React.fragment [
@@ -171,7 +172,7 @@ type SelectiveImportModal =
                 {
                     importDataState with
                         ImportMetadata  = true;
-                        ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
+                        ImportTables    = [for ti in 0..tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
                 } |> setImportDataState
             else
                 SelectiveImportModalState.init() |> setImportDataState
