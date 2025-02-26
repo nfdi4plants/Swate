@@ -12,7 +12,7 @@ module Feliz =
     | Ok of 's
     | Error of exn
 
-module JsonImport =
+module FileImport =
 
     [<RequireQualifiedAccess>]
     type ImportTable = {
@@ -21,7 +21,7 @@ module JsonImport =
         FullImport: bool
     }
 
-    type SelectiveImportModalState = {
+    type SelectiveImportConfig = {
         ImportType: ARCtrl.TableJoinOptions
         ImportMetadata: bool
         ImportTables: ImportTable list
@@ -37,11 +37,14 @@ module JsonImport =
                 TemplateName = None
             }
 
-        member this.toggleDeselectedColumns(tableIndex: int, columnIndex: int) =
-            if Set.contains (tableIndex, columnIndex) this.DeselectedColumns then
-                Set.remove (tableIndex, columnIndex) this.DeselectedColumns
-            else
-                Set.add (tableIndex, columnIndex) this.DeselectedColumns
+        member this.toggleDeselectColumn(tableIndex: int, columnIndex: int) : SelectiveImportConfig =
+            { this with
+                DeselectedColumns =
+                    if Set.contains (tableIndex, columnIndex) this.DeselectedColumns then
+                        Set.remove (tableIndex, columnIndex) this.DeselectedColumns
+                    else
+                        Set.add (tableIndex, columnIndex) this.DeselectedColumns
+            }
 
 open Fable.Core
 

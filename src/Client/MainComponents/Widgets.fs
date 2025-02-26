@@ -6,7 +6,7 @@ open Browser.Types
 open LocalStorage.Widgets
 open Swate
 open Modals
-open Types.JsonImport
+open Types.FileImport
 open Swate.Components
 
 module private InitExtensions =
@@ -220,15 +220,14 @@ type Widget =
         Widget.Base(content, prefix, rmv, prefix)
 
     [<ReactComponent>]
-    static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
-        let isProtocolSearch, setProtocolSearch = React.useState(true)
+    static member Templates (model: Model, dispatch, rmv: MouseEvent -> unit) =
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
 
         let content =
-            if isProtocolSearch then
-                Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch)
+            if model.ProtocolState.ShowSearch then
+                Protocol.SearchContainer.Main(model, dispatch)
             else
-                SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch)
+                SelectiveTemplateFromDB.Main(model, dispatch)
 
         let prefix = WidgetLiterals.Templates
         Widget.Base(content, prefix, rmv, prefix)

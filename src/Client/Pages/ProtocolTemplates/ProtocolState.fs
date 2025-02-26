@@ -10,18 +10,22 @@ module Protocol =
     open Swate.Components.Shared
     open Fable.Core
 
-    let update (fujMsg:Protocol.Msg) (state: Protocol.Model) (model: Model.Model) : Protocol.Model * Cmd<Messages.Msg> =
+    let update (msg:Protocol.Msg) (state: Protocol.Model) (model: Model.Model) : Protocol.Model * Model.Model * Cmd<Messages.Msg> =
 
-        match fujMsg with
+        match msg with
         | UpdateLoading next ->
-            {state with Loading = next}, Cmd.none
+            {state with Loading = next}, model, Cmd.none
+        | UpdateShowSearch next ->
+            {state with ShowSearch = next}, model, Cmd.none
+        | UpdateImportConfig next ->
+            {state with ImportConfig = next}, model, Cmd.none
         // ------ Protocol from Database ------
         | GetAllProtocolsRequest ->
             let now = System.DateTime.UtcNow
             let olderThanOneHour = state.LastUpdated |> Option.map (fun last -> (now - last) > System.TimeSpan(1,0,0))
             let cmd =
                 if olderThanOneHour.IsNone || olderThanOneHour.Value then GetAllProtocolsForceRequest |> ProtocolMsg |> Cmd.ofMsg else Cmd.none
-            state, cmd
+            state, model, cmd
         | GetAllProtocolsForceRequest ->
             let nextState = {state with Loading = true}
             let cmd =
@@ -31,7 +35,7 @@ module Protocol =
                     ()
                     (GetAllProtocolsResponse >> ProtocolMsg)
                     (curry GenericError updateRequestStateOnErrorCmd >> DevMsg)
-            nextState, cmd
+            nextState, model, cmd
         | GetAllProtocolsResponse protocolsJson ->
             let state = {state with Loading = false}
             let templates =
@@ -46,19 +50,25 @@ module Protocol =
                     let nextState = { state with LastUpdated = Some System.DateTime.UtcNow }
                     nextState, UpdateTemplates t |> ProtocolMsg |> Cmd.ofMsg
                 | Result.Error e -> state, GenericError (Cmd.none,e) |> DevMsg |> Cmd.ofMsg
-            nextState, cmd
+            nextState, model, cmd
         | UpdateTemplates templates ->
             let nextState = {
                 state with
                     Templates = templates
             }
-            nextState, Cmd.none
+            nextState, model, Cmd.none
         | SelectProtocols prots ->
-            let nextModel = {
-                model with
-                    Model.ProtocolState.TemplatesSelected = prots
+            let importArr: Types.FileImport.ImportTable list = List.init prots.Length (fun i -> { Index = i; FullImport = false })
+            let nextState = {
+                state with
+                    TemplatesSelected = prots //
+                    ShowSearch = false // Switch to config view
+                    ImportConfig = { // default append all selected templates
+                        Types.FileImport.SelectiveImportConfig.init() with
+                            ImportTables = importArr
+                        }
             }
-            state, Cmd.ofMsg (UpdateModel nextModel)
+            nextState, model, Cmd.none
         | AddProtocol prot ->
             let templates =
                 if List.contains prot model.ProtocolState.TemplatesSelected then
@@ -69,7 +79,7 @@ module Protocol =
                 state with
                     TemplatesSelected = templates
             }
-            nextState, Cmd.none
+            nextState, model, Cmd.none
         | ProtocolIncreaseTimesUsed templateId ->
             failwith "ParseUploadedFileRequest IS NOT IMPLEMENTED YET"
             //let cmd =
@@ -77,7 +87,7 @@ module Protocol =
             //        Api.templateApi.increaseTimesUsedById
             //        templateId
             //        (curry GenericError Cmd.none >> DevMsg)
-            state, Cmd.none
+            state, model, Cmd.none
 
         // Client
         | RemoveSelectedProtocols ->
@@ -85,4 +95,4 @@ module Protocol =
                 state with
                     TemplatesSelected   = []
             }
-            nextState, Cmd.none
+            nextState, model, Cmd.none

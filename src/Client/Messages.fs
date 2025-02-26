@@ -81,16 +81,19 @@ module BuildingBlock =
 module Protocol =
 
     type Msg =
-        // Client
-        | UpdateTemplates               of Template []
+        // UI
+        | UpdateShowSearch              of bool
+        | UpdateImportConfig            of Types.FileImport.SelectiveImportConfig
         | UpdateLoading                 of bool
+        //
+        | UpdateTemplates               of Template []
+        | SelectProtocols               of Template list
+        | AddProtocol                   of Template
         | RemoveSelectedProtocols
         // // ------ Protocol from Database ------
         | GetAllProtocolsForceRequest
         | GetAllProtocolsRequest
         | GetAllProtocolsResponse       of string
-        | SelectProtocols               of Template list
-        | AddProtocol                   of Template
         | ProtocolIncreaseTimesUsed     of protocolName:string
 
 type SettingsDataStewardMsg =

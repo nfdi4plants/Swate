@@ -205,7 +205,7 @@ module GetHandler =
     /// <param name="tablesToAdd"></param>
     /// <param name="selectedColumnsCollection"></param>
     /// <param name="importTables"></param>
-    let selectTablesToAdd (tablesToAdd: ArcTable []) (importTables: JsonImport.ImportTable list) =
+    let selectTablesToAdd (tablesToAdd: ArcTable []) (importTables: FileImport.ImportTable list) =
 
         let importData =
             importTables
@@ -1178,7 +1178,7 @@ type Main =
     /// <param name="tableToAdd"></param>
     /// <param name="index"></param>
     /// <param name="options"></param>
-    static member joinTables (tablesToAdd: ArcTable [], deselectedColumnsCollection: Set<int*int>, options: TableJoinOptions option, importTables: JsonImport.ImportTable list, ?context0) =
+    static member joinTables (tablesToAdd: ArcTable [], deselectedColumnsCollection: Set<int*int>, options: TableJoinOptions option, importTables: FileImport.ImportTable list, ?context0) =
         excelRunWith context0 <| fun context ->
             promise {
                 //When a name is available get the annotation and arctable for easy access of indices and value adaption
