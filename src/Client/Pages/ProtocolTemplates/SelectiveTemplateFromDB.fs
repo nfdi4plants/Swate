@@ -110,7 +110,7 @@ type SelectiveTemplateFromDB =
             let templates = model.ProtocolState.TemplatesSelected
             if templates.Length = 0 then
                 failwith "No template selected!"
-            if model.ProtocolState.TemplatesSelected.Length > 0 then
+            else
                 let importTables = templates |> List.map (fun item -> item.Table) |> Array.ofList
                 SpreadsheetInterface.AddTemplates(importTables, model.ProtocolState.ImportConfig) |> InterfaceMsg |> dispatch
 
