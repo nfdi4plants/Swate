@@ -206,7 +206,7 @@ type Widget =
                     ]
                 ]
                 Html.div [
-                    prop.className "p-2 max-h-[80vh] overflow-visible"
+                    prop.className "p-2 max-h-[80vh] overflow-visible flex flex-col"
                     prop.children [
                         content
                     ]
@@ -223,24 +223,12 @@ type Widget =
     static member Templates (model: Model, importTypeStateData, dispatch, rmv: MouseEvent -> unit) =
         let isProtocolSearch, setProtocolSearch = React.useState(true)
         React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
-        let selectContent() =
-            Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch)
-        let insertContent() =
-            Html.div [
-                prop.style [style.maxHeight (length.px 350); style.overflow.auto]
-                prop.className "flex flex-col gap-2"
-                prop.children (SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch))
-            ]
 
         let content =
-            Html.div [
-                prop.children [
-                    if isProtocolSearch then
-                        selectContent ()
-                    else
-                        insertContent ()
-                ]
-            ]
+            if isProtocolSearch then
+                Protocol.SearchContainer.Main(model, setProtocolSearch, importTypeStateData, dispatch)
+            else
+                SelectiveTemplateFromDB.Main(model, true, setProtocolSearch, importTypeStateData, dispatch)
 
         let prefix = WidgetLiterals.Templates
         Widget.Base(content, prefix, rmv, prefix)

@@ -11,7 +11,7 @@ open OfficeInterop.Core
 type SelectiveTemplateFromDB =
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="adaptTableName"></param>
     /// <param name="setAdaptTableName"></param>
@@ -31,7 +31,7 @@ type SelectiveTemplateFromDB =
         ]
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
@@ -50,7 +50,7 @@ type SelectiveTemplateFromDB =
         ]
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="selectedTemplate"></param>
     /// <param name="templateIndex"></param>
@@ -73,7 +73,7 @@ type SelectiveTemplateFromDB =
         ]
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="importState"></param>
     /// <param name="activeTableIndex"></param>
@@ -96,7 +96,7 @@ type SelectiveTemplateFromDB =
         |> ResizeArray
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="name"></param>
     /// <param name="model"></param>
@@ -123,7 +123,7 @@ type SelectiveTemplateFromDB =
         ]
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
@@ -136,32 +136,40 @@ type SelectiveTemplateFromDB =
             {importTypeState with ImportTables = newImportTables} |> setImportTypeState
         let rmvTableImport = fun index ->
             {importTypeState with ImportTables = importTypeState.ImportTables |> List.filter (fun it -> it.Index <> index)} |> setImportTypeState
-        React.fragment [
-            Html.div [
-                SelectiveTemplateFromDB.ToProtocolSearchElement(model, setProtocolSearch, dispatch)
-            ]
-            if model.ProtocolState.TemplatesSelected.Length > 0 then
-                SelectiveImportModal.RadioPluginsBox(
-                    "Import Type",
-                    "fa-solid fa-cog",
-                    importTypeState.ImportType,
-                    "importType",
-                    [|
-                        ARCtrl.TableJoinOptions.Headers, " Column Headers";
-                        ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
-                        ARCtrl.TableJoinOptions.WithValues, " ..With Values";
-                    |],
-                    fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
-                )
+        Html.div [
+            prop.className "flex flex-col gap-2 lg:gap-4 overflow-hidden"
+            prop.children [
 
-            if model.ProtocolState.TemplatesSelected.Length > 0 then
-                let templates = model.ProtocolState.TemplatesSelected
-                for templateIndex in 0..templates.Length-1 do
-                    let template = templates.[templateIndex]
-                    SelectiveImportModal.TableImport(
-                        templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, importTypeState, setImportTypeState, template.Name)
                 Html.div [
-                    SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton(
-                        "Import", model, importTypeState, setImportTypeState, protocolSearchState, setProtocolSearch, dispatch)
+                    SelectiveTemplateFromDB.ToProtocolSearchElement(model, setProtocolSearch, dispatch)
                 ]
+                if model.ProtocolState.TemplatesSelected.Length > 0 then
+                    Html.div [
+                        prop.className "flex gap-2 flex-col shrink overflow-y-auto"
+                        prop.children [
+
+                            SelectiveImportModal.RadioPluginsBox(
+                                "Import Type",
+                                "fa-solid fa-cog",
+                                importTypeState.ImportType,
+                                "importType",
+                                [|
+                                    ARCtrl.TableJoinOptions.Headers, " Column Headers";
+                                    ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
+                                    ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                                |],
+                                fun importType -> {importTypeState with ImportType = importType} |> setImportTypeState
+                            )
+
+                            for templateIndex in 0..model.ProtocolState.TemplatesSelected.Length-1 do
+                                let template = model.ProtocolState.TemplatesSelected.[templateIndex]
+                                SelectiveImportModal.TableImport(
+                                    templateIndex, template.Table, importTypeState, addTableImport, rmvTableImport, importTypeState, setImportTypeState, template.Name)
+                            Html.div [
+                                SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton(
+                                    "Import", model, importTypeState, setImportTypeState, protocolSearchState, setProtocolSearch, dispatch)
+                            ]
+                        ]
+                    ]
+            ]
         ]

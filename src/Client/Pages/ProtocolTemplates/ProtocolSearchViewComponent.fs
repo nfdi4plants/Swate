@@ -391,7 +391,7 @@ module ComponentAux =
                             prop.children [
                                 if List.contains template model.ProtocolState.TemplatesSelected then
                                     let templates = model.ProtocolState.TemplatesSelected |> Array.ofSeq
-                                    let templateIndex = Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates                                    
+                                    let templateIndex = Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates
                                     Daisy.button.a [
                                         button.sm
                                         prop.onClick (fun _ ->
@@ -580,7 +580,8 @@ type Search =
         let maxheight = defaultArg maxheight (length.px 600)
         let showIds, setShowIds = React.useState(fun _ -> [])
         Html.div [
-            prop.style [style.overflow.auto; style.maxHeight maxheight]
+            prop.style [style.maxHeight maxheight]
+            prop.className "shrink overflow-y-auto"
             prop.children [
                 Daisy.table [
                     table.zebra
