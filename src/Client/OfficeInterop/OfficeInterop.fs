@@ -948,8 +948,9 @@ module UpdateHandler =
             let rec loop (originTable: ArcTable) (tablesToAdd: ArcTable []) (deselectedColumns: Set<int*int>) (options: TableJoinOptions option) i =
                 let tableToAdd = tablesToAdd.[i]
                 let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumns i
-                let refinedTableToAdd = Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
-
+                let refinedTableToAdd =
+                    let temp = Table.distinctByHeader originTable tableToAdd
+                    Table.selectiveTablePrepare originTable temp deselectedColumnIndices
                 let newTable =
                     if i > 0 then
                         originTable.Join(refinedTableToAdd, ?joinOptions=options, forceReplace=true)

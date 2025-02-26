@@ -113,7 +113,12 @@ module Table =
         // find duplicate columns
         let tablecopy = toJoinTable.Copy()
         for header in activeTable.Headers do
-            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
+            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> 
+                let isEqual = h = header
+                let isInput = h.isInput && header.isInput
+                let isOutput = h.isOutput && header.isOutput
+                isEqual || isInput || isOutput
+            )
             if containsAtIndex.IsSome then
                 columnsToRemove <- containsAtIndex.Value::columnsToRemove
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
@@ -150,14 +155,13 @@ module Table =
         let mutable columnsToRemove = removeColumns
         // find duplicate columns
         let tablecopy = toJoinTable.Copy()
+
         for header in activeTable.Headers do
             let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
             if containsAtIndex.IsSome then
                 columnsToRemove <- containsAtIndex.Value::columnsToRemove
 
         //Remove duplicates because unselected and already existing columns can overlap
-        let columnsToRemove = columnsToRemove |> Set.ofList |> Set.toList
-
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
 
         tablecopy.IteriColumns(fun i c0 ->
