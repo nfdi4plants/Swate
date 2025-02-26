@@ -113,25 +113,14 @@ module Table =
         // find duplicate columns
         let tablecopy = toJoinTable.Copy()
         for header in activeTable.Headers do
-            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = header)
+            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> 
+                let isEqual = h = header
+                let isInput = h.isInput && header.isInput
+                let isOutput = h.isOutput && header.isOutput
+                isEqual || isInput || isOutput
+            )
             if containsAtIndex.IsSome then
                 columnsToRemove <- containsAtIndex.Value::columnsToRemove
-
-        let tablecopy = toJoinTable.Copy()
-        let joinInput = tablecopy.TryGetInputColumn()
-        let joinOutput = tablecopy.TryGetOutputColumn()
-        let activeInput = activeTable.TryGetInputColumn()
-        let activeOutput = activeTable.TryGetOutputColumn()
-
-        if activeInput.IsSome && joinInput.IsSome then
-            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = joinInput.Value.Header)
-            if containsAtIndex.IsSome then
-                columnsToRemove <- containsAtIndex.Value::columnsToRemove
-        if activeOutput.IsSome && joinOutput.IsSome then
-            let containsAtIndex = tablecopy.Headers |> Seq.tryFindIndex (fun h -> h = joinOutput.Value.Header)
-            if containsAtIndex.IsSome then
-                columnsToRemove <- containsAtIndex.Value::columnsToRemove
-
         tablecopy.RemoveColumns (Array.ofList columnsToRemove)
         tablecopy
 
