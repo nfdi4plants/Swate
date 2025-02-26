@@ -7,6 +7,7 @@ open LocalStorage.Widgets
 open Swate
 open Modals
 open Types.JsonImport
+open Swate.Components
 
 module private InitExtensions =
 
@@ -64,12 +65,22 @@ module private ResizeEventListener =
 
     open Fable.Core.JsInterop
 
-    let adaptElement (innerWidth: int) (size: Rect) (position: Rect) setWidth setPosition =
+    let adaptElement (innerWidth: int) (innerHeight: int) (size: Rect) (position: Rect) setWidth setPosition =
         let combinedWidth = size.X + position.X
+        let combinedHeight = size.Y + position.Y
         if innerWidth <= size.X then
             (Some {X = innerWidth; Y = size.Y}) |> setWidth
-        if innerWidth <= combinedWidth then
-            (Some {X = System.Math.Max(0,innerWidth - size.X); Y = position.Y}) |> setPosition
+        let newXPosition =
+            if innerWidth <= combinedWidth then
+                System.Math.Max(0,innerWidth - size.X)
+            else
+                position.X
+        let newYPosition =
+            if innerHeight <= combinedHeight then
+                System.Math.Max(0,innerHeight - size.Y)
+            else
+                position.Y
+        setPosition (Some {X = newXPosition; Y = newYPosition})
 
 
     let onmousemove (startPosition: Rect) (startSize: Rect) setSize = fun (e: Event) ->
@@ -86,11 +97,11 @@ module private ResizeEventListener =
         if element.current.IsSome then
             Size.write(prefix, {X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight})
 
-    let windowSizeChange setInnerWidth =
+    let windowSizeChange setInnerWidth setInnerHeight =
         React.useEffect(fun () ->
             let onResize _ =
                 setInnerWidth Browser.Dom.window.innerWidth
-            setInnerWidth Browser.Dom.window.innerWidth
+                setInnerHeight Browser.Dom.window.innerHeight
             Browser.Dom.window.addEventListener("resize", onResize)
             // Cleanup function to remove event listener when the component unmounts
             React.createDisposable(fun () ->
@@ -110,27 +121,29 @@ type Widget =
         let position, setPosition = React.useState(fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState(fun _ -> Rect.initSizeFromPrefix prefix)
         let innerWidth, setInnerWidth = React.useState(fun _ -> Browser.Dom.window.innerWidth)
+        let innerHeight, setInnerHeight = React.useState(fun _ -> Browser.Dom.window.innerHeight)
         let element = React.useElementRef()
 
-        ResizeEventListener.windowSizeChange setInnerWidth
+        ResizeEventListener.windowSizeChange setInnerWidth setInnerHeight
+
+        let debouncedAdaptElement =
+            React.useDebouncedCallback(fun () ->
+                match position, size with
+                | Some position, Some size ->
+                    ResizeEventListener.adaptElement (int innerWidth) (int innerHeight) size position setSize setPosition
+                | _, _ -> ()
+            , 100)
 
         React.useEffectOnce(fun _ ->
-            position |> Option.iter (fun position ->
-                if size.IsSome then
-                    ResizeEventListener.adaptElement (int innerWidth) size.Value position setSize setPosition
-            )
+            debouncedAdaptElement()
         )
 
         React.useEffect(
             (fun () ->
                 //Adapt position when the size of the element is changed so that it is visible
-                position |> Option.iter (fun position ->
-                    if size.IsSome then
-                        ResizeEventListener.adaptElement (int innerWidth) size.Value position setSize setPosition
-                )
-                ()
+                debouncedAdaptElement()
                 //React shall only be used, when the size of the element is changed
-            ), [| box innerWidth |]
+            ), [| box innerWidth; box innerHeight |]
         )
 
         React.useLayoutEffectOnce(fun _ -> position |> Option.iter (fun position -> MoveEventListener.ensurePositionInsideWindow element position |> Some |> setPosition)) // Reposition widget inside window
