@@ -108,10 +108,11 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, model: Model.Model, dispatch, ?templateName) =
+    static member TableImport(tableIndex: int, table0: ArcTable, model: Model.Model, dispatch, ?radiogroup, ?templateName) =
         let importConfig = model.ProtocolState.ImportConfig
         let name = defaultArg templateName table0.Name
-        let radioGroup = "RADIO_GROUP" + table0.Name + string tableIndex
+        let radiogroup = defaultArg radiogroup ""
+        let radioGroup = "RADIO_GROUP" + table0.Name + string tableIndex + radiogroup
         let import = importConfig.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
         let isActive = import.IsSome
         let isDisabled = importConfig.ImportMetadata
@@ -192,7 +193,7 @@ type SelectiveImportModal =
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
                 Daisy.modalBox.div [
-                    prop.className "w-4/5 overflow-y-auto flex flex-col @container/importModal gap-2"
+                    prop.className "w-4/5 flex flex-col @container/importModal"
                     prop.children [
                         Daisy.cardTitle [
                             prop.className "justify-between"
@@ -201,21 +202,26 @@ type SelectiveImportModal =
                                 Components.DeleteButton(props=[prop.onClick rmv])
                             ]
                         ]
-                        SelectiveImportModal.RadioPluginsBox(
-                            "Import Type",
-                            "fa-solid fa-cog",
-                            importDataState.ImportType,
-                            "importType",
-                            [|
-                                ARCtrl.TableJoinOptions.Headers,    " Column Headers";
-                                ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
-                                ARCtrl.TableJoinOptions.WithValues, " ..With Values";
-                            |],
-                            fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
-                        SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
-                        for ti in 0 .. (tables.Count-1) do
-                            let t = tables.[ti]
-                            SelectiveImportModal.TableImport(ti, t, model, dispatch)
+                        Html.div [
+                            prop.className "overflow-y-auto space-y-2"
+                            prop.children [
+                                SelectiveImportModal.RadioPluginsBox(
+                                    "Import Type",
+                                    "fa-solid fa-cog",
+                                    importDataState.ImportType,
+                                    "importType",
+                                    [|
+                                        ARCtrl.TableJoinOptions.Headers,    " Column Headers";
+                                        ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
+                                        ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                                    |],
+                                    fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
+                                SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
+                                for ti in 0 .. (tables.Count-1) do
+                                    let t = tables.[ti]
+                                    SelectiveImportModal.TableImport(ti, t, model, dispatch)
+                            ]
+                        ]
                         Daisy.cardActions [
                             Daisy.button.button [
                                 button.info

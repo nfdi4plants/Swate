@@ -43,7 +43,7 @@ type Templates =
                 if model.ProtocolState.ShowSearch then
                     Protocol.SearchContainer.Main(model, dispatch)
                 else
-                    Modals.SelectiveTemplateFromDB.Main(model, dispatch)
+                    Modals.SelectiveTemplateFromDB.Main(model, dispatch, false)
             ]
 
             // Box 2

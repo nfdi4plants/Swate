@@ -88,9 +88,9 @@ module ARCtrlHelper =
         static member fromString (str: string) =
             match str.ToLower() with
             | "arctrl" -> ARCtrl
-            | "arctrlcompressed" -> ARCtrlCompressed
+            | "arctrl compressed" -> ARCtrlCompressed
             | "isa" -> ISA
-            | "rocrate" -> ROCrate
+            | "ro-crate metadata" -> ROCrate
             | _ -> failwithf "Unknown JSON export format: %s" str
 
         member this.AsStringRdbl =

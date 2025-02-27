@@ -20,6 +20,7 @@ open ARCtrl
 open Fable.Core.JsInterop
 
 open Modals
+open Model.ModalState
 
 type private TemplateFromFileState = {
     /// User select type to upload
@@ -100,16 +101,6 @@ type TemplateFromFile =
             | ArcFilesDiscriminate.Template, JsonExportFormat.ISA -> true
             | _ -> false
         SidebarComponents.SidebarLayout.LogicContainer [
-            // modal!
-            match state.UploadedFile with
-            | Some af ->
-                Modals.SelectiveImportModal.Main (
-                    af,
-                    model,
-                    dispatch,
-                    fun _ -> setState {state with UploadedFile = None}
-                )
-            | None -> Html.none
             Html.div [
                 Daisy.join [
                     prop.className "w-full"
@@ -137,4 +128,13 @@ type TemplateFromFile =
             Html.div [
                 TemplateFromFile.FileUploadButton(state, setState, dispatch)
             ]
+
+            // modal!
+            if state.UploadedFile.IsSome then
+                TableModals.SelectiveFileImport state.UploadedFile.Value
+                |> Model.ModalState.ModalTypes.TableModal
+                |> Some
+                |> Messages.UpdateModal
+                |> dispatch
+                setState {state with UploadedFile = None}
         ]
