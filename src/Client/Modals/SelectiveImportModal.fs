@@ -144,7 +144,10 @@ type SelectiveImportModal =
                 Html.input [prop.type'.checkbox; prop.className "min-h-0 h-5"]
 
                 Daisy.collapseTitle [
-                    prop.className "p-1 min-h-0 h-5 text-success text-sm font-bold space-x-2"
+                    prop.className [
+                        "p-1 min-h-0 h-5 text-sm font-bold space-x-2"
+                        if isActive then "text-primary-content" else "text-success"
+                    ]
                     prop.children [
                         Html.span (if isActive then "Select Columns" else "Preview Table")
                         Html.i [prop.className "fa-solid fa-magnifying-glass"]
