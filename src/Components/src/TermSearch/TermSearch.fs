@@ -696,6 +696,17 @@ type TermSearch =
 
         let (modal: Modals option), setModal = React.useState None
 
+        let inputText = term |> Option.bind _.name |> Option.defaultValue ""
+
+        React.useLayoutEffect(
+            (fun () ->
+                if inputRef.current.IsSome then
+                    inputRef.current.Value.value <- inputText
+                ()
+            ),
+            [|box term|]
+        )
+
         /// Close term search result window when opening a modal
         let setModal =
             fun (modal: Modals option) ->
@@ -959,11 +970,11 @@ type TermSearch =
                                     ]
                                 ]
                                 Html.input [
-                                    prop.className "grow"
+                                    prop.className "grow shrink min-w-[50px] w-full"
                                     if debug then
                                         prop.testid "term-search-input"
                                     prop.ref(inputRef)
-                                    prop.defaultValue (term |> Option.bind _.name |> Option.defaultValue "")
+                                    prop.defaultValue inputText
                                     prop.placeholder "..."
                                     prop.autoFocus autoFocus
                                     prop.onChange (fun (e: string) ->

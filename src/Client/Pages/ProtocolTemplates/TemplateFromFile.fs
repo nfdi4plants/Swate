@@ -103,7 +103,12 @@ type TemplateFromFile =
             // modal!
             match state.UploadedFile with
             | Some af ->
-                Modals.SelectiveImportModal.Main (af, dispatch, rmv = (fun _ -> TemplateFromFileState.init() |> setState))
+                Modals.SelectiveImportModal.Main (
+                    af,
+                    model,
+                    dispatch,
+                    fun _ -> setState {state with UploadedFile = None}
+                )
             | None -> Html.none
             Html.div [
                 Daisy.join [

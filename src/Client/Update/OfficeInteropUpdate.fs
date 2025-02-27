@@ -74,11 +74,11 @@ module OfficeInterop =
                 let jsonExport = UpdateUtil.JsonExportHelper.parseToJsonString(arcfile, jef)
                 UpdateUtil.downloadFromString (jsonExport)
                 state, model, Cmd.none
-            | AddTemplates (tables, deselectedColumns, importType) ->
+            | AddTemplates (tables, importType) ->
                 let cmd =
                     Cmd.OfPromise.either
                         Main.joinTables
-                        (tables, deselectedColumns, Some importType.ImportType, importType.ImportTables)
+                        (tables, importType.DeselectedColumns, Some importType.ImportType, importType.ImportTables)
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
                 state, model, cmd
