@@ -20,20 +20,19 @@ open ARCtrl
 open Fable.Core.JsInterop
 
 open Modals
+open Model.ModalState
 
 type private TemplateFromFileState = {
     /// User select type to upload
     FileType: ArcFilesDiscriminate
     /// User selects json type to upload
     JsonFormat: JsonExportFormat
-    UploadedFile: ArcFiles option
     Loading: bool
 } with
     static member init () =
         {
             FileType = ArcFilesDiscriminate.Assay
             JsonFormat = JsonExportFormat.ROCrate
-            UploadedFile = None
             Loading = false
         }
 
@@ -54,8 +53,14 @@ module private Helper =
                     let p = Spreadsheet.IO.Json.readFromJson state.FileType state.JsonFormat r
                     do!
                         Promise.either
-                            (fun af -> setState {state with UploadedFile = Some af; Loading = false})
-                            (fun e -> GenericError (Cmd.none,e) |> DevMsg |> dispatch)
+                            (fun af ->
+                                TableModals.SelectiveFileImport af
+                                |> Model.ModalState.ModalTypes.TableModal
+                                |> Some
+                                |> Messages.UpdateModal
+                                |> dispatch
+                                setState {state with Loading = false})
+                            (fun e -> GenericError (Cmd.none, e) |> DevMsg |> dispatch)
                             p
                         |> Async.AwaitPromise
                 } |> Async.StartImmediate
@@ -100,16 +105,6 @@ type TemplateFromFile =
             | ArcFilesDiscriminate.Template, JsonExportFormat.ISA -> true
             | _ -> false
         SidebarComponents.SidebarLayout.LogicContainer [
-            // modal!
-            match state.UploadedFile with
-            | Some af ->
-                Modals.SelectiveImportModal.Main (
-                    af,
-                    model,
-                    dispatch,
-                    fun _ -> setState {state with UploadedFile = None}
-                )
-            | None -> Html.none
             Html.div [
                 Daisy.join [
                     prop.className "w-full"

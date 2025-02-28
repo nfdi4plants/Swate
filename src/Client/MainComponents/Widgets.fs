@@ -227,7 +227,7 @@ type Widget =
             if model.ProtocolState.ShowSearch then
                 Protocol.SearchContainer.Main(model, dispatch)
             else
-                SelectiveTemplateFromDB.Main(model, dispatch)
+                SelectiveTemplateFromDB.Main(model, dispatch, true)
 
         let prefix = WidgetLiterals.Templates
         Widget.Base(content, prefix, rmv, prefix)

@@ -123,11 +123,11 @@ type SelectiveTemplateFromDB =
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
     [<ReactComponent>]
-    static member Main (model: Model, dispatch) =
+    static member Main (model: Model, dispatch, isWidget) =
+        let radioGroup = if isWidget then "Widget" else ""
         Html.div [
             prop.className "flex flex-col gap-2 lg:gap-4 overflow-hidden"
             prop.children [
-
                 Html.div [
                     prop.className "grid grid-cols-2 gap-2"
                     prop.children [
@@ -147,12 +147,11 @@ type SelectiveTemplateFromDB =
                     Html.div [
                         prop.className "flex gap-2 flex-col shrink overflow-y-auto"
                         prop.children [
-
                             SelectiveImportModal.RadioPluginsBox(
                                 "Import Type",
                                 "fa-solid fa-cog",
                                 model.ProtocolState.ImportConfig.ImportType,
-                                "importType",
+                                "importType" + radioGroup,
                                 [|
                                     ARCtrl.TableJoinOptions.Headers, " Column Headers";
                                     ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
