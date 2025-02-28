@@ -27,14 +27,12 @@ type private TemplateFromFileState = {
     FileType: ArcFilesDiscriminate
     /// User selects json type to upload
     JsonFormat: JsonExportFormat
-    UploadedFile: ArcFiles option
     Loading: bool
 } with
     static member init () =
         {
             FileType = ArcFilesDiscriminate.Assay
             JsonFormat = JsonExportFormat.ROCrate
-            UploadedFile = None
             Loading = false
         }
 
@@ -55,8 +53,14 @@ module private Helper =
                     let p = Spreadsheet.IO.Json.readFromJson state.FileType state.JsonFormat r
                     do!
                         Promise.either
-                            (fun af -> setState {state with UploadedFile = Some af; Loading = false})
-                            (fun e -> GenericError (Cmd.none,e) |> DevMsg |> dispatch)
+                            (fun af ->
+                                TableModals.SelectiveFileImport af
+                                |> Model.ModalState.ModalTypes.TableModal
+                                |> Some
+                                |> Messages.UpdateModal
+                                |> dispatch
+                                setState {state with Loading = false})
+                            (fun e -> GenericError (Cmd.none, e) |> DevMsg |> dispatch)
                             p
                         |> Async.AwaitPromise
                 } |> Async.StartImmediate
@@ -128,13 +132,4 @@ type TemplateFromFile =
             Html.div [
                 TemplateFromFile.FileUploadButton(state, setState, dispatch)
             ]
-
-            // modal!
-            if state.UploadedFile.IsSome then
-                TableModals.SelectiveFileImport state.UploadedFile.Value
-                |> Model.ModalState.ModalTypes.TableModal
-                |> Some
-                |> Messages.UpdateModal
-                |> dispatch
-                setState {state with UploadedFile = None}
         ]

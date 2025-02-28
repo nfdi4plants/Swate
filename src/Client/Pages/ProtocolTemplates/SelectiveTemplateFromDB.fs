@@ -169,7 +169,6 @@ type SelectiveTemplateFromDB =
                                     template.Table,
                                     model,
                                     dispatch,
-                                    radioGroup,
                                     template.Name
                                 )
                         ]

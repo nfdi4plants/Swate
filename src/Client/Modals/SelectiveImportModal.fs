@@ -108,11 +108,11 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, model: Model.Model, dispatch, ?radiogroup, ?templateName) =
+    static member TableImport(tableIndex: int, table0: ArcTable, model: Model.Model, dispatch, ?templateName) =
         let importConfig = model.ProtocolState.ImportConfig
         let name = defaultArg templateName table0.Name
-        let radiogroup = defaultArg radiogroup ""
-        let radioGroup = "RADIO_GROUP" + table0.Name + string tableIndex + radiogroup
+        let radiogroupId = React.useMemo(System.Guid.NewGuid)
+        let radioGroup = "RADIO_GROUP" + table0.Name + string tableIndex + radiogroupId.ToString()
         let import = importConfig.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
         let isActive = import.IsSome
         let isDisabled = importConfig.ImportMetadata
