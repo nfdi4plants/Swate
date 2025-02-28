@@ -1,5 +1,6 @@
 import React from 'react';
 import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
+import Table from '../src/Table/Table.fs.ts';
 
 const App = () => {
     const [term, setTerm] = React.useState(undefined);
@@ -13,7 +14,6 @@ const App = () => {
               showDetails
               debug={true}
             /> */}
-
             <TermSearch
               onTermSelect={(term) => setTerm(term as Term | undefined)}
               term={term}
@@ -22,6 +22,8 @@ const App = () => {
               debug={true}
               advancedSearch
             />
+            <h2 className='text-3xl'>Table</h2>
+            <Table />
         </div>
     );
 };
