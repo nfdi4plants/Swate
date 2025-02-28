@@ -48,7 +48,9 @@
   "homepage": "https://github.com/nfdi4plants/Swate#readme",
   "dependencies": {
     "@fable-org/fable-library-js": "^1.8.0",
-    "@fortawesome/fontawesome-free": "^6.7.2"
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@tanstack/react-table": "^8.21.2",
+    "@tanstack/react-virtual": "^3.13.2"
   },
   "peerDependencies": {
     "react": "^18.2.0",
