@@ -169,6 +169,18 @@ module private Mock =
             createdAt = DateTime.UtcNow.AddDays(-random.Next(0, 365))
         |}
 
+    let generateStaticPersonFromId id =
+        {|
+            id = id
+            firstName = "FirstName" +  string id
+            lastName = "LastName" + string id
+            age = 42
+            visits = 88
+            progress = 100
+            status = "Active"
+            createdAt = DateTime.UtcNow.AddDays(-365)
+        |}
+
 open TanStack.Table
 open TanStack.Virtual
 
@@ -305,8 +317,8 @@ type Table =
 
         let (data: ResizeArray<Person>), setData = React.useState(fun () ->
             let ra = ResizeArray()
-            for i in 0 .. 5000 do
-                ra.Add (Mock.generatePerson i)
+            for i in 0 .. 50000 do
+                ra.Add (Mock.generateStaticPersonFromId i)
             ra
         )
 
