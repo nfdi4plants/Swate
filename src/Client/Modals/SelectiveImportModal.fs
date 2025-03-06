@@ -182,61 +182,42 @@ type SelectiveImportModal =
                 } |> setImportDataState
             else
                 SelectiveImportConfig.init() |> setImportDataState
-        let addTableImport = fun (i: int) (fullImport: bool) ->
-            let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
-            {importDataState with ImportTables = newImportTables} |> setImportDataState
-        let rmvTableImport = fun i ->
-            {importDataState with ImportTables = importDataState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportDataState
-        Daisy.modal.div [
-            modal.active
-            prop.children [
-                Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.modalBox.div [
-                    prop.className "w-4/5 flex flex-col @container/importModal"
-                    prop.children [
-                        Daisy.cardTitle [
-                            prop.className "justify-between"
-                            prop.children [
-                                Html.p "Import"
-                                Components.DeleteButton(props=[prop.onClick rmv])
-                            ]
-                        ]
-                        Html.div [
-                            prop.className "overflow-y-auto space-y-2"
-                            prop.children [
-                                SelectiveImportModal.RadioPluginsBox(
-                                    "Import Type",
-                                    "fa-solid fa-cog",
-                                    importDataState.ImportType,
-                                    "importType",
-                                    [|
-                                        ARCtrl.TableJoinOptions.Headers,    " Column Headers";
-                                        ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
-                                        ARCtrl.TableJoinOptions.WithValues, " ..With Values";
-                                    |],
-                                    fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
-                                SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
-                                for ti in 0 .. (tables.Count-1) do
-                                    let t = tables.[ti]
-                                    SelectiveImportModal.TableImport(ti, t, model, dispatch)
-                            ]
-                        ]
-                        Daisy.cardActions [
-                            Daisy.button.button [
-                                button.info
-                                prop.style [style.marginLeft length.auto]
-                                prop.text "Submit"
-                                prop.onClick(fun e ->
-                                    {| importState = importDataState; importedFile = import; deselectedColumns = importDataState.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
-                                    rmv e
-                                )
-                            ]
-                        ]
-                    ]
-                ]
+        let content =
+            [
+                SelectiveImportModal.RadioPluginsBox(
+                    "Import Type",
+                    "fa-solid fa-cog",
+                    importDataState.ImportType,
+                    "importType",
+                    [|
+                        ARCtrl.TableJoinOptions.Headers,    " Column Headers";
+                        ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
+                        ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                    |],
+                    fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
+                SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
+                for ti in 0 .. (tables.Count-1) do
+                    let t = tables.[ti]
+                    SelectiveImportModal.TableImport(ti, t, model, dispatch)
             ]
-        ]
+        let fodder =
+            Daisy.button.button [
+                button.primary
+                prop.style [style.marginLeft length.auto]
+                prop.text "Submit"
+                prop.onClick(fun e ->
+                    {| importState = importDataState; importedFile = import; deselectedColumns = importDataState.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                    rmv e
+                )
+            ]
+
+        Modals.BaseModal.Main(
+            rmv,
+            header = "Import",
+            modalClassInfo = "@container/importModal",
+            content = content,
+            fooder = fodder
+        ) 
 
     static member Main(import: ArcFiles, model, dispatch: Messages.Msg -> unit) =
         let rmv = Util.RMV_MODAL dispatch
