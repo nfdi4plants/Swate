@@ -75,28 +75,25 @@ module private Components =
         ]
 
     let PreviewTable(column: CompositeColumn, cellValues: string [], regex) =
-        Html.div [
-            prop.className "shrink-1 overflow-y-auto"
-            prop.children [
-                Daisy.label [
-                    Daisy.labelText "Preview"
-                ]
-                Html.div [
-                    prop.className "overflow-x-auto grow"
-                    prop.children [
-                        Daisy.table [
-                            Html.thead [
-                                Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
-                            ]
-                            Html.tbody [
-                                let previewCount = 5
-                                let preview = Array.takeSafe previewCount cellValues
-                                for i in 0 .. (preview.Length-1) do
-                                    let cell0 = column.Cells.[i].ToString()
-                                    let cell = preview.[i]
-                                    let regexMarkedIndex = calculateRegex regex cell0
-                                    PreviewRow(i,cell0,cell,regexMarkedIndex)
-                            ]
+        [
+            Daisy.label [
+                Daisy.labelText "Preview"
+            ]
+            Html.div [
+                prop.className "overflow-x-auto grow"
+                prop.children [
+                    Daisy.table [
+                        Html.thead [
+                            Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
+                        ]
+                        Html.tbody [
+                            let previewCount = 5
+                            let preview = Array.takeSafe previewCount cellValues
+                            for i in 0 .. (preview.Length-1) do
+                                let cell0 = column.Cells.[i].ToString()
+                                let cell = preview.[i]
+                                let regexMarkedIndex = calculateRegex regex cell0
+                                PreviewRow(i,cell0,cell,regexMarkedIndex)
                         ]
                     ]
                 ]
@@ -227,48 +224,43 @@ type UpdateColumn =
             |> fun x -> Spreadsheet.SetColumn (index, x)
             |> SpreadsheetMsg
             |> dispatch
-        Daisy.modal.div [
-            modal.active
-            prop.children [
-                Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.modalBox.div [
-                    prop.className "max-h-screen max-w-4xl flex"
-                    prop.children [
-                        Daisy.card [
-                            prop.className "flex"
-                            card.compact
-                            prop.children [
-                                Daisy.cardBody [
-                                    prop.className "overflow-y-hidden"
-                                    prop.children [
-                                        Daisy.cardTitle [
-                                            prop.className "flex flex-row justify-between"
-                                            prop.children [
-                                                Html.p "Update Column"
-                                                Components.DeleteButton(props=[prop.onClick rmv])
-                                            ]
-                                        ]
-                                        Components.TabNavigation(currentPage, setPage)
-                                        match currentPage with
-                                        | FunctionPage.Create -> UpdateColumn.CreateForm(getCellStrings(), setPreview)
-                                        | FunctionPage.Update -> UpdateColumn.UpdateForm(getCellStrings(), setPreview, regex, setRegex)
-                                        Components.PreviewTable(column, preview, regex)
-                                        Daisy.cardActions [
-                                            Daisy.button.button [
-                                                button.info
-                                                prop.style [style.marginLeft length.auto]
-                                                prop.text "Submit"
-                                                prop.onClick(fun e ->
-                                                    submit()
-                                                    rmv e
-                                                )
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
+
+        let modalActivity =
+            Html.div [
+                Components.TabNavigation(currentPage, setPage)
+                match currentPage with
+                | FunctionPage.Create -> UpdateColumn.CreateForm(getCellStrings(), setPreview)
+                | FunctionPage.Update -> UpdateColumn.UpdateForm(getCellStrings(), setPreview, regex, setRegex)
+            ]
+        let content = Components.PreviewTable(column, preview, regex)
+        let footer =
+            Html.div [
+                prop.className "justify-end flex gap-2"
+                prop.style [style.marginLeft length.auto]
+                prop.children [
+                    Daisy.button.button [
+                        prop.onClick rmv
+                        button.outline
+                        prop.text "Cancel"
+                    ]
+                    Daisy.button.button [
+                        button.primary
+                        prop.style [style.marginLeft length.auto]
+                        prop.text "Submit"
+                        prop.onClick(fun e ->
+                            submit()
+                            rmv e
+                        )
                     ]
                 ]
             ]
-        ]
+
+        Modals.BaseModal.Main(
+            rmv,
+            header = Html.p "Update Column",
+            modalClassInfo = "max-h-screen max-w-4xl flex",
+            modalActivity = modalActivity,
+            contentClassInfo = "shrink-1 overflow-y-auto",
+            content = content,
+            footer = footer
+        )
