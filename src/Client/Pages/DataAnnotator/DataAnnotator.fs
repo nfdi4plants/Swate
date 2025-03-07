@@ -14,9 +14,7 @@ module private DataAnnotatorHelper =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
             Daisy.button.button [
-                prop.className "grow"
                 prop.onClick rmvFile
-                button.outline
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     button.disabled
                 else
@@ -164,11 +162,11 @@ module private DataAnnotatorHelper =
                     UpdateSeparatorButton dispatch
                     UpdateIsHeaderCheckbox model dispatch
                     UpdateTargetColumn target setTarget
-                    ResetButton model rmvFile
+                    //ResetButton model rmvFile
                 | Spreadsheet.ActivePattern.IsDataMap ->
                     UpdateSeparatorButton dispatch
                     UpdateIsHeaderCheckbox model dispatch
-                    ResetButton model rmvFile
+                    //ResetButton model rmvFile
                 | _ -> Html.none
             ]
         ]
@@ -304,34 +302,55 @@ type DataAnnotator =
             [
                 FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
             ]
-        let fooder =
-            Daisy.button.button [
-                button.primary
-                prop.style [style.marginLeft length.auto]
-                prop.text "Submit"
-                prop.onClick(fun e ->
-                    match model.DataAnnotatorModel.DataFile with
-                    | Some dtf ->
-                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
-                        let name = dtf.DataFileName
-                        let dt = dtf.DataFileType
-                        SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
-                        |> InterfaceMsg
-                        |> dispatch
-                    | None ->
-                        logw "No file selected"
-                    rmv e
-                )
+        let footer =
+            Html.div [
+                prop.className "w-full flex justify-between items-center gap-2"
+                //prop.style [style.marginLeft length.auto]
+                prop.children [
+                    Html.div [
+                        prop.children [
+                            DataAnnotatorButtons.ResetButton model rmvFile
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "ml-auto flex gap-2"
+                        prop.style [style.marginLeft length.auto]
+                        prop.children [
+                            Daisy.button.button [
+                                prop.onClick rmv
+                                button.outline
+                                prop.text "Cancel"
+                            ]
+                            Daisy.button.button [
+                                button.primary
+                                prop.text "Submit"
+                                prop.onClick(fun e ->
+                                    match model.DataAnnotatorModel.DataFile with
+                                    | Some dtf ->
+                                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
+                                        let name = dtf.DataFileName
+                                        let dt = dtf.DataFileType
+                                        SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
+                                        |> InterfaceMsg
+                                        |> dispatch
+                                    | None ->
+                                        logw "No file selected"
+                                    rmv e
+                                )
+                            ]
+                        ]
+                    ]
+                ]
             ]
 
         Modals.BaseModal.Main(
             rmv,
-            header="Data Annotator",
-            modalClassInfo="max-w-none",
-            modalActivity=modalActivity,
-            content=content,
-            contentClassInfo="grid grid-cols-1 grid-rows h-[600px] overflow-hidden",
-            fooder=fooder
+            header = Html.p "Data Annotator",
+            modalClassInfo = "max-w-none",
+            modalActivity = modalActivity,
+            content = content,
+            contentClassInfo = "grid grid-cols-1 grid-rows h-[600px] overflow-hidden",
+            footer = footer
         )
 
     [<ReactComponent>]

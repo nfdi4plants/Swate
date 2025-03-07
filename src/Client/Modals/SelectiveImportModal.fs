@@ -182,6 +182,7 @@ type SelectiveImportModal =
                 } |> setImportDataState
             else
                 SelectiveImportConfig.init() |> setImportDataState
+
         let content =
             [
                 SelectiveImportModal.RadioPluginsBox(
@@ -200,23 +201,34 @@ type SelectiveImportModal =
                     let t = tables.[ti]
                     SelectiveImportModal.TableImport(ti, t, model, dispatch)
             ]
-        let fodder =
-            Daisy.button.button [
-                button.primary
+        let footer =
+            Html.div [
+                prop.className "justify-end flex gap-2"
                 prop.style [style.marginLeft length.auto]
-                prop.text "Submit"
-                prop.onClick(fun e ->
-                    {| importState = importDataState; importedFile = import; deselectedColumns = importDataState.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
-                    rmv e
-                )
+                prop.children [
+                    Daisy.button.button [
+                        prop.onClick rmv
+                        button.outline
+                        prop.text "Cancel"
+                    ]
+                    Daisy.button.button [
+                        button.primary
+                        prop.style [style.marginLeft length.auto]
+                        prop.text "Submit"
+                        prop.onClick(fun e ->
+                            {| importState = importDataState; importedFile = import; deselectedColumns = importDataState.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                            rmv e
+                        )
+                    ]
+                ]
             ]
 
         Modals.BaseModal.Main(
             rmv,
-            header = "Import",
+            header = Html.p "Import",
             modalClassInfo = "@container/importModal",
             content = content,
-            fooder = fodder
+            footer = footer
         ) 
 
     static member Main(import: ArcFiles, model, dispatch: Messages.Msg -> unit) =
