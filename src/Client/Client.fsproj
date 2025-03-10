@@ -39,7 +39,6 @@
     <Compile Include="States\ModalState.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Messages.fs" />
-    <Compile Include="Modals\BaseModal.fs" />
     <Compile Include="Modals\ModalElements.fs" />
     <Compile Include="Modals\Util.fs" />
     <Compile Include="Modals\ContextMenus\Util.fs" />

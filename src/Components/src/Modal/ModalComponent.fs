@@ -1,16 +1,13 @@
-namespace Modals
+namespace Swate.Components
 
 open Feliz
 open Feliz.DaisyUI
-open ARCtrl
-open FileImport
 open Swate.Components
-open Fable.Core
 
 type BaseModal =
 
     [<ReactComponent>]
-    static member Main (rmv, ?modalClassInfo: string, ?header: ReactElement, ?modalActivity: ReactElement, ?content: ReactElement seq, ?contentClassInfo: string, ?footer: ReactElement) =
+    static member BaseModal (rmv, ?modalClassInfo: string, ?header: ReactElement, ?modalActivity: ReactElement, ?content: ReactElement seq, ?contentClassInfo: string, ?footer: ReactElement) =
         Daisy.modal.div [
             modal.active
             prop.children [

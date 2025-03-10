@@ -223,7 +223,7 @@ type SelectiveImportModal =
                 ]
             ]
 
-        Modals.BaseModal.Main(
+        Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Import",
             modalClassInfo = "@container/importModal",

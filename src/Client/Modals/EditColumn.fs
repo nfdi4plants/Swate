@@ -234,7 +234,7 @@ type EditColumn =
                 ]
             ]
 
-        Modals.BaseModal.Main(
+        Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Update Column",
             modalClassInfo = "lg:max-w-[600px]",

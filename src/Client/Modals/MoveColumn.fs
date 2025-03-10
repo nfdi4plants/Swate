@@ -101,7 +101,7 @@ type MoveColumn =
                 ]
             ]
 
-        Modals.BaseModal.Main(
+        Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Move Column",
             modalActivity = modalActivity,

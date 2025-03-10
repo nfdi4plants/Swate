@@ -255,7 +255,7 @@ type UpdateColumn =
                 ]
             ]
 
-        Modals.BaseModal.Main(
+        Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Update Column",
             modalClassInfo = "max-h-screen max-w-4xl flex",

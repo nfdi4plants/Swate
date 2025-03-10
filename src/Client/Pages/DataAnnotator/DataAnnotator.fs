@@ -343,7 +343,7 @@ type DataAnnotator =
                 ]
             ]
 
-        Modals.BaseModal.Main(
+        Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Data Annotator",
             modalClassInfo = "max-w-none",
