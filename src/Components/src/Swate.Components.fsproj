@@ -25,10 +25,11 @@
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
+    <Compile Include="GenericComponents\BaseModal.fs" />
+    <Content Include="GenericComponents\BaseModal.fs" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
-    <Compile Include="Modal\BaseModal.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 
@@ -44,7 +45,6 @@
 
   <ItemGroup>
     <!-- Include all files that are compiled with this project -->
-    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <!-- Include the project file itself as well -->
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
   </ItemGroup>
