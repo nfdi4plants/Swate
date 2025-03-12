@@ -62,6 +62,7 @@ const meta = {
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout
     layout: 'centered',
+    viewport: {defaultViewport:'responsive'}
   },
   component: ButtonWithModal,
 } satisfies Meta<typeof ButtonWithModal>;
@@ -72,11 +73,7 @@ type Story = StoryObj<typeof meta>;
 
 const simpleHeader: JSX.Element = <>Simple Header</>;
 const modalActivity: JSX.Element = <>Simple Modal Activity</>;
-const list: JSX.Element[] =
-  [ <>Simple Content 0</>, <>Simple Content 1</>, <>Simple Content 2</>, <>Simple Content 3</>, <>Simple Content 4</>,
-    <>Simple Content 5</>, <>Simple Content 6</>, <>Simple Content 7</>, <>Simple Content 8</>, <>Simple Content 9</>,
-    <>Simple Content 10</>, <>Simple Content 11</>, <>Simple Content 12</>, <>Simple Content 13</>, <>Simple Content 14</>
-  ];
+const list: JSX.Element[] = Array.from({ length: 500 }, (_, index) => <>Simple Content {index}</>);
 const content =
   list.map((item, index) => (
       <div key={index} style={{ padding: "8px", borderBottom: "1px solid #ddd" }}>
@@ -100,40 +97,26 @@ export const CompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = await canvas.getByTestId('modal-content');
+    const modalContent = canvas.getByTestId('modal-content');
 
     // Verify that the modal is open (checking for modal content)
     const item0 = canvas.getByText("Simple Content 0", { selector: 'div' });
-    const item1 = canvas.getByText("Simple Content 14", { selector: 'div' });
+    const item1 = canvas.getByText("Simple Content 400", { selector: 'div' });
 
     expect(item0).toBeInTheDocument();
     expect(item1).toBeInTheDocument;
 
-    // Get the element's position in the viewport
-    const rect0 = item1.getBoundingClientRect();
-    // Ensure that the element is not yet visible (its position should be outside the viewport)
-    await waitFor(() => {
-      expect(rect0.top).toBeGreaterThan(window.innerHeight); // Element is out of the viewport
-    });
+     // Element is scrollable
+     await waitFor(() => {
+       expect(modalContent.scrollHeight).toBeGreaterThan(modalContent.clientHeight);
+     });
 
-    // Scroll the modal content to make sure the item is not initially visible
-    const scrollableContainer = canvas.getByTestId('modal-content');
-    await userEvent.click(scrollableContainer); // Trigger scroll (if necessary)
-    scrollableContainer.scrollTop = 1000; // Manually scroll down
+     // Find the submit button (or trigger) and click to close the modal
+     const closeButton = canvas.getByRole("button", { name: /Submit/i });
+     await userEvent.click(closeButton);
 
-    // Get the element's position in the viewport
-    const rect1 = item0.getBoundingClientRect();
-    // Ensure that the element is no longer visible (its position should be outside the viewport)
-    await waitFor(() => {
-      expect(rect1.top).toBeLessThan(window.innerHeight); // Element is out of the viewport
-    });
-
-    // Find the submit button (or trigger) and click to close the modal
-    const closeButton = canvas.getByRole("button", { name: /Submit/i });
-    await userEvent.click(closeButton);
-
-    // Verify that the modal is closed (the content should no longer be in the document)
-    await waitFor(() => expect(canvas.queryByText("Simple Content 10")).not.toBeInTheDocument());
+     // Verify that the modal is closed (the content should no longer be in the document)
+     await waitFor(() => expect(canvas.queryByText("Simple Content 10")).not.toBeInTheDocument());
   },
 }
 
@@ -152,40 +135,26 @@ export const WideCompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = await canvas.getByTestId('modal-content');
+    const modalContent = canvas.getByTestId('modal-content');
 
     // Verify that the modal is open (checking for modal content)
     const item0 = canvas.getByText("Simple Content 0", { selector: 'div' });
-    const item1 = canvas.getByText("Simple Content 14", { selector: 'div' });
+    const item1 = canvas.getByText("Simple Content 400", { selector: 'div' });
 
     expect(item0).toBeInTheDocument();
     expect(item1).toBeInTheDocument;
 
-    // Get the element's position in the viewport
-    const rect0 = item1.getBoundingClientRect();
-    // Ensure that the element is not yet visible (its position should be outside the viewport)
-    await waitFor(() => {
-      expect(rect0.top).toBeGreaterThan(window.innerHeight); // Element is out of the viewport
-    });
+     // Element is scrollable
+     await waitFor(() => {
+       expect(modalContent.scrollHeight).toBeGreaterThan(modalContent.clientHeight);
+     });
 
-    // Scroll the modal content to make sure the item is not initially visible
-    const scrollableContainer = canvas.getByTestId('modal-content');
-    await userEvent.click(scrollableContainer); // Trigger scroll (if necessary)
-    scrollableContainer.scrollTop = 1000; // Manually scroll down
+     // Find the submit button (or trigger) and click to close the modal
+     const closeButton = canvas.getByRole("button", { name: /Submit/i });
+     await userEvent.click(closeButton);
 
-    // Get the element's position in the viewport
-    const rect1 = item0.getBoundingClientRect();
-    // Ensure that the element is no longer visible (its position should be outside the viewport)
-    await waitFor(() => {
-      expect(rect1.top).toBeLessThan(window.innerHeight); // Element is out of the viewport
-    });
-
-    // Find the submit button (or trigger) and click to close the modal
-    const closeButton = canvas.getByRole("button", { name: /Submit/i });
-    await userEvent.click(closeButton);
-
-    // Verify that the modal is closed (the content should no longer be in the document)
-    await waitFor(() => expect(canvas.queryByText("Simple Content 10")).not.toBeInTheDocument());
+     // Verify that the modal is closed (the content should no longer be in the document)
+     await waitFor(() => expect(canvas.queryByText("Simple Content 10")).not.toBeInTheDocument());
   },
 }
 
@@ -196,13 +165,13 @@ export const SmallWindowedCompleteModal: Story = {
     modalActivity: modalActivity,
     content: content
   },
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile1"
+    }
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-
-    // Simulate resizing the window to a specific size
-    global.innerWidth = 1024; // Set the width to 1024px (desktop size)
-    global.innerHeight = 768; // Set the height to 768px (desktop size)
-    global.dispatchEvent(new Event('resize')); // Dispatch a resize event to ensure the new size is applied
 
     // Find the button and click to open the modal
     const button = canvas.getByRole("button", { name: /open modal/i });
@@ -222,14 +191,14 @@ export const SmallWindowedCompleteModal: Story = {
     const rect0 = header.getBoundingClientRect();
     // Ensure that the element is not yet visible (its position should be outside the viewport)
     await waitFor(() => {
-      expect(rect0.top).toBeLessThan(global.innerHeight); // Element is out of the viewport
+      expect(rect0.top).toBeLessThan(window.innerHeight); // Element is out of the viewport
     });
 
     // Get the element's position in the viewport
     const rect1 = fooder.getBoundingClientRect();
     // Ensure that the element is no longer visible (its position should be outside the viewport)
     await waitFor(() => {
-      expect(rect1.top).toBeLessThan(global.innerHeight); // Element is out of the viewport
+      expect(rect1.top).toBeLessThan(window.innerHeight); // Element is out of the viewport
     });
   }
 }
