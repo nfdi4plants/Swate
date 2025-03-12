@@ -49,6 +49,7 @@ const ButtonWithModal = ({header, modalClassInfo, modalActivity, content}) => {
           modalActivity={modalActivity}
           content={content}
           footer={submitButton}
+          debug={true}
         />
       )}
     </div>

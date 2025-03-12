@@ -17,7 +17,11 @@ type BaseModal =
         ?modalActivity: ReactElement,
         ?content: ReactElement seq,
         ?contentClassInfo: string,
-        ?footer: ReactElement) =
+        ?footer: ReactElement,
+        ?debug: bool) =
+
+        let debug = defaultArg debug false
+
         Daisy.modal.div [
             modal.active
             prop.children [
@@ -48,7 +52,8 @@ type BaseModal =
                         // Scrollable content
                         if content.IsSome then
                             Html.div [
-                                prop.testId "modal-content"
+                                if debug then
+                                    prop.testId "modal-content"
                                 prop.className [
                                     "overflow-y-auto space-y-2"
                                     if contentClassInfo.IsSome then
