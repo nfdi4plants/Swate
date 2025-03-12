@@ -28,7 +28,7 @@
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
-    <Compile Include="Modal\ModalComponent.fs" />
+    <Compile Include="Modal\BaseModal.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 

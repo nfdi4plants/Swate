@@ -305,7 +305,6 @@ type DataAnnotator =
         let footer =
             Html.div [
                 prop.className "w-full flex justify-between items-center gap-2"
-                //prop.style [style.marginLeft length.auto]
                 prop.children [
                     Html.div [
                         prop.children [

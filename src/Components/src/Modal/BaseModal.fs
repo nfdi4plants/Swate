@@ -3,11 +3,21 @@ namespace Swate.Components
 open Feliz
 open Feliz.DaisyUI
 open Swate.Components
+open Fable.Core
 
+//Modal that is the base of all big modals
+[<Mangle(false); Erase>]
 type BaseModal =
 
-    [<ReactComponent>]
-    static member BaseModal (rmv, ?modalClassInfo: string, ?header: ReactElement, ?modalActivity: ReactElement, ?content: ReactElement seq, ?contentClassInfo: string, ?footer: ReactElement) =
+    [<ReactComponent(true)>]
+    static member BaseModal (
+        rmv,
+        ?modalClassInfo: string,
+        ?header: ReactElement,
+        ?modalActivity: ReactElement,
+        ?content: ReactElement seq,
+        ?contentClassInfo: string,
+        ?footer: ReactElement) =
         Daisy.modal.div [
             modal.active
             prop.children [
@@ -38,6 +48,7 @@ type BaseModal =
                         // Scrollable content
                         if content.IsSome then
                             Html.div [
+                                prop.testId "modal-content"
                                 prop.className [
                                     "overflow-y-auto space-y-2"
                                     if contentClassInfo.IsSome then
