@@ -26,10 +26,10 @@ module private EditColumnComponents =
         Daisy.button.button [
             prop.onClick cancel
             button.outline
-            prop.text "Back"
+            prop.text "Cancel"
         ]
 
-    let SubmitButton(submit) =
+    let SubmitButton submit =
         Daisy.button.button [
             button.primary
             prop.text "Submit"
@@ -203,47 +203,41 @@ type EditColumn =
             let cells = Array.takeSafe 10 column0.Cells
             updateColumn {column0 with Cells = cells}
 
-        Daisy.modal.div [
-            modal.open'
-            prop.children [
-                Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.modalBox.div [
-                    prop.className "lg:max-w-[600px]"
-                    prop.style [style.maxHeight(length.percent 70)]
-                    prop.children [
-                        Daisy.cardBody [
-                            Daisy.cardTitle [
-                                prop.className "flex flex-row justify-between"
-                                prop.children [
-                                    Html.span "Update Column"
-                                    Components.Components.DeleteButton(props=[prop.onClick rmv])
-                                ]
-                            ]
-                            Html.div [
-                                prop.className "join"
-                                prop.children [
-                                    SelectHeaderType(state, setState)
-                                    match state.NextHeaderType with
-                                    | CompositeHeaderDiscriminate.Output | CompositeHeaderDiscriminate.Input ->
-                                        SelectIOType(state, setState)
-                                    | _ -> Html.none
-                                ]
-                            ]
-                            Html.div [
-                                prop.style [style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex]
-                                prop.children [
-                                    Preview(previewColumn)
-                                ]
-                            ]
-                            Daisy.cardActions [
-                                prop.className "justify-end"
-                                prop.children [
-                                    BackButton rmv
-                                    SubmitButton submit
-                                ]
-                            ]
+        let modalActivity =
+            Html.div [
+                prop.children [
+                    Html.div [
+                        prop.className "join"
+                        prop.children [
+                            SelectHeaderType(state, setState)
+                            match state.NextHeaderType with
+                            | CompositeHeaderDiscriminate.Output | CompositeHeaderDiscriminate.Input ->
+                                SelectIOType(state, setState)
+                            | _ -> Html.none
+                        ]
+                    ]
+                    Html.div [
+                        prop.style [style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex]
+                        prop.children [
+                            Preview(previewColumn)
                         ]
                     ]
                 ]
             ]
-        ]
+        let footer =
+            Html.div [
+                prop.className "justify-end flex gap-2"
+                prop.style [style.marginLeft length.auto]
+                prop.children [
+                    BackButton rmv
+                    SubmitButton submit
+                ]
+            ]
+
+        Swate.Components.BaseModal.BaseModal(
+            rmv,
+            header = Html.p "Update Column",
+            modalClassInfo = "lg:max-w-[600px]",
+            modalActivity = modalActivity,
+            footer = footer
+        )
