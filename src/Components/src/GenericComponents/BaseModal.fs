@@ -23,6 +23,8 @@ type BaseModal =
         let debug = defaultArg debug false
 
         Daisy.modal.div [
+            if debug then
+                prop.testId "base-modal"
             modal.active
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
@@ -53,7 +55,7 @@ type BaseModal =
                         if content.IsSome then
                             Html.div [
                                 if debug then
-                                    prop.testId "modal-content"
+                                    prop.testId "base-modal-content"
                                 prop.className [
                                     "overflow-y-auto space-y-2"
                                     if contentClassInfo.IsSome then
