@@ -10,6 +10,7 @@ open Swate.Components.Shared
 open ARCtrl
 open Components
 open Model
+open Modals
 
 module private CellAux =
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
@@ -31,6 +32,7 @@ module private CellAux =
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
     let oasetter (index, nextCell: CompositeCell, dispatch) = Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
     let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, dispatch) else ContextMenu.DataMap.onContextMenu (index, dispatch)
+    let buildingBlockModalController index dispatch = CompositeCollumnModal.onKeyDown(index, dispatch)
 open CellAux
 module private EventPresets =
     open Swate.Components.Shared
@@ -238,6 +240,14 @@ type Cell =
             ]
             prop.readOnly readonly
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
+            prop.onClick(fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                if not readonly then
+                    if isIdle then makeActive()
+                if isIdle then
+                    EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch) e
+            )
             prop.onDoubleClick(fun e ->
                 e.preventDefault()
                 e.stopPropagation()
@@ -245,7 +255,11 @@ type Cell =
                     if isIdle then makeActive()
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
             )
-            if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
+            prop.onKeyDown(fun e ->
+                if e.key.ToLower() = "enter" then
+                    buildingBlockModalController index dispatch
+            )
+            //if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
             prop.onMouseDown(fun e -> if isIdle then e.preventDefault())
             prop.children [
                 if isActive then

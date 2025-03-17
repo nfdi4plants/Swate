@@ -25,9 +25,9 @@
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
+    <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Content Include="GenericComponents\BaseModal.fs" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
-    <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="Table\Table.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
