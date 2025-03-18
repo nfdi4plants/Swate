@@ -18,20 +18,6 @@ type Term
 
 [<AllowNullLiteral>]
 [<Global>]
-type Unit
-    [<ParamObjectAttribute; Emit("$0")>]
-    (?name: string, ?unit: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
-    member val name: string option = jsNative with get, set
-    member val unit: string option = jsNative with get, set
-    member val id: string option = jsNative with get, set
-    member val description: string option = jsNative with get, set
-    member val source: string option = jsNative with get, set
-    member val href: string option = jsNative with get, set
-    member val isObsolete: bool option = jsNative with get, set
-    member val data: obj option = jsNative with get, set
-
-[<AllowNullLiteral>]
-[<Global>]
 type Data
     [<ParamObjectAttribute; Emit("$0")>]
     (?name: string, ?unit: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
