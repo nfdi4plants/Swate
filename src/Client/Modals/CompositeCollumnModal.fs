@@ -153,6 +153,77 @@ type private Freetext =
             ]
         ]
 
+type private Data =
+
+    static member header = Html.p "Data"
+
+    static member content(
+        value: string, setValue: string -> unit,
+        selector: string, setSelector: string -> unit,
+        format: string, setFormat: string -> unit,
+        selectorFormat: string, setSelectorFormat: string -> unit) =
+        let displaySelector = value.Length > 0 && selector.Length > 0
+        [
+            Html.label [
+                prop.text "Name:"
+                ]
+            Html.div [
+                prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
+                prop.children [
+                    Html.input [
+                        prop.className "flex-1 outline-none border-none bg-transparent"
+                        prop.valueOrDefault value
+                        prop.autoFocus true
+                        prop.onChange (fun input -> setValue input)
+                    ]
+                    if displaySelector then
+                        Html.span [
+                            prop.className "text-gray-500 whitespace-nowrap pl-1 "
+                            prop.text $"#{selector}"
+                        ]
+                ]
+            ]
+            Html.label [
+                prop.text "Selector:"
+                ]
+            Html.div [
+                prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
+                prop.children [
+                    Html.input [
+                        prop.className "flex-1 outline-none border-none bg-transparent"
+                        prop.valueOrDefault selector
+                        prop.onChange (fun input -> setSelector input)
+                    ]
+                ]
+            ]
+            Html.label [
+                prop.text "Format:"
+                ]
+            Html.div [
+                prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
+                prop.children [
+                    Html.input [
+                        prop.className "flex-1 outline-none border-none bg-transparent"
+                        prop.valueOrDefault format
+                        prop.onChange (fun input -> setFormat input)
+                    ]
+                ]
+            ]
+            Html.label [
+                prop.text "Selector Format:"
+                ]
+            Html.div [
+                prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
+                prop.children [
+                    Html.input [
+                        prop.className "flex-1 outline-none border-none bg-transparent"
+                        prop.valueOrDefault selectorFormat
+                        prop.onChange (fun input -> setSelectorFormat input)
+                    ]
+                ]
+            ]
+        ]
+
 type CompositeCollumnModal =
 
     static member onKeyDown (index: int*int, dispatch) =
@@ -238,8 +309,12 @@ type CompositeCollumnModal =
                     let value, oa = cell.AsUnitized
                     (Some value, Some (oa.ToTerm()))
 
-            elif potCell.IsSome && potCell.Value.isFreeText then
-                (Some potCell.Value.AsFreeText, None)
+            elif potCell.IsSome then
+                if potCell.Value.isFreeText then
+                    (Some potCell.Value.AsFreeText, None)
+                else
+                    let result = potCell.Value.AsData
+                    (result.FilePath, None)
             else
                 (None, None)
         let cellHeader = model.SpreadsheetModel.ActiveTable.Headers.[ci]
@@ -282,7 +357,7 @@ type CompositeCollumnModal =
                     Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
 
         match potCell with
-        | Some term when term.isTerm ->
+        | Some cell when cell.isTerm ->
             BaseModal.BaseModal(
                 rmv = rmv,
                 header = Term.header,
@@ -291,7 +366,7 @@ type CompositeCollumnModal =
                 content = Term.content(model, termState, setTermState),
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer(updateTermUnit, rmv))
-        | Some unit when unit.isUnitized ->
+        | Some cell when cell.isUnitized ->
             BaseModal.BaseModal(
                 rmv = rmv,
                 header = Unit.header,
@@ -300,7 +375,7 @@ type CompositeCollumnModal =
                 content = Unit.content(model, newValue, setValue, termState, setTermState),
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer(updateTermUnit, rmv))
-        | Some freeText when freeText.isFreeText ->
+        | Some cell when cell.isFreeText ->
             let nextCell = CompositeCell.createFreeText(newValue)
             let updateFreetext = fun () -> Spreadsheet.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
             BaseModal.BaseModal(
@@ -311,4 +386,22 @@ type CompositeCollumnModal =
                 content = [Freetext.content(newValue, setValue)],
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer(updateFreetext, rmv))
+        | Some cell when cell.isData ->
+            let data = cell.AsData
+            let selector = defaultArg data.Selector ""
+            let format = defaultArg data.Format ""
+            let selectorFormat = defaultArg data.SelectorFormat ""
+            let selector, setSelector = React.useState(selector)
+            let format, setFormat = React.useState(format)
+            let selectorFormat, setSelectorFormat = React.useState(selectorFormat)
+            let nextCell = CompositeCell.createDataFromString($"{newValue}#{selector}", format, selectorFormat)
+            let updateData = fun () -> Spreadsheet.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+            BaseModal.BaseModal(
+                rmv = rmv,
+                header = Data.header,
+                modalClassInfo = "relative overflow-visible",
+                modalActivity = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv, cellHeader.IsDataColumn),
+                content = Data.content(newValue, setValue, selector, setSelector, format, setFormat, selectorFormat, setSelectorFormat),
+                contentClassInfo = "",
+                footer = CompositeCollumnModal.footer(updateData, rmv))
         | _ -> Html.div []

@@ -98,10 +98,14 @@ type Cell =
                     )
                     prop.onKeyDown(fun e ->
                         e.stopPropagation()
+                        log("e.code", e.code)
                         match e.code with
+                        //| code when code.ToLower().Contains("key") //enter
                         | Swate.Components.kbdEventCode.enter -> //enter
                             if isHeader then
                                 setter state
+                                debounceStorage.current.ClearAndRun()
+                                makeIdle()
                             else if index.IsSome && dispatch.IsSome then
                                 debounceStorage.current.ClearAndRun()
                                 makeIdle()
