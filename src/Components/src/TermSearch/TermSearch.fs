@@ -673,7 +673,8 @@ type TermSearch =
         ?disableDefaultParentSearch: bool,
         ?disableDefaultAllChildrenSearch: bool,
         ?portalTermSelectArea: IRefValue<option<HTMLElement>>,
-        ?fullwidth: bool, ?autoFocus: bool,
+        ?fullwidth: bool,
+        ?autoFocus: bool,
         ?classNames: TermSearchStyle
     ) =
 

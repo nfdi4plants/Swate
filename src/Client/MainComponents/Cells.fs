@@ -104,6 +104,7 @@ type Cell =
                                 setter state
                             else if index.IsSome && dispatch.IsSome then
                                 debounceStorage.current.ClearAndRun()
+                                makeIdle()
                                 CellAux.buildingBlockModalController index.Value dispatch.Value
                             else
                                 debounceStorage.current.ClearAndRun()
