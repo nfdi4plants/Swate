@@ -33,7 +33,8 @@ type private Term =
                         disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
                         termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
                         parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                        allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
+                        allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch,
+                        autoFocus = true
                     )
                 ]
             ]
@@ -129,6 +130,29 @@ type private Unit =
             ]
         ]
 
+type private Freetext =
+
+    static member header = Html.p "Free Text"
+
+    static member content(value: string, setValue: string -> unit) =
+
+        Html.div [
+            Html.label [
+                prop.text "Value:"
+                ]
+            Html.div [
+                prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
+                prop.children [
+                    Html.input [
+                        prop.className "flex-1 outline-none border-none bg-transparent"
+                        prop.valueOrDefault value
+                        prop.autoFocus true
+                        prop.onChange (fun input -> setValue input)
+                    ]
+                ]
+            ]
+        ]
+
 type CompositeCollumnModal =
 
     static member onKeyDown (index: int*int, dispatch) =
@@ -138,7 +162,8 @@ type CompositeCollumnModal =
         |> Messages.UpdateModal
         |> dispatch
 
-    static member modalActivity((potCell: CompositeCell option), modalActivity, setModalActivity, transFormCell, (rmv: MouseEvent -> unit)) =
+    static member modalActivity(potCell: CompositeCell option, modalActivity, setModalActivity, transFormCell, rmv: MouseEvent -> unit, ?isButtonActive) =
+        let isButtonActive = defaultArg isButtonActive true
         Html.div [
             Daisy.cardActions [
                 Daisy.button.button [
@@ -151,7 +176,10 @@ type CompositeCollumnModal =
                 ]
             ]
             Daisy.button.button [
-                button.outline
+                if isButtonActive then
+                    button.outline
+                else
+                    button.disabled
                 button.wide
                 prop.style [style.marginLeft length.auto]
                 match potCell with
@@ -159,6 +187,11 @@ type CompositeCollumnModal =
                     prop.text "As Unit"
                 | Some cell when cell.isUnitized ->
                     prop.text "As Term"
+                | Some cell when cell.isFreeText ->
+                    prop.text "As Data"
+                | Some cell when cell.isData ->
+                    prop.text "As Free Text"
+                | _ -> failwith "Not supported"
                 prop.onClick(fun e ->
                     setModalActivity modalActivity
                     transFormCell ()
@@ -196,7 +229,7 @@ type CompositeCollumnModal =
         let index = (ci, ri)
         let potCell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(index)
         let isUnitOrTermCell = Modals.ContextMenus.Util.isUnitOrTermCell potCell
-        let potUnitValue, potTerm =
+        let value, potTerm =
             if isUnitOrTermCell then
                 let cell = potCell.Value
                 if cell.isTerm then
@@ -205,14 +238,16 @@ type CompositeCollumnModal =
                     let value, oa = cell.AsUnitized
                     (Some value, Some (oa.ToTerm()))
 
-            else (None, None)
-
+            elif potCell.IsSome && potCell.Value.isFreeText then
+                (Some potCell.Value.AsFreeText, None)
+            else
+                (None, None)
         let cellHeader = model.SpreadsheetModel.ActiveTable.Headers.[ci]
         let termState, setTermState = React.useState(potTerm)
-        let newValue, setValue = React.useState(if potUnitValue.IsSome then potUnitValue.Value else "")
+        let newValue, setValue = React.useState(if value.IsSome then value.Value else "")
         let showModalActivity, setShowModalActivity = React.useState(false)
         
-        let submitTermUnit =
+        let updateTermUnit =
             fun _ ->
                 if termState.IsSome then
                     let term = termState.Value
@@ -220,14 +255,14 @@ type CompositeCollumnModal =
                     let tsr = defaultArg term.source ""
                     let tan = defaultArg term.id ""
                     let nextCell =
-                        if potUnitValue.IsSome then
+                        if value.IsSome then
                             CompositeCell.createUnitizedFromString(newValue, name, tsr, tan)
                         else
                             CompositeCell.createTermFromString(name, tsr, tan)
                     Spreadsheet.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
         let transFormCell =
             fun _ ->
-                if potCell.IsSome && (potCell.Value.isTerm || potCell.Value.isUnitized) then
+                if isUnitOrTermCell then
                     let term = termState.Value
                     let name = defaultArg term.name ""
                     let tsr = defaultArg term.source ""
@@ -239,7 +274,11 @@ type CompositeCollumnModal =
                             CompositeCell.createTermFromString(name, tsr, tan)
                     Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
                 elif potCell.IsSome && cellHeader.IsDataColumn then
-                    let nextCell = if potCell.Value.isFreeText then potCell.Value.ToDataCell() else potCell.Value.ToFreeTextCell()
+                    let nextCell =
+                        if potCell.Value.isFreeText then
+                            CompositeCell.createDataFromString(newValue, "", "")
+                        else
+                            potCell.Value.ToFreeTextCell()
                     Spreadsheet.UpdateCell (index, nextCell) |> Messages.SpreadsheetMsg |> dispatch
 
         match potCell with
@@ -251,7 +290,7 @@ type CompositeCollumnModal =
                 modalActivity = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv),
                 content = Term.content(model, termState, setTermState),
                 contentClassInfo = "",
-                footer = CompositeCollumnModal.footer(submitTermUnit, rmv))
+                footer = CompositeCollumnModal.footer(updateTermUnit, rmv))
         | Some unit when unit.isUnitized ->
             BaseModal.BaseModal(
                 rmv = rmv,
@@ -260,5 +299,16 @@ type CompositeCollumnModal =
                 modalActivity = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv),
                 content = Unit.content(model, newValue, setValue, termState, setTermState),
                 contentClassInfo = "",
-                footer = CompositeCollumnModal.footer(submitTermUnit, rmv))
+                footer = CompositeCollumnModal.footer(updateTermUnit, rmv))
+        | Some freeText when freeText.isFreeText ->
+            let nextCell = CompositeCell.createFreeText(newValue)
+            let updateFreetext = fun () -> Spreadsheet.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
+            BaseModal.BaseModal(
+                rmv = rmv,
+                header = Freetext.header,
+                modalClassInfo = "relative overflow-visible",
+                modalActivity = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv, cellHeader.IsDataColumn),
+                content = [Freetext.content(newValue, setValue)],
+                contentClassInfo = "",
+                footer = CompositeCollumnModal.footer(updateFreetext, rmv))
         | _ -> Html.div []

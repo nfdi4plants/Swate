@@ -77,7 +77,7 @@ open Fable.Core.JsInterop
 type Cell =
 
     [<ReactComponent>]
-    static member CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle) =
+    static member CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle, ?index, ?dispatch) =
         let state, setState = React.useState(input)
         React.useEffect((fun () -> setState input), [|box input|])
         let debounceStorage = React.useRef(newDebounceStorage())
@@ -100,9 +100,14 @@ type Cell =
                         e.stopPropagation()
                         match e.code with
                         | Swate.Components.kbdEventCode.enter -> //enter
-                            if isHeader then setter state
-                            debounceStorage.current.ClearAndRun()
-                            makeIdle()
+                            if isHeader then
+                                setter state
+                            else if index.IsSome && dispatch.IsSome then
+                                debounceStorage.current.ClearAndRun()
+                                CellAux.buildingBlockModalController index.Value dispatch.Value
+                            else
+                                debounceStorage.current.ClearAndRun()
+                                makeIdle()
                         | Swate.Components.kbdEventCode.escape -> //escape
                             debounceStorage.current.Clear()
                             makeIdle()
@@ -243,8 +248,8 @@ type Cell =
             prop.onClick(fun e ->
                 e.preventDefault()
                 e.stopPropagation()
-                if not readonly then
-                    if isIdle then makeActive()
+                if not readonly && isIdle then
+                    makeActive()
                 if isIdle then
                     EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch) e
             )
@@ -256,7 +261,7 @@ type Cell =
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
             )
             prop.onKeyDown(fun e ->
-                if e.key.ToLower() = "enter" then
+                if e.code = Swate.Components.kbdEventCode.enter then
                     buildingBlockModalController index dispatch
             )
             //if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
@@ -305,7 +310,7 @@ type Cell =
                             allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
                         )
                     else
-                        Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
+                        Cell.CellInputElement(cellValue, false, false, setter, makeIdle, index, dispatch)
                 else
                     if columnType = Main && oasetter.IsSome then
                         CellStyles.CompositeCellDisplay(oasetter.Value.oa, displayValue)
