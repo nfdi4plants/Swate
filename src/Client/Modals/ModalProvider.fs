@@ -34,7 +34,6 @@ type ModalProvider =
             let rmv = Util.RMV_MODAL dispatch
             Modals.CompositeCollumnModal.Main(ci, ri, model, dispatch, rmv)
 
-
     static member GeneralModal (modal: GeneralModals, model, dispatch) =
         match modal with
         | GeneralModals.Error exn ->
@@ -43,7 +42,6 @@ type ModalProvider =
             Modals.Warning.Main (msg, dispatch)
         | GeneralModals.Loading ->
             Modals.Loading.Modal (dispatch)
-
 
     [<ReactComponent>]
     static member Main (model: Model.Model, dispatch) =

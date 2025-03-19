@@ -15,8 +15,33 @@ type private Term =
 
     static member header = Html.p "Term"
 
-    static member content(model, term: Swate.Components.Term option, setTerm) =
+    static member content(model, term: Swate.Components.Term option, setTerm, ?value: string, ?setValue: string -> unit) =
         [
+            if value.IsSome && setValue.IsSome then
+                let value = value.Value
+                let setValue = setValue.Value
+                let displayUnit = (value.ToString().Length > 0) && term.Value.name.IsSome
+                Html.div [
+                    Html.label [
+                        prop.text "Value:"
+                        ]
+                    Html.div [
+                        prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
+                        prop.children [
+                            Html.input [
+                                prop.className "flex-1 outline-none border-none bg-transparent"
+                                prop.valueOrDefault value
+                                prop.autoFocus true
+                                prop.onChange (fun input -> setValue input)
+                            ]
+                            if displayUnit then
+                                Html.span [
+                                    prop.className "text-gray-500 whitespace-nowrap pl-1 "
+                                    prop.text term.Value.name.Value
+                                ]
+                        ]
+                    ]
+                ]
             Html.div [
                 prop.children [
                     Html.label [
@@ -34,7 +59,7 @@ type private Term =
                         termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
                         parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
                         allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch,
-                        autoFocus = true
+                        autoFocus = not value.IsSome
                     )
                 ]
             ]
@@ -63,72 +88,6 @@ type private Term =
 type private Unit =
 
     static member header = Html.p "Unit"
-
-    static member content(model, value: string, setValue: string -> unit, term: Swate.Components.Term option, setTerm) =
-        let displayUnit = (value.ToString().Length > 0) && term.Value.name.IsSome
-        [
-            Html.div [
-                Html.label [
-                    prop.text "Value:"
-                    ]
-                Html.div [
-                    prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
-                    prop.children [
-                        Html.input [
-                            prop.className "flex-1 outline-none border-none bg-transparent"
-                            prop.valueOrDefault value
-                            prop.autoFocus true
-                            prop.onChange (fun input -> setValue input)
-                        ]
-                        if displayUnit then
-                            Html.span [
-                                prop.className "text-gray-500 whitespace-nowrap pl-1 "
-                                prop.text term.Value.name.Value
-                            ]
-                    ]
-                ]
-            ]
-            Html.div [
-                prop.children [
-                    Html.label [
-                        prop.text "Unit:"
-                    ]
-                    TermSearch.TermSearch(
-                        setTerm,
-                        term=term,
-                        classNames = Swate.Components.TermSearchStyle(U2.Case1 "border-current join-item"),
-                        advancedSearch = U2.Case2 true,
-                        showDetails = true,
-                        disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
-                        parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                        allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
-                    )
-                ]
-            ]
-            Html.div [
-                Html.label [
-                    prop.text "Term-Source-Reference:"
-                ]
-                Html.p [
-                    prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px]"
-                    prop.readOnly true
-                    prop.text (if term.IsSome && term.Value.source.IsSome then term.Value.source.Value else "")
-                ]
-            ]
-            Html.div [ 
-                Html.label [
-                    prop.text "Term-Accession-Number:"
-                ]
-                Html.p [
-                    prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px]"
-                    prop.readOnly true
-                    prop.text (if term.IsSome && term.Value.id.IsSome then term.Value.id.Value else "")
-                ]
-            ]
-        ]
 
 type private Freetext =
 
@@ -272,11 +231,35 @@ type CompositeCollumnModal =
         ]
 
     static member footer(submitOnClick, rmv: MouseEvent -> unit) =
+
+        let cancelButtonRef = React.useRef<HTMLButtonElement option>(None)
+        let submitButtonRef = React.useRef<HTMLButtonElement option>(None)
+
+        let handleKeyDown (buttonRef: IRefValue<HTMLButtonElement option>) targetButton (e: Event) =
+            let keyboardEvent = e :?> Browser.Types.KeyboardEvent
+            if keyboardEvent.code = targetButton then
+                match buttonRef.current with
+                | Some button -> button.click()
+                | None -> ()
+
+        React.useEffect(fun () ->
+            Browser.Dom.document.addEventListener("keydown", handleKeyDown cancelButtonRef Swate.Components.kbdEventCode.escape)
+            React.createDisposable(fun () ->
+                Browser.Dom.document.removeEventListener("keydown", handleKeyDown cancelButtonRef Swate.Components.kbdEventCode.escape))
+        , [||])
+
+        React.useEffect(fun () ->
+            Browser.Dom.document.addEventListener("keydown", handleKeyDown submitButtonRef Swate.Components.kbdEventCode.enter)
+            React.createDisposable(fun () ->
+                Browser.Dom.document.removeEventListener("keydown", handleKeyDown submitButtonRef Swate.Components.kbdEventCode.enter))
+        , [||])
+
         Html.div [
             prop.style [style.marginLeft length.auto]
             prop.children [
                 Daisy.cardActions [
                     Daisy.button.button [
+                        prop.ref cancelButtonRef
                         button.outline
                         prop.text "Cancel"
                         prop.onClick(fun e ->
@@ -284,6 +267,7 @@ type CompositeCollumnModal =
                         )
                     ]
                     Daisy.button.button [
+                        prop.ref submitButtonRef
                         button.primary
                         prop.text "Submit"
                         prop.onClick(fun e ->
@@ -372,7 +356,7 @@ type CompositeCollumnModal =
                 header = Unit.header,
                 modalClassInfo = "relative overflow-visible",
                 modalActivity = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv),
-                content = Unit.content(model, newValue, setValue, termState, setTermState),
+                content = Term.content(model, termState, setTermState, newValue, setValue),
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer(updateTermUnit, rmv))
         | Some cell when cell.isFreeText ->
