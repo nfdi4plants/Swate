@@ -1,4 +1,4 @@
-module Modals
+namespace Modals
 
 open System
 open ARCtrl
