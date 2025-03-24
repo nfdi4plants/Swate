@@ -77,7 +77,7 @@ open Fable.Core.JsInterop
 type Cell =
 
     [<ReactComponent>]
-    static member CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle, ?index, ?dispatch) =
+    static member CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle, index, dispatch) =
         let state, setState = React.useState(input)
         React.useEffect((fun () -> setState input), [|box input|])
         let debounceStorage = React.useRef(newDebounceStorage())
@@ -98,21 +98,22 @@ type Cell =
                     )
                     prop.onKeyDown(fun e ->
                         e.stopPropagation()
-                        log("e.code", e.code)
                         match e.code with
-                        //| code when code.ToLower().Contains("key") //enter
-                        | Swate.Components.kbdEventCode.enter -> //enter
+                        | Swate.Components.kbdEventCode.enter ->
                             if isHeader then
                                 setter state
                                 debounceStorage.current.ClearAndRun()
+                                ModalState.TableModals.EditColumn(fst (index))
+                                |> Model.ModalState.ModalTypes.TableModal
+                                |> Some
+                                |> Messages.UpdateModal
+                                |> dispatch
                                 makeIdle()
-                            else if index.IsSome && dispatch.IsSome then
-                                debounceStorage.current.ClearAndRun()
-                                makeIdle()
-                                CellAux.buildingBlockModalController index.Value dispatch.Value
                             else
                                 debounceStorage.current.ClearAndRun()
                                 makeIdle()
+                                CellAux.buildingBlockModalController index dispatch
+
                         | Swate.Components.kbdEventCode.escape -> //escape
                             debounceStorage.current.Clear()
                             makeIdle()
@@ -148,7 +149,7 @@ type Cell =
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
             prop.children [
                 Html.div [
-                    if not isReadOnly then prop.onDoubleClick(fun e ->
+                    if not isReadOnly then prop.onClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
@@ -156,7 +157,7 @@ type Cell =
                     )
                     prop.children [
                         if isActive then
-                            Cell.CellInputElement(cellValue, true, isReadOnly, setter, makeIdle)
+                            Cell.CellInputElement(cellValue, true, isReadOnly, setter, makeIdle, (columnIndex, 0), dispatch)
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
                                 match columnType with
