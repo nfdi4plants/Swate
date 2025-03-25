@@ -15,8 +15,10 @@ open LocalStorage.Darkmode
 
 type Settings =
 
+    [<ReactComponent>]
     static member ThemeToggle () =
         let darkmodeState = React.useContext(LocalStorage.Darkmode.themeContext)
+        darkmodeState.Update() |> ignore
         let isDark = darkmodeState.Theme = Dark
         Html.label [
             prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"

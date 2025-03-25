@@ -72,10 +72,10 @@ type State = {
     Theme:    DataTheme
     SetTheme: State -> unit
 } with
-    static member init() =
+    static member init(setTheme) =
         {
             Theme    = DataTheme.Light
-            SetTheme = fun _ -> failwith "This is not implemented and serves as placeholder"
+            SetTheme = setTheme
         }
 
     member this.Update() =
@@ -83,4 +83,4 @@ type State = {
         DataTheme.SET dt
         {this with Theme = dt}
 
-let themeContext = React.createContext(name="Theme", defaultValue=LocalStorage.Darkmode.State.init())
+let themeContext = React.createContext(name="DataTheme", defaultValue=LocalStorage.Darkmode.State.init(fun _ -> ()))
