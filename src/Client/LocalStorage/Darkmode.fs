@@ -72,10 +72,10 @@ type State = {
     Theme:    DataTheme
     SetTheme: State -> unit
 } with
-    static member init(setTheme) =
+    static member init() =
         {
             Theme    = DataTheme.Light
-            SetTheme = setTheme
+            SetTheme = fun _ -> ()
         }
 
     member this.Update() =
@@ -83,4 +83,4 @@ type State = {
         DataTheme.SET dt
         {this with Theme = dt}
 
-let themeContext = React.createContext(name="DataTheme", defaultValue=LocalStorage.Darkmode.State.init(fun _ -> ()))
+let themeContext = React.createContext(name="DataTheme", defaultValue=LocalStorage.Darkmode.State.init())

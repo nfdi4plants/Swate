@@ -15,7 +15,7 @@ open Feliz.DaisyUI
 
 [<ReactComponent>]
 let View (model : Model) (dispatch : Msg -> unit) =
-    let colorstate, setColorstate = React.useState(LocalStorage.Darkmode.State.init(fun _ -> ()))
+    let colorstate, setColorstate = React.useState(LocalStorage.Darkmode.State.init())
     // Make ARCitect always use lighttheme
     let makeColorSchemeLight = fun _ ->
         if model.PersistentStorageState.Host.IsSome && model.PersistentStorageState.Host.Value = Swatehost.ARCitect then
