@@ -18,7 +18,6 @@
     <Compile Include="LocalStorage\AutosaveConfig.fs" />
     <Compile Include="LocalStorage\SwateSearchConfig.fs" />
     <Compile Include="LocalStorage\Widgets.fs" />
-    <Compile Include="LocalStorage\Darkmode.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Cytoscape.fs" />
     <Compile Include="Api.fs" />
