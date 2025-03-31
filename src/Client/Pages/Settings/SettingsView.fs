@@ -11,38 +11,35 @@ open Messages
 
 open Feliz
 open Feliz.DaisyUI
+
+open Swate.Components.ReactHelper
+
 open Browser.Dom
 
 type Settings =
 
-    static member themeChangeModule: obj = importDefault "theme-change"
-
     [<ReactComponent>]
     static member ThemeToggle () =
+        let useLocalStorage = importMember "@uidotdev/usehooks"
+        let (theme, handleSetTheme) = React.useLocalStorage(useLocalStorage, "theme", "light")
 
-        let currentTheme, setTheme = React.useState(document.documentElement.getAttribute("data-theme"))
-
-        let themeChange =
-            let themeChange: obj = Settings.themeChangeModule?themeChange
-            themeChange :?> (bool -> unit)
-
-        React.useEffectOnce (fun () ->
-            themeChange false // Reattach event listeners manually
-            None
-        )
-
-        let newTheme, icon =
-            match currentTheme with
-            | "light"   -> "dark", "🌙 Dark Mode"
-            | "dark"    -> "light", "☀️ Light Mode"
-            | _         -> "dark", "🌙 Dark Mode"
-
-        Html.button [
-            prop.className "btn btn-primary"
-            prop.custom ("data-set-theme", newTheme) // Theme-change switches between themes
-            prop.custom ("data-key", "theme")
-            prop.text icon
-            prop.onClick (fun _ -> setTheme newTheme) // Manual override to ensure the change
+        Html.label [
+            prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
+            prop.children [
+                Html.p [
+                    prop.className "text-xl py-2"
+                    prop.text "Theme"
+                ]
+                Html.button [
+                    prop.className "btn btn-block btn-primary"
+                    prop.text (if theme = "light" then "🌙" else "☀️")
+                    prop.onClick (fun _ -> 
+                        let newTheme = if theme = "light" then "dark" else "light"
+                        handleSetTheme newTheme  // Save to localStorage
+                        document.documentElement.setAttribute("data-theme", theme)
+                    )
+                ]
+            ]
         ]
 
     static member ToggleAutosaveConfig(model, dispatch) =

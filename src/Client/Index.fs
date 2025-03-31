@@ -8,6 +8,8 @@ open Messages
 open Model
 open Update
 
+open Swate.Components.ReactHelper
+
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
 
@@ -16,22 +18,17 @@ open Feliz.DaisyUI
 
 open Fable.Core.JsInterop
 
+open Browser.Dom
+
 [<ReactComponent>]
 let View (model : Model) (dispatch : Msg -> unit) =
 
-    let themeChangeModule: obj = importDefault "theme-change"
-
-    let themeChange =
-        let themeChange: obj = themeChangeModule?themeChange
-        themeChange :?> (bool -> unit)
-
-    React.useEffectOnce (fun () ->
-        themeChange false // Reattach event listeners manually
-        let storedTheme = Browser.WebStorage.localStorage.getItem("theme")
-        if (String.IsNullOrEmpty storedTheme) then
-            Browser.Dom.document.documentElement.setAttribute("data-theme", "light")
-        None
-    )
+    //Set the initial theme
+    let useLocalStorage = importMember "@uidotdev/usehooks"
+    let (theme, handleSetTheme) = React.useLocalStorage(useLocalStorage, "theme", "light")
+    let newTheme = if String.IsNullOrEmpty theme then "light" else theme
+    handleSetTheme newTheme
+    document.documentElement.setAttribute("data-theme", newTheme)
 
     React.strictMode [
         Html.div [

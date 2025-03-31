@@ -1,4 +1,4 @@
-﻿[<AutoOpenAttribute>]
+[<AutoOpenAttribute>]
 module Swate.Components.ReactHelper
 
 // https://github.com/Shmew/Feliz.UseListener/blob/master/src/Feliz.UseListener/Listener.fs
@@ -103,6 +103,10 @@ type React =
             )
         )
         cancel, debouncedCallBack
+
+    static member inline useLocalStorage<'A>(func: (string * 'A) -> ('A * ('A -> unit)), key: string, defaultValue: 'A) =
+        let useLocalStorage: (string * 'A) -> ('A * ('A -> unit)) = func
+        useLocalStorage(key, defaultValue)
 
 [<Erase;RequireQualifiedAccess>]
 module React =
