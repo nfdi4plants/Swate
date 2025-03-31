@@ -6,7 +6,7 @@ import tailwindcss from "tailwindcss";
 export default defineConfig({
     plugins: [
         react(
-            { include: /\.(fs|js|jsx|ts|tsx)$/, jsxRuntime: "classic" }
+            { include: /\.(fs|js|jsx|ts|tsx)$/ }
         ),
         dts({
             include: ['src'],
