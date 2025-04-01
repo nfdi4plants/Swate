@@ -1,20 +1,19 @@
-
 module LocalStorage.AutosaveConfig
 
 open Browser
 
-let [<Literal>] AutosaveConfig_Key = "AutosaveConfig"
+[<Literal>]
+let AutosaveConfig_Key = "AutosaveConfig"
 
-let getAutosaveConfiguration() =
+let getAutosaveConfiguration () =
     try
-        WebStorage.localStorage.getItem(AutosaveConfig_Key)
+        WebStorage.localStorage.getItem (AutosaveConfig_Key)
         |> (fun item -> bool.Parse(item))
         |> Some
-    with
-        | _ ->
-            WebStorage.localStorage.removeItem(AutosaveConfig_Key)
-            printfn "Could not find %s" AutosaveConfig_Key
-            None
+    with _ ->
+        WebStorage.localStorage.removeItem (AutosaveConfig_Key)
+        printfn "Could not find %s" AutosaveConfig_Key
+        None
 
-let setAutosaveConfiguration(autosaveConfig: bool) =
-    WebStorage.localStorage.setItem(AutosaveConfig_Key, autosaveConfig.ToString())
+let setAutosaveConfiguration (autosaveConfig: bool) =
+    WebStorage.localStorage.setItem (AutosaveConfig_Key, autosaveConfig.ToString())

@@ -14,6 +14,7 @@ type ModalElements =
 
     static member Button(text: string, onClickAction, buttonInput, ?isDisabled: bool, ?className: string) =
         let isDisabled = defaultArg isDisabled false
+
         Daisy.button.a [
             button.primary
             if isDisabled then
@@ -27,6 +28,7 @@ type ModalElements =
 
     static member RadioPlugin(radioGroup: string, txt: string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
         let isDisabled = defaultArg isDisabled false
+
         Daisy.formControl [
             Daisy.label [
                 prop.className [
@@ -44,10 +46,7 @@ type ModalElements =
                         prop.isChecked isChecked
                         prop.onChange onChange
                     ]
-                    Html.span [
-                        prop.className "text-sm"
-                        prop.text txt
-                    ]
+                    Html.span [ prop.className "text-sm"; prop.text txt ]
                 ]
             ]
         ]
@@ -62,21 +61,20 @@ type ModalElements =
             prop.children [
                 Html.h3 [
                     prop.className "font-semibold gap-2 flex flex-row items-center"
-                    prop.children [
-                        Html.i [prop.className icon]
-                        Html.span title
-                    ]
+                    prop.children [ Html.i [ prop.className icon ]; Html.span title ]
                 ]
                 content
             ]
         ]
 
-    static member SelectorButton<'a when 'a : equality> (targetselector: 'a, selector: 'a, setSelector: 'a -> unit, ?isDisabled) =
+    static member SelectorButton<'a when 'a: equality>
+        (targetselector: 'a, selector: 'a, setSelector: 'a -> unit, ?isDisabled)
+        =
         Daisy.button.button [
             join.item
             if isDisabled.IsSome then
                 prop.disabled isDisabled.Value
-            prop.style [style.flexGrow 1]
+            prop.style [ style.flexGrow 1 ]
             if (targetselector = selector) then
                 button.primary
             prop.onClick (fun _ -> setSelector targetselector)
