@@ -15,52 +15,57 @@ open FileImport
 /// Fields of Template that can be searched
 [<RequireQualifiedAccess>]
 type SearchFields =
-| Name
-| Organisation
-| Authors
+    | Name
+    | Organisation
+    | Authors
 
-    static member private ofFieldString (str: string) =
+    static member private ofFieldString(str: string) =
         let str = str.ToLower()
+
         match str with
-        | "/o" | "/org"             -> Some Organisation
-        | "/a" | "/authors"         -> Some Authors
-        | "/n" | "/reset" | "/e"    -> Some Name
+        | "/o"
+        | "/org" -> Some Organisation
+        | "/a"
+        | "/authors" -> Some Authors
+        | "/n"
+        | "/reset"
+        | "/e" -> Some Name
         | _ -> None
 
     member this.toStr =
         match this with
-        | Name          -> "/name"
-        | Organisation  -> "/org"
-        | Authors       -> "/auth"
+        | Name -> "/name"
+        | Organisation -> "/org"
+        | Authors -> "/auth"
 
     member this.toNameRdb =
         match this with
-        | Name          -> "template name"
-        | Organisation  -> "organisation"
-        | Authors       -> "authors"
+        | Name -> "template name"
+        | Organisation -> "organisation"
+        | Authors -> "authors"
 
-    static member GetOfQuery(query: string) =
-        SearchFields.ofFieldString query
+    static member GetOfQuery(query: string) = SearchFields.ofFieldString query
 
 open ARCtrl
 
 type TemplateFilterConfig = {
-        ProtocolSearchQuery     : string
-        ProtocolTagSearchQuery  : string
-        ProtocolFilterTags      : OntologyAnnotation list
-        ProtocolFilterErTags    : OntologyAnnotation list
-        CommunityFilter         : Model.Protocol.CommunityFilter
-        TagFilterIsAnd          : bool
-        Searchfield             : SearchFields
+    ProtocolSearchQuery: string
+    ProtocolTagSearchQuery: string
+    ProtocolFilterTags: OntologyAnnotation list
+    ProtocolFilterErTags: OntologyAnnotation list
+    CommunityFilter: Model.Protocol.CommunityFilter
+    TagFilterIsAnd: bool
+    Searchfield: SearchFields
 } with
-    static member init () = {
-        ProtocolSearchQuery     = ""
-        ProtocolTagSearchQuery  = ""
-        ProtocolFilterTags      = []
-        ProtocolFilterErTags    = []
-        CommunityFilter         = Model.Protocol.CommunityFilter.OnlyCurated
-        TagFilterIsAnd          = true
-        Searchfield             = SearchFields.Name
+
+    static member init() = {
+        ProtocolSearchQuery = ""
+        ProtocolTagSearchQuery = ""
+        ProtocolFilterTags = []
+        ProtocolFilterErTags = []
+        CommunityFilter = Model.Protocol.CommunityFilter.OnlyCurated
+        TagFilterIsAnd = true
+        Searchfield = SearchFields.Name
     }
 
 module ComponentAux =
@@ -68,10 +73,7 @@ module ComponentAux =
     let ErBadgeColor = badge.primary
     let TagBadgeColor = badge.accent
 
-    let curatedOrganisationNames = [
-        "dataplant"
-        "nfdi4plants"
-    ]
+    let curatedOrganisationNames = [ "dataplant"; "nfdi4plants" ]
 
     [<LiteralAttribute>]
     let SearchFieldId = "template_searchfield_main"
@@ -80,11 +82,18 @@ module ComponentAux =
         Html.div [
             Html.p $"Search by {state.Searchfield.toNameRdb}"
             let hasSearchAddon = state.Searchfield <> SearchFields.Name
+
             Daisy.join [
                 prop.className "w-full"
                 prop.children [
                     if hasSearchAddon then
-                        Daisy.button.a [ join.item; prop.readOnly true; button.disabled; prop.text state.Searchfield.toStr; prop.className "!text-base-content !border-primary"]
+                        Daisy.button.a [
+                            join.item
+                            prop.readOnly true
+                            button.disabled
+                            prop.text state.Searchfield.toStr
+                            prop.className "!text-base-content !border-primary"
+                        ]
                     Daisy.label [
                         prop.className "join-item input input-bordered input-sm input-primary flex items-center w-full"
                         prop.children [
@@ -97,34 +106,46 @@ module ComponentAux =
                                     // if query starts with "/" expect intend to search by different field
                                     if query.StartsWith "/" then
                                         let searchField = SearchFields.GetOfQuery query
+
                                         if searchField.IsSome then
-                                            {state with Searchfield = searchField.Value; ProtocolSearchQuery = ""} |> setState
-                                            //let inp = Browser.Dom.document.getElementById SearchFieldId
+                                            {
+                                                state with
+                                                    Searchfield = searchField.Value
+                                                    ProtocolSearchQuery = ""
+                                            }
+                                            |> setState
+                                    //let inp = Browser.Dom.document.getElementById SearchFieldId
                                     // if query starts NOT with "/" update query
                                     else
                                         {
                                             state with
                                                 ProtocolSearchQuery = query
                                         }
-                                        |> setState
-                                )
+                                        |> setState)
                             ]
-                            Html.i [prop.className "fa-solid fa-search"]
+                            Html.i [ prop.className "fa-solid fa-search" ]
                         ]
                     ]
                 ]
             ]
         ]
 
-    let Tag (tag: OntologyAnnotation, color: IReactProperty, isRemovable: bool, onclick: (Browser.Types.MouseEvent -> unit) option) =
+    let Tag
+        (
+            tag: OntologyAnnotation,
+            color: IReactProperty,
+            isRemovable: bool,
+            onclick: (Browser.Types.MouseEvent -> unit) option
+        ) =
         Daisy.badge [
             color
             prop.className [
-                if onclick.IsSome then "cursor-pointer"
+                if onclick.IsSome then
+                    "cursor-pointer"
                 "text-nowrap"
             ]
             if onclick.IsSome then
-                prop.onClick(onclick.Value)
+                prop.onClick (onclick.Value)
             prop.children [
                 if isRemovable then
                     Svg.svg [
@@ -146,40 +167,68 @@ module ComponentAux =
             prop.title tag.TermAccessionShort
         ]
 
-    let TagContainer(tagList: OntologyAnnotation seq, title: string option, updateToggle: (OntologyAnnotation -> unit) option, badgeColor) =
+    let TagContainer
+        (
+            tagList: OntologyAnnotation seq,
+            title: string option,
+            updateToggle: (OntologyAnnotation -> unit) option,
+            badgeColor
+        ) =
         React.fragment [
-            if title.IsSome then Daisy.divider title.Value
+            if title.IsSome then
+                Daisy.divider title.Value
             Html.div [
                 prop.className "flex flex-wrap gap-2"
                 prop.children [
                     for tagSuggestion in tagList do
-                        Tag(tagSuggestion, badgeColor, false, updateToggle |> Option.map (fun f -> fun _ -> f tagSuggestion))
+                        Tag(
+                            tagSuggestion,
+                            badgeColor,
+                            false,
+                            updateToggle |> Option.map (fun f -> fun _ -> f tagSuggestion)
+                        )
                 ]
             ]
         ]
 
     let tagQueryField (model: Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
-        let allTags = model.ProtocolState.Templates |> Seq.collect (fun x -> x.Tags) |> Seq.distinct |> Seq.filter (fun x -> state.ProtocolFilterTags |> List.contains x |> not ) |> Array.ofSeq
-        let allErTags = model.ProtocolState.Templates |> Seq.collect (fun x -> x.EndpointRepositories) |> Seq.distinct |> Seq.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not ) |> Array.ofSeq
+        let allTags =
+            model.ProtocolState.Templates
+            |> Seq.collect (fun x -> x.Tags)
+            |> Seq.distinct
+            |> Seq.filter (fun x -> state.ProtocolFilterTags |> List.contains x |> not)
+            |> Array.ofSeq
+
+        let allErTags =
+            model.ProtocolState.Templates
+            |> Seq.collect (fun x -> x.EndpointRepositories)
+            |> Seq.distinct
+            |> Seq.filter (fun x -> state.ProtocolFilterErTags |> List.contains x |> not)
+            |> Array.ofSeq
+
         let hitTagList, hitErTagList =
-            if state.ProtocolTagSearchQuery <> ""
-            then
-                let queryBigram = state.ProtocolTagSearchQuery |> Swate.Components.Shared.SorensenDice.createBigrams
-                let getMatchingTags (allTags: OntologyAnnotation []) =
+            if state.ProtocolTagSearchQuery <> "" then
+                let queryBigram =
+                    state.ProtocolTagSearchQuery
+                    |> Swate.Components.Shared.SorensenDice.createBigrams
+
+                let getMatchingTags (allTags: OntologyAnnotation[]) =
                     allTags
                     |> Array.map (fun oa ->
                         oa.NameText
                         |> Swate.Components.Shared.SorensenDice.createBigrams
-                        |> Swate.Components.Shared.SorensenDice.calculateDistance queryBigram, oa
-                    )
+                        |> Swate.Components.Shared.SorensenDice.calculateDistance queryBigram,
+                        oa)
                     |> Array.filter (fun x -> fst x >= 0.3 || (snd x).TermAccessionShort = state.ProtocolTagSearchQuery)
                     |> Array.sortByDescending fst
                     |> Array.map snd
+
                 let sortedTags = getMatchingTags allTags
                 let sortedErTags = getMatchingTags allErTags
                 sortedTags, sortedErTags
             else
                 [||], [||]
+
         Html.div [
             Html.p "Search for tags"
             Html.div [
@@ -192,17 +241,21 @@ module ComponentAux =
                                 prop.placeholder ".. protocol tag"
                                 prop.valueOrDefault state.ProtocolTagSearchQuery
                                 prop.onChange (fun (e: string) ->
-                                    {state with ProtocolTagSearchQuery = e} |> setState
-                                )
+                                    {
+                                        state with
+                                            ProtocolTagSearchQuery = e
+                                    }
+                                    |> setState)
                             ]
-                            Html.i [prop.className "fa-solid fa-search"]
-                            // Pseudo dropdown
+                            Html.i [ prop.className "fa-solid fa-search" ]
+                        // Pseudo dropdown
                         ]
                     ]
                     Html.div [
                         prop.className "absolute bg-base-300 shadow-lg rounded-md w-full z-10 p-2 text-base-content"
                         prop.style [
-                            if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then style.display.none
+                            if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then
+                                style.display.none
                         ]
                         prop.children [
                             if hitErTagList <> [||] then
@@ -210,21 +263,29 @@ module ComponentAux =
                                     (fun tagSuggestion ->
                                         let nextState = {
                                             state with
-                                                ProtocolFilterErTags    = tagSuggestion::state.ProtocolFilterErTags
-                                                ProtocolTagSearchQuery  = ""
+                                                ProtocolFilterErTags = tagSuggestion :: state.ProtocolFilterErTags
+                                                ProtocolTagSearchQuery = ""
                                         }
-                                        setState nextState
-                                    )
-                                TagContainer(hitErTagList, Some "Endpoint Repositories", Some updateToggle, ErBadgeColor)
-                            if hitTagList <> [||] then
-                                let updateToggle = (fun tagSuggestion ->
-                                    let nextState = {
-                                        state with
-                                            ProtocolFilterTags      = tagSuggestion::state.ProtocolFilterTags
-                                            ProtocolTagSearchQuery  = ""
-                                    }
-                                    setState nextState
+
+                                        setState nextState)
+
+                                TagContainer(
+                                    hitErTagList,
+                                    Some "Endpoint Repositories",
+                                    Some updateToggle,
+                                    ErBadgeColor
                                 )
+                            if hitTagList <> [||] then
+                                let updateToggle =
+                                    (fun tagSuggestion ->
+                                        let nextState = {
+                                            state with
+                                                ProtocolFilterTags = tagSuggestion :: state.ProtocolFilterTags
+                                                ProtocolTagSearchQuery = ""
+                                        }
+
+                                        setState nextState)
+
                                 TagContainer(hitTagList, Some "Tags", Some updateToggle, TagBadgeColor)
                         ]
                     ]
@@ -238,12 +299,16 @@ module ComponentAux =
         let communityNames =
             model.ProtocolState.Templates
             |> Array.choose (fun t -> Model.Protocol.CommunityFilter.CommunityFromOrganisation t.Organisation)
-            |> Array.distinct |> List.ofArray
+            |> Array.distinct
+            |> List.ofArray
+
         let options =
             [
                 Model.Protocol.CommunityFilter.All
                 Model.Protocol.CommunityFilter.OnlyCurated
-            ]@communityNames
+            ]
+            @ communityNames
+
         Html.div [
             Html.p "Select community"
             Daisy.select [
@@ -252,11 +317,11 @@ module ComponentAux =
                 select.bordered
                 select.primary
                 prop.value (state.CommunityFilter.ToStringRdb())
-                prop.onChange(fun (e: Browser.Types.Event) ->
+                prop.onChange (fun (e: Browser.Types.Event) ->
                     let filter = Model.Protocol.CommunityFilter.fromString e.target?value
+
                     if state.CommunityFilter <> filter then
-                        {state with CommunityFilter = filter} |> setState
-                )
+                        { state with CommunityFilter = filter } |> setState)
                 prop.children [
                     for option in options do
                         Html.option [
@@ -270,12 +335,17 @@ module ComponentAux =
 
     let SwitchElement (tagIsFilterAnd: bool) (setFilter: bool -> unit) =
         Html.div [
-            prop.style [style.marginLeft length.auto]
+            prop.style [ style.marginLeft length.auto ]
             prop.children [
                 Daisy.button.button [
                     button.sm
                     prop.onClick (fun _ -> setFilter (not tagIsFilterAnd))
-                    prop.title (if tagIsFilterAnd then "Templates contain all tags." else "Templates contain at least one tag.")
+                    prop.title (
+                        if tagIsFilterAnd then
+                            "Templates contain all tags."
+                        else
+                            "Templates contain at least one tag."
+                    )
                     prop.text (if tagIsFilterAnd then "And" else "Or")
                 ]
             ]
@@ -289,39 +359,72 @@ module ComponentAux =
                     prop.className "flex flex-wrap gap-2"
                     prop.children [
                         for selectedTag in state.ProtocolFilterErTags do
-                            let rmv = fun _ -> {state with ProtocolFilterErTags = state.ProtocolFilterErTags |> List.except [selectedTag]} |> setState
-                            Tag (selectedTag, ErBadgeColor, true, Some rmv)
+                            let rmv =
+                                fun _ ->
+                                    {
+                                        state with
+                                            ProtocolFilterErTags =
+                                                state.ProtocolFilterErTags |> List.except [ selectedTag ]
+                                    }
+                                    |> setState
+
+                            Tag(selectedTag, ErBadgeColor, true, Some rmv)
                         for selectedTag in state.ProtocolFilterTags do
-                            let rmv = fun _ -> {state with ProtocolFilterTags = state.ProtocolFilterTags |> List.except [selectedTag]} |> setState
+                            let rmv =
+                                fun _ ->
+                                    {
+                                        state with
+                                            ProtocolFilterTags = state.ProtocolFilterTags |> List.except [ selectedTag ]
+                                    }
+                                    |> setState
+
                             Tag(selectedTag, TagBadgeColor, true, Some rmv)
                     ]
                 ]
                 // tag filter (AND or OR)
-                let filtersetter = fun b -> setState {state with TagFilterIsAnd = b}
+                let filtersetter = fun b -> setState { state with TagFilterIsAnd = b }
                 SwitchElement state.TagFilterIsAnd filtersetter
             ]
         ]
 
-    let curatedTag = Daisy.badge [prop.text "curated"; badge.primary]
-    let communitytag = Daisy.badge [prop.text "community"; badge.warning]
+    let curatedTag = Daisy.badge [ prop.text "curated"; badge.primary ]
+    let communitytag = Daisy.badge [ prop.text "community"; badge.warning ]
 
     let curatedCommunityTag =
         Daisy.badge [
-            prop.style [style.custom("background", "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)")]
+            prop.style [
+                style.custom ("background", "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)")
+            ]
             badge.success
             prop.children [
-                Html.span [prop.style [style.marginRight (length.em 0.75)]; prop.text "cur"]
-                Html.span [prop.style [style.marginLeft (length.em 0.75); style.color "rgba(0, 0, 0, 0.7)"]; prop.text "com"]
+                Html.span [ prop.style [ style.marginRight (length.em 0.75) ]; prop.text "cur" ]
+                Html.span [
+                    prop.style [ style.marginLeft (length.em 0.75); style.color "rgba(0, 0, 0, 0.7)" ]
+                    prop.text "com"
+                ]
             ]
         ]
 
     let createAuthorStringHelper (author: Person) =
-        let mi = if author.MidInitials.IsSome then author.MidInitials.Value else ""
+        let mi =
+            if author.MidInitials.IsSome then
+                author.MidInitials.Value
+            else
+                ""
+
         $"{author.FirstName} {mi} {author.LastName}"
 
-    let createAuthorsStringHelper (authors: ResizeArray<Person>) = authors |> Seq.map createAuthorStringHelper |> String.concat ", "
+    let createAuthorsStringHelper (authors: ResizeArray<Person>) =
+        authors |> Seq.map createAuthorStringHelper |> String.concat ", "
 
-    let protocolElement i (template: ARCtrl.Template) (isShown: bool) (setIsShown: bool -> unit) (model: Model) dispatch  =
+    let protocolElement
+        i
+        (template: ARCtrl.Template)
+        (isShown: bool)
+        (setIsShown: bool -> unit)
+        (model: Model)
+        dispatch
+        =
         [
             Html.tr [
                 prop.key $"{i}_{template.Id}"
@@ -332,29 +435,32 @@ module ComponentAux =
 
                 ]
                 prop.onClick (fun e ->
-                    e.preventDefault()
-                    setIsShown (not isShown)
-                )
+                    e.preventDefault ()
+                    setIsShown (not isShown))
                 prop.children [
-                    Html.td [
-                        prop.text template.Name
-                        prop.key $"{i}_{template.Id}_name"
-                    ]
+                    Html.td [ prop.text template.Name; prop.key $"{i}_{template.Id}_name" ]
                     Html.td [
                         prop.key $"{i}_{template.Id}_tag"
                         prop.children [
-                            if curatedOrganisationNames |> List.contains (template.Organisation.ToString().ToLower()) then
+                            if
+                                curatedOrganisationNames
+                                |> List.contains (template.Organisation.ToString().ToLower())
+                            then
                                 curatedTag
                             else
                                 communitytag
                         ]
                     ]
                     //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ a [ OnClick (fun e -> e.stopPropagation()); Href prot.DocsLink; Target "_Blank"; Title "docs" ] [Fa.i [Fa.Size Fa.Fa2x ; Fa.Regular.FileAlt] []] ]
-                    Html.td [ prop.key $"{i}_{template.Id}_version"; prop.style [style.textAlign.center; style.verticalAlign.middle]; prop.text template.Version ]
+                    Html.td [
+                        prop.key $"{i}_{template.Id}_version"
+                        prop.style [ style.textAlign.center; style.verticalAlign.middle ]
+                        prop.text template.Version
+                    ]
                     //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
                     Html.td [
                         prop.key $"{i}_{template.Id}_button"
-                        prop.children [Html.i [prop.className "fa-solid fa-chevron-down"] ]
+                        prop.children [ Html.i [ prop.className "fa-solid fa-chevron-down" ] ]
                     ]
                 ]
             ]
@@ -375,11 +481,20 @@ module ComponentAux =
                                 Html.div [
                                     Html.div template.Description
                                     Html.div [
-                                        Html.div [ Html.b "Author: "; Html.span (createAuthorsStringHelper template.Authors) ]
-                                        Html.div [ Html.b "Created: "; Html.span (template.LastUpdated.ToString("yyyy/MM/dd")) ]
+                                        Html.div [
+                                            Html.b "Author: "
+                                            Html.span (createAuthorsStringHelper template.Authors)
+                                        ]
+                                        Html.div [
+                                            Html.b "Created: "
+                                            Html.span (template.LastUpdated.ToString("yyyy/MM/dd"))
+                                        ]
                                     ]
                                     Html.div [
-                                        Html.div [ Html.b "Organisation: "; Html.span (template.Organisation.ToString()) ]
+                                        Html.div [
+                                            Html.b "Organisation: "
+                                            Html.span (template.Organisation.ToString())
+                                        ]
                                     ]
                                 ]
                                 TagContainer(template.EndpointRepositories, None, None, ErBadgeColor)
@@ -391,14 +506,19 @@ module ComponentAux =
                             prop.children [
                                 if List.contains template model.ProtocolState.TemplatesSelected then
                                     let templates = model.ProtocolState.TemplatesSelected |> Array.ofSeq
-                                    let templateIndex = Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates
+
+                                    let templateIndex =
+                                        Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates
+
                                     Daisy.button.a [
                                         button.sm
                                         prop.onClick (fun _ ->
                                             setIsShown (not isShown)
-                                            let newTemplatesSelected = List.removeAt templateIndex model.ProtocolState.TemplatesSelected
-                                            SelectProtocols newTemplatesSelected |> ProtocolMsg |> dispatch
-                                        )
+
+                                            let newTemplatesSelected =
+                                                List.removeAt templateIndex model.ProtocolState.TemplatesSelected
+
+                                            SelectProtocols newTemplatesSelected |> ProtocolMsg |> dispatch)
                                         button.primary
                                         prop.text "remove"
                                     ]
@@ -407,8 +527,7 @@ module ComponentAux =
                                         button.sm
                                         prop.onClick (fun _ ->
                                             setIsShown (not isShown)
-                                            AddProtocol template |> ProtocolMsg |> dispatch
-                                        )
+                                            AddProtocol template |> ProtocolMsg |> dispatch)
                                         button.primary
                                         prop.text "select"
                                     ]
@@ -423,24 +542,22 @@ module ComponentAux =
         Daisy.button.button [
             button.sm
             prop.onClick (fun _ -> Messages.Protocol.GetAllProtocolsForceRequest |> ProtocolMsg |> dispatch)
-            prop.children [
-                Html.i [prop.className "fa-solid fa-arrows-rotate"]
-            ]
+            prop.children [ Html.i [ prop.className "fa-solid fa-arrows-rotate" ] ]
         ]
 
 module FilterHelper =
 
     open ComponentAux
 
-    let sortTableBySearchQuery (searchfield: SearchFields) (searchQuery: string) (protocol: ARCtrl.Template []) =
+    let sortTableBySearchQuery (searchfield: SearchFields) (searchQuery: string) (protocol: ARCtrl.Template[]) =
         let query = searchQuery.Trim()
         // Only search if field is not empty and does not start with "/".
         // If it starts with "/" and does not match SearchFields then it will never trigger search
         // As soon as it matches SearchFields it will be removed and can become 'query <> ""'
-        if query <> "" && query.StartsWith("/") |> not
-        then
+        if query <> "" && query.StartsWith("/") |> not then
             let query = query.ToLower()
             let queryBigram = query |> Swate.Components.Shared.SorensenDice.createBigrams
+
             let createScore (str: string) =
                 str
                 |> Swate.Components.Shared.SorensenDice.createBigrams
@@ -448,57 +565,63 @@ module FilterHelper =
             // https://github.com/nfdi4plants/Swate/issues/490
             let adjustScore (compareString: string) (score: float) =
                 let compareString = compareString.ToLower()
-                if compareString.StartsWith query then
-                    score + 0.5
-                elif compareString.Contains query then
-                    score + 0.3
-                else
-                    score
+
+                if compareString.StartsWith query then score + 0.5
+                elif compareString.Contains query then score + 0.3
+                else score
+
             let scoredTemplate =
                 protocol
                 |> Array.map (fun template ->
                     let score =
                         match searchfield with
-                        | SearchFields.Name          ->
+                        | SearchFields.Name ->
                             let s = template.Name
-                            createScore s
-                            |> adjustScore s
-                        | SearchFields.Organisation  ->
+                            createScore s |> adjustScore s
+                        | SearchFields.Organisation ->
                             let s = (template.Organisation.ToString())
-                            createScore s
-                            |> adjustScore s
-                        | SearchFields.Authors       ->
-                            let scores = template.Authors |> Seq.filter (fun author ->
-                                (createAuthorStringHelper author).ToLower().Contains query
-                                || (author.ORCID.IsSome && author.ORCID.Value = query)
-                            )
+                            createScore s |> adjustScore s
+                        | SearchFields.Authors ->
+                            let scores =
+                                template.Authors
+                                |> Seq.filter (fun author ->
+                                    (createAuthorStringHelper author).ToLower().Contains query
+                                    || (author.ORCID.IsSome && author.ORCID.Value = query))
+
                             if Seq.isEmpty scores then 0.0 else 1.0
-                    score, template
-                )
-                |> Array.filter (fun (score,_) -> score > 0.3)
+
+                    score, template)
+                |> Array.filter (fun (score, _) -> score > 0.3)
                 |> Array.sortByDescending fst
                 |> fun y ->
                     for score, x in y do
                         log (score, x.Name)
+
                     y
                 |> Array.map snd
+
             scoredTemplate
         else
             protocol
 
-    let filterTableByTags tags ertags tagfilter (templates: ARCtrl.Template []) =
+    let filterTableByTags tags ertags tagfilter (templates: ARCtrl.Template[]) =
         if tags <> [] || ertags <> [] then
-            let tagArray = tags@ertags |> ResizeArray
-            let filteredTemplates = ResizeArray templates |> ARCtrl.Templates.filterByOntologyAnnotation(tagArray, tagfilter)
+            let tagArray = tags @ ertags |> ResizeArray
+
+            let filteredTemplates =
+                ResizeArray templates
+                |> ARCtrl.Templates.filterByOntologyAnnotation (tagArray, tagfilter)
+
             Array.ofSeq filteredTemplates
         else
             templates
 
-    let filterTableByCommunityFilter communityfilter (protocol: ARCtrl.Template []) =
+    let filterTableByCommunityFilter communityfilter (protocol: ARCtrl.Template[]) =
         match communityfilter with
-        | Protocol.CommunityFilter.All              -> protocol
-        | Protocol.CommunityFilter.OnlyCurated      -> protocol |> Array.filter (fun x -> x.Organisation.IsOfficial())
-        | Protocol.CommunityFilter.Community name   -> protocol |> Array.filter (fun x -> x.Organisation.ToString() = name)
+        | Protocol.CommunityFilter.All -> protocol
+        | Protocol.CommunityFilter.OnlyCurated -> protocol |> Array.filter (fun x -> x.Organisation.IsOfficial())
+        | Protocol.CommunityFilter.Community name ->
+            protocol |> Array.filter (fun x -> x.Organisation.ToString() = name)
 
 open ComponentAux
 
@@ -511,26 +634,40 @@ type Search =
                 Html.p [
                     Html.b "Search for templates."
                     Html.text " For more information you can look "
-                    Html.a [ prop.href Swate.Components.Shared.URLs.SWATE_WIKI; prop.target "_Blank"; prop.text "here"]
+                    Html.a [
+                        prop.href Swate.Components.Shared.URLs.SWATE_WIKI
+                        prop.target "_Blank"
+                        prop.text "here"
+                    ]
                     Html.text ". If you find any problems with a template or have other suggestions you can contact us "
-                    Html.a [ prop.href URLs.Helpdesk.UrlTemplateTopic; prop.target "_Blank"; prop.className ["link"]; prop.text "here"]
+                    Html.a [
+                        prop.href URLs.Helpdesk.UrlTemplateTopic
+                        prop.target "_Blank"
+                        prop.className [ "link" ]
+                        prop.text "here"
+                    ]
                     Html.text "."
                 ]
                 Html.p "You can search by template name, organisation and authors. Just type:"
                 Html.ul [
-                    Html.li [Html.code "/a"; Html.span " to search authors."]
-                    Html.li [Html.code "/o"; Html.span " to search organisations."]
-                    Html.li [Html.code "/n"; Html.span " to search template names."]
+                    Html.li [ Html.code "/a"; Html.span " to search authors." ]
+                    Html.li [ Html.code "/o"; Html.span " to search organisations." ]
+                    Html.li [ Html.code "/n"; Html.span " to search template names." ]
                 ]
             ]
         ]
 
-    static member filterTemplates(templates: ARCtrl.Template [], config: TemplateFilterConfig) =
-        if templates.Length = 0 then [||] else
+    static member filterTemplates(templates: ARCtrl.Template[], config: TemplateFilterConfig) =
+        if templates.Length = 0 then
+            [||]
+        else
             templates
             |> Array.ofSeq
             |> Array.sortBy (fun template -> template.Name, template.Organisation)
-            |> FilterHelper.filterTableByTags config.ProtocolFilterTags config.ProtocolFilterErTags config.TagFilterIsAnd
+            |> FilterHelper.filterTableByTags
+                config.ProtocolFilterTags
+                config.ProtocolFilterErTags
+                config.TagFilterIsAnd
             |> FilterHelper.filterTableByCommunityFilter config.CommunityFilter
             |> FilterHelper.sortTableBySearchQuery config.Searchfield config.ProtocolSearchQuery
 
@@ -540,7 +677,8 @@ type Search =
             Html.div [
                 prop.className [
                     "grid grid-cols-1 gap-2"
-                    if classes.IsSome then classes.Value
+                    if classes.IsSome then
+                        classes.Value
                 ]
                 prop.children [
                     queryField model config configSetter
@@ -550,9 +688,7 @@ type Search =
             ]
             // Only show the tag list and tag filter (AND or OR) if any tag exists
             if config.ProtocolFilterErTags <> [] || config.ProtocolFilterTags <> [] then
-                Html.div [
-                    TagDisplayField model config configSetter
-                ]
+                Html.div [ TagDisplayField model config configSetter ]
         ]
 
     static member SelectTemplatesButton(model: Model.Model, dispatch) =
@@ -562,8 +698,7 @@ type Search =
                 Daisy.button.a [
                     button.wide
                     prop.onClick (fun _ ->
-                        SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch
-                    )
+                        SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch)
                     if model.ProtocolState.TemplatesSelected.Length > 0 then
                         button.primary
                     else
@@ -574,11 +709,12 @@ type Search =
         ]
 
     [<ReactComponent>]
-    static member Component (templates, model: Model, dispatch, ?maxheight: Styles.ICssUnit) =
+    static member Component(templates, model: Model, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
-        let showIds, setShowIds = React.useState(fun _ -> [])
+        let showIds, setShowIds = React.useState (fun _ -> [])
+
         Html.div [
-            prop.style [style.maxHeight maxheight]
+            prop.style [ style.maxHeight maxheight ]
             prop.className "shrink overflow-y-auto"
             prop.children [
                 Daisy.table [
@@ -590,12 +726,10 @@ type Search =
                             Html.tr [
                                 Html.th "Template Name"
                                 //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Documentation"      ]
-                                Html.th "Community"//[CommunityFilterElement state setState]
+                                Html.th "Community" //[CommunityFilterElement state setState]
                                 Html.th "Template Version"
                                 //th [ Style [ Color model.SiteStyleState.ColorMode.Text; TextAlign TextAlignOptions.Center] ] [ str "Uses"               ]
-                                Html.th [
-                                    RefreshButton model dispatch
-                                ]
+                                Html.th [ RefreshButton model dispatch ]
                             ]
                         ]
                         Html.tbody [
@@ -604,26 +738,24 @@ type Search =
                                 Html.tr [
                                     Html.td [
                                         prop.colSpan 4
-                                        prop.style [style.textAlign.center]
-                                        prop.children [
-                                            Html.i [prop.className "fa-solid fa-spinner fa-spin fa-lg"]
-                                        ]
+                                        prop.style [ style.textAlign.center ]
+                                        prop.children [ Html.i [ prop.className "fa-solid fa-spinner fa-spin fa-lg" ] ]
                                     ]
                                 ]
                             | false ->
                                 match templates with
-                                | [||] ->
-                                    Html.tr [ Html.td "Empty" ]
+                                | [||] -> Html.tr [ Html.td "Empty" ]
                                 | _ ->
-                                    for i in 0..templates.Length-1 do
+                                    for i in 0 .. templates.Length - 1 do
                                         let isShown = showIds |> List.contains i
+
                                         let setIsShown (show: bool) =
                                             if show then
-                                                i::showIds |> setShowIds
+                                                i :: showIds |> setShowIds
                                             else
                                                 showIds |> List.filter (fun id -> id <> i) |> setShowIds
-                                        yield!
-                                            protocolElement i templates.[i] isShown setIsShown model dispatch
+
+                                        yield! protocolElement i templates.[i] isShown setIsShown model dispatch
                         ]
                     ]
                 ]

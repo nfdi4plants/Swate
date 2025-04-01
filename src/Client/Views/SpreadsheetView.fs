@@ -11,21 +11,16 @@ open Model
 open ARCtrl
 
 let private WidgetOrderContainer bringWidgetToFront (widget) =
-    Html.div [
-        prop.onClick bringWidgetToFront
-        prop.children [
-            widget
-        ]
-    ]
+    Html.div [ prop.onClick bringWidgetToFront; prop.children [ widget ] ]
 
 let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactElement) =
 
     match widgets.Length with
-    | 0 ->
-        Html.none
+    | 0 -> Html.none
     | _ ->
         Html.div [
-            for widget in widgets do displayWidget widget
+            for widget in widgets do
+                displayWidget widget
         ]
 
 
@@ -35,41 +30,50 @@ open FileImport
 
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
-    let widgets, setWidgets = React.useState([])
-    let rmvWidget (widget: Widget) = widgets |> List.except [widget] |> setWidgets
+    let widgets, setWidgets = React.useState ([])
+
+    let rmvWidget (widget: Widget) =
+        widgets |> List.except [ widget ] |> setWidgets
+
     let bringWidgetToFront (widget: Widget) =
-        let newList = widgets |> List.except [widget] |> fun x -> widget::x |> List.rev
+        let newList =
+            widgets |> List.except [ widget ] |> (fun x -> widget :: x |> List.rev)
+
         setWidgets newList
+
     let displayWidget (widget: Widget) =
         let rmv (widget: Widget) = fun _ -> rmvWidget widget
         let bringWidgetToFront = fun _ -> bringWidgetToFront widget
+
         match widget with
-        | Widget._BuildingBlock -> Widget.BuildingBlock (model, dispatch, rmv widget)
-        | Widget._Template -> Widget.Templates (model, dispatch, rmv widget)
-        | Widget._FilePicker -> Widget.FilePicker (model, dispatch, rmv widget)
+        | Widget._BuildingBlock -> Widget.BuildingBlock(model, dispatch, rmv widget)
+        | Widget._Template -> Widget.Templates(model, dispatch, rmv widget)
+        | Widget._FilePicker -> Widget.FilePicker(model, dispatch, rmv widget)
         | Widget._DataAnnotator -> Widget.DataAnnotator(model, dispatch, rmv widget)
         |> WidgetOrderContainer bringWidgetToFront
+
     let addWidget (widget: Widget) =
-        widget::widgets |> List.rev |> setWidgets
+        widget :: widgets |> List.rev |> setWidgets
+
     let state = model.SpreadsheetModel
+
     Html.div [
         prop.id "MainWindow"
         prop.className "@container/main min-w-[400px] flex flex-col h-screen"
         prop.children [
-            MainComponents.Navbar.Main (model, dispatch, widgets, setWidgets)
-            ModalDisplay (widgets, displayWidget)
+            MainComponents.Navbar.Main(model, dispatch, widgets, setWidgets)
+            ModalDisplay(widgets, displayWidget)
             Html.div [
                 prop.id "TableContainer"
                 prop.className "flex grow flex-col h-full overflow-y-hidden"
                 prop.children [
                     //
                     match state.ArcFile with
-                    | None ->
-                        MainComponents.NoFileElement.Main {|dispatch = dispatch|}
-                    | Some (ArcFiles.Assay _)
-                    | Some (ArcFiles.Study _)
-                    | Some (ArcFiles.Investigation _)
-                    | Some (ArcFiles.Template _) ->
+                    | None -> MainComponents.NoFileElement.Main {| dispatch = dispatch |}
+                    | Some(ArcFiles.Assay _)
+                    | Some(ArcFiles.Study _)
+                    | Some(ArcFiles.Investigation _)
+                    | Some(ArcFiles.Template _) ->
                         match model.SpreadsheetModel.ActiveView with
                         | Spreadsheet.ActiveView.Table _ ->
                             match model.SpreadsheetModel.ActiveTable.ColumnCount with
@@ -87,28 +91,65 @@ let Main (model: Model, dispatch) =
                                     Html.div [
                                         prop.children [
                                             match model.SpreadsheetModel.ArcFile with
-                                            | Some (ArcFiles.Assay assay) ->
+                                            | Some(ArcFiles.Assay assay) ->
                                                 let setAssay assay =
-                                                    assay |> Assay |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                                                    assay
+                                                    |> Assay
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
                                                 let setAssayDataMap assay dataMap =
-                                                    dataMap |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
+                                                    dataMap
+                                                    |> SpreadsheetInterface.UpdateDatamap
+                                                    |> InterfaceMsg
+                                                    |> dispatch
+
                                                 Components.Metadata.Assay.Main(assay, setAssay, setAssayDataMap, model)
-                                            | Some (ArcFiles.Study (study, assays)) ->
+                                            | Some(ArcFiles.Study(study, assays)) ->
                                                 let setStudy (study, assays) =
-                                                    (study, assays) |> Study |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                                                    (study, assays)
+                                                    |> Study
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
                                                 let setStudyDataMap study dataMap =
-                                                    dataMap |> SpreadsheetInterface.UpdateDatamap |> InterfaceMsg |> dispatch
-                                                Components.Metadata.Study.Main(study, assays, setStudy, setStudyDataMap, model)
-                                            | Some (ArcFiles.Investigation investigation) ->
+                                                    dataMap
+                                                    |> SpreadsheetInterface.UpdateDatamap
+                                                    |> InterfaceMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Study.Main(
+                                                    study,
+                                                    assays,
+                                                    setStudy,
+                                                    setStudyDataMap,
+                                                    model
+                                                )
+                                            | Some(ArcFiles.Investigation investigation) ->
                                                 let setInvesigation investigation =
-                                                    investigation |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-                                                Components.Metadata.Investigation.Main(investigation, setInvesigation, model)
-                                            | Some (ArcFiles.Template template) ->
+                                                    investigation
+                                                    |> Investigation
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Investigation.Main(
+                                                    investigation,
+                                                    setInvesigation,
+                                                    model
+                                                )
+                                            | Some(ArcFiles.Template template) ->
                                                 let setTemplate template =
-                                                    template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+                                                    template
+                                                    |> ArcFiles.Template
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
                                                 Components.Metadata.Template.Main(template, setTemplate)
-                                            | None ->
-                                                Html.none
+                                            | None -> Html.none
                                         ]
                                     ]
                                 ]

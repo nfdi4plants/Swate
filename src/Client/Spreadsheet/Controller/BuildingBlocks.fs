@@ -20,72 +20,113 @@ module SidebarControllerAux =
     let getNextColumnIndex (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
         if not state.SelectedCells.IsEmpty then
-            let indexNextToSelected = state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1
+            let indexNextToSelected =
+                state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1
+
             indexNextToSelected
         else
             state.ActiveTable.ColumnCount
 
 module SanityChecks =
     /// Make sure only one column is selected
-    let verifyOnlyOneColumnSelected (selectedCells: (int*int) [])=
+    let verifyOnlyOneColumnSelected (selectedCells: (int * int)[]) =
         let isOneColumn =
             let columnIndex = fst selectedCells.[0] // can just use head of selected cells as all must be same column
             selectedCells |> Array.forall (fun x -> fst x = columnIndex)
-        if not isOneColumn then failwith "Can only paste term in one column at a time!"
+
+        if not isOneColumn then
+            failwith "Can only paste term in one column at a time!"
 
 
 open SidebarControllerAux
 
-let addBuildingBlock(newColumn: CompositeColumn) (state: Spreadsheet.Model) : Messages.Msg * Spreadsheet.Model =
+let addBuildingBlock (newColumn: CompositeColumn) (state: Spreadsheet.Model) : Messages.Msg * Spreadsheet.Model =
     let table = state.ActiveTable
     // add one to last column index OR to selected column index to append one to the right.
     let mutable nextIndex = getNextColumnIndex state
     let mutable newColumn = newColumn
+
     let msg =
         // nested if cases to only run table operations if necessary
         if newColumn.Header.isOutput then
             let hasOutput = table.TryGetOutputColumn()
+
             if hasOutput.IsSome then
-                let txt = $"Found existing output column. Changed output column to \"{newColumn.Header.ToString()}\"."
-                let msg0 = Model.ModalState.GeneralModals.Warning txt |> Model.ModalState.ModalTypes.GeneralModal |> Some |> Messages.UpdateModal
-                newColumn <- {newColumn with Cells = hasOutput.Value.Cells}
+                let txt =
+                    $"Found existing output column. Changed output column to \"{newColumn.Header.ToString()}\"."
+
+                let msg0 =
+                    Model.ModalState.GeneralModals.Warning txt
+                    |> Model.ModalState.ModalTypes.GeneralModal
+                    |> Some
+                    |> Messages.UpdateModal
+
+                newColumn <- {
+                    newColumn with
+                        Cells = hasOutput.Value.Cells
+                }
+
                 msg0
             else
                 Messages.Msg.DoNothing
         elif newColumn.Header.isInput then
             let hasInput = table.TryGetInputColumn()
+
             if hasInput.IsSome then
-                let txt = $"Found existing input column. Changed input column to \"{newColumn.Header.ToString()}\"."
-                let msg0 = Model.ModalState.GeneralModals.Warning txt |> Model.ModalState.ModalTypes.GeneralModal |> Some |> Messages.UpdateModal
-                newColumn <- {newColumn with Cells = hasInput.Value.Cells}
+                let txt =
+                    $"Found existing input column. Changed input column to \"{newColumn.Header.ToString()}\"."
+
+                let msg0 =
+                    Model.ModalState.GeneralModals.Warning txt
+                    |> Model.ModalState.ModalTypes.GeneralModal
+                    |> Some
+                    |> Messages.UpdateModal
+
+                newColumn <- {
+                    newColumn with
+                        Cells = hasInput.Value.Cells
+                }
+
                 msg0
             else
                 Messages.Msg.DoNothing
         else
             Messages.Msg.DoNothing
+
     table.AddColumn(newColumn.Header, newColumn.Cells, nextIndex, true)
-    msg, {state with ArcFile = state.ArcFile}
+    msg, { state with ArcFile = state.ArcFile }
 
 
-let addBuildingBlocks(newColumns: CompositeColumn []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let addBuildingBlocks (newColumns: CompositeColumn[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     let mutable newColumns = newColumns
     let mutable nextIndex = getNextColumnIndex state
-    table.AddColumns(newColumns,nextIndex)
-    {state with ArcFile = state.ArcFile}
+    table.AddColumns(newColumns, nextIndex)
+    { state with ArcFile = state.ArcFile }
 
-let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; fileType: string; targetColumn: DataAnnotator.TargetColumn |}) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let tryIfNone() =
+let addDataAnnotation
+    (data:
+        {|
+            fragmentSelectors: string[]
+            fileName: string
+            fileType: string
+            targetColumn: DataAnnotator.TargetColumn
+        |})
+    (state: Spreadsheet.Model)
+    : Spreadsheet.Model =
+    let tryIfNone () =
         match state.ActiveTable.TryGetInputColumn(), state.ActiveTable.TryGetOutputColumn() with
         | Some _, None
-        | None, None        -> CompositeHeader.Output IOType.Data
-        | None, Some _      -> CompositeHeader.Input IOType.Data
-        | Some _, Some _    -> failwith "Both Input and Output columns exist and no target column was specified"
+        | None, None -> CompositeHeader.Output IOType.Data
+        | None, Some _ -> CompositeHeader.Input IOType.Data
+        | Some _, Some _ -> failwith "Both Input and Output columns exist and no target column was specified"
+
     let newHeader =
         match data.targetColumn with
-        | DataAnnotator.TargetColumn.Input      -> CompositeHeader.Input IOType.Data
-        | DataAnnotator.TargetColumn.Output     -> CompositeHeader.Output IOType.Data
-        | DataAnnotator.TargetColumn.Autodetect -> tryIfNone()
+        | DataAnnotator.TargetColumn.Input -> CompositeHeader.Input IOType.Data
+        | DataAnnotator.TargetColumn.Output -> CompositeHeader.Output IOType.Data
+        | DataAnnotator.TargetColumn.Autodetect -> tryIfNone ()
+
     let values = [|
         for selector in data.fragmentSelectors do
             let d = Data()
@@ -95,29 +136,42 @@ let addDataAnnotation (data: {| fragmentSelectors: string []; fileName: string; 
             d.SelectorFormat <- Some Swate.Components.Shared.URLs.Data.SelectorFormat.csv
             CompositeCell.createData d
     |]
-    state.ActiveTable.AddColumn(newHeader, values, forceReplace=true)
-    {state with ArcFile = state.ArcFile}
 
-let joinTable(tableToAdd: ArcTable) (index: int option) (options: TableJoinOptions option) (state: Spreadsheet.Model) (templateName:string option): Spreadsheet.Model =
+    state.ActiveTable.AddColumn(newHeader, values, forceReplace = true)
+    { state with ArcFile = state.ArcFile }
+
+let joinTable
+    (tableToAdd: ArcTable)
+    (index: int option)
+    (options: TableJoinOptions option)
+    (state: Spreadsheet.Model)
+    (templateName: string option)
+    : Spreadsheet.Model =
 
     if templateName.IsSome then
         //Should be updated to remove all kinds of extra symbols
-        let templateName = System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
-        let newTable = ArcTable.create(templateName, state.ActiveTable.Headers, state.ActiveTable.Values)
+        let templateName =
+            System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
+
+        let newTable =
+            ArcTable.create (templateName, state.ActiveTable.Headers, state.ActiveTable.Values)
+
         state.ArcFile.Value.Tables().SetTable(state.ActiveTable.Name, newTable)
 
     let table = state.ActiveTable
-    table.Join(tableToAdd,?index=index, ?joinOptions=options, forceReplace=true)
-    {state with ArcFile = state.ArcFile}
+    table.Join(tableToAdd, ?index = index, ?joinOptions = options, forceReplace = true)
+    { state with ArcFile = state.ArcFile }
 
-let insertTerm_IntoSelected (term:OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let insertTerm_IntoSelected (term: OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let selected = state.SelectedCells |> Set.toArray
     SanityChecks.verifyOnlyOneColumnSelected selected
+
     for (colIndex, rowIndex) in selected do
-        let c = Generic.getCell (colIndex,rowIndex) state
+        let c = Generic.getCell (colIndex, rowIndex) state
         let newCell = c.UpdateWithOA term
-        Controller.Generic.setCell (colIndex,rowIndex) newCell state
-    {state with ArcFile = state.ArcFile}
+        Controller.Generic.setCell (colIndex, rowIndex) newCell state
+
+    { state with ArcFile = state.ArcFile }
 
 //let insertCells_IntoSelected (term:CompositeCell []) (state: Spreadsheet.Model) : Spreadsheet.Model =
 //    let table = state.ActiveTable

@@ -26,190 +26,246 @@ module Impl =
         let mutable passive = false
 
         try
-            if isWindowDefined() && isWindowListenerFunction() then
-                let options =
-                    jsOptions<AddEventListenerOptions>(fun o ->
-                        o.passive <- true
-                    )
+            if isWindowDefined () && isWindowListenerFunction () then
+                let options = jsOptions<AddEventListenerOptions> (fun o -> o.passive <- true)
 
-                window.addEventListener("testPassiveEventSupport", ignore, options)
-                window.removeEventListener("testPassiveEventSupport", ignore)
-        with _ -> ()
+                window.addEventListener ("testPassiveEventSupport", ignore, options)
+                window.removeEventListener ("testPassiveEventSupport", ignore)
+        with _ ->
+            ()
 
         passive
 
-    let defaultPassive = jsOptions<AddEventListenerOptions>(fun o -> o.passive <- true)
+    let defaultPassive = jsOptions<AddEventListenerOptions> (fun o -> o.passive <- true)
 
     let adjustPassive (maybeOptions: AddEventListenerOptions option) =
         maybeOptions
         |> Option.map (fun options ->
             if options.passive && not allowsPassiveEvents then
-                jsOptions<AddEventListenerOptions>(fun o ->
+                jsOptions<AddEventListenerOptions> (fun o ->
                     o.capture <- options.capture
                     o.once <- options.once
-                    o.passive <- false
-                )
-            else options)
+                    o.passive <- false)
+            else
+                options)
 
     let createRemoveOptions (maybeOptions: AddEventListenerOptions option) =
         maybeOptions
         |> Option.bind (fun options ->
             if options.capture then
-                Some (jsOptions<RemoveEventListenerOptions>(fun o -> o.capture <- true))
-            else None)
+                Some(jsOptions<RemoveEventListenerOptions> (fun o -> o.capture <- true))
+            else
+                None)
 
 type React =
-    
+
     static member inline useDebouncedCallback<'A>(func: 'A -> unit, ?delay: int) =
-        let timeout = React.useRef(None)
+        let timeout = React.useRef (None)
         let delay = defaultArg delay 500
 
-        React.useCallback(
+        React.useCallback (
             (fun (arg: 'A) ->
 
-                let later = fun () ->
-                    timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
-                    func arg
+                let later =
+                    fun () ->
+                        timeout.current |> Option.iter (Fable.Core.JS.clearTimeout)
+                        func arg
 
-                timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
-                timeout.current <- Some(Fable.Core.JS.setTimeout later delay)
-            ),
+                timeout.current |> Option.iter (Fable.Core.JS.clearTimeout)
+                timeout.current <- Some(Fable.Core.JS.setTimeout later delay)),
             [| func; delay |]
         )
 
-    static member inline useDebouncedCallbackWithCancel<'A>(func: 'A -> unit, ?delay: int, ?oncancel: unit -> unit, ?ondebouncestart: unit -> unit, ?ondebouncerun: unit -> unit) =
-        let timeout = React.useRef(None)
+    static member inline useDebouncedCallbackWithCancel<'A>
+        (
+            func: 'A -> unit,
+            ?delay: int,
+            ?oncancel: unit -> unit,
+            ?ondebouncestart: unit -> unit,
+            ?ondebouncerun: unit -> unit
+        ) =
+        let timeout = React.useRef (None)
         let delay = defaultArg delay 500
 
-        let debouncedCallBack = React.useCallback(
-            (fun (arg: 'A) ->
+        let debouncedCallBack =
+            React.useCallback (
+                (fun (arg: 'A) ->
 
-                let later = fun () ->
-                    timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
-                    ondebouncerun |> Option.iter(fun f -> f())
-                    func arg
+                    let later =
+                        fun () ->
+                            timeout.current |> Option.iter (Fable.Core.JS.clearTimeout)
+                            ondebouncerun |> Option.iter (fun f -> f ())
+                            func arg
 
-                ondebouncestart |> Option.iter(fun f -> f())
-                timeout.current |> Option.iter(Fable.Core.JS.clearTimeout)
-                timeout.current <- Some(Fable.Core.JS.setTimeout later delay)
-            ),
-            [| func; delay |]
-        )
-        let cancel = React.useCallback(
-            (fun () ->
-                if timeout.current.IsSome then
-                    Fable.Core.JS.clearTimeout(timeout.current.Value)
-                    oncancel |> Option.iter(fun f -> f())
+                    ondebouncestart |> Option.iter (fun f -> f ())
+                    timeout.current |> Option.iter (Fable.Core.JS.clearTimeout)
+                    timeout.current <- Some(Fable.Core.JS.setTimeout later delay)),
+                [| func; delay |]
             )
-        )
+
+        let cancel =
+            React.useCallback (
+                (fun () ->
+                    if timeout.current.IsSome then
+                        Fable.Core.JS.clearTimeout (timeout.current.Value)
+                        oncancel |> Option.iter (fun f -> f ()))
+            )
+
         cancel, debouncedCallBack
 
     [<ImportMember("@uidotdev/usehooks")>]
-    static member useLocalStorage<'A>(key: string, defaultValue: 'A): ('A * ('A -> unit)) = jsNative
+    static member useLocalStorage<'A>(key: string, defaultValue: 'A) : ('A * ('A -> unit)) = jsNative
 
-[<Erase;RequireQualifiedAccess>]
+[<Erase; RequireQualifiedAccess>]
 module React =
 
     [<Erase>]
     type useListener =
-        static member inline on (eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions, ?dependencies: obj []) =
-            let addOptions = React.useMemo((fun () -> Impl.adjustPassive options), [| options |])
-            let removeOptions = React.useMemo((fun () -> Impl.createRemoveOptions options), [| options |])
-            let fn = React.useMemo((fun () -> unbox<#Event> >> action), [| action; if dependencies.IsSome then yield! dependencies.Value |])
+        static member inline on
+            (eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions, ?dependencies: obj[])
+            =
+            let addOptions =
+                React.useMemo ((fun () -> Impl.adjustPassive options), [| options |])
 
-            let listener = React.useCallbackRef(fun () ->
-                match addOptions with
-                | Some options ->
-                    document.addEventListener(eventType, fn, options)
-                | None -> document.addEventListener(eventType, fn)
+            let removeOptions =
+                React.useMemo ((fun () -> Impl.createRemoveOptions options), [| options |])
 
-                React.createDisposable(fun () ->
-                    match removeOptions with
-                    | Some options -> document.removeEventListener(eventType, fn, options)
-                    | None -> document.removeEventListener(eventType, fn)
+            let fn =
+                React.useMemo (
+                    (fun () -> unbox<#Event> >> action),
+                    [|
+                        action
+                        if dependencies.IsSome then
+                            yield! dependencies.Value
+                    |]
                 )
-            )
 
-            React.useEffect(listener)
+            let listener =
+                React.useCallbackRef (fun () ->
+                    match addOptions with
+                    | Some options -> document.addEventListener (eventType, fn, options)
+                    | None -> document.addEventListener (eventType, fn)
 
-        static member inline onMouseDown (action: MouseEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
-            useListener.on("mousedown", action, ?options = options, ?dependencies = dependencies)
-        static member inline onTouchStart (action: TouchEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
-            useListener.on("touchstart", action, ?options = options, ?dependencies = dependencies)
+                    React.createDisposable (fun () ->
+                        match removeOptions with
+                        | Some options -> document.removeEventListener (eventType, fn, options)
+                        | None -> document.removeEventListener (eventType, fn)))
 
-        static member inline onResize (action: Event -> unit, ?options: AddEventListenerOptions) =
-            useListener.on("resize", action, ?options = options)
+            React.useEffect (listener)
+
+        static member inline onMouseDown(action: MouseEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
+            useListener.on ("mousedown", action, ?options = options, ?dependencies = dependencies)
+
+        static member inline onTouchStart
+            (action: TouchEvent -> unit, ?options: AddEventListenerOptions, ?dependencies)
+            =
+            useListener.on ("touchstart", action, ?options = options, ?dependencies = dependencies)
+
+        static member inline onResize(action: Event -> unit, ?options: AddEventListenerOptions) =
+            useListener.on ("resize", action, ?options = options)
 
         /// Invokes the callback when a click event is not within the given element.
         ///
         /// Uses separate handlers for touch and mouse events.
         ///
         /// This listener is passive by default.
-        static member inline onClickAway (elemRef: IRefValue<#HTMLElement option>, callback: MouseEvent -> unit, touchCallback: TouchEvent -> unit, ?options: AddEventListenerOptions) =
+        static member inline onClickAway
+            (
+                elemRef: IRefValue<#HTMLElement option>,
+                callback: MouseEvent -> unit,
+                touchCallback: TouchEvent -> unit,
+                ?options: AddEventListenerOptions
+            ) =
             let options = Option.defaultValue Impl.defaultPassive options
 
-            useListener.onMouseDown((fun ev ->
-                match elemRef.current with
-                | Some elem when not (elem.contains(unbox ev.target)) ->
-                    callback ev
-                | _ -> ()
-            ), options)
+            useListener.onMouseDown (
+                (fun ev ->
+                    match elemRef.current with
+                    | Some elem when not (elem.contains (unbox ev.target)) -> callback ev
+                    | _ -> ()),
+                options
+            )
 
-            useListener.onTouchStart((fun ev ->
-                match elemRef.current with
-                | Some elem when not (elem.contains(unbox ev.target)) ->
-                    touchCallback ev
-                | _ -> ()
-            ), options)
+            useListener.onTouchStart (
+                (fun ev ->
+                    match elemRef.current with
+                    | Some elem when not (elem.contains (unbox ev.target)) -> touchCallback ev
+                    | _ -> ()),
+                options
+            )
 
         /// Invokes the callback when a click event is not within the given element.
         ///
         /// Shares a common callback for both touch and mouse events.
         ///
         /// This listener is passive by default.
-        static member inline onClickAway (elemRef: IRefValue<#HTMLElement option>, callback: UIEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
+        static member inline onClickAway
+            (
+                elemRef: IRefValue<#HTMLElement option>,
+                callback: UIEvent -> unit,
+                ?options: AddEventListenerOptions,
+                ?dependencies
+            ) =
             let options = Option.defaultValue Impl.defaultPassive options
 
-            useListener.onMouseDown((fun ev ->
-                match elemRef.current with
-                | Some elem when not (elem.contains(unbox ev.target)) ->
-                    callback ev
-                | _ -> ()
-            ), options, ?dependencies = dependencies)
+            useListener.onMouseDown (
+                (fun ev ->
+                    match elemRef.current with
+                    | Some elem when not (elem.contains (unbox ev.target)) -> callback ev
+                    | _ -> ()),
+                options,
+                ?dependencies = dependencies
+            )
 
-            useListener.onTouchStart((fun ev ->
-                match elemRef.current with
-                | Some elem when not (elem.contains(unbox ev.target)) ->
-                    callback ev
-                | _ -> ()
-            ), options, ?dependencies = dependencies)
+            useListener.onTouchStart (
+                (fun ev ->
+                    match elemRef.current with
+                    | Some elem when not (elem.contains (unbox ev.target)) -> callback ev
+                    | _ -> ()),
+                options,
+                ?dependencies = dependencies
+            )
 
     [<Erase>]
     type useElementListener =
-        static member inline on (elemRef: IRefValue<#HTMLElement option>, eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions) =
-            let addOptions = React.useMemo((fun () -> Impl.adjustPassive options), [| options |])
-            let removeOptions = React.useMemo((fun () -> Impl.createRemoveOptions options), [| options |])
-            let fn = React.useMemo((fun () -> unbox<#Event> >> action), [| action |])
+        static member inline on
+            (
+                elemRef: IRefValue<#HTMLElement option>,
+                eventType: string,
+                action: #Event -> unit,
+                ?options: AddEventListenerOptions
+            ) =
+            let addOptions =
+                React.useMemo ((fun () -> Impl.adjustPassive options), [| options |])
 
-            let listener = React.useCallbackRef(fun () ->
-                elemRef.current |> Option.iter(fun elem ->
-                    match addOptions with
-                    | Some options -> elem.addEventListener(eventType, fn, options)
-                    | None -> elem.addEventListener(eventType, fn)
-                )
+            let removeOptions =
+                React.useMemo ((fun () -> Impl.createRemoveOptions options), [| options |])
 
-                React.createDisposable(fun () ->
-                    elemRef.current |> Option.iter(fun elem ->
-                        match removeOptions with
-                        | Some options -> elem.removeEventListener(eventType, fn, options)
-                        | None -> elem.removeEventListener(eventType, fn)
-                ))
-            )
+            let fn = React.useMemo ((fun () -> unbox<#Event> >> action), [| action |])
 
-            React.useEffect(listener)
+            let listener =
+                React.useCallbackRef (fun () ->
+                    elemRef.current
+                    |> Option.iter (fun elem ->
+                        match addOptions with
+                        | Some options -> elem.addEventListener (eventType, fn, options)
+                        | None -> elem.addEventListener (eventType, fn))
 
-        static member inline onResize (elemRef: IRefValue<#HTMLElement option>, action: Event -> unit, ?options: AddEventListenerOptions) =
-            useElementListener.on(elemRef, "resize", action, ?options = options)
+                    React.createDisposable (fun () ->
+                        elemRef.current
+                        |> Option.iter (fun elem ->
+                            match removeOptions with
+                            | Some options -> elem.removeEventListener (eventType, fn, options)
+                            | None -> elem.removeEventListener (eventType, fn))))
 
-        static member inline onKeyDown (elemRef: IRefValue<#HTMLElement option>, action: KeyboardEvent -> unit, ?options: AddEventListenerOptions) =
-            useElementListener.on(elemRef, "keydown", action, ?options = options)
+            React.useEffect (listener)
+
+        static member inline onResize
+            (elemRef: IRefValue<#HTMLElement option>, action: Event -> unit, ?options: AddEventListenerOptions)
+            =
+            useElementListener.on (elemRef, "resize", action, ?options = options)
+
+        static member inline onKeyDown
+            (elemRef: IRefValue<#HTMLElement option>, action: KeyboardEvent -> unit, ?options: AddEventListenerOptions)
+            =
+            useElementListener.on (elemRef, "keydown", action, ?options = options)

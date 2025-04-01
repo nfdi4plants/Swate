@@ -10,22 +10,23 @@ module ControllerTableAux =
 
     let rec createNewTableName (ind: int) names =
         let name = "NewTable" + string ind
+
         if Seq.contains name names then
-            createNewTableName (ind+1) names
+            createNewTableName (ind + 1) names
         else
             name
 
-    let findEarlierTable (tableIndex:int) (tables: ArcTables) =
-        let indices = [ 0 .. tables.TableCount-1 ]
+    let findEarlierTable (tableIndex: int) (tables: ArcTables) =
+        let indices = [ 0 .. tables.TableCount - 1 ]
         let lower = indices |> Seq.tryFindBack (fun k -> k < tableIndex)
         Option.map (fun i -> i, tables.GetTableAt i) lower
 
-    let findLaterTable (tableIndex:int) (tables: ArcTables) =
-        let indices = [ 0 .. tables.TableCount-1 ]
+    let findLaterTable (tableIndex: int) (tables: ArcTables) =
+        let indices = [ 0 .. tables.TableCount - 1 ]
         let higher = indices |> Seq.tryFind (fun k -> k > tableIndex)
         Option.map (fun i -> i, tables.GetTableAt i) higher
 
-    let findNeighborTables (tableIndex:int) (tables: ArcTables) =
+    let findNeighborTables (tableIndex: int) (tables: ArcTables) =
         findEarlierTable tableIndex tables, findLaterTable tableIndex tables
 
 open ControllerTableAux
@@ -33,11 +34,12 @@ open ControllerTableAux
 let switchTable (nextIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     match state.ActiveView with
     | ActiveView.Table i when i = nextIndex -> state
-    | _ ->
-        { state with
+    | _ -> {
+        state with
             ActiveCell = None
             SelectedCells = Set.empty
-            ActiveView = ActiveView.Table nextIndex }
+            ActiveView = ActiveView.Table nextIndex
+      }
 
 /// <summary>This is the basic function to create new Tables from an array of SwateBuildingBlocks</summary>
 let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -46,35 +48,37 @@ let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model
 
 
 /// <summary>This function is used to create multiple tables at once.</summary>
-let addTables (tables: ArcTable []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let addTables (tables: ArcTable[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.Tables.AddTables(tables)
     switchTable (state.Tables.TableCount - 1) state
 
 
 /// <summary>Adds the most basic empty Swate table with auto generated name.</summary>
-let createTable (usePrevOutput:bool) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let createTable (usePrevOutput: bool) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let tables = state.ArcFile.Value.Tables()
     let newName = createNewTableName 0 tables.TableNames
-    let newTable = ArcTable.init(newName)
-    if usePrevOutput && ((tables.TableCount-1) >= state.ActiveView.ViewIndex) then
+    let newTable = ArcTable.init (newName)
+
+    if usePrevOutput && ((tables.TableCount - 1) >= state.ActiveView.ViewIndex) then
         let table = tables.GetTableAt(state.ActiveView.ViewIndex)
         let output = table.GetOutputColumn()
         let newInput = output.Header.TryOutput().Value |> CompositeHeader.Input
-        newTable.AddColumn(newInput,output.Cells,forceReplace=true)
-    let nextState = {state with ArcFile = state.ArcFile}
+        newTable.AddColumn(newInput, output.Cells, forceReplace = true)
+
+    let nextState = { state with ArcFile = state.ArcFile }
     addTable newTable nextState
 
-let updateTableOrder (prevIndex:int, newIndex:int) (state:Spreadsheet.Model) =
+let updateTableOrder (prevIndex: int, newIndex: int) (state: Spreadsheet.Model) =
     state.Tables.MoveTable(prevIndex, newIndex)
-    {state with ArcFile = state.ArcFile}
+    { state with ArcFile = state.ArcFile }
 
 let resetTableState () : Spreadsheet.Model =
     LocalHistory.Model.ResetHistoryWebStorage()
-    Spreadsheet.Model.init()
+    Spreadsheet.Model.init ()
 
-let renameTable (tableIndex:int) (newName: string) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    state.Tables.RenameTableAt(tableIndex,newName)
-    {state with ArcFile = state.ArcFile}
+let renameTable (tableIndex: int) (newName: string) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    state.Tables.RenameTableAt(tableIndex, newName)
+    { state with ArcFile = state.ArcFile }
 
 let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     if state.Tables.TableCount = 0 then
@@ -85,81 +89,107 @@ let removeTable (removeIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Mode
         match state.ActiveView with
         | ActiveView.Table i when i = removeIndex ->
             let neighbors = findNeighborTables removeIndex state.Tables
+
             match neighbors with
-            | Some (i, _), _ ->
-                switchTable i state
-            | None, Some (i, _) ->
-                switchTable i state
-            | _ -> { state with ActiveView = ActiveView.Metadata }
+            | Some(i, _), _ -> switchTable i state
+            | None, Some(i, _) -> switchTable i state
+            | _ -> {
+                state with
+                    ActiveView = ActiveView.Metadata
+              }
         | ActiveView.Table i -> // Tables still exist and an inactive one was removed. Just remove it.
             let nextTableIndex = if i > removeIndex then i - 1 else i
-            { state with
-                ActiveView = ActiveView.Table nextTableIndex }
-        | _ -> {state with ActiveView = ActiveView.Metadata }
+
+            {
+                state with
+                    ActiveView = ActiveView.Table nextTableIndex
+            }
+        | _ -> {
+            state with
+                ActiveView = ActiveView.Metadata
+          }
 
 ///<summary>Add `n` rows to active table.</summary>
 let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.AddRowsEmpty(n)
-    {state with ArcFile = state.ArcFile}
+    { state with ArcFile = state.ArcFile }
 
 let deleteRow (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveRow index
-    {state with
-        ArcFile = state.ArcFile
-        SelectedCells = Set.empty }
 
-let deleteRows (indexArr: int []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    {
+        state with
+            ArcFile = state.ArcFile
+            SelectedCells = Set.empty
+    }
+
+let deleteRows (indexArr: int[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveRows indexArr
-    {state with
-        ArcFile = state.ArcFile
-        SelectedCells = Set.empty }
+
+    {
+        state with
+            ArcFile = state.ArcFile
+            SelectedCells = Set.empty
+    }
 
 
 let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveColumn index
-    {state with
-        ArcFile = state.ArcFile
-        SelectedCells = Set.empty}
+
+    {
+        state with
+            ArcFile = state.ArcFile
+            SelectedCells = Set.empty
+    }
 
 let setColumn (index: int) (column: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    state.ActiveTable.UpdateColumn (index, column.Header, column.Cells)
-    {state with
-        ArcFile = state.ArcFile
-        SelectedCells = Set.empty}
+    state.ActiveTable.UpdateColumn(index, column.Header, column.Cells)
+
+    {
+        state with
+            ArcFile = state.ArcFile
+            SelectedCells = Set.empty
+    }
 
 let moveColumn (current: int) (next: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    state.ActiveTable.MoveColumn (current, next)
-    {state with
-        ArcFile = state.ArcFile
-        SelectedCells = Set.empty }
+    state.ActiveTable.MoveColumn(current, next)
 
-let fillColumnWithCell (index: int*int) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    {
+        state with
+            ArcFile = state.ArcFile
+            SelectedCells = Set.empty
+    }
+
+let fillColumnWithCell (index: int * int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = Generic.getCell index state
     let columnIndex = fst index
+
     for ri in 0 .. Generic.getRowCount state - 1 do
         let copy = cell.Copy()
         Generic.setCell (columnIndex, ri) copy state
-    {state with ArcFile = state.ArcFile}
+
+    { state with ArcFile = state.ArcFile }
 
 /// <summary>
 /// Transform cells of given indices to their empty equivalents
 /// </summary>
 /// <param name="indexArr"></param>
 /// <param name="state"></param>
-let clearCells (indexArr: (int*int) []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let clearCells (indexArr: (int * int)[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let newCells = [|
         for index in indexArr do
             let cell = Generic.getCell index state
             let emptyCell = cell.GetEmptyCell()
             index, emptyCell
     |]
+
     Generic.setCells newCells state
     state
 
 open Fable.Core.JsInterop
 open System
 
-let selectRelativeCell (index: int*int) (move: int*int) (maxColumnIndex: int) (maxRowIndex: int) =
+let selectRelativeCell (index: int * int) (move: int * int) (maxColumnIndex: int) (maxRowIndex: int) =
     //let index =
     //    match index with
     //    | U2.Case2 index -> index,-1

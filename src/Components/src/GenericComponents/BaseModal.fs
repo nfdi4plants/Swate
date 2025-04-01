@@ -9,15 +9,17 @@ open Fable.Core
 type BaseModal =
 
     [<ReactComponent(true)>]
-    static member BaseModal (
-        rmv,
-        ?modalClassInfo: string,
-        ?header: ReactElement,
-        ?modalActivity: ReactElement,
-        ?content: ReactElement seq,
-        ?contentClassInfo: string,
-        ?footer: ReactElement,
-        ?debug: bool) =
+    static member BaseModal
+        (
+            rmv,
+            ?modalClassInfo: string,
+            ?header: ReactElement,
+            ?modalActivity: ReactElement,
+            ?content: ReactElement seq,
+            ?contentClassInfo: string,
+            ?footer: ReactElement,
+            ?debug: bool
+        ) =
 
         let debug = defaultArg debug false
 
@@ -39,17 +41,12 @@ type BaseModal =
                             prop.children [
                                 if header.IsSome then
                                     header.Value
-                                Components.DeleteButton(props=[
-                                    prop.className "ml-auto"
-                                    prop.onClick rmv
-                                ])
+                                Components.DeleteButton(props = [ prop.className "ml-auto"; prop.onClick rmv ])
                             ]
                         ]
                         // Modal specific action
                         if modalActivity.IsSome then
-                            Html.div [
-                                modalActivity.Value
-                            ]
+                            Html.div [ modalActivity.Value ]
                         // Scrollable content
                         if content.IsSome then
                             Html.div [
@@ -65,9 +62,7 @@ type BaseModal =
                             ]
                         // Footer
                         if footer.IsSome then
-                            Daisy.cardActions [
-                                footer.Value
-                            ]
+                            Daisy.cardActions [ footer.Value ]
                     ]
                 ]
             ]

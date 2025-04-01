@@ -9,43 +9,44 @@ open Components
 open Components.Forms
 
 [<ReactComponent>]
-let Main(assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit, model: Model.Model) =
+let Main
+    (assay: ArcAssay, setArcAssay: ArcAssay -> unit, setDatamap: ArcAssay -> DataMap option -> unit, model: Model.Model)
+    =
     Generic.Section [
         Generic.BoxedField(
             "Assay Metadata",
             content = [
-                FormComponents.TextInput (
+                FormComponents.TextInput(
                     assay.Identifier,
                     (fun v ->
                         let nextAssay = IdentifierSetters.setAssayIdentifier v assay
-                        setArcAssay nextAssay
-                    ),
+                        setArcAssay nextAssay),
                     "Identifier",
-                    validator = {| fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s); msg = "Invalid Identifier" |},
+                    validator = {|
+                        fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s)
+                        msg = "Invalid Identifier"
+                    |},
                     disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
                 )
                 FormComponents.OntologyAnnotationInput(
                     assay.MeasurementType,
                     (fun oa ->
                         assay.MeasurementType <- oa
-                        setArcAssay <| assay
-                    ),
+                        setArcAssay <| assay),
                     "Measurement Type"
                 )
                 FormComponents.OntologyAnnotationInput(
                     assay.TechnologyType,
                     (fun oa ->
                         assay.TechnologyType <- oa
-                        setArcAssay <| assay
-                    ),
+                        setArcAssay <| assay),
                     "Technology Type"
                 )
                 FormComponents.OntologyAnnotationInput(
                     assay.TechnologyPlatform,
                     (fun oa ->
                         assay.TechnologyPlatform <- oa
-                        setArcAssay <| assay
-                    ),
+                        setArcAssay <| assay),
                     "Technology Platform"
                 )
                 FormComponents.PersonsInput(

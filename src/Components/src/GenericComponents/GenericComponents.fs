@@ -14,9 +14,11 @@ type Components =
     static member DeleteButton(?children, ?props) =
         Daisy.button.button [
             button.square
-            if props.IsSome then yield! props.Value
+            if props.IsSome then
+                yield! props.Value
             prop.children [
-                if children.IsSome then yield! children.Value
+                if children.IsSome then
+                    yield! children.Value
                 Svg.svg [
                     svg.xmlns "http://www.w3.org/2000/svg"
                     svg.className "h-6 w-6"
@@ -39,21 +41,35 @@ type Components =
         Html.label [
             prop.className [
                 "btn btn-square swap swap-rotate grow-0"
-                if classes.IsSome then classes.Value
+                if classes.IsSome then
+                    classes.Value
             ]
-            prop.onClick (fun e -> e.preventDefault(); e.stopPropagation(); not isCollapsed |> setIsCollapsed)
+            prop.onClick (fun e ->
+                e.preventDefault ()
+                e.stopPropagation ()
+                not isCollapsed |> setIsCollapsed)
             prop.children [
-                Html.input [prop.type'.checkbox; prop.isChecked isCollapsed; prop.onChange(fun (_:bool) -> ())]
+                Html.input [
+                    prop.type'.checkbox
+                    prop.isChecked isCollapsed
+                    prop.onChange (fun (_: bool) -> ())
+                ]
                 Html.i [
                     prop.className [
                         "swap-off fa-solid"
-                        if collapsedIcon.IsSome then collapsedIcon.Value else "fa-solid fa-chevron-down"
+                        if collapsedIcon.IsSome then
+                            collapsedIcon.Value
+                        else
+                            "fa-solid fa-chevron-down"
                     ]
                 ]
                 Html.i [
                     prop.className [
                         "swap-on"
-                        if collapseIcon.IsSome then collapseIcon.Value else "fa-solid fa-x"
+                        if collapseIcon.IsSome then
+                            collapseIcon.Value
+                        else
+                            "fa-solid fa-x"
                     ]
                 ]
             ]

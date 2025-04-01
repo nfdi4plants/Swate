@@ -4,15 +4,19 @@ open System
 open Neo4j.Driver
 open Swate.Components.Shared.Database
 
-let defaultOutputWith<'a> (def:'a) (neo4jReturnVal:obj) =
-    if isNull neo4jReturnVal then def else neo4jReturnVal.As<'a>()
+let defaultOutputWith<'a> (def: 'a) (neo4jReturnVal: obj) =
+    if isNull neo4jReturnVal then
+        def
+    else
+        neo4jReturnVal.As<'a>()
 
 type Neo4JCredentials = {
-    User        : string
-    Pw          : string
-    BoltUrl     : string
+    User: string
+    Pw: string
+    BoltUrl: string
     DatabaseName: string
 } with
+
     static member UserVarString = "DB_USER"
     static member PwVarString = "DB_PASSWORD"
     static member UriVarString = "DB_URL"
@@ -36,27 +40,37 @@ module Regex =
         regex.Replace(query, eval)
 
 type FullTextSearch with
-    member this.ofQueryString(queryString:string) =
+    member this.ofQueryString(queryString: string) =
         let escaped = Regex.escapeQuery queryString
+
         match this with
-        | Exact         -> "\"" + queryString + "\""
-        | Complete      -> queryString + "*"
+        | Exact -> "\"" + queryString + "\""
+        | Complete -> queryString + "*"
         | PerformanceComplete ->
             let singleWordArr = escaped.Split(" ", System.StringSplitOptions.RemoveEmptyEntries)
             let count = singleWordArr.Length
+
             singleWordArr
             // add "+" to every word so the fulltext search must include the previous word, this highly improves search performance
-            |> Array.mapi (fun i str -> if i <> count-1 then "+" + str else str)
+            |> Array.mapi (fun i str -> if i <> count - 1 then "+" + str else str)
             |> String.concat " "
-        | Fuzzy         -> queryString.Replace(" ","~ ") + "~"
+        | Fuzzy -> queryString.Replace(" ", "~ ") + "~"
         |> fun x -> escaped, x
 
 type Neo4j =
 
     static member establishConnection(c: Neo4JCredentials) =
-        let driver = Neo4j.Driver.GraphDatabase.Driver(c.BoltUrl, Neo4j.Driver.AuthTokens.Basic(c.User,c.Pw), fun o ->
-            o.WithMaxTransactionRetryTime(TimeSpan.FromSeconds(3))
-                .WithConnectionTimeout(TimeSpan.FromSeconds(3)) |> ignore)
+        let driver =
+            Neo4j.Driver.GraphDatabase.Driver(
+                c.BoltUrl,
+                Neo4j.Driver.AuthTokens.Basic(c.User, c.Pw),
+                fun o ->
+                    o
+                        .WithMaxTransactionRetryTime(TimeSpan.FromSeconds(3))
+                        .WithConnectionTimeout(TimeSpan.FromSeconds(3))
+                    |> ignore
+            )
+
         printfn "established connection"
         driver.AsyncSession(SessionConfigBuilder.ForDatabase c.DatabaseName)
 
@@ -66,80 +80,109 @@ type Neo4j =
     /// <param name="resultAs">How to return query results. In the format of `(fun (record:IRecord) -> parsingFunction record)`.</param>
     /// <param name="credentials">Username, password, bolt-url and database name to create session with database.</param>
     /// <param name="session">Optional parameter to insert query into running session.</param>
-    static member runQuery(query:string,parameters:Map<string,'a> option,resultAs:IRecord -> 'T, ?credentials:Neo4JCredentials, ?session:IAsyncSession) =
-        if credentials.IsNone && session.IsNone then failwith "Cannot execute query without credentials or session parameter!"
-        let currentSession = if session.IsSome then session.Value else Neo4j.establishConnection(credentials.Value)
+    static member runQuery
+        (
+            query: string,
+            parameters: Map<string, 'a> option,
+            resultAs: IRecord -> 'T,
+            ?credentials: Neo4JCredentials,
+            ?session: IAsyncSession
+        ) =
+        if credentials.IsNone && session.IsNone then
+            failwith "Cannot execute query without credentials or session parameter!"
+
+        let currentSession =
+            if session.IsSome then
+                session.Value
+            else
+                Neo4j.establishConnection (credentials.Value)
+
         async {
             let! executeReadQuery =
                 if parameters.IsSome then
                     // Cast a whole lot of types to expected types by neo4j driver
                     let param =
                         parameters.Value
-                        |> Map.fold (fun s k v ->
-                            let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
-                            kvp::s
-                        ) []
-                        |> fun x -> Collections.Generic.Dictionary<string,obj>(x :> Collections.Generic.IEnumerable<_>)
+                        |> Map.fold
+                            (fun s k v ->
+                                let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
+                                kvp :: s)
+                            []
+                        |> fun x -> Collections.Generic.Dictionary<string, obj>(x :> Collections.Generic.IEnumerable<_>)
+
                     currentSession.RunAsync(
-                        Query(query,param),
-                        action = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                        Query(query, param),
+                        action =
+                            Action<TransactionConfigBuilder>(fun (config: TransactionConfigBuilder) ->
+                                config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
                     )
                 else
                     currentSession.RunAsync(
                         query,
-                        action = Action<TransactionConfigBuilder>(fun (config : TransactionConfigBuilder) -> config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                        action =
+                            Action<TransactionConfigBuilder>(fun (config: TransactionConfigBuilder) ->
+                                config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
                     )
                 |> Async.AwaitTask
-            let! dbValues =
-                executeReadQuery.ToListAsync()
-                |> Async.AwaitTask
+
+            let! dbValues = executeReadQuery.ToListAsync() |> Async.AwaitTask
             let parsedDbValues = dbValues |> Seq.map resultAs
-            if session.IsNone then currentSession.Dispose()
+
+            if session.IsNone then
+                currentSession.Dispose()
+
             return parsedDbValues
-        } |> Async.RunSynchronously
+        }
+        |> Async.RunSynchronously
 
     /// <summary>Standardized function to easily execute neo4j cypher queries in parallel.</summary>
     /// <param name="queryArr">Array of query information. See 'runQuery' for description of parameters.</param>
     /// <param name="credentials">Username, password, bolt-url and database name to create session with database.</param>
-    static member runQueries(queryArr: (string*(Map<string,'a> option)*(IRecord -> 'T)) [], credentials:Neo4JCredentials) =
+    static member runQueries
+        (queryArr: (string * (Map<string, 'a> option) * (IRecord -> 'T))[], credentials: Neo4JCredentials)
+        =
         async {
             // let! transaction = currentSession.BeginTransactionAsync() |> Async.AwaitTask
             let queries =
                 queryArr
-                |> Array.map (fun (q,p,resultAs) ->
+                |> Array.map (fun (q, p, resultAs) ->
                     // Cast a whole lot of types to expected types by neo4j driver
                     if p.IsSome then
                         let param =
                             p.Value
-                            |> Map.fold (fun s k v ->
-                                let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
-                                kvp::s
-                            ) []
-                            |> fun x -> Collections.Generic.Dictionary<string,obj>(x :> Collections.Generic.IEnumerable<_>)
-                        Query(q,param)
+                            |> Map.fold
+                                (fun s k v ->
+                                    let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
+                                    kvp :: s)
+                                []
+                            |> fun x ->
+                                Collections.Generic.Dictionary<string, obj>(x :> Collections.Generic.IEnumerable<_>)
+
+                        Query(q, param)
                     else
-                        Query(q)
-                )
+                        Query(q))
+
             let transactions =
                 queries
                 |> Array.map (fun query ->
-                    let currentSession = Neo4j.establishConnection(credentials)
-                    let transaction = currentSession.ExecuteReadAsync(fun tx ->
-                        async {
-                            let! result = tx.RunAsync query |> Async.AwaitTask
-                            return! result.ToListAsync() |> Async.AwaitTask
-                        }
-                        |> Async.StartAsTask
-                    )
-                    transaction
-                )
+                    let currentSession = Neo4j.establishConnection (credentials)
+
+                    let transaction =
+                        currentSession.ExecuteReadAsync(fun tx ->
+                            async {
+                                let! result = tx.RunAsync query |> Async.AwaitTask
+                                return! result.ToListAsync() |> Async.AwaitTask
+                            }
+                            |> Async.StartAsTask)
+
+                    transaction)
+
             let parsedToResult =
                 transactions
                 |> Array.mapi (fun i x ->
-                    let _,_,resultAs = queryArr.[i]
-                    Seq.map resultAs x.Result
-                    |> Array.ofSeq
-                )
+                    let _, _, resultAs = queryArr.[i]
+                    Seq.map resultAs x.Result |> Array.ofSeq)
+
             return parsedToResult
 
         }

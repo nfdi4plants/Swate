@@ -11,8 +11,7 @@ module Regex =
     /// (|Regex|_|) pattern input
     let (|Regex|_|) pattern input =
         let m = Regex.Match(input, pattern)
-        if m.Success then Some(m)
-        else None
+        if m.Success then Some(m) else None
 
 module Route =
 
@@ -22,64 +21,60 @@ module Route =
             // -> We want to keep fable-remoting's flexible for development and production.
             //      When we publish the components, we want to use the production URL.
             //      Both for npm and nuget packages.
-            #if SWATE_ENVIRONMENT || !FABLE_COMPILER
+#if SWATE_ENVIRONMENT || !FABLE_COMPILER
             ""
-            #else
+#else
             URLs.PRODUCTION_URL
-            #endif
+#endif
 
         sprintf "%s/api/%s/%s" prefix typeName methodName
 
 module SorensenDice =
 
-    let inline calculateDistance (x : Set<'T>) (y : Set<'T>) =
-        match  (x.Count, y.Count) with
+    let inline calculateDistance (x: Set<'T>) (y: Set<'T>) =
+        match (x.Count, y.Count) with
         | (0, 0) -> 1.
-        | (xCount,yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
+        | (xCount, yCount) -> (2. * (Set.intersect x y |> Set.count |> float)) / ((xCount + yCount) |> float)
 
-    let createBigrams (s:string) =
-        s
-            .ToUpperInvariant()
-            .ToCharArray()
+    let createBigrams (s: string) =
+        s.ToUpperInvariant().ToCharArray()
         |> Array.windowed 2
         |> Array.map (fun inner -> sprintf "%c%c" inner.[0] inner.[1])
         |> set
 
-    let sortBySimilarity (searchStr:string) (f: 'a -> string) (arrayToSort:'a []) =
+    let sortBySimilarity (searchStr: string) (f: 'a -> string) (arrayToSort: 'a[]) =
         let searchSet = searchStr |> createBigrams
+
         arrayToSort
         |> Array.sortByDescending (fun result ->
             let resultSet = f result |> createBigrams
-            calculateDistance resultSet searchSet
-        )
+            calculateDistance resultSet searchSet)
 
 open Swate.Components.Shared.DTOs
 
 type IOntologyAPIv3 = {
     // Development
-    getTestNumber           : unit                  -> Async<int>
-    searchTerm              : TermQuery          -> Async<Term []>
-    searchTerms             : TermQuery[]        -> Async<TermQueryResults[]>
-    getTermById             : string                -> Async<Term option>
-    searchChildTerms        : ParentTermQuery    -> Async<ParentTermQueryResults>
-    searchTermAdvanced      : AdvancedSearchQuery -> Async<Term []>
+    getTestNumber: unit -> Async<int>
+    searchTerm: TermQuery -> Async<Term[]>
+    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
+    getTermById: string -> Async<Term option>
+    searchChildTerms: ParentTermQuery -> Async<ParentTermQueryResults>
+    searchTermAdvanced: AdvancedSearchQuery -> Async<Term[]>
 }
 
 /// Development api
 type ITestAPI = {
-    test    : unit      -> Async<string*string>
-    postTest: string    -> Async<string*string>
+    test: unit -> Async<string * string>
+    postTest: string -> Async<string * string>
 }
 
-type IServiceAPIv1 = {
-    getAppVersion           : unit      -> Async<string>
-}
+type IServiceAPIv1 = { getAppVersion: unit -> Async<string> }
 
 
 type ITemplateAPIv1 = {
     // must return template as string, fable remoting cannot do conversion automatically
-    getTemplates                    : unit      -> Async<string>
-    getTemplateById                 : string    -> Async<string>
+    getTemplates: unit -> Async<string>
+    getTemplateById: string -> Async<string>
 }
 
 
@@ -142,34 +137,32 @@ module SwateObsolete =
             //let TermAccessionPattern = @"(?<=\()\S+[:_][^;)#]*(?=[\)\#])" //"[a-zA-Z0-9]+?[:_][a-zA-Z0-9]+"
 
             /// Hits term accession, without id: ENVO:01001831
-            let TermAnnotationShortPattern = $@"(?<{MatchGroups.idspace}>\w+?):(?<{MatchGroups.localID}>\w+)" //prev: @"[\w]+?:[\d]+"
+            let TermAnnotationShortPattern =
+                $@"(?<{MatchGroups.idspace}>\w+?):(?<{MatchGroups.localID}>\w+)" //prev: @"[\w]+?:[\d]+"
 
             // https://obofoundry.org/id-policy.html#mapping-of-owl-ids-to-obo-format-ids
             /// <summary>Regex pattern is designed to hit only Foundry-compliant URIs.</summary>
-            let TermAnnotationURIPattern = $@".*\/(?<{MatchGroups.idspace}>\w+?)[:_](?<{MatchGroups.localID}>\w+)"
+            let TermAnnotationURIPattern =
+                $@".*\/(?<{MatchGroups.idspace}>\w+?)[:_](?<{MatchGroups.localID}>\w+)"
 
         open Pattern
         open System
         open System.Text.RegularExpressions
 
-        let parseSquaredTermNameBrackets (headerStr:string) =
+        let parseSquaredTermNameBrackets (headerStr: string) =
             match headerStr with
             | Regex SquaredBracketsTermNamePattern value ->
                 // trim whitespace AND remove brackets
-                value.Value.Trim().[1..value.Length-2]
+                value.Value.Trim().[1 .. value.Length - 2]
                 // remove #id pattern
                 |> fun str -> Regex.Replace(str, IdPattern, "")
                 |> Some
-            | _ ->
-                None
+            | _ -> None
 
-        let parseCoreName (headerStr:string) =
+        let parseCoreName (headerStr: string) =
             match headerStr with
-            | Regex CoreNamePattern value ->
-                value.Value.Trim()
-                |> Some
-            | _ ->
-                None
+            | Regex CoreNamePattern value -> value.Value.Trim() |> Some
+            | _ -> None
 
         //let parseTermAccession (headerStr:string) =
         //    printfn "parse.."
@@ -181,80 +174,74 @@ module SwateObsolete =
         //        None
 
         /// <summary>This function can be used to extract `IDSPACE:LOCALID` (or: `Term Accession` from Swate header strings or obofoundry conform URI strings.</summary>
-        let parseTermAccession (headerStr:string) =
+        let parseTermAccession (headerStr: string) =
             match headerStr.Trim() with
-            | Regex TermAnnotationShortPattern value ->
-                value.Value.Trim()
-                |> Some
+            | Regex TermAnnotationShortPattern value -> value.Value.Trim() |> Some
             | Regex TermAnnotationURIPattern value ->
                 let idspace = value.Groups.["idspace"].Value
                 let localid = value.Groups.["localid"].Value
-                idspace + ":" + localid
-                |> Some
-            | _ ->
-                None
+                idspace + ":" + localid |> Some
+            | _ -> None
 
-        let parseDoubleQuotes (headerStr:string) =
+        let parseDoubleQuotes (headerStr: string) =
             match headerStr with
             | Regex DoubleQuotesPattern value ->
                 // remove quotes at beginning and end of matched string
-                value.Value.[1..value.Length-2].Trim()
-                |> Some
-            | _ ->
-                None
+                value.Value.[1 .. value.Length - 2].Trim() |> Some
+            | _ -> None
 
-        let getId (headerStr:string) =
+        let getId (headerStr: string) =
             match headerStr with
             | Regex IdPattern value -> value.Value.Trim().[1..] |> Some
-            | _ ->
-                None
+            | _ -> None
 
 
     type TermMinimal = {
-        Name            : string
+        Name: string
         /// This is the Ontology Term Accession 'XX:aaaaaa'
-        TermAccession   : string
+        TermAccession: string
     } with
-        static member create name tan = { Name = name; TermAccession = tan}
+
+        static member create name tan = { Name = name; TermAccession = tan }
 
     type TermSearchable = {
         // Contains information about the term to search itself. If term accession is known, search result is 100% correct.
-        Term                : TermMinimal
+        Term: TermMinimal
         // If ParentTerm isSome, then the term name is first searched in a is_a directed search
-        ParentTerm          : TermMinimal option
+        ParentTerm: TermMinimal option
         // Is term ist used as unit, unit ontology is searched first.
-        IsUnit              : bool
+        IsUnit: bool
         // ColIndex in table
-        ColIndex            : int
+        ColIndex: int
         // RowIndex in table
-        RowIndices          : int []
+        RowIndices: int[]
         // Search result
-        SearchResultTerm    : Term option
+        SearchResultTerm: Term option
     }
 
 /// <summary>Deprecated</summary>
 type IOntologyAPIv1 = {
     // Development
-    getTestNumber               : unit                                                                  -> Async<int>
+    getTestNumber: unit -> Async<int>
 
     // Ontology related requests
-    getAllOntologies            : unit                                                                  -> Async<Ontology []>
+    getAllOntologies: unit -> Async<Ontology[]>
 
     // Term related requests
     ///
-    getTermSuggestions                  : (int*string)                                                  -> Async<Term []>
+    getTermSuggestions: (int * string) -> Async<Term[]>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : (int*string*SwateObsolete.TermMinimal)                        -> Async<Term []>
-    getAllTermsByParentTerm             : SwateObsolete.TermMinimal                                     -> Async<Term []>
+    getTermSuggestionsByParentTerm: (int * string * SwateObsolete.TermMinimal) -> Async<Term[]>
+    getAllTermsByParentTerm: SwateObsolete.TermMinimal -> Async<Term[]>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : (int*string*SwateObsolete.TermMinimal)                        -> Async<Term []>
-    getAllTermsByChildTerm              : SwateObsolete.TermMinimal                                     -> Async<Term []>
-    getTermsForAdvancedSearch           : (AdvancedSearchQuery)                   -> Async<Term []>
-    getUnitTermSuggestions              : (int*string)                                                  -> Async<Term []>
-    getTermsByNames                     : SwateObsolete.TermSearchable []                               -> Async<SwateObsolete.TermSearchable []>
+    getTermSuggestionsByChildTerm: (int * string * SwateObsolete.TermMinimal) -> Async<Term[]>
+    getAllTermsByChildTerm: SwateObsolete.TermMinimal -> Async<Term[]>
+    getTermsForAdvancedSearch: (AdvancedSearchQuery) -> Async<Term[]>
+    getUnitTermSuggestions: (int * string) -> Async<Term[]>
+    getTermsByNames: SwateObsolete.TermSearchable[] -> Async<SwateObsolete.TermSearchable[]>
 
     // Tree related requests
-    getTreeByAccession                  : string                                                        -> Async<TreeTypes.Tree>
+    getTreeByAccession: string -> Async<TreeTypes.Tree>
 }
 
 
@@ -263,25 +250,42 @@ type IOntologyAPIv1 = {
 /// </summary>
 type IOntologyAPIv2 = {
     // Development
-    getTestNumber                       : unit                                                          -> Async<int>
+    getTestNumber: unit -> Async<int>
 
     // Ontology related requests
-    getAllOntologies                    : unit                                                          -> Async<Ontology []>
+    getAllOntologies: unit -> Async<Ontology[]>
 
     // Term related requests
     ///
-    getTermSuggestions                  : {| n: int; query: string; ontology: string option|} -> Async<Term []>
+    getTermSuggestions:
+        {|
+            n: int
+            query: string
+            ontology: string option
+        |}
+            -> Async<Term[]>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByParentTerm      : {| n: int; query: string; parent_term: SwateObsolete.TermMinimal |} -> Async<Term []>
-    getAllTermsByParentTerm             : SwateObsolete.TermMinimal -> Async<Term []>
+    getTermSuggestionsByParentTerm:
+        {|
+            n: int
+            query: string
+            parent_term: SwateObsolete.TermMinimal
+        |}
+            -> Async<Term[]>
+    getAllTermsByParentTerm: SwateObsolete.TermMinimal -> Async<Term[]>
     /// (nOfReturnedResults*queryString*parentOntology). If parentOntology = "" then isNull -> Error.
-    getTermSuggestionsByChildTerm       : {| n: int; query: string; child_term: SwateObsolete.TermMinimal |} -> Async<Term []>
-    getAllTermsByChildTerm              : SwateObsolete.TermMinimal -> Async<Term []>
-    getTermsForAdvancedSearch           : (AdvancedSearchQuery) -> Async<Term []>
-    getUnitTermSuggestions              : {| n: int; query: string|} -> Async<Term []>
-    getTermsByNames                     : SwateObsolete.TermSearchable []   -> Async<SwateObsolete.TermSearchable []>
+    getTermSuggestionsByChildTerm:
+        {|
+            n: int
+            query: string
+            child_term: SwateObsolete.TermMinimal
+        |}
+            -> Async<Term[]>
+    getAllTermsByChildTerm: SwateObsolete.TermMinimal -> Async<Term[]>
+    getTermsForAdvancedSearch: (AdvancedSearchQuery) -> Async<Term[]>
+    getUnitTermSuggestions: {| n: int; query: string |} -> Async<Term[]>
+    getTermsByNames: SwateObsolete.TermSearchable[] -> Async<SwateObsolete.TermSearchable[]>
 
     // Tree related requests
-    getTreeByAccession                  : string                            -> Async<TreeTypes.Tree>
+    getTreeByAccession: string -> Async<TreeTypes.Tree>
 }
-

@@ -21,22 +21,23 @@ open GlobalBindings
 open ARCtrl
 open ARCtrl.Spreadsheet
 
-let download(filename, text) =
-  let element = document.createElement("a");
-  element.setAttribute("href", "data:text/plain;charset=utf-8," +  Fable.Core.JS.encodeURIComponent(text));
-  element.setAttribute("download", filename);
+let download (filename, text) =
+    let element = document.createElement ("a")
+    element.setAttribute ("href", "data:text/plain;charset=utf-8," + Fable.Core.JS.encodeURIComponent (text))
+    element.setAttribute ("download", filename)
 
-  element?style?display <- "None";
-  let _ = document.body.appendChild(element);
+    element?style?display <- "None"
+    let _ = document.body.appendChild (element)
 
-  element.click();
+    element.click ()
 
-  document.body.removeChild(element) |> ignore
-  ()
+    document.body.removeChild (element) |> ignore
+    ()
 
 type private JsonExportState = {
     ExportFormat: JsonExportFormat
 } with
+
     static member init() = {
         ExportFormat = JsonExportFormat.ROCrate
     }
@@ -44,26 +45,22 @@ type private JsonExportState = {
 type FileExporter =
 
     static member private FileFormat(efm: JsonExportFormat, state: JsonExportState, setState) =
-        Html.option [
-            prop.text (efm.AsStringRdbl)
-        ]
+        Html.option [ prop.text (efm.AsStringRdbl) ]
 
     [<ReactComponent>]
     static member JsonExport(model: Model, dispatch) =
         let state, setState = React.useState JsonExportState.init
+
         Html.div [
             Daisy.join [
                 prop.children [
                     Daisy.select [
                         join.item
                         select.bordered
-                        prop.onChange (fun (e:Browser.Types.Event) ->
+                        prop.onChange (fun (e: Browser.Types.Event) ->
                             let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
-                            { state with
-                                ExportFormat = jef }
-                            |> setState
-                        )
-                        prop.defaultValue(string state.ExportFormat)
+                            { state with ExportFormat = jef } |> setState)
+                        prop.defaultValue (string state.ExportFormat)
                         prop.children [
                             FileExporter.FileFormat(JsonExportFormat.ROCrate, state, setState)
                             FileExporter.FileFormat(JsonExportFormat.ISA, state, setState)
@@ -78,70 +75,78 @@ type FileExporter =
                         prop.text "Download"
                         prop.onClick (fun _ ->
                             let host = model.PersistentStorageState.Host
+
                             match host with
                             | Some Swatehost.Excel ->
                                 promise {
-                                    let! result = OfficeInterop.Core.Main.tryParseToArcFile()
+                                    let! result = OfficeInterop.Core.Main.tryParseToArcFile ()
+
                                     match result with
-                                    | Result.Ok arcFile -> SpreadsheetInterface.ExportJson (arcFile, state.ExportFormat) |> InterfaceMsg |> dispatch
-                                    | Result.Error msgs -> OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
-                                } |> ignore
-                            | Some Swatehost.Browser | Some Swatehost.ARCitect ->
+                                    | Result.Ok arcFile ->
+                                        SpreadsheetInterface.ExportJson(arcFile, state.ExportFormat)
+                                        |> InterfaceMsg
+                                        |> dispatch
+                                    | Result.Error msgs ->
+                                        OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
+                                }
+                                |> ignore
+                            | Some Swatehost.Browser
+                            | Some Swatehost.ARCitect ->
                                 if model.SpreadsheetModel.ArcFile.IsSome then
-                                    SpreadsheetInterface.ExportJson (model.SpreadsheetModel.ArcFile.Value, state.ExportFormat) |> InterfaceMsg |> dispatch
-                            | _ -> failwith "not implemented"
-                        )
+                                    SpreadsheetInterface.ExportJson(
+                                        model.SpreadsheetModel.ArcFile.Value,
+                                        state.ExportFormat
+                                    )
+                                    |> InterfaceMsg
+                                    |> dispatch
+                            | _ -> failwith "not implemented")
                     ]
                 ]
             ]
         ]
 
-    static member Main(model:Model, dispatch: Messages.Msg -> unit) =
+    static member Main(model: Model, dispatch: Messages.Msg -> unit) =
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "File Export"
 
-            SidebarComponents.SidebarLayout.Description(Html.div [
-                Html.p "Export Swate annotation tables to official JSON."
-                Html.ul [
-                    Html.li [
-                        Html.b "ARCtrl"
-                        Html.text ": A simple ARCtrl specific format."
-                    ]
-                    Html.li [
-                        Html.b "ARCtrl Compressed"
-                        Html.text ": A compressed ARCtrl specific format."
-                    ]
-                    Html.li [
-                        Html.b "ISA"
-                        Html.text ": ISA-JSON format ("
-                        Html.a [
-                            prop.target.blank
-                            prop.href "https://isa-specs.readthedocs.io/en/latest/isajson.html#"
-                            prop.text "ISA-JSON"
+            SidebarComponents.SidebarLayout.Description(
+                Html.div [
+                    Html.p "Export Swate annotation tables to official JSON."
+                    Html.ul [
+                        Html.li [ Html.b "ARCtrl"; Html.text ": A simple ARCtrl specific format." ]
+                        Html.li [
+                            Html.b "ARCtrl Compressed"
+                            Html.text ": A compressed ARCtrl specific format."
                         ]
-                        Html.text ")."
-                    ]
-                    Html.li [
-                        Html.b "RO-Crate Metadata"
-                        Html.text ": RO-Crate format ("
-                        Html.a [
-                            prop.target.blank
-                            prop.href "https://www.researchobject.org/ro-crate/"
-                            prop.text "RO-Crate"
+                        Html.li [
+                            Html.b "ISA"
+                            Html.text ": ISA-JSON format ("
+                            Html.a [
+                                prop.target.blank
+                                prop.href "https://isa-specs.readthedocs.io/en/latest/isajson.html#"
+                                prop.text "ISA-JSON"
+                            ]
+                            Html.text ")."
                         ]
-                        Html.text ", "
-                        Html.a [
-                            prop.target.blank
-                            prop.href "https://github.com/nfdi4plants/isa-ro-crate-profile/blob/main/profile/isa_ro_crate.md"
-                            prop.text "ISA-Profile"
+                        Html.li [
+                            Html.b "RO-Crate Metadata"
+                            Html.text ": RO-Crate format ("
+                            Html.a [
+                                prop.target.blank
+                                prop.href "https://www.researchobject.org/ro-crate/"
+                                prop.text "RO-Crate"
+                            ]
+                            Html.text ", "
+                            Html.a [
+                                prop.target.blank
+                                prop.href
+                                    "https://github.com/nfdi4plants/isa-ro-crate-profile/blob/main/profile/isa_ro_crate.md"
+                                prop.text "ISA-Profile"
+                            ]
+                            Html.text ")."
                         ]
-                        Html.text ")."
                     ]
                 ]
-            ])
-            SidebarComponents.SidebarLayout.LogicContainer [
-                FileExporter.JsonExport(model, dispatch)
-            ]
+            )
+            SidebarComponents.SidebarLayout.LogicContainer [ FileExporter.JsonExport(model, dispatch) ]
         ]
-
-

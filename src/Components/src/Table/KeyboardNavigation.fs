@@ -29,19 +29,33 @@ module GridSelect =
 
     module SelectedCellRange =
 
-        let make xStart yStart xEnd yEnd =
-            {| xStart = xStart; yStart = yStart; xEnd = xEnd; yEnd = yEnd |}
-        let create (xStart, yStart, xEnd, yEnd) =
-            {| xStart = xStart; yStart = yStart; xEnd = xEnd; yEnd = yEnd |}
-        let singleton (cell: CellCoordinate) : CellCoordinateRange =
-            {| yStart = cell.y; yEnd = cell.y; xStart = cell.x; xEnd = cell.x|}
+        let make xStart yStart xEnd yEnd = {|
+            xStart = xStart
+            yStart = yStart
+            xEnd = xEnd
+            yEnd = yEnd
+        |}
+
+        let create (xStart, yStart, xEnd, yEnd) = {|
+            xStart = xStart
+            yStart = yStart
+            xEnd = xEnd
+            yEnd = yEnd
+        |}
+
+        let singleton (cell: CellCoordinate) : CellCoordinateRange = {|
+            yStart = cell.y
+            yEnd = cell.y
+            xStart = cell.x
+            xEnd = cell.x
+        |}
 
         let toReducedSet (range: CellCoordinateRange option) =
             match range with
             | Some range ->
                 set [
-                    {|x = range.xStart; y = range.yStart|}
-                    {|x = range.xEnd; y = range.yEnd|}
+                    {| x = range.xStart; y = range.yStart |}
+                    {| x = range.xEnd; y = range.yEnd |}
                 ]
             | _ -> Set.empty
 
@@ -51,12 +65,17 @@ module GridSelect =
             else
                 let min = selectedCells.MinimumElement
                 let max = selectedCells.MaximumElement
-                Some {| xStart = min.x; yStart = min.y; xEnd = max.x; yEnd = max.y |}
+
+                Some {|
+                    xStart = min.x
+                    yStart = min.y
+                    xEnd = max.x
+                    yEnd = max.y
+                |}
 
         let count (selectedCellRange: CellCoordinateRange option) =
             match selectedCellRange with
-            | Some range ->
-                (range.xEnd - range.xStart + 1) * (range.yEnd - range.yStart + 1)
+            | Some range -> (range.xEnd - range.xStart + 1) * (range.yEnd - range.yStart + 1)
             | None -> 0
 
 
@@ -69,111 +88,176 @@ type GridSelect() =
 
     member val internal LastAppend: CellCoordinate option = None with get, set
 
-    member private this.GetNextIndex(kbd: Kbd, jump: bool, selectedCells: Set<CellCoordinate>, maxRow, maxCol, minRow, minCol) =
+    member private this.GetNextIndex
+        (kbd: Kbd, jump: bool, selectedCells: Set<CellCoordinate>, maxRow, maxCol, minRow, minCol)
+        =
         let current =
             match this.LastAppend, this.Origin with
-            | Some lastAppend, _ ->
-                lastAppend
-            | None, Some origin ->
-                origin
+            | Some lastAppend, _ -> lastAppend
+            | None, Some origin -> origin
             | None, None ->
                 let isIncrease = kbd = ArrowDown || kbd = ArrowRight
-                if isIncrease then selectedCells.MaximumElement else selectedCells.MinimumElement
+
+                if isIncrease then
+                    selectedCells.MaximumElement
+                else
+                    selectedCells.MinimumElement
+
         match jump with
         | true ->
             match kbd with
-            | ArrowDown -> {|current with y = maxRow|}
-            | ArrowUp -> {|current with y = minRow|}
-            | ArrowLeft -> {|current with x = minCol|}
-            | ArrowRight -> {|current with x = maxCol|}
+            | ArrowDown -> {| current with y = maxRow |}
+            | ArrowUp -> {| current with y = minRow |}
+            | ArrowLeft -> {| current with x = minCol |}
+            | ArrowRight -> {| current with x = maxCol |}
         | false ->
             match kbd with
-            | ArrowDown -> {|current with y = min (current.y + 1) maxRow |}
-            | ArrowUp -> {|current with y = max (current.y - 1) minRow |}
-            | ArrowLeft -> {|current with x = max (current.x - 1) minCol |}
-            | ArrowRight -> {|current with x = min (current.x + 1) maxCol |}
+            | ArrowDown -> {|
+                current with
+                    y = min (current.y + 1) maxRow
+              |}
+            | ArrowUp -> {|
+                current with
+                    y = max (current.y - 1) minRow
+              |}
+            | ArrowLeft -> {|
+                current with
+                    x = max (current.x - 1) minCol
+              |}
+            | ArrowRight -> {|
+                current with
+                    x = min (current.x + 1) maxCol
+              |}
 
-    member this.SelectBy(e: Browser.Types.KeyboardEvent, selectedCells: CellCoordinateRange option, setter: CellCoordinateRange option -> unit, maxRow, maxCol, ?minRow, ?minCol, ?onSelect) =
+    member this.SelectBy
+        (
+            e: Browser.Types.KeyboardEvent,
+            selectedCells: CellCoordinateRange option,
+            setter: CellCoordinateRange option -> unit,
+            maxRow,
+            maxCol,
+            ?minRow,
+            ?minCol,
+            ?onSelect
+        ) =
         let kbd = Kbd.tryFromKey e.key
+
         match kbd with
         | Some kbd ->
-            e.preventDefault()
+            e.preventDefault ()
             let jump = e.ctrlKey || e.metaKey
-            this.SelectBy(kbd, jump, e.shiftKey, selectedCells, setter, maxRow, maxCol, ?minRow = minRow, ?minCol = minCol, ?onSelect = onSelect)
+
+            this.SelectBy(
+                kbd,
+                jump,
+                e.shiftKey,
+                selectedCells,
+                setter,
+                maxRow,
+                maxCol,
+                ?minRow = minRow,
+                ?minCol = minCol,
+                ?onSelect = onSelect
+            )
         | None -> ()
 
-    member this.SelectBy(kbd: Kbd, jump: bool, isAppend: bool, selectedCells: CellCoordinateRange option, setter: CellCoordinateRange option -> unit, maxRow: int, maxCol: int, ?minRow: int, ?minCol: int, ?onSelect) =
+    member this.SelectBy
+        (
+            kbd: Kbd,
+            jump: bool,
+            isAppend: bool,
+            selectedCells: CellCoordinateRange option,
+            setter: CellCoordinateRange option -> unit,
+            maxRow: int,
+            maxCol: int,
+            ?minRow: int,
+            ?minCol: int,
+            ?onSelect
+        ) =
         let minRow = defaultArg minRow 0
         let minCol = defaultArg minCol 0
-        if selectedCells.IsNone then failwith "No selected cells"
+
+        if selectedCells.IsNone then
+            failwith "No selected cells"
+
         if not isAppend then
             this.LastAppend <- None
             this.Origin <- None
+
         let selectedCellsSet = SelectedCellRange.toReducedSet selectedCells
 
-        let nextIndex = this.GetNextIndex(kbd, jump, selectedCellsSet, maxRow, maxCol, minRow, minCol)
+        let nextIndex =
+            this.GetNextIndex(kbd, jump, selectedCellsSet, maxRow, maxCol, minRow, minCol)
+
         this.SelectAt(nextIndex, isAppend, selectedCells, setter, ?onSelect = onSelect)
 
-    member this.SelectAt(nextIndex: CellCoordinate, isAppend: bool, selectedCellRange: CellCoordinateRange option, setter: CellCoordinateRange option -> unit, ?onSelect: OnSelect) =
+    member this.SelectAt
+        (
+            nextIndex: CellCoordinate,
+            isAppend: bool,
+            selectedCellRange: CellCoordinateRange option,
+            setter: CellCoordinateRange option -> unit,
+            ?onSelect: OnSelect
+        ) =
         match isAppend, this.Origin with // add append origin if we start appending
         | true, None ->
-            this.Origin <- selectedCellRange |> Option.map (fun r -> {| x = r.xStart; y = r.yStart |}) |> Option.defaultValue nextIndex |> Some
+            this.Origin <-
+                selectedCellRange
+                |> Option.map (fun r -> {| x = r.xStart; y = r.yStart |})
+                |> Option.defaultValue nextIndex
+                |> Some
+
             this.LastAppend <- Some nextIndex
-        | true, _ ->
-            this.LastAppend <- Some nextIndex
+        | true, _ -> this.LastAppend <- Some nextIndex
         | false, _ ->
             this.Origin <- None
             this.LastAppend <- None
 
         let newCellRange =
             if not isAppend then
-                Set.singleton (nextIndex)
-                |> SelectedCellRange.fromReducedSet
+                Set.singleton (nextIndex) |> SelectedCellRange.fromReducedSet
             else
-                let selectedCells = selectedCellRange |> SelectedCellRange.toReducedSet |> function | isEmpty when isEmpty.Count = 0 -> Set.singleton nextIndex | x -> x
+                let selectedCells =
+                    selectedCellRange
+                    |> SelectedCellRange.toReducedSet
+                    |> function
+                        | isEmpty when isEmpty.Count = 0 -> Set.singleton nextIndex
+                        | x -> x
+
                 let origin = this.Origin.Value
                 let lastAppend = defaultArg this.LastAppend this.Origin.Value
 
                 let minRow =
-                    if nextIndex.y <= origin.y then
-                        nextIndex.y
-                    else
-                        if origin.y < lastAppend.y then
-                            origin.y
-                        else
-                            selectedCells.MinimumElement.y
+                    if nextIndex.y <= origin.y then nextIndex.y
+                    else if origin.y < lastAppend.y then origin.y
+                    else selectedCells.MinimumElement.y
+
                 let maxRow =
-                    if nextIndex.y >= origin.y then
-                        nextIndex.y
-                    else
-                        if origin.y > lastAppend.y then
-                            origin.y
-                        else
-                            selectedCells.MaximumElement.y
+                    if nextIndex.y >= origin.y then nextIndex.y
+                    else if origin.y > lastAppend.y then origin.y
+                    else selectedCells.MaximumElement.y
 
                 let minCol =
-                    if nextIndex.x <= origin.x then
-                        nextIndex.x
-                    else
-                        if origin.x < lastAppend.x then
-                            origin.x
-                        else
-                            selectedCells.MinimumElement.x
-                let maxCol =
-                    if nextIndex.x >= origin.x then
-                        nextIndex.x
-                    else
-                        if origin.x > lastAppend.x then
-                            origin.x
-                        else
-                            selectedCells.MaximumElement.x
+                    if nextIndex.x <= origin.x then nextIndex.x
+                    else if origin.x < lastAppend.x then origin.x
+                    else selectedCells.MinimumElement.x
 
-                let newCellRange = {| xStart = minCol; yStart = minRow; xEnd = maxCol; yEnd = maxRow |}
+                let maxCol =
+                    if nextIndex.x >= origin.x then nextIndex.x
+                    else if origin.x > lastAppend.x then origin.x
+                    else selectedCells.MaximumElement.x
+
+                let newCellRange = {|
+                    xStart = minCol
+                    yStart = minRow
+                    xEnd = maxCol
+                    yEnd = maxRow
+                |}
 
                 Some newCellRange
+
         setter newCellRange
-        onSelect
-        |> Option.iter (fun f -> f nextIndex newCellRange)
+        onSelect |> Option.iter (fun f -> f nextIndex newCellRange)
 
     member this.Clear() =
         this.Origin <- None
@@ -185,21 +269,34 @@ module Extensions =
     open Feliz
 
     type React with
-        static member useGridSelect(kbdNavContainer: IRefValue<Browser.Types.HTMLElement option>, rowCount: int, columnCount: int, ?minRow, ?minCol, ?onSelect: OnSelect, ?seed: ResizeArray<CellCoordinate>) =
+        static member useGridSelect
+            (
+                kbdNavContainer: IRefValue<Browser.Types.HTMLElement option>,
+                rowCount: int,
+                columnCount: int,
+                ?minRow,
+                ?minCol,
+                ?onSelect: OnSelect,
+                ?seed: ResizeArray<CellCoordinate>
+            ) =
 
             let minRow = defaultArg minRow 0
             let minCol = defaultArg minCol 0
+
             let seed: CellCoordinateRange option =
                 seed
                 |> Option.map Set.ofSeq
-                |> Option.map
-                    (fun seed ->
-                        {|xStart = seed.MinimumElement.x; yStart = seed.MinimumElement.y; xEnd = seed.MaximumElement.x; yEnd = seed.MaximumElement.y |}
-                    )
+                |> Option.map (fun seed -> {|
+                    xStart = seed.MinimumElement.x
+                    yStart = seed.MinimumElement.y
+                    xEnd = seed.MaximumElement.x
+                    yEnd = seed.MaximumElement.y
+                |})
 
-            let (selectedCells: CellCoordinateRange option), setSelectedCells = React.useState(seed)
+            let (selectedCells: CellCoordinateRange option), setSelectedCells =
+                React.useState (seed)
 
-            let select = React.useRef(GridSelect())
+            let select = React.useRef (GridSelect())
 
             let selectBy =
                 (fun e ->
@@ -212,12 +309,8 @@ module Extensions =
                         minRow,
                         minCol,
                         (fun newIndex newCellRange ->
-                            onSelect |> Option.iter(fun onSelect ->
-                                onSelect newIndex newCellRange
-                            )
-                        )
-                    )
-                )
+                            onSelect |> Option.iter (fun onSelect -> onSelect newIndex newCellRange))
+                    ))
 
             let selectAt =
                 fun (newIndex, isAppend) ->
@@ -227,23 +320,18 @@ module Extensions =
                         selectedCells,
                         setSelectedCells,
                         (fun newIndex newCellRange ->
-                            onSelect |> Option.iter(fun onSelect ->
-                                onSelect newIndex newCellRange
-                            )
-                        )
+                            onSelect |> Option.iter (fun onSelect -> onSelect newIndex newCellRange))
                     )
 
-            React.useElementListener.onKeyDown(
-                kbdNavContainer,
-                selectBy
-            )
+            React.useElementListener.onKeyDown (kbdNavContainer, selectBy)
 
-            let contains = fun (cell: CellCoordinate) ->
-                selectedCells.IsSome
-                && cell.x <= selectedCells.Value.xEnd
-                && cell.x >= selectedCells.Value.xStart
-                && cell.y <= selectedCells.Value.yEnd
-                && cell.y >= selectedCells.Value.yStart
+            let contains =
+                fun (cell: CellCoordinate) ->
+                    selectedCells.IsSome
+                    && cell.x <= selectedCells.Value.xEnd
+                    && cell.x >= selectedCells.Value.xStart
+                    && cell.y <= selectedCells.Value.yEnd
+                    && cell.y >= selectedCells.Value.yStart
 
             {|
                 selectOrigin = select.current.Origin
@@ -252,9 +340,10 @@ module Extensions =
                 contains = contains
                 selectBy = selectBy
                 selectAt = selectAt
-                clear = fun () ->
-                    select.current.Clear()
-                    setSelectedCells None
+                clear =
+                    fun () ->
+                        select.current.Clear()
+                        setSelectedCells None
                 selectedCellsReducedSet = selectedCells |> SelectedCellRange.toReducedSet
                 count = selectedCells |> SelectedCellRange.count
             |}

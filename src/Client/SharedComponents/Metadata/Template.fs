@@ -7,45 +7,44 @@ open Components
 open Components.Forms
 
 [<ReactComponent>]
-let Main(template: Template, setTemplate: Template -> unit) =
+let Main (template: Template, setTemplate: Template -> unit) =
     Generic.Section [
         Generic.BoxedField(
             "Template Metadata",
             content = [
-                FormComponents.GUIDInput (
+                FormComponents.GUIDInput(
                     template.Id,
                     (fun guid ->
                         template.Id <- guid
-                        setTemplate template
-                    ),
+                        setTemplate template),
                     "Identifier"
                 )
-                FormComponents.TextInput (
+                FormComponents.TextInput(
                     template.Name,
-                    (fun (s:string) ->
+                    (fun (s: string) ->
                         template.Name <- s
                         setTemplate template),
                     "Name"
                 )
-                FormComponents.TextInput (
+                FormComponents.TextInput(
                     template.Description,
-                    (fun (s:string) ->
+                    (fun (s: string) ->
                         template.Description <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
                     "Description",
-                    isarea=true
+                    isarea = true
                 )
-                FormComponents.TextInput (
+                FormComponents.TextInput(
                     template.Organisation.ToString(),
-                    (fun (s:string) ->
-                        template.Organisation <- Organisation.ofString(s)
+                    (fun (s: string) ->
+                        template.Organisation <- Organisation.ofString (s)
                         setTemplate template),
                     "Organisation"
                 )
                 FormComponents.TextInput(
                     template.Version,
-                    (fun (s:string) ->
+                    (fun (s: string) ->
                         template.Version <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
                         setTemplate template),
@@ -78,10 +77,10 @@ let Main(template: Template, setTemplate: Template -> unit) =
                 FormComponents.PersonsInput(
                     template.Authors,
                     (fun (s) ->
-                        template.Authors <-ResizeArray s
+                        template.Authors <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
                         setTemplate template),
-                    label="Authors"
+                    label = "Authors"
                 )
             ]
         )

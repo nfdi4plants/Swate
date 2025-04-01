@@ -5,7 +5,13 @@ open Fable.Core.JS
 open Feliz
 
 type CellCoordinate = {| x: int; y: int |}
-type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
+
+type CellCoordinateRange = {|
+    yStart: int
+    yEnd: int
+    xStart: int
+    xEnd: int
+|}
 
 [<AllowNullLiteral>]
 [<Global>]
@@ -18,9 +24,7 @@ type SelectHandle
 
 [<AllowNullLiteral>]
 [<Global>]
-type TableHandle
-    [<ParamObjectAttribute; Emit("$0")>]
-    (scrollTo: CellCoordinate -> unit, select: SelectHandle) =
+type TableHandle [<ParamObjectAttribute; Emit("$0")>] (scrollTo: CellCoordinate -> unit, select: SelectHandle) =
     member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
     member val select: SelectHandle = select with get, set
 
@@ -41,7 +45,16 @@ type Term
 [<Global>]
 type Data
     [<ParamObjectAttribute; Emit("$0")>]
-    (?name: string, ?unit: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
+    (
+        ?name: string,
+        ?unit: string,
+        ?id: string,
+        ?description: string,
+        ?source: string,
+        ?href: string,
+        ?isObsolete: bool,
+        ?data: obj
+    ) =
     member val name: string option = jsNative with get, set
     member val unit: string option = jsNative with get, set
     member val id: string option = jsNative with get, set
@@ -63,6 +76,7 @@ module Term =
             | None, Some d2 -> Some d2
             | None, None -> None
             | Some d1, Some d2 -> objectMerge d1 d2 |> Some
+
         Term(
             ?name = Option.orElse t2.name t1.name,
             ?id = Option.orElse t2.id t1.id,
@@ -80,6 +94,7 @@ module Term =
             | None, Some d2 -> Some d2
             | None, None -> None
             | Some d1, Some d2 -> objectMerge d1 d2 |> Some
+
         Term(
             ?name = Option.orElse t1.name t2.name,
             ?id = Option.orElse t1.id t2.id,
@@ -92,9 +107,7 @@ module Term =
 
 [<AllowNullLiteral>]
 [<Global>]
-type TermSearchStyle
-    [<ParamObjectAttribute; Emit("$0")>]
-    (?inputLabel: U2<string, ResizeArray<string>>) =
+type TermSearchStyle [<ParamObjectAttribute; Emit("$0")>] (?inputLabel: U2<string, ResizeArray<string>>) =
     member val inputLabel: U2<string, ResizeArray<string>> option = jsNative with get, set
 
 module TermSearchStyle =
@@ -105,9 +118,7 @@ module TermSearchStyle =
 
 [<AllowNullLiteral>]
 [<Global>]
-type AdvancedSearchController
-    [<ParamObjectAttribute; Emit("$0")>]
-    (startSearch: unit -> unit, cancel: unit -> unit) =
+type AdvancedSearchController [<ParamObjectAttribute; Emit("$0")>] (startSearch: unit -> unit, cancel: unit -> unit) =
     member val startSearch: unit -> unit = jsNative with get, set
     member val cancel: unit -> unit = jsNative with get, set
 
@@ -129,7 +140,7 @@ type SearchCall = string -> JS.Promise<ResizeArray<Term>>
 // A parent search function that resolves a list of terms based on a parent ID and query.
 // @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
 //
-type ParentSearchCall = (string*string) -> JS.Promise<ResizeArray<Term>>
+type ParentSearchCall = (string * string) -> JS.Promise<ResizeArray<Term>>
 
 ///
 /// A function that fetches all child terms of a parent.

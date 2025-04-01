@@ -19,9 +19,10 @@ open Browser.Dom
 type Settings =
 
     [<ReactComponent>]
-    static member ThemeToggle () =
+    static member ThemeToggle() =
 
-        let (theme, handleSetTheme) = React.useLocalStorage("theme", "light")
+        let (theme, handleSetTheme) = React.useLocalStorage ("theme", "light")
+
         let animatedMoon =
             """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
             <g fill="currentColor" fill-opacity="0"><path d="M15.22 6.03l2.53-1.94L14.56 4L13.5 1l-1.06 3l-3.19.09l2.53 1.94l-.91 3.06l2.63-1.81l2.63 1.81z">
@@ -56,10 +57,7 @@ type Settings =
         Html.label [
             prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
             prop.children [
-                Html.p [
-                    prop.className "text-xl py-2"
-                    prop.text "Theme"
-                ]
+                Html.p [ prop.className "text-xl py-2"; prop.text "Theme" ]
                 Html.button [
                     prop.className "btn btn-block btn-primary"
                     //prop.text (if theme = "light" then dark else light)
@@ -67,16 +65,15 @@ type Settings =
                         Html.div [
                             prop.dangerouslySetInnerHTML (
                                 match theme.ToLower() with
-                                | "light"   -> animatedSun
-                                | _         -> animatedMoon
+                                | "light" -> animatedSun
+                                | _ -> animatedMoon
                             )
                         ]
                     ]
-                    prop.onClick (fun _ -> 
+                    prop.onClick (fun _ ->
                         let newTheme = if theme = "light" then "dark" else "light"
-                        handleSetTheme newTheme  // Save to localStorage
-                        document.documentElement.setAttribute("data-theme", theme)
-                    )
+                        handleSetTheme newTheme // Save to localStorage
+                        document.documentElement.setAttribute ("data-theme", theme))
                 ]
             ]
         ]
@@ -85,10 +82,7 @@ type Settings =
         Html.label [
             prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
             prop.children [
-                Html.p [
-                    prop.className "select-none text-xl"
-                    prop.text "Autosave"
-                ]
+                Html.p [ prop.className "select-none text-xl"; prop.text "Autosave" ]
                 Html.div [
                     prop.className "flex items-center pl-10"
                     prop.children [
@@ -97,8 +91,7 @@ type Settings =
                             prop.isChecked model.PersistentStorageState.Autosave
                             toggle.primary
                             prop.onChange (fun (b: bool) ->
-                                PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch
-                            )
+                                PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
                         ]
                     ]
                 ]
@@ -110,33 +103,30 @@ type Settings =
         ]
 
     static member General(model, dispatch) =
-        Components.Forms.Generic.BoxedField("General",
+        Components.Forms.Generic.BoxedField(
+            "General",
             content = [
                 Html.div [
                     prop.className "grid grid-cols-1 gap-4 lg:grid-cols-2"
-                    prop.children [
-                        Settings.ThemeToggle()
-                        Settings.ToggleAutosaveConfig(model, dispatch)
-                    ]
+                    prop.children [ Settings.ThemeToggle(); Settings.ToggleAutosaveConfig(model, dispatch) ]
                 ]
             ]
         )
 
-    static member SearchConfig (model, dispatch) =
-        Components.Forms.Generic.BoxedField("Term Search Configuration",
-            content = [
-                Settings.SearchConfig.Main(model, dispatch)
-            ]
+    static member SearchConfig(model, dispatch) =
+        Components.Forms.Generic.BoxedField(
+            "Term Search Configuration",
+            content = [ Settings.SearchConfig.Main(model, dispatch) ]
         )
 
     static member ActivityLog model =
-        Components.Forms.Generic.BoxedField("Activity Log", "Display all recorded activities of this session.",
+        Components.Forms.Generic.BoxedField(
+            "Activity Log",
+            "Display all recorded activities of this session.",
             content = [
                 Html.div [
                     prop.className "overflow-y-auto max-h-[600px]"
-                    prop.children [
-                        ActivityLog.Main(model)
-                    ]
+                    prop.children [ ActivityLog.Main(model) ]
                 ]
             ]
         )
@@ -145,19 +135,19 @@ type Settings =
         Components.Forms.Generic.Section [
             Settings.General(model, dispatch)
 
-            Settings.SearchConfig (model, dispatch)
+            Settings.SearchConfig(model, dispatch)
 
             Settings.ActivityLog(model)
 
-            //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
-            //    toggleRgbModeElement model dispatch
+        //if model.SiteStyleState.ColorMode.Name.StartsWith "Dark" && model.SiteStyleState.ColorMode.Name.EndsWith "_rgb" then
+        //    toggleRgbModeElement model dispatch
 
-            //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
-            //customXmlSettings model dispatch
+        //Label.label [Label.Props [Style [Color model.SiteStyleState.ColorMode.Accent]]] [str "Advanced Settings"]
+        //customXmlSettings model dispatch
 
-            //Bulma.label "Advanced Settings"
-            //if model.PageState.IsExpert then
-            //    swateCore model dispatch
-            //else
-            //    swateExperts model dispatch
+        //Bulma.label "Advanced Settings"
+        //if model.PageState.IsExpert then
+        //    swateCore model dispatch
+        //else
+        //    swateExperts model dispatch
         ]

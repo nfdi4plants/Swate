@@ -8,7 +8,7 @@ module Extensions =
     let inline log e = Browser.Dom.console.log e
 
     type prop with
-        static member testid (value: string) = prop.custom("data-testid", value)
+        static member testid(value: string) = prop.custom ("data-testid", value)
 
 [<RequireQualifiedAccess>]
 module kbdEventCode =
@@ -42,5 +42,4 @@ module kbdEventCode =
     [<Literal>]
     let backspace = "Backspace"
 
-    let key (key:string) = key.ToUpper() |> sprintf "Key%s"
-
+    let key (key: string) = key.ToUpper() |> sprintf "Key%s"

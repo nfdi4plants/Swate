@@ -15,13 +15,12 @@ module private HelperProtocolSearch =
         Html.button [
             prop.className "btn btn-outline btn-sm"
             prop.onClick (fun _ ->
-                Messages.Protocol.UpdateShowSearch false |> Messages.ProtocolMsg |> setIsProtocolSearch
-            )
+                Messages.Protocol.UpdateShowSearch false
+                |> Messages.ProtocolMsg
+                |> setIsProtocolSearch)
             prop.children [
                 Html.i [ prop.className "fa-solid fa-chevron-left" ]
-                Html.span [
-                    prop.text "Back"
-                ]
+                Html.span [ prop.text "Back" ]
             ]
         ]
 
@@ -49,10 +48,9 @@ type SearchContainer =
                                 Daisy.dropdownContent [
                                     Html.ul [
                                         prop.tabIndex 0
-                                        prop.className "relative left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-gray-800 text-white text-sm rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-[100]"
-                                        prop.children [
-                                            Html.li [ Search.InfoField() ]
-                                        ]
+                                        prop.className
+                                            "relative left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-gray-800 text-white text-sm rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-[100]"
+                                        prop.children [ Html.li [ Search.InfoField() ] ]
                                     ]
                                 ]
                             ]
@@ -61,7 +59,7 @@ type SearchContainer =
                             button.sm
                             prop.className "fa-solid fa-cog"
                             button.success
-                            prop.onClick(fun _ -> toggleShowFilter())
+                            prop.onClick (fun _ -> toggleShowFilter ())
                         ]
                     ]
                 ]
@@ -69,19 +67,24 @@ type SearchContainer =
         ]
 
     [<ReactComponent>]
-    static member Main(model:Model, dispatch) =
-        let config, setConfig = React.useState(TemplateFilterConfig.init)
-        let showTemplatesFilter, setShowTemplatesFilter = React.useState(false)
+    static member Main(model: Model, dispatch) =
+        let config, setConfig = React.useState (TemplateFilterConfig.init)
+        let showTemplatesFilter, setShowTemplatesFilter = React.useState (false)
+
         let filteredTemplates =
-            React.useMemo(
-                (fun _ ->
-                    Protocol.Search.filterTemplates (model.ProtocolState.Templates, config)
-                ),
-                [|box model.ProtocolState.Templates; box config|]
+            React.useMemo (
+                (fun _ -> Protocol.Search.filterTemplates (model.ProtocolState.Templates, config)),
+                [| box model.ProtocolState.Templates; box config |]
             )
-        React.useEffectOnce(fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
-        let isEmpty = model.ProtocolState.Templates |> isNull || model.ProtocolState.Templates |> Array.isEmpty
+
+        React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
+
+        let isEmpty =
+            model.ProtocolState.Templates |> isNull
+            || model.ProtocolState.Templates |> Array.isEmpty
+
         let isLoading = model.ProtocolState.Loading
+
         Html.div [
             prop.className "flex flex-col gap-2 lg:gap-4 overflow-hidden"
             prop.children [
@@ -89,9 +92,13 @@ type SearchContainer =
                 if showTemplatesFilter then
                     Protocol.Search.FileSortElement(model, config, setConfig)
                 if isEmpty && not isLoading then
-                    Html.p [prop.className "text-error text-sm"; prop.text "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."]
+                    Html.p [
+                        prop.className "text-error text-sm"
+                        prop.text
+                            "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."
+                    ]
                 else
                     Search.SelectTemplatesButton(model, dispatch)
-                    Protocol.Search.Component (filteredTemplates, model, dispatch)
+                    Protocol.Search.Component(filteredTemplates, model, dispatch)
             ]
         ]

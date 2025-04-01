@@ -11,6 +11,7 @@ open FsSpreadsheet.Js
 open ARCtrl
 open ARCtrl.Spreadsheet
 open ARCtrl.Json
+
 module Spreadsheet =
 
     module Helper =
@@ -36,43 +37,57 @@ module Spreadsheet =
 
             //This matchcase handles undo / redo functionality
             match msg with
-            | UpdateActiveView _  | Reset | UpdateSelectedCells _ | InitFromArcFile _
-            | UpdateActiveCell _ | CopySelectedCell | CopyCell _ | MoveSelectedCell _ | SetActiveCellFromSelected ->
-                state, model, cmd
+            | UpdateActiveView _
+            | Reset
+            | UpdateSelectedCells _
+            | InitFromArcFile _
+            | UpdateActiveCell _
+            | CopySelectedCell
+            | CopyCell _
+            | MoveSelectedCell _
+            | SetActiveCellFromSelected -> state, model, cmd
             | _ ->
                 let newCmd =
                     if model.PersistentStorageState.Autosave then
                         Cmd.OfPromise.either
                             model.History.SaveSessionSnapshotIndexedDB
                             (snapshotJsonString)
-                            (fun newHistory -> Messages.History.UpdateAnd (newHistory, cmd) |> HistoryMsg)
+                            (fun newHistory -> Messages.History.UpdateAnd(newHistory, cmd) |> HistoryMsg)
                             (curry GenericError Cmd.none >> DevMsg)
                     else
                         Cmd.none
 
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
-                    | Some (Assay assay) ->
+                    | Some(Assay assay) ->
                         let json = assay.ToJsonString()
+
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, json)
                         |> Promise.start
-                    | Some (Study (study,_)) ->
+                    | Some(Study(study, _)) ->
                         let json = study.ToJsonString()
+
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, json)
                         |> Promise.start
-                    | Some (Investigation inv) ->
+                    | Some(Investigation inv) ->
                         let json = inv.ToJsonString()
+
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Investigation, json)
                         |> Promise.start
-                    | Some (Template template) ->
-                        let json = template.toJsonString()
+                    | Some(Template template) ->
+                        let json = template.toJsonString ()
+
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
                         |> Promise.start
                     | _ -> ()
 
                 state, model, newCmd
 
-    let update (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
+    let update
+        (state: Spreadsheet.Model)
+        (model: Model)
+        (msg: Spreadsheet.Msg)
+        : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
         //let createPromiseCmd (func: unit -> Spreadsheet.Model) =
         //    let nextState() = promise {
         //        return func()
@@ -88,12 +103,11 @@ module Spreadsheet =
 
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
-            | UpdateState nextState ->
-                nextState, model, Cmd.none
+            | UpdateState nextState -> nextState, model, Cmd.none
             | UpdateDatamap datamapOption ->
                 let nextState = Controller.DataMap.updateDatamap datamapOption state
                 nextState, model, Cmd.none
-            | UpdateDataMapDataContextAt (index, dtx) ->
+            | UpdateDataMapDataContextAt(index, dtx) ->
                 let nextState = Controller.DataMap.updateDataMapDataContextAt dtx index state
                 nextState, model, Cmd.none
             | AddTable table ->
@@ -115,27 +129,41 @@ module Spreadsheet =
                     | IsDataMap -> Controller.DataMap.addDataAnnotation data state
                     | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
                     | IsMetadata -> failwith "Unable to add data annotation in metadata view"
+
                 nextState, model, Cmd.none
-            | AddTemplates (tables, importType) ->
+            | AddTemplates(tables, importType) ->
                 let arcFile = model.SpreadsheetModel.ArcFile
-                let updatedArcFile = UpdateUtil.JsonImportHelper.updateTables (tables |> ResizeArray) importType model.SpreadsheetModel.ActiveView.TryTableIndex arcFile
-                let nextState = {state with ArcFile = Some updatedArcFile}
+
+                let updatedArcFile =
+                    UpdateUtil.JsonImportHelper.updateTables
+                        (tables |> ResizeArray)
+                        importType
+                        model.SpreadsheetModel.ActiveView.TryTableIndex
+                        arcFile
+
+                let nextState = {
+                    state with
+                        ArcFile = Some updatedArcFile
+                }
+
                 nextState, model, Cmd.none
-            | JoinTable (table, index, options, templateName) ->
-                let nextState = Controller.BuildingBlocks.joinTable table index options state templateName
+            | JoinTable(table, index, options, templateName) ->
+                let nextState =
+                    Controller.BuildingBlocks.joinTable table index options state templateName
+
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
                 let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
+
                 let nextState =
                     if reset then
-                        Spreadsheet.Model.init(arcFile)
+                        Spreadsheet.Model.init (arcFile)
                     else
-                        { state with
-                            ArcFile = Some arcFile
-                        }
+                        { state with ArcFile = Some arcFile }
+
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState = Spreadsheet.Model.init(arcFile)
+                let nextState = Spreadsheet.Model.init (arcFile)
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation oa ->
                 let nextState = Controller.BuildingBlocks.insertTerm_IntoSelected oa state
@@ -145,19 +173,19 @@ module Spreadsheet =
                 //let cmd = createPromiseCmd <| fun _ -> Controller.insertTerms termMinimals state
                 let cmd = Cmd.none
                 state, model, cmd
-            | UpdateCell (index, cell) ->
+            | UpdateCell(index, cell) ->
                 Controller.Generic.setCell index cell state
-                let nextState = {state with ArcFile = state.ArcFile}
+                let nextState = { state with ArcFile = state.ArcFile }
                 nextState, model, Cmd.none
             | UpdateCells arr ->
                 Controller.Generic.setCells arr state
-                let nextState =
-                    {state with ArcFile = state.ArcFile}
+                let nextState = { state with ArcFile = state.ArcFile }
                 nextState, model, Cmd.none
-            | UpdateHeader (index, header) ->
+            | UpdateHeader(index, header) ->
                 let nextState =
                     state.ActiveTable.UpdateHeader(index, header)
-                    {state with ArcFile = state.ArcFile}
+                    { state with ArcFile = state.ArcFile }
+
                 nextState, model, Cmd.none
             | UpdateActiveView nextView ->
                 let nextState = {
@@ -165,26 +193,33 @@ module Spreadsheet =
                         ActiveView = nextView
                         SelectedCells = Set.empty
                 }
+
                 nextState, model, Cmd.none
             | RemoveTable removeIndex ->
                 let nextState = Controller.Table.removeTable removeIndex state
                 nextState, model, Cmd.none
-            | RenameTable (index, name) ->
+            | RenameTable(index, name) ->
                 let nextState = Controller.Table.renameTable index name state
                 nextState, model, Cmd.none
-            | UpdateTableOrder (prev_index, new_index) ->
+            | UpdateTableOrder(prev_index, new_index) ->
                 let nextState = Controller.Table.updateTableOrder (prev_index, new_index) state
                 nextState, model, Cmd.none
-            | AddRows (n) ->
+            | AddRows(n) ->
                 let nextState =
                     if state.TableViewIsActive() then
                         Controller.Table.addRows n state
                     else
                         Controller.DataMap.addRows n state
+
                 nextState, model, Cmd.none
             | Reset ->
-                let nextState = Controller.Table.resetTableState()
-                let nextModel = {model with History = LocalHistory.Model.init()}
+                let nextState = Controller.Table.resetTableState ()
+
+                let nextModel = {
+                    model with
+                        History = LocalHistory.Model.init ()
+                }
+
                 nextState, nextModel, Cmd.none
             | DeleteRow index ->
                 let nextState =
@@ -192,6 +227,7 @@ module Spreadsheet =
                         Controller.Table.deleteRow index state
                     else
                         Controller.DataMap.deleteRow index state
+
                 nextState, model, Cmd.none
             | DeleteRows indexArr ->
                 let nextState =
@@ -199,18 +235,23 @@ module Spreadsheet =
                         Controller.Table.deleteRows indexArr state
                     else
                         Controller.DataMap.deleteRows indexArr state
+
                 nextState, model, Cmd.none
             | DeleteColumn index ->
                 let nextState = Controller.Table.deleteColumn index state
                 nextState, model, Cmd.none
-            | SetColumn (index, column) ->
+            | SetColumn(index, column) ->
                 let nextState = Controller.Table.setColumn index column state
                 nextState, model, Cmd.none
-            | MoveColumn (current, next) ->
+            | MoveColumn(current, next) ->
                 let nextState = Controller.Table.moveColumn current next state
                 nextState, model, Cmd.none
             | UpdateSelectedCells nextSelectedCells ->
-                let nextState = {state with SelectedCells = nextSelectedCells}
+                let nextState = {
+                    state with
+                        SelectedCells = nextSelectedCells
+                }
+
                 nextState, model, Cmd.none
             | MoveSelectedCell keypressed ->
                 let cmd =
@@ -219,22 +260,35 @@ module Spreadsheet =
                     | false ->
                         let moveBy =
                             match keypressed with
-                            | Key.Down -> (0,1)
-                            | Key.Up -> (0,-1)
-                            | Key.Left -> (-1,0)
-                            | Key.Right -> (1,0)
+                            | Key.Down -> (0, 1)
+                            | Key.Up -> (0, -1)
+                            | Key.Left -> (-1, 0)
+                            | Key.Right -> (1, 0)
+
                         let maxColIndex, maxRowIndex =
                             match state.ActiveView with
-                            | ActiveView.Table _ -> (state.ActiveTable.ColumnCount-1), (state.ActiveTable.RowCount-1)
-                            | ActiveView.DataMap -> DataMap.ColumnCount-1 , state.DataMapOrDefault.DataContexts.Count-1
-                            | _ -> (state.ActiveTable.ColumnCount-1), (state.ActiveTable.RowCount-1) // This does not matter
-                        let nextIndex = Controller.Table.selectRelativeCell state.SelectedCells.MinimumElement moveBy maxColIndex maxRowIndex
-                        let s = Set([nextIndex])
+                            | ActiveView.Table _ ->
+                                (state.ActiveTable.ColumnCount - 1), (state.ActiveTable.RowCount - 1)
+                            | ActiveView.DataMap ->
+                                DataMap.ColumnCount - 1, state.DataMapOrDefault.DataContexts.Count - 1
+                            | _ -> (state.ActiveTable.ColumnCount - 1), (state.ActiveTable.RowCount - 1) // This does not matter
+
+                        let nextIndex =
+                            Controller.Table.selectRelativeCell
+                                state.SelectedCells.MinimumElement
+                                moveBy
+                                maxColIndex
+                                maxRowIndex
+
+                        let s = Set([ nextIndex ])
                         let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
+
                         match Browser.Dom.document.getElementById cellId with
                         | null -> ()
-                        | ele -> ele.focus()
+                        | ele -> ele.focus ()
+
                         UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
+
                 state, model, cmd
             | SetActiveCellFromSelected ->
                 let cmd =
@@ -242,8 +296,15 @@ module Spreadsheet =
                         Cmd.none
                     else
                         let min = state.SelectedCells.MinimumElement
-                        let cmd = (Fable.Core.U2.Case2 min, ColumnType.Main) |> Some |> UpdateActiveCell |> SpreadsheetMsg
+
+                        let cmd =
+                            (Fable.Core.U2.Case2 min, ColumnType.Main)
+                            |> Some
+                            |> UpdateActiveCell
+                            |> SpreadsheetMsg
+
                         Cmd.ofMsg cmd
+
                 state, model, cmd
             | UpdateActiveCell next ->
                 let nextState = { state with ActiveCell = next }
@@ -254,6 +315,7 @@ module Spreadsheet =
                         (Controller.Clipboard.copyCellByIndex index)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | CopyCells indices ->
                 let cmd =
@@ -261,6 +323,7 @@ module Spreadsheet =
                         (Controller.Clipboard.copyCellsByIndex indices)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | CopySelectedCell ->
                 let cmd =
@@ -268,6 +331,7 @@ module Spreadsheet =
                         (Controller.Clipboard.copySelectedCell)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | CopySelectedCells ->
                 let cmd =
@@ -275,19 +339,26 @@ module Spreadsheet =
                         (Controller.Clipboard.copySelectedCells)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | CutCell index ->
                 let nextState = Controller.Clipboard.cutCellByIndex index state
                 nextState, model, Cmd.none
             | CutSelectedCell ->
                 let nextState =
-                    if state.SelectedCells.IsEmpty then state else
+                    if state.SelectedCells.IsEmpty then
+                        state
+                    else
                         Controller.Clipboard.cutSelectedCell state
+
                 nextState, model, Cmd.none
             | CutSelectedCells ->
                 let nextState =
-                    if state.SelectedCells.IsEmpty then state else
+                    if state.SelectedCells.IsEmpty then
+                        state
+                    else
                         Controller.Clipboard.cutSelectedCells state
+
                 nextState, model, Cmd.none
             | PasteCell index ->
                 let cmd =
@@ -296,6 +367,7 @@ module Spreadsheet =
                         state
                         (UpdateState >> SpreadsheetMsg)
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | PasteCellsExtend index ->
                 let cmd =
@@ -304,6 +376,7 @@ module Spreadsheet =
                         state
                         (UpdateState >> SpreadsheetMsg)
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | PasteSelectedCell ->
                 let cmd =
@@ -312,6 +385,7 @@ module Spreadsheet =
                         state
                         (UpdateState >> SpreadsheetMsg)
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | PasteSelectedCells ->
                 let cmd =
@@ -320,6 +394,7 @@ module Spreadsheet =
                         state
                         (UpdateState >> SpreadsheetMsg)
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | Clear indices ->
                 let nextState = Controller.Table.clearCells indices state
@@ -341,37 +416,36 @@ module Spreadsheet =
                         bytes
                         (UpdateArcFile >> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
+
                 state, model, cmd
-            | ExportJson (arcfile,jef) ->
-                let jsonExport = UpdateUtil.JsonExportHelper.parseToJsonString(arcfile, jef)
+            | ExportJson(arcfile, jef) ->
+                let jsonExport = UpdateUtil.JsonExportHelper.parseToJsonString (arcfile, jef)
                 UpdateUtil.downloadFromString (jsonExport)
                 state, model, Cmd.none
-            | ExportXlsx arcfile->
+            | ExportXlsx arcfile ->
                 let name, fswb =
                     let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
+
                     match arcfile with
-                    | Investigation ai ->
-                        n + "_" + ArcInvestigation.FileName, ArcInvestigation.toFsWorkbook ai
-                    | Study (as',aaList) ->
-                        n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
-                    | Assay aa ->
-                        n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
-                    | Template t ->
-                        n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+                    | Investigation ai -> n + "_" + ArcInvestigation.FileName, ArcInvestigation.toFsWorkbook ai
+                    | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
+                    | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
+                    | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+
                 let cmd =
                     Cmd.OfPromise.either
                         Xlsx.toXlsxBytes
                         fswb
-                        (fun bytes -> ExportXlsxDownload (name,bytes) |> Messages.SpreadsheetMsg)
+                        (fun bytes -> ExportXlsxDownload(name, bytes) |> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
+
                 state, model, cmd
-            | ExportXlsxDownload (name,xlsxBytes) ->
-                let _ = UpdateUtil.download (name ,xlsxBytes)
+            | ExportXlsxDownload(name, xlsxBytes) ->
+                let _ = UpdateUtil.download (name, xlsxBytes)
                 state, model, Cmd.none
+
         try
-            innerUpdate state model msg
-            |> Helper.updateHistoryStorageMsg msg
-        with
-            | e ->
-                let cmd = GenericError (Cmd.none, e) |> DevMsg |> Cmd.ofMsg
-                state, model, cmd
+            innerUpdate state model msg |> Helper.updateHistoryStorageMsg msg
+        with e ->
+            let cmd = GenericError(Cmd.none, e) |> DevMsg |> Cmd.ofMsg
+            state, model, cmd
