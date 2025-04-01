@@ -2,7 +2,6 @@ namespace Swate.Components
 
 open Feliz
 open Feliz.DaisyUI
-open Swate.Components
 open Fable.Core
 
 //Modal that is the base of all big modals
@@ -57,9 +56,10 @@ type BaseModal =
                                 if debug then
                                     prop.testId "base-modal-content"
                                 prop.className [
-                                    "overflow-y-auto space-y-2"
                                     if contentClassInfo.IsSome then
                                         contentClassInfo.Value
+                                    else
+                                        "overflow-y-auto space-y-2"
                                 ]
                                 prop.children content.Value
                             ]

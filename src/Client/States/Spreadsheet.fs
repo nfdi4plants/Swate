@@ -1,6 +1,6 @@
 namespace Spreadsheet
 
-open Swate.Components.Shared
+open Swate.Components
 open ARCtrl
 open Fable.Core
 open FileImport
@@ -185,6 +185,7 @@ type Msg =
 | CopyCells of indices:(int*int) []
 | CutCell of index:(int*int)
 | PasteCell of index:(int*int)
+| SetCell of columnIndex:int * rowIndex:int * term:Term option
 /// This Msg will paste all cell from clipboard into column starting from index. It will extend the table if necessary.
 | PasteCellsExtend of index:(int*int)
 | Clear of index:(int*int) []

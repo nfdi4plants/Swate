@@ -46,8 +46,9 @@
     <Compile Include="Modals\ContextMenus\TableCell.fs" />
     <Compile Include="Modals\ContextMenus\DataMapCell.fs" />
     <Compile Include="Modals\ContextMenus\FooterTabs.fs" />
+    <Compile Include="Modals\CompositeHeaderModal.fs" />
+    <Compile Include="Modals\CompositeCollumnModal.fs" />
     <Compile Include="Modals\Loading.fs" />
-    <Compile Include="Modals\EditColumn.fs" />
     <Compile Include="Modals\ResetTable.fs" />
     <Compile Include="Modals\WarningModal.fs" />
     <Compile Include="Modals\InteropLoggingModal.fs" />

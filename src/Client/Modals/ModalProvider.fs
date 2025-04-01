@@ -15,7 +15,7 @@ type ModalProvider =
     static member TableModal (modal: TableModals, model, dispatch) =
         match modal with
         | TableModals.EditColumn columnIndex ->
-            Modals.EditColumn.Main (columnIndex, model, dispatch)
+            Modals.CompositeHeaderModal.Main (columnIndex, model, dispatch)
         | TableModals.MoveColumn columnIndex ->
             Modals.MoveColumn.Main (columnIndex, model, dispatch)
         | TableModals.ResetTable ->
@@ -30,7 +30,9 @@ type ModalProvider =
             Modals.ContextMenus.TableCell.Main(mouseX, mouseY, ci, ri, model, dispatch)
         | TableModals.DataMapCellContext (mouseX, mouseY, ci, ri) ->
             Modals.ContextMenus.DataMapCell.Main(mouseX, mouseY, ci, ri, model, dispatch)
-
+        | TableModals.TableCellDetailsAtIndex (ci, ri) ->
+            let rmv = Util.RMV_MODAL dispatch
+            Modals.CompositeCollumnModal.Main(ci, ri, model, dispatch, rmv)
 
     static member GeneralModal (modal: GeneralModals, model, dispatch) =
         match modal with
@@ -40,7 +42,6 @@ type ModalProvider =
             Modals.Warning.Main (msg, dispatch)
         | GeneralModals.Loading ->
             Modals.Loading.Modal (dispatch)
-
 
     [<ReactComponent>]
     static member Main (model: Model.Model, dispatch) =
