@@ -135,7 +135,6 @@
     <PackageReference Include="ARCtrl.Core" Version="2.2.4" />
     <PackageReference Include="ARCtrl.Json" Version="2.2.4" />
     <PackageReference Include="ARCtrl.Javascript" Version="2.2.4" />
-    <PackageReference Include="Fable.Core" Version="4.3.0" />
     <PackageReference Include="Fable.Elmish" Version="4.2.0" />
     <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />
     <PackageReference Include="Fable.Elmish.React" Version="4.0.0" />

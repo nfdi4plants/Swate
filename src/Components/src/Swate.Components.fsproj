@@ -29,6 +29,7 @@
     <Content Include="GenericComponents\BaseModal.fs" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
+    <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\Table.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="Style.fs" />
@@ -38,7 +39,7 @@
     <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />
-    <PackageReference Include="Fable.Core" Version="4.3.0" />
+    <PackageReference Include="Fable.Core" Version="4.5.0" />
     <PackageReference Include="Feliz" Version="2.9.0" />
     <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
     <PackageReference Include="Fable.Browser.Dom" Version="2.18.0" />

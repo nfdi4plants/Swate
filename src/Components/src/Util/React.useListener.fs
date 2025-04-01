@@ -207,3 +207,6 @@ module React =
 
         static member inline onResize (elemRef: IRefValue<#HTMLElement option>, action: Event -> unit, ?options: AddEventListenerOptions) =
             useElementListener.on(elemRef, "resize", action, ?options = options)
+
+        static member inline onKeyDown (elemRef: IRefValue<#HTMLElement option>, action: KeyboardEvent -> unit, ?options: AddEventListenerOptions) =
+            useElementListener.on(elemRef, "keydown", action, ?options = options)
