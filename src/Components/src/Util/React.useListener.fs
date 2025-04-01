@@ -1,4 +1,4 @@
-﻿[<AutoOpenAttribute>]
+[<AutoOpenAttribute>]
 module Swate.Components.ReactHelper
 
 // https://github.com/Shmew/Feliz.UseListener/blob/master/src/Feliz.UseListener/Listener.fs
@@ -59,7 +59,7 @@ module Impl =
             else None)
 
 type React =
-
+    
     static member inline useDebouncedCallback<'A>(func: 'A -> unit, ?delay: int) =
         let timeout = React.useRef(None)
         let delay = defaultArg delay 500
@@ -103,6 +103,9 @@ type React =
             )
         )
         cancel, debouncedCallBack
+
+    [<ImportMember("@uidotdev/usehooks")>]
+    static member useLocalStorage<'A>(key: string, defaultValue: 'A): ('A * ('A -> unit)) = jsNative
 
 [<Erase;RequireQualifiedAccess>]
 module React =
