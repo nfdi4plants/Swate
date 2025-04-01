@@ -24,8 +24,7 @@ open Browser.Dom
 let View (model : Model) (dispatch : Msg -> unit) =
 
     //Set the initial theme
-    let useLocalStorage = importMember "@uidotdev/usehooks"
-    let (theme, handleSetTheme) = React.useLocalStorage(useLocalStorage, "theme", "light")
+    let (theme, handleSetTheme) = React.useLocalStorage("theme", "light")
     let newTheme = if String.IsNullOrEmpty theme then "light" else theme
     handleSetTheme newTheme
     document.documentElement.setAttribute("data-theme", newTheme)

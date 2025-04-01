@@ -59,7 +59,7 @@ module Impl =
             else None)
 
 type React =
-
+    
     static member inline useDebouncedCallback<'A>(func: 'A -> unit, ?delay: int) =
         let timeout = React.useRef(None)
         let delay = defaultArg delay 500
@@ -104,9 +104,8 @@ type React =
         )
         cancel, debouncedCallBack
 
-    static member inline useLocalStorage<'A>(func: (string * 'A) -> ('A * ('A -> unit)), key: string, defaultValue: 'A) =
-        let useLocalStorage: (string * 'A) -> ('A * ('A -> unit)) = func
-        useLocalStorage(key, defaultValue)
+    [<ImportMember("@uidotdev/usehooks")>]
+    static member useLocalStorage<'A>(key: string, defaultValue: 'A): ('A * ('A -> unit)) = jsNative
 
 [<Erase;RequireQualifiedAccess>]
 module React =
