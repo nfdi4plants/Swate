@@ -186,7 +186,7 @@ type private Data =
 type CompositeCollumnModal =
 
     static member onKeyDown (index: int*int, dispatch) =
-        Model.ModalState.TableModals.TableCellIndex index
+        Model.ModalState.TableModals.TableCellDetailsAtIndex  index
         |> Model.ModalState.ModalTypes.TableModal
         |> Some
         |> Messages.UpdateModal

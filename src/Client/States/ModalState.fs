@@ -17,7 +17,7 @@ module ModalState =
     | TermDetails of OntologyAnnotation
     | TableCellContext of mouseX: int * mouseY: int * columnIndex: int * rowIndex: int
     | DataMapCellContext of mouseX: int * mouseY: int * columnIndex: int * rowIndex: int
-    | TableCellIndex of columnIndex: int * rowIndex: int
+    | TableCellDetailsAtIndex  of columnIndex: int * rowIndex: int
     | ResetTable
 
     type ExcelModals =

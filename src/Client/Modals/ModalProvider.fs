@@ -30,7 +30,7 @@ type ModalProvider =
             Modals.ContextMenus.TableCell.Main(mouseX, mouseY, ci, ri, model, dispatch)
         | TableModals.DataMapCellContext (mouseX, mouseY, ci, ri) ->
             Modals.ContextMenus.DataMapCell.Main(mouseX, mouseY, ci, ri, model, dispatch)
-        | TableModals.TableCellIndex (ci, ri) ->
+        | TableModals.TableCellDetailsAtIndex (ci, ri) ->
             let rmv = Util.RMV_MODAL dispatch
             Modals.CompositeCollumnModal.Main(ci, ri, model, dispatch, rmv)
 
