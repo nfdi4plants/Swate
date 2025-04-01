@@ -7,7 +7,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
 
-
+[<RequireQualifiedAccess>]
 type private Modals =
 | AdvancedSearch
 | Details
@@ -543,15 +543,16 @@ type TermSearch =
         let advancedSearch =
             match advancedSearch0 with
             | U2.Case1 advancedSearch -> advancedSearch
-            | U2.Case2 _ -> {|
-                search = fun () -> API.callAdvancedSearch advancedSearchState
-                form = TermSearch.AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState)
-            |}
+            | U2.Case2 _ ->
+                AdvancedSearch(
+                    (fun () -> API.callAdvancedSearch advancedSearchState),
+                    TermSearch.AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState)
+                )
 
         let BinSize = 20
         let BinCount = React.useMemo((fun () -> searchResults.Results.Count / BinSize), [|box searchResults|])
-        let controller = {|
-            startSearch = fun () ->
+        let controller = AdvancedSearchController(
+            startSearch = (fun () ->
                 advancedSearch.search()
                 |> Promise.map(fun results ->
                     let results = results.ConvertAll(fun t0 ->
@@ -559,8 +560,9 @@ type TermSearch =
                     setSearchResults (SearchState.SearchDone results)
                 )
                 |> Promise.start
+            ),
             cancel = rvm
-        |}
+        )
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
         React.useEffect(
             (fun () -> setTempPagination (pagination + 1 |> Some)),
@@ -673,7 +675,8 @@ type TermSearch =
         ?disableDefaultParentSearch: bool,
         ?disableDefaultAllChildrenSearch: bool,
         ?portalTermSelectArea: IRefValue<option<HTMLElement>>,
-        ?fullwidth: bool, ?autoFocus: bool,
+        ?fullwidth: bool,
+        ?autoFocus: bool,
         ?classNames: TermSearchStyle
     ) =
 
@@ -894,7 +897,7 @@ type TermSearch =
             prop.ref containerRef
             prop.children [
                 match modal with
-                | Some Details ->
+                | Some Modals.Details ->
                     let configDetails =
                         [
                             "Parent Id", parentId
@@ -913,7 +916,7 @@ type TermSearch =
                         ) []
                         |> List.rev
                     TermSearch.DetailsModal((fun () -> setModal None), term, configDetails)
-                | Some AdvancedSearch when advancedSearch.IsSome->
+                | Some Modals.AdvancedSearch when advancedSearch.IsSome->
                     let onTermSelect = fun (term: Term option) ->
                         onTermSelect term
                         setModal None
@@ -930,7 +933,7 @@ type TermSearch =
                                     sprintf "%s - %s" term.name.Value term.id.Value,
                                     "tooltip-left",
                                     "fa-solid fa-square-check text-primary",
-                                    fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)
+                                    fun _ -> setModal (if modal.IsSome && modal.Value = Modals.Details then None else Some Modals.Details)
                                 )
                         | _ when showDetails -> // show only when focused
                             TermSearch.IndicatorItem(
@@ -938,7 +941,7 @@ type TermSearch =
                                 "Details",
                                 "tooltip-left",
                                 "fa-solid fa-circle-info text-info",
-                                (fun _ -> setModal (if modal.IsSome && modal.Value = Details then None else Some Modals.Details)),
+                                (fun _ -> setModal (if modal.IsSome && modal.Value = Modals.Details then None else Some Modals.Details)),
                                 focused
                             )
                         | _ ->
@@ -950,7 +953,7 @@ type TermSearch =
                                 "Advanced Search",
                                 "tooltip-left",
                                 "fa-solid fa-magnifying-glass-plus text-primary",
-                                (fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch)),
+                                (fun _ -> setModal (if modal.IsSome && modal.Value = Modals.AdvancedSearch then None else Some Modals.AdvancedSearch)),
                                 focused,
                                 [prop.testid "advanced-search-indicator"]
                             )
@@ -1013,7 +1016,7 @@ type TermSearch =
                                         if loading.IsEmpty then "invisible";
                                     ]
                                 ]
-                                let advancedSearchToggle = advancedSearch |> Option.map (fun _ -> fun _ -> setModal (if modal.IsSome && modal.Value = AdvancedSearch then None else Some AdvancedSearch))
+                                let advancedSearchToggle = advancedSearch |> Option.map (fun _ -> fun _ -> setModal (if modal.IsSome && modal.Value = Modals.AdvancedSearch then None else Some Modals.AdvancedSearch))
                                 match portalTermSelectArea with
                                 | Some portalTermSelectArea when portalTermSelectArea.current.IsSome ->
                                     ReactDOM.createPortal(

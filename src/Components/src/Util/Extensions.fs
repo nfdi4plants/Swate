@@ -5,6 +5,8 @@ open Feliz
 [<AutoOpen>]
 module Extensions =
 
+    let inline log e = Browser.Dom.console.log e
+
     type prop with
         static member testid (value: string) = prop.custom("data-testid", value)
 

@@ -1,7 +1,28 @@
 namespace Swate.Components
 
 open Fable.Core
+open Fable.Core.JS
 open Feliz
+
+type CellCoordinate = {| x: int; y: int |}
+type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
+
+[<AllowNullLiteral>]
+[<Global>]
+type SelectHandle
+    [<ParamObjectAttribute; Emit("$0")>]
+    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit) =
+    member val contains: CellCoordinate -> bool = contains with get, set
+    member val selectAt: (CellCoordinate * bool) -> unit = selectAt with get, set
+    member val clear: unit -> unit = clear with get, set
+
+[<AllowNullLiteral>]
+[<Global>]
+type TableHandle
+    [<ParamObjectAttribute; Emit("$0")>]
+    (scrollTo: CellCoordinate -> unit, select: SelectHandle) =
+    member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
+    member val select: SelectHandle = select with get, set
 
 [<AllowNullLiteral>]
 [<Global>]
@@ -9,6 +30,20 @@ type Term
     [<ParamObjectAttribute; Emit("$0")>]
     (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
     member val name: string option = jsNative with get, set
+    member val id: string option = jsNative with get, set
+    member val description: string option = jsNative with get, set
+    member val source: string option = jsNative with get, set
+    member val href: string option = jsNative with get, set
+    member val isObsolete: bool option = jsNative with get, set
+    member val data: obj option = jsNative with get, set
+
+[<AllowNullLiteral>]
+[<Global>]
+type Data
+    [<ParamObjectAttribute; Emit("$0")>]
+    (?name: string, ?unit: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
+    member val name: string option = jsNative with get, set
+    member val unit: string option = jsNative with get, set
     member val id: string option = jsNative with get, set
     member val description: string option = jsNative with get, set
     member val source: string option = jsNative with get, set
@@ -68,16 +103,21 @@ module TermSearchStyle =
         | U2.Case1 className -> className
         | U2.Case2 classNames -> classNames |> String.concat " "
 
+[<AllowNullLiteral>]
+[<Global>]
+type AdvancedSearchController
+    [<ParamObjectAttribute; Emit("$0")>]
+    (startSearch: unit -> unit, cancel: unit -> unit) =
+    member val startSearch: unit -> unit = jsNative with get, set
+    member val cancel: unit -> unit = jsNative with get, set
 
-type AdvancedSearchController = {|
-    startSearch: unit -> unit
-    cancel: unit -> unit
-|}
-
-type AdvancedSearch = {|
-    search: unit -> JS.Promise<ResizeArray<Term>>
-    form: AdvancedSearchController -> ReactElement
-|}
+[<AllowNullLiteral>]
+[<Global>]
+type AdvancedSearch
+    [<ParamObjectAttribute; Emit("$0")>]
+    (search: unit -> JS.Promise<ResizeArray<Term>>, form: AdvancedSearchController -> ReactElement) =
+    member val search: unit -> JS.Promise<ResizeArray<Term>> = jsNative with get, set
+    member val form: AdvancedSearchController -> ReactElement = jsNative with get, set
 
 ///
 /// A search function that resolves a list of terms.

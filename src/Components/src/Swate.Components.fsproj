@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -26,7 +26,11 @@
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
+    <Compile Include="GenericComponents\BaseModal.fs" />
+    <Content Include="GenericComponents\BaseModal.fs" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
+    <Compile Include="Table\KeyboardNavigation.fs" />
+    <Compile Include="Table\Table.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
@@ -35,7 +39,7 @@
     <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />
-    <PackageReference Include="Fable.Core" Version="4.3.0" />
+    <PackageReference Include="Fable.Core" Version="4.5.0" />
     <PackageReference Include="Feliz" Version="2.9.0" />
     <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
     <PackageReference Include="Fable.Browser.Dom" Version="2.18.0" />
@@ -43,7 +47,6 @@
 
   <ItemGroup>
     <!-- Include all files that are compiled with this project -->
-    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <!-- Include the project file itself as well -->
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
   </ItemGroup>

@@ -10,6 +10,7 @@ open Swate.Components.Shared
 open ARCtrl
 open Components
 open Model
+open Modals
 
 module private CellAux =
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
@@ -31,6 +32,7 @@ module private CellAux =
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader (columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
     let oasetter (index, nextCell: CompositeCell, dispatch) = Msg.UpdateCell (index, nextCell) |> SpreadsheetMsg |> dispatch
     let contextMenuController index model dispatch = if model.SpreadsheetModel.TableViewIsActive() then ContextMenu.Table.onContextMenu (index, dispatch) else ContextMenu.DataMap.onContextMenu (index, dispatch)
+    let buildingBlockModalController index dispatch = CompositeCollumnModal.onKeyDown(index, dispatch)
 open CellAux
 module private EventPresets =
     open Swate.Components.Shared
@@ -75,7 +77,7 @@ open Fable.Core.JsInterop
 type Cell =
 
     [<ReactComponent>]
-    static member CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle) =
+    static member CellInputElement (input: string, isHeader: bool, isReadOnly: bool, setter: string -> unit, makeIdle, index, dispatch) =
         let state, setState = React.useState(input)
         React.useEffect((fun () -> setState input), [|box input|])
         let debounceStorage = React.useRef(newDebounceStorage())
@@ -97,10 +99,21 @@ type Cell =
                     prop.onKeyDown(fun e ->
                         e.stopPropagation()
                         match e.code with
-                        | Swate.Components.kbdEventCode.enter -> //enter
-                            if isHeader then setter state
-                            debounceStorage.current.ClearAndRun()
-                            makeIdle()
+                        | Swate.Components.kbdEventCode.enter ->
+                            if isHeader then
+                                setter state
+                                debounceStorage.current.ClearAndRun()
+                                ModalState.TableModals.EditColumn(fst (index))
+                                |> Model.ModalState.ModalTypes.TableModal
+                                |> Some
+                                |> Messages.UpdateModal
+                                |> dispatch
+                                makeIdle()
+                            else
+                                debounceStorage.current.ClearAndRun()
+                                makeIdle()
+                                CellAux.buildingBlockModalController index dispatch
+
                         | Swate.Components.kbdEventCode.escape -> //escape
                             debounceStorage.current.Clear()
                             makeIdle()
@@ -136,7 +149,7 @@ type Cell =
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
             prop.children [
                 Html.div [
-                    if not isReadOnly then prop.onDoubleClick(fun e ->
+                    if not isReadOnly then prop.onClick(fun e ->
                         e.preventDefault()
                         e.stopPropagation()
                         UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
@@ -144,7 +157,7 @@ type Cell =
                     )
                     prop.children [
                         if isActive then
-                            Cell.CellInputElement(cellValue, true, isReadOnly, setter, makeIdle)
+                            Cell.CellInputElement(cellValue, true, isReadOnly, setter, makeIdle, (columnIndex, 0), dispatch)
                         else
                             let cellValue = // shadow cell value for tsr and tan to add columnType
                                 match columnType with
@@ -238,6 +251,14 @@ type Cell =
             ]
             prop.readOnly readonly
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
+            prop.onClick(fun e ->
+                e.preventDefault()
+                e.stopPropagation()
+                if not readonly && isIdle then
+                    makeActive()
+                if isIdle then
+                    EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch) e
+            )
             prop.onDoubleClick(fun e ->
                 e.preventDefault()
                 e.stopPropagation()
@@ -245,7 +266,11 @@ type Cell =
                     if isIdle then makeActive()
                     UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
             )
-            if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
+            prop.onKeyDown(fun e ->
+                if e.code = Swate.Components.kbdEventCode.enter then
+                    buildingBlockModalController index dispatch
+            )
+            //if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
             prop.onMouseDown(fun e -> if isIdle then e.preventDefault())
             prop.children [
                 if isActive then
@@ -291,7 +316,7 @@ type Cell =
                             allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
                         )
                     else
-                        Cell.CellInputElement(cellValue, false, false, setter, makeIdle)
+                        Cell.CellInputElement(cellValue, false, false, setter, makeIdle, index, dispatch)
                 else
                     if columnType = Main && oasetter.IsSome then
                         CellStyles.CompositeCellDisplay(oasetter.Value.oa, displayValue)

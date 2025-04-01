@@ -14,9 +14,7 @@ module private DataAnnotatorHelper =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
             Daisy.button.button [
-                prop.className "grow"
                 prop.onClick rmvFile
-                button.outline
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     button.disabled
                 else
@@ -164,11 +162,11 @@ module private DataAnnotatorHelper =
                     UpdateSeparatorButton dispatch
                     UpdateIsHeaderCheckbox model dispatch
                     UpdateTargetColumn target setTarget
-                    ResetButton model rmvFile
+                    //ResetButton model rmvFile
                 | Spreadsheet.ActivePattern.IsDataMap ->
                     UpdateSeparatorButton dispatch
                     UpdateIsHeaderCheckbox model dispatch
-                    ResetButton model rmvFile
+                    //ResetButton model rmvFile
                 | _ -> Html.none
             ]
         ]
@@ -292,58 +290,67 @@ type DataAnnotator =
         let init: unit -> Set<DataTarget> = fun () -> Set.empty
         let state, setState = React.useState(init)
         let (targetCol: TargetColumn), setTargetCol = React.useState(TargetColumn.Autodetect)
-        Daisy.modal.div [
-            modal.active
-            prop.children [
-                Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.modalBox.div [
-                    prop.className "max-w-none"
-                    prop.children [
-                        Daisy.card [
-                            card.compact
-                            prop.children [
-                                Daisy.cardBody [
-                                    prop.className "grid grid-cols-1 grid-rows-[1fr_1fr_20px_8fr_1fr] h-[600px] w-full overflow-hidden"
-                                    prop.children [
-                                        Daisy.cardTitle [
-                                            prop.className "flex flex-row justify-between"
-                                            prop.children [
-                                                Html.span "Data Annotator"
-                                                Daisy.cardActions [Components.DeleteButton(props = [prop.onClick rmv]) |> prop.children; prop.className "justify-end"]
-                                            ]
-                                        ]
-                                        DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
-                                        FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
-                                        // Html.div [prop.text "Test 4"; prop.className "bg-yellow-300"]
-                                        FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
-                                        Daisy.cardActions [
-                                            Daisy.button.button [
-                                                button.info
-                                                prop.style [style.marginLeft length.auto]
-                                                prop.text "Submit"
-                                                prop.onClick(fun e ->
-                                                    match model.DataAnnotatorModel.DataFile with
-                                                    | Some dtf ->
-                                                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
-                                                        let name = dtf.DataFileName
-                                                        let dt = dtf.DataFileType
-                                                        SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
-                                                        |> InterfaceMsg
-                                                        |> dispatch
-                                                    | None ->
-                                                        logw "No file selected"
-                                                    rmv e
-                                                )
-                                            ]
-                                        ]
-                                    ]
-                                ]
+
+        let modalActivity =
+            Html.div [
+                prop.children [
+                    DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
+                    FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
+                ]
+            ]
+        let content =
+            [
+                FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
+            ]
+        let footer =
+            Html.div [
+                prop.className "w-full flex justify-between items-center gap-2"
+                prop.children [
+                    Html.div [
+                        prop.children [
+                            DataAnnotatorButtons.ResetButton model rmvFile
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "ml-auto flex gap-2"
+                        prop.style [style.marginLeft length.auto]
+                        prop.children [
+                            Daisy.button.button [
+                                prop.onClick rmv
+                                button.outline
+                                prop.text "Cancel"
+                            ]
+                            Daisy.button.button [
+                                button.primary
+                                prop.text "Submit"
+                                prop.onClick(fun e ->
+                                    match model.DataAnnotatorModel.DataFile with
+                                    | Some dtf ->
+                                        let selectors = [|for x in state do x.ToFragmentSelectorString(model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome)|]
+                                        let name = dtf.DataFileName
+                                        let dt = dtf.DataFileType
+                                        SpreadsheetInterface.AddDataAnnotation {|fileName=name; fileType=dt; fragmentSelectors=selectors; targetColumn=targetCol|}
+                                        |> InterfaceMsg
+                                        |> dispatch
+                                    | None ->
+                                        logw "No file selected"
+                                    rmv e
+                                )
                             ]
                         ]
                     ]
                 ]
             ]
-        ]
+
+        Swate.Components.BaseModal.BaseModal(
+            rmv,
+            header = Html.p "Data Annotator",
+            modalClassInfo = "max-w-none",
+            modalActivity = modalActivity,
+            content = content,
+            contentClassInfo = "grid grid-cols-1 grid-rows h-[600px] overflow-hidden",
+            footer = footer
+        )
 
     [<ReactComponent>]
     static member Main(model: Model, dispatch: Msg -> unit) =
