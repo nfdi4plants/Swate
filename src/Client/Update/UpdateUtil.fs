@@ -109,8 +109,7 @@ module JsonImportHelper =
                 |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
                 |> Seq.iter (fun table -> existingTables.Add table)
             existing
-        | None -> //
-            failwith "Error! Can only append information if metadata sheet exists!"
+        | None ->  failwith "Error! Can only append information if metadata sheet exists!"
 
     /// <summary>
     ///
