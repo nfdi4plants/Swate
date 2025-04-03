@@ -109,26 +109,31 @@ type SelectiveImportModal =
 
     [<ReactComponent>]
     static member TableImport(tableIndex: int, table0: ArcTable, model: Model.Model, dispatch, ?templateName) =
-        let importConfig = model.ProtocolState.ImportConfig
         let name = defaultArg templateName table0.Name
         let radiogroupId = React.useMemo(System.Guid.NewGuid)
         let radioGroup = "RADIO_GROUP" + table0.Name + string tableIndex + radiogroupId.ToString()
-        let import = importConfig.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
+        let import = model.ProtocolState.ImportConfig.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
         let isActive = import.IsSome
-        let isDisabled = importConfig.ImportMetadata
+        let isDisabled = model.ProtocolState.ImportConfig.ImportMetadata
+        let isTemplate =
+            if model.SpreadsheetModel.ArcFile.IsSome then
+                match model.SpreadsheetModel.ArcFile.Value with
+                | Template _ -> true
+                | _         -> false
+            else false
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importConfig.ImportTables |> List.distinct
-            {importConfig with ImportTables = newImportTables} |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
+            let newImportTables = newImportTable::model.ProtocolState.ImportConfig.ImportTables |> List.distinctBy (fun template -> template.Index)
+            {model.ProtocolState.ImportConfig with ImportTables = newImportTables } |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
         let rmvTableImport = fun i ->
-            let tableRemoved = importConfig.ImportTables |> List.filter (fun it -> it.Index <> i)
-            {importConfig with ImportTables = tableRemoved} |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
+            let tableRemoved = model.ProtocolState.ImportConfig.ImportTables |> List.filter (fun it -> it.Index <> i)
+            {model.ProtocolState.ImportConfig with ImportTables = tableRemoved} |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
         ModalElements.Box (name, "fa-solid fa-table", React.fragment [
             Html.div [
                 ModalElements.RadioPlugin (radioGroup, "Import",
                     isActive && import.Value.FullImport,
                     (fun _ -> addTableImport tableIndex true),
-                    isDisabled
+                    isDisabled || isTemplate
                 )
                 ModalElements.RadioPlugin (radioGroup, "Append to active table",
                     isActive && not import.Value.FullImport,
@@ -174,20 +179,9 @@ type SelectiveImportModal =
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
         let importDataState, setImportDataState = React.useState(SelectiveImportConfig.init())
         let setMetadataImport = fun b ->
-            if b then
-                {
-                    importDataState with
-                        ImportMetadata  = true;
-                        ImportTables    = [for ti in 0 .. tables.Count-1 do {ImportTable.Index = ti; ImportTable.FullImport = true}]
-                } |> setImportDataState
-            else
-                SelectiveImportConfig.init() |> setImportDataState
-        let addTableImport = fun (i: int) (fullImport: bool) ->
-            let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
-            {importDataState with ImportTables = newImportTables} |> setImportDataState
-        let rmvTableImport = fun i ->
-            {importDataState with ImportTables = importDataState.ImportTables |> List.filter (fun it -> it.Index <> i)} |> setImportDataState
+            {
+                importDataState with ImportMetadata  = b;
+            } |> setImportDataState
         Daisy.modal.div [
             modal.active
             prop.children [
