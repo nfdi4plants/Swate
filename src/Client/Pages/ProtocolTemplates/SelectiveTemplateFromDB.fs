@@ -125,7 +125,6 @@ type SelectiveTemplateFromDB =
     [<ReactComponent>]
     static member Main (model: Model, dispatch, isWidget) =
         let radioGroup = if isWidget then "Widget" else ""
-        let importDataState, setImportDataState = React.useState(SelectiveImportConfig.init())
         Html.div [
             prop.className "flex flex-col gap-2 lg:gap-4 overflow-hidden"
             prop.children [
@@ -169,8 +168,6 @@ type SelectiveTemplateFromDB =
                                     templateIndex,
                                     template.Table,
                                     model,
-                                    importDataState,
-                                    setImportDataState,
                                     dispatch,
                                     template.Name
                                 )

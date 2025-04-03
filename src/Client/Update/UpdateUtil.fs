@@ -31,7 +31,6 @@ module JsonImportHelper =
                     let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumns importTable.Index
                     let sourceTable = arcTables.[importTable.Index]
                     let appliedTable = ArcTable.init(sourceTable.Name)
-
                     let finalTable = Table.selectiveTablePrepare appliedTable sourceTable deselectedColumnIndices
                     appliedTable.Join(finalTable, joinOptions=state.ImportType)
                     appliedTable
@@ -96,7 +95,9 @@ module JsonImportHelper =
                     for table in selectedColumnTables do
                         let preparedTemplate = Table.distinctByHeader tempTable table
                         tempTable.Join(preparedTemplate, joinOptions=importConfig.ImportType)
-                    existingTables.[i] <- tempTable
+                    match existing with
+                    | Template t -> t.Table <- tempTable
+                    | _ -> existingTables.[i] <- tempTable
                 | _ -> ()
             let addTables =
                 let selectedColumnTables = createUpdatedTables importTables importConfig deselectedColumns (Some true) |> Array.ofSeq |> Array.rev
@@ -107,7 +108,12 @@ module JsonImportHelper =
                     nTable
                 )
                 |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
-                |> Seq.iter (fun table -> existingTables.Add table)
+                |> Seq.iter (fun table ->
+                    match existing with
+                    | Template t ->
+                        Browser.Dom.console.warn "You are trying to add a new table to template. Currently, template supports only one table."
+                    | _ -> existingTables.Add table
+                )
             existing
         | None ->  failwith "Error! Can only append information if metadata sheet exists!"
 

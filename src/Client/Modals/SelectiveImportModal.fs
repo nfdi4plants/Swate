@@ -108,26 +108,32 @@ type SelectiveImportModal =
     )
 
     [<ReactComponent>]
-    static member TableImport(tableIndex: int, table0: ArcTable, model: Model.Model, importDataState, setImportDataState, dispatch, ?templateName) =
+    static member TableImport(tableIndex: int, table0: ArcTable, model: Model.Model, dispatch, ?templateName) =
         let name = defaultArg templateName table0.Name
         let radiogroupId = React.useMemo(System.Guid.NewGuid)
         let radioGroup = "RADIO_GROUP" + table0.Name + string tableIndex + radiogroupId.ToString()
-        let import = importDataState.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
+        let import = model.ProtocolState.ImportConfig.ImportTables |> List.tryFind (fun it -> it.Index = tableIndex)
         let isActive = import.IsSome
-        let isDisabled = importDataState.ImportMetadata
+        let isDisabled = model.ProtocolState.ImportConfig.ImportMetadata
+        let isTemplate =
+            if model.SpreadsheetModel.ArcFile.IsSome then
+                match model.SpreadsheetModel.ArcFile.Value with
+                | Template _ -> true
+                | _         -> false
+            else false
         let addTableImport = fun (i: int) (fullImport: bool) ->
             let newImportTable: ImportTable = {Index = i; FullImport = fullImport}
-            let newImportTables = newImportTable::importDataState.ImportTables |> List.distinct
-            {importDataState with ImportTables = newImportTables} |> setImportDataState
+            let newImportTables = newImportTable::model.ProtocolState.ImportConfig.ImportTables |> List.distinctBy (fun template -> template.Index)
+            {model.ProtocolState.ImportConfig with ImportTables = newImportTables } |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
         let rmvTableImport = fun i ->
-            let tableRemoved = importDataState.ImportTables |> List.filter (fun it -> it.Index <> i)
-            {importDataState with ImportTables = tableRemoved} |> setImportDataState
+            let tableRemoved = model.ProtocolState.ImportConfig.ImportTables |> List.filter (fun it -> it.Index <> i)
+            {model.ProtocolState.ImportConfig with ImportTables = tableRemoved} |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
         ModalElements.Box (name, "fa-solid fa-table", React.fragment [
             Html.div [
                 ModalElements.RadioPlugin (radioGroup, "Import",
                     isActive && import.Value.FullImport,
                     (fun _ -> addTableImport tableIndex true),
-                    isDisabled
+                    isDisabled || isTemplate
                 )
                 ModalElements.RadioPlugin (radioGroup, "Append to active table",
                     isActive && not import.Value.FullImport,
@@ -207,7 +213,7 @@ type SelectiveImportModal =
                                 SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
                                 for ti in 0 .. (tables.Count-1) do
                                     let t = tables.[ti]
-                                    SelectiveImportModal.TableImport(ti, t, model, importDataState, setImportDataState, dispatch)
+                                    SelectiveImportModal.TableImport(ti, t, model, dispatch)
                             ]
                         ]
                         Daisy.cardActions [
