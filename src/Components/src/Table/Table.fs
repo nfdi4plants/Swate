@@ -73,86 +73,29 @@ type Virtual =
 [<Mangle(false); Erase>]
 type Table =
 
-    static member DefaultRowHeight = 40
-    static member DefaultColumnWidth = 150
-
-    static member Cell(rowIndex: int, columnIndex: int, props, className, content: ReactElement, debug: bool) =
-        Html.div [
-            prop.key $"{rowIndex}-{columnIndex}"
-            if debug then
-                prop.testId $"cell-{rowIndex}-{columnIndex}"
-            prop.className [
-                "h-full w-full py-2 px-1 flex items-center justify-center border border-base-200 snap-center"
-                className
-            ]
-            yield! props
-            prop.children [
-                content
-            ]
-        ]
-
-    static member StickyHeader(index: int, debug: bool) =
-        Table.Cell(
-            rowIndex = 0,
-            columnIndex = index,
-            props = [
-                prop.style [
-                    style.position.sticky
-                    style.height Table.DefaultRowHeight
-                    style.top Table.DefaultRowHeight
-                ]
-            ],
-            className = "bg-neutral text-neutral-content",
-            content = Html.div [
-                prop.className "text-lg"
-                prop.children [
-                    Html.text $"Column {index}"
-                ]
-            ],
-            debug = debug
-        )
-
-    static member StickyIndexColumn(index: int, debug: bool) =
-        Table.Cell(
-            rowIndex = index,
-            columnIndex = 0,
-            props = [
-                prop.style [
-                    style.position.sticky
-                    style.width Table.DefaultColumnWidth
-                    style.left Table.DefaultColumnWidth
-                ]
-            ],
-            className = "bg-base-300 text-base-content",
-            content = Html.div [
-                prop.className "text-lg"
-                prop.children [
-                    Html.text $"Row {index}"
-                ]
-            ],
-            debug = debug
-        )
 
     [<ReactComponent(true)>]
     static member Table(
         rowCount: int,
         columnCount: int,
-        renderCell: CellCoordinate -> ReactElement,
+        renderCell: CellCoordinate -> bool -> bool -> ReactElement,
         ref: IRefValue<TableHandle>,
         ?onSelect: GridSelect.OnSelect,
+        ?defaultStyleSelect: bool,
         ?debug: bool
     ) =
         let debug = defaultArg debug false
+        let defaultStyleSelect = defaultArg defaultStyleSelect true
 
         let scrollContainerRef = React.useElementRef()
 
         let rowVirtualizer = Virtual.useVirtualizer(
             count = rowCount,
             getScrollElement = (fun () -> scrollContainerRef.current),
-            estimateSize = (fun _ -> Table.DefaultRowHeight),
+            estimateSize = (fun _ -> Constants.Table.DefaultRowHeight),
             overscan = 2,
-            scrollMargin = -Table.DefaultRowHeight,
-            scrollPaddingEnd = 1.5 * float Table.DefaultRowHeight,
+            scrollMargin = -Constants.Table.DefaultRowHeight,
+            scrollPaddingEnd = 1.5 * float Constants.Table.DefaultRowHeight,
             rangeExtractor = (fun range ->
                 let next = set [
                     0
@@ -165,10 +108,10 @@ type Table =
         let columnVirtualizer = Virtual.useVirtualizer(
             count = columnCount,
             getScrollElement = (fun () -> scrollContainerRef.current),
-            estimateSize = (fun _ -> Table.DefaultColumnWidth),
+            estimateSize = (fun _ -> Constants.Table.DefaultColumnWidth),
             overscan = 2,
-            scrollMargin = -Table.DefaultColumnWidth,
-            scrollPaddingEnd = 1.5 * float Table.DefaultColumnWidth,
+            scrollMargin = -Constants.Table.DefaultColumnWidth,
+            scrollPaddingEnd = 1.5 * float Constants.Table.DefaultColumnWidth,
             horizontal = true,
             rangeExtractor = (fun range ->
                 let next = set [
@@ -206,11 +149,13 @@ type Table =
                     scrollTo = scrollTo,
                     select = SelectHandle(
                         contains = GridSelect.contains,
+                        SelectOrigin = GridSelect.SelectOrigin,
                         selectAt = GridSelect.selectAt,
                         clear = GridSelect.clear
                     )
                 )
-            )
+            ),
+            [| GridSelect.selectedCells |]
         )
 
         Html.div [
@@ -222,8 +167,8 @@ type Table =
             prop.children [
                 Html.div [
                     prop.style [
-                        style.marginTop Table.DefaultRowHeight
-                        style.marginLeft Table.DefaultColumnWidth
+                        style.marginTop Constants.Table.DefaultRowHeight
+                        style.marginLeft Constants.Table.DefaultColumnWidth
                         style.height (rowVirtualizer.getTotalSize())
                         style.width (columnVirtualizer.getTotalSize())
                         style.position.relative
@@ -233,6 +178,8 @@ type Table =
                         for virtualRow in rowVirtualizer.getVirtualItems() do
                             React.keyedFragment(virtualRow.index, [
                                 for virtualColumn in columnVirtualizer.getVirtualItems() do
+                                    let isSelected = GridSelect.contains ({| x = virtualColumn.index; y = virtualRow.index |})
+                                    let isOrigin = GridSelect.SelectOrigin |> Option.exists(fun origin -> origin = {| x = virtualColumn.index; y = virtualRow.index |})
                                     Html.div [
                                         prop.key virtualColumn.key
                                         prop.style [
@@ -259,15 +206,18 @@ type Table =
                                             if GridSelect.selectedCellsReducedSet = nextSet then
                                                 GridSelect.clear()
                                             else
-                                                e.preventDefault()
                                                 GridSelect.selectAt({|x = virtualColumn.index; y = virtualRow.index|}, e.shiftKey)
                                         )
-                                        prop.className "data-[active=true]:bg-accent data-[active=true]:text-accent-content cursor-pointer data-[is-append-origin=true]:border data-[is-append-origin=true]:border-base-content"
-                                        prop.custom("data-active", GridSelect.contains ({| x = virtualColumn.index; y = virtualRow.index|}))
-                                        prop.custom("data-is-append-origin", GridSelect.selectOrigin |> Option.exists(fun origin -> origin = {| x = virtualColumn.index; y = virtualRow.index|}))
-                                        prop.children [
-                                            renderCell {| x = virtualColumn.index; y = virtualRow.index |}
+                                        prop.className [
+                                            "cursor-pointer"
+                                            if defaultStyleSelect then
+                                                "data-[selected=true]:bg-accent data-[selected=true]:text-accent-content data-[is-append-origin=true]:border data-[is-append-origin=true]:border-base-content"
                                         ]
+                                        prop.custom("data-selected", isSelected)
+                                        prop.custom("data-is-append-origin", GridSelect.SelectOrigin |> Option.exists(fun origin -> origin = {| x = virtualColumn.index; y = virtualRow.index|}))
+                                        prop.children (
+                                            renderCell {| x = virtualColumn.index; y = virtualRow.index |} isSelected isOrigin
+                                        )
                                     ]
                             ])
                     ]
@@ -281,17 +231,14 @@ type Table =
             React.memo (
                 (fun (coordinate: CellCoordinate) ->
                     if coordinate.x = 0 then
-                        Table.StickyIndexColumn(coordinate.y, false)
+                        TableCell.StickyIndexColumn(coordinate.y, false)
                     elif coordinate.y = 0 then
-                        Table.StickyHeader(coordinate.x, false)
+                        TableCell.StickyHeader(coordinate.x, false)
                     else
-                        Table.Cell(
+                        TableCell.BaseCell(
                             coordinate.y,
                             coordinate.x,
-                            [],
-                            "",
-                            Html.text $"Row {coordinate.y}, Column {coordinate.x}",
-                            false
+                            Html.text $"Row {coordinate.y}, Column {coordinate.x}"
                         )
                 ),
                 withKey = (fun (coordinate: CellCoordinate) -> $"{coordinate.x}-{coordinate.y}")
@@ -310,7 +257,7 @@ type Table =
                 Table.Table(
                     rowCount = 1000,
                     columnCount = 1000,
-                    renderCell = render,
+                    renderCell = (fun cc _ _ -> render cc),
                     ref = TableHandler
                 )
             ]

@@ -4,6 +4,18 @@ open Fable.Core
 open Fable.Core.JS
 open Feliz
 
+type TableCellState = {
+    IsSelected: bool
+    IsOrigin: bool
+    IsActive: bool
+} with
+    static member init(?isSelected, ?isOrigin, ?isActive) =
+        {
+            IsSelected = Option.defaultValue false isSelected
+            IsOrigin = Option.defaultValue false isOrigin
+            IsActive = Option.defaultValue false isActive
+        }
+
 type CellCoordinate = {| x: int; y: int |}
 type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
 
@@ -11,10 +23,11 @@ type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
 [<Global>]
 type SelectHandle
     [<ParamObjectAttribute; Emit("$0")>]
-    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit) =
+    (contains: CellCoordinate -> bool, SelectOrigin: CellCoordinate option, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit) =
     member val contains: CellCoordinate -> bool = contains with get, set
     member val selectAt: (CellCoordinate * bool) -> unit = selectAt with get, set
     member val clear: unit -> unit = clear with get, set
+    member val SelectOrigin: CellCoordinate option = SelectOrigin with get, set
 
 [<AllowNullLiteral>]
 [<Global>]

@@ -5,8 +5,6 @@ open Feliz
 [<AutoOpen>]
 module Extensions =
 
-    let inline log e = Browser.Dom.console.log e
-
     type prop with
         static member testid (value: string) = prop.custom("data-testid", value)
 
@@ -44,3 +42,9 @@ module kbdEventCode =
 
     let key (key:string) = key.ToUpper() |> sprintf "Key%s"
 
+open Fable.Core
+open Fable.Core.JsInterop
+[<Fable.Core.Global>]
+type console =
+    [<Emit("console.log($0)")>]
+    static member inline log e = jsNative

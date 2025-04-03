@@ -180,7 +180,7 @@ type GridSelect() =
         this.LastAppend <- None
 
 [<AutoOpen>]
-module Extensions =
+module KeyboardNavExtensions =
 
     open Feliz
 
@@ -246,7 +246,7 @@ module Extensions =
                 && cell.y >= selectedCells.Value.yStart
 
             {|
-                selectOrigin = select.current.Origin
+                SelectOrigin = select.current.Origin
                 lastAppend = select.current.LastAppend
                 selectedCells = selectedCells
                 contains = contains
