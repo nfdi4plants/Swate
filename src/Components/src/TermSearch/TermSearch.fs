@@ -891,7 +891,7 @@ type TermSearch =
                 prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "form-control not-prose"
+                "form-control not-prose h-full"
                 if fullwidth then "w-full"
             ]
             prop.ref containerRef
@@ -923,7 +923,7 @@ type TermSearch =
                     TermSearch.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
                 | _ -> Html.none
                 Html.div [
-                    prop.className "indicator w-full"
+                    prop.className "indicator w-full h-full"
                     prop.children [
                         match term with
                         | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always

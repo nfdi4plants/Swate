@@ -4,6 +4,17 @@ open Fable.Core
 
 module GridSelect =
 
+    type GridSelectHandle = {|
+        SelectOrigin: CellCoordinate option
+        lastAppend: CellCoordinate option
+        selectedCells: CellCoordinateRange option
+        contains: CellCoordinate -> bool
+        selectBy: Browser.Types.KeyboardEvent -> bool
+        selectAt: CellCoordinate * bool -> unit
+        clear: unit -> unit
+        selectedCellsReducedSet: Set<CellCoordinate>
+        count: int
+    |}
 
     [<StringEnum>]
     type Kbd =
@@ -59,6 +70,16 @@ module GridSelect =
                 (range.xEnd - range.xStart + 1) * (range.yEnd - range.yStart + 1)
             | None -> 0
 
+        let toString (range: CellCoordinateRange option) =
+            match range with
+            | Some range ->
+                let xStart = range.xStart
+                let yStart = range.yStart
+                let xEnd = range.xEnd
+                let yEnd = range.yEnd
+                sprintf "x: %d-%d, y: %d-%d" xStart xEnd yStart yEnd
+            | None -> "None"
+
 
 
 open GridSelect
@@ -100,7 +121,9 @@ type GridSelect() =
             e.preventDefault()
             let jump = e.ctrlKey || e.metaKey
             this.SelectBy(kbd, jump, e.shiftKey, selectedCells, setter, maxRow, maxCol, ?minRow = minRow, ?minCol = minCol, ?onSelect = onSelect)
-        | None -> ()
+            true
+        | None ->
+            false
 
     member this.SelectBy(kbd: Kbd, jump: bool, isAppend: bool, selectedCells: CellCoordinateRange option, setter: CellCoordinateRange option -> unit, maxRow: int, maxCol: int, ?minRow: int, ?minCol: int, ?onSelect) =
         let minRow = defaultArg minRow 0
@@ -185,8 +208,14 @@ module KeyboardNavExtensions =
     open Feliz
 
     type React with
-        static member useGridSelect(kbdNavContainer: IRefValue<Browser.Types.HTMLElement option>, rowCount: int, columnCount: int, ?minRow, ?minCol, ?onSelect: OnSelect, ?seed: ResizeArray<CellCoordinate>) =
-
+        static member useGridSelect(
+            rowCount: int,
+            columnCount: int,
+            ?minRow,
+            ?minCol,
+            ?onSelect: OnSelect,
+            ?seed: ResizeArray<CellCoordinate>
+        ) : GridSelectHandle =
             let minRow = defaultArg minRow 0
             let minCol = defaultArg minCol 0
             let seed: CellCoordinateRange option =
@@ -232,11 +261,6 @@ module KeyboardNavExtensions =
                             )
                         )
                     )
-
-            React.useElementListener.onKeyDown(
-                kbdNavContainer,
-                selectBy
-            )
 
             let contains = fun (cell: CellCoordinate) ->
                 selectedCells.IsSome

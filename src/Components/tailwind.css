@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.swt-table-cell {
+    @apply data-[selected=true]:bg-accent data-[selected=true]:text-accent-content
+    data-[is-append-origin=true]:border data-[is-append-origin=true]:border-base-content
+    data-[active=true]:border-2 data-[active=true]:border-primary
+}
