@@ -95,6 +95,13 @@ module private TableHelper =
 [<Mangle(false); Erase>]
 type Table =
 
+    static member private BodyPortal(content: ReactElement) =
+        ReactDOM.createPortal(
+            content,
+            Browser.Dom.document.body
+        )
+
+
     [<ReactComponent(true)>]
     static member Table(
         rowCount: int,
@@ -183,15 +190,6 @@ type Table =
 
         React.fragment [
             Html.div [
-                prop.className "border border-primary p-2 flex flex-row gap-2"
-                prop.children [
-                    Html.div [
-                        let txt = Swate.Components.GridSelect.SelectedCellRange.toString GridSelect.selectedCells
-                        prop.text txt
-                    ]
-                ]
-            ]
-            Html.div [
                 prop.ref scrollContainerRef
                 prop.onKeyDown (fun e ->
                     TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex)
@@ -216,7 +214,9 @@ type Table =
                                     for virtualColumn in columnVirtualizer.getVirtualItems() do
                                         let isSelected = GridSelect.contains ({| x = virtualColumn.index; y = virtualRow.index |})
                                         let isOrigin = GridSelect.SelectOrigin |> Option.exists(fun origin -> origin = {| x = virtualColumn.index; y = virtualRow.index |})
-                                        let isActive = activeCellIndex = Some {| x = virtualColumn.index; y = virtualRow.index |}
+                                        let isActive =
+                                            (activeCellIndex = Some {| x = virtualColumn.index; y = virtualRow.index |})
+                                            // || {| x = virtualColumn.index; y = virtualRow.index |} = {|x = 3; y = 2|}
                                         Html.div [
                                             prop.key virtualColumn.key
                                             prop.style [
@@ -224,7 +224,11 @@ type Table =
                                                 style.left 0
                                                 style.position.absolute
                                                 style.custom("transform", $"translateX({virtualColumn.start}px) translateY({virtualRow.start}px)" )
-                                                if virtualColumn.index = 0 then
+                                                if isActive then
+                                                    style.zIndex 3
+                                                    style.height virtualRow.size
+                                                    style.width virtualColumn.size
+                                                elif virtualColumn.index = 0 then
                                                     style.height virtualRow.size
                                                     style.width (length.perc 100)
                                                     style.zIndex 2
@@ -241,10 +245,8 @@ type Table =
                                             prop.onClick(fun e ->
                                                 if not isActive then
                                                     if e.detail >= 2 then
-                                                        console.log("set active")
                                                         setActiveCellIndex(Some {| x = virtualColumn.index; y = virtualRow.index |})
                                                     else
-                                                        console.log("set select")
                                                         let nextSet = Set.singleton ({|x = virtualColumn.index; y = virtualRow.index|})
                                                         if GridSelect.selectedCellsReducedSet = nextSet then
                                                             GridSelect.clear()
@@ -276,7 +278,6 @@ type Table =
                                                                     elif GridSelect.contains({|x = index.x + 1; y = GridSelect.selectedCells.Value.yStart|}) then
                                                                         setActiveCellIndex(Some {|x = index.x + 1; y = GridSelect.selectedCells.Value.yStart|})
                                                                     else
-                                                                        // setActiveCellIndex(Some({|x = GridSelect.selectedCells.Value.xStart; y = GridSelect.selectedCells.Value.yStart|}))
                                                                         setActiveCellIndex(None)
                                                                         scrollContainerRef.current.Value.focus()
                                                                         GridSelect.selectAt(index, false)
@@ -302,36 +303,6 @@ type Table =
                 ]
             ]
     ]
-
-    [<ReactComponent>]
-    static member MinimalTableCell(ts: TableCellController, data: string, setData) =
-        let tempData, setTempData = React.useState(data)
-        React.useEffect((fun _ ->
-            setTempData data
-        ), [| box data |])
-        TableCell.BaseCell(
-            ts.Index.y,
-            ts.Index.x,
-            Html.input [
-                prop.autoFocus true
-                prop.className "rounded-none w-full h-full bg-base-100 text-base-content px-2 py-1"
-                prop.defaultValue tempData
-                prop.onChange (fun (e: string) ->
-                    setTempData e
-                )
-                prop.onKeyDown (fun e ->
-                    ts.onKeyDown e
-                    match e.code with
-                    | kbdEventCode.enter ->
-                        setData tempData
-                    | _ -> ()
-                )
-                prop.onBlur (fun e ->
-                    ts.onBlur e
-                    setData tempData
-                )
-            ]
-        )
 
     [<ReactComponent>]
     static member Entry() =
@@ -367,7 +338,7 @@ type Table =
         let renderActiveCell =
             React.memo (
                 (fun (ts: TableCellController) ->
-                    Table.MinimalTableCell(
+                    TableCell.BaseActiveTableCell(
                         ts,
                         data.[ts.Index.y].[ts.Index.x],
                         (fun newData ->
@@ -391,8 +362,8 @@ type Table =
                     )
                 ]
                 Table.Table(
-                    rowCount = 100_000,
-                    columnCount = 100_000,
+                    rowCount = rowCount,
+                    columnCount = columnCount,
                     renderCell = render,
                     renderActiveCell = renderActiveCell,
                     ref = TableHandler

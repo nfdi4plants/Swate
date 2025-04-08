@@ -181,6 +181,7 @@ type TermSearch =
                 Html.div [
                     prop.onClick (fun e ->
                         e.stopPropagation()
+                        console.log("onclick-term select")
                         onTermSelect (Some term.Term)
                     )
                     prop.className [
@@ -277,8 +278,9 @@ type TermSearch =
             ]
         ]
 
-    static member private TermDropdown(onTermSelect, state: SearchState, loading: Set<string>, advancedSearchToggle: (unit -> unit) option, keyboardNavState: KeyboardNavigationController) =
+    static member private TermDropdown(termDropdownRef: IRefValue<option<HTMLElement>>, onTermSelect, state: SearchState, loading: Set<string>, advancedSearchToggle: (unit -> unit) option, keyboardNavState: KeyboardNavigationController) =
         Html.div [
+            prop.ref termDropdownRef
             prop.style [style.scrollbarGutter.stable]
             prop.className [
                 "min-w-[400px] not-prose"
@@ -666,15 +668,16 @@ type TermSearch =
         ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
         ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
         ?advancedSearch: U2<AdvancedSearch, bool>,
-        ?onFocus: unit -> Fable.Core.JS.Promise<unit>,
-        ?onBlur: unit -> Fable.Core.JS.Promise<unit>,
-        ?onKeyDown: Browser.Types.KeyboardEvent -> Fable.Core.JS.Promise<unit>,
+        ?onFocus: unit -> unit,
+        ?onBlur: unit -> unit,
+        ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
         ?showDetails: bool,
         ?debug: bool,
         ?disableDefaultSearch: bool,
         ?disableDefaultParentSearch: bool,
         ?disableDefaultAllChildrenSearch: bool,
-        ?portalTermSelectArea: IRefValue<option<HTMLElement>>,
+        ?portalTermDropdown: PortalTermDropdown,
+        ?portalModals: HTMLElement,
         ?fullwidth: bool,
         ?autoFocus: bool,
         ?classNames: TermSearchStyle
@@ -688,13 +691,14 @@ type TermSearch =
         let (keyboardNavState: KeyboardNavigationController), setKeyboardNavState = React.useState(KeyboardNavigationController.init)
 
         let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
-        // Set of string ids for each action started. As long as one id is still contained, shows loading spinner
+        /// Set of string ids for each action started. As long as one id is still contained, shows loading spinner
         let (loading: Set<string>), setLoading = React.useStateWithUpdater(Set.empty)
         let inputRef = React.useInputRef()
-        let containerRef = React.useRef(None)
-        // Used to show indicator buttons only when focused
+        let containerRef: IRefValue<option<HTMLElement>> = React.useElementRef()
+        let termDropdownRef: IRefValue<option<HTMLElement>> = React.useElementRef()
+        let modalContainerRef: IRefValue<option<HTMLElement>> = React.useElementRef()
+        /// Used to show indicator buttons only when focused
         let focused, setFocused = React.useState(false)
-
         let cancelled = React.useRef(false)
 
         let (modal: Modals option), setModal = React.useState None
@@ -845,22 +849,42 @@ type TermSearch =
             setSearchResults (fun _ -> SearchState.init())
             allChildSearch()
 
-        // Run when clicking outside of the search container
-        // If portal for term select area is given then use it, otherwise this will be called when clicking on term select area.
-        React.useListener.onClickAway((if portalTermSelectArea.IsSome then portalTermSelectArea.Value else containerRef),
-            (fun _ ->
-                setFocused false
-                setSearchResults(fun _ -> SearchState.init())
-                if onBlur.IsSome then
-                    onBlur.Value() |> Promise.start
-                cancel()
+        // Handles click outside events to close dropdown
+        React.useListener.onMouseDown(
+            (fun e ->
+                if focused then
+                    // these are the refs, which must be checked. It boils down to: base ref (containerRef)
+                    // + one ref for everything, which can be portalled outside
+                    let refs = [|
+                        if containerRef.current.IsSome then
+                            containerRef.current.Value
+                        if modalContainerRef.current.IsSome then
+                            modalContainerRef.current.Value
+                        if termDropdownRef.current.IsSome then
+                            termDropdownRef.current.Value
+                    |]
+                    let refsContain =
+                        refs
+                        |> Array.forall(fun el ->
+                            not (el.contains(unbox e.target))
+                        )
+                    match refsContain with
+                    | true ->
+                        setFocused false
+                        setSearchResults(fun _ -> SearchState.init())
+                        if onBlur.IsSome then
+                            onBlur.Value ()
+                        cancel()
+                    | _ -> ()
             )
         )
 
         // keyboard navigation
-        React.useListener.on("keydown", (fun (e:Browser.Types.KeyboardEvent) ->
+        let keyboardNav = (fun (e:Browser.Types.KeyboardEvent) ->
             if focused then // only run when focused
                 match searchResults, e.code with
+                | _, kbdEventCode.escape ->
+                    cancel()
                 | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
                     setKeyboardNavState(
                         match keyboardNavState.SelectedTermSearchResult with
@@ -879,11 +903,49 @@ type TermSearch =
                 | SearchState.Idle, kbdEventCode.arrowDown when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
                     startSearch inputRef.current.Value.value
                 | SearchState.SearchDone res, kbdEventCode.enter when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
+                    console.log("onEnter-term select")
                     onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
                     cancel()
                 | _ ->
                     ()
-        ))
+        )
+
+        if containerRef.current.IsSome then
+            console.log(containerRef.current.Value.getBoundingClientRect())
+
+        /// Could move this outside, but there are so many variable to pass to...
+        let modalContainer =
+            let configDetails =
+                [
+                    "Parent Id", parentId
+                    "Disable Default Search", Option.map string disableDefaultSearch
+                    "Disable Default Parent Search", Option.map string disableDefaultParentSearch
+                    "Disable Default All Children Search", Option.map string disableDefaultAllChildrenSearch
+                    "Custom Term Search Queries", Option.map (Seq.map fst >> String.concat "; ") termSearchQueries
+                    "Custom Parent Search Queries", Option.map (Seq.map fst >> String.concat "; ") parentSearchQueries
+                    "Custom All Children Search Queries", Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
+                    "Advanced Search", Option.map (function | U2.Case1 _ -> "Custom" | U2.Case2 _ -> "Default") advancedSearch
+                ]
+                |> List.fold(fun acc (key, value) ->
+                    match value with
+                    | Some value -> (key, value)::acc
+                    | _ -> acc
+                ) []
+                |> List.rev
+            Html.div [
+                prop.ref modalContainerRef
+                prop.children [
+                    match modal with
+                    | Some Modals.Details ->
+                        TermSearch.DetailsModal((fun () -> setModal None), term, configDetails)
+                    | Some Modals.AdvancedSearch when advancedSearch.IsSome->
+                        let onTermSelect = fun (term: Term option) ->
+                            onTermSelect term
+                            setModal None
+                        TermSearch.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
+                    | _ -> Html.none
+                ]
+            ]
 
         Html.div [
             if debug then
@@ -896,32 +958,13 @@ type TermSearch =
             ]
             prop.ref containerRef
             prop.children [
-                match modal with
-                | Some Modals.Details ->
-                    let configDetails =
-                        [
-                            "Parent Id", parentId
-                            "Disable Default Search", Option.map string disableDefaultSearch
-                            "Disable Default Parent Search", Option.map string disableDefaultParentSearch
-                            "Disable Default All Children Search", Option.map string disableDefaultAllChildrenSearch
-                            "Custom Term Search Queries", Option.map (Seq.map fst >> String.concat "; ") termSearchQueries
-                            "Custom Parent Search Queries", Option.map (Seq.map fst >> String.concat "; ") parentSearchQueries
-                            "Custom All Children Search Queries", Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
-                            "Advanced Search", Option.map (function | U2.Case1 _ -> "Custom" | U2.Case2 _ -> "Default") advancedSearch
-                        ]
-                        |> List.fold(fun acc (key, value) ->
-                            match value with
-                            | Some value -> (key, value)::acc
-                            | _ -> acc
-                        ) []
-                        |> List.rev
-                    TermSearch.DetailsModal((fun () -> setModal None), term, configDetails)
-                | Some Modals.AdvancedSearch when advancedSearch.IsSome->
-                    let onTermSelect = fun (term: Term option) ->
-                        onTermSelect term
-                        setModal None
-                    TermSearch.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
-                | _ -> Html.none
+                if portalModals.IsSome then
+                    ReactDOM.createPortal(
+                        modalContainer,
+                        portalModals.Value
+                    )
+                else
+                    modalContainer
                 Html.div [
                     prop.className "indicator w-full h-full"
                     prop.children [
@@ -997,16 +1040,14 @@ type TermSearch =
                                             startSearch inputRef.current.Value.value
                                     )
                                     prop.onKeyDown (fun e ->
-                                        match e.code with
-                                        | kbdEventCode.escape ->
-                                            cancel()
-                                        | _ -> ()
+                                        e.stopPropagation()
+                                        keyboardNav e
                                         if onKeyDown.IsSome then
-                                            onKeyDown.Value e |> Promise.start
+                                            onKeyDown.Value e
                                     )
                                     prop.onFocus(fun _ ->
                                         if onFocus.IsSome then
-                                            onFocus.Value() |> Promise.start
+                                            onFocus.Value()
                                         setFocused true
                                     )
                                 ]
@@ -1017,14 +1058,16 @@ type TermSearch =
                                     ]
                                 ]
                                 let advancedSearchToggle = advancedSearch |> Option.map (fun _ -> fun _ -> setModal (if modal.IsSome && modal.Value = Modals.AdvancedSearch then None else Some Modals.AdvancedSearch))
-                                match portalTermSelectArea with
-                                | Some portalTermSelectArea when portalTermSelectArea.current.IsSome ->
+                                match portalTermDropdown with
+                                | Some portalTermSelectArea when containerRef.current.IsSome ->
                                     ReactDOM.createPortal(
-                                        TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState),
-                                        portalTermSelectArea.current.Value
+                                        (portalTermSelectArea.renderer
+                                            (containerRef.current.Value.getBoundingClientRect())
+                                            (TermSearch.TermDropdown(termDropdownRef, onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState))),
+                                        portalTermSelectArea.portal
                                     )
                                 | _ ->
-                                    TermSearch.TermDropdown(onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState)
+                                    TermSearch.TermDropdown(termDropdownRef, onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState)
                             ]
                         ]
                     ]

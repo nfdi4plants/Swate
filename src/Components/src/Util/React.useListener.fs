@@ -59,7 +59,7 @@ module Impl =
             else None)
 
 type React =
-    
+
     static member inline useDebouncedCallback<'A>(func: 'A -> unit, ?delay: int) =
         let timeout = React.useRef(None)
         let delay = defaultArg delay 500

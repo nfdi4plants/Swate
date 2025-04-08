@@ -104,6 +104,83 @@ module Term =
             ?data = data
         )
 
+    module ConvertLiterals =
+        [<Literal>]
+        let Description = "description"
+
+        [<Literal>]
+        let Data = "data"
+
+        [<Literal>]
+        let Source = "source"
+
+        [<Literal>]
+        let IsObsolete = "isObsolete"
+
+    open Swate.Components.Shared
+    open Fable.SimpleJson
+
+    open ARCtrl
+
+    let toOntologyAnnotation (term: Term) =
+        let comments =
+            ResizeArray [
+                if term.description.IsSome then
+                    Comment(
+                        ConvertLiterals.Description,
+                        JSON.stringify term.description.Value
+                    )
+                if term.data.IsSome then
+                    Comment(
+                        ConvertLiterals.Data,
+                        JSON.stringify term.data.Value
+                    )
+                if term.source.IsSome then
+                    Comment(
+                        ConvertLiterals.Source,
+                        JSON.stringify term.source.Value
+                    )
+                if term.isObsolete.IsSome then
+                    Comment(
+                        ConvertLiterals.IsObsolete,
+                        JSON.stringify term.isObsolete.Value
+                    )
+            ]
+            |> Option.whereNot Seq.isEmpty
+        ARCtrl.OntologyAnnotation(
+            ?name = term.name,
+            ?tsr = term.source,
+            ?tan = term.id,
+            ?comments = comments
+        )
+
+    let fromOntologyAnnotation (oa: ARCtrl.OntologyAnnotation) =
+        let description =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Description)
+            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+        let data =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Data)
+            |> Option.map (fun c -> Json.parseAs<obj>(c.Value.Value))
+        let source =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Source)
+            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+        let isObsolete =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.IsObsolete)
+            |> Option.map (fun c -> Json.parseAs<bool>(c.Value.Value))
+        Term(
+            ?name = oa.Name,
+            ?id = oa.TermAccessionNumber,
+            ?description = description,
+            ?source = source,
+            ?href = Option.whereNot System.String.IsNullOrWhiteSpace oa.TermAccessionOntobeeUrl,
+            ?isObsolete = isObsolete,
+            ?data = data
+        )
+
 [<AllowNullLiteral>]
 [<Global>]
 type TermSearchStyle
@@ -132,6 +209,14 @@ type AdvancedSearch
     (search: unit -> JS.Promise<ResizeArray<Term>>, form: AdvancedSearchController -> ReactElement) =
     member val search: unit -> JS.Promise<ResizeArray<Term>> = jsNative with get, set
     member val form: AdvancedSearchController -> ReactElement = jsNative with get, set
+
+[<AllowNullLiteral>]
+[<Global>]
+type PortalTermDropdown
+    [<ParamObjectAttribute; Emit("$0")>]
+    (portal: Browser.Types.HTMLElement, renderer: Browser.Types.ClientRect -> ReactElement -> Fable.React.ReactElement) =
+    member val portal = portal with get, set
+    member val renderer = renderer with get, set
 
 ///
 /// A search function that resolves a list of terms.

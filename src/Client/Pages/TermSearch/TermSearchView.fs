@@ -93,6 +93,7 @@ let Main (model:Model, dispatch) =
                     let! parent = OfficeInterop.Core.Main.getParentTerm()
                     TermSearch.UpdateParentTerm parent |> TermSearchMsg |> dispatch
                 }
+                |> Promise.start
             |> Some
         | _ -> None
     SidebarComponents.SidebarLayout.Container  [
