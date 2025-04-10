@@ -26,7 +26,13 @@ type AnnotationTable =
                     | isIndexCol when ts.x = 0 ->
                         TableCell.StickyIndexColumn(ts.y, ?debug = debug)
                     | isIndexRow when ts.y = 0 ->
-                        TableCell.StickyHeader(ts.x, ?debug = debug)
+                        let header = arcTable.Headers.[(ts.x - 1)]
+                        let render =
+                            Html.div [
+                                prop.className "truncate text-lg"
+                                prop.text (header.ToString())
+                            ]
+                        TableCell.StickyHeader(ts.x, render, ?debug = debug)
                     | cell when ts.x > 0 && ts.y > 0 ->
                         let cell = arcTable.GetCellAt(ts.x - 1, ts.y - 1)
                         let text = cell.ToString()
@@ -87,7 +93,8 @@ type AnnotationTable =
                 columnCount = arcTable.ColumnCount + 1,
                 renderCell = cellRender,
                 renderActiveCell = renderActiveCell,
-                ref = tableRef
+                ref = tableRef,
+                enableColumnHeaderSelect = true
             )
         ]
 

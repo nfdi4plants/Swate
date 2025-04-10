@@ -910,9 +910,6 @@ type TermSearch =
                     ()
         )
 
-        if containerRef.current.IsSome then
-            console.log(containerRef.current.Value.getBoundingClientRect())
-
         /// Could move this outside, but there are so many variable to pass to...
         let modalContainer =
             let configDetails =

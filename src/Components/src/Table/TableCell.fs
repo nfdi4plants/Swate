@@ -18,9 +18,9 @@ type TableCell =
             columnIndex: int,
             content: ReactElement,
             ?className: string,
-            ?style,
             ?props,
-            ?debug: bool
+            ?debug: bool,
+            ?isStickyHeader: bool
         ) =
         let debug = defaultArg debug false
 
@@ -35,12 +35,12 @@ type TableCell =
             ]
             if props.IsSome then
                 yield! props.Value
-            if style.IsSome then
-                prop.style style.Value
+            if isStickyHeader.IsSome then
+                prop.style [ style.position.sticky; style.height Constants.Table.DefaultRowHeight; style.top Constants.Table.DefaultRowHeight ]
             prop.children [ content ]
         ]
 
-    static member DefaultClasses: string = "select-none h-full w-full border border-base-200 snap-center"
+    static member DefaultClasses: string = "select-none h-full w-full border border-base-200"
 
     static member StickyIndexColumn(index: int, ?debug: bool, ?defaultWidth) =
         let defaultWidth = defaultArg defaultWidth Constants.Table.DefaultColumnWidth
@@ -69,7 +69,7 @@ type TableCell =
             ]
         ]
 
-    static member StickyHeader(index: int, ?debug: bool, ?defaultHeight) =
+    static member StickyHeader(index: int, ?customContent: ReactElement, ?debug: bool, ?defaultHeight) =
         let defaultHeight = defaultArg defaultHeight Constants.Table.DefaultRowHeight
         let debug = defaultArg debug false
         let rowIndex = 0
@@ -84,12 +84,16 @@ type TableCell =
             ]
             prop.style [ style.position.sticky; style.height defaultHeight; style.top defaultHeight ]
             prop.children [
-                Html.div [ prop.className "text-lg"; prop.children [ Html.text $"Column {index}" ] ]
+                if customContent.IsSome then
+                    customContent.Value
+                else
+                    Html.div [ prop.className "text-lg"; prop.children [ Html.text $"Column {index}" ] ]
             ]
         ]
 
     [<ReactComponent>]
-    static member BaseActiveTableCell(ts: TableCellController, data: string, setData) =
+    static member BaseActiveTableCell(ts: TableCellController, data: string, setData, ?isStickyHeader: bool) =
+        let isStickyHeader = defaultArg isStickyHeader false
         let tempData, setTempData = React.useState(data)
         React.useEffect((fun _ ->
             setTempData data
@@ -100,6 +104,8 @@ type TableCell =
             Html.input [
                 prop.autoFocus true
                 prop.className "rounded-none w-full h-full bg-base-100 text-base-content px-2 py-1 outline-none"
+                if isStickyHeader then
+                    prop.style [ style.position.sticky; style.height Constants.Table.DefaultRowHeight; style.top Constants.Table.DefaultRowHeight ]
                 prop.defaultValue tempData
                 prop.onChange (fun (e: string) ->
                     setTempData e

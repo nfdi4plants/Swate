@@ -41,6 +41,8 @@ module Virtual =
         member this.getVirtualItems() : VirtualItem [] = jsNative
         member this.getTotalSize() : int = jsNative
         member this.scrollToIndex (index: int, ?options: {|align: AlignOption option; behavior: ScrollBehavior option|}) : unit = jsNative
+        member this.scrollRect: {|height: int; width: int|} = jsNative
+        member this.scrollOffset: int = jsNative
 
 type Virtual =
 
@@ -111,10 +113,12 @@ type Table =
         ref: IRefValue<TableHandle>,
         ?onSelect: GridSelect.OnSelect,
         ?onKeyDown: {|event: Browser.Types.KeyboardEvent; |} -> unit,
+        ?enableColumnHeaderSelect: bool,
         ?defaultStyleSelect: bool,
         ?debug: bool
     ) =
         let debug = defaultArg debug false
+        let enableColumnHeaderSelect = defaultArg enableColumnHeaderSelect false
         let defaultStyleSelect = defaultArg defaultStyleSelect true
 
         let scrollContainerRef = React.useElementRef()
@@ -146,6 +150,7 @@ type Table =
             rangeExtractor = (fun range ->
                 let next = set [
                     0
+
                     yield! Virtual.defaultRangeExtractor range
                 ]
                 Set.toArray next
@@ -168,7 +173,7 @@ type Table =
         let GridSelect = React.useGridSelect(
             rowCount = rowCount,
             columnCount = columnCount,
-            minRow = 1,
+            minRow = (if enableColumnHeaderSelect then 0 else 1),
             minCol = 1,
             onSelect = onSelect
         )
@@ -187,7 +192,6 @@ type Table =
             ),
             [| GridSelect.selectedCells |]
         )
-
         React.fragment [
             Html.div [
                 prop.ref scrollContainerRef
@@ -207,7 +211,6 @@ type Table =
                             style.width (columnVirtualizer.getTotalSize())
                             style.position.relative
                         ]
-                        prop.className ""
                         prop.children [
                             for virtualRow in rowVirtualizer.getVirtualItems() do
                                 React.keyedFragment(virtualRow.index, [
@@ -220,27 +223,29 @@ type Table =
                                         Html.div [
                                             prop.key virtualColumn.key
                                             prop.style [
-                                                style.top 0
                                                 style.left 0
+                                                style.top 0
                                                 style.position.absolute
-                                                style.custom("transform", $"translateX({virtualColumn.start}px) translateY({virtualRow.start}px)" )
+                                                if virtualRow.index = 0 then
+                                                    style.custom("transform", $"translateX({virtualColumn.start}px) translateY({rowVirtualizer.scrollOffset - Constants.Table.DefaultRowHeight}px)" )
+                                                elif virtualColumn.index = 0 then
+                                                    style.custom("transform", $"translateX({columnVirtualizer.scrollOffset - Constants.Table.DefaultColumnWidth}px) translateY({virtualRow.start}px)" )
+                                                else
+                                                    style.custom("transform", $"translateX({virtualColumn.start}px) translateY({virtualRow.start}px)" )
                                                 if isActive then
                                                     style.zIndex 3
-                                                    style.height virtualRow.size
-                                                    style.width virtualColumn.size
+                                                    // style.height virtualRow.size
+                                                    // style.width virtualColumn.size
                                                 elif virtualColumn.index = 0 then
-                                                    style.height virtualRow.size
-                                                    style.width (length.perc 100)
+                                                    // style.height virtualRow.size
                                                     style.zIndex 2
-                                                    style.pointerEvents.none
                                                 elif virtualRow.index = 0 then
-                                                    style.height (length.perc 100)
-                                                    style.width virtualColumn.size
+                                                    // style.width virtualColumn.size
                                                     style.zIndex 1
-                                                    style.pointerEvents.none
                                                 else
-                                                    style.height virtualRow.size
-                                                    style.width virtualColumn.size
+                                                    style.zIndex 0
+                                                style.height virtualRow.size
+                                                style.width virtualColumn.size
                                             ]
                                             prop.onClick(fun e ->
                                                 if not isActive then
@@ -322,7 +327,7 @@ type Table =
                     if ts.x = 0 then
                         TableCell.StickyIndexColumn(ts.y, false)
                     elif ts.y = 0 then
-                        TableCell.StickyHeader(ts.x, false)
+                        TableCell.StickyHeader(ts.x, debug = false)
                     else
                         TableCell.BaseCell(
                             ts.y,
