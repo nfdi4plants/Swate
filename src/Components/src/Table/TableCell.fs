@@ -19,8 +19,7 @@ type TableCell =
             content: ReactElement,
             ?className: string,
             ?props,
-            ?debug: bool,
-            ?isStickyHeader: bool
+            ?debug: bool
         ) =
         let debug = defaultArg debug false
 
@@ -29,66 +28,12 @@ type TableCell =
             if debug then
                 prop.testId $"cell-{rowIndex}-{columnIndex}"
             prop.className [
-                TableCell.DefaultClasses
                 if className.IsSome then
                     className.Value
             ]
             if props.IsSome then
                 yield! props.Value
-            if isStickyHeader.IsSome then
-                prop.style [ style.position.sticky; style.height Constants.Table.DefaultRowHeight; style.top Constants.Table.DefaultRowHeight ]
             prop.children [ content ]
-        ]
-
-    static member DefaultClasses: string = "select-none h-full w-full border border-base-200"
-
-    static member StickyIndexColumn(index: int, ?debug: bool, ?defaultWidth) =
-        let defaultWidth = defaultArg defaultWidth Constants.Table.DefaultColumnWidth
-        let debug = defaultArg debug false
-        let rowIndex = index
-        let columnIndex = 0
-        Html.div [
-            prop.key $"{rowIndex}-{columnIndex}"
-            if debug then
-                prop.testId $"cell-{rowIndex}-{columnIndex}"
-            prop.className [
-                TableCell.DefaultClasses
-                "bg-base-300 flex text-base-content items-center justify-center"
-            ]
-            prop.style [ style.position.sticky; style.width defaultWidth; style.left defaultWidth ]
-            prop.children [
-                Html.div [
-                    prop.className "text-lg"
-                    prop.children [
-                        if index = 0 then
-                            Html.text "Header"
-                        else
-                            Html.text $"Row {index}"
-                    ]
-                ]
-            ]
-        ]
-
-    static member StickyHeader(index: int, ?customContent: ReactElement, ?debug: bool, ?defaultHeight) =
-        let defaultHeight = defaultArg defaultHeight Constants.Table.DefaultRowHeight
-        let debug = defaultArg debug false
-        let rowIndex = 0
-        let columnIndex = index
-        Html.div [
-            prop.key $"{rowIndex}-{columnIndex}"
-            if debug then
-                prop.testId $"cell-{rowIndex}-{columnIndex}"
-            prop.className [
-                TableCell.DefaultClasses
-                "bg-neutral text-neutral-content flex items-center px-2 py-1"
-            ]
-            prop.style [ style.position.sticky; style.height defaultHeight; style.top defaultHeight ]
-            prop.children [
-                if customContent.IsSome then
-                    customContent.Value
-                else
-                    Html.div [ prop.className "text-lg"; prop.children [ Html.text $"Column {index}" ] ]
-            ]
         ]
 
     [<ReactComponent>]

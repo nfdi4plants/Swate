@@ -11,60 +11,64 @@ open ARCtrl
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member x = 0
+    static member InactiveTextRender(text: string, tcc: TableCellController) =
+        TableCell.BaseCell(tcc.Index.y, tcc.Index.x,
+            Html.div [
+                prop.className [
+                    if not tcc.IsSelected && tcc.Index.y = 0 then
+                        "bg-base-300"
+                    "flex flex-row gap-2 items-center h-full max-w-full px-2 py-1 w-full"
+                ]
+                prop.children [
+                    Html.div [
+                        prop.className "truncate"
+                        prop.text text
+                    ]
+                ]
+            ],
+            props = [
+                prop.title text
+                prop.onClick (fun e ->
+                    tcc.onClick e
+                )
+            ],
+            className = "w-full h-full"
+        )
 
     [<ReactComponent(true)>]
     static member AnnotationTable(arcTable: ArcTable, ?debug: bool) =
         let tableRef = React.useRef<TableHandle>(null)
-        let setCell = fun (cell: CellCoordinate) (cc: CompositeCell) ->
-            arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
+        let (detailsModal: CellCoordinate option), setDetailsModal = React.useState(None)
 
         let cellRender =
             React.memo (
-                (fun (ts: CellCoordinate) ->
-                    match ts with
-                    | isIndexCol when ts.x = 0 ->
-                        TableCell.StickyIndexColumn(ts.y, ?debug = debug)
-                    | isIndexRow when ts.y = 0 ->
-                        let header = arcTable.Headers.[(ts.x - 1)]
-                        let render =
-                            Html.div [
-                                prop.className "truncate text-lg"
-                                prop.text (header.ToString())
-                            ]
-                        TableCell.StickyHeader(ts.x, render, ?debug = debug)
-                    | cell when ts.x > 0 && ts.y > 0 ->
-                        let cell = arcTable.GetCellAt(ts.x - 1, ts.y - 1)
-                        let text = cell.ToString()
-                        TableCell.BaseCell(ts.y, ts.x,
-                            Html.div [
-                                prop.title text
-                                prop.className "truncate flex flex-row gap-2 items-center"
-                                prop.children [
-                                    if (cell.isTerm || cell.isUnitized)
-                                        && System.String.IsNullOrWhiteSpace cell.AsTerm.TermAccessionShort |> not then
-                                        Html.i [
-                                            prop.className "fa-solid fa-check text-primary "
-                                        ]
-                                    Html.text text
-                                ]
-                            ],
-                            className = "px-2 py-1 flex items-center"
+                (fun (tcc: TableCellController) ->
+                    match tcc with
+                    | index when tcc.Index.x = 0 ->
+                        TableCell.BaseCell(tcc.Index.y, tcc.Index.x,
+                            Html.text tcc.Index.y,
+                            className = "px-2 py-1 flex items-center justify-center cursor-not-allowed w-full h-full bg-base-200"
                         )
+                    | header when tcc.Index.y = 0 ->
+                        let header = arcTable.Headers.[tcc.Index.x - 1]
+                        let text = header.ToString()
+                        AnnotationTable.InactiveTextRender(text, tcc)
+                    | cell when tcc.Index.x > 0 && tcc.Index.y > 0 ->
+                        let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
+                        let text = cell.ToString()
+                        AnnotationTable.InactiveTextRender(text, tcc)
                     | _ ->
                         Html.div "Unknown cell type"
                 ),
-                withKey = fun (ts: CellCoordinate) -> $"{ts.x}-{ts.y}"
+                withKey = fun (tcc: TableCellController) -> $"{tcc.Index.x}-{tcc.Index.y}"
             )
         let renderActiveCell =
             React.memo(
                 (fun (tcc: TableCellController) ->
                     match tcc with
-                    | isIndexCol when tcc.Index.x = 0 ->
-                        TableCell.StickyIndexColumn(tcc.Index.y, ?debug = debug)
-                    | isIndexRow when tcc.Index.y = 0 ->
-                        TableCell.StickyHeader(tcc.Index.x, ?debug = debug)
                     | cell when tcc.Index.x > 0 && tcc.Index.y > 0 ->
+                        let setCell = fun (cell: CellCoordinate) (cc: CompositeCell) ->
+                            arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
                         let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
                         TableCell.CompositeCellActiveRender(
                             tcc,
@@ -73,7 +77,6 @@ type AnnotationTable =
                         )
                     | _ ->
                         Html.div "Unknown cell type"
-
                 )
 
             )
@@ -88,6 +91,23 @@ type AnnotationTable =
                     prop.text "Verify 2,2"
                 ]
             ]
+            ReactDOM.createPortal(
+                React.fragment [
+                    match detailsModal with
+                    | None -> Html.none
+                    | Some cc ->
+                        if cc.x = 0 then // no details modal for index col
+                            Html.none
+                        elif cc.y = 0 then // headers
+                            let header = arcTable.Headers.[cc.x - 1]
+                            Html.none
+                        else
+                            let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+                            Html.none
+
+                ],
+                Browser.Dom.document.body
+            )
             Table.Table(
                 rowCount = arcTable.RowCount + 1,
                 columnCount = arcTable.ColumnCount + 1,

@@ -11,14 +11,22 @@ type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
 
 type TableCellController = {
     Index: CellCoordinate
+    IsActive: bool
+    IsSelected: bool
+    IsOrigin: bool
     onKeyDown: Browser.Types.KeyboardEvent -> unit
     onBlur: Browser.Types.FocusEvent -> unit
+    onClick: Browser.Types.MouseEvent -> unit
 } with
-    static member init(index, onKeyDown, onBlur) =
+    static member init(index, isActive, isSelected, isOrigin, onKeyDown, onBlur, onClick) =
         {
             Index = index
+            IsActive = isActive
+            IsSelected = isSelected
+            IsOrigin = isOrigin
             onKeyDown = onKeyDown
             onBlur = onBlur
+            onClick = onClick
         }
 
 [<AllowNullLiteral>]

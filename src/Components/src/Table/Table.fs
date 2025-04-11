@@ -39,10 +39,12 @@ module Virtual =
     [<ImportMember(ImportPath)>]
     type Virtualizer<'A,'B> =
         member this.getVirtualItems() : VirtualItem [] = jsNative
+        member this.getVirtualIndexes(): int [] = jsNative
         member this.getTotalSize() : int = jsNative
         member this.scrollToIndex (index: int, ?options: {|align: AlignOption option; behavior: ScrollBehavior option|}) : unit = jsNative
         member this.scrollRect: {|height: int; width: int|} = jsNative
         member this.scrollOffset: int = jsNative
+        member this.measureElement: IRefValue<Browser.Types.HTMLElement option> = jsNative
 
 type Virtual =
 
@@ -108,11 +110,10 @@ type Table =
     static member Table(
         rowCount: int,
         columnCount: int,
-        renderCell: CellCoordinate -> ReactElement,
+        renderCell: TableCellController -> ReactElement,
         renderActiveCell: TableCellController -> ReactElement,
         ref: IRefValue<TableHandle>,
         ?onSelect: GridSelect.OnSelect,
-        ?onKeyDown: {|event: Browser.Types.KeyboardEvent; |} -> unit,
         ?enableColumnHeaderSelect: bool,
         ?defaultStyleSelect: bool,
         ?debug: bool
@@ -128,7 +129,8 @@ type Table =
             getScrollElement = (fun () -> scrollContainerRef.current),
             estimateSize = (fun _ -> Constants.Table.DefaultRowHeight),
             overscan = 2,
-            scrollMargin = -Constants.Table.DefaultRowHeight,
+            gap = 0,
+            scrollPaddingStart = 1.5 * float Constants.Table.DefaultRowHeight,
             scrollPaddingEnd = 1.5 * float Constants.Table.DefaultRowHeight,
             rangeExtractor = (fun range ->
                 let next = set [
@@ -143,8 +145,8 @@ type Table =
             count = columnCount,
             getScrollElement = (fun () -> scrollContainerRef.current),
             estimateSize = (fun _ -> Constants.Table.DefaultColumnWidth),
+            gap = 0,
             overscan = 2,
-            scrollMargin = -Constants.Table.DefaultColumnWidth,
             scrollPaddingEnd = 1.5 * float Constants.Table.DefaultColumnWidth,
             horizontal = true,
             rangeExtractor = (fun range ->
@@ -192,6 +194,52 @@ type Table =
             ),
             [| GridSelect.selectedCells |]
         )
+
+        let createController (index: CellCoordinate) =
+            let isSelected = GridSelect.contains index
+            let isOrigin = GridSelect.SelectOrigin |> Option.exists(fun origin -> origin = index)
+            let isActive = (activeCellIndex = Some index)
+            TableCellController.init(
+                index,
+                isActive,
+                isSelected,
+                isOrigin,
+                onKeyDown = (fun (e: Browser.Types.KeyboardEvent) ->
+                    match e.code with
+                    | kbdEventCode.enter ->
+                        if GridSelect.contains({|index with y = index.y + 1|}) then
+                            setActiveCellIndex(Some({|index with y = index.y + 1|}))
+                        elif GridSelect.contains({|x = index.x + 1; y = GridSelect.selectedCells.Value.yStart|}) then
+                            setActiveCellIndex(Some {|x = index.x + 1; y = GridSelect.selectedCells.Value.yStart|})
+                        else
+                            setActiveCellIndex(None)
+                            scrollContainerRef.current.Value.focus()
+                            GridSelect.selectAt(index, false)
+                    | kbdEventCode.escape ->
+                        setActiveCellIndex(None)
+                        scrollContainerRef.current.Value.focus()
+                        GridSelect.clear()
+                    | _ ->
+                        ()
+                ),
+                onBlur = (fun _ ->
+                    setActiveCellIndex(None)
+                ),
+                onClick = (fun e ->
+                    if not isActive then
+                        if e.detail >= 2 then
+                            setActiveCellIndex(Some index)
+                            if GridSelect.count = 0 then
+                                GridSelect.selectAt(index, false)
+                        else
+                            let nextSet = Set.singleton (index)
+                            if GridSelect.selectedCellsReducedSet = nextSet then
+                                GridSelect.clear()
+                            else
+                                GridSelect.selectAt(index, e.shiftKey)
+                )
+            )
+
         React.fragment [
             Html.div [
                 prop.ref scrollContainerRef
@@ -199,110 +247,133 @@ type Table =
                     TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex)
                 )
                 prop.tabIndex 0
-                prop.className "overflow-auto h-96 w-full border border-primary rounded snap-both snap-proximity"
+                prop.className "overflow-auto h-96 w-full border border-primary rounded"
                 if debug then
                     prop.testId "virtualized-table"
                 prop.children [
                     Html.div [
                         prop.style [
-                            style.marginTop Constants.Table.DefaultRowHeight
-                            style.marginLeft Constants.Table.DefaultColumnWidth
                             style.height (rowVirtualizer.getTotalSize())
                             style.width (columnVirtualizer.getTotalSize())
                             style.position.relative
                         ]
                         prop.children [
-                            for virtualRow in rowVirtualizer.getVirtualItems() do
-                                React.keyedFragment(virtualRow.index, [
-                                    for virtualColumn in columnVirtualizer.getVirtualItems() do
-                                        let isSelected = GridSelect.contains ({| x = virtualColumn.index; y = virtualRow.index |})
-                                        let isOrigin = GridSelect.SelectOrigin |> Option.exists(fun origin -> origin = {| x = virtualColumn.index; y = virtualRow.index |})
-                                        let isActive =
-                                            (activeCellIndex = Some {| x = virtualColumn.index; y = virtualRow.index |})
-                                            // || {| x = virtualColumn.index; y = virtualRow.index |} = {|x = 3; y = 2|}
-                                        Html.div [
-                                            prop.key virtualColumn.key
-                                            prop.style [
-                                                style.left 0
-                                                style.top 0
-                                                style.position.absolute
-                                                if virtualRow.index = 0 then
-                                                    style.custom("transform", $"translateX({virtualColumn.start}px) translateY({rowVirtualizer.scrollOffset - Constants.Table.DefaultRowHeight}px)" )
-                                                elif virtualColumn.index = 0 then
-                                                    style.custom("transform", $"translateX({columnVirtualizer.scrollOffset - Constants.Table.DefaultColumnWidth}px) translateY({virtualRow.start}px)" )
-                                                else
-                                                    style.custom("transform", $"translateX({virtualColumn.start}px) translateY({virtualRow.start}px)" )
-                                                if isActive then
-                                                    style.zIndex 3
-                                                    // style.height virtualRow.size
-                                                    // style.width virtualColumn.size
-                                                elif virtualColumn.index = 0 then
-                                                    // style.height virtualRow.size
-                                                    style.zIndex 2
-                                                elif virtualRow.index = 0 then
-                                                    // style.width virtualColumn.size
-                                                    style.zIndex 1
-                                                else
-                                                    style.zIndex 0
-                                                style.height virtualRow.size
-                                                style.width virtualColumn.size
+                            Html.table [
+                                prop.className "w-full h-full border-collapse"
+                                prop.children [
+                                    Html.thead [
+                                        prop.key "table-thead"
+                                        prop.className "[&>tr>th]:border [&>tr>th]:border-neutral"
+                                        prop.children [
+                                            Html.tr [
+                                                prop.key "header"
+                                                prop.className "sticky top-0 left-0 z-10 bg-base-100 text-left"
+                                                prop.style [
+                                                    style.height Constants.Table.DefaultRowHeight
+                                                ]
+                                                prop.children [
+                                                    for virtualColumn in columnVirtualizer.getVirtualItems() do
+                                                        let controller = createController {|x = virtualColumn.index; y = 0 |}
+                                                        Html.th [
+                                                            prop.ref columnVirtualizer.measureElement
+                                                            prop.custom("data-index", virtualColumn.index)
+                                                            prop.key virtualColumn.key
+                                                            prop.className [
+                                                                if virtualColumn.index <> 0 then
+                                                                    "min-w-32"
+                                                                else
+                                                                    "min-w-min"
+                                                                "h-full resize-x overflow-x-auto swt-table-cell"
+                                                            ]
+                                                            prop.style [
+                                                                style.position.absolute
+                                                                style.top 0
+                                                                style.left 0
+                                                                style.custom("transform", $"translateX({virtualColumn.start}px)")
+                                                            ]
+                                                            if controller.IsActive then
+                                                                prop.custom("data-active", true)
+                                                            if controller.IsSelected then
+                                                                prop.custom("data-selected", true)
+                                                            if controller.IsOrigin then
+                                                                prop.custom("data-is-append-origin", true)
+                                                            prop.children [
+                                                                if virtualColumn.index = 0 then
+                                                                    TableCell.BaseCell(controller.Index.y, controller.Index.x,
+                                                                        Html.text (rowVirtualizer.getVirtualIndexes() |> Seq.last),
+                                                                        className = "px-2 py-1 flex items-center cursor-not-allowed w-full h-full min-w-8 bg-base-200"
+                                                                    )
+                                                                elif controller.IsActive then
+                                                                    renderActiveCell controller
+                                                                else
+                                                                    renderCell controller
+                                                            ]
+                                                        ]
+                                                ]
                                             ]
-                                            prop.onClick(fun e ->
-                                                if not isActive then
-                                                    if e.detail >= 2 then
-                                                        setActiveCellIndex(Some {| x = virtualColumn.index; y = virtualRow.index |})
-                                                    else
-                                                        let nextSet = Set.singleton ({|x = virtualColumn.index; y = virtualRow.index|})
-                                                        if GridSelect.selectedCellsReducedSet = nextSet then
-                                                            GridSelect.clear()
-                                                        else
-                                                            GridSelect.selectAt({|x = virtualColumn.index; y = virtualRow.index|}, e.shiftKey)
-                                            )
-                                            prop.className [
-                                                "cursor-pointer"
-                                                if defaultStyleSelect then
-                                                    "swt-table-cell"
-                                            ]
-                                            if isActive then
-                                                prop.custom("data-active", isActive)
-                                            if isSelected then
-                                                prop.custom("data-selected", isSelected)
-                                            if isOrigin then
-                                                prop.custom("data-is-append-origin", isOrigin)
-                                            prop.children (
-                                                let index = {|x = virtualColumn.index; y = virtualRow.index|}
-                                                if isActive then
-                                                    let controller =
-                                                        TableCellController.init(
-                                                            index,
-                                                            onKeyDown = (fun (e: Browser.Types.KeyboardEvent) ->
-                                                                match e.code with
-                                                                | kbdEventCode.enter ->
-                                                                    if GridSelect.contains({|index with y = index.y + 1|}) then
-                                                                        setActiveCellIndex(Some({|index with y = index.y + 1|}))
-                                                                    elif GridSelect.contains({|x = index.x + 1; y = GridSelect.selectedCells.Value.yStart|}) then
-                                                                        setActiveCellIndex(Some {|x = index.x + 1; y = GridSelect.selectedCells.Value.yStart|})
-                                                                    else
-                                                                        setActiveCellIndex(None)
-                                                                        scrollContainerRef.current.Value.focus()
-                                                                        GridSelect.selectAt(index, false)
-                                                                | kbdEventCode.escape ->
-                                                                    setActiveCellIndex(None)
-                                                                    scrollContainerRef.current.Value.focus()
-                                                                    GridSelect.clear()
-                                                                | _ ->
-                                                                    ()
-                                                            ),
-                                                            onBlur = (fun _ ->
-                                                                setActiveCellIndex(None)
-                                                            )
-                                                        )
-                                                    renderActiveCell controller
-                                                else
-                                                    renderCell index
-                                            )
                                         ]
-                                ])
+                                    ]
+                                    Html.tbody [
+                                        prop.style [
+                                            style.marginTop Constants.Table.DefaultRowHeight
+                                        ]
+                                        prop.className "[&>tr>td]:border [&>tr>td]:border-neutral"
+                                        prop.children [
+                                            for virtualRow in rowVirtualizer.getVirtualItems() do
+                                                if virtualRow.index = 0 then
+                                                    Html.none // skip header row, is part of thead
+                                                else
+                                                    Html.tr [
+                                                        prop.key virtualRow.key
+                                                        prop.style [
+                                                            style.top 0
+                                                            style.left 0
+                                                            style.position.absolute
+                                                            style.custom("transform", $"translateY({virtualRow.start}px)")
+                                                            style.height virtualRow.size
+                                                        ]
+                                                        prop.className "w-full"
+                                                        prop.children [
+                                                            for virtualColumn in columnVirtualizer.getVirtualItems() do
+                                                                let index = {|x = virtualColumn.index; y = virtualRow.index |}
+                                                                let controller = createController index
+                                                                Html.td [
+                                                                    prop.key virtualColumn.key
+                                                                    prop.className [
+                                                                        if defaultStyleSelect then
+                                                                            "swt-table-cell"
+                                                                    ]
+                                                                    if controller.IsActive then
+                                                                        prop.custom("data-active", true)
+                                                                    if controller.IsSelected then
+                                                                        prop.custom("data-selected", true)
+                                                                    if controller.IsOrigin then
+                                                                        prop.custom("data-is-append-origin", true)
+                                                                    prop.style [
+                                                                        if virtualColumn.index = 0 then
+                                                                            style.position.sticky
+                                                                            style.zIndex 10
+                                                                        else
+                                                                            style.position.absolute
+                                                                        style.width virtualColumn.size
+                                                                        style.height virtualRow.size
+                                                                        style.top 0
+                                                                        style.left 0
+                                                                        style.custom("transform", $"translateX({virtualColumn.start}px)")
+                                                                    ]
+                                                                    prop.children [
+                                                                        if controller.IsActive then
+                                                                            renderActiveCell controller
+                                                                        else
+                                                                            renderCell controller
+                                                                    ]
+                                                                ]
+                                                    ]
+                                                ]
+                                        ]
+                                    ]
+                                ]
+                            ]
                         ]
                     ]
                 ]
@@ -315,31 +386,28 @@ type Table =
         let rowCount = 1_000
         let columnCount = 1_000
         let data, setData = React.useState([|
-            for i in 0 .. columnCount - 1 do
+            for i in 0 .. rowCount - 1 do
                 [|
-                    for j in 0 .. rowCount - 1 do
-                        yield $"Row {j}, Column {i}"
+                    for j in 0 .. columnCount - 1 do
+                        yield $"Row {i}, Column {j}"
                 |]
         |])
         let render =
-            React.memo (
-                (fun (ts: CellCoordinate) ->
-                    if ts.x = 0 then
-                        TableCell.StickyIndexColumn(ts.y, false)
-                    elif ts.y = 0 then
-                        TableCell.StickyHeader(ts.x, debug = false)
+            React.memo((fun (ts: TableCellController) -> TableCell.BaseCell(
+                ts.Index.y,
+                ts.Index.x,
+                Html.div [
+                    prop.key $"{ts.Index.x}-{ts.Index.y}"
+                    prop.className "truncate"
+                    if ts.Index.x = 0 then
+                        prop.text ts.Index.y
                     else
-                        TableCell.BaseCell(
-                            ts.y,
-                            ts.x,
-                            Html.div [
-                                prop.className "truncate"
-                                prop.text data.[ts.y].[ts.x]
-                            ]
-                        )
-                ),
-                withKey = (fun (ts: CellCoordinate) -> $"{ts.x}-{ts.y}")
-            )
+                        prop.text data.[ts.Index.y].[ts.Index.x]
+                    prop.onClick (fun e ->
+                        ts.onClick e
+                    )
+                ]
+            )), withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}"))
         let renderActiveCell =
             React.memo (
                 (fun (ts: TableCellController) ->
