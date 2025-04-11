@@ -301,7 +301,7 @@ type Table =
                                                                 if virtualColumn.index = 0 then
                                                                     TableCell.BaseCell(controller.Index.y, controller.Index.x,
                                                                         Html.text (rowVirtualizer.getVirtualIndexes() |> Seq.last),
-                                                                        className = "px-2 py-1 flex items-center cursor-not-allowed w-full h-full min-w-8 bg-base-200"
+                                                                        className = "px-2 py-1 flex items-center cursor-not-allowed w-full h-full min-w-8 bg-base-200 text-transparent"
                                                                     )
                                                                 elif controller.IsActive then
                                                                     renderActiveCell controller
