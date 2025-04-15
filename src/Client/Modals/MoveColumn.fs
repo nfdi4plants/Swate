@@ -61,7 +61,7 @@ type MoveColumn =
                 ]
             ]
         let content =
-            [
+            React.fragment [
                 Daisy.table [
                     Html.thead [
                         Html.tr [
@@ -104,7 +104,7 @@ type MoveColumn =
         Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Move Column",
-            modalActivity = modalActivity,
+            modalActions = modalActivity,
             contentClassInfo = "overflow-y-auto max-w-[700px]",
             content = content,
             footer = fooder submit input rmv

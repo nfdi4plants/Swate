@@ -331,39 +331,6 @@ type TermSearch =
             ]
         ]
 
-    static member private BaseModal(
-        title: string,
-        content: ReactElement,
-        rmv: _ -> unit,
-        ?debug: string
-    ) =
-        Html.div [
-            if debug.IsSome then
-                prop.testid debug.Value
-            prop.className "fixed top-0 left-0 right-0 bottom-0 z-50 bg-base-300 bg-opacity-50 flex items-center justify-center p-2 sm:p-10"
-            prop.onMouseDown(fun _ -> rmv())
-            prop.children [
-                Html.div [ // centered box
-                    prop.onMouseDown(fun e -> e.stopPropagation())
-                    prop.onClick(fun e -> e.stopPropagation())
-                    prop.className "bg-base-100 rounded shadow-lg p-2 sm:p-4 flex flex-col gap-2 min-w-80 grow sm:max-w-md md:max-w-2xl max-h-[100%] overflow-hidden"
-                    prop.children [
-                        Html.div [ // header
-                            prop.className "flex justify-between items-center gap-4"
-                            prop.children [
-                                Html.h1 [
-                                    prop.className "text-3xl font-bold"
-                                    prop.text title
-                                ]
-                                Components.DeleteButton(props=[prop.onClick (fun _ -> rmv())])
-                            ]
-                        ]
-                        content
-                    ]
-                ]
-            ]
-        ]
-
     [<ReactComponent>]
     static member private DetailsModal(rvm, term: Term option, config: (string * string) list) =
         let showConfig, setShowConfig = React.useState(false)
@@ -450,7 +417,7 @@ type TermSearch =
                 ]
                 componentConfig
         ]
-        TermSearch.BaseModal("Details", content, rvm)
+        BaseModal.BaseModal(rvm, header = Html.div "Details", content = content)
 
     static member private AdvancedSearchDefault(advancedSearchState: Swate.Components.Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState) = fun (cc: AdvancedSearchController) ->
         React.fragment [
@@ -533,7 +500,7 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-    static member private AdvancedSearchModal(rvm, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool) =
+    static member private AdvancedSearchModal(rmv, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool) =
         let searchResults, setSearchResults = React.useState(SearchState.init)
         /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
         let (tempPagination: int option), setTempPagination = React.useState(None)
@@ -563,7 +530,7 @@ type TermSearch =
                 )
                 |> Promise.start
             ),
-            cancel = rvm
+            cancel = rmv
         )
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
         React.useEffect(
@@ -649,7 +616,7 @@ type TermSearch =
                     resultsComponent results
             ]
         ]
-        TermSearch.BaseModal("Advanced Search", content, rvm, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
+        BaseModal.BaseModal(!!rmv, header = Html.div "Advanced Search", content = content, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
 
     ///
     /// Customizable react component for term search. Utilizing SwateDB search by default.
@@ -722,10 +689,12 @@ type TermSearch =
                 setModal modal
 
         let onTermSelect = fun (term: Term option) ->
+            console.log("onTermSelect - start")
             if inputRef.current.IsSome then
                 let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
                 inputRef.current.Value.value <- v
             setSearchResults (fun _ -> SearchState.init())
+            console.log("ontermSelect", term)
             onTermSelect term
 
         let startLoadingBy = fun (key: string) ->
@@ -881,33 +850,35 @@ type TermSearch =
 
         // keyboard navigation
         let keyboardNav = (fun (e:Browser.Types.KeyboardEvent) ->
-            if focused then // only run when focused
-                match searchResults, e.code with
-                | _, kbdEventCode.escape ->
-                    cancel()
-                | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
-                    setKeyboardNavState(
-                        match keyboardNavState.SelectedTermSearchResult with
-                        | Some 0 -> None
-                        | Some i -> Some(System.Math.Max(i - 1, 0))
-                        | _ -> None
-                        |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
-                    )
-                | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
-                    setKeyboardNavState(
-                        match keyboardNavState.SelectedTermSearchResult with
-                        | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
-                        | _ -> Some(0)
-                        |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
-                    )
-                | SearchState.Idle, kbdEventCode.arrowDown when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
-                    startSearch inputRef.current.Value.value
-                | SearchState.SearchDone res, kbdEventCode.enter when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
-                    console.log("onEnter-term select")
-                    onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
-                    cancel()
-                | _ ->
-                    ()
+            promise {
+                if focused then // only run when focused
+                    match searchResults, e.code with
+                    | _, kbdEventCode.escape ->
+                        cancel()
+                    | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
+                        setKeyboardNavState(
+                            match keyboardNavState.SelectedTermSearchResult with
+                            | Some 0 -> None
+                            | Some i -> Some(System.Math.Max(i - 1, 0))
+                            | _ -> None
+                            |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                        )
+                    | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
+                        setKeyboardNavState(
+                            match keyboardNavState.SelectedTermSearchResult with
+                            | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
+                            | _ -> Some(0)
+                            |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                        )
+                    | SearchState.Idle, kbdEventCode.arrowDown when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
+                        startSearch inputRef.current.Value.value
+                    | SearchState.SearchDone res, kbdEventCode.enter when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
+                        console.log("onEnter-term select")
+                        onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
+                        cancel()
+                    | _ ->
+                        ()
+            }
         )
 
         /// Could move this outside, but there are so many variable to pass to...
@@ -930,16 +901,17 @@ type TermSearch =
                 ) []
                 |> List.rev
             Html.div [
+                prop.className "z-[9999] fixed w-screen h-screen pointer-events-none"
                 prop.ref modalContainerRef
                 prop.children [
                     match modal with
                     | Some Modals.Details ->
-                        TermSearch.DetailsModal((fun () -> setModal None), term, configDetails)
+                        TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
                     | Some Modals.AdvancedSearch when advancedSearch.IsSome->
                         let onTermSelect = fun (term: Term option) ->
                             onTermSelect term
                             setModal None
-                        TermSearch.AdvancedSearchModal((fun () -> setModal None), advancedSearch.Value, onTermSelect, debug)
+                        TermSearch.AdvancedSearchModal((fun _ -> setModal None), advancedSearch.Value, onTermSelect, debug)
                     | _ -> Html.none
                 ]
             ]
@@ -1038,9 +1010,12 @@ type TermSearch =
                                     )
                                     prop.onKeyDown (fun e ->
                                         e.stopPropagation()
-                                        keyboardNav e
-                                        if onKeyDown.IsSome then
-                                            onKeyDown.Value e
+                                        promise {
+                                            do! keyboardNav e
+                                            if onKeyDown.IsSome then
+                                                onKeyDown.Value e
+                                        }
+                                        |> Promise.start
                                     )
                                     prop.onFocus(fun _ ->
                                         if onFocus.IsSome then

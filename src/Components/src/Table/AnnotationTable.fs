@@ -11,7 +11,7 @@ open ARCtrl
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member InactiveTextRender(text: string, tcc: TableCellController) =
+    static member InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
         TableCell.BaseCell(tcc.Index.y, tcc.Index.x,
             Html.div [
                 prop.className [
@@ -20,6 +20,8 @@ type AnnotationTable =
                     "flex flex-row gap-2 items-center h-full max-w-full px-2 py-1 w-full"
                 ]
                 prop.children [
+                    if icon.IsSome then
+                        icon.Value
                     Html.div [
                         prop.className "truncate"
                         prop.text text
@@ -36,7 +38,7 @@ type AnnotationTable =
         )
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, ?debug: bool) =
+    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?debug: bool) =
         let tableRef = React.useRef<TableHandle>(null)
         let (detailsModal: CellCoordinate option), setDetailsModal = React.useState(None)
 
@@ -56,7 +58,17 @@ type AnnotationTable =
                     | cell when tcc.Index.x > 0 && tcc.Index.y > 0 ->
                         let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
                         let text = cell.ToString()
-                        AnnotationTable.InactiveTextRender(text, tcc)
+                        let icon =
+                            if (cell.isTerm || cell.isUnitized)
+                                && System.String.IsNullOrWhiteSpace cell.AsTerm.TermAccessionShort |> not then
+                                    Html.i [
+                                        prop.className "fa-solid fa-check text-primary"
+                                        prop.title cell.AsTerm.TermAccessionShort
+                                    ]
+                                    |> Some
+                            else
+                                None
+                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)
                     | _ ->
                         Html.div "Unknown cell type"
                 ),
@@ -103,7 +115,16 @@ type AnnotationTable =
                             Html.none
                         else
                             let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
-                            Html.none
+                            let setCell = fun (cell: CompositeCell) ->
+                                arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                                setArcTable arcTable
+                            CompositeCellModal.CompositeCellModal(
+                                cell,
+                                setCell,
+                                fun _ ->
+                                    tableRef.current.focus()
+                                    setDetailsModal None
+                            )
 
                 ],
                 Browser.Dom.document.body
@@ -114,6 +135,15 @@ type AnnotationTable =
                 renderCell = cellRender,
                 renderActiveCell = renderActiveCell,
                 ref = tableRef,
+                onKeydown = (fun (e, selectedCells, activeCell) ->
+                    if (e.ctrlKey || e.metaKey)
+                        && e.code = kbdEventCode.enter
+                        && activeCell.IsNone
+                        && selectedCells.count > 0 then
+                        let cell = selectedCells.selectedCellsReducedSet.MinimumElement
+                        console.log("set details modal for:", cell)
+                        setDetailsModal (Some cell)
+                ),
                 enableColumnHeaderSelect = true
             )
         ]
@@ -123,4 +153,6 @@ type AnnotationTable =
         arcTable.AddColumn(CompositeHeader.Input IOType.Source, [|for i in 0 .. 100 do CompositeCell.createFreeText $"Source {i}"|])
         arcTable.AddColumn(CompositeHeader.Output IOType.Sample, [|for i in 0 .. 100 do CompositeCell.createFreeText $"Sample {i}"|])
         arcTable.AddColumn(CompositeHeader.Component (OntologyAnnotation ("instrument model", "MS", "MS:2138970")), [|for i in 0 .. 100 do CompositeCell.createTermFromString("SCIEX instrument model", "MS", "MS:11111231")|])
-        AnnotationTable.AnnotationTable(arcTable = arcTable)
+        let table, setTable = React.useState(arcTable)
+
+        AnnotationTable.AnnotationTable(table, setTable)

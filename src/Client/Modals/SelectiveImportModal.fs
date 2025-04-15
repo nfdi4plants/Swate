@@ -184,7 +184,7 @@ type SelectiveImportModal =
                 SelectiveImportConfig.init() |> setImportDataState
 
         let content =
-            [
+            React.fragment [
                 SelectiveImportModal.RadioPluginsBox(
                     "Import Type",
                     "fa-solid fa-cog",
@@ -229,7 +229,7 @@ type SelectiveImportModal =
             modalClassInfo = "@container/importModal",
             content = content,
             footer = footer
-        ) 
+        )
 
     static member Main(import: ArcFiles, model, dispatch: Messages.Msg -> unit) =
         let rmv = Util.RMV_MODAL dispatch

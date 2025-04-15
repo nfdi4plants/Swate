@@ -299,9 +299,7 @@ type DataAnnotator =
                 ]
             ]
         let content =
-            [
-                FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
-            ]
+            FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
         let footer =
             Html.div [
                 prop.className "w-full flex justify-between items-center gap-2"
@@ -346,7 +344,7 @@ type DataAnnotator =
             rmv,
             header = Html.p "Data Annotator",
             modalClassInfo = "max-w-none",
-            modalActivity = modalActivity,
+            modalActions = modalActivity,
             content = content,
             contentClassInfo = "grid grid-cols-1 grid-rows h-[600px] overflow-hidden",
             footer = footer

@@ -42,7 +42,8 @@ type SelectHandle
 [<Global>]
 type TableHandle
     [<ParamObjectAttribute; Emit("$0")>]
-    (scrollTo: CellCoordinate -> unit, select: SelectHandle) =
+    (focus: unit -> unit, scrollTo: CellCoordinate -> unit, select: SelectHandle) =
+    member val focus: unit -> unit = focus with get, set
     member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
     member val select: SelectHandle = select with get, set
 

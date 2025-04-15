@@ -75,7 +75,7 @@ module private Components =
         ]
 
     let PreviewTable(column: CompositeColumn, cellValues: string [], regex) =
-        [
+        React.fragment [
             Daisy.label [
                 Daisy.labelText "Preview"
             ]
@@ -259,7 +259,7 @@ type UpdateColumn =
             rmv,
             header = Html.p "Update Column",
             modalClassInfo = "max-h-screen max-w-4xl flex",
-            modalActivity = modalActivity,
+            modalActions = modalActivity,
             contentClassInfo = "shrink-1 overflow-y-auto",
             content = content,
             footer = footer

@@ -83,10 +83,14 @@ module private TableHelper =
         else
             Default
 
-    let keyDownController (e: Browser.Types.KeyboardEvent) (selectedCells: GridSelect.GridSelectHandle) (activeCellIndex: CellCoordinate option, setActiveCellIndex) =
+
+    let keyDownController (e: Browser.Types.KeyboardEvent) (selectedCells: GridSelect.GridSelectHandle) (activeCellIndex: CellCoordinate option, setActiveCellIndex) onKeydown =
         if activeCellIndex.IsNone then
             let nav = selectedCells.selectBy e
             if not nav && selectedCells.count > 0 then
+                onKeydown |> Option.iter(fun onKeydown ->
+                    onKeydown (e, selectedCells, activeCellIndex)
+                )
                 match e.code with
                 | ActiveTrigger ->
                     selectedCells.SelectOrigin |> Option.defaultValue selectedCells.selectedCellsReducedSet.MinimumElement
@@ -99,13 +103,6 @@ module private TableHelper =
 [<Mangle(false); Erase>]
 type Table =
 
-    static member private BodyPortal(content: ReactElement) =
-        ReactDOM.createPortal(
-            content,
-            Browser.Dom.document.body
-        )
-
-
     [<ReactComponent(true)>]
     static member Table(
         rowCount: int,
@@ -114,6 +111,7 @@ type Table =
         renderActiveCell: TableCellController -> ReactElement,
         ref: IRefValue<TableHandle>,
         ?onSelect: GridSelect.OnSelect,
+        ?onKeydown: (Browser.Types.KeyboardEvent * GridSelect.GridSelectHandle * CellCoordinate option) -> unit,
         ?enableColumnHeaderSelect: bool,
         ?defaultStyleSelect: bool,
         ?debug: bool
@@ -184,6 +182,9 @@ type Table =
             ref,
             (fun () ->
                 TableHandle(
+                    focus = (fun () ->
+                        scrollContainerRef.current.Value.focus()
+                    ),
                     scrollTo = scrollTo,
                     select = SelectHandle(
                         contains = GridSelect.contains,
@@ -244,7 +245,7 @@ type Table =
             Html.div [
                 prop.ref scrollContainerRef
                 prop.onKeyDown (fun e ->
-                    TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex)
+                    TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown
                 )
                 prop.tabIndex 0
                 prop.className "overflow-auto h-96 w-full border border-primary rounded"
