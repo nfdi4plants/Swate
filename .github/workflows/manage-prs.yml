@@ -1,0 +1,21 @@
+name: Manage PRs
+
+on:
+  pull_request:
+    types:
+    - opened
+    - reopened
+
+jobs:
+  add-to-project:
+    name: Add PR to project
+    runs-on: ubuntu-latest
+    steps:
+      # add PR to project if it is a depdendabot PR
+      - uses: actions/add-to-project@v1.0.2
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'dependencies') }}
+        with:
+          # You can target a project in a different organization
+          # to the issue
+          project-url: https://github.com/orgs/nfdi4plants/projects/10
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
