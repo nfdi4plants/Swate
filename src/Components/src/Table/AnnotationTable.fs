@@ -118,12 +118,15 @@ type AnnotationTable =
                             let setCell = fun (cell: CompositeCell) ->
                                 arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
                                 setArcTable arcTable
+                            let header = arcTable.Headers.[cc.x - 1]
                             CompositeCellModal.CompositeCellModal(
                                 cell,
                                 setCell,
-                                fun _ ->
+                                (fun _ ->
                                     tableRef.current.focus()
                                     setDetailsModal None
+                                ),
+                                header
                             )
 
                 ],
