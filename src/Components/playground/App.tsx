@@ -3,6 +3,7 @@ import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 import {Entry as Table} from '../src/Table/Table.fs.ts';
 // // import {type Term} from '../src/Util/Types.fs.ts';
 import {Entry as AnnotationTable} from '../src/Table/AnnotationTable.fs.ts';
+import {Example as ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -40,11 +41,19 @@ function AnnoTableContainer() {
   </div>
 }
 
+function ContextMenuContainer() {
+  return <div className='flex flex-col gap-4'>
+    <h2 className='text-3xl'>Context Menu</h2>
+    <ContextMenu />
+  </div>
+}
+
 const App = () => {
     return (
         <div className="container mx-auto flex flex-col p-2 gap-4 mb-12">
             <h1 className='text-6xl'>Playground</h1>
             <TermSearchContainer />
+            <ContextMenuContainer />
             <AnnoTableContainer />
             <TableContainer />
         </div>

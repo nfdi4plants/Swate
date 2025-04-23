@@ -27,10 +27,12 @@
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
+    <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
+    <Compile Include="Table\TableContextMenu.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
