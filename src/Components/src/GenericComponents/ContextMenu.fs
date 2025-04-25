@@ -194,6 +194,7 @@ type ContextMenu =
                         FloatingUI.FloatingFocusManager(
                             context = floating.context,
                             initialFocus = floating.refs.floating,
+                            visuallyHiddenDismiss = true,
                             children =
                                 Html.div [
                                     prop.ref floating.refs.setFloating
@@ -238,10 +239,10 @@ type ContextMenu =
                                                 prop.key index
                                                 prop.className
                                                     "col-span-3 grid grid-cols-subgrid gap-x-2
-                                                    text-base-content px-2 py-1
-                                                    w-full text-left
-                                                    hover:bg-base-100
-                                                    focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary"
+text-base-content px-2 py-1
+w-full text-left
+hover:bg-base-100
+focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary"
                                                 prop.children [
                                                     if child.icon.IsSome then
                                                         Html.div [
