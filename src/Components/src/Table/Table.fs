@@ -286,6 +286,8 @@ type Table =
                                                                     "min-w-min"
                                                                 "h-full resize-x overflow-x-auto swt-table-cell"
                                                             ]
+                                                            prop.dataRow 0
+                                                            prop.dataColumn virtualColumn.index
                                                             prop.style [
                                                                 style.position.absolute
                                                                 style.top 0
@@ -340,6 +342,8 @@ type Table =
                                                                 let controller = createController index
                                                                 Html.td [
                                                                     prop.key virtualColumn.key
+                                                                    prop.dataRow virtualRow.index
+                                                                    prop.dataColumn virtualColumn.index
                                                                     prop.className [
                                                                         if defaultStyleSelect then
                                                                             "swt-table-cell"

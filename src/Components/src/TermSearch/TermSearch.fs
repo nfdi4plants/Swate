@@ -647,7 +647,8 @@ type TermSearch =
         ?portalModals: HTMLElement,
         ?fullwidth: bool,
         ?autoFocus: bool,
-        ?classNames: TermSearchStyle
+        ?classNames: TermSearchStyle,
+        ?props: IReactProperty list
     ) =
 
         let showDetails = defaultArg showDetails false
@@ -925,6 +926,9 @@ type TermSearch =
                 "form-control not-prose h-full"
                 if fullwidth then "w-full"
             ]
+            if props.IsSome then
+                for prop in props.Value do
+                    prop
             prop.ref containerRef
             prop.children [
                 if portalModals.IsSome then

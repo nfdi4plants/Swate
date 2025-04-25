@@ -39,6 +39,7 @@ type AnnotationTable =
 
     [<ReactComponent(true)>]
     static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?debug: bool) =
+        let containerRef = React.useElementRef()
         let tableRef = React.useRef<TableHandle>(null)
         let (detailsModal: CellCoordinate option), setDetailsModal = React.useState(None)
 
@@ -92,63 +93,99 @@ type AnnotationTable =
                 )
 
             )
-        React.fragment [
-            Html.div [
-                Html.button [
-                    prop.className "btn btn-primary"
-                    prop.onClick (fun _ ->
-                        let iscontained = tableRef.current.select.contains {|x = 2; y = 2|}
-                        console.log("iscontained", iscontained)
-                    )
-                    prop.text "Verify 2,2"
+        Html.div [
+            prop.ref containerRef
+            prop.children [
+                Html.div [
+                    Html.button [
+                        prop.className "btn btn-primary"
+                        prop.onClick (fun _ ->
+                            let iscontained = tableRef.current.select.contains {|x = 2; y = 2|}
+                            console.log("iscontained", iscontained)
+                        )
+                        prop.text "Verify 2,2"
+                    ]
                 ]
-            ]
-            ReactDOM.createPortal(
-                React.fragment [
-                    match detailsModal with
-                    | None -> Html.none
-                    | Some cc ->
-                        if cc.x = 0 then // no details modal for index col
-                            Html.none
-                        elif cc.y = 0 then // headers
-                            let header = arcTable.Headers.[cc.x - 1]
-                            Html.none
-                        else
-                            let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
-                            let setCell = fun (cell: CompositeCell) ->
-                                arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
-                                setArcTable arcTable
-                            let header = arcTable.Headers.[cc.x - 1]
-                            CompositeCellModal.CompositeCellModal(
-                                cell,
-                                setCell,
-                                (fun _ ->
-                                    tableRef.current.focus()
-                                    setDetailsModal None
-                                ),
-                                header
-                            )
+                ReactDOM.createPortal(
+                    React.fragment [
+                        match detailsModal with
+                        | None -> Html.none
+                        | Some cc ->
+                            if cc.x = 0 then // no details modal for index col
+                                Html.none
+                            elif cc.y = 0 then // headers
+                                let header = arcTable.Headers.[cc.x - 1]
+                                Html.none
+                            else
+                                let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+                                let setCell = fun (cell: CompositeCell) ->
+                                    arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                                    setArcTable arcTable
+                                let header = arcTable.Headers.[cc.x - 1]
+                                CompositeCellModal.CompositeCellModal(
+                                    cell,
+                                    setCell,
+                                    (fun _ ->
+                                        tableRef.current.focus()
+                                        setDetailsModal None
+                                    ),
+                                    header
+                                )
 
-                ],
-                Browser.Dom.document.body
-            )
-            Table.Table(
-                rowCount = arcTable.RowCount + 1,
-                columnCount = arcTable.ColumnCount + 1,
-                renderCell = cellRender,
-                renderActiveCell = renderActiveCell,
-                ref = tableRef,
-                onKeydown = (fun (e, selectedCells, activeCell) ->
-                    if (e.ctrlKey || e.metaKey)
-                        && e.code = kbdEventCode.enter
-                        && activeCell.IsNone
-                        && selectedCells.count > 0 then
-                        let cell = selectedCells.selectedCellsReducedSet.MinimumElement
-                        console.log("set details modal for:", cell)
-                        setDetailsModal (Some cell)
-                ),
-                enableColumnHeaderSelect = true
-            )
+                    ],
+                    Browser.Dom.document.body
+                )
+                ContextMenu.ContextMenu(
+                    [
+                        for i in 0..5 do
+                            ContextMenuItem(
+                                text = Html.span $"Item {i}",
+                                ?icon = (if i = 4 then Html.i [ prop.className "fa-solid fa-check" ] |> Some else None),
+                                ?kbdbutton = (if i = 3 then Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ] |> Some else None),
+                                ?label = (if i = 3 then Some "Back" else None),
+                                onClick =
+                                    (fun e ->
+                                        e.buttonEvent.stopPropagation ()
+                                        let index = e.spawnData |> unbox<CellCoordinate>
+                                        console.log (sprintf "Item clicked: %i" i, index))
+                            )
+                    ],
+                    ref = containerRef,
+                    onSpawn =
+                        (fun e ->
+                            let target = e.target :?> Browser.Types.HTMLElement
+                            let tableCell = target.closest ("[data-row][data-column]")
+
+                            match tableCell, containerRef.current with
+                            | Some cell, Some container when container.contains(cell) ->
+                                let cell = cell :?> Browser.Types.HTMLElement
+                                let row = int cell?dataset?row
+                                let col = int cell?dataset?column
+                                let indices: CellCoordinate = {| y = row; x = col |}
+                                console.log (indices)
+                                Some indices
+                            | _ ->
+                                console.log ("No table cell found")
+                                None)
+                )
+                Table.Table(
+                    rowCount = arcTable.RowCount + 1,
+                    columnCount = arcTable.ColumnCount + 1,
+                    renderCell = cellRender,
+                    renderActiveCell = renderActiveCell,
+                    ref = tableRef,
+                    onKeydown = (fun (e, selectedCells, activeCell) ->
+                        if (e.ctrlKey || e.metaKey)
+                            && e.code = kbdEventCode.enter
+                            && activeCell.IsNone
+                            && selectedCells.count > 0 then
+                            let cell = selectedCells.selectedCellsReducedSet.MinimumElement
+                            console.log("set details modal for:", cell)
+                            setDetailsModal (Some cell)
+                    ),
+                    enableColumnHeaderSelect = true
+                )
+            ]
         ]
 
     static member Entry() =
