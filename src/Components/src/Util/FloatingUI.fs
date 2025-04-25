@@ -182,11 +182,12 @@ module FloatingUI =
         member val onTypingChange = onTypingChange
         member val findMatch = findMatch
 
-
+    [<Erase>]
     type IMiddleware =
         interface
         end
 
+    [<Erase>]
     type Middleware =
         [<ImportMemberAttribute("@floating-ui/react")>]
         static member offset(?options: obj) : IMiddleware = jsNative

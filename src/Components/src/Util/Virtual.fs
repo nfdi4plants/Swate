@@ -21,7 +21,7 @@ module Virtual =
         member this.``end``: int = jsNative
         member this.size: int = jsNative
 
-    [<StringEnum(CaseRules.LowerFirst)>]
+    [<StringEnum(CaseRules.LowerFirst); Global>]
     type AlignOption =
         | Auto
         | Start
@@ -43,6 +43,7 @@ module Virtual =
         member this.scrollOffset: int = jsNative
         member this.measureElement: IRefValue<Browser.Types.HTMLElement option> = jsNative
 
+[<Erase>]
 type Virtual =
 
     [<ImportMember(Virtual.ImportPath)>]
