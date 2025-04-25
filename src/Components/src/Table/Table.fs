@@ -7,72 +7,6 @@ open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
 
-module Virtual =
-
-    [<Literal>]
-    let ImportPath = "@tanstack/react-virtual"
-
-    [<ImportMember(ImportPath)>]
-    type Range =
-        interface end
-
-    [<ImportMember(ImportPath)>]
-    type VirtualItem =
-        member this.key: string = jsNative
-        member this.index: int = jsNative
-        member this.start: int = jsNative
-        member this.``end``: int = jsNative
-        member this.size: int = jsNative
-
-    [<StringEnum(CaseRules.LowerFirst)>]
-    type AlignOption =
-        | Auto
-        | Start
-        | Center
-        | End
-
-    [<StringEnum(CaseRules.LowerFirst)>]
-    type ScrollBehavior =
-        | Auto
-        | Smooth
-
-    [<ImportMember(ImportPath)>]
-    type Virtualizer<'A,'B> =
-        member this.getVirtualItems() : VirtualItem [] = jsNative
-        member this.getVirtualIndexes(): int [] = jsNative
-        member this.getTotalSize() : int = jsNative
-        member this.scrollToIndex (index: int, ?options: {|align: AlignOption option; behavior: ScrollBehavior option|}) : unit = jsNative
-        member this.scrollRect: {|height: int; width: int|} = jsNative
-        member this.scrollOffset: int = jsNative
-        member this.measureElement: IRefValue<Browser.Types.HTMLElement option> = jsNative
-
-type Virtual =
-
-    [<ImportMember(Virtual.ImportPath)>]
-    static member defaultRangeExtractor(range: Virtual.Range) : int [] = jsNative
-
-    [<ImportMember(Virtual.ImportPath)>]
-    [<NamedParamsAttribute>]
-    static member useVirtualizer
-        (
-            // required
-            count: int,
-            getScrollElement: unit -> option<Browser.Types.HTMLElement>,
-            estimateSize: int -> int,
-            // optional
-            ?scrollMargin: float,
-            ?scrollPaddingStart: float,
-            ?scrollPaddingEnd: float,
-            ?overscan: int,
-            ?rangeExtractor: Virtual.Range -> int [],
-            ?debug: bool,
-            ?onChange: (Virtual.Virtualizer<_,_> * bool) -> unit,
-            ?horizontal: bool,
-            ?paddingStart: int,
-            ?paddingEnd: int,
-            ?gap: int,
-            ?lanes: int
-        ) : Virtual.Virtualizer<obj, obj> = jsNative
 
 module private TableHelper =
 
@@ -102,6 +36,13 @@ module private TableHelper =
 
 [<Mangle(false); Erase>]
 type Table =
+
+    static member TableCellStyle = """data-[selected=true]:text-secondary-content data-[selected=true]:bg-secondary
+data-[is-append-origin=true]:border data-[is-append-origin=true]:border-base-content
+data-[active=true]:border-2 data-[active=true]:border-primary data-[active=true]:!bg-transparent
+cursor-pointer
+select-none
+p-0"""
 
     [<ReactComponent(true)>]
     static member Table(
@@ -284,7 +225,9 @@ type Table =
                                                                     "min-w-32"
                                                                 else
                                                                     "min-w-min"
-                                                                "h-full resize-x overflow-x-auto swt-table-cell"
+                                                                "h-full resize-x overflow-x-auto"
+                                                                if defaultStyleSelect then
+                                                                    Table.TableCellStyle
                                                             ]
                                                             prop.dataRow 0
                                                             prop.dataColumn virtualColumn.index
@@ -346,7 +289,7 @@ type Table =
                                                                     prop.dataColumn virtualColumn.index
                                                                     prop.className [
                                                                         if defaultStyleSelect then
-                                                                            "swt-table-cell"
+                                                                            Table.TableCellStyle
                                                                     ]
                                                                     if controller.IsActive then
                                                                         prop.custom("data-active", true)

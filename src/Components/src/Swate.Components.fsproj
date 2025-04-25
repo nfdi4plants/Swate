@@ -22,6 +22,8 @@
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
     <Compile Include="Util\Types.fs" />
+    <Compile Include="Util\Virtual.fs" />
+    <Compile Include="Util\FloatingUI.fs" />
     <Compile Include="Util\Constants.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
