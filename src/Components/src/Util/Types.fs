@@ -1,7 +1,6 @@
 namespace Swate.Components
 
 open Fable.Core
-open Fable.Core.JS
 open Feliz
 
 
@@ -33,19 +32,22 @@ type TableCellController = {
 [<Global>]
 type SelectHandle
     [<ParamObjectAttribute; Emit("$0")>]
-    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit) =
+    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit, getSelectedCellRange, getSelectedCells, getCount) =
     member val contains: CellCoordinate -> bool = contains with get, set
     member val selectAt: (CellCoordinate * bool) -> unit = selectAt with get, set
     member val clear: unit -> unit = clear with get, set
+    member val getSelectedCellRange: unit -> CellCoordinateRange option = getSelectedCellRange with get, set
+    member val getSelectedCells: unit -> ResizeArray<CellCoordinate> = getSelectedCells with get, set
+    member val getCount: unit -> int = getCount with get, set
 
 [<AllowNullLiteral>]
 [<Global>]
 type TableHandle
     [<ParamObjectAttribute; Emit("$0")>]
-    (focus: unit -> unit, scrollTo: CellCoordinate -> unit, select: SelectHandle) =
+    (focus: unit -> unit, scrollTo: CellCoordinate -> unit, SelectHandle: SelectHandle) =
     member val focus: unit -> unit = focus with get, set
     member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
-    member val select: SelectHandle = select with get, set
+    member val SelectHandle: SelectHandle = SelectHandle with get, set
 
 [<AllowNullLiteral>]
 [<Global>]
@@ -123,22 +125,22 @@ module Term =
                 if term.description.IsSome then
                     Comment(
                         ConvertLiterals.Description,
-                        JSON.stringify term.description.Value
+                        JS.JSON.stringify term.description.Value
                     )
                 if term.data.IsSome then
                     Comment(
                         ConvertLiterals.Data,
-                        JSON.stringify term.data.Value
+                        JS.JSON.stringify term.data.Value
                     )
                 if term.source.IsSome then
                     Comment(
                         ConvertLiterals.Source,
-                        JSON.stringify term.source.Value
+                        JS.JSON.stringify term.source.Value
                     )
                 if term.isObsolete.IsSome then
                     Comment(
                         ConvertLiterals.IsObsolete,
-                        JSON.stringify term.isObsolete.Value
+                        JS.JSON.stringify term.isObsolete.Value
                     )
             ]
             |> Option.whereNot Seq.isEmpty

@@ -1,6 +1,28 @@
 namespace Swate.Components
 
 open Feliz
+open ARCtrl
+
+[<AutoOpen>]
+module ARCtrl =
+    type ArcTable with
+        member this.ClearCell(cellIndex) =
+            let c = this.Values.[cellIndex]
+            this.Values.[cellIndex] <- c.GetEmptyCell()
+
+        member this.ClearSelectedCells(selectHandle: SelectHandle) =
+            match selectHandle.getCount() with
+            | c when c <= 100 ->
+                let selectedCells = selectHandle.getSelectedCells()
+                selectedCells |> Seq.iter (fun i ->
+                    let c = this.Values.[(i.x - 1, i.y - 1)]
+                    this.Values.[(i.x - 1, i.y - 1)] <- c.GetEmptyCell()
+                )
+            | c ->
+                for (x,y) in this.Values.Keys do
+                    if selectHandle.contains ({|x = x + 1; y = y + 1|}) then
+                        let c = this.Values.[(x, y)]
+                        this.Values.[(x, y)] <- c.GetEmptyCell()
 
 [<AutoOpen>]
 module Extensions =

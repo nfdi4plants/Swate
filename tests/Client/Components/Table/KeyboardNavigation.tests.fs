@@ -12,7 +12,7 @@ let private DEFAULT_START_POINT: CellCoordinate = {|x = 5; y = 5|}
 let private tests_single = testList "Single" [
 
   test "Single down" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(Kbd.ArrowDown, false, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -22,7 +22,7 @@ let private tests_single = testList "Single" [
   }
 
   test "Single Up" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowUp, false, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -32,7 +32,7 @@ let private tests_single = testList "Single" [
   }
 
   test "Single left" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowLeft, false, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -42,7 +42,7 @@ let private tests_single = testList "Single" [
   }
 
   test "Single right" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowRight, false, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -54,7 +54,7 @@ let private tests_single = testList "Single" [
 
 let private tests_singleJump = testList "Single jump" [
   test "jump down" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowDown, true, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -64,7 +64,7 @@ let private tests_singleJump = testList "Single jump" [
   }
 
   test "jump up" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowUp, true, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -74,7 +74,7 @@ let private tests_singleJump = testList "Single jump" [
   }
 
   test "jump left" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowLeft, true, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -84,7 +84,7 @@ let private tests_singleJump = testList "Single jump" [
   }
 
   test "jump right" {
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowRight, true, false, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -97,7 +97,7 @@ let private tests_singleJump = testList "Single jump" [
 let private tests_appendSingles = testList "Append singles" [
     test "Append down" {
         let appendCount = 5
-        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
         let setter cells = selectedCells <- cells
         let nav = GridSelect()
         for _ in 1..appendCount do
@@ -109,7 +109,7 @@ let private tests_appendSingles = testList "Append singles" [
 
     test "Append up" {
         let appendCount = 5
-        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
         let setter cells = selectedCells <- cells
         let nav = GridSelect()
         for _ in 1..appendCount do
@@ -121,7 +121,7 @@ let private tests_appendSingles = testList "Append singles" [
 
     test "Append left" {
         let appendCount = 5
-        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
         let setter cells = selectedCells <- cells
         let nav = GridSelect()
         for _ in 1..appendCount do
@@ -133,7 +133,7 @@ let private tests_appendSingles = testList "Append singles" [
 
     test "Append right" {
         let appendCount = 5
-        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+        let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
         let setter cells = selectedCells <- cells
         let nav = GridSelect()
         for _ in 1..appendCount do
@@ -147,7 +147,7 @@ let private tests_appendSingles = testList "Append singles" [
 let private tests_appendMultiple = testList "appendMultiple" [
   test "append down" {
       let appendCount = 5
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowRight, false, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -160,7 +160,7 @@ let private tests_appendMultiple = testList "appendMultiple" [
 
   test "append up" {
       let appendCount = 5
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowRight, false, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -173,7 +173,7 @@ let private tests_appendMultiple = testList "appendMultiple" [
 
   test "append left" {
       let appendCount = 5
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowDown, false, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -186,7 +186,7 @@ let private tests_appendMultiple = testList "appendMultiple" [
 
   test "append right" {
       let appendCount = 5
-      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+      let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
       let setter cells = selectedCells <- cells
       let nav = GridSelect()
       nav.SelectBy(ArrowDown, false, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -200,7 +200,7 @@ let private tests_appendMultiple = testList "appendMultiple" [
 
 let private tests_appendJump = testList "Append jump" [
   test "append jump down" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectBy(ArrowDown, true, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -209,7 +209,7 @@ let private tests_appendJump = testList "Append jump" [
     Expect.equal actual expected ""
   }
   test "append right then jump down" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectBy(ArrowRight, false, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -219,7 +219,7 @@ let private tests_appendJump = testList "Append jump" [
     Expect.equal actual expected ""
   }
   test "append jump up" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectBy(ArrowUp, true, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -229,7 +229,7 @@ let private tests_appendJump = testList "Append jump" [
   }
 
   test "append jump left" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectBy(ArrowLeft, true, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -239,7 +239,7 @@ let private tests_appendJump = testList "Append jump" [
   }
 
   test "append jump right" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectBy(ArrowRight, true, true, selectedCells, setter, DEFAULT_MAX, DEFAULT_MAX)
@@ -251,7 +251,7 @@ let private tests_appendJump = testList "Append jump" [
 
 let private tests_selectAt = testList "Select At" [
   test "select at append" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectAt({|x = 6; y = 6|}, true, selectedCells, setter)
@@ -260,7 +260,7 @@ let private tests_selectAt = testList "Select At" [
     Expect.equal actual expected ""
   }
   test "select at" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectAt({|x = 6; y = 6|}, false, selectedCells, setter)
@@ -270,7 +270,7 @@ let private tests_selectAt = testList "Select At" [
   }
 
   test "select at append up left" {
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     nav.SelectAt({|x = 4; y = 4|}, true, selectedCells, setter)
@@ -283,7 +283,7 @@ let private tests_selectAt = testList "Select At" [
 let private tests_appendReverse = testList "append reverse" [
   test "append up then down" {
     let appendCount = 3
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     for _ in 1..appendCount do
@@ -296,7 +296,7 @@ let private tests_appendReverse = testList "append reverse" [
 
   test "append down then up" {
     let appendCount = 3
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     for _ in 1..appendCount do
@@ -309,7 +309,7 @@ let private tests_appendReverse = testList "append reverse" [
 
   test "append left then right" {
     let appendCount = 3
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     for _ in 1..appendCount do
@@ -322,7 +322,7 @@ let private tests_appendReverse = testList "append reverse" [
 
   test "append right then left" {
     let appendCount = 3
-    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromReducedSet
+    let mutable selectedCells = Set.singleton DEFAULT_START_POINT |> SelectedCellRange.fromSet
     let setter cells = selectedCells <- cells
     let nav = GridSelect()
     for _ in 1..appendCount do

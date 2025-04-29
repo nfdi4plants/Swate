@@ -56,7 +56,7 @@ module GridSelect =
                 ]
             | _ -> Set.empty
 
-        let fromReducedSet (selectedCells: Set<CellCoordinate>) =
+        let fromSet (selectedCells: Set<CellCoordinate>) =
             if selectedCells.IsEmpty then
                 None
             else
@@ -151,7 +151,7 @@ type GridSelect() =
         let newCellRange =
             if not isAppend then
                 Set.singleton (nextIndex)
-                |> SelectedCellRange.fromReducedSet
+                |> SelectedCellRange.fromSet
             else
                 let selectedCells = selectedCellRange |> SelectedCellRange.toReducedSet |> function | isEmpty when isEmpty.Count = 0 -> Set.singleton nextIndex | x -> x
                 let origin = this.Origin.Value
@@ -232,20 +232,23 @@ module KeyboardNavExtensions =
 
             let selectBy =
                 (fun e ->
-                    select.current.SelectBy(
-                        e,
-                        selectedCells,
-                        setSelectedCells,
-                        rowCount - 1,
-                        columnCount - 1,
-                        minRow,
-                        minCol,
-                        (fun newIndex newCellRange ->
-                            onSelect |> Option.iter(fun onSelect ->
-                                onSelect newIndex newCellRange
+                    match selectedCells with
+                    | Some _ ->
+                        select.current.SelectBy(
+                            e,
+                            selectedCells,
+                            setSelectedCells,
+                            rowCount - 1,
+                            columnCount - 1,
+                            minRow,
+                            minCol,
+                            (fun newIndex newCellRange ->
+                                onSelect |> Option.iter(fun onSelect ->
+                                    onSelect newIndex newCellRange
+                                )
                             )
                         )
-                    )
+                    | None -> false
                 )
 
             let selectAt =

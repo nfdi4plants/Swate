@@ -9,24 +9,22 @@ open Browser.Types
 type ContextMenuItem
     [<ParamObjectAttribute; Emit("$0")>]
     (
-        text: ReactElement,
+        ?text: ReactElement,
         ?icon: ReactElement,
-        ?kbdbutton: ReactElement,
+        ?kbdbutton: {|element: ReactElement; label: string|},
         ?isDivider: bool,
         ?onClick:
             {|
                 buttonEvent: Browser.Types.MouseEvent
-                spawnData: obj option
+                spawnData: obj
             |}
-                -> unit,
-        ?label: string
+                -> unit
     ) =
     member val text = text with get, set
     member val icon = icon with get, set
     member val kbdbutton = kbdbutton with get, set
-    member val isDivider = isDivider with get, set
+    member val isDivider: bool = defaultArg isDivider false with get, set
     member val onClick = onClick with get, set
-    member val label = label with get, set
 
 
 [<Erase>]
@@ -43,12 +41,13 @@ type ContextMenu =
     [<ReactComponent>]
     static member ContextMenu
         (
-            childInfo: ContextMenuItem list,
+            childInfo: obj -> ContextMenuItem list,
             ?ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option
         ) =
 
-        let (spawnData: obj option), setSpawnData = React.useState (None)
+        let (spawnData: obj), setSpawnData = React.useState (null)
+        let children, setChildren = React.useState ([])
         let onSpawn = onSpawn |> Option.defaultValue (fun e -> box e |> Some)
         let (isOpen, setIsOpen) = React.useState (false)
         let (activeIndex: int option), setActiveIndex = React.useState (None)
@@ -62,7 +61,7 @@ type ContextMenu =
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
         let listContentRef =
-            React.useRef (ResizeArray(childInfo |> List.map (fun child -> child.label)))
+            React.useRef (ResizeArray())
 
         let floating =
             FloatingUI.useFloating (
@@ -122,8 +121,14 @@ type ContextMenu =
                     match onSpawn e with
                     | Some data ->
                         e.preventDefault ()
-                        setSpawnData (Some data)
+                        setSpawnData (data)
+                        let children = childInfo data
 
+                        if children.Length = 0 then
+                            failwith "Context menu must have at least one item"
+
+                        children |> setChildren
+                        listContentRef.current.AddRange (children |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label)))
                         let rect: ClientRect =
                             {|
                                 width = 0
@@ -146,6 +151,7 @@ type ContextMenu =
 
                         allowMouseUpCloseRef.current <- false
                         timeout.current <- Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
+
                     | None -> ()
 
                 let onMouseUp (e: Event) =
@@ -204,8 +210,8 @@ type ContextMenu =
                                         prop.custom (key, v)
                                     prop.className "grid grid-cols-[auto_1fr_auto] bg-base-100 border-2 border-base-300 w-56 rounded-md focus:outline-none"
                                     prop.children [
-                                        for index in 0 .. childInfo.Length - 1 do
-                                            let child = childInfo.[index]
+                                        for index in 0 .. children.Length - 1 do
+                                            let child = children.[index]
 
                                             let triggerEvent =
                                                 fun (e: Browser.Types.MouseEvent) ->
@@ -230,42 +236,47 @@ type ContextMenu =
                                                                 -1
                                                         onClick = triggerEvent
                                                         onMouseUp = triggerEvent
-                                                        label = child.label
+                                                        label = child.kbdbutton |> Option.map _.label
                                                     |}
                                                 )
                                                 |> Fable.Core.JS.Constructors.Object.entries
-
-                                            Html.button [
-                                                prop.key index
-                                                prop.className
-                                                    "col-span-3 grid grid-cols-subgrid gap-x-2
+                                            if child.isDivider then
+                                                Html.div [
+                                                    prop.className "divider my-0 col-span-3"
+                                                ]
+                                            else
+                                                Html.button [
+                                                    prop.key index
+                                                    prop.className
+                                                        "col-span-3 grid grid-cols-subgrid gap-x-2 text-sm
 text-base-content px-2 py-1
 w-full text-left
 hover:bg-base-100
 focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                                                prop.children [
-                                                    if child.icon.IsSome then
-                                                        Html.div [
-                                                            prop.className "col-start-1 justify-self-start"
-                                                            prop.children child.icon.Value
-                                                        ]
-                                                    else
-                                                        Html.none
-                                                    Html.div [
-                                                        prop.className "col-start-2 justify-self-start"
-                                                        prop.children child.text
+                                                    prop.children [
+                                                        if child.icon.IsSome then
+                                                            Html.div [
+                                                                prop.className "col-start-1 justify-self-start"
+                                                                prop.children child.icon.Value
+                                                            ]
+                                                        else
+                                                            Html.none
+                                                        if child.text.IsSome then
+                                                            Html.div [
+                                                                prop.className "col-start-2 justify-self-start"
+                                                                prop.children child.text.Value
+                                                            ]
+                                                        if child.kbdbutton.IsSome then
+                                                            Html.div [
+                                                                prop.className "col-start-3 justify-self-end"
+                                                                prop.children child.kbdbutton.Value.element
+                                                            ]
+                                                        else
+                                                            Html.none
                                                     ]
-                                                    if child.kbdbutton.IsSome then
-                                                        Html.div [
-                                                            prop.className "col-start-3 justify-self-end"
-                                                            prop.children child.kbdbutton.Value
-                                                        ]
-                                                    else
-                                                        Html.none
+                                                    for key, v in props do
+                                                        prop.custom (key, v)
                                                 ]
-                                                for key, v in props do
-                                                    prop.custom (key, v)
-                                            ]
                                     ]
                                 ]
                         )
@@ -293,20 +304,20 @@ focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary"
                     prop.dataColumn 5
                 ]
                 ContextMenu.ContextMenu(
-                    [
-                        for i in 0..5 do
-                            ContextMenuItem(
-                                text = Html.span $"Item {i}",
-                                ?icon = (if i = 4 then Html.i [ prop.className "fa-solid fa-check" ] |> Some else None),
-                                ?kbdbutton = (if i = 3 then Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ] |> Some else None),
-                                ?label = (if i = 3 then Some "Back" else None),
-                                onClick =
-                                    (fun e ->
-                                        e.buttonEvent.stopPropagation ()
-                                        let index = e.spawnData |> unbox<CellCoordinate>
-                                        console.log (sprintf "Item clicked: %i" i, index))
-                            )
-                    ],
+                    (fun (data: obj) ->
+                        [
+                            for i in 0..5 do
+                                ContextMenuItem(
+                                    text = Html.span $"Item {i}",
+                                    ?icon = (if i = 4 then Html.i [ prop.className "fa-solid fa-check" ] |> Some else None),
+                                    ?kbdbutton = (if i = 3 then {| element = Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]; label = "Back"|} |> Some else None),
+                                    onClick =
+                                        (fun e ->
+                                            e.buttonEvent.stopPropagation ()
+                                            let index = e.spawnData |> unbox<CellCoordinate>
+                                            console.log (sprintf "Item clicked: %i" i, index))
+                                )
+                        ]),
                     ref = containerRef,
                     onSpawn =
                         (fun e ->

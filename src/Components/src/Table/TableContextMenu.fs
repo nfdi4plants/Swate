@@ -1,1 +1,0 @@
-namespace Swate.Components
