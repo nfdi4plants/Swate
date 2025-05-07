@@ -177,17 +177,17 @@ type SelectiveImportModal =
             | Study (s,_) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([t.Table]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-        let importDataState, setImportDataState = React.useState(SelectiveImportConfig.init())
+
         let setMetadataImport = fun b ->
             {
-                importDataState with ImportMetadata  = b;
-            } |> setImportDataState
+                model.ProtocolState.ImportConfig with ImportMetadata  = b;
+            } |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
         Daisy.modal.div [
             modal.active
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
                 Daisy.modalBox.div [
-                    prop.className "w-4/5 flex flex-col @container/importModal"
+                    prop.className "w-4/5 flex flex-col @container/importModal space-y-2"
                     prop.children [
                         Daisy.cardTitle [
                             prop.className "justify-between"
@@ -202,15 +202,15 @@ type SelectiveImportModal =
                                 SelectiveImportModal.RadioPluginsBox(
                                     "Import Type",
                                     "fa-solid fa-cog",
-                                    importDataState.ImportType,
+                                    model.ProtocolState.ImportConfig.ImportType,
                                     "importType",
                                     [|
                                         ARCtrl.TableJoinOptions.Headers,    " Column Headers";
                                         ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
                                         ARCtrl.TableJoinOptions.WithValues, " ..With Values";
                                     |],
-                                    fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
-                                SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
+                                    fun importType -> {model.ProtocolState.ImportConfig with ImportType = importType} |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch)
+                                SelectiveImportModal.MetadataImport(model.ProtocolState.ImportConfig.ImportMetadata, setMetadataImport, disArcfile)
                                 for ti in 0 .. (tables.Count-1) do
                                     let t = tables.[ti]
                                     SelectiveImportModal.TableImport(ti, t, model, dispatch)
@@ -218,11 +218,11 @@ type SelectiveImportModal =
                         ]
                         Daisy.cardActions [
                             Daisy.button.button [
-                                button.info
+                                button.primary
                                 prop.style [style.marginLeft length.auto]
-                                prop.text "Submit"
+                                prop.text "Import"
                                 prop.onClick(fun e ->
-                                    {| importState = importDataState; importedFile = import; deselectedColumns = importDataState.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
+                                    {| importState = model.ProtocolState.ImportConfig; importedFile = import; deselectedColumns = model.ProtocolState.ImportConfig.DeselectedColumns |} |> SpreadsheetInterface.ImportJson |> InterfaceMsg |> dispatch
                                     rmv e
                                 )
                             ]
