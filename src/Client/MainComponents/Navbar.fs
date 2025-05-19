@@ -102,28 +102,20 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
     let addBuildingBlock =
         QuickAccessButton.QuickAccessButton(
             "Add Building Block",
-            Icons.AddBuildingBlock,
+            Icons.BuildingBlock(),
             (fun _ -> addWidget Widget._BuildingBlock)
         )
 
     let addTemplate =
-        QuickAccessButton.QuickAccessButton(
-            "Add Template",
-            Icons.AddTemplate,
-            (fun _ -> addWidget Widget._Template)
-        )
+        QuickAccessButton.QuickAccessButton("Add Template", Icons.Templates(), (fun _ -> addWidget Widget._Template))
 
     let filePicker =
-        QuickAccessButton.QuickAccessButton(
-            "File Picker",
-            Icons.FilePicker,
-            (fun _ -> addWidget Widget._FilePicker)
-        )
+        QuickAccessButton.QuickAccessButton("File Picker", Icons.FilePicker(), (fun _ -> addWidget Widget._FilePicker))
 
     let dataAnnotator =
         QuickAccessButton.QuickAccessButton(
             "Data Annotator",
-            Icons.DataAnnotator,
+            Icons.DataAnnotator(),
             (fun _ -> addWidget Widget._DataAnnotator)
         )
 

@@ -5,6 +5,7 @@ import {Entry as Table} from '../src/Table/Table.fs.ts';
 import {Entry as AnnotationTable} from '../src/Table/AnnotationTable.fs.ts';
 import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
 import { Menu } from "./NativeContextMenu";
+// import { Icons } from '../src/index'
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);

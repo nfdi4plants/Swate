@@ -68,29 +68,21 @@ type NavbarBurger =
             [
                 NavbarBurger.DropdownItem(
                     "Settings",
-                    Icons.Settings,
+                    Icons.Settings(),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.Settings)
                 )
                 NavbarBurger.DropdownItem(
                     "About",
-                    Icons.About,
+                    Icons.About(),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.About)
                 )
                 NavbarBurger.DropdownItem(
                     "Privacy Policy",
-                    Icons.PrivacyPolicy,
+                    Icons.PrivacyPolicy(),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.PrivacyPolicy)
                 )
-                NavbarBurger.DropdownItem(
-                    "Docs",
-                    Icons.Docs,
-                    prop.href Swate.Components.Shared.URLs.SWATE_WIKI
-                )
-                NavbarBurger.DropdownItem(
-                    "Contact",
-                    Icons.Contact,
-                    prop.href Swate.Components.Shared.URLs.CONTACT
-                )
+                NavbarBurger.DropdownItem("Docs", Icons.Docs(), prop.href Swate.Components.Shared.URLs.SWATE_WIKI)
+                NavbarBurger.DropdownItem("Contact", Icons.Contact(), prop.href Swate.Components.Shared.URLs.CONTACT)
             ],
             style = Style.init "dropdown-end flex text-base-content"
         )

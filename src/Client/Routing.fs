@@ -27,12 +27,12 @@ type SidebarPage =
             Html.i [ prop.title this.AsStringRdbl; prop.children [ icons ] ]
 
         match this with
-        | TermSearch -> createElem Icons.Terms
-        | BuildingBlock -> createElem Icons.AddBuildingBlock
-        | Protocol -> createElem Icons.Templates
-        | JsonExport -> createElem Icons.FileExport
-        | FilePicker -> createElem Icons.FilePicker
-        | DataAnnotator -> createElem Icons.DataAnnotator
+        | TermSearch -> createElem <| Icons.Terms()
+        | BuildingBlock -> createElem <| Icons.BuildingBlock()
+        | Protocol -> createElem <| Icons.Templates()
+        | JsonExport -> createElem <| Icons.FileExport()
+        | FilePicker -> createElem <| Icons.FilePicker()
+        | DataAnnotator -> createElem <| Icons.DataAnnotator()
 
 [<RequireQualifiedAccess>]
 type MainPage =
