@@ -172,8 +172,7 @@ module private Helper =
             prop.text "+"
             button.wide
             prop.onClick clickEvent
-            button.active
-            prop.className "text-accent bg-transparent hover:text-primary"
+            prop.className "text-accent btn-outline"
         ]
 
     let deleteButton (clickEvent: MouseEvent -> unit) =
