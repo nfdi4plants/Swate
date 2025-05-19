@@ -28,7 +28,7 @@ module ARCtrl =
 module Extensions =
 
     type prop with
-        static member testid (value: string) = prop.custom("data-testid", value)
+        static member testid(value: string) = prop.custom ("data-testid", value)
 
         static member dataRow (value: int) = prop.custom("data-row", value)
         static member dataColumn (value: int) = prop.custom("data-column", value)

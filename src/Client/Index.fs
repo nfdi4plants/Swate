@@ -21,13 +21,13 @@ open Fable.Core.JsInterop
 open Browser.Dom
 
 [<ReactComponent>]
-let View (model : Model) (dispatch : Msg -> unit) =
+let View (model: Model) (dispatch: Msg -> unit) =
 
     //Set the initial theme
-    let (theme, handleSetTheme) = React.useLocalStorage("theme", "light")
+    let (theme, handleSetTheme) = React.useLocalStorage ("theme", "light")
     let newTheme = if String.IsNullOrEmpty theme then "light" else theme
     handleSetTheme newTheme
-    document.documentElement.setAttribute("data-theme", newTheme)
+    document.documentElement.setAttribute ("data-theme", newTheme)
 
     React.strictMode [
         Html.div [
@@ -36,21 +36,21 @@ let View (model : Model) (dispatch : Msg -> unit) =
             prop.children [
                 Modals.ModalProvider.Main(model, dispatch)
                 match model.PageState.IsHome, model.PersistentStorageState.Host with
-                | false, _ ->
-                    View.MainPageView.Main(model, dispatch)
+                | false, _ -> View.MainPageView.Main(model, dispatch)
                 | _, Some Swatehost.Excel ->
                     Html.div [
                         prop.className "flex flex-col w-full h-full"
-                        prop.children [
-                            SidebarView.SidebarView.Main(model, dispatch)
-                        ]
+                        prop.children [ SidebarView.SidebarView.Main(model, dispatch) ]
                     ]
                 | _, _ ->
-                    let isActive = model.SpreadsheetModel.TableViewIsActive() && model.PageState.ShowSideBar
+                    let isActive =
+                        model.SpreadsheetModel.TableViewIsActive() && model.PageState.ShowSideBar
+
                     Daisy.drawer [
                         prop.className [
                             "drawer-end"
-                            if isActive then "drawer-open"
+                            if isActive then
+                                "drawer-open"
                         ]
                         prop.children [
                             Html.input [
@@ -58,12 +58,8 @@ let View (model : Model) (dispatch : Msg -> unit) =
                                 prop.type'.checkbox
                                 prop.className "drawer-toggle"
                             ]
-                            Daisy.drawerContent [
-                                SpreadsheetView.Main (model, dispatch)
-                            ]
-                            Daisy.drawerSide [
-                                SidebarView.SidebarView.Main(model, dispatch)
-                            ]
+                            Daisy.drawerContent [ SpreadsheetView.Main(model, dispatch) ]
+                            Daisy.drawerSide [ SidebarView.SidebarView.Main(model, dispatch) ]
                         ]
                     ]
             ]

@@ -25,28 +25,31 @@ let TableStyleLight = "TableStyleMedium7"
 let getAllTableNames (context: RequestContext) =
     // Ref. 2
 
-    let tables = context.workbook.tables.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|]))
-    let _ = tables.load(propertyNames = U2.Case1 "name")
+    let tables =
+        context.workbook.tables.load (propertyNames = U2.Case2(ResizeArray [| "tables" |]))
 
-    context.sync()
-        .``then``( fun _ ->
+    let _ = tables.load (propertyNames = U2.Case1 "name")
+
+    context
+        .sync()
+        .``then`` (fun _ ->
 
             /// Get all names of all tables in the whole workbook.
-            let tableNames =
-                tables.items
-                |> Seq.toArray
-                |> Array.map (fun x -> x.name)
+            let tableNames = tables.items |> Seq.toArray |> Array.map (fun x -> x.name)
 
-            tableNames
-    )
+            tableNames)
 
 let createMatrixForTables (colCount: int) (rowCount: int) value =
     [|
-        for i in 0 .. rowCount-1 do
-            yield [|
-                for i in 0 .. colCount-1 do yield U3<bool,string,float>.Case2 value
-            |] :> IList<U3<bool,string,float>>
-    |] :> IList<IList<U3<bool,string,float>>>
+        for i in 0 .. rowCount - 1 do
+            yield
+                [|
+                    for i in 0 .. colCount - 1 do
+                        yield U3<bool, string, float>.Case2 value
+                |]
+                :> IList<U3<bool, string, float>>
+    |]
+    :> IList<IList<U3<bool, string, float>>>
 
 let inline excelRunWith<'A> (context: RequestContext option) (promise: RequestContext -> JS.Promise<'A>) =
     match context with
@@ -55,18 +58,20 @@ let inline excelRunWith<'A> (context: RequestContext option) (promise: RequestCo
 
 /// This is based on a excel hack on how to add multiple header of the same name to an excel table.,
 /// by just appending more whitespace to the name.
-let extendName (existingNames: string []) (baseName: string) =
+let extendName (existingNames: string[]) (baseName: string) =
     /// https://unicode-table.com/en/200B/
     /// Play with Fire 🔥
     let zeroWidthChar = '​'
-    let rec loop (baseName:string) =
+
+    let rec loop (baseName: string) =
         if existingNames |> Array.contains baseName then
             loop (baseName + " ")
         else
             baseName
+
     loop baseName
 
-let createNewTableName() =
+let createNewTableName () =
     let guid = System.Guid.NewGuid().ToString("N")
     ArcTable.annotationTablePrefix + guid
 
@@ -75,20 +80,27 @@ let createNewTableName() =
 /// </summary>
 /// <param name="context"></param>
 /// <param name="tableName"></param>
-let tryGetTableByName (context: RequestContext) (tableName: string) =
-    promise {
-        let _ = context.workbook.load(U2.Case1 "tables")
-        let excelTable = context.workbook.tables.getItem(tableName)
+let tryGetTableByName (context: RequestContext) (tableName: string) = promise {
+    let _ = context.workbook.load (U2.Case1 "tables")
+    let excelTable = context.workbook.tables.getItem (tableName)
 
-        if String.IsNullOrWhiteSpace tableName then
-            return None
-        else
-            let annoHeaderRange = excelTable.getHeaderRowRange()
-            let _ = annoHeaderRange.load(U2.Case2 (ResizeArray [|"columnIndex"; "values"; "columnCount"|])) |> ignore
-            let annoBodyRange = excelTable.getDataBodyRange()
-            let _ = annoBodyRange.load(U2.Case2 (ResizeArray [|"values"; "numberFormat"|])) |> ignore
-            return Some (excelTable, annoHeaderRange, annoBodyRange)
-    }
+    if String.IsNullOrWhiteSpace tableName then
+        return None
+    else
+        let annoHeaderRange = excelTable.getHeaderRowRange ()
+
+        let _ =
+            annoHeaderRange.load (U2.Case2(ResizeArray [| "columnIndex"; "values"; "columnCount" |]))
+            |> ignore
+
+        let annoBodyRange = excelTable.getDataBodyRange ()
+
+        let _ =
+            annoBodyRange.load (U2.Case2(ResizeArray [| "values"; "numberFormat" |]))
+            |> ignore
+
+        return Some(excelTable, annoHeaderRange, annoBodyRange)
+}
 
 /// <summary>
 /// Swaps 'Rows with column values' to 'Columns with row values'
@@ -101,7 +113,7 @@ let viewRowsByColumns (rows: ResizeArray<ResizeArray<'a>>) =
     |> Seq.map (snd >> Seq.map snd >> Seq.toArray)
     |> Seq.toArray
 
- /// <summary>
+/// <summary>
 /// Converts a sequence of sequence of excel data into a resizearray, compatible with Excel.Range
 /// </summary>
 /// <param name="metadataValues"></param>
@@ -113,25 +125,28 @@ let convertSeqToExcelRangeInput (metadataValues: seq<seq<string option>>) =
 
     //Adapts the length of the smaller sequences to the length of the longest sequence in order to avoid problems with the insertion into excel.Range
     let ra = ResizeArray()
+
     for seq in metadataValues do
         //Parse string to obj option
-        let ira = ResizeArray (seq |> Seq.map (fun cell -> cell |> Option.map box))
+        let ira = ResizeArray(seq |> Seq.map (fun cell -> cell |> Option.map box))
+
         if ira.Count < maxLength then
-            ira.AddRange (Array.create (maxLength - ira.Count) None)
+            ira.AddRange(Array.create (maxLength - ira.Count) None)
+
         ra.Add ira
+
     ra
 
 /// <summary>
 /// This function is used as minimal test function to ensure a working excel function test suit
 /// </summary>
-let getSelectedRangeAdress (context: RequestContext) =
-    promise {
-        let range = context.workbook.getSelectedRange()
-        let _ = range.load(U2.Case1 "address") |> ignore
-        do! context.sync()
+let getSelectedRangeAdress (context: RequestContext) = promise {
+    let range = context.workbook.getSelectedRange ()
+    let _ = range.load (U2.Case1 "address") |> ignore
+    do! context.sync ()
 
-        return range.address
-    }
+    return range.address
+}
 
 let getTableValues (tableRange: Range) =
     tableRange.values
@@ -139,13 +154,7 @@ let getTableValues (tableRange: Range) =
     |> Array.map (fun row ->
         row
         |> Array.ofSeq
-        |> Array.map (fun column ->
-            column
-            |> Option.map string
-            |> Option.defaultValue ""
-            |> (fun s -> s.TrimEnd())
-        )
-    )
+        |> Array.map (fun column -> column |> Option.map string |> Option.defaultValue "" |> (fun s -> s.TrimEnd())))
 
 [<AutoOpen>]
 module Table =
@@ -161,11 +170,7 @@ module Table =
     let addColumn (index: float) (excelTable: Table) name rowCount value =
         let col = createMatrixForTables 1 rowCount value
 
-        excelTable.columns.add(
-            index   = index,
-            values  = U4.Case1 col,
-            name    = name
-        )
+        excelTable.columns.add (index = index, values = U4.Case1 col, name = name)
 
     /// <summary>
     /// Add a new column with the given values at the index
@@ -173,19 +178,14 @@ module Table =
     /// <param name="index"></param>
     /// <param name="excelTable"></param>
     /// <param name="values"></param>
-    let addColumnAt (index: int) (excelTable: Table) (values: string []) =
+    let addColumnAt (index: int) (excelTable: Table) (values: string[]) =
         let columnValues =
-            U4<Array<Array<U3<bool,string,float>>>,bool,string,float>.Case1 [|
+            U4<Array<Array<U3<bool, string, float>>>, bool, string, float>.Case1 [|
                 for row in values do
-                    [|
-                        U3.Case2 row
-                    |] 
+                    [| U3.Case2 row |]
             |]
 
-        excelTable.columns.add(
-            index,
-            columnValues
-        )
+        excelTable.columns.add (index, columnValues)
 
     /// <summary>
     /// Delete an existing column at the given index
@@ -197,9 +197,9 @@ module Table =
     /// <param name="value"></param>
     let deleteColumn (index: float) (excelTable: Table) =
         let col = excelTable.columns.getItemAt index
-        col.delete()
+        col.delete ()
 
-     /// <summary>
+    /// <summary>
     /// Add only the row values of the column you are adding
     /// </summary>
     /// <param name="columnIndex"></param>
@@ -207,11 +207,7 @@ module Table =
     /// <param name="columnName"></param>
     /// <param name="rows"></param>
     let addColumnAndRows (columnIndex: float) (excelTable: Table) columnName rows =
-        excelTable.columns.add(
-            index   = columnIndex,
-            values  = U4.Case1 rows,
-            name    = columnName
-        )
+        excelTable.columns.add (index = columnIndex, values = U4.Case1 rows, name = columnName)
 
     /// <summary>
     /// Add new rows with the same value to the table
@@ -222,10 +218,7 @@ module Table =
     /// <param name="value"></param>
     let addRows (index: float) (excelTable: Table) columnCount rowCount value =
         let col = createMatrixForTables columnCount rowCount value
-        excelTable.rows.add(
-            index   = index,
-            values  = U4.Case1 col
-        )
+        excelTable.rows.add (index = index, values = U4.Case1 col)
 
 // I retrieve the index of the currently opened worksheet, here the new table should be created.
 // I retrieve all annotationTables in the workbook.
@@ -237,61 +230,65 @@ module Table =
 /// Will return Some tableName if any annotationTable exists in a worksheet before the active one
 /// </summary>
 /// <param name="context"></param>
-let tryGetPrevAnnotationTableName (context: RequestContext) =
-    promise {
+let tryGetPrevAnnotationTableName (context: RequestContext) = promise {
 
-        let _ = context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|" tables"|]))
-        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
-        let tables = context.workbook.tables
-        let _ =
-            activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
-            tables.load(propertyNames=U2.Case2 (ResizeArray[|"items";"worksheet";"name"; "position"; "values"|]))
+    let _ =
+        context.workbook.load (propertyNames = U2.Case2(ResizeArray [| " tables" |]))
 
-        let! prevTable = context.sync().``then``(fun _ ->
-            /// Get all names of all tables in the whole workbook.
-            let prevTable =
-                tables.items
-                |> Seq.toArray
-                |> Array.choose (fun table ->
-                    if table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) then
-                        Some (table.worksheet.position ,table.name)
-                    else
-                        None
-                )
-                |> Array.filter(fun (wp, _) -> activeWorksheet.position - wp > 0.)
-                |> Array.sortBy(fun (wp, _) ->
-                    activeWorksheet.position - wp
-                )
-                |> Array.tryHead
-            Option.bind (snd >> Some) prevTable
-        )
+    let activeWorksheet = context.workbook.worksheets.getActiveWorksheet ()
+    let tables = context.workbook.tables
 
-        return prevTable
-    }
+    let _ =
+        activeWorksheet.load (propertyNames = U2.Case2(ResizeArray [| "position" |]))
+        |> ignore
+
+        tables.load (propertyNames = U2.Case2(ResizeArray [| "items"; "worksheet"; "name"; "position"; "values" |]))
+
+    let! prevTable =
+        context
+            .sync()
+            .``then`` (fun _ ->
+                /// Get all names of all tables in the whole workbook.
+                let prevTable =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.choose (fun table ->
+                        if table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) then
+                            Some(table.worksheet.position, table.name)
+                        else
+                            None)
+                    |> Array.filter (fun (wp, _) -> activeWorksheet.position - wp > 0.)
+                    |> Array.sortBy (fun (wp, _) -> activeWorksheet.position - wp)
+                    |> Array.tryHead
+
+                Option.bind (snd >> Some) prevTable)
+
+    return prevTable
+}
 
 /// <summary>
 /// Checks whether the active excel table is valid or not
 /// </summary>
-let getValidatedExcelTable excelTable context =
-    promise {
-        let! indexedErrors = validateExcelTable excelTable context
+let getValidatedExcelTable excelTable context = promise {
+    let! indexedErrors = validateExcelTable excelTable context
 
-        let messages =
-            if indexedErrors.Length > 0 then
-                indexedErrors
-                |> List.ofArray
-                |> List.collect (fun (ex, header ) ->
-                    [InteropLogging.Msg.create InteropLogging.Warning
-                        $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error."
-                    ])
-            else
-                []
-
-        if messages.IsEmpty then
-            return Result.Ok excelTable
+    let messages =
+        if indexedErrors.Length > 0 then
+            indexedErrors
+            |> List.ofArray
+            |> List.collect (fun (ex, header) -> [
+                InteropLogging.Msg.create
+                    InteropLogging.Warning
+                    $"Table is not a valid ARC table / ISA table: {ex.Message}. The column {header} is not valid! It needs further inspection what causes the error."
+            ])
         else
-            return Result.Error messages
-    }
+            []
+
+    if messages.IsEmpty then
+        return Result.Ok excelTable
+    else
+        return Result.Error messages
+}
 
 /// <summary>
 /// Get all annotation tables
@@ -300,33 +297,41 @@ let getValidatedExcelTable excelTable context =
 let getAnnotationTables (tables: TableCollection) =
     tables.items
     |> Seq.toArray
-    |> Array.filter (fun table ->
-        table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix))
+    |> Array.filter (fun table -> table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix))
 
 /// <summary>
 /// Try select the annotation table from the current active work sheet
 /// </summary>
 /// <param name="context"></param>
-let tryGetActiveExcelTable (context: RequestContext) =
-    promise {
-        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
-        let tables = context.workbook.tables
-        let _ =
-            activeWorksheet.load(propertyNames=U2.Case2 (ResizeArray[|"position"|])) |> ignore
-            context.workbook.load(propertyNames=U2.Case2 (ResizeArray[|"tables"|])) |> ignore
-            tables.load(propertyNames=U2.Case2 (ResizeArray[|"items"; "worksheet"; "name"; "position"; "style"; "values"|]))
-            
-        return! context.sync().``then``(fun _ ->
-            /// Get name of the table of currently active worksheet.
-            let activeTable =
-                tables.items
-                |> Seq.toArray
-                |> Array.tryFind (fun table ->                        
-                    table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) && table.worksheet.position = activeWorksheet.position
-                )
-            activeTable
+let tryGetActiveExcelTable (context: RequestContext) = promise {
+    let activeWorksheet = context.workbook.worksheets.getActiveWorksheet ()
+    let tables = context.workbook.tables
+
+    let _ =
+        activeWorksheet.load (propertyNames = U2.Case2(ResizeArray [| "position" |]))
+        |> ignore
+
+        context.workbook.load (propertyNames = U2.Case2(ResizeArray [| "tables" |]))
+        |> ignore
+
+        tables.load (
+            propertyNames = U2.Case2(ResizeArray [| "items"; "worksheet"; "name"; "position"; "style"; "values" |])
         )
-    }
+
+    return!
+        context
+            .sync()
+            .``then`` (fun _ ->
+                /// Get name of the table of currently active worksheet.
+                let activeTable =
+                    tables.items
+                    |> Seq.toArray
+                    |> Array.tryFind (fun table ->
+                        table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix)
+                        && table.worksheet.position = activeWorksheet.position)
+
+                activeTable)
+}
 
 /// <summary>
 /// Adopt the tables, columns, and values
@@ -334,23 +339,26 @@ let tryGetActiveExcelTable (context: RequestContext) =
 /// <param name="table"></param>
 /// <param name="context"></param>
 /// <param name="shallHide"></param>
-let format(table: Table, context: RequestContext, shallHide: bool) =
-    promise {
-        let _ = table.columns.load(propertyNames = U2.Case2 (ResizeArray[|"items"; "name"|]))
+let format (table: Table, context: RequestContext, shallHide: bool) = promise {
+    let _ =
+        table.columns.load (propertyNames = U2.Case2(ResizeArray [| "items"; "name" |]))
 
-        do! context.sync().``then``( fun _ -> ())
+    do! context.sync().``then`` (fun _ -> ())
 
-        let range = table.getRange()
+    let range = table.getRange ()
 
-        range.format.autofitColumns()
-        range.format.autofitRows()
+    range.format.autofitColumns ()
+    range.format.autofitRows ()
 
-        table.columns.items
-        |> Array.ofSeq
-        |> Array.iter (fun column ->
-            if ARCtrl.Spreadsheet.ArcTable.helperColumnStrings |> List.exists (fun cName -> column.name.StartsWith cName) then
-                column.getRange().columnHidden <- shallHide)
-    }
+    table.columns.items
+    |> Array.ofSeq
+    |> Array.iter (fun column ->
+        if
+            ARCtrl.Spreadsheet.ArcTable.helperColumnStrings
+            |> List.exists (fun cName -> column.name.StartsWith cName)
+        then
+            column.getRange().columnHidden <- shallHide)
+}
 
 /// <summary>
 /// This function is used to hide all reference columns and to fit rows and columns to their values.
@@ -358,33 +366,27 @@ let format(table: Table, context: RequestContext, shallHide: bool) =
 /// </summary>
 /// <param name="hideRefCols"></param>
 /// <param name="context"></param>
-let formatActive (context: RequestContext) (shallHide: bool) =
-    promise {
-        let! table = tryGetActiveExcelTable context
+let formatActive (context: RequestContext) (shallHide: bool) = promise {
+    let! table = tryGetActiveExcelTable context
 
-        match table with
-        | Some table -> do! format(table, context, shallHide)
-        | None -> ()
-    }
+    match table with
+    | Some table -> do! format (table, context, shallHide)
+    | None -> ()
+}
 
 /// <summary>
 /// Get headers from range
 /// </summary>
 /// <param name="range"></param>
 let getHeaders (range: ResizeArray<ResizeArray<obj option>>) =
-    range.Item 0
-    |> Array.ofSeq
-    |> Array.map (fun header -> header.ToString())
+    range.Item 0 |> Array.ofSeq |> Array.map (fun header -> header.ToString())
 
 /// <summary>
 /// Get headers from range
 /// </summary>
 /// <param name="range"></param>
 let getBody (range: ResizeArray<ResizeArray<obj option>>) =
-    range
-    |> Array.ofSeq
-    |> (fun items -> items.[1..])
-    |> ResizeArray
+    range |> Array.ofSeq |> (fun items -> items.[1..]) |> ResizeArray
 
 /// <summary>
 /// Update an existing inputcolumn of an annotation table
@@ -401,10 +403,11 @@ let updateInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composite
         let inputColumnName = possibleInputColumn.Value.Header.ToString()
 
         let columns = excelTable.columns
+
         let inputColumn =
             columns.items
             |> Array.ofSeq
-            |> Array.tryFind(fun col -> col.name = inputColumnName)
+            |> Array.tryFind (fun col -> col.name = inputColumnName)
 
         if inputColumn.IsSome then
 
@@ -424,9 +427,11 @@ let updateInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composite
 
             loggingList
         else
-            failwith "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
+            failwith
+                "Something went wrong! The update input column is not filled with data! Please report this as a bug to the developers."
     else
-        failwith "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."
+        failwith
+            "Something went wrong! The update input column does not exist! Please report this as a bug to the developers."
 
 /// <summary>
 /// Add a new inputcolumn to an annotation table
@@ -437,18 +442,22 @@ let updateInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composite
 let addInputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     if arcTable.TryGetInputColumn().IsSome then
-        failwith "Something went wrong! The add input column is filled with data! Please report this as a bug to the developers."
+        failwith
+            "Something went wrong! The add input column is filled with data! Please report this as a bug to the developers."
 
     else
 
         let rowCount = arcTable.RowCount + 1
 
-        let newColumn = Table.addColumn AppendIndex excelTable (newBB.Header.ToString()) rowCount ""
-        let columnBody = newColumn.getDataBodyRange()
-        // Fit column width to content
-        columnBody.format.autofitColumns()
+        let newColumn =
+            Table.addColumn AppendIndex excelTable (newBB.Header.ToString()) rowCount ""
 
-        let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new input column: {newBB.Header}"
+        let columnBody = newColumn.getDataBodyRange ()
+        // Fit column width to content
+        columnBody.format.autofitColumns ()
+
+        let msg =
+            InteropLogging.Msg.create InteropLogging.Info $"Added new input column: {newBB.Header}"
 
         let loggingList = [ msg ]
 
@@ -469,10 +478,11 @@ let updateOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composit
         let outputColumnName = possibleOutputColumn.Value.Header.ToString()
 
         let columns = excelTable.columns
+
         let outputColumn =
             columns.items
             |> Array.ofSeq
-            |> Array.tryFind(fun col -> col.name = outputColumnName)
+            |> Array.tryFind (fun col -> col.name = outputColumnName)
 
         if outputColumn.IsSome then
 
@@ -492,9 +502,11 @@ let updateOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composit
 
             loggingList
         else
-            failwith "Something went wrong! The update output column is not filled with data! Please report this as a bug to the developers."
+            failwith
+                "Something went wrong! The update output column is not filled with data! Please report this as a bug to the developers."
     else
-        failwith "Something went wrong! The update output column does not exist! Please report this as a bug to the developers."
+        failwith
+            "Something went wrong! The update output column does not exist! Please report this as a bug to the developers."
 
 /// <summary>
 /// Add a new outputcolumn to an annotation table
@@ -505,18 +517,22 @@ let updateOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: Composit
 let addOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeColumn) =
 
     if arcTable.TryGetOutputColumn().IsSome then
-        failwith "Something went wrong! The add output column is filled with data! Please report this as a bug to the developers."
+        failwith
+            "Something went wrong! The add output column is filled with data! Please report this as a bug to the developers."
 
     else
 
         let rowCount = arcTable.RowCount + 1
 
-        let newColumn = Table.addColumn AppendIndex excelTable (newBB.Header.ToString()) rowCount ""
-        let columnBody = newColumn.getDataBodyRange()
-        // Fit column width to content
-        columnBody.format.autofitColumns()
+        let newColumn =
+            Table.addColumn AppendIndex excelTable (newBB.Header.ToString()) rowCount ""
 
-        let msg = InteropLogging.Msg.create InteropLogging.Info $"Added new output column: {newBB.Header}"
+        let columnBody = newColumn.getDataBodyRange ()
+        // Fit column width to content
+        columnBody.format.autofitColumns ()
+
+        let msg =
+            InteropLogging.Msg.create InteropLogging.Info $"Added new output column: {newBB.Header}"
 
         let loggingList = [ msg ]
 
@@ -527,25 +543,36 @@ let addOutputColumn (excelTable: Table) (arcTable: ArcTable) (newBB: CompositeCo
 /// </summary>
 /// <param name="templateName"></param>
 /// <param name="context"></param>
-let getNewActiveWorkSheetName (worksheetName: string) (context: RequestContext) =
-    promise {
-        let worksheets = context.workbook.worksheets
-        let activeWorksheet = context.workbook.worksheets.getActiveWorksheet()
-        let _ =
-            activeWorksheet.load(propertyNames = U2.Case2 (ResizeArray["name"])) |> ignore
-            worksheets.load(propertyNames = U2.Case2 (ResizeArray["items"; "name"]))
+let getNewActiveWorkSheetName (worksheetName: string) (context: RequestContext) = promise {
+    let worksheets = context.workbook.worksheets
+    let activeWorksheet = context.workbook.worksheets.getActiveWorksheet ()
 
-        do! context.sync()
+    let _ =
+        activeWorksheet.load (propertyNames = U2.Case2(ResizeArray["name"])) |> ignore
 
-        let worksheetNames = worksheets.items |> Seq.map (fun item -> item.name) |> Array.ofSeq
-        let worksheetName = System.Text.RegularExpressions.Regex.Replace(worksheetName, "\W", "")
+        worksheets.load (
+            propertyNames =
+                U2.Case2(
+                    ResizeArray["items"
+                                "name"]
+                )
+        )
 
-        if (Array.contains worksheetName worksheetNames) then
-            let nameCount =
-                worksheetNames
-                |> Array.filter(fun item -> item.Contains(worksheetName))
-                |> Array.length
-            return (worksheetName + (nameCount.ToString()))
-        else
-            return worksheetName
-    }
+    do! context.sync ()
+
+    let worksheetNames =
+        worksheets.items |> Seq.map (fun item -> item.name) |> Array.ofSeq
+
+    let worksheetName =
+        System.Text.RegularExpressions.Regex.Replace(worksheetName, "\W", "")
+
+    if (Array.contains worksheetName worksheetNames) then
+        let nameCount =
+            worksheetNames
+            |> Array.filter (fun item -> item.Contains(worksheetName))
+            |> Array.length
+
+        return (worksheetName + (nameCount.ToString()))
+    else
+        return worksheetName
+}

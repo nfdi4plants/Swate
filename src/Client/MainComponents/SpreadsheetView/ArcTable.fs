@@ -10,19 +10,22 @@ open ARCtrl
 open Swate.Components.Shared
 open Model
 
-let private CreateBodyCells (columnIndex, rowIndex, state:Set<int>, model:Model, dispatch: Msg -> unit) =
+let private CreateBodyCells (columnIndex, rowIndex, state: Set<int>, model: Model, dispatch: Msg -> unit) =
     let index = columnIndex, rowIndex
     let table = model.SpreadsheetModel.ActiveTable
     let cell = model.SpreadsheetModel.ActiveTable.Values.[index]
     let isExtended = state.Contains columnIndex
+
     [
-        Cells.Cell.Body (index, cell, model, dispatch)
+        Cells.Cell.Body(index, cell, model, dispatch)
         let header = table.Headers.[columnIndex]
+
         if (cell.isTerm || cell.isUnitized) && isExtended then
             if cell.isUnitized then
                 Cell.BodyUnit(index, cell, model, dispatch)
             else
                 Cell.Empty()
+
             Cell.BodyTSR(index, cell, model, dispatch)
             Cell.BodyTAN(index, cell, model, dispatch)
         elif header.IsDataColumn && isExtended then
@@ -36,19 +39,22 @@ let private CreateBodyCells (columnIndex, rowIndex, state:Set<int>, model:Model,
                 Cell.Empty()
     ]
 
-let private CreateHeaderCells(columnIndex, state, setState, model, dispatch) =
+let private CreateHeaderCells (columnIndex, state, setState, model, dispatch) =
     let table = model.SpreadsheetModel.ActiveTable
     let header = table.Headers.[columnIndex]
+
     [
         Cells.Cell.Header(columnIndex, header, state, setState, model, dispatch)
         if header.IsTermColumn then
             let isExtended = state.Contains columnIndex
+
             if isExtended then
                 Cell.HeaderUnit(columnIndex, header, state, setState, model, dispatch)
                 Cell.HeaderTSR(columnIndex, header, state, setState, model, dispatch)
                 Cell.HeaderTAN(columnIndex, header, state, setState, model, dispatch)
         elif header.IsDataColumn then
             let isExtended = state.Contains columnIndex
+
             if isExtended then
                 Cell.HeaderDataSelector(columnIndex, header, state, setState, model, dispatch)
                 Cell.HeaderDataFormat(columnIndex, header, state, setState, model, dispatch)
@@ -58,41 +64,26 @@ let private CreateHeaderCells(columnIndex, state, setState, model, dispatch) =
     ]
 
 
-let private BodyRow (rowIndex: int) (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
-    [
-        for columnIndex in 0 .. (model.SpreadsheetModel.ActiveTable.ColumnCount-1) do
-            (
-                columnIndex,
-                rowIndex,
-                state,
-                model,
-                dispatch
-            )
-    ]
+let private BodyRow (rowIndex: int) (state: Set<int>) (model: Model) (dispatch: Msg -> unit) = [
+    for columnIndex in 0 .. (model.SpreadsheetModel.ActiveTable.ColumnCount - 1) do
+        (columnIndex, rowIndex, state, model, dispatch)
+]
 
-let private BodyRows (state:Set<int>) (model:Model) (dispatch: Msg -> unit) =
-    [|
-        for rowInd in 0 .. model.SpreadsheetModel.ActiveTable.RowCount-1 do
-            yield BodyRow rowInd state model dispatch
-    |]
+let private BodyRows (state: Set<int>) (model: Model) (dispatch: Msg -> unit) = [|
+    for rowInd in 0 .. model.SpreadsheetModel.ActiveTable.RowCount - 1 do
+        yield BodyRow rowInd state model dispatch
+|]
 
 
-let private HeaderRow (state:Set<int>) setState (model:Model) (dispatch: Msg -> unit) =
-    [
-        for columnIndex in 0 .. (model.SpreadsheetModel.ActiveTable.ColumnCount-1) do
-            (
-                columnIndex,
-                state,
-                setState,
-                model,
-                dispatch
-            )
-    ]
+let private HeaderRow (state: Set<int>) setState (model: Model) (dispatch: Msg -> unit) = [
+    for columnIndex in 0 .. (model.SpreadsheetModel.ActiveTable.ColumnCount - 1) do
+        (columnIndex, state, setState, model, dispatch)
+]
 
 open Fable.Core.JsInterop
 
 [<ReactComponent>]
-let Main (model:Model, dispatch: Msg -> unit) =
+let Main (model: Model, dispatch: Msg -> unit) =
     ////React.useListener.on("keydown", (Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch))
     //let ref = React.useElementRef()
     ////React.useElementListener.on(ref, "keydown", (Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch))

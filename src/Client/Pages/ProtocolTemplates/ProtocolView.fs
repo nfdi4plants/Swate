@@ -26,18 +26,20 @@ open FileImport
 type Templates =
 
     [<ReactComponent>]
-    static member Main (model: Model, dispatch) =
+    static member Main(model: Model, dispatch) =
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"
 
-            SidebarComponents.SidebarLayout.Description (Html.p [
-                Html.b "Search the database for templates."
-                Html.text " The building blocks from these templates can be inserted into the Swate table. "
-                Html.span [
-                    prop.className "text-error"
-                    prop.text "Only missing building blocks will be added."
+            SidebarComponents.SidebarLayout.Description(
+                Html.p [
+                    Html.b "Search the database for templates."
+                    Html.text " The building blocks from these templates can be inserted into the Swate table. "
+                    Html.span [
+                        prop.className "text-error"
+                        prop.text "Only missing building blocks will be added."
+                    ]
                 ]
-            ])
+            )
 
             SidebarComponents.SidebarLayout.LogicContainer [
                 if model.ProtocolState.ShowSearch then
@@ -47,10 +49,12 @@ type Templates =
             ]
 
             // Box 2
-            SidebarComponents.SidebarLayout.Description (Html.p [
-                Html.b "Import JSON files."
-                Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
-            ])
+            SidebarComponents.SidebarLayout.Description(
+                Html.p [
+                    Html.b "Import JSON files."
+                    Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
+                ]
+            )
 
             TemplateFromFile.Main(model, dispatch)
         ]

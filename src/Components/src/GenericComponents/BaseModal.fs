@@ -37,10 +37,7 @@ type BaseModal =
                             prop.children [
                                 if header.IsSome then
                                     header.Value
-                                Components.DeleteButton(props=[
-                                    prop.className "ml-auto"
-                                    prop.onClick rmv
-                                ])
+                                Components.DeleteButton(props = [ prop.className "ml-auto"; prop.onClick rmv ])
                             ]
                         ]
                         // Modal specific action
@@ -63,9 +60,7 @@ type BaseModal =
                             ]
                         // Footer
                         if footer.IsSome then
-                            Daisy.cardActions [
-                                footer.Value
-                            ]
+                            Daisy.cardActions [ footer.Value ]
                     ]
                 ]
             ]

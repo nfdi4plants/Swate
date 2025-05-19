@@ -35,20 +35,18 @@ type SelectiveTemplateFromDB =
     /// </summary>
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
-    static member ToProtocolSearchElement (model: Model, dispatch, ?className: Fable.Core.U2<string, string list>) =
+    static member ToProtocolSearchElement(model: Model, dispatch, ?className: Fable.Core.U2<string, string list>) =
         Daisy.button.button [
-            prop.onClick(fun _ ->
-                    Protocol.UpdateShowSearch true |> ProtocolMsg |> dispatch
-                    if model.ProtocolState.TemplatesSelected.Length > 0 then
-                        Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch
-                )
+            prop.onClick (fun _ ->
+                Protocol.UpdateShowSearch true |> ProtocolMsg |> dispatch
+
+                if model.ProtocolState.TemplatesSelected.Length > 0 then
+                    Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch)
             button.primary
             if className.IsSome then
                 match className.Value with // this can also be done with !^ , but i was too lazy to open Fable.Core
-                | Fable.Core.Case1 className ->
-                    prop.className className
-                | Fable.Core.U2.Case2 className ->
-                    prop.className className
+                | Fable.Core.Case1 className -> prop.className className
+                | Fable.Core.U2.Case2 className -> prop.className className
             prop.text "Browse database"
         ]
 
@@ -108,11 +106,15 @@ type SelectiveTemplateFromDB =
     static member AddTemplatesFromDBToTableButton(label: string, model: Model, dispatch) =
         let addTemplates () =
             let templates = model.ProtocolState.TemplatesSelected
+
             if templates.Length = 0 then
                 failwith "No template selected!"
             else
                 let importTables = templates |> List.map (fun item -> item.Table) |> Array.ofList
-                SpreadsheetInterface.AddTemplates(importTables, model.ProtocolState.ImportConfig) |> InterfaceMsg |> dispatch
+
+                SpreadsheetInterface.AddTemplates(importTables, model.ProtocolState.ImportConfig)
+                |> InterfaceMsg
+                |> dispatch
 
         let isDisabled = model.ProtocolState.TemplatesSelected.Length = 0
         ModalElements.Button(label, addTemplates, (), isDisabled, "grow")
@@ -123,8 +125,9 @@ type SelectiveTemplateFromDB =
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
     [<ReactComponent>]
-    static member Main (model: Model, dispatch, isWidget) =
+    static member Main(model: Model, dispatch, isWidget) =
         let radioGroup = if isWidget then "Widget" else ""
+
         Html.div [
             prop.className "flex flex-col gap-2 lg:gap-4 overflow-hidden"
             prop.children [
@@ -134,13 +137,13 @@ type SelectiveTemplateFromDB =
                         SelectiveTemplateFromDB.ToProtocolSearchElement(
                             model,
                             dispatch,
-                            Fable.Core.U2.Case2 ["grow"; if model.ProtocolState.TemplatesSelected.Length > 0 then "btn-outline"]
+                            Fable.Core.U2.Case2 [
+                                "grow"
+                                if model.ProtocolState.TemplatesSelected.Length > 0 then
+                                    "btn-outline"
+                            ]
                         )
-                        SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton(
-                            "Import",
-                            model,
-                            dispatch
-                        )
+                        SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton("Import", model, dispatch)
                     ]
                 ]
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
@@ -153,17 +156,23 @@ type SelectiveTemplateFromDB =
                                 model.ProtocolState.ImportConfig.ImportType,
                                 "importType" + radioGroup,
                                 [|
-                                    ARCtrl.TableJoinOptions.Headers, " Column Headers";
-                                    ARCtrl.TableJoinOptions.WithUnit, " ..With Units";
-                                    ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                                    ARCtrl.TableJoinOptions.Headers, " Column Headers"
+                                    ARCtrl.TableJoinOptions.WithUnit, " ..With Units"
+                                    ARCtrl.TableJoinOptions.WithValues, " ..With Values"
                                 |],
                                 fun importType ->
-                                    {model.ProtocolState.ImportConfig with ImportType = importType}
-                                    |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
+                                    {
+                                        model.ProtocolState.ImportConfig with
+                                            ImportType = importType
+                                    }
+                                    |> Protocol.UpdateImportConfig
+                                    |> ProtocolMsg
+                                    |> dispatch
                             )
 
-                            for templateIndex in 0..model.ProtocolState.TemplatesSelected.Length-1 do
+                            for templateIndex in 0 .. model.ProtocolState.TemplatesSelected.Length - 1 do
                                 let template = model.ProtocolState.TemplatesSelected.[templateIndex]
+
                                 SelectiveImportModal.TableImport(
                                     templateIndex,
                                     template.Table,
