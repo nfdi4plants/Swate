@@ -15,10 +15,8 @@ type private Term =
 
     static member header = Html.p "Term"
 
-    static member content
-        (model, term: Swate.Components.Term option, setTerm, ?value: string, ?setValue: string -> unit)
-        =
-        [
+    static member content(model, term: Swate.Components.Term option, setTerm, ?value: string, ?setValue: string -> unit) =
+        React.fragment [
             if value.IsSome && setValue.IsSome then
                 let value = value.Value
                 let setValue = setValue.Value
@@ -76,7 +74,9 @@ type private Term =
                 ]
             ]
             Html.div [
-                Html.label [ prop.text "Term-Accession-Number:" ]
+                Html.label [
+                    prop.text "Term-Accession-Number:"
+                ]
                 Html.p [
                     prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px]"
                     prop.readOnly true
@@ -131,8 +131,7 @@ type private Data =
             setSelectorFormat: string -> unit
         ) =
         let displaySelector = value.Length > 0 && selector.Length > 0
-
-        [
+        React.fragment [
             Html.label [ prop.text "Name:" ]
             Html.div [
                 prop.className "border border-gray-300 rounded px-3 py-2 min-h-[42px] flex items-center"
@@ -324,9 +323,9 @@ type CompositeCollumnModal =
                 (None, None)
 
         let cellHeader = model.SpreadsheetModel.ActiveTable.Headers.[ci]
-        let termState, setTermState = React.useState (potTerm)
-        let newValue, setValue = React.useState (if value.IsSome then value.Value else "")
-        let showModalActivity, setShowModalActivity = React.useState (false)
+        let termState, setTermState = React.useState(potTerm)
+        let newValue, setValue = React.useState(if value.IsSome then value.Value else "")
+        let showModalActivity, setShowModalActivity = React.useState(false)
 
         let updateTermUnit =
             fun _ ->
@@ -374,15 +373,8 @@ type CompositeCollumnModal =
                 rmv = rmv,
                 header = Term.header,
                 modalClassInfo = "relative overflow-visible",
-                modalActivity =
-                    CompositeCollumnModal.modalActivity (
-                        potCell,
-                        showModalActivity,
-                        setShowModalActivity,
-                        transFormCell,
-                        rmv
-                    ),
-                content = Term.content (model, termState, setTermState),
+                modalActions = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv),
+                content = Term.content(model, termState, setTermState),
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer (updateTermUnit, rmv)
             )
@@ -391,15 +383,8 @@ type CompositeCollumnModal =
                 rmv = rmv,
                 header = Unit.header,
                 modalClassInfo = "relative overflow-visible",
-                modalActivity =
-                    CompositeCollumnModal.modalActivity (
-                        potCell,
-                        showModalActivity,
-                        setShowModalActivity,
-                        transFormCell,
-                        rmv
-                    ),
-                content = Term.content (model, termState, setTermState, newValue, setValue),
+                modalActions = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv),
+                content = Term.content(model, termState, setTermState, newValue, setValue),
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer (updateTermUnit, rmv)
             )
@@ -413,16 +398,8 @@ type CompositeCollumnModal =
                 rmv = rmv,
                 header = Freetext.header,
                 modalClassInfo = "relative overflow-visible",
-                modalActivity =
-                    CompositeCollumnModal.modalActivity (
-                        potCell,
-                        showModalActivity,
-                        setShowModalActivity,
-                        transFormCell,
-                        rmv,
-                        cellHeader.IsDataColumn
-                    ),
-                content = [ Freetext.content (newValue, setValue) ],
+                modalActions = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv, cellHeader.IsDataColumn),
+                content = Freetext.content(newValue, setValue),
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer (updateFreetext, rmv)
             )
@@ -445,26 +422,8 @@ type CompositeCollumnModal =
                 rmv = rmv,
                 header = Data.header,
                 modalClassInfo = "relative overflow-visible",
-                modalActivity =
-                    CompositeCollumnModal.modalActivity (
-                        potCell,
-                        showModalActivity,
-                        setShowModalActivity,
-                        transFormCell,
-                        rmv,
-                        cellHeader.IsDataColumn
-                    ),
-                content =
-                    Data.content (
-                        newValue,
-                        setValue,
-                        selector,
-                        setSelector,
-                        format,
-                        setFormat,
-                        selectorFormat,
-                        setSelectorFormat
-                    ),
+                modalActions = CompositeCollumnModal.modalActivity(potCell, showModalActivity, setShowModalActivity, transFormCell, rmv, cellHeader.IsDataColumn),
+                content = Data.content(newValue, setValue, selector, setSelector, format, setFormat, selectorFormat, setSelectorFormat),
                 contentClassInfo = "",
                 footer = CompositeCollumnModal.footer (updateData, rmv)
             )

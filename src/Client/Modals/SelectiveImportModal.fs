@@ -274,30 +274,24 @@ type SelectiveImportModal =
                 else
                     SelectiveImportConfig.init () |> setImportDataState
 
-        let content = [
-            SelectiveImportModal.RadioPluginsBox(
-                "Import Type",
-                "fa-solid fa-cog",
-                importDataState.ImportType,
-                "importType",
-                [|
-                    ARCtrl.TableJoinOptions.Headers, " Column Headers"
-                    ARCtrl.TableJoinOptions.WithUnit, " ..With Units"
-                    ARCtrl.TableJoinOptions.WithValues, " ..With Values"
-                |],
-                fun importType ->
-                    {
-                        importDataState with
-                            ImportType = importType
-                    }
-                    |> setImportDataState
-            )
-            SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
-            for ti in 0 .. (tables.Count - 1) do
-                let t = tables.[ti]
-                SelectiveImportModal.TableImport(ti, t, model, dispatch)
-        ]
-
+        let content =
+            React.fragment [
+                SelectiveImportModal.RadioPluginsBox(
+                    "Import Type",
+                    "fa-solid fa-cog",
+                    importDataState.ImportType,
+                    "importType",
+                    [|
+                        ARCtrl.TableJoinOptions.Headers,    " Column Headers";
+                        ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
+                        ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                    |],
+                    fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
+                SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
+                for ti in 0 .. (tables.Count-1) do
+                    let t = tables.[ti]
+                    SelectiveImportModal.TableImport(ti, t, model, dispatch)
+            ]
         let footer =
             Html.div [
                 prop.className "justify-end flex gap-2"

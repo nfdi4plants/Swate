@@ -24,7 +24,7 @@ const BaseButton: React.FC<ButtonProps> = ({ className, style, children, onClick
   );
 };
 
-const ButtonWithModal = ({header, modalClassInfo, modalActivity, content}) => {
+const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
   const [open, setOpen] = useState(false);
   const rmv=() => setOpen(false) // Close modal when needed
   const openModal=() => setOpen(true) // Close modal when needed
@@ -48,7 +48,7 @@ const ButtonWithModal = ({header, modalClassInfo, modalActivity, content}) => {
           rmv={rmv}
           header={header}
           modalClassInfo={modalClassInfo}
-          modalActivity={modalActivity}
+          modalActions={modalActions}
           content={content}
           footer={submitButton}
           debug={true}
@@ -88,7 +88,7 @@ export const CompleteModal: Story = {
   args: {
     header: simpleHeader,
     modalClassInfo: undefined,
-    modalActivity: modalActivity,
+    modalActions: modalActivity,
     content: content
   },
   play: async ({ canvasElement }) => {
@@ -126,7 +126,7 @@ export const WideCompleteModal: Story = {
   args: {
     header: simpleHeader,
     modalClassInfo: modalClassInfo,
-    modalActivity: modalActivity,
+    modalActions: modalActivity,
     content: content
   },
   play: async ({ canvasElement }) => {
@@ -164,7 +164,7 @@ export const SmallWindowedCompleteModal: Story = {
   args: {
     header: simpleHeader,
     modalClassInfo: undefined,
-    modalActivity: modalActivity,
+    modalActions: modalActivity,
     content: content
   },
   parameters: {

@@ -1,32 +1,52 @@
 namespace Swate.Components
 
 open Fable.Core
-open Fable.Core.JS
 open Feliz
 
 type CellCoordinate = {| x: int; y: int |}
 
-type CellCoordinateRange = {|
-    yStart: int
-    yEnd: int
-    xStart: int
-    xEnd: int
-|}
+type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
+
+type TableCellController = {
+    Index: CellCoordinate
+    IsActive: bool
+    IsSelected: bool
+    IsOrigin: bool
+    onKeyDown: Browser.Types.KeyboardEvent -> unit
+    onBlur: Browser.Types.FocusEvent -> unit
+    onClick: Browser.Types.MouseEvent -> unit
+} with
+    static member init(index, isActive, isSelected, isOrigin, onKeyDown, onBlur, onClick) =
+        {
+            Index = index
+            IsActive = isActive
+            IsSelected = isSelected
+            IsOrigin = isOrigin
+            onKeyDown = onKeyDown
+            onBlur = onBlur
+            onClick = onClick
+        }
 
 [<AllowNullLiteral>]
 [<Global>]
 type SelectHandle
     [<ParamObjectAttribute; Emit("$0")>]
-    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit) =
+    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit, getSelectedCellRange, getSelectedCells, getCount) =
     member val contains: CellCoordinate -> bool = contains with get, set
     member val selectAt: (CellCoordinate * bool) -> unit = selectAt with get, set
     member val clear: unit -> unit = clear with get, set
+    member val getSelectedCellRange: unit -> CellCoordinateRange option = getSelectedCellRange with get, set
+    member val getSelectedCells: unit -> ResizeArray<CellCoordinate> = getSelectedCells with get, set
+    member val getCount: unit -> int = getCount with get, set
 
 [<AllowNullLiteral>]
 [<Global>]
-type TableHandle [<ParamObjectAttribute; Emit("$0")>] (scrollTo: CellCoordinate -> unit, select: SelectHandle) =
+type TableHandle
+    [<ParamObjectAttribute; Emit("$0")>]
+    (focus: unit -> unit, scrollTo: CellCoordinate -> unit, SelectHandle: SelectHandle) =
+    member val focus: unit -> unit = focus with get, set
     member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
-    member val select: SelectHandle = select with get, set
+    member val SelectHandle: SelectHandle = SelectHandle with get, set
 
 [<AllowNullLiteral>]
 [<Global>]
@@ -34,29 +54,6 @@ type Term
     [<ParamObjectAttribute; Emit("$0")>]
     (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
     member val name: string option = jsNative with get, set
-    member val id: string option = jsNative with get, set
-    member val description: string option = jsNative with get, set
-    member val source: string option = jsNative with get, set
-    member val href: string option = jsNative with get, set
-    member val isObsolete: bool option = jsNative with get, set
-    member val data: obj option = jsNative with get, set
-
-[<AllowNullLiteral>]
-[<Global>]
-type Data
-    [<ParamObjectAttribute; Emit("$0")>]
-    (
-        ?name: string,
-        ?unit: string,
-        ?id: string,
-        ?description: string,
-        ?source: string,
-        ?href: string,
-        ?isObsolete: bool,
-        ?data: obj
-    ) =
-    member val name: string option = jsNative with get, set
-    member val unit: string option = jsNative with get, set
     member val id: string option = jsNative with get, set
     member val description: string option = jsNative with get, set
     member val source: string option = jsNative with get, set
@@ -105,6 +102,83 @@ module Term =
             ?data = data
         )
 
+    module ConvertLiterals =
+        [<Literal>]
+        let Description = "description"
+
+        [<Literal>]
+        let Data = "data"
+
+        [<Literal>]
+        let Source = "source"
+
+        [<Literal>]
+        let IsObsolete = "isObsolete"
+
+    open Swate.Components.Shared
+    open Fable.SimpleJson
+
+    open ARCtrl
+
+    let toOntologyAnnotation (term: Term) =
+        let comments =
+            ResizeArray [
+                if term.description.IsSome then
+                    Comment(
+                        ConvertLiterals.Description,
+                        JS.JSON.stringify term.description.Value
+                    )
+                if term.data.IsSome then
+                    Comment(
+                        ConvertLiterals.Data,
+                        JS.JSON.stringify term.data.Value
+                    )
+                if term.source.IsSome then
+                    Comment(
+                        ConvertLiterals.Source,
+                        JS.JSON.stringify term.source.Value
+                    )
+                if term.isObsolete.IsSome then
+                    Comment(
+                        ConvertLiterals.IsObsolete,
+                        JS.JSON.stringify term.isObsolete.Value
+                    )
+            ]
+            |> Option.whereNot Seq.isEmpty
+        ARCtrl.OntologyAnnotation(
+            ?name = term.name,
+            ?tsr = term.source,
+            ?tan = term.id,
+            ?comments = comments
+        )
+
+    let fromOntologyAnnotation (oa: ARCtrl.OntologyAnnotation) =
+        let description =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Description)
+            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+        let data =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Data)
+            |> Option.map (fun c -> Json.parseAs<obj>(c.Value.Value))
+        let source =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Source)
+            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+        let isObsolete =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.IsObsolete)
+            |> Option.map (fun c -> Json.parseAs<bool>(c.Value.Value))
+        Term(
+            ?name = oa.Name,
+            ?id = oa.TermAccessionNumber,
+            ?description = description,
+            ?source = source,
+            ?href = Option.whereNot System.String.IsNullOrWhiteSpace oa.TermAccessionOntobeeUrl,
+            ?isObsolete = isObsolete,
+            ?data = data
+        )
+
 [<AllowNullLiteral>]
 [<Global>]
 type TermSearchStyle [<ParamObjectAttribute; Emit("$0")>] (?inputLabel: U2<string, ResizeArray<string>>) =
@@ -129,6 +203,14 @@ type AdvancedSearch
     (search: unit -> JS.Promise<ResizeArray<Term>>, form: AdvancedSearchController -> ReactElement) =
     member val search: unit -> JS.Promise<ResizeArray<Term>> = jsNative with get, set
     member val form: AdvancedSearchController -> ReactElement = jsNative with get, set
+
+[<AllowNullLiteral>]
+[<Global>]
+type PortalTermDropdown
+    [<ParamObjectAttribute; Emit("$0")>]
+    (portal: Browser.Types.HTMLElement, renderer: Browser.Types.ClientRect -> ReactElement -> Fable.React.ReactElement) =
+    member val portal = portal with get, set
+    member val renderer = renderer with get, set
 
 ///
 /// A search function that resolves a list of terms.

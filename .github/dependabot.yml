@@ -1,0 +1,47 @@
+version: 2
+updates:
+  # Daily updates for NuGet packages
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: daily
+    groups:
+      DataPLANT:
+        patterns:
+          - "ARCtrl*"
+          - "FSSpreadsheet*"
+          - "DynamicObj*"
+          - "ARCTokenization*"
+          - "ControlledVocabulary*"
+          - "ARCExpect*"
+          - "ARCValidationPackages*"
+          - "AVPRClient*"
+          - "AVPRIndex*"
+      Tests:
+        patterns:
+          - "xunit*"
+          - "Expecto*"
+          - "Fable.Pyxpecto*"
+      Fable:
+        patterns:
+          - "Fable*"
+      Other:
+        exclude-patterns:
+          - "ARCtrl*"
+          - "FSSpreadsheet*"
+          - "DynamicObj*"
+          - "ARCTokenization*"
+          - "ControlledVocabulary*"
+          - "ARCExpect*"
+          - "ARCValidationPackages*"
+          - "AVPRClient*"
+          - "AVPRIndex*"
+          - "xunit*"
+          - "Expecto*"
+          - "Fable.Pyxpecto*"
+
+  # Weekly updates for GitHub Actions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

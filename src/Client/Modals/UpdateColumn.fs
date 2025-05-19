@@ -67,27 +67,31 @@ module private Components =
             Html.td (cell)
         ]
 
-    let PreviewTable (column: CompositeColumn, cellValues: string[], regex) = [
-        Daisy.label [ Daisy.labelText "Preview" ]
-        Html.div [
-            prop.className "overflow-x-auto grow"
-            prop.children [
-                Daisy.table [
-                    Html.thead [ Html.tr [ Html.th ""; Html.th "Before"; Html.th "After" ] ]
-                    Html.tbody [
-                        let previewCount = 5
-                        let preview = Array.takeSafe previewCount cellValues
-
-                        for i in 0 .. (preview.Length - 1) do
-                            let cell0 = column.Cells.[i].ToString()
-                            let cell = preview.[i]
-                            let regexMarkedIndex = calculateRegex regex cell0
-                            PreviewRow(i, cell0, cell, regexMarkedIndex)
+    let PreviewTable(column: CompositeColumn, cellValues: string [], regex) =
+        React.fragment [
+            Daisy.label [
+                Daisy.labelText "Preview"
+            ]
+            Html.div [
+                prop.className "overflow-x-auto grow"
+                prop.children [
+                    Daisy.table [
+                        Html.thead [
+                            Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
+                        ]
+                        Html.tbody [
+                            let previewCount = 5
+                            let preview = Array.takeSafe previewCount cellValues
+                            for i in 0 .. (preview.Length-1) do
+                                let cell0 = column.Cells.[i].ToString()
+                                let cell = preview.[i]
+                                let regexMarkedIndex = calculateRegex regex cell0
+                                PreviewRow(i,cell0,cell,regexMarkedIndex)
+                        ]
                     ]
                 ]
             ]
         ]
-    ]
 
 type UpdateColumn =
 
@@ -252,7 +256,7 @@ type UpdateColumn =
             rmv,
             header = Html.p "Update Column",
             modalClassInfo = "max-h-screen max-w-4xl flex",
-            modalActivity = modalActivity,
+            modalActions = modalActivity,
             contentClassInfo = "shrink-1 overflow-y-auto",
             content = content,
             footer = footer

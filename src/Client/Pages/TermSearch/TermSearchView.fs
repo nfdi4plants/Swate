@@ -89,10 +89,12 @@ let Main (model: Model, dispatch) =
     let excelGetParentTerm =
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
-            fun _ -> promise {
-                let! parent = OfficeInterop.Core.Main.getParentTerm ()
-                TermSearch.UpdateParentTerm parent |> TermSearchMsg |> dispatch
-            }
+            fun _ ->
+                promise {
+                    let! parent = OfficeInterop.Core.Main.getParentTerm()
+                    TermSearch.UpdateParentTerm parent |> TermSearchMsg |> dispatch
+                }
+                |> Promise.start
             |> Some
         | _ -> None
 

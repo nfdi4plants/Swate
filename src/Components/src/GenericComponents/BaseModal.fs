@@ -9,23 +9,19 @@ open Fable.Core
 type BaseModal =
 
     [<ReactComponent(true)>]
-    static member BaseModal
-        (
-            rmv,
-            ?modalClassInfo: string,
-            ?header: ReactElement,
-            ?modalActivity: ReactElement,
-            ?content: ReactElement seq,
-            ?contentClassInfo: string,
-            ?footer: ReactElement,
-            ?debug: bool
-        ) =
-
-        let debug = defaultArg debug false
+    static member BaseModal (
+        rmv,
+        ?modalClassInfo: string,
+        ?header: ReactElement,
+        ?modalActions: ReactElement,
+        ?content: ReactElement,
+        ?contentClassInfo: string,
+        ?footer: ReactElement,
+        ?debug: string) =
 
         Daisy.modal.div [
-            if debug then
-                prop.testId "base-modal"
+            if debug.IsSome then
+                prop.testId ("modal_" + debug.Value)
             modal.active
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick rmv ]
@@ -45,13 +41,15 @@ type BaseModal =
                             ]
                         ]
                         // Modal specific action
-                        if modalActivity.IsSome then
-                            Html.div [ modalActivity.Value ]
+                        if modalActions.IsSome then
+                            Html.div [
+                                modalActions.Value
+                            ]
                         // Scrollable content
                         if content.IsSome then
                             Html.div [
-                                if debug then
-                                    prop.testId "base-modal-content"
+                                if debug.IsSome then
+                                    prop.testId ("modal_content_" + debug.Value)
                                 prop.className [
                                     if contentClassInfo.IsSome then
                                         contentClassInfo.Value

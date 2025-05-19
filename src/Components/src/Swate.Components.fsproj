@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -22,16 +22,23 @@
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
     <Compile Include="Util\Types.fs" />
+    <Compile Include="Util\Virtual.fs" />
+    <Compile Include="Util\FloatingUI.fs" />
+    <Compile Include="Util\Constants.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
+    <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
-    <Content Include="GenericComponents\BaseModal.fs" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
-    <Compile Include="Table\KeyboardNavigation.fs" />
-    <Compile Include="Table\Table.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
+    <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
+    <Compile Include="Table\AnnotationTableContextMenu.fs" />
+    <Compile Include="Table\KeyboardNavigation.fs" />
+    <Compile Include="Table\TableCell.fs" />
+    <Compile Include="Table\Table.fs" />
+    <Compile Include="Table\AnnotationTable.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 
@@ -43,6 +50,7 @@
     <PackageReference Include="Feliz" Version="2.9.0" />
     <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
     <PackageReference Include="Fable.Browser.Dom" Version="2.18.0" />
+    <PackageReference Include="ARCtrl.Core" Version="2.5.1" />
   </ItemGroup>
 
   <ItemGroup>

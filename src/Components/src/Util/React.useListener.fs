@@ -226,6 +226,8 @@ module React =
                 ?dependencies = dependencies
             )
 
+        static member inline onKeyDown (action: KeyboardEvent -> unit, ?options: AddEventListenerOptions) = useListener.on("keydown", action, ?options = options)
+
     [<Erase>]
     type useElementListener =
         static member inline on

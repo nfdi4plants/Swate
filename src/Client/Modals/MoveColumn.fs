@@ -59,23 +59,32 @@ type MoveColumn =
 
         let modalActivity =
             Html.div [
-                prop.children [ MoveColumn.InputField(index, updateIndex, state.Length - 1, input, setInput) ]
-            ]
-
-        let content = [
-            Daisy.table [
-                Html.thead [ Html.tr [ Html.th "Index"; Html.th "Column" ] ]
-                Html.tbody [
-                    for i in 0 .. state.Length - 1 do
-                        Html.tr [
-                            if i = index then
-                                prop.className "bg-error text-error-content"
-                            prop.children [ Html.td i; Html.td (state.[i].ToString()) ]
-                        ]
+                prop.children [
+                    MoveColumn.InputField(index, updateIndex, state.Length-1, input, setInput)
                 ]
             ]
-        ]
-
+        let content =
+            React.fragment [
+                Daisy.table [
+                    Html.thead [
+                        Html.tr [
+                            Html.th "Index"
+                            Html.th "Column"
+                        ]
+                    ]
+                    Html.tbody [
+                        for i in 0 .. state.Length-1 do
+                            Html.tr [
+                                if i = index then
+                                    prop.className "bg-error text-error-content"
+                                prop.children [
+                                    Html.td i
+                                    Html.td (state.[i].ToString())
+                                ]
+                            ]
+                    ]
+                ]
+            ]
         let fooder submit input rmv =
             Html.div [
                 prop.className "justify-end flex gap-2"
@@ -90,7 +99,7 @@ type MoveColumn =
         Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Move Column",
-            modalActivity = modalActivity,
+            modalActions = modalActivity,
             contentClassInfo = "overflow-y-auto max-w-[700px]",
             content = content,
             footer = fooder submit input rmv

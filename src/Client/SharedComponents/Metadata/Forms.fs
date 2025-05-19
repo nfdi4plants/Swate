@@ -606,16 +606,13 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member OntologyAnnotationInput
-        (
-            input: OntologyAnnotation option,
-            setter: OntologyAnnotation option -> unit,
-            ?label: string,
-            ?parent: OntologyAnnotation,
-            ?rmv: MouseEvent -> unit
-        ) =
-        let portal = React.useElementRef ()
-
+    static member OntologyAnnotationInput (input: OntologyAnnotation option, setter: OntologyAnnotation option -> unit, ?label: string, ?parent: OntologyAnnotation, ?rmv: MouseEvent -> unit) =
+        let portal = React.useElementRef()
+        let renderer = fun _ c  -> React.fragment [
+            c
+        ]
+        let portalObj =
+            portal.current |> Option.map (fun p -> PortalTermDropdown(p, renderer))
         Html.div [
             prop.className "space-y-2"
             prop.children [
@@ -629,7 +626,7 @@ type FormComponents =
                             (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
                             (input |> Option.map _.ToTerm()),
                             ?parentId = (parent |> Option.map _.TermAccessionShort),
-                            portalTermSelectArea = portal,
+                            ?portalTermDropdown = portalObj,
                             showDetails = true,
                             advancedSearch = !^true,
                             fullwidth = true

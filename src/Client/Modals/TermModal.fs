@@ -74,4 +74,8 @@ type TermModal =
                 ]
             ]
 
-        Swate.Components.BaseModal.BaseModal(rmv, header = Html.p headerElement, modalActivity = modalActivity)
+        Swate.Components.BaseModal.BaseModal(
+            rmv,
+            header = Html.p headerElement,
+            modalActions = modalActivity
+        )

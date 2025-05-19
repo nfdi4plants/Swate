@@ -246,12 +246,13 @@ type CompositeHeaderModal =
                     | cell when cell.isTerm -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
                     | cell when cell.isUnitized -> cells.[i] <- CompositeHeaderModal.placeHolderUnitCell
                     | cell when cell.isData -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
-                    | _ -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell)
-
-            CompositeHeaderModal.updateColumn ({ column0 with Cells = cells }, state)
-
-        [
-            Html.label [ prop.text "Preview:" ]
+                    | _ -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
+            )
+            CompositeHeaderModal.updateColumn({column0 with Cells = cells}, state)
+        React.fragment [
+            Html.label [
+                prop.text "Preview:"
+                ]
             Html.div [
                 prop.style [ style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex ]
                 prop.children [ CompositeHeaderModal.Preview(previewColumn) ]
@@ -284,7 +285,7 @@ type CompositeHeaderModal =
             rmv,
             header = Html.p "Update Column",
             modalClassInfo = "lg:max-w-[600px]",
-            modalActivity = CompositeHeaderModal.modalActivity (state, setState),
-            content = CompositeHeaderModal.content (column0, state),
-            footer = CompositeHeaderModal.footer (columnIndex, column0, state, rmv, dispatch)
+            modalActions = CompositeHeaderModal.modalActivity(state, setState),
+            content = CompositeHeaderModal.content(column0, state),
+            footer = CompositeHeaderModal.footer(columnIndex, column0, state, rmv, dispatch)
         )

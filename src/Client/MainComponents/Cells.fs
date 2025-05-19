@@ -542,26 +542,16 @@ type Cell =
                     // Update change to mainState and exit active input.
                     if oasetter.IsSome then
                         let input = oasetter.Value.oa.ToTerm() |> Some
-                        let onBlur = fun e -> promise { makeIdle () }
-
-                        let onKeyDown =
-                            fun (e: Browser.Types.KeyboardEvent) -> promise {
-                                match e.code with
+                        let onBlur = fun e -> makeIdle();
+                        let onKeyDown = fun (e: Browser.Types.KeyboardEvent) ->
+                            match e.code with
                                 | Swate.Components.kbdEventCode.enter //enter
                                 | Swate.Components.kbdEventCode.escape -> //escape
-                                    makeIdle ()
+                                    makeIdle()
                                 | _ -> ()
-                            }
-
-                        let setter =
-                            fun (termOpt: Swate.Components.Term option) ->
-                                let oa =
-                                    termOpt
-                                    |> Option.map OntologyAnnotation.fromTerm
-                                    |> Option.defaultWith OntologyAnnotation
-
-                                oasetter.Value.setter oa
-
+                        let setter = fun (termOpt: Swate.Components.Term option) ->
+                            let oa = termOpt |> Option.map OntologyAnnotation.fromTerm |> Option.defaultWith OntologyAnnotation
+                            oasetter.Value.setter oa
                         let headerOA =
                             if state.TableViewIsActive() then
                                 state.ActiveTable.Headers.[columnIndex].TryOA()
