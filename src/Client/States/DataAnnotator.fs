@@ -6,7 +6,7 @@ type TargetColumn =
     | Output
     | Autodetect
 
-    static member fromString (str: string) =
+    static member fromString(str: string) =
         match str.ToLower() with
         | "input" -> Input
         | "output" -> Output
@@ -20,16 +20,17 @@ type DataTarget =
 
     member this.ToFragmentSelectorString(hasHeader: bool) =
         let rowOffset = if hasHeader then 2 else 1 // header counts and is 1-based
+
         match this with
         | Row ri -> sprintf "row=%i" (ri + rowOffset)
-        | Column ci -> sprintf "col=%i" (ci+1)
-        | Cell (ci, ri) -> sprintf "cell=%i,%i" (ri + rowOffset) (ci+1)
+        | Column ci -> sprintf "col=%i" (ci + 1)
+        | Cell(ci, ri) -> sprintf "cell=%i,%i" (ri + rowOffset) (ci + 1)
 
     member this.ToReactKey() =
         match this with
         | Row ri -> sprintf "row-%i" ri
         | Column ci -> sprintf "col-%i" ci
-        | Cell (ci, ri) -> sprintf "cell-%i-%i" ri ci
+        | Cell(ci, ri) -> sprintf "cell-%i-%i" ri ci
 
 type DataFile = {
     DataFileName: string
@@ -37,6 +38,7 @@ type DataFile = {
     DataContent: string
     DataSize: float
 } with
+
     static member create(dfn, dft, dc, ds) = {
         DataFileName = dfn
         DataFileType = dft
@@ -45,17 +47,15 @@ type DataFile = {
     }
 
     member this.ExpectedSeparator =
-        if this.DataFileName.EndsWith(".csv") then
-            ","
-        elif this.DataFileName.EndsWith(".tsv") then
-            "\t"
-        else
-            ","
+        if this.DataFileName.EndsWith(".csv") then ","
+        elif this.DataFileName.EndsWith(".tsv") then "\t"
+        else ","
 
 type ParsedDataFile = {
-    HeaderRow: string [] option
-    BodyRows: string [] []
+    HeaderRow: string[] option
+    BodyRows: string[][]
 } with
+
     static member fromFileBySeparator (separator: string) (file: DataFile) =
         let sanatizedSeparator =
             match separator with
@@ -66,43 +66,44 @@ type ParsedDataFile = {
             | "\\r\\n" -> "\r\n"
             | "\\v" -> "\v"
             | _ -> separator
+
         let rows = file.DataContent.Split("\n")
-        let splitRows = rows |> Array.map (fun row ->
-            row.Split(sanatizedSeparator)
-        )
+        let splitRows = rows |> Array.map (fun row -> row.Split(sanatizedSeparator))
+
         if splitRows.Length > 1 then
             let headers = Some splitRows.[0]
             let data = splitRows.[1..]
-            let parsedFile : ParsedDataFile = {
-                HeaderRow = headers
-                BodyRows = data
-            }
+            let parsedFile: ParsedDataFile = { HeaderRow = headers; BodyRows = data }
             parsedFile
         else
-            let parsedFile : ParsedDataFile = {
+            let parsedFile: ParsedDataFile = {
                 HeaderRow = None
                 BodyRows = splitRows
             }
+
             parsedFile
 
     member this.ToggleHeader() =
         match this.HeaderRow with
-        | Some header -> { this with HeaderRow = None; BodyRows = Array.insertAt 0 header this.BodyRows }
-        | None when this.BodyRows.Length > 1 ->
-            {
-                this with
-                    HeaderRow = Some this.BodyRows.[0]
-                    BodyRows = this.BodyRows.[1..]
-            }
+        | Some header -> {
+            this with
+                HeaderRow = None
+                BodyRows = Array.insertAt 0 header this.BodyRows
+          }
+        | None when this.BodyRows.Length > 1 -> {
+            this with
+                HeaderRow = Some this.BodyRows.[0]
+                BodyRows = this.BodyRows.[1..]
+          }
         | _ -> this
 
-type Model =
-    {
-        DataFile: DataFile option
-        ParsedFile: ParsedDataFile option
-        Loading: bool
-    }
-    static member init () = {
+type Model = {
+    DataFile: DataFile option
+    ParsedFile: ParsedDataFile option
+    Loading: bool
+} with
+
+    static member init() = {
         DataFile = None
         ParsedFile = None
         Loading = false

@@ -9,11 +9,9 @@ open Fable.Core.JsInterop
 type Rect = {
     X: int
     Y: int
-} with 
-    static member init () = {
-        X = 0
-        Y = 0
-    }
+} with
+
+    static member init() = { X = 0; Y = 0 }
 
 open Fable.SimpleJson
 
@@ -37,43 +35,41 @@ module Position =
 
     open Browser
 
-    let [<Literal>] private Key_Prefix = "WidgetsPosition_"
+    [<Literal>]
+    let private Key_Prefix = "WidgetsPosition_"
 
-    let write(modalName:string, dt: Rect) = 
+    let write (modalName: string, dt: Rect) =
         let s = Json.serialize dt
-        WebStorage.localStorage.setItem(Key_Prefix + modalName, s)
+        WebStorage.localStorage.setItem (Key_Prefix + modalName, s)
 
-    let load(modalName:string) =
+    let load (modalName: string) =
         let key = Key_Prefix + modalName
-        try 
-            WebStorage.localStorage.getItem(key)
-            |> Json.parseAs<Rect>
-            |> Some
-        with
-            |_ -> 
-                WebStorage.localStorage.removeItem(key)
-                printfn "Could not find %s" key
-                None
+
+        try
+            WebStorage.localStorage.getItem (key) |> Json.parseAs<Rect> |> Some
+        with _ ->
+            WebStorage.localStorage.removeItem (key)
+            printfn "Could not find %s" key
+            None
 
 
 [<RequireQualifiedAccess>]
 module Size =
     open Browser
 
-    let [<Literal>] private Key_Prefix = "WidgetsSize_"
+    [<Literal>]
+    let private Key_Prefix = "WidgetsSize_"
 
-    let write(modalName:string, dt: Rect) = 
+    let write (modalName: string, dt: Rect) =
         let s = Json.serialize dt
-        WebStorage.localStorage.setItem(Key_Prefix + modalName, s)
+        WebStorage.localStorage.setItem (Key_Prefix + modalName, s)
 
-    let load(modalName:string) =
+    let load (modalName: string) =
         let key = Key_Prefix + modalName
-        try 
-            WebStorage.localStorage.getItem(key)
-            |> Json.parseAs<Rect>
-            |> Some
-        with
-            |_ -> 
-                WebStorage.localStorage.removeItem(key)
-                printfn "Could not find %s" key
-                None
+
+        try
+            WebStorage.localStorage.getItem (key) |> Json.parseAs<Rect> |> Some
+        with _ ->
+            WebStorage.localStorage.removeItem (key)
+            printfn "Could not find %s" key
+            None

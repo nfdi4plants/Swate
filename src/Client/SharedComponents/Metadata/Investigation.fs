@@ -8,12 +8,12 @@ open ARCtrl
 open Components
 open Components.Forms
 
-let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit, model: Model.Model) =
+let Main (investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit, model: Model.Model) =
     Generic.Section [
         Generic.BoxedField(
             "Investigation Metadata",
             content = [
-                FormComponents.TextInput (
+                FormComponents.TextInput(
                     investigation.Identifier,
                     (fun s ->
                         let nextInvestigation = IdentifierSetters.setInvestigationIdentifier s investigation
@@ -21,14 +21,14 @@ let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> 
                     "Identifier",
                     disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
                 )
-                FormComponents.TextInput (
+                FormComponents.TextInput(
                     Option.defaultValue "" investigation.Title,
                     (fun s ->
                         investigation.Title <- s |> Option.whereNot String.IsNullOrWhiteSpace
                         setInvestigation investigation),
                     "Title"
                 )
-                FormComponents.TextInput (
+                FormComponents.TextInput(
                     Option.defaultValue "" investigation.Description,
                     (fun s ->
                         investigation.Description <- s |> Option.whereNot String.IsNullOrWhiteSpace
@@ -51,14 +51,14 @@ let Main(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> 
                         setInvestigation investigation),
                     "Publications"
                 )
-                FormComponents.DateTimeInput (
+                FormComponents.DateTimeInput(
                     Option.defaultValue "" investigation.SubmissionDate,
                     (fun s ->
                         investigation.SubmissionDate <- if s = "" then None else Some s
                         setInvestigation investigation),
                     "Submission Date"
                 )
-                FormComponents.DateTimeInput (
+                FormComponents.DateTimeInput(
                     Option.defaultValue "" investigation.PublicReleaseDate,
                     (fun s ->
                         investigation.PublicReleaseDate <- if s = "" then None else Some s

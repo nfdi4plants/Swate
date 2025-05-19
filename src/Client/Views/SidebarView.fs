@@ -15,31 +15,38 @@ type SidebarView =
             prop.className "grow overflow-y-auto"
             prop.children [
                 match model.PageState with
-                | {SidebarPage = Routing.SidebarPage.BuildingBlock } ->
-                    BuildingBlock.Core.addBuildingBlockComponent model dispatch
+                | {
+                      SidebarPage = Routing.SidebarPage.BuildingBlock
+                  } -> BuildingBlock.Core.addBuildingBlockComponent model dispatch
 
-                | {SidebarPage = Routing.SidebarPage.TermSearch } ->
-                    TermSearch.Main (model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.TermSearch
+                  } -> TermSearch.Main(model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.FilePicker } ->
-                    Pages.FilePicker.Sidebar (model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.FilePicker
+                  } -> Pages.FilePicker.Sidebar(model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.Protocol } ->
-                    Protocol.Templates.Main (model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.Protocol
+                  } -> Protocol.Templates.Main(model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.DataAnnotator } ->
-                    Pages.DataAnnotator.Sidebar(model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.DataAnnotator
+                  } -> Pages.DataAnnotator.Sidebar(model, dispatch)
 
-                | {SidebarPage = Routing.SidebarPage.JsonExport } ->
-                    JsonExporter.Core.FileExporter.Main(model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.JsonExport
+                  } -> JsonExporter.Core.FileExporter.Main(model, dispatch)
             ]
         ]
 
     /// The base react component for the sidebar view in the app. contains the navbar and takes body and footer components to create the full view.
     [<ReactComponent>]
-    static member Main (model: Model, dispatch: Msg -> unit) =
+    static member Main(model: Model, dispatch: Msg -> unit) =
         Html.div [
-            prop.className "min-h-full flex flex-col bg-base-300 min-w-[500px] xl:min-w-[600px] overflow-y-auto h-40 [scrollbar-gutter:stable] @container/sidebar"
+            prop.className
+                "min-h-full flex flex-col bg-base-300 min-w-[500px] xl:min-w-[600px] overflow-y-auto h-40 [scrollbar-gutter:stable] @container/sidebar"
             prop.children [
 
                 SidebarComponents.Navbar.NavbarComponent model dispatch

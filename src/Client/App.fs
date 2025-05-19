@@ -14,13 +14,13 @@ module Subscriptions =
 
     let private ARCitectInAPI (dispatch: Messages.Msg -> unit) : Model.ARCitect.Interop.IARCitectInAPI = {
         TestHello = fun name -> promise { return sprintf "Hello %s" name }
-        ResponsePaths = fun paths ->
-            promise {
+        ResponsePaths =
+            fun paths -> promise {
                 Model.ARCitect.ResponsePaths paths |> Messages.ARCitectMsg |> dispatch
                 return true
             }
-        ResponseFile = fun file ->
-            promise {
+        ResponseFile =
+            fun file -> promise {
                 Model.ARCitect.ResponseFile file |> Messages.ARCitectMsg |> dispatch
                 return true
             }
@@ -29,14 +29,16 @@ module Subscriptions =
     let subscription (initial: Model.Model) : (SubId * Subscribe<Messages.Msg>) list =
         let arcitect (dispatch: Messages.Msg -> unit) : System.IDisposable =
             let initEventHandler =
-                MessageInterop.MessageInterop.createApi()
-                |> MessageInterop.MessageInterop.buildInProxy<Model.ARCitect.Interop.IARCitectInAPI> (ARCitectInAPI dispatch)
+                MessageInterop.MessageInterop.createApi ()
+                |> MessageInterop.MessageInterop.buildInProxy<Model.ARCitect.Interop.IARCitectInAPI> (
+                    ARCitectInAPI dispatch
+                )
+
             { new System.IDisposable with
-                member _.Dispose() = initEventHandler()
+                member _.Dispose() = initEventHandler ()
             }
-        [
-            ["ARCitect"], arcitect
-        ]
+
+        [ [ "ARCitect" ], arcitect ]
 
 #if DEBUG
 open Elmish.HMR

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { within, expect, userEvent, waitFor } from '@storybook/test';
-import BaseModal from "../Modal/BaseModal.fs.js";
+import BaseModal from "./BaseModal.fs.js";
 import { useState } from 'react';
 import React from 'react';
 
@@ -10,6 +10,8 @@ interface ButtonProps {
   children: React.ReactNode; // Accepts text, icons, or elements
   onClick?: () => void;
 }
+
+const TESTID_BASE_MODAL_CONTENT = "base-modal-content"
 
 const BaseButton: React.FC<ButtonProps> = ({ className, style, children, onClick }) => {
   return (
@@ -97,7 +99,7 @@ export const CompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = canvas.getByTestId('base-modal-content');
+    const modalContent = canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
 
     // Verify that the modal is open (checking for modal content)
     const item0 = canvas.getByText("Simple Content 0", { selector: 'div' });
@@ -135,7 +137,7 @@ export const WideCompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = canvas.getByTestId('modal-content');
+    const modalContent = canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
 
     // Verify that the modal is open (checking for modal content)
     const item0 = canvas.getByText("Simple Content 0", { selector: 'div' });
@@ -178,7 +180,7 @@ export const SmallWindowedCompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = await canvas.getByTestId('modal-content');
+    const modalContent = await canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
 
     // Verify that the modal is open (checking for modal content)
     const header = canvas.getByText("Simple Header");
