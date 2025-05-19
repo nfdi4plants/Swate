@@ -11,18 +11,21 @@ module SwateDefaultSearch =
     [<Literal>]
     let KEY = Util.BASE_KEY + "_SwateDefaultSearch"
 
-    let Get() : bool =
+    let Get () : bool =
         try
-            let v = Browser.WebStorage.localStorage.getItem(KEY)
-            match v.ToLower() with
-            | "true"  | "1" -> true
-            | "false" | "0" -> false
-            | _ -> true
-        with
-            | _ -> true
+            let v = Browser.WebStorage.localStorage.getItem (KEY)
 
-    let Set(v: bool) =
-        Browser.WebStorage.localStorage.setItem(KEY, string v)
+            match v.ToLower() with
+            | "true"
+            | "1" -> true
+            | "false"
+            | "0" -> false
+            | _ -> true
+        with _ ->
+            true
+
+    let Set (v: bool) =
+        Browser.WebStorage.localStorage.setItem (KEY, string v)
 
 [<RequireQualifiedAccess>]
 module TIBSearch =
@@ -32,13 +35,12 @@ module TIBSearch =
     [<Literal>]
     let KEY = Util.BASE_KEY + "_TIBSearch"
 
-    let Get() : string [] =
+    let Get () : string[] =
         try
-            let v = Browser.WebStorage.localStorage.getItem(KEY)
-            Json.parseAs<string []> v
-        with
-            | _ -> [||]
+            let v = Browser.WebStorage.localStorage.getItem (KEY)
+            Json.parseAs<string[]> v
+        with _ -> [||]
 
-    let Set(v: string []) =
+    let Set (v: string[]) =
         let s = Json.serialize v
-        Browser.WebStorage.localStorage.setItem(KEY, s)
+        Browser.WebStorage.localStorage.setItem (KEY, s)

@@ -16,9 +16,9 @@ module URLs =
     module Docs =
 
         type FileType =
-        | Html
-        | Yaml
-         with
+            | Html
+            | Yaml
+
             member this.toStr =
                 match this with
                 | Html -> ".html"
@@ -27,7 +27,8 @@ module URLs =
 
         let private Base = "/docs"
 
-        let OntologyApi (filetype: FileType)= Base + "/IOntologyAPIv2" + filetype.toStr
+        let OntologyApi (filetype: FileType) =
+            Base + "/IOntologyAPIv2" + filetype.toStr
 
 
     type Helpdesk =
@@ -67,4 +68,3 @@ module URLs =
 
     [<LiteralAttribute>]
     let OntobeeOntologyPrefix = @"https://ontobee.org/ontology/"
-

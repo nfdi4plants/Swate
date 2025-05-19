@@ -98,7 +98,7 @@ const DefaultAdvancedSearch: Story = {
     expect(indicator).toBeInTheDocument();
     userEvent.click(indicator);
 
-    const modal = await waitFor(() => canvas.getByTestId("advanced-search-modal"));
+    const modal = await waitFor(() => canvas.getByTestId("modal_advanced-search-modal"));
     expect(modal).toBeInTheDocument();
 
     const input = canvas.getByTestId("advanced-search-term-name-input");
@@ -224,7 +224,7 @@ export const CustomAdvancedSearch: Story = {
     expect(indicator).toBeInTheDocument();
     userEvent.click(indicator);
 
-    const modal = await waitFor(() => canvas.getByTestId("advanced-search-modal"));
+    const modal = await waitFor(() => canvas.getByTestId("modal_advanced-search-modal"));
     expect(modal).toBeInTheDocument();
 
     const input = canvas.getByTestId("advanced-search-input");

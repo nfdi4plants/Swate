@@ -3,6 +3,51 @@ namespace Swate.Components
 open Fable.Core
 open Feliz
 
+type CellCoordinate = {| x: int; y: int |}
+
+type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
+
+type TableCellController = {
+    Index: CellCoordinate
+    IsActive: bool
+    IsSelected: bool
+    IsOrigin: bool
+    onKeyDown: Browser.Types.KeyboardEvent -> unit
+    onBlur: Browser.Types.FocusEvent -> unit
+    onClick: Browser.Types.MouseEvent -> unit
+} with
+    static member init(index, isActive, isSelected, isOrigin, onKeyDown, onBlur, onClick) =
+        {
+            Index = index
+            IsActive = isActive
+            IsSelected = isSelected
+            IsOrigin = isOrigin
+            onKeyDown = onKeyDown
+            onBlur = onBlur
+            onClick = onClick
+        }
+
+[<AllowNullLiteral>]
+[<Global>]
+type SelectHandle
+    [<ParamObjectAttribute; Emit("$0")>]
+    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit, getSelectedCellRange, getSelectedCells, getCount) =
+    member val contains: CellCoordinate -> bool = contains with get, set
+    member val selectAt: (CellCoordinate * bool) -> unit = selectAt with get, set
+    member val clear: unit -> unit = clear with get, set
+    member val getSelectedCellRange: unit -> CellCoordinateRange option = getSelectedCellRange with get, set
+    member val getSelectedCells: unit -> ResizeArray<CellCoordinate> = getSelectedCells with get, set
+    member val getCount: unit -> int = getCount with get, set
+
+[<AllowNullLiteral>]
+[<Global>]
+type TableHandle
+    [<ParamObjectAttribute; Emit("$0")>]
+    (focus: unit -> unit, scrollTo: CellCoordinate -> unit, SelectHandle: SelectHandle) =
+    member val focus: unit -> unit = focus with get, set
+    member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
+    member val SelectHandle: SelectHandle = SelectHandle with get, set
+
 [<AllowNullLiteral>]
 [<Global>]
 type Term
@@ -28,6 +73,7 @@ module Term =
             | None, Some d2 -> Some d2
             | None, None -> None
             | Some d1, Some d2 -> objectMerge d1 d2 |> Some
+
         Term(
             ?name = Option.orElse t2.name t1.name,
             ?id = Option.orElse t2.id t1.id,
@@ -45,6 +91,7 @@ module Term =
             | None, Some d2 -> Some d2
             | None, None -> None
             | Some d1, Some d2 -> objectMerge d1 d2 |> Some
+
         Term(
             ?name = Option.orElse t1.name t2.name,
             ?id = Option.orElse t1.id t2.id,
@@ -55,11 +102,86 @@ module Term =
             ?data = data
         )
 
+    module ConvertLiterals =
+        [<Literal>]
+        let Description = "description"
+
+        [<Literal>]
+        let Data = "data"
+
+        [<Literal>]
+        let Source = "source"
+
+        [<Literal>]
+        let IsObsolete = "isObsolete"
+
+    open Swate.Components.Shared
+    open Fable.SimpleJson
+
+    open ARCtrl
+
+    let toOntologyAnnotation (term: Term) =
+        let comments =
+            ResizeArray [
+                if term.description.IsSome then
+                    Comment(
+                        ConvertLiterals.Description,
+                        JS.JSON.stringify term.description.Value
+                    )
+                if term.data.IsSome then
+                    Comment(
+                        ConvertLiterals.Data,
+                        JS.JSON.stringify term.data.Value
+                    )
+                if term.source.IsSome then
+                    Comment(
+                        ConvertLiterals.Source,
+                        JS.JSON.stringify term.source.Value
+                    )
+                if term.isObsolete.IsSome then
+                    Comment(
+                        ConvertLiterals.IsObsolete,
+                        JS.JSON.stringify term.isObsolete.Value
+                    )
+            ]
+            |> Option.whereNot Seq.isEmpty
+        ARCtrl.OntologyAnnotation(
+            ?name = term.name,
+            ?tsr = term.source,
+            ?tan = term.id,
+            ?comments = comments
+        )
+
+    let fromOntologyAnnotation (oa: ARCtrl.OntologyAnnotation) =
+        let description =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Description)
+            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+        let data =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Data)
+            |> Option.map (fun c -> Json.parseAs<obj>(c.Value.Value))
+        let source =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Source)
+            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+        let isObsolete =
+            oa.Comments
+            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.IsObsolete)
+            |> Option.map (fun c -> Json.parseAs<bool>(c.Value.Value))
+        Term(
+            ?name = oa.Name,
+            ?id = oa.TermAccessionNumber,
+            ?description = description,
+            ?source = source,
+            ?href = Option.whereNot System.String.IsNullOrWhiteSpace oa.TermAccessionOntobeeUrl,
+            ?isObsolete = isObsolete,
+            ?data = data
+        )
+
 [<AllowNullLiteral>]
 [<Global>]
-type TermSearchStyle
-    [<ParamObjectAttribute; Emit("$0")>]
-    (?inputLabel: U2<string, ResizeArray<string>>) =
+type TermSearchStyle [<ParamObjectAttribute; Emit("$0")>] (?inputLabel: U2<string, ResizeArray<string>>) =
     member val inputLabel: U2<string, ResizeArray<string>> option = jsNative with get, set
 
 module TermSearchStyle =
@@ -68,16 +190,27 @@ module TermSearchStyle =
         | U2.Case1 className -> className
         | U2.Case2 classNames -> classNames |> String.concat " "
 
+[<AllowNullLiteral>]
+[<Global>]
+type AdvancedSearchController [<ParamObjectAttribute; Emit("$0")>] (startSearch: unit -> unit, cancel: unit -> unit) =
+    member val startSearch: unit -> unit = jsNative with get, set
+    member val cancel: unit -> unit = jsNative with get, set
 
-type AdvancedSearchController = {|
-    startSearch: unit -> unit
-    cancel: unit -> unit
-|}
+[<AllowNullLiteral>]
+[<Global>]
+type AdvancedSearch
+    [<ParamObjectAttribute; Emit("$0")>]
+    (search: unit -> JS.Promise<ResizeArray<Term>>, form: AdvancedSearchController -> ReactElement) =
+    member val search: unit -> JS.Promise<ResizeArray<Term>> = jsNative with get, set
+    member val form: AdvancedSearchController -> ReactElement = jsNative with get, set
 
-type AdvancedSearch = {|
-    search: unit -> JS.Promise<ResizeArray<Term>>
-    form: AdvancedSearchController -> ReactElement
-|}
+[<AllowNullLiteral>]
+[<Global>]
+type PortalTermDropdown
+    [<ParamObjectAttribute; Emit("$0")>]
+    (portal: Browser.Types.HTMLElement, renderer: Browser.Types.ClientRect -> ReactElement -> Fable.React.ReactElement) =
+    member val portal = portal with get, set
+    member val renderer = renderer with get, set
 
 ///
 /// A search function that resolves a list of terms.
@@ -89,7 +222,7 @@ type SearchCall = string -> JS.Promise<ResizeArray<Term>>
 // A parent search function that resolves a list of terms based on a parent ID and query.
 // @typedef {function(string, string): Promise<Term[]>} ParentSearchCall
 //
-type ParentSearchCall = (string*string) -> JS.Promise<ResizeArray<Term>>
+type ParentSearchCall = (string * string) -> JS.Promise<ResizeArray<Term>>
 
 ///
 /// A function that fetches all child terms of a parent.

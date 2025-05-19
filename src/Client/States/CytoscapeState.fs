@@ -9,6 +9,7 @@ type Model = {
     //CyObject: Types.ICytoscape option
     CyTermTree: TreeTypes.Tree option
 } with
+
     static member init(?accession: string) = {
         TargetAccession = if accession.IsSome then accession.Value else ""
         //CyObject = None
@@ -16,7 +17,7 @@ type Model = {
     }
 
 type Msg =
-// Client
-// Server Interop
-| GetTermTree of accession:string
-| GetTermTreeResponse of tree:TreeTypes.Tree
+    // Client
+    // Server Interop
+    | GetTermTree of accession: string
+    | GetTermTreeResponse of tree: TreeTypes.Tree

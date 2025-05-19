@@ -2,6 +2,7 @@ module Routing
 
 open Elmish.UrlParser
 open Feliz
+open Swate.Components
 
 [<RequireQualifiedAccess>]
 type SidebarPage =
@@ -14,33 +15,24 @@ type SidebarPage =
 
     member this.AsStringRdbl =
         match this with
-        | BuildingBlock     -> "Building Blocks"
-        | TermSearch        -> "Terms"
-        | FilePicker        -> "File Picker"
-        | Protocol          -> "Templates"
-        | JsonExport        -> "Json Export"
-        | DataAnnotator     -> "Data Annotator"
+        | BuildingBlock -> "Building Blocks"
+        | TermSearch -> "Terms"
+        | FilePicker -> "File Picker"
+        | Protocol -> "Templates"
+        | JsonExport -> "Json Export"
+        | DataAnnotator -> "Data Annotator"
 
     member this.AsIcon() =
-        let createElem (icons: ReactElement list) =
-            Html.i [
-                prop.title this.AsStringRdbl
-                prop.children icons
-            ]
+        let createElem (icons: ReactElement) =
+            Html.i [ prop.title this.AsStringRdbl; prop.children [ icons ] ]
 
         match this with
-        | TermSearch        ->
-            createElem [Html.i [prop.className "fa-solid fa-magnifying-glass-plus" ]]
-        | BuildingBlock     ->
-            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ]; Html.i [prop.className "fa-solid fa-table-columns" ]]
-        | Protocol          ->
-            createElem [ Html.i [prop.className "fa-solid fa-circle-plus" ];Html.i [prop.className "fa-solid fa-table" ]]
-        | JsonExport        ->
-            createElem [ Html.i [prop.className "fa-solid fa-file-export" ]]
-        | FilePicker        ->
-            createElem [ Html.i [prop.className "fa-solid fa-file-signature" ]]
-        | DataAnnotator     ->
-            createElem [ Html.i [prop.className "fa-solid fa-object-group" ]]
+        | TermSearch -> createElem Icons.Terms
+        | BuildingBlock -> createElem Icons.AddBuildingBlock
+        | Protocol -> createElem Icons.Templates
+        | JsonExport -> createElem Icons.FileExport
+        | FilePicker -> createElem Icons.FilePicker
+        | DataAnnotator -> createElem Icons.DataAnnotator
 
 [<RequireQualifiedAccess>]
 type MainPage =
@@ -51,15 +43,14 @@ type MainPage =
 
     member this.AsStringRdbl =
         match this with
-        | About         -> "About"
+        | About -> "About"
         | PrivacyPolicy -> "Privacy Policy"
-        | Settings      -> "Settings"
-        | Default       -> "Home"
+        | Settings -> "Settings"
+        | Default -> "Home"
 
 /// The different pages of the application. If you add a new page, then add an entry here.
 [<RequireQualifiedAccess>]
-type Route =
-| Home of int option
+type Route = Home of int option
 
 ///explained here: https://elmish.github.io/browser/routing.html
 //let curry f x y = f (x,y)
@@ -70,9 +61,8 @@ module Routing =
     open Elmish.Navigation
 
     /// The URL is turned into a Result.
-    let route : Parser<Route -> Route, _> =
-        oneOf [
-            map Route.Home                  (s "" <?> intParam "is_swatehost")
-        ]
+    let route: Parser<Route -> Route, _> =
+        oneOf [ map Route.Home (s "" <?> intParam "is_swatehost") ]
 
-    let parsePath (location:Browser.Types.Location) : Route option = Elmish.UrlParser.parsePath route location
+    let parsePath (location: Browser.Types.Location) : Route option =
+        Elmish.UrlParser.parsePath route location
