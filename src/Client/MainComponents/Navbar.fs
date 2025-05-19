@@ -102,36 +102,28 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
     let addBuildingBlock =
         QuickAccessButton.QuickAccessButton(
             "Add Building Block",
-            React.fragment [
-                React.fragment [
-                    Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                    Html.i [ prop.className "fa-solid fa-table-columns" ]
-                ]
-            ],
+            Icons.AddBuildingBlock,
             (fun _ -> addWidget Widget._BuildingBlock)
         )
 
     let addTemplate =
         QuickAccessButton.QuickAccessButton(
             "Add Template",
-            React.fragment [
-                Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                Html.i [ prop.className "fa-solid fa-table" ]
-            ],
+            Icons.AddTemplate,
             (fun _ -> addWidget Widget._Template)
         )
 
     let filePicker =
         QuickAccessButton.QuickAccessButton(
             "File Picker",
-            React.fragment [ Html.i [ prop.className "fa-solid fa-file-signature" ] ],
+            Icons.FilePicker,
             (fun _ -> addWidget Widget._FilePicker)
         )
 
     let dataAnnotator =
         QuickAccessButton.QuickAccessButton(
             "Data Annotator",
-            React.fragment [ Html.i [ prop.className "fa-solid fa-object-group" ] ],
+            Icons.DataAnnotator,
             (fun _ -> addWidget Widget._DataAnnotator)
         )
 

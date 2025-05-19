@@ -68,27 +68,27 @@ type NavbarBurger =
             [
                 NavbarBurger.DropdownItem(
                     "Settings",
-                    Html.i [ prop.className "fa-solid fa-cog" ],
+                    Icons.Settings,
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.Settings)
                 )
                 NavbarBurger.DropdownItem(
                     "About",
-                    Html.i [ prop.className "fa-solid fa-question-circle" ],
+                    Icons.About,
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.About)
                 )
                 NavbarBurger.DropdownItem(
                     "Privacy Policy",
-                    Html.i [ prop.className "fa-solid fa-fingerprint" ],
+                    Icons.PrivacyPolicy,
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.PrivacyPolicy)
                 )
                 NavbarBurger.DropdownItem(
                     "Docs",
-                    Html.i [ prop.className "fa-solid fa-book" ],
+                    Icons.Docs,
                     prop.href Swate.Components.Shared.URLs.SWATE_WIKI
                 )
                 NavbarBurger.DropdownItem(
                     "Contact",
-                    Html.i [ prop.className "fa-solid fa-comments" ],
+                    Icons.Contact,
                     prop.href Swate.Components.Shared.URLs.CONTACT
                 )
             ],
