@@ -161,11 +161,10 @@ type SelectiveImportModal =
         let addTableImport =
             fun (i: int) (fullImport: bool) ->
                 let newImportTable: ImportTable = { Index = i; FullImport = fullImport }
-                let newImportTables = newImportTable :: importConfig.ImportTables |> List.distinct
+                let newImportTables = newImportTable :: importConfig.ImportTables |> List.distinctBy (fun table -> table.Index)
 
                 {
-                    importConfig with
-                        ImportTables = newImportTables
+                    importConfig with ImportTables = newImportTables
                 }
                 |> Protocol.UpdateImportConfig
                 |> ProtocolMsg
@@ -253,41 +252,28 @@ type SelectiveImportModal =
             | Template t -> ResizeArray([ t.Table ]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
 
-        let importDataState, setImportDataState =
-            React.useState (SelectiveImportConfig.init ())
-
-        let setMetadataImport =
-            fun b ->
-                if b then
-                    {
-                        importDataState with
-                            ImportMetadata = true
-                            ImportTables = [
-                                for ti in 0 .. tables.Count - 1 do
-                                    {
-                                        ImportTable.Index = ti
-                                        ImportTable.FullImport = true
-                                    }
-                            ]
-                    }
-                    |> setImportDataState
-                else
-                    SelectiveImportConfig.init () |> setImportDataState
+        let setMetadataImport = fun b ->
+            {
+                model.ProtocolState.ImportConfig with ImportMetadata  = b;
+            }
+            |> Protocol.UpdateImportConfig
+            |> ProtocolMsg
+            |> dispatch
 
         let content =
             React.fragment [
                 SelectiveImportModal.RadioPluginsBox(
                     "Import Type",
                     "fa-solid fa-cog",
-                    importDataState.ImportType,
+                    model.ProtocolState.ImportConfig.ImportType,
                     "importType",
                     [|
                         ARCtrl.TableJoinOptions.Headers,    " Column Headers";
                         ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
                         ARCtrl.TableJoinOptions.WithValues, " ..With Values";
                     |],
-                    fun importType -> {importDataState with ImportType = importType} |> setImportDataState)
-                SelectiveImportModal.MetadataImport(importDataState.ImportMetadata, setMetadataImport, disArcfile)
+                    fun importType -> {model.ProtocolState.ImportConfig with ImportType = importType} |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch)
+                SelectiveImportModal.MetadataImport(model.ProtocolState.ImportConfig.ImportMetadata, setMetadataImport, disArcfile)
                 for ti in 0 .. (tables.Count-1) do
                     let t = tables.[ti]
                     SelectiveImportModal.TableImport(ti, t, model, dispatch)
@@ -304,9 +290,9 @@ type SelectiveImportModal =
                         prop.text "Submit"
                         prop.onClick (fun e ->
                             {|
-                                importState = importDataState
-                                importedFile = import
-                                deselectedColumns = importDataState.DeselectedColumns
+                                importState = model.ProtocolState.ImportConfig;
+                                importedFile = import;
+                                deselectedColumns = model.ProtocolState.ImportConfig.DeselectedColumns
                             |}
                             |> SpreadsheetInterface.ImportJson
                             |> InterfaceMsg
