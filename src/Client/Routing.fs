@@ -2,6 +2,7 @@ module Routing
 
 open Elmish.UrlParser
 open Feliz
+open Swate.Components
 
 [<RequireQualifiedAccess>]
 type SidebarPage =
@@ -22,24 +23,16 @@ type SidebarPage =
         | DataAnnotator -> "Data Annotator"
 
     member this.AsIcon() =
-        let createElem (icons: ReactElement list) =
-            Html.i [ prop.title this.AsStringRdbl; prop.children icons ]
+        let createElem (icons: ReactElement) =
+            Html.i [ prop.title this.AsStringRdbl; prop.children [ icons ] ]
 
         match this with
-        | TermSearch -> createElem [ Html.i [ prop.className "fa-solid fa-magnifying-glass-plus" ] ]
-        | BuildingBlock ->
-            createElem [
-                Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                Html.i [ prop.className "fa-solid fa-table-columns" ]
-            ]
-        | Protocol ->
-            createElem [
-                Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                Html.i [ prop.className "fa-solid fa-table" ]
-            ]
-        | JsonExport -> createElem [ Html.i [ prop.className "fa-solid fa-file-export" ] ]
-        | FilePicker -> createElem [ Html.i [ prop.className "fa-solid fa-file-signature" ] ]
-        | DataAnnotator -> createElem [ Html.i [ prop.className "fa-solid fa-object-group" ] ]
+        | TermSearch -> createElem Icons.Terms
+        | BuildingBlock -> createElem Icons.AddBuildingBlock
+        | Protocol -> createElem Icons.Templates
+        | JsonExport -> createElem Icons.FileExport
+        | FilePicker -> createElem Icons.FilePicker
+        | DataAnnotator -> createElem Icons.DataAnnotator
 
 [<RequireQualifiedAccess>]
 type MainPage =
