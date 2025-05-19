@@ -11,7 +11,7 @@ interface ButtonProps {
   onClick?: () => void;
 }
 
-const TESTID_BASE_MODAL_CONTENT = "base-modal-content"
+const TESTID_BASE_MODAL_CONTENT = "modal_content_base"
 
 const BaseButton: React.FC<ButtonProps> = ({ className, style, children, onClick }) => {
   return (
@@ -51,7 +51,7 @@ const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
           modalActions={modalActions}
           content={content}
           footer={submitButton}
-          debug={true}
+          debug={"base"}
         />
       )}
     </div>
