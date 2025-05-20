@@ -11,7 +11,11 @@ type ContextMenuItem
     (
         ?text: ReactElement,
         ?icon: ReactElement,
-        ?kbdbutton: {|element: ReactElement; label: string|},
+        ?kbdbutton:
+            {|
+                element: ReactElement
+                label: string
+            |},
         ?isDivider: bool,
         ?onClick:
             {|
@@ -60,8 +64,7 @@ type ContextMenu =
 
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
-        let listContentRef =
-            React.useRef (ResizeArray())
+        let listContentRef = React.useRef (ResizeArray())
 
         let floating =
             FloatingUI.useFloating (
@@ -128,7 +131,12 @@ type ContextMenu =
                             failwith "Context menu must have at least one item"
 
                         children |> setChildren
-                        listContentRef.current.AddRange (children |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label)))
+
+                        listContentRef.current.AddRange(
+                            children
+                            |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
+                        )
+
                         let rect: ClientRect =
                             {|
                                 width = 0
@@ -208,7 +216,8 @@ type ContextMenu =
                                     for key, v in
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do
                                         prop.custom (key, v)
-                                    prop.className "grid grid-cols-[auto_1fr_auto] bg-base-100 border-2 border-base-300 w-56 rounded-md focus:outline-none"
+                                    prop.className
+                                        "grid grid-cols-[auto_1fr_auto] bg-base-100 border-2 border-base-300 w-56 rounded-md focus:outline-hidden"
                                     prop.children [
                                         for index in 0 .. children.Length - 1 do
                                             let child = children.[index]
@@ -240,10 +249,9 @@ type ContextMenu =
                                                     |}
                                                 )
                                                 |> Fable.Core.JS.Constructors.Object.entries
+
                                             if child.isDivider then
-                                                Html.div [
-                                                    prop.className "divider my-0 col-span-3"
-                                                ]
+                                                Html.div [ prop.className "divider my-0 col-span-3" ]
                                             else
                                                 Html.button [
                                                     prop.key index
@@ -252,7 +260,7 @@ type ContextMenu =
 text-base-content px-2 py-1
 w-full text-left
 hover:bg-base-100
-focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary"
+focus:bg-base-100 focus:outline-hidden focus:ring-2 focus:ring-primary"
                                                     prop.children [
                                                         if child.icon.IsSome then
                                                             Html.div [
@@ -292,7 +300,7 @@ focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary"
 
         Html.div [
             prop.className
-                "w-full h-72 border border-dashed border-primary rounded flex items-center justify-center flex-col gap-4"
+                "w-full h-72 border border-dashed border-primary rounded-sm flex items-center justify-center flex-col gap-4"
             prop.ref containerRef
 
             prop.children [
@@ -304,20 +312,32 @@ focus:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary"
                     prop.dataColumn 5
                 ]
                 ContextMenu.ContextMenu(
-                    (fun (data: obj) ->
-                        [
-                            for i in 0..5 do
-                                ContextMenuItem(
-                                    text = Html.span $"Item {i}",
-                                    ?icon = (if i = 4 then Html.i [ prop.className "fa-solid fa-check" ] |> Some else None),
-                                    ?kbdbutton = (if i = 3 then {| element = Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]; label = "Back"|} |> Some else None),
-                                    onClick =
-                                        (fun e ->
-                                            e.buttonEvent.stopPropagation ()
-                                            let index = e.spawnData |> unbox<CellCoordinate>
-                                            console.log (sprintf "Item clicked: %i" i, index))
-                                )
-                        ]),
+                    (fun (data: obj) -> [
+                        for i in 0..5 do
+                            ContextMenuItem(
+                                text = Html.span $"Item {i}",
+                                ?icon =
+                                    (if i = 4 then
+                                         Html.i [ prop.className "fa-solid fa-check" ] |> Some
+                                     else
+                                         None),
+                                ?kbdbutton =
+                                    (if i = 3 then
+                                         {|
+                                             element =
+                                                 Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]
+                                             label = "Back"
+                                         |}
+                                         |> Some
+                                     else
+                                         None),
+                                onClick =
+                                    (fun e ->
+                                        e.buttonEvent.stopPropagation ()
+                                        let index = e.spawnData |> unbox<CellCoordinate>
+                                        console.log (sprintf "Item clicked: %i" i, index))
+                            )
+                    ]),
                     ref = containerRef,
                     onSpawn =
                         (fun e ->

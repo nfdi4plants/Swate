@@ -255,7 +255,7 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
 //     prop.children [
 
 //         Daisy.dropdownContent [
-//             prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2 shadow"
+//             prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2"
 //             prop.children
 //         ]
 //     ]

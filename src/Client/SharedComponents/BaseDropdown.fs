@@ -23,7 +23,7 @@ type BaseDropdown =
                 toggle
                 Html.ul [
                     prop.className [
-                        "dropdown-content min-w-48 menu bg-base-200 rounded-box z-[1] p-2 shadow !top-[110%]"
+                        "dropdown-content min-w-48 menu bg-base-200 rounded-box z-[1] p-2 shadow-sm !top-[110%]"
                         if style.IsSome then
                             style.Value.GetSubclassStyle "content"
                     ]

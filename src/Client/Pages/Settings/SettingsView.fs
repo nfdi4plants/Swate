@@ -27,6 +27,7 @@ module Settings =
         FoundOnTIB: Set<string>
         Selected: Set<string>
     } with
+
         /// Found on TIB but not selected
         member this.UnusedCatalogues = Set.difference this.FoundOnTIB this.Selected
 
@@ -40,17 +41,17 @@ module Settings =
         static member private SwateDefaultSearch(model: Model.Model, dispatch) =
             Html.div [
                 Html.h2 [ prop.text "Swate Default Search" ]
-                Html.p [ prop.text "Enables search through the community build DPBO ontology and fast updates through our GitHub contribution model." ]
+                Html.p [
+                    prop.text
+                        "Enables search through the community build DPBO ontology and fast updates through our GitHub contribution model."
+                ]
                 Html.div [
                     prop.className "form-control lg:max-w-md"
                     prop.children [
                         Html.label [
                             prop.className "label cursor-pointer"
                             prop.children [
-                                Html.span [
-                                    prop.className "label-text"
-                                    prop.text "Use Swate Default Search"
-                                ]
+                                Html.span [ prop.className "label-text"; prop.text "Use Swate Default Search" ]
                                 Daisy.toggle [
                                     prop.isChecked model.PersistentStorageState.SwateDefaultSearch
                                     prop.id "swateDefaultSearch"
@@ -58,7 +59,9 @@ module Settings =
                                     toggle.primary
 
                                     prop.onChange (fun (b: bool) ->
-                                        Messages.PersistentStorage.UpdateSwateDefaultSearch b |> PersistentStorageMsg |> dispatch)
+                                        Messages.PersistentStorage.UpdateSwateDefaultSearch b
+                                        |> PersistentStorageMsg
+                                        |> dispatch)
                                 ]
                             ]
                         ]
@@ -67,9 +70,14 @@ module Settings =
             ]
 
         /// Element with label and select adding support for search through a single TIB catalogue.
-        static member private TIBSearchCatalogueElement(chosen: string, catalogues: Catalogues, select: string -> unit, rmv: unit -> unit) =
+        static member private TIBSearchCatalogueElement
+            (chosen: string, catalogues: Catalogues, select: string -> unit, rmv: unit -> unit)
+            =
             let disconnected = catalogues.DisconnectedCatalogues.Contains chosen
-            let disconnectedMsg = "This catalogue is not found on TIB. Get in contact with the support team and remove it for now!"
+
+            let disconnectedMsg =
+                "This catalogue is not found on TIB. Get in contact with the support team and remove it for now!"
+
             Html.div [
                 prop.className "flex flex-row gap-2 items-end"
                 prop.children [
@@ -79,20 +87,21 @@ module Settings =
                             Html.div [
                                 prop.className "label"
                                 prop.children [
-                                    Html.span [
-                                        prop.className "label-text"
-                                        prop.text "Choose your catalogue"
-                                    ]
+                                    Html.span [ prop.className "label-text"; prop.text "Choose your catalogue" ]
                                 ]
                             ]
                             Html.select [
                                 prop.value chosen
-                                prop.onChange (fun e -> select(e))
-                                prop.className "select select-bordered"
+                                prop.onChange (fun e -> select (e))
+                                prop.className "select"
                                 prop.children [
                                     for catalogue in catalogues.AllCatalogues do
-                                        let disabled = catalogues.DisconnectedCatalogues.Contains catalogue || catalogues.Selected.Contains catalogue
+                                        let disabled =
+                                            catalogues.DisconnectedCatalogues.Contains catalogue
+                                            || catalogues.Selected.Contains catalogue
+
                                         let disconnected = catalogues.DisconnectedCatalogues.Contains catalogue
+
                                         Html.option [
                                             prop.disabled (disconnected || disabled)
                                             prop.value catalogue
@@ -112,26 +121,25 @@ module Settings =
                     ]
                     Html.button [
                         prop.className "btn btn-error btn-square"
-                        prop.onClick (fun _ -> rmv())
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-trash-can"]
-                        ]
+                        prop.onClick (fun _ -> rmv ())
+                        prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ] ]
                     ]
                     if disconnected then
                         Html.div [
                             prop.className "tooltip"
-                            prop.custom("data-tip", disconnectedMsg)
+                            prop.custom ("data-tip", disconnectedMsg)
                             prop.children [
                                 Html.div [
                                     prop.className "relative"
                                     prop.children [
                                         Html.div [
-                                            prop.className "absolute top-0 right-0 left-0 bottom-0 animate-ping bg-yellow-400"
+                                            prop.className
+                                                "absolute top-0 right-0 left-0 bottom-0 animate-ping bg-yellow-400"
                                         ]
                                         Html.button [
                                             prop.className "btn btn-warning btn-active btn-square no-animation"
                                             prop.children [
-                                                Html.i [prop.className "fa-solid fa-triangle-exclamation"]
+                                                Html.i [ prop.className "fa-solid fa-triangle-exclamation" ]
                                             ]
                                         ]
                                     ]
@@ -144,25 +152,32 @@ module Settings =
         [<ReactComponent>]
         static member private TIBSearch(model: Model.Model, dispatch: Messages.Msg -> unit) =
             let selectedCatalogues = model.PersistentStorageState.TIBSearchCatalogues
-            let catalogues, setCatalogues = React.useState([||])
-            let loading, setLoading = React.useState(true)
-            React.useEffectOnce(fun _ -> // get all currently supported catalogues
+            let catalogues, setCatalogues = React.useState ([||])
+            let loading, setLoading = React.useState (true)
+
+            React.useEffectOnce (fun _ -> // get all currently supported catalogues
                 promise {
-                    let! catalogues = Swate.Components.Api.TIBApi.getCollections()
+                    let! catalogues = Swate.Components.Api.TIBApi.getCollections ()
                     setCatalogues catalogues.content
                     setLoading false
-                } |> ignore
-            )
+                }
+                |> ignore)
+
             let catalogues: Catalogues =
-                React.useMemo((fun () ->
-                    {
+                React.useMemo (
+                    (fun () -> {
                         FoundOnTIB = catalogues |> Set.ofArray
                         Selected = selectedCatalogues
-                    }
-                ), [|catalogues; selectedCatalogues|])
+                    }),
+                    [| catalogues; selectedCatalogues |]
+                )
+
             Html.div [
                 Html.h2 [ prop.text "TIB Search" ]
-                Html.p [ prop.text "Adds support for high performance TIB term search. Choose a catalogue of terms to search through." ]
+                Html.p [
+                    prop.text
+                        "Adds support for high performance TIB term search. Choose a catalogue of terms to search through."
+                ]
                 Html.p [ prop.text "Selecting multiple catalogues may impact search performance." ]
                 Html.p [ prop.textf "Selected: %A" (selectedCatalogues |> String.concat ", ") ]
                 Html.div [
@@ -173,14 +188,11 @@ module Settings =
                             prop.disabled (catalogues.UnusedCatalogues.Count = 0)
                             prop.onClick (fun _ ->
                                 if catalogues.UnusedCatalogues.Count <> 0 then
-                                    Messages.PersistentStorage.AddTIBSearchCatalogue catalogues.UnusedCatalogues.MinimumElement
+                                    Messages.PersistentStorage.AddTIBSearchCatalogue
+                                        catalogues.UnusedCatalogues.MinimumElement
                                     |> PersistentStorageMsg
-                                    |> dispatch
-                            )
-                            prop.children [
-                                Html.i [prop.className "fa-solid fa-plus"]
-                                Html.text "Add"
-                            ]
+                                    |> dispatch)
+                            prop.children [ Html.i [ prop.className "fa-solid fa-plus" ]; Html.text "Add" ]
                         ]
                         Html.button [
                             prop.className "btn btn-error btn-sm"
@@ -188,41 +200,37 @@ module Settings =
                             prop.onClick (fun _ ->
                                 Messages.PersistentStorage.SetTIBSearchCatalogues Set.empty
                                 |> PersistentStorageMsg
-                                |> dispatch
-                            )
-                            prop.children [
-                                Html.i [prop.className "fa-solid fa-trash-can"]
-                                Html.text "Clear"
-                            ]
+                                |> dispatch)
+                            prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ]; Html.text "Clear" ]
                         ]
                     ]
                 ]
                 if loading then
                     Html.div [
                         prop.className "flex justify-center"
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-spinner fa-spin"]
-                        ]
+                        prop.children [ Html.i [ prop.className "fa-solid fa-spinner fa-spin" ] ]
                     ]
                 elif catalogues.AllCatalogues.Count = 0 then
                     Html.div [
                         prop.className "flex justify-center"
-                        prop.children [
-                            Html.p [ prop.text "No catalogues found." ]
-                        ]
+                        prop.children [ Html.p [ prop.text "No catalogues found." ] ]
                     ]
                 else
                     for catalogue in selectedCatalogues do
-                        let rmv = fun () ->
-                            Messages.PersistentStorage.RemoveTIBSearchCatalogue catalogue
-                            |> PersistentStorageMsg
-                            |> dispatch
-                        let setter = fun (s: string) ->
-                            (selectedCatalogues |> Set.remove catalogue |> Set.add s)
-                            |> PersistentStorage.SetTIBSearchCatalogues
-                            |> PersistentStorageMsg
-                            |> dispatch
-                        SearchConfig.TIBSearchCatalogueElement (catalogue, catalogues, setter, rmv)
+                        let rmv =
+                            fun () ->
+                                Messages.PersistentStorage.RemoveTIBSearchCatalogue catalogue
+                                |> PersistentStorageMsg
+                                |> dispatch
+
+                        let setter =
+                            fun (s: string) ->
+                                (selectedCatalogues |> Set.remove catalogue |> Set.add s)
+                                |> PersistentStorage.SetTIBSearchCatalogues
+                                |> PersistentStorageMsg
+                                |> dispatch
+
+                        SearchConfig.TIBSearchCatalogueElement(catalogue, catalogues, setter, rmv)
             ]
 
         static member Main(model, dispatch) =

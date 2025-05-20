@@ -139,7 +139,7 @@ export const Menu = forwardRef<
         <FloatingOverlay lockScroll>
           <FloatingFocusManager context={context} >
             <div
-              className="bg-base-200 w-56 rounded-sm h-80"
+              className="bg-base-200 w-56 rounded-xs h-80"
               // ref={refs.setFloating}
               // style={floatingStyles}
               // {...getFloatingProps()}

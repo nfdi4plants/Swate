@@ -1,2 +1,92 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@plugin "daisyui" {
+    themes: light --default, dark --prefersdark;
+}
+
+@plugin "daisyui/theme" {
+  name: light;
+  --color-primary: oklch(0.7305 0.13 177.47);
+  --color-primary-content: oklch(0% 0 0);
+  --color-secondary: oklch(0.3571 0.0384 250.36);
+  --color-secondary-content: oklch(100% 0 0);
+  --color-accent: oklch(0.8141 0.1041 124.06);
+  --color-accent-content: oklch(0% 0 0);
+}
+
+@plugin "daisyui/theme" {
+  name: dark;
+  --color-primary: oklch(0.7305 0.13 177.47);
+  --color-primary-content: oklch(0% 0 0);
+  --color-secondary: oklch(0.3571 0.0384 250.36);
+  --color-secondary-content: oklch(100% 0 0);
+  --color-accent: oklch(0.8141 0.1041 124.06);
+  --color-accent-content: oklch(0% 0 0);
+}
+
+
+@plugin "daisyui/theme" {
+  name: "dataplant";
+  default: false;
+  prefersdark: false;
+  color-scheme: "dark";
+  --color-base-100: oklch(27% 0.046 192.524);
+  --color-base-200: oklch(38% 0.063 188.416);
+  --color-base-300: oklch(43% 0.078 188.216);
+  --color-base-content: oklch(95% 0.051 180.801);
+  --color-primary: oklch(84% 0.143 164.978);
+  --color-primary-content: oklch(0% 0 0);
+  --color-secondary: oklch(83% 0.128 66.29);
+  --color-secondary-content: oklch(0% 0 0);
+  --color-accent: oklch(80% 0.105 251.813);
+  --color-accent-content: oklch(0% 0 0);
+  --color-neutral: oklch(51% 0.096 186.391);
+  --color-neutral-content: oklch(98% 0.014 180.72);
+  --color-info: oklch(54% 0.245 262.881);
+  --color-info-content: oklch(100% 0 0);
+  --color-success: oklch(62% 0.194 149.214);
+  --color-success-content: oklch(100% 0 0);
+  --color-warning: oklch(66% 0.179 58.318);
+  --color-warning-content: oklch(100% 0 0);
+  --color-error: oklch(57% 0.245 27.325);
+  --color-error-content: oklch(100% 0 0);
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0rem;
+  --size-selector: 0.21875rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1rem;
+
+  @variant sm {
+    padding-inline: 2rem;
+    max-width: 640px;
+  }
+
+  @variant md {
+    padding-inline: 3rem;
+    max-width: 768px;
+  }
+
+  @variant lg {
+    padding-inline: 4rem;
+    max-width: 1024px;
+  }
+
+  @variant xl {
+    padding-inline: 5rem;
+    max-width: 1280px;
+  }
+
+  @variant 2xl {
+    padding-inline: 6rem;
+    max-width: 1536px;
+  }
+}

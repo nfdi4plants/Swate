@@ -248,7 +248,7 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
         prop.children [
             Html.div [
                 prop.className
-                    "tabs tabs-lifted w-full overflow-x-auto overflow-y-hidden
+                    "tabs tabs-lift w-full overflow-x-auto overflow-y-hidden
                 flex flex-row items-center pt-1
                 *:!border-b-0 *:gap-1 *:flex-nowrap"
                 prop.children [

@@ -563,9 +563,9 @@ type FormComponents =
                 Daisy.label [
                     prop.className [
                         if isarea.IsSome && isarea.Value then
-                            "textarea textarea-bordered"
+                            "textarea"
                         else
-                            "input input-bordered"
+                            "input"
                         "flex items-center gap-2"
                         if isJoin then
                             "join-item"
@@ -605,13 +605,20 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member OntologyAnnotationInput (input: OntologyAnnotation option, setter: OntologyAnnotation option -> unit, ?label: string, ?parent: OntologyAnnotation, ?rmv: MouseEvent -> unit) =
-        let portal = React.useElementRef()
-        let renderer = fun _ c  -> React.fragment [
-            c
-        ]
+    static member OntologyAnnotationInput
+        (
+            input: OntologyAnnotation option,
+            setter: OntologyAnnotation option -> unit,
+            ?label: string,
+            ?parent: OntologyAnnotation,
+            ?rmv: MouseEvent -> unit
+        ) =
+        let portal = React.useElementRef ()
+        let renderer = fun _ c -> React.fragment [ c ]
+
         let portalObj =
             portal.current |> Option.map (fun p -> PortalTermDropdown(p, renderer))
+
         Html.div [
             prop.className "space-y-2"
             prop.children [

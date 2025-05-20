@@ -95,7 +95,7 @@ module ComponentAux =
                             prop.className "!text-base-content !border-primary"
                         ]
                     Daisy.label [
-                        prop.className "join-item input input-bordered input-sm input-primary flex items-center w-full"
+                        prop.className "join-item input input-sm input-primary flex items-center w-full"
                         prop.children [
                             Html.input [
                                 prop.placeholder $".. {state.Searchfield.toNameRdb}"
@@ -235,7 +235,7 @@ module ComponentAux =
                 prop.className "relative"
                 prop.children [
                     Daisy.label [
-                        prop.className "input input-bordered input-sm input-primary flex items-center"
+                        prop.className "input input-sm input-primary flex items-center"
                         prop.children [
                             Html.input [
                                 prop.placeholder ".. protocol tag"

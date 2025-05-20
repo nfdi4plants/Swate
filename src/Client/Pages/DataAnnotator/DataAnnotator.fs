@@ -108,7 +108,7 @@ module private DataAnnotatorHelper =
                     Html.button [ prop.className "btn btn-primary join-item"; prop.text "Choose File" ]
                     Html.input [
                         prop.title fileName
-                        prop.className "input input-bordered input-disabled join-item grow w-full"
+                        prop.className "input input-disabled join-item grow w-full"
                         prop.value fileName
                         prop.readOnly true
                     ]
@@ -288,8 +288,10 @@ type DataAnnotator =
                     FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
                 ]
             ]
+
         let content =
             FileViewComponent(model.DataAnnotatorModel.ParsedFile.Value, state, setState)
+
         let footer =
             Html.div [
                 prop.className "w-full flex justify-between items-center gap-2"

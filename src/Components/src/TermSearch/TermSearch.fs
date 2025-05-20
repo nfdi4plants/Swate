@@ -293,7 +293,7 @@ type TermSearch =
                                 Components.CollapseButton(
                                     collapsed,
                                     setCollapsed,
-                                    classes = "btn-sm rounded justify-self-end"
+                                    classes = "btn-sm rounded-sm justify-self-end"
                                 )
                             ]
                         ]
@@ -350,15 +350,23 @@ type TermSearch =
             ]
         ]
 
-    static member private TermDropdown(termDropdownRef: IRefValue<option<HTMLElement>>, onTermSelect, state: SearchState, loading: Set<string>, advancedSearchToggle: (unit -> unit) option, keyboardNavState: KeyboardNavigationController) =
+    static member private TermDropdown
+        (
+            termDropdownRef: IRefValue<option<HTMLElement>>,
+            onTermSelect,
+            state: SearchState,
+            loading: Set<string>,
+            advancedSearchToggle: (unit -> unit) option,
+            keyboardNavState: KeyboardNavigationController
+        ) =
         Html.div [
             prop.ref termDropdownRef
-            prop.style [style.scrollbarGutter.stable]
+            prop.style [ style.scrollbarGutter.stable ]
             prop.className [
                 "min-w-[400px] not-prose"
                 "absolute top-[100%] left-0 right-0 z-50"
                 "grid grid-cols-[auto,1fr,auto,auto]"
-                "bg-base-200 rounded shadow-lg border-2 border-primary max-h-[400px] overflow-y-auto divide-y divide-dashed divide-base-100"
+                "bg-base-200 rounded-sm shadow-lg border-2 border-primary max-h-[400px] overflow-y-auto divide-y divide-dashed divide-base-100"
                 if state = SearchState.Idle then
                     "hidden"
             ]
@@ -452,49 +460,44 @@ type TermSearch =
                             ]
                     ]
                 ]
-            | _ ->
-                Html.div [
-                    prop.text "No term selected."
+            | _ -> Html.div [ prop.text "No term selected." ]
+
+        let componentConfig =
+            Html.div [
+                prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
+                prop.children [
+                    for (key, value) in config do
+                        label key
+                        Html.div value
                 ]
-        let componentConfig = Html.div [
-            prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
-            prop.children [
-                for (key, value) in config do
-                    label key
-                    Html.div value
             ]
-        ]
-        let content = Html.div [
-            match showConfig with
-            | false ->
-                termContent
-                Html.div [
-                    prop.className "w-full flex justify-end"
-                    prop.children [
-                        Html.button [
-                            prop.className "btn btn-primary btn-xs"
-                            prop.onClick(fun _ -> setShowConfig (not showConfig))
-                            prop.children [
-                                Html.i [
-                                    prop.className "fa-solid fa-cog"
-                                ]
+
+        let content =
+            Html.div [
+                match showConfig with
+                | false ->
+                    termContent
+
+                    Html.div [
+                        prop.className "w-full flex justify-end"
+                        prop.children [
+                            Html.button [
+                                prop.className "btn btn-primary btn-xs"
+                                prop.onClick (fun _ -> setShowConfig (not showConfig))
+                                prop.children [ Html.i [ prop.className "fa-solid fa-cog" ] ]
                             ]
                         ]
                     ]
-                ]
-            | true ->
-                Html.button [
-                    prop.className "btn btn-neutral btn-xs btn-outline mb-2"
-                    prop.onClick(fun _ -> setShowConfig (not showConfig))
-                    prop.children [
-                        Html.i [
-                            prop.className "fa-solid fa-arrow-left"
-                        ]
-                        Html.span "back"
+                | true ->
+                    Html.button [
+                        prop.className "btn btn-neutral btn-xs btn-outline mb-2"
+                        prop.onClick (fun _ -> setShowConfig (not showConfig))
+                        prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "back" ]
                     ]
-                ]
-                componentConfig
-        ]
+
+                    componentConfig
+            ]
+
         BaseModal.BaseModal(rvm, header = Html.div "Details", content = content)
 
     static member private AdvancedSearchDefault
@@ -527,7 +530,7 @@ type TermSearch =
                         ]
                         Html.input [
                             prop.testid "advanced-search-term-name-input"
-                            prop.className "input input-bordered w-full"
+                            prop.className "input w-full"
                             prop.type'.text
                             prop.autoFocus true
                             prop.value advancedSearchState.TermName
@@ -549,7 +552,7 @@ type TermSearch =
                         ]
                         Html.input [
                             prop.testid "advanced-search-term-description-input"
-                            prop.className "input input-bordered w-full"
+                            prop.className "input w-full"
                             prop.type'.text
                             prop.value advancedSearchState.TermDefinition
                             prop.onChange (fun e ->
@@ -585,13 +588,17 @@ type TermSearch =
             ]
 
     [<ReactComponent>]
-    static member private AdvancedSearchModal(rmv, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool) =
-        let searchResults, setSearchResults = React.useState(SearchState.init)
+    static member private AdvancedSearchModal
+        (rmv, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool)
+        =
+        let searchResults, setSearchResults = React.useState (SearchState.init)
         /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
-        let (tempPagination: int option), setTempPagination = React.useState(None)
-        let pagination, setPagination = React.useState(0)
+        let (tempPagination: int option), setTempPagination = React.useState (None)
+        let pagination, setPagination = React.useState (0)
         // Only used if advancedSearch is set to default
-        let advancedSearchState, setAdvancedSearchState = React.useState (Swate.Components.Shared.DTOs.AdvancedSearchQuery.init)
+        let advancedSearchState, setAdvancedSearchState =
+            React.useState (Swate.Components.Shared.DTOs.AdvancedSearchQuery.init)
+
         let advancedSearch =
             match advancedSearch0 with
             | U2.Case1 advancedSearch -> advancedSearch
@@ -600,105 +607,119 @@ type TermSearch =
                     (fun () -> API.callAdvancedSearch advancedSearchState),
                     TermSearch.AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState)
                 )
+
         let BinSize = 20
-        let BinCount = React.useMemo((fun () -> searchResults.Results.Count / BinSize), [|box searchResults|])
-        let controller = AdvancedSearchController(
-            startSearch = (fun () ->
-                advancedSearch.search()
-                |> Promise.map(fun results ->
-                    let results = results.ConvertAll(fun t0 ->
-                        {Term = t0; IsDirectedSearchResult = false})
-                    setSearchResults (SearchState.SearchDone results)
-                )
-                |> Promise.start
-            ),
-            cancel = rmv
-        )
+
+        let BinCount =
+            React.useMemo ((fun () -> searchResults.Results.Count / BinSize), [| box searchResults |])
+
+        let controller =
+            AdvancedSearchController(
+                startSearch =
+                    (fun () ->
+                        advancedSearch.search ()
+                        |> Promise.map (fun results ->
+                            let results =
+                                results.ConvertAll(fun t0 -> {
+                                    Term = t0
+                                    IsDirectedSearchResult = false
+                                })
+
+                            setSearchResults (SearchState.SearchDone results))
+                        |> Promise.start),
+                cancel = rmv
+            )
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
-        React.useEffect(
-            (fun () -> setTempPagination (pagination + 1 |> Some)),
-            [|box pagination|]
-        )
-        let searchFormComponent() = React.fragment [
-            advancedSearch.form controller
-            Html.button [
-                prop.className "btn btn-primary"
-                prop.onClick(fun _ ->
-                    controller.startSearch()
-                )
-                prop.text "Submit"
-            ]
-        ]
-        let resultsComponent (results: ResizeArray<TermSearchResult>) = React.fragment [
-            Html.div [
-                Html.textf "Results: %i" results.Count
-            ]
-            Html.div [
-                prop.className "max-h-[50%] overflow-y-auto"
-                prop.children [
-                    for res in results.GetRange(pagination * BinSize, BinSize) do
-                        TermSearch.TermItem(res, onTermSelect, key = JS.JSON.stringify res)
+        React.useEffect ((fun () -> setTempPagination (pagination + 1 |> Some)), [| box pagination |])
+
+        let searchFormComponent () =
+            React.fragment [
+                advancedSearch.form controller
+                Html.button [
+                    prop.className "btn btn-primary"
+                    prop.onClick (fun _ -> controller.startSearch ())
+                    prop.text "Submit"
                 ]
             ]
-            if BinCount > 1 then
+
+        let resultsComponent (results: ResizeArray<TermSearchResult>) =
+            React.fragment [
+                Html.div [ Html.textf "Results: %i" results.Count ]
                 Html.div [
-                    prop.className "join"
+                    prop.className "max-h-[50%] overflow-y-auto"
                     prop.children [
-                        Html.input [
-                            prop.className "input input-bordered join-item grow"
-                            prop.type'.number
-                            prop.min 1
-                            prop.valueOrDefault (tempPagination |> Option.defaultValue pagination)
-                            prop.max BinCount
-                            prop.onChange (fun (e: int) -> System.Math.Min(System.Math.Max(e, 1), BinCount) |> Some |> setTempPagination)
-                        ]
-                        Html.div [
-                            prop.className "input input-bordered join-item shrink flex justify-center items-center bg-opacity-60 cursor-not-allowed border-l-0 select-none"
-                            prop.type'.text
-                            prop.text ($"/{BinCount}")
-                        ]
-                        Html.button [
-                            prop.className "btn btn-primary join-item"
-                            let disabled = tempPagination.IsNone || (tempPagination.Value-1) = pagination
-                            prop.disabled disabled
-                            prop.onClick(fun _ ->
-                                tempPagination |> Option.iter ((fun x -> x-1) >> setPagination)
-                            )
-                            prop.text "Go"
-                        ]
-                        Html.button [
-                            let disabled = pagination = 0
-                            prop.className "btn join-item"
-                            prop.disabled disabled
-                            prop.onClick(fun _ -> setPagination (pagination - 1))
-                            prop.text "Previous"
-                        ]
-                        Html.button [
-                            let disabled = pagination = BinCount-1
-                            prop.disabled disabled
-                            prop.className "btn join-item"
-                            prop.onClick(fun _ -> setPagination (pagination + 1))
-                            prop.text "Next"
-                        ]
+                        for res in results.GetRange(pagination * BinSize, BinSize) do
+                            TermSearch.TermItem(res, onTermSelect, key = JS.JSON.stringify res)
                     ]
                 ]
-            Html.button [
-                prop.className "btn btn-primary"
-                prop.onClick(fun _ -> setSearchResults SearchState.Idle)
-                prop.text "Back"
+                if BinCount > 1 then
+                    Html.div [
+                        prop.className "join"
+                        prop.children [
+                            Html.input [
+                                prop.className "input join-item grow"
+                                prop.type'.number
+                                prop.min 1
+                                prop.valueOrDefault (tempPagination |> Option.defaultValue pagination)
+                                prop.max BinCount
+                                prop.onChange (fun (e: int) ->
+                                    System.Math.Min(System.Math.Max(e, 1), BinCount) |> Some |> setTempPagination)
+                            ]
+                            Html.div [
+                                prop.className
+                                    "input join-item shrink flex justify-center items-center cursor-not-allowed border-l-0 select-none"
+                                prop.type'.text
+                                prop.text ($"/{BinCount}")
+                            ]
+                            Html.button [
+                                prop.className "btn btn-primary join-item"
+                                let disabled = tempPagination.IsNone || (tempPagination.Value - 1) = pagination
+                                prop.disabled disabled
+
+                                prop.onClick (fun _ ->
+                                    tempPagination |> Option.iter ((fun x -> x - 1) >> setPagination))
+
+                                prop.text "Go"
+                            ]
+                            Html.button [
+                                let disabled = pagination = 0
+                                prop.className "btn join-item"
+                                prop.disabled disabled
+                                prop.onClick (fun _ -> setPagination (pagination - 1))
+                                prop.text "Previous"
+                            ]
+                            Html.button [
+                                let disabled = pagination = BinCount - 1
+                                prop.disabled disabled
+                                prop.className "btn join-item"
+                                prop.onClick (fun _ -> setPagination (pagination + 1))
+                                prop.text "Next"
+                            ]
+                        ]
+                    ]
+                Html.button [
+                    prop.className "btn btn-primary"
+                    prop.onClick (fun _ -> setSearchResults SearchState.Idle)
+                    prop.text "Back"
+                ]
             ]
-        ]
-        let content = Html.div [
-            prop.className "flex flex-col gap-2 overflow-hidden p-2"
-            prop.children [
-                match searchResults with
-                | SearchState.Idle ->
-                    searchFormComponent()
-                | SearchState.SearchDone results ->
-                    resultsComponent results
+
+        let content =
+            Html.div [
+                prop.className "flex flex-col gap-2 overflow-hidden p-2"
+                prop.children [
+                    match searchResults with
+                    | SearchState.Idle -> searchFormComponent ()
+                    | SearchState.SearchDone results -> resultsComponent results
+                ]
             ]
-        ]
-        BaseModal.BaseModal(!!rmv, header = Html.div "Advanced Search", content = content, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
+
+        BaseModal.BaseModal(
+            !!rmv,
+            header = Html.div "Advanced Search",
+            content = content,
+            ?debug = (Option.map (fun _ -> "advanced-search-modal") debug)
+        )
 
     ///
     /// Customizable react component for term search. Utilizing SwateDB search by default.
@@ -709,29 +730,30 @@ type TermSearch =
     // [<ExportDefaultAttribute; NamedParams>]
     // #endif
     [<ReactComponent(true)>]
-    static member TermSearch(
-        onTermSelect: Term option -> unit,
-        term: Term option,
-        ?parentId: string,
-        ?termSearchQueries: ResizeArray<string * SearchCall>,
-        ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
-        ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
-        ?advancedSearch: U2<AdvancedSearch, bool>,
-        ?onFocus: unit -> unit,
-        ?onBlur: unit -> unit,
-        ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
-        ?showDetails: bool,
-        ?debug: bool,
-        ?disableDefaultSearch: bool,
-        ?disableDefaultParentSearch: bool,
-        ?disableDefaultAllChildrenSearch: bool,
-        ?portalTermDropdown: PortalTermDropdown,
-        ?portalModals: HTMLElement,
-        ?fullwidth: bool,
-        ?autoFocus: bool,
-        ?classNames: TermSearchStyle,
-        ?props: IReactProperty list
-    ) =
+    static member TermSearch
+        (
+            onTermSelect: Term option -> unit,
+            term: Term option,
+            ?parentId: string,
+            ?termSearchQueries: ResizeArray<string * SearchCall>,
+            ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
+            ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
+            ?advancedSearch: U2<AdvancedSearch, bool>,
+            ?onFocus: unit -> unit,
+            ?onBlur: unit -> unit,
+            ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
+            ?showDetails: bool,
+            ?debug: bool,
+            ?disableDefaultSearch: bool,
+            ?disableDefaultParentSearch: bool,
+            ?disableDefaultAllChildrenSearch: bool,
+            ?portalTermDropdown: PortalTermDropdown,
+            ?portalModals: HTMLElement,
+            ?fullwidth: bool,
+            ?autoFocus: bool,
+            ?classNames: TermSearchStyle,
+            ?props: IReactProperty list
+        ) =
 
         let showDetails = defaultArg showDetails false
         let debug = defaultArg debug false
@@ -741,16 +763,18 @@ type TermSearch =
         let (keyboardNavState: KeyboardNavigationController), setKeyboardNavState =
             React.useState (KeyboardNavigationController.init)
 
-        let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
+        let (searchResults: SearchState), setSearchResults =
+            React.useStateWithUpdater (SearchState.init ())
+
         /// Set of string ids for each action started. As long as one id is still contained, shows loading spinner
-        let (loading: Set<string>), setLoading = React.useStateWithUpdater(Set.empty)
-        let inputRef = React.useInputRef()
-        let containerRef: IRefValue<option<HTMLElement>> = React.useElementRef()
-        let termDropdownRef: IRefValue<option<HTMLElement>> = React.useElementRef()
-        let modalContainerRef: IRefValue<option<HTMLElement>> = React.useElementRef()
+        let (loading: Set<string>), setLoading = React.useStateWithUpdater (Set.empty)
+        let inputRef = React.useInputRef ()
+        let containerRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
+        let termDropdownRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
+        let modalContainerRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
         /// Used to show indicator buttons only when focused
-        let focused, setFocused = React.useState(false)
-        let cancelled = React.useRef(false)
+        let focused, setFocused = React.useState (false)
+        let cancelled = React.useRef (false)
 
         let (modal: Modals option), setModal = React.useState None
 
@@ -773,12 +797,14 @@ type TermSearch =
 
                 setModal modal
 
-        let onTermSelect = fun (term: Term option) ->
-            if inputRef.current.IsSome then
-                let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
-                inputRef.current.Value.value <- v
-            setSearchResults (fun _ -> SearchState.init())
-            onTermSelect term
+        let onTermSelect =
+            fun (term: Term option) ->
+                if inputRef.current.IsSome then
+                    let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
+                    inputRef.current.Value.value <- v
+
+                setSearchResults (fun _ -> SearchState.init ())
+                onTermSelect term
 
         let startLoadingBy =
             fun (key: string) ->
@@ -961,7 +987,7 @@ type TermSearch =
                 allChildSearch ()
 
         // Handles click outside events to close dropdown
-        React.useListener.onMouseDown(
+        React.useListener.onMouseDown (
             (fun e ->
                 if focused then
                     // these are the refs, which must be checked. It boils down to: base ref (containerRef)
@@ -974,53 +1000,61 @@ type TermSearch =
                         if termDropdownRef.current.IsSome then
                             termDropdownRef.current.Value
                     |]
+
                     let refsContain =
-                        refs
-                        |> Array.forall(fun el ->
-                            not (el.contains(unbox e.target))
-                        )
+                        refs |> Array.forall (fun el -> not (el.contains (unbox e.target)))
+
                     match refsContain with
                     | true ->
                         setFocused false
-                        setSearchResults(fun _ -> SearchState.init())
+                        setSearchResults (fun _ -> SearchState.init ())
+
                         if onBlur.IsSome then
-                            onBlur.Value ()
-                        cancel()
-                    | _ -> ()
-            )
+                            onBlur.Value()
+
+                        cancel ()
+                    | _ -> ())
         )
 
         // keyboard navigation
-        let keyboardNav = (fun (e:Browser.Types.KeyboardEvent) ->
-            promise {
+        let keyboardNav =
+            (fun (e: Browser.Types.KeyboardEvent) -> promise {
                 if focused then // only run when focused
                     match searchResults, e.code with
-                    | _, kbdEventCode.escape ->
-                        cancel()
+                    | _, kbdEventCode.escape -> cancel ()
                     | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
-                        setKeyboardNavState(
+                        setKeyboardNavState (
                             match keyboardNavState.SelectedTermSearchResult with
                             | Some 0 -> None
                             | Some i -> Some(System.Math.Max(i - 1, 0))
                             | _ -> None
-                            |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                            |> fun x -> {
+                                keyboardNavState with
+                                    SelectedTermSearchResult = x
+                            }
                         )
                     | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
-                        setKeyboardNavState(
+                        setKeyboardNavState (
                             match keyboardNavState.SelectedTermSearchResult with
                             | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
                             | _ -> Some(0)
-                            |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                            |> fun x -> {
+                                keyboardNavState with
+                                    SelectedTermSearchResult = x
+                            }
                         )
-                    | SearchState.Idle, kbdEventCode.arrowDown when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
+                    | SearchState.Idle, kbdEventCode.arrowDown when
+                        inputRef.current.IsSome
+                        && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not
+                        -> // down
                         startSearch inputRef.current.Value.value
-                    | SearchState.SearchDone res, kbdEventCode.enter when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
+                    | SearchState.SearchDone res, kbdEventCode.enter when
+                        keyboardNavState.SelectedTermSearchResult.IsSome
+                        -> // enter
                         onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
-                        cancel()
-                    | _ ->
-                        ()
-            }
-        )
+                        cancel ()
+                    | _ -> ()
+            })
 
         /// Could move this outside, but there are so many variable to pass to...
         let modalContainer =
@@ -1032,27 +1066,41 @@ type TermSearch =
                     "Disable Default All Children Search", Option.map string disableDefaultAllChildrenSearch
                     "Custom Term Search Queries", Option.map (Seq.map fst >> String.concat "; ") termSearchQueries
                     "Custom Parent Search Queries", Option.map (Seq.map fst >> String.concat "; ") parentSearchQueries
-                    "Custom All Children Search Queries", Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
-                    "Advanced Search", Option.map (function | U2.Case1 _ -> "Custom" | U2.Case2 _ -> "Default") advancedSearch
+                    "Custom All Children Search Queries",
+                    Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
+                    "Advanced Search",
+                    Option.map
+                        (function
+                        | U2.Case1 _ -> "Custom"
+                        | U2.Case2 _ -> "Default")
+                        advancedSearch
                 ]
-                |> List.fold(fun acc (key, value) ->
-                    match value with
-                    | Some value -> (key, value)::acc
-                    | _ -> acc
-                ) []
+                |> List.fold
+                    (fun acc (key, value) ->
+                        match value with
+                        | Some value -> (key, value) :: acc
+                        | _ -> acc)
+                    []
                 |> List.rev
+
             Html.div [
                 prop.className "z-[9999] fixed w-screen h-screen pointer-events-none"
                 prop.ref modalContainerRef
                 prop.children [
                     match modal with
-                    | Some Modals.Details ->
-                        TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
-                    | Some Modals.AdvancedSearch when advancedSearch.IsSome->
-                        let onTermSelect = fun (term: Term option) ->
-                            onTermSelect term
-                            setModal None
-                        TermSearch.AdvancedSearchModal((fun _ -> setModal None), advancedSearch.Value, onTermSelect, debug)
+                    | Some Modals.Details -> TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
+                    | Some Modals.AdvancedSearch when advancedSearch.IsSome ->
+                        let onTermSelect =
+                            fun (term: Term option) ->
+                                onTermSelect term
+                                setModal None
+
+                        TermSearch.AdvancedSearchModal(
+                            (fun _ -> setModal None),
+                            advancedSearch.Value,
+                            onTermSelect,
+                            debug
+                        )
                     | _ -> Html.none
                 ]
             ]
@@ -1060,11 +1108,12 @@ type TermSearch =
         Html.div [
             if debug then
                 prop.testId "term-search-container"
-                prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
-                prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
+                prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
+                prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
                 "form-control not-prose h-full"
-                if fullwidth then "w-full"
+                if fullwidth then
+                    "w-full"
             ]
             if props.IsSome then
                 for prop in props.Value do
@@ -1072,10 +1121,7 @@ type TermSearch =
             prop.ref containerRef
             prop.children [
                 if portalModals.IsSome then
-                    ReactDOM.createPortal(
-                        modalContainer,
-                        portalModals.Value
-                    )
+                    ReactDOM.createPortal (modalContainer, portalModals.Value)
                 else
                     modalContainer
                 Html.div [
@@ -1133,7 +1179,7 @@ type TermSearch =
 
                         Html.div [ // main search component
                             prop.className [
-                                "input input-bordered flex flex-row items-center relative w-full"
+                                "input flex flex-row items-center relative w-full"
                                 if classNames.IsSome && classNames.Value.inputLabel.IsSome then
                                     TermSearchStyle.resolveStyle classNames.Value.inputLabel.Value
                             ]
@@ -1174,19 +1220,20 @@ type TermSearch =
                                         elif System.String.IsNullOrEmpty inputRef.current.Value.value |> not then
                                             startSearch inputRef.current.Value.value)
                                     prop.onKeyDown (fun e ->
-                                        e.stopPropagation()
+                                        e.stopPropagation ()
+
                                         promise {
                                             do! keyboardNav e
+
                                             if onKeyDown.IsSome then
                                                 onKeyDown.Value e
                                         }
-                                        |> Promise.start
-                                    )
-                                    prop.onFocus(fun _ ->
+                                        |> Promise.start)
+                                    prop.onFocus (fun _ ->
                                         if onFocus.IsSome then
                                             onFocus.Value()
-                                        setFocused true
-                                    )
+
+                                        setFocused true)
                                 ]
                                 Daisy.loading [
                                     prop.className [
@@ -1195,17 +1242,41 @@ type TermSearch =
                                             "invisible"
                                     ]
                                 ]
-                                let advancedSearchToggle = advancedSearch |> Option.map (fun _ -> fun _ -> setModal (if modal.IsSome && modal.Value = Modals.AdvancedSearch then None else Some Modals.AdvancedSearch))
+                                let advancedSearchToggle =
+                                    advancedSearch
+                                    |> Option.map (fun _ ->
+                                        fun _ ->
+                                            setModal (
+                                                if modal.IsSome && modal.Value = Modals.AdvancedSearch then
+                                                    None
+                                                else
+                                                    Some Modals.AdvancedSearch
+                                            ))
+
                                 match portalTermDropdown with
                                 | Some portalTermSelectArea when containerRef.current.IsSome ->
-                                    ReactDOM.createPortal(
+                                    ReactDOM.createPortal (
                                         (portalTermSelectArea.renderer
-                                            (containerRef.current.Value.getBoundingClientRect())
-                                            (TermSearch.TermDropdown(termDropdownRef, onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState))),
+                                            (containerRef.current.Value.getBoundingClientRect ())
+                                            (TermSearch.TermDropdown(
+                                                termDropdownRef,
+                                                onTermSelect,
+                                                searchResults,
+                                                loading,
+                                                advancedSearchToggle,
+                                                keyboardNavState
+                                            ))),
                                         portalTermSelectArea.portal
                                     )
                                 | _ ->
-                                    TermSearch.TermDropdown(termDropdownRef, onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState)
+                                    TermSearch.TermDropdown(
+                                        termDropdownRef,
+                                        onTermSelect,
+                                        searchResults,
+                                        loading,
+                                        advancedSearchToggle,
+                                        keyboardNavState
+                                    )
                             ]
                         ]
                     ]

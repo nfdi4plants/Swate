@@ -54,7 +54,7 @@ type ModalElements =
     static member Box(title: string, icon: string, content: ReactElement, ?className: string list) =
         Html.div [
             prop.className [
-                "rounded shadow p-2 flex flex-col gap-2 border"
+                "rounded-sm shadow-sm p-2 flex flex-col gap-2 border"
                 if className.IsSome then
                     className.Value |> String.concat " "
             ]

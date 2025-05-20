@@ -129,7 +129,7 @@ module private Helper =
                 ]
                 Daisy.dropdownContent [
                     prop.tabIndex 0
-                    prop.className "bg-base-300 [&_a]:rounded-none shadow"
+                    prop.className "bg-base-300 [&_a]:rounded-none shadow-sm"
                     prop.children [
                         Html.ul [
                             createNewTableItem (

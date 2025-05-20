@@ -15,8 +15,8 @@ module private TableHelper =
 
         if
             (lower.StartsWith("key")
-            || lower.StartsWith("digit")
-            || lower.StartsWith("numpad"))
+             || lower.StartsWith("digit")
+             || lower.StartsWith("numpad"))
             || lower.StartsWith("backspace")
         then
             ActiveTrigger
@@ -147,8 +147,8 @@ p-0"""
                             contains = GridSelect.contains,
                             selectAt = GridSelect.selectAt,
                             clear = GridSelect.clear,
-                            getSelectedCells = (
-                                fun () ->
+                            getSelectedCells =
+                                (fun () ->
                                     match GridSelect.selectedCells with
                                     | Some range ->
                                         ResizeArray [|
@@ -156,8 +156,7 @@ p-0"""
                                                 for y in range.yStart .. range.yEnd do
                                                     yield {| x = x; y = y |}
                                         |]
-                                    | None -> ResizeArray ()
-                            ),
+                                    | None -> ResizeArray()),
                             getSelectedCellRange = (fun () -> GridSelect.selectedCells),
                             getCount = (fun () -> GridSelect.count)
                         )
@@ -231,7 +230,7 @@ p-0"""
                 prop.onKeyDown (fun e ->
                     TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown)
                 prop.tabIndex 0
-                prop.className "overflow-auto h-96 w-full border border-primary rounded"
+                prop.className "overflow-auto h-96 w-full border border-primary rounded-sm"
                 if debug then
                     prop.testId "virtualized-table"
                 prop.children [
