@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @keyframes border-gradient-flow {
     0% {
@@ -13,7 +12,6 @@
       background-position: 50% 0%;
     }
   }
-
 
 @layer utilities {
     .animated-border::before {

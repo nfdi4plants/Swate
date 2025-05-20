@@ -8,7 +8,7 @@ open Elmish.React // do not delete this line, it is required #if !DEBUG
 open Fable.Core.JsInterop
 
 
-importSideEffects "./tailwindstyle.scss"
+importSideEffects "./tailwind.css"
 
 module Subscriptions =
 
