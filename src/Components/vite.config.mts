@@ -15,14 +15,24 @@ export default defineConfig({
         jsx: 'automatic', // Enables React 17+ JSX Transform
     },
     build: {
+        sourcemap: true,
         lib: {
-            entry: './src/index.js', // Entry file for your library
+            entry: './src/index.js', // Entry file
             name: "@nfdi4plants/swate-components",
+            formats: ['es', 'cjs'],
             fileName: (format) => `index.${format}.js`,
         },
         rollupOptions: {
             // Exclude peer dependencies from the final bundle
-            external: ['react', 'react-dom', 'tailwindcss', '@fable-org/fable-library-js'],
+            external: [
+                'react',
+                'react-dom',
+                'tailwindcss',
+                '@fable-org/fable-library-js',
+                "@floating-ui/react",
+                "@fortawesome/fontawesome-free",
+                "@tanstack/react-virtual"
+            ],
             output: {
                 globals: {
                     react: 'React',
