@@ -29,7 +29,7 @@ type ModalElements =
     static member RadioPlugin(radioGroup: string, txt: string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
         let isDisabled = defaultArg isDisabled false
 
-        Daisy.formControl [
+        Daisy.fieldset [
             Daisy.label [
                 prop.className [
                     "cursor-pointer transition-colors"

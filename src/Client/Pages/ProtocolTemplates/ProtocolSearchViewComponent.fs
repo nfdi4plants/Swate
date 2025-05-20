@@ -314,7 +314,6 @@ module ComponentAux =
             Daisy.select [
                 prop.className "w-full"
                 select.sm
-                select.bordered
                 select.primary
                 prop.value (state.CommunityFilter.ToStringRdb())
                 prop.onChange (fun (e: Browser.Types.Event) ->

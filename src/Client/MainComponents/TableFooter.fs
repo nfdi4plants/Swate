@@ -20,7 +20,6 @@ let Main (dispatch: Messages.Msg -> unit) =
                 Daisy.input [
                     prop.className "border-current"
                     join.item
-                    input.bordered
                     prop.type'.number
                     prop.id "n_row_input"
                     prop.min init_RowsToAdd

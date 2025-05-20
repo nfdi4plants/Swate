@@ -120,7 +120,7 @@ type SelectiveImportModal =
             sprintf "%s Metadata" name,
             "fa-solid fa-lightbulb",
             React.fragment [
-                Daisy.formControl [
+                Daisy.fieldset [
                     Daisy.label [
                         prop.className "cursor-pointer"
                         prop.children [
@@ -161,10 +161,14 @@ type SelectiveImportModal =
         let addTableImport =
             fun (i: int) (fullImport: bool) ->
                 let newImportTable: ImportTable = { Index = i; FullImport = fullImport }
-                let newImportTables = newImportTable :: importConfig.ImportTables |> List.distinctBy (fun table -> table.Index)
+
+                let newImportTables =
+                    newImportTable :: importConfig.ImportTables
+                    |> List.distinctBy (fun table -> table.Index)
 
                 {
-                    importConfig with ImportTables = newImportTables
+                    importConfig with
+                        ImportTables = newImportTables
                 }
                 |> Protocol.UpdateImportConfig
                 |> ProtocolMsg
@@ -252,13 +256,15 @@ type SelectiveImportModal =
             | Template t -> ResizeArray([ t.Table ]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
 
-        let setMetadataImport = fun b ->
-            {
-                model.ProtocolState.ImportConfig with ImportMetadata  = b;
-            }
-            |> Protocol.UpdateImportConfig
-            |> ProtocolMsg
-            |> dispatch
+        let setMetadataImport =
+            fun b ->
+                {
+                    model.ProtocolState.ImportConfig with
+                        ImportMetadata = b
+                }
+                |> Protocol.UpdateImportConfig
+                |> ProtocolMsg
+                |> dispatch
 
         let content =
             React.fragment [
@@ -268,16 +274,29 @@ type SelectiveImportModal =
                     model.ProtocolState.ImportConfig.ImportType,
                     "importType",
                     [|
-                        ARCtrl.TableJoinOptions.Headers,    " Column Headers";
-                        ARCtrl.TableJoinOptions.WithUnit,   " ..With Units";
-                        ARCtrl.TableJoinOptions.WithValues, " ..With Values";
+                        ARCtrl.TableJoinOptions.Headers, " Column Headers"
+                        ARCtrl.TableJoinOptions.WithUnit, " ..With Units"
+                        ARCtrl.TableJoinOptions.WithValues, " ..With Values"
                     |],
-                    fun importType -> {model.ProtocolState.ImportConfig with ImportType = importType} |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch)
-                SelectiveImportModal.MetadataImport(model.ProtocolState.ImportConfig.ImportMetadata, setMetadataImport, disArcfile)
-                for ti in 0 .. (tables.Count-1) do
+                    fun importType ->
+                        {
+                            model.ProtocolState.ImportConfig with
+                                ImportType = importType
+                        }
+                        |> Protocol.UpdateImportConfig
+                        |> ProtocolMsg
+                        |> dispatch
+                )
+                SelectiveImportModal.MetadataImport(
+                    model.ProtocolState.ImportConfig.ImportMetadata,
+                    setMetadataImport,
+                    disArcfile
+                )
+                for ti in 0 .. (tables.Count - 1) do
                     let t = tables.[ti]
                     SelectiveImportModal.TableImport(ti, t, model, dispatch)
             ]
+
         let footer =
             Html.div [
                 prop.className "justify-end flex gap-2"
@@ -290,8 +309,8 @@ type SelectiveImportModal =
                         prop.text "Submit"
                         prop.onClick (fun e ->
                             {|
-                                importState = model.ProtocolState.ImportConfig;
-                                importedFile = import;
+                                importState = model.ProtocolState.ImportConfig
+                                importedFile = import
                                 deselectedColumns = model.ProtocolState.ImportConfig.DeselectedColumns
                             |}
                             |> SpreadsheetInterface.ImportJson

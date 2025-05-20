@@ -14,7 +14,7 @@ type Generic =
 
     static member BoxedField(?title: string, ?description: string, ?content: ReactElement list) =
         Daisy.card [
-            card.compact
+            card.sm
             prop.className
                 "space-y-6 border-2 border-base-300 shadow-xl bg-base
             prose prose-headings:text-primary container max-w-full lg:max-w-[800px]"

@@ -186,15 +186,10 @@ module private Helper =
     let readOnlyFormElement (v: string option, label: string) =
         let v = defaultArg v "-"
 
-        Daisy.formControl [
+        Daisy.fieldset [
             prop.children [
-                Daisy.label [ Daisy.labelText label ]
-                Daisy.input [
-                    input.bordered
-                    prop.disabled true
-                    prop.readOnly true
-                    prop.valueOrDefault v
-                ]
+                Daisy.label label
+                Daisy.input [ prop.disabled true; prop.readOnly true; prop.valueOrDefault v ]
             ]
         ]
 
@@ -877,7 +872,6 @@ type FormComponents =
                 if label.IsSome then
                     Generic.FieldTitle label.Value
                 Daisy.input [
-                    input.bordered
                     prop.type'.dateTimeLocal
                     prop.ref ref
                     prop.onChange (fun (e: System.DateTime) ->
@@ -980,7 +974,7 @@ type FormComponents =
         Html.div [
             prop.children [
                 if label.IsSome then
-                    Daisy.label [ Daisy.labelText label.Value ]
+                    Daisy.label label.Value
                 Html.div [
                     prop.className "flex flex-row gap-2 relative"
                     prop.children [

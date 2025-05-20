@@ -32,7 +32,6 @@ module private DataAnnotatorHelper =
             Daisy.join [
                 prop.children [
                     Daisy.input [
-                        input.bordered
                         join.item
                         prop.placeholder ".. update separator"
                         prop.defaultValue input_
@@ -82,7 +81,6 @@ module private DataAnnotatorHelper =
                         prop.children [
                             Html.i [ prop.className "indicator-item fa-solid fa-info-circle fa-lg text-accent" ]
                             Daisy.select [
-                                select.bordered
                                 join.item
                                 prop.title infoText
                                 prop.defaultValue (string current)

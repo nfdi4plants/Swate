@@ -56,7 +56,6 @@ type FileExporter =
                 prop.children [
                     Daisy.select [
                         join.item
-                        select.bordered
                         prop.onChange (fun (e: Browser.Types.Event) ->
                             let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
                             { state with ExportFormat = jef } |> setState)

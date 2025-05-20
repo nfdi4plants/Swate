@@ -32,7 +32,7 @@ type Tabs =
         let isIEBrowser: bool = Browser.Dom.window.document?documentMode
 
         Daisy.tabs [
-            tabs.boxed
+            tabs.box
             prop.className "w-full"
             prop.children [
                 Tabs.NavigationTab Routing.SidebarPage.BuildingBlock model dispatch

@@ -48,7 +48,7 @@ module private Components =
     let TabNavigation (currentPage, setPage) =
         Daisy.tabs [
             prop.className "grow"
-            tabs.bordered
+            tabs.border
             prop.children [
                 Tab(FunctionPage.Create, currentPage, setPage)
                 Tab(FunctionPage.Update, currentPage, setPage)
@@ -67,26 +67,23 @@ module private Components =
             Html.td (cell)
         ]
 
-    let PreviewTable(column: CompositeColumn, cellValues: string [], regex) =
+    let PreviewTable (column: CompositeColumn, cellValues: string[], regex) =
         React.fragment [
-            Daisy.label [
-                Daisy.labelText "Preview"
-            ]
+            Daisy.label [ prop.text "Preview" ]
             Html.div [
                 prop.className "overflow-x-auto grow"
                 prop.children [
                     Daisy.table [
-                        Html.thead [
-                            Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
-                        ]
+                        Html.thead [ Html.tr [ Html.th ""; Html.th "Before"; Html.th "After" ] ]
                         Html.tbody [
                             let previewCount = 5
                             let preview = Array.takeSafe previewCount cellValues
-                            for i in 0 .. (preview.Length-1) do
+
+                            for i in 0 .. (preview.Length - 1) do
                                 let cell0 = column.Cells.[i].ToString()
                                 let cell = preview.[i]
                                 let regexMarkedIndex = calculateRegex regex cell0
-                                PreviewRow(i,cell0,cell,regexMarkedIndex)
+                                PreviewRow(i, cell0, cell, regexMarkedIndex)
                         ]
                     ]
                 ]
@@ -109,10 +106,9 @@ type UpdateColumn =
             |> setPreview
 
         React.fragment [
-            Daisy.formControl [
-                Daisy.label [ Daisy.labelText "Base" ]
+            Daisy.fieldset [
+                Daisy.fieldsetLegend "Base"
                 Daisy.input [
-                    input.bordered
                     prop.className "input-xs sm:input-sm md:input-md"
                     prop.autoFocus true
                     prop.valueOrDefault baseStr
@@ -120,12 +116,10 @@ type UpdateColumn =
                         setBaseStr s
                         updateCells s suffix)
                 ]
-            ]
-            Daisy.formControl [
                 Daisy.label [
                     prop.className "cursor-pointer"
                     prop.children [
-                        Daisy.labelText "Add number suffix"
+                        Html.span "Add number suffix"
                         Daisy.checkbox [
                             prop.isChecked suffix
                             prop.onChange (fun e ->
@@ -164,22 +158,18 @@ type UpdateColumn =
         Html.div [
             prop.className "flex gap-2"
             prop.children [
-                Daisy.formControl [
-                    Daisy.label [ Daisy.labelText "Regex" ]
+                Daisy.fieldset [
+                    Daisy.fieldsetLabel "Regex"
                     Daisy.input [
                         prop.autoFocus true
-                        input.bordered
                         prop.className "input-xs sm:input-sm md:input-md"
                         prop.valueOrDefault regex
                         prop.onChange (fun s ->
                             setRegex s
                             updateCells replacement s)
                     ]
-                ]
-                Daisy.formControl [
-                    Daisy.label [ Daisy.labelText "Replacement" ]
+                    Daisy.fieldsetLabel "Replacement"
                     Daisy.input [
-                        input.bordered
                         prop.className "input-xs sm:input-sm md:input-md"
                         prop.valueOrDefault replacement
                         prop.onChange (fun s ->
