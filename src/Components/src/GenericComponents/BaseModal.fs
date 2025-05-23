@@ -9,15 +9,17 @@ open Fable.Core
 type BaseModal =
 
     [<ReactComponent(true)>]
-    static member BaseModal (
-        rmv,
-        ?modalClassInfo: string,
-        ?header: ReactElement,
-        ?modalActions: ReactElement,
-        ?content: ReactElement,
-        ?contentClassInfo: string,
-        ?footer: ReactElement,
-        ?debug: string) =
+    static member BaseModal
+        (
+            rmv,
+            ?modalClassInfo: string,
+            ?header: ReactElement,
+            ?modalActions: ReactElement,
+            ?content: ReactElement,
+            ?contentClassInfo: string,
+            ?footer: ReactElement,
+            ?debug: string
+        ) =
 
         //Daisy.modal.div [
         //    if debug.IsSome then
@@ -68,26 +70,22 @@ type BaseModal =
         Html.div [
             if debug.IsSome then
                 prop.testId ("modal_" + debug.Value)
-            prop.className "swt:modal swt:modal-active"
+            prop.className "swt:modal swt:modal-open"
             prop.children [
-                Html.div [
-                    prop.className "swt:modal-backdrop"
-                    prop.onClick rmv
-                ]
+                Html.div [ prop.className "swt:modal-backdrop"; prop.onClick rmv ]
                 Html.div [
                     prop.className [
                         "swt:modal-box swt:w-4/5 swt:flex swt:flex-col swt:gap-2"
                         if modalClassInfo.IsSome then
                             modalClassInfo.Value
-                        else
-                            ""
                     ]
                     prop.children [
                         Html.div [
                             prop.className "swt:card-title"
                             prop.children [
-                                if header.IsSome then header.Value
-                                Components.DeleteButton(props = [ prop.className "swt:ml-auto"; prop.onClick rmv ])
+                                if header.IsSome then
+                                    header.Value
+                                Components.DeleteButton(className = "swt:ml-auto", props = [ prop.onClick rmv ])
                             ]
                         ]
 
@@ -107,10 +105,7 @@ type BaseModal =
                             ]
 
                         if footer.IsSome then
-                            Html.div [
-                                prop.className "swt:card-actions"
-                                prop.children footer.Value
-                            ]
+                            Html.div [ prop.className "swt:card-actions"; prop.children footer.Value ]
                     ]
                 ]
             ]
