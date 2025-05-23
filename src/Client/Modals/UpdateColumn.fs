@@ -74,10 +74,7 @@ module private Components =
     let PreviewTable (column: CompositeColumn, cellValues: string[], regex) =
         React.fragment [
             //Daisy.label [
-            Html.label [
-                prop.className "swt:label"
-                prop.text "Preview"
-            ]
+            Html.label [ prop.className "swt:label"; prop.text "Preview" ]
             Html.div [
                 prop.className "swt:overflow-x-auto swt:grow"
                 prop.children [
@@ -123,10 +120,7 @@ type UpdateColumn =
                 prop.className "swt:fieldset"
                 prop.children [
                     //Daisy.fieldsetLegend "Base"
-                    Html.legend [
-                        prop.className "swt:fieldset-legend"
-                        prop.text "Base"
-                    ]
+                    Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Base" ]
                     //Daisy.input [
                     Html.input [
                         prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
@@ -136,24 +130,20 @@ type UpdateColumn =
                             let target = ev.target :?> Browser.Types.HTMLInputElement
                             let value = target.value
                             setBaseStr value
-                            updateCells value suffix
-                        )
+                            updateCells value suffix)
                     ]
                     //Daisy.label [
-                    Html.label[
+                    Html.label [
                         prop.className "swt:label swt:cursor-pointer"
                         prop.children [
                             Html.span "Add number suffix"
-                            //Daisy.checkbox [
                             Html.input [
                                 prop.type'.checkbox
                                 prop.className "swt:checkbox"
                                 prop.isChecked suffix
-                                prop.onChange (fun (ev: Browser.Types.Event) ->
-                                    let target = ev.target :?> Browser.Types.HTMLInputElement
-                                    let isChecked = target.checked
-                                    setSuffix isChecked
-                                    updateCells baseStr isChecked)
+                                prop.onChange (fun (b: bool) ->
+                                    setSuffix b
+                                    updateCells baseStr b)
                             ]
                         ]
                     ]
@@ -193,10 +183,7 @@ type UpdateColumn =
                     prop.className "swt:fieldset"
                     prop.children [
                         //Daisy.fieldsetLabel "Regex"
-                        Html.legend [
-                            prop.className "swt:fieldset-legend"
-                            prop.text "Regex"
-                        ]
+                        Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Regex" ]
                         //Daisy.input [
                         Html.input [
                             prop.autoFocus true
@@ -209,10 +196,7 @@ type UpdateColumn =
                                 updateCells replacement value)
                         ]
                         //Daisy.fieldsetLabel "Replacement"
-                        Html.legend [
-                            prop.className "swt:fieldset-legend"
-                            prop.text "Replacement"
-                        ]
+                        Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Replacement" ]
                         //Daisy.input [
                         Html.input [
                             prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"

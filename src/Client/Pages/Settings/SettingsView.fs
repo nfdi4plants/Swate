@@ -59,14 +59,8 @@ module Settings =
                                     prop.id "swateDefaultSearch"
                                     prop.type'.checkbox
 
-                                    //prop.onChange (fun (b: bool) ->
-                                    //    Messages.PersistentStorage.UpdateSwateDefaultSearch b
-                                    //    |> PersistentStorageMsg
-                                    //    |> dispatch)
-                                    prop.onChange (fun (ev: Browser.Types.Event) ->
-                                        let target = ev.target :?> Browser.Types.HTMLInputElement
-                                        let checked = target.checked
-                                        Messages.PersistentStorage.UpdateSwateDefaultSearch checked
+                                    prop.onChange (fun (b: bool) ->
+                                        Messages.PersistentStorage.UpdateSwateDefaultSearch b
                                         |> PersistentStorageMsg
                                         |> dispatch)
                                 ]
@@ -144,7 +138,8 @@ module Settings =
                                                 "swt:absolute swt:top-0 swt:right-0 swt:left-0 swt:bottom-0 swt:animate-ping swt:bg-yellow-400"
                                         ]
                                         Html.button [
-                                            prop.className "swt:btn swt:btn-warning swt:btn-active swt:btn-square swt:no-animation"
+                                            prop.className
+                                                "swt:btn swt:btn-warning swt:btn-active swt:btn-square swt:no-animation"
                                             prop.children [
                                                 Html.i [ prop.className "fa-solid fa-triangle-exclamation" ]
                                             ]
@@ -287,10 +282,7 @@ type Settings =
         Html.label [
             prop.className "swt:grid swt:lg:col-span-2 swt:grid-cols-subgrid swt:cursor-pointer swt:not-prose"
             prop.children [
-                Html.p [
-                    prop.className "swt:text-xl swt:py-2"
-                    prop.text "Theme"
-                ]
+                Html.p [ prop.className "swt:text-xl swt:py-2"; prop.text "Theme" ]
                 Html.button [
                     prop.className "swt:btn swt:btn-block swt:btn-primary"
                     //prop.text (if theme = "light" then dark else light)
@@ -315,26 +307,17 @@ type Settings =
         Html.label [
             prop.className "swt:grid swt:lg:col-span-2 swt:grid-cols-subgrid swt:cursor-pointer swt:not-prose"
             prop.children [
-                Html.p [
-                    prop.className "swt:select-none swt:text-xl"
-                    prop.text "Autosave"
-                ]
+                Html.p [ prop.className "swt:select-none swt:text-xl"; prop.text "Autosave" ]
                 Html.div [
                     prop.className "swt:flex swt:items-center swt:pl-10"
                     prop.children [
-                        //Daisy.toggle [
                         Html.input [
                             prop.className "swt:toggle swt:toggle-primary swt:ml-14"
                             prop.isChecked model.PersistentStorageState.Autosave
                             prop.type'.checkbox
-                            //prop.onChange (fun (b: bool) ->
-                            //    PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
-                            prop.onChange (fun (ev: Browser.Types.Event) ->
-                                let target = ev.target :?> Browser.Types.HTMLInputElement
-                                let checked = target.checked
-                                Messages.PersistentStorage.UpdateAutosave checked
-                                |> PersistentStorageMsg
-                                |> dispatch)
+                            prop.onChange (fun (b: bool) ->
+
+                                Messages.PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
                         ]
                     ]
                 ]

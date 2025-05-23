@@ -199,7 +199,8 @@ type Widget =
                     let config = createEmpty<AddEventListenerOptions>
                     config.once <- true
                     Browser.Dom.document.addEventListener ("mouseup", onmouseup, config))
-                prop.className "swt:shadow-md swt:border swt:border-base-300 swt:space-y-4 swt:rounded-lg swt:border-r-2 swt:bg-base-100"
+                prop.className
+                    "swt:shadow-md swt:border swt:border-base-300 swt:space-y-4 swt:rounded-lg swt:border-r-2 swt:bg-base-100"
                 prop.style [
                     style.zIndex 40
                     style.cursor.eastWestResize //style.cursor.northWestSouthEastResize ;
@@ -240,11 +241,12 @@ type Widget =
                         let config = createEmpty<AddEventListenerOptions>
                         config.once <- true
                         Browser.Dom.document.addEventListener ("mouseup", onmouseup, config))
-                    prop.className "swt:cursor-move swt:flex swt:justify-end swt:bg-gradient-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
+                    prop.className
+                        "swt:cursor-move swt:flex swt:justify-end swt:bg-gradient-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
                         Components.Components.DeleteButton(
+                            className = "swt:btn-ghost swt:glass",
                             props = [
-                                prop.className "swt:btn-ghost swt:glass"
                                 prop.onClick (fun e ->
                                     e.stopPropagation ()
                                     rmv e)

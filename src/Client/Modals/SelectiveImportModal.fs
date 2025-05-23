@@ -67,11 +67,10 @@ type SelectiveImportModal =
                     prop.disabled (not isActive)
                     prop.style [ style.height (length.perc 100) ]
                     prop.isChecked isChecked
-                    prop.onChange (fun (ev: Browser.Types.Event) ->
+                    prop.onChange (fun (_: bool) ->
                         if columns.Length > 0 then
                             let nextImportConfig = importConfig.toggleDeselectColumn (tableIndex, columnIndex)
-                            nextImportConfig |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
-                    )
+                            nextImportConfig |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch)
                 ]
             ]
         ]
@@ -137,9 +136,7 @@ type SelectiveImportModal =
                                 Html.input [
                                     prop.type'.checkbox
                                     prop.className "swt:checkbox"
-                                    prop.onChange (fun (ev: Browser.Types.Event) ->
-                                        let target = ev.target :?> Browser.Types.HTMLInputElement
-                                        setActive target.checked)
+                                    prop.onChange (fun (b: bool) -> setActive b)
                                 ]
                                 Html.span [ prop.className "swt:text-sm"; prop.text "Import" ]
                             ]
@@ -147,7 +144,8 @@ type SelectiveImportModal =
                     ]
                 ]
                 Html.span [
-                    prop.className "swt:text-warning swt:bg-warning-content swt:flex flex-row swt:gap-2 swt:justify-center swt:items-center"
+                    prop.className
+                        "swt:text-warning swt:bg-warning-content swt:flex flex-row swt:gap-2 swt:justify-center swt:items-center"
                     prop.children [
                         Html.i [ prop.className "fa-solid fa-exclamation-triangle" ]
                         Html.text " Importing metadata will overwrite the current file."
@@ -240,7 +238,10 @@ type SelectiveImportModal =
                         Html.div [
                             prop.className [
                                 "swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
-                                if isActive then "swt:text-primary-content" else "swt:text-success"
+                                if isActive then
+                                    "swt:text-primary-content"
+                                else
+                                    "swt:text-success"
                             ]
                             prop.children [
                                 Html.span (if isActive then "Select Columns" else "Preview Table")

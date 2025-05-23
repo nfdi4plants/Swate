@@ -223,9 +223,7 @@ module private Helper =
             prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop []
-                Html.div [
-                    prop.className "swt:modal-backdrop"
-                ]
+                Html.div [ prop.className "swt:modal-backdrop" ]
                 //Daisy.modalBox.div [
                 Html.div [
                     prop.className "swt:modal-box"
@@ -269,12 +267,11 @@ module private Helper =
             prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop []
-                Html.div [
-                    prop.className "swt:modal-backdrop"
-                ]
+                Html.div [ prop.className "swt:modal-backdrop" ]
                 //Daisy.modalBox.div [
                 Html.div [
-                    prop.className "swt:modal-box swt:max-h-[80%] swt:overflow-y-hidden swt:flex swt:flex-col swt:space-y-2"
+                    prop.className
+                        "swt:modal-box swt:max-h-[80%] swt:overflow-y-hidden swt:flex swt:flex-col swt:space-y-2"
                     prop.children [
                         Html.div [
                             prop.className "swt:space-y-2 swt:overflow-y-auto swt:max-h-fit swt:overflow-x-auto"
@@ -371,9 +368,7 @@ module private Helper =
             prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop []
-                Html.div [
-                    prop.className "swt:modal-backdrop"
-                ]
+                Html.div [ prop.className "swt:modal-backdrop" ]
                 //Daisy.modalBox.form [
                 Html.form [
                     prop.className "swt:modal-box"
@@ -390,11 +385,7 @@ module private Helper =
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
                                 //Daisy.button.button [ prop.text "back"; prop.onClick back ]
-                                Html.button [
-                                    prop.className "swt:btn"
-                                    prop.text "back"
-                                    prop.onClick back
-                                ]
+                                Html.button [ prop.className "swt:btn"; prop.text "back"; prop.onClick back ]
                                 //Daisy.button.button [ button.success; prop.text "confirm"; prop.onClick confirm ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-success"
@@ -415,10 +406,7 @@ module private Helper =
             prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop [ prop.onClick back ]
-                Html.div [
-                    prop.className "swt:modal-backdrop"
-                    prop.onClick back
-                ]
+                Html.div [ prop.className "swt:modal-backdrop"; prop.onClick back ]
                 //Daisy.modalBox.div [
                 Html.form [
                     //prop.className "swt:modal-box"
@@ -429,7 +417,7 @@ module private Helper =
                             //alert.error
                             prop.className "swt:alert"
                             prop.children [
-                                Components.DeleteButton(props = [| prop.onClick back |])
+                                Components.DeleteButton(props = [ prop.onClick back ])
                                 Html.div error.Message
                             ]
                         ]
@@ -1088,10 +1076,7 @@ type FormComponents =
             prop.children [
                 if label.IsSome then
                     //Daisy.label label.Value
-                    Html.label [
-                        prop.className "swt:label"
-                        prop.text label.Value
-                    ]
+                    Html.label [ prop.className "swt:label"; prop.text label.Value ]
                 Html.div [
                     prop.className "swt:flex swt:flex-row swt:gap-2 swt:relative"
                     prop.children [

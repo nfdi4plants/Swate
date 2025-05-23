@@ -16,12 +16,15 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
         //Daisy.button.a [
         Html.button [
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
+
             prop.className [
                 "swt:btn swt:btn-outline swt:join-item"
                 if isActive then
-                   "swt:btn-primary"
+                    "swt:btn-primary"
             ]
+
             prop.text "Term"
+
             prop.onClick (fun _ ->
                 BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Term
                 |> BuildingBlockMsg
@@ -29,12 +32,15 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
         ]
         Html.button [
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
+
             prop.className [
                 "swt:btn swt:btn-outline swt:join-item"
                 if isActive then
-                   "swt:btn-primary"
+                    "swt:btn-primary"
             ]
+
             prop.text "Unit"
+
             prop.onClick (fun _ ->
                 BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Unitized
                 |> BuildingBlockMsg
@@ -46,8 +52,12 @@ open Fable.Core
 
 [<ReactComponent>]
 let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
-    let element = React.useElementRef()
-    let portalTermDropdown = element.current |> Option.map (fun e -> Swate.Components.PortalTermDropdown(e, fun _ c -> React.fragment [c]))
+    let element = React.useElementRef ()
+
+    let portalTermDropdown =
+        element.current
+        |> Option.map (fun e -> Swate.Components.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
+
     Html.div [
         prop.ref element
         prop.style [ style.position.relative ]
@@ -67,21 +77,21 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                     let input = model.AddBuildingBlockState.TryBodyOA()
 
                     Swate.Components.TermSearch.TermSearch(
-                            setter,
-                            (input |> Option.map _.ToTerm()),
-                            ?parentId=(parent |> Option.map _.TermAccessionShort),
-                            ?portalTermDropdown= portalTermDropdown,
-                            fullwidth=true,
-                            classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
-                            advancedSearch = !^true,
-                            showDetails = true,
-                            disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
-                            parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
-                        )
+                        setter,
+                        (input |> Option.map _.ToTerm()),
+                        ?parentId = (parent |> Option.map _.TermAccessionShort),
+                        ?portalTermDropdown = portalTermDropdown,
+                        fullwidth = true,
+                        classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
+                        advancedSearch = !^true,
+                        showDetails = true,
+                        disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
+                        disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
+                        disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
+                        termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
+                        parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
+                        allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
+                    )
                 ]
             ]
         ]
@@ -90,8 +100,12 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
 [<ReactComponent>]
 let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, model: Model, dispatch) =
     let state = model.AddBuildingBlockState
-    let element = React.useElementRef()
-    let portalTermDropdown = element.current |> Option.map (fun e -> Swate.Components.PortalTermDropdown(e, fun _ c -> React.fragment [c]))
+    let element = React.useElementRef ()
+
+    let portalTermDropdown =
+        element.current
+        |> Option.map (fun e -> Swate.Components.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
+
     Html.div [
         prop.ref element // The ref must be place here, otherwise the portalled term select area will trigger daisy join syntax
         prop.style [ style.position.relative ]
@@ -125,10 +139,10 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
 
                         Swate.Components.TermSearch.TermSearch(
                             setter,
-                            (input |> Option.map _.ToTerm() ),
-                            ?portalTermDropdown=portalTermDropdown,
-                            fullwidth=true,
-                            classNames = Swate.Components.TermSearchStyle(!^"border-current join-item"),
+                            (input |> Option.map _.ToTerm()),
+                            ?portalTermDropdown = portalTermDropdown,
+                            fullwidth = true,
+                            classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
                             advancedSearch = !^true,
                             showDetails = true,
                             disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
@@ -194,10 +208,7 @@ let private AddBuildingBlockButton (model: Model) dispatch =
 
                 prop.className [
                     "swt:btn swt:btn-wide"
-                    if isValid then
-                        "swt:btn-success"
-                    else
-                        "swt:btn-error"
+                    if isValid then "swt:btn-success" else "swt:btn-error"
                 ]
 
                 if not isValid then
