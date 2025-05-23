@@ -9,8 +9,14 @@ type ActivityLog =
 
     static member Main(model: Model) =
         Html.div [
-            Daisy.table [
-                prop.className "table-xs"
-                prop.children [ Html.tbody (model.DevState.Log |> List.map LogItem.toTableRow) ]
+            //Daisy.table [
+            Html.table [
+                prop.className "swt:table swt:table-xs"
+                prop.children [
+                    Html.tbody [
+                        for logEntry in model.DevState.Log do
+                            yield LogItem.toTableRow logEntry
+                    ]
+                ]
             ]
         ]

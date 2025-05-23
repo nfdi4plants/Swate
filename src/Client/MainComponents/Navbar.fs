@@ -3,7 +3,6 @@ module MainComponents.Navbar
 open Feliz
 open Feliz.DaisyUI
 
-
 open LocalHistory
 open Messages
 open Components
@@ -25,7 +24,7 @@ let private FileName (model: Model) =
     match model.SpreadsheetModel.ArcFile with
     | Some _ ->
         Html.div [
-            prop.className "text-white text-lg font-bold inline-flex items-center max-w-[125px] px-2 truncate"
+            prop.className "swt:text-white swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-[125px] swt:px-2 swt:truncate"
             prop.text txt
             prop.title txt
         ]
@@ -37,7 +36,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
         prop.children [
             QuickAccessButton.QuickAccessButton(
                 "Back",
-                React.fragment [ Html.i [ prop.className "fa-solid fa-rotate-left" ] ],
+                Icons.Back(),
                 (fun _ ->
                     let newPosition = state.HistoryCurrentPosition + 1
                     //let newPosition_clamped = System.Math.Min(newPosition, state.HistoryExistingItemCount)
@@ -50,7 +49,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
             )
             QuickAccessButton.QuickAccessButton(
                 "Forward",
-                React.fragment [ Html.i [ prop.className "fa-solid fa-rotate-right" ] ],
+                Icons.Forward(),
                 (fun _ ->
                     let newPosition = state.HistoryCurrentPosition - 1
 
@@ -67,7 +66,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
         prop.children [
             QuickAccessButton.QuickAccessButton(
                 "Save",
-                React.fragment [ Html.i [ prop.className "fa-solid fa-floppy-disk" ] ],
+                Icons.Save(),
                 (fun _ ->
                     match model.PersistentStorageState.Host with
                     | Some(Swatehost.Browser) ->
@@ -83,14 +82,14 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
             | Some Swatehost.Browser ->
                 QuickAccessButton.QuickAccessButton(
                     "Reset",
-                    React.fragment [ Html.i [ prop.className "fa-solid fa-trash-can" ] ],
+                    Icons.Delete(),
                     (fun _ ->
                         Model.ModalState.TableModals.ResetTable
                         |> Model.ModalState.ModalTypes.TableModal
                         |> Some
                         |> Messages.UpdateModal
                         |> dispatch),
-                    classes = "hover:!text-error"
+                    classes = "swt:hover:!text-error"
                 )
 
                 NavbarBurger.Main(model, dispatch)
@@ -107,10 +106,18 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
         )
 
     let addTemplate =
-        QuickAccessButton.QuickAccessButton("Add Template", Icons.Templates(), (fun _ -> addWidget Widget._Template))
+        QuickAccessButton.QuickAccessButton(
+            "Add Template",
+            Icons.Templates(),
+            (fun _ -> addWidget Widget._Template)
+        )
 
     let filePicker =
-        QuickAccessButton.QuickAccessButton("File Picker", Icons.FilePicker(), (fun _ -> addWidget Widget._FilePicker))
+        QuickAccessButton.QuickAccessButton(
+            "File Picker",
+            Icons.FilePicker(),
+            (fun _ -> addWidget Widget._FilePicker)
+        )
 
     let dataAnnotator =
         QuickAccessButton.QuickAccessButton(
@@ -120,7 +127,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
         )
 
     Html.div [
-        prop.className "flex flex-row"
+        prop.className "swt:flex swt:flex-row"
         prop.children [
             match model.SpreadsheetModel.ActiveView with
             | Spreadsheet.ActivePattern.IsTable ->
@@ -128,12 +135,12 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 addTemplate
                 filePicker
                 dataAnnotator
-            | Spreadsheet.ActivePattern.IsDataMap -> dataAnnotator
-            | Spreadsheet.ActivePattern.IsMetadata -> Html.none
+            | Spreadsheet.ActivePattern.IsDataMap ->
+                dataAnnotator
+            | Spreadsheet.ActivePattern.IsMetadata ->
+                Html.none
         ]
     ]
-
-
 
 [<ReactComponent>]
 let Main (model: Model, dispatch, widgets, setWidgets) =
@@ -148,8 +155,13 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
             add widget widgets
 
     Components.BaseNavbar.Main [
-        Html.div [ prop.className "grow-0"; prop.children [ FileName model ] ]
-        Daisy.navbarCenter [
+        Html.div [
+            prop.className "swt:grow-0"
+            prop.children [ FileName model ]
+        ]
+        //Daisy.navbarCenter [
+        Html.div [
+            prop.className "swt:navbar-center"
             prop.children [
                 QuickAccessButtonListStart model.History dispatch
                 WidgetNavbarList(model, dispatch, addWidget)
@@ -167,7 +179,7 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
         //     ]
         // | _ -> Html.none
         Html.div [
-            prop.className "ml-auto"
+            prop.className "swt:ml-auto"
             prop.children [ QuickAccessButtonListEnd model dispatch ]
         ]
     ]

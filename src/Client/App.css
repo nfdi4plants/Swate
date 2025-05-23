@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 @keyframes border-gradient-flow {
     0% {
       background-position: 50% 0%;
@@ -13,7 +9,6 @@
       background-position: 50% 0%;
     }
   }
-
 
 @layer utilities {
     .animated-border::before {

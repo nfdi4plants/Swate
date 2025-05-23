@@ -128,7 +128,7 @@ function customAdvancedSearch (input: string, setInput: (value: string) => void)
       ]),
     form: (controller: { startSearch: () => void; cancel: () => void }) => (
       <input
-        className="input input-bordered"
+        className="input"
         data-testid="advanced-search-input"
         type="text"
         onChange={(e) => setInput(e.target.value)}
@@ -178,7 +178,7 @@ function renderCustomAdvancedTermSearch(args: any) {
  *     ]),
  *   form: (controller: { startSearch: () => void; cancel: () => void }) => (
  *     <input
- *       className="input input-bordered"
+ *       className="input"
  *       data-testid="advanced-search-input"
  *       type="text"
  *       onChange={(e) => setInput(e.target.value)}

@@ -15,7 +15,7 @@ type Tabs =
         Daisy.tab [
             if isActive then
                 tab.active
-            prop.className "navigation" // this class does not do anything, but disables <a> styling.
+            prop.className "swt:navigation" // this class does not do anything, but disables <a> styling.
             prop.onClick (fun e ->
                 e.preventDefault ()
 
@@ -32,8 +32,8 @@ type Tabs =
         let isIEBrowser: bool = Browser.Dom.window.document?documentMode
 
         Daisy.tabs [
-            tabs.boxed
-            prop.className "w-full"
+            tabs.box
+            prop.className "swt:w-full"
             prop.children [
                 Tabs.NavigationTab Routing.SidebarPage.BuildingBlock model dispatch
                 Tabs.NavigationTab Routing.SidebarPage.TermSearch model dispatch

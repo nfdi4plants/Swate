@@ -18,14 +18,14 @@ type CellStyles =
 
     static member cellStyle(adjusted: string list) =
         prop.className [
-            "min-w-48 max-w-xl"
-            "h-[38px] min-h-[38px] max-h-[38px] overflow-visible border border-solid border-base-content cursor-pointer"
+            "swt:min-w-48 swt:max-w-xl"
+            "swt:h-[38px] swt:min-h-[38px] swt:max-h-[38px] swt:overflow-visible swt:border swt:border-solid swt:border-base-content swt:cursor-pointer"
             adjusted |> String.concat " "
         ]
 
     static member private cellInnerContainerStyle(adjusted: string list) =
         prop.className [
-            "flex justify-between flex-row flex-nowrap size-full items-center *:truncate *:min-w-0 px-2 py-1 max-w-xl"
+            "swt:flex swt:justify-between swt:flex-row swt:flex-nowrap swt:size-full swt:items-center *:truncate *:min-w-0 px-2 swt:py-1 swt:max-w-xl"
             adjusted |> String.concat " "
         ]
 
@@ -81,9 +81,9 @@ type CellStyles =
         Html.div [
             CellStyles.cellInnerContainerStyle []
             prop.children [
-                Html.span [ prop.className "grow"; prop.text displayValue ]
+                Html.span [ prop.className "swt:grow"; prop.text displayValue ]
                 if hasValidOA then
-                    Html.i [ prop.className [ "ml-auto text-primary"; "fa-solid"; "fa-check"; "size-4" ] ]
+                    Html.i [ prop.className [ "swt:ml-auto swt:text-primary"; "fa-solid"; "fa-check"; "swt:size-4" ] ]
             ]
         ]
 
@@ -104,12 +104,12 @@ type CellStyles =
             //        prop.text (if rowIndex < 0 then "" else $"{rowIndex+1}")
             //    ]
             //]
-            prop.className "border border-solid border-base-content"
+            prop.className "swt:border swt:border-solid swt:border-base-content"
             prop.style [ style.resize.none ]
             prop.children [
                 Html.div [
                     prop.style [ style.height (length.perc 100) ]
-                    prop.className "flex items-center justify-center px-2 py-1"
+                    prop.className "swt:flex swt:items-center swt:justify-center swt:px-2 swt:py-1"
                     prop.disabled true
                     prop.children [ Html.b (if rowIndex < 0 then "" else $"{rowIndex + 1}") ]
                 ]

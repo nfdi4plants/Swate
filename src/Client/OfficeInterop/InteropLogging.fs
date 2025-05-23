@@ -28,6 +28,5 @@ type Msg = {
         MessageTxt = msgTxt
     }
 
-
 let NoActiveTableMsg =
     Msg.create Error "Error! No annotation table found in active worksheet!"
