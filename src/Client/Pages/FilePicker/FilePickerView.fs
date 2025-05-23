@@ -39,7 +39,7 @@ type FilePicker =
         let inputId = "filePicker_OnFilePickerMainFunc"
 
         Html.div [
-            prop.className [ "flex flex-col gap-2"; parentContainerResizeClass ]
+            prop.className [ "swt:flex swt:flex-col swt:gap-2"; parentContainerResizeClass ]
             prop.children [
                 Html.input [
                     prop.style [ style.display.none ]
@@ -87,7 +87,7 @@ type FilePicker =
 
     static member private ActionButtons (model: Model) dispatch =
         Html.div [
-            prop.className "flex flex-row justify-center gap-2"
+            prop.className "swt:flex swt:flex-row swt:justify-center swt:gap-2"
             prop.children [
 
                 Daisy.button.button [

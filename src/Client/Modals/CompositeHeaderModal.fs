@@ -29,7 +29,7 @@ type CompositeHeaderModal =
 
     static member SelectHeaderType(state, setState) =
         Html.select [
-            prop.className "select join-item"
+            prop.className "swt:select swt:join-item"
             prop.value (state.NextHeaderType.ToString())
             prop.onChange (fun (e: string) ->
                 {
@@ -73,7 +73,7 @@ type CompositeHeaderModal =
 
     static member SelectIOType(state, setState) =
         Html.select [
-            prop.className "select join-item"
+            prop.className "swt:select swt:join-item"
             prop.value (state.NextIOType |> Option.defaultValue IOType.Sample |> _.ToString())
             prop.onChange (fun (e: string) ->
                 {
@@ -100,22 +100,48 @@ type CompositeHeaderModal =
                 parsedStrList.[0], []
 
         Html.div [
-            prop.className "overflow-x-auto grow"
+            prop.className "swt:overflow-x-auto swt:grow"
             prop.children [
-                Daisy.table [
-                    table.sm
+                //Daisy.table [
+                //    table.sm
+                //    prop.children [
+                //        Html.thead [
+                //            Html.tr [
+                //                for header in headers do
+                //                    Html.th [ prop.className "swt:truncate swt:max-w-16"; prop.text header; prop.title header ]
+                //            ]
+                //        ]
+                //        Html.tbody [
+                //            for row in body do
+                //                Html.tr [
+                //                    for cell in row do
+                //                        Html.td [ prop.className "swt:truncate swt:max-w-16"; prop.text cell; prop.title cell ]
+                //                ]
+                //        ]
+                //    ]
+                //]
+                Html.table [
+                    prop.className "swt:table swt:table-sm"
                     prop.children [
                         Html.thead [
                             Html.tr [
                                 for header in headers do
-                                    Html.th [ prop.className "truncate max-w-16"; prop.text header; prop.title header ]
+                                    Html.th [
+                                        prop.className "swt:truncate swt:max-w-16"
+                                        prop.text header
+                                        prop.title header
+                                    ]
                             ]
                         ]
                         Html.tbody [
                             for row in body do
                                 Html.tr [
                                     for cell in row do
-                                        Html.td [ prop.className "truncate max-w-16"; prop.text cell; prop.title cell ]
+                                        Html.td [
+                                            prop.className "swt:truncate swt:max-w-16"
+                                            prop.text cell
+                                            prop.title cell
+                                        ]
                                 ]
                         ]
                     ]
@@ -212,7 +238,7 @@ type CompositeHeaderModal =
         Html.div [
             prop.children [
                 Html.div [
-                    prop.className "join"
+                    prop.className "swt:join"
                     prop.children [
                         CompositeHeaderModal.SelectHeaderType(state, setState)
                         match state.NextHeaderType with
@@ -265,11 +291,21 @@ type CompositeHeaderModal =
             rmv (e)
 
         Html.div [
-            prop.className "justify-end flex gap-2"
+            prop.className "swt:justify-end swt:flex gap-2"
             prop.style [ style.marginLeft length.auto ]
             prop.children [
-                Daisy.button.button [ prop.onClick rmv; button.outline; prop.text "Cancel" ]
-                Daisy.button.button [ button.primary; prop.text "Submit"; prop.onClick submit ]
+                //Daisy.button.button [ prop.onClick rmv; button.outline; prop.text "Cancel" ]
+                Html.button [
+                    prop.className "swt:btn swt:btn-outline"
+                    prop.text "Cancel"
+                    prop.onClick rmv
+                ]
+                //Daisy.button.button [ button.primary; prop.text "Submit"; prop.onClick submit ]
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.text "Submit"
+                    prop.onClick submit
+                ]
             ]
         ]
 

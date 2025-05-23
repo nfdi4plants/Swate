@@ -217,7 +217,7 @@ type ContextMenu =
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do
                                         prop.custom (key, v)
                                     prop.className
-                                        "grid grid-cols-[auto_1fr_auto] bg-base-100 border-2 border-base-300 w-56 rounded-md focus:outline-hidden"
+                                        "swt:grid swt:grid-cols-[auto_1fr_auto] swt:bg-base-100 swt:border-2 swt:border-base-300 swt:w-56 swt:rounded-md swt:focus:outline-hidden"
                                     prop.children [
                                         for index in 0 .. children.Length - 1 do
                                             let child = children.[index]
@@ -251,32 +251,32 @@ type ContextMenu =
                                                 |> Fable.Core.JS.Constructors.Object.entries
 
                                             if child.isDivider then
-                                                Html.div [ prop.className "divider my-0 col-span-3" ]
+                                                Html.div [ prop.className "swt:divider swt:my-0 swt:col-span-3" ]
                                             else
                                                 Html.button [
                                                     prop.key index
                                                     prop.className
-                                                        "col-span-3 grid grid-cols-subgrid gap-x-2 text-sm
-text-base-content px-2 py-1
-w-full text-left
-hover:bg-base-100
-focus:bg-base-100 focus:outline-hidden focus:ring-2 focus:ring-primary"
+                                                        "swt:col-span-3 swt:grid swt:grid-cols-subgrid swt:gap-x-2 swt:text-sm
+swt:text-base-content swt:px-2 swt:py-1
+swt:w-full swt:text-left
+swt:hover:bg-base-100
+swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-primary"
                                                     prop.children [
                                                         if child.icon.IsSome then
                                                             Html.div [
-                                                                prop.className "col-start-1 justify-self-start"
+                                                                prop.className "swt:col-start-1 swt:justify-self-start"
                                                                 prop.children child.icon.Value
                                                             ]
                                                         else
                                                             Html.none
                                                         if child.text.IsSome then
                                                             Html.div [
-                                                                prop.className "col-start-2 justify-self-start"
+                                                                prop.className "swt:col-start-2 swt:justify-self-start"
                                                                 prop.children child.text.Value
                                                             ]
                                                         if child.kbdbutton.IsSome then
                                                             Html.div [
-                                                                prop.className "col-start-3 justify-self-end"
+                                                                prop.className "swt:col-start-3 swt:justify-self-end"
                                                                 prop.children child.kbdbutton.Value.element
                                                             ]
                                                         else
@@ -300,13 +300,13 @@ focus:bg-base-100 focus:outline-hidden focus:ring-2 focus:ring-primary"
 
         Html.div [
             prop.className
-                "w-full h-72 border border-dashed border-primary rounded-sm flex items-center justify-center flex-col gap-4"
+                "swt:w-full swt:h-72 swt:border swt:border-dashed swt:border-primary swt:rounded-sm swt:flex swt:items-center swt:justify-center swt:flex-col swt:gap-4"
             prop.ref containerRef
 
             prop.children [
                 Html.span [ prop.className "select-none"; prop.text "Click here for context menu!" ]
                 Html.button [
-                    prop.className "btn btn-primary"
+                    prop.className "swt:btn swt:btn-primary"
                     prop.text "Example Table Cell"
                     prop.dataRow 12
                     prop.dataColumn 5
@@ -325,7 +325,7 @@ focus:bg-base-100 focus:outline-hidden focus:ring-2 focus:ring-primary"
                                     (if i = 3 then
                                          {|
                                              element =
-                                                 Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]
+                                                 Html.kbd [ prop.className "swt:ml-auto swt:kbd swt:kbd-sm"; prop.text "Back" ]
                                              label = "Back"
                                          |}
                                          |> Some

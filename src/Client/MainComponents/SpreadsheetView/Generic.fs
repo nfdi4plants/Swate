@@ -27,7 +27,7 @@ let Main (data, createCell, headers, createHeaderCell, model: Model, dispatch: M
         prop.id "SPREADSHEET_MAIN_VIEW"
         prop.key $"SPREADSHEET_MAIN_VIEW_{model.SpreadsheetModel.ActiveView.ViewIndex}"
         prop.tabIndex 0
-        prop.className "flex grow overflow-y-hidden"
+        prop.className "swt:flex swt:grow swt:overflow-y-hidden"
         prop.style [ style.border (1, borderStyle.solid, "grey") ]
         prop.ref ref
         prop.onKeyDown (fun e -> Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch e)

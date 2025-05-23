@@ -219,9 +219,9 @@ type TermSearch =
         let isDirectedSearch = term.IsDirectedSearchResult
 
         let activeClasses =
-            "group-[.collapse-open]:bg-secondary group-[.collapse-open]:text-secondary-content"
+            "swt:group-[.collapse-open]:bg-secondary swt:group-[.collapse-open]:text-secondary-content"
 
-        let gridClasses = "grid grid-cols-subgrid col-span-4"
+        let gridClasses = "swt:grid swt:grid-cols-subgrid swt:col-span-4"
         let ref = React.useElementRef ()
 
         React.useEffect (
@@ -239,20 +239,20 @@ type TermSearch =
         Html.div [
             prop.ref ref
             prop.className [
-                "group collapse rounded-none"
+                "swt:group swt:collapse swt:rounded-none"
                 gridClasses
                 if collapsed || (isActive.IsSome && isActive.Value) then
-                    "collapse-open"
+                    "swt:collapse-open"
             ]
             prop.children [
                 Html.div [
                     prop.onClick (fun e ->
                         e.stopPropagation ()
                         onTermSelect (Some term.Term))
-                    prop.className [ "collapse-title p-2 min-h-fit cursor-pointer"; gridClasses; activeClasses ]
+                    prop.className [ "swt:collapse-title swt:p-2 swt:min-h-fit swt:cursor-pointer"; gridClasses; activeClasses ]
                     prop.children [
                         Html.div [
-                            prop.className "items-center grid col-span-4 gap-2 grid-cols-[auto,1fr,auto,auto]"
+                            prop.className "swt:items-center swt:grid swt:col-span-4 swt:gap-2 swt:grid-cols-[auto,1fr,auto,auto]"
                             prop.children [
                                 Html.i [
                                     if isObsolete then
@@ -260,11 +260,11 @@ type TermSearch =
                                     elif isDirectedSearch then
                                         prop.title "Directed Search"
                                     prop.className [
-                                        "w-5"
+                                        "swt:w-5"
                                         if isObsolete then
-                                            "fa-solid fa-link-slash text-error"
+                                            "fa-solid fa-link-slash swt:text-error"
                                         elif isDirectedSearch then
-                                            "fa-solid fa-diagram-project text-primary"
+                                            "fa-solid fa-diagram-project swt:text-primary"
                                     ]
                                 ]
                                 Html.span [
@@ -272,9 +272,9 @@ type TermSearch =
                                     prop.title name
 
                                     prop.className [
-                                        "truncate font-bold"
+                                        "swt:truncate swt:font-bold"
                                         if isObsolete then
-                                            "line-through"
+                                            "swt:line-through"
                                     ]
 
                                     prop.text name
@@ -286,29 +286,29 @@ type TermSearch =
                                         prop.onClick (fun e -> e.stopPropagation ())
                                         prop.target.blank
                                         prop.href term.Term.href.Value
-                                        prop.className "link link-primary"
+                                        prop.className "swt:link swt:link-primary"
 
                                     prop.text id
                                 ]
                                 Components.CollapseButton(
                                     collapsed,
                                     setCollapsed,
-                                    classes = "btn-sm rounded-sm justify-self-end"
+                                    classes = "swt:btn-sm swt:rounded-sm swt:justify-self-end"
                                 )
                             ]
                         ]
                     ]
                 ]
                 Html.div [
-                    prop.className [ "collapse-content prose-sm"; "col-span-4"; activeClasses ]
+                    prop.className [ "swt:collapse-content swt:prose-sm"; "swt:col-span-4"; activeClasses ]
                     prop.children [
                         Html.p [
-                            prop.className "text-sm"
+                            prop.className "swt:text-sm"
                             prop.children [ Html.text (Option.defaultValue "<no-description>" term.Term.description) ]
                         ]
                         if term.Term.data.IsSome then
                             Html.pre [
-                                prop.className "text-xs"
+                                prop.className "swt:text-xs"
                                 prop.children [
                                     Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
                                 ]
@@ -320,7 +320,7 @@ type TermSearch =
 
     static member private NoResultsElement(advancedSearchToggle: (unit -> unit) option) =
         Html.div [
-            prop.className "gap-y-2 py-2 px-4"
+            prop.className "swt:gap-y-2 swt:py-2 swt:px-4"
             prop.children [
                 Html.div "No terms found matching your input."
                 if advancedSearchToggle.IsSome then
@@ -328,7 +328,7 @@ type TermSearch =
                         prop.children [
                             Html.span "Can't find the term you are looking for? "
                             Html.a [
-                                prop.className "link link-primary"
+                                prop.className "swt:link swt:link-primary"
                                 prop.onClick (fun e ->
                                     e.preventDefault ()
                                     e.stopPropagation ()
@@ -343,7 +343,7 @@ type TermSearch =
                         prop.href @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"
                         prop.target.blank
                         prop.text "contact"
-                        prop.className "link link-primary"
+                        prop.className "swt:link swt:link-primary"
                     ]
                     Html.span " with us!"
                 ]
@@ -363,12 +363,12 @@ type TermSearch =
             prop.ref termDropdownRef
             prop.style [ style.scrollbarGutter.stable ]
             prop.className [
-                "min-w-[400px] not-prose"
-                "absolute top-[100%] left-0 right-0 z-50"
-                "grid grid-cols-[auto,1fr,auto,auto]"
-                "bg-base-200 rounded-sm shadow-lg border-2 border-primary max-h-[400px] overflow-y-auto divide-y divide-dashed divide-base-100"
+                "swt:min-w-[400px] swt:not-prose"
+                "swt:absolute top-[100%] swt:left-0 swt:right-0 z-50"
+                "swt:grid swt:grid-cols-[auto,1fr,auto,auto]"
+                "swt:bg-base-200 swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto divide-y swt:divide-dashed swt:divide-base-100"
                 if state = SearchState.Idle then
-                    "hidden"
+                    "swt:hidden"
             ]
 
             prop.children [
@@ -402,7 +402,7 @@ type TermSearch =
 
         Html.span [
             prop.className [
-                "indicator-item text-sm transition-[opacity] opacity-0"
+                "swt:indicator-item swt:text-sm swt:transition-[opacity] swt:opacity-0"
                 indicatorPosition
                 if isActive then
                     "!opacity-100"
@@ -413,7 +413,7 @@ type TermSearch =
                     prop.onClick onclick
                     for prop in defaultArg props [] do
                         prop
-                    prop.className [ "btn btn-xs btn-ghost px-2"; "tooltip"; tooltipPosition ]
+                    prop.className [ "swt:btn swt:btn-xs swt:btn-ghost swt:px-2"; "swt:tooltip"; tooltipPosition ]
                     prop.children [ Html.i [ prop.className icon ] ]
                 ]
             ]
@@ -424,13 +424,13 @@ type TermSearch =
         let showConfig, setShowConfig = React.useState (false)
 
         let label (str: string) =
-            Html.div [ prop.className "font-bold"; prop.text str ]
+            Html.div [ prop.className "swt:font-bold"; prop.text str ]
 
         let termContent =
             match term with
             | Some term ->
                 Html.div [
-                    prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
+                    prop.className "swt:grid swt:grid-cols-1 swt:md:grid-cols-[auto,1fr] swt:gap-4 swt:lg:gap-x-8"
                     prop.children [
                         label "Name"
                         Html.div (Option.defaultValue "<no-name>" term.name)
@@ -444,16 +444,16 @@ type TermSearch =
                             label "Data"
 
                             Html.pre [
-                                prop.className "text-xs"
+                                prop.className "swt:text-xs"
                                 prop.children [
                                     Html.code (Fable.Core.JS.JSON.stringify (term.data.Value, space = '\t'))
                                 ]
                             ]
                         if term.isObsolete.IsSome && term.isObsolete.Value then
-                            Html.div [ prop.className "text-error"; prop.text "obsolete" ]
+                            Html.div [ prop.className "swt:text-error"; prop.text "obsolete" ]
                         if term.href.IsSome then
                             Html.a [
-                                prop.className "link link-primary"
+                                prop.className "swt:link swt:link-primary"
                                 prop.href term.href.Value
                                 prop.target.blank
                                 prop.text "Source Link"
@@ -464,7 +464,7 @@ type TermSearch =
 
         let componentConfig =
             Html.div [
-                prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
+                prop.className "swt:grid swt:grid-cols-1 swt:md:grid-cols-[auto,1fr] swt:gap-4 swt:lg:gap-x-8"
                 prop.children [
                     for (key, value) in config do
                         label key
@@ -479,10 +479,10 @@ type TermSearch =
                     termContent
 
                     Html.div [
-                        prop.className "w-full flex justify-end"
+                        prop.className "swt:w-full swt:flex swt:justify-end"
                         prop.children [
                             Html.button [
-                                prop.className "btn btn-primary btn-xs"
+                                prop.className "swt:btn swt:btn-primary swt:btn-xs"
                                 prop.onClick (fun _ -> setShowConfig (not showConfig))
                                 prop.children [ Html.i [ prop.className "fa-solid fa-cog" ] ]
                             ]
@@ -490,7 +490,7 @@ type TermSearch =
                     ]
                 | true ->
                     Html.button [
-                        prop.className "btn btn-neutral btn-xs btn-outline mb-2"
+                        prop.className "swt:btn swt:btn-neutral swt:btn-xs swt:btn-outline swt:mb-2"
                         prop.onClick (fun _ -> setShowConfig (not showConfig))
                         prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "back" ]
                     ]
@@ -506,7 +506,7 @@ type TermSearch =
         fun (cc: AdvancedSearchController) ->
             React.fragment [
                 Html.div [
-                    prop.className "prose"
+                    prop.className "swt:prose"
                     prop.children [
                         Html.p "Use the following fields to search for terms."
                         Html.p [
@@ -515,7 +515,7 @@ type TermSearch =
                                 prop.href @"https://lucene.apache.org/core/2_9_4/queryparsersyntax.html"
                                 prop.target.blank
                                 prop.text "Learn more!"
-                                prop.className "text-xs"
+                                prop.className "swt:text-xs"
                             ]
                         ]
 
@@ -526,11 +526,11 @@ type TermSearch =
                     prop.children [
                         Html.div [
                             prop.className "label"
-                            prop.children [ Html.span [ prop.className "label-text"; prop.text "Term Name" ] ]
+                            prop.children [ Html.span [ prop.className "swt:label-text"; prop.text "Term Name" ] ]
                         ]
                         Html.input [
                             prop.testid "advanced-search-term-name-input"
-                            prop.className "input w-full"
+                            prop.className "swt:input swt:w-full"
                             prop.type'.text
                             prop.autoFocus true
                             prop.value advancedSearchState.TermName
@@ -544,15 +544,15 @@ type TermSearch =
                     ]
                 ]
                 Html.label [
-                    prop.className "form-control w-full"
+                    prop.className "swt:form-control swt:w-full"
                     prop.children [
                         Html.div [
                             prop.className "label"
-                            prop.children [ Html.span [ prop.className "label-text"; prop.text "Term Description" ] ]
+                            prop.children [ Html.span [ prop.className "swt:label-text"; prop.text "Term Description" ] ]
                         ]
                         Html.input [
                             prop.testid "advanced-search-term-description-input"
-                            prop.className "input w-full"
+                            prop.className "swt:input swt:w-full"
                             prop.type'.text
                             prop.value advancedSearchState.TermDefinition
                             prop.onChange (fun e ->
@@ -565,14 +565,14 @@ type TermSearch =
                     ]
                 ]
                 Html.div [
-                    prop.className "form-control max-w-xs"
+                    prop.className "swt:form-control swt:max-w-xs"
                     prop.children [
                         Html.label [
-                            prop.className "label cursor-pointer"
+                            prop.className "swt:label swt:cursor-pointer"
                             prop.children [
-                                Html.span [ prop.className "label-text"; prop.text "Keep Obsolete" ]
+                                Html.span [ prop.className "swt:label-text"; prop.text "Keep Obsolete" ]
                                 Html.input [
-                                    prop.className "checkbox"
+                                    prop.className "swt:checkbox"
                                     prop.type'.checkbox
                                     prop.isChecked advancedSearchState.KeepObsolete
                                     prop.onChange (fun e ->
@@ -636,7 +636,7 @@ type TermSearch =
             React.fragment [
                 advancedSearch.form controller
                 Html.button [
-                    prop.className "btn btn-primary"
+                    prop.className "swt:btn swt:btn-primary"
                     prop.onClick (fun _ -> controller.startSearch ())
                     prop.text "Submit"
                 ]
@@ -646,7 +646,7 @@ type TermSearch =
             React.fragment [
                 Html.div [ Html.textf "Results: %i" results.Count ]
                 Html.div [
-                    prop.className "max-h-[50%] overflow-y-auto"
+                    prop.className "swt:max-h-[50%] swt:overflow-y-auto"
                     prop.children [
                         for res in results.GetRange(pagination * BinSize, BinSize) do
                             TermSearch.TermItem(res, onTermSelect, key = JS.JSON.stringify res)
@@ -654,10 +654,10 @@ type TermSearch =
                 ]
                 if BinCount > 1 then
                     Html.div [
-                        prop.className "join"
+                        prop.className "swt:join"
                         prop.children [
                             Html.input [
-                                prop.className "input join-item grow"
+                                prop.className "swt:input swt:join-item swt:grow"
                                 prop.type'.number
                                 prop.min 1
                                 prop.valueOrDefault (tempPagination |> Option.defaultValue pagination)
@@ -667,12 +667,12 @@ type TermSearch =
                             ]
                             Html.div [
                                 prop.className
-                                    "input join-item shrink flex justify-center items-center cursor-not-allowed border-l-0 select-none"
+                                    "swt:input swt:join-item swt:shrink swt:flex swt:justify-center swt:items-center swt:cursor-not-allowed swt:border-l-0 swt:select-none"
                                 prop.type'.text
                                 prop.text ($"/{BinCount}")
                             ]
                             Html.button [
-                                prop.className "btn btn-primary join-item"
+                                prop.className "swt:btn swt:btn-primary swt:join-item"
                                 let disabled = tempPagination.IsNone || (tempPagination.Value - 1) = pagination
                                 prop.disabled disabled
 
@@ -683,7 +683,7 @@ type TermSearch =
                             ]
                             Html.button [
                                 let disabled = pagination = 0
-                                prop.className "btn join-item"
+                                prop.className "swt:btn swt:join-item"
                                 prop.disabled disabled
                                 prop.onClick (fun _ -> setPagination (pagination - 1))
                                 prop.text "Previous"
@@ -691,14 +691,14 @@ type TermSearch =
                             Html.button [
                                 let disabled = pagination = BinCount - 1
                                 prop.disabled disabled
-                                prop.className "btn join-item"
+                                prop.className "swt:btn swt:join-item"
                                 prop.onClick (fun _ -> setPagination (pagination + 1))
                                 prop.text "Next"
                             ]
                         ]
                     ]
                 Html.button [
-                    prop.className "btn btn-primary"
+                    prop.className "swt:btn swt:btn-primary"
                     prop.onClick (fun _ -> setSearchResults SearchState.Idle)
                     prop.text "Back"
                 ]
@@ -706,7 +706,7 @@ type TermSearch =
 
         let content =
             Html.div [
-                prop.className "flex flex-col gap-2 overflow-hidden p-2"
+                prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-hidden swt:p-2"
                 prop.children [
                     match searchResults with
                     | SearchState.Idle -> searchFormComponent ()
@@ -1084,7 +1084,7 @@ type TermSearch =
                 |> List.rev
 
             Html.div [
-                prop.className "z-[9999] fixed w-screen h-screen pointer-events-none"
+                prop.className "swt:z-[9999] swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"
                 prop.ref modalContainerRef
                 prop.children [
                     match modal with
@@ -1111,9 +1111,9 @@ type TermSearch =
                 prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "form-control not-prose h-full"
+                "swt:form-control swt:not-prose swt:h-full"
                 if fullwidth then
-                    "w-full"
+                    "swt:w-full"
             ]
             if props.IsSome then
                 for prop in props.Value do
@@ -1125,7 +1125,7 @@ type TermSearch =
                 else
                     modalContainer
                 Html.div [
-                    prop.className "indicator w-full h-full"
+                    prop.className "swt:indicator swt:w-full swt:h-full"
                     prop.children [
                         match term with
                         | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
@@ -1179,14 +1179,14 @@ type TermSearch =
 
                         Html.div [ // main search component
                             prop.className [
-                                "input flex flex-row items-center relative w-full"
+                                "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full"
                                 if classNames.IsSome && classNames.Value.inputLabel.IsSome then
                                     TermSearchStyle.resolveStyle classNames.Value.inputLabel.Value
                             ]
                             prop.children [
                                 Html.i [
                                     prop.className [
-                                        "fa-solid fa-search text-primary pr-2 transition-all w-6 overflow-x-hidden opacity-100"
+                                        "fa-solid fa-search swt:text-primary swt:pr-2 swt:transition-all swt:w-6 swt:overflow-x-hidden swt:opacity-100"
                                         if
                                             focused
                                             || inputRef.current.IsSome
@@ -1196,7 +1196,7 @@ type TermSearch =
                                     ]
                                 ]
                                 Html.input [
-                                    prop.className "grow shrink min-w-[50px] w-full"
+                                    prop.className "swt:grow swt:shrink swt:min-w-[50px] swt:w-full"
                                     if debug then
                                         prop.testid "term-search-input"
                                     prop.ref (inputRef)
@@ -1235,13 +1235,15 @@ type TermSearch =
 
                                         setFocused true)
                                 ]
-                                Daisy.loading [
+                                //Daisy.loading [
+                                Html.div [
                                     prop.className [
-                                        "text-primary loading-sm"
+                                        "swt:loading swt:text-primary swt:loading-sm"
                                         if loading.IsEmpty then
-                                            "invisible"
+                                            "swt:invisible"
                                     ]
                                 ]
+
                                 let advancedSearchToggle =
                                     advancedSearch
                                     |> Option.map (fun _ ->

@@ -6,51 +6,59 @@ open Feliz
 type Generic =
 
     static member isDisabledInARCitect(host: Swatehost option) =
-
         host.IsSome && host.Value = Swatehost.ARCitect
 
     static member FieldTitle(title: string) =
-        Html.h5 [ prop.className "text-primary font-semibold mt-6 mb-2"; prop.text title ]
+        Html.h5 [ prop.className "swt:text-primary swt:font-semibold swt:mt-6 swt:mb-2"; prop.text title ]
 
     static member BoxedField(?title: string, ?description: string, ?content: ReactElement list) =
-        Daisy.card [
-            card.sm
+        //Daisy.card [
+        Html.div [
             prop.className
-                "space-y-6 border-2 border-base-300 shadow-xl bg-base
-            prose prose-headings:text-primary container max-w-full lg:max-w-[800px]"
+                "swt:card swt:card-sm swt:space-y-6 swt:border-2 swt:border-base-300 swt:shadow-xl swt:bg-base
+            swt:prose swt:prose-headings:text-primary swt:container swt:max-w-full swt:lg:max-w-[800px]"
             prop.children [
-                Daisy.cardBody [
-                    Html.div [
-                        prop.children [
-                            if title.IsSome then
-                                Html.h1 [ prop.className "mt-0"; prop.text title.Value ]
-                            if description.IsSome then
-                                Html.p [ prop.className "text-sm text-gray-500"; prop.text description.Value ]
-                        ]
-                    ]
-                    if content.IsSome then
+                //Daisy.cardBody [
+                Html.div [
+                    prop.className "swt:card-body"
+                    prop.children [
                         Html.div [
-                            prop.className "space-y-4 divide-y divide-base-content"
-                            prop.children content.Value
+                            prop.children [
+                                if title.IsSome then
+                                    Html.h1 [ prop.className "swt:mt-0"; prop.text title.Value ]
+                                if description.IsSome then
+                                    Html.p [ prop.className "swt:text-sm swt:text-gray-500"; prop.text description.Value ]
+                            ]
                         ]
+                        if content.IsSome then
+                            Html.div [
+                                prop.className "swt:space-y-4 swt:divide-y swt:divide-base-content"
+                                prop.children content.Value
+                            ]
+                    ]
                 ]
             ]
         ]
 
     static member Section(children: ReactElement seq) =
-        Html.section [ prop.className "container py-2 lg:py-8 space-y-8"; prop.children children ]
+        Html.section [ prop.className "swt:container swt:py-2 swt:lg:py-8 swt:space-y-8"; prop.children children ]
 
     static member Collapse (title: ReactElement seq) (content: ReactElement seq) =
-        Daisy.collapse [
-            prop.className "grow border has-[:checked]:border-transparent has-[:checked]:bg-base-200"
-            collapse.plus
+        //Daisy.collapse [
+        Html.div [
+            prop.className "swt:collapse swt:collapse-plus swt:grow swt:border swt:has-[:checked]:border-transparent swt:has-[:checked]:bg-base-200"
             prop.children [
                 Html.input [ prop.type'.checkbox; prop.className "peer" ]
-                Daisy.collapseTitle [
-                    prop.className "after:text-primary @md/main:after:!size-4 @md/main:after:text-xl flex gap-4"
+                //Daisy.collapseTitle [
+                Html.div [
+                    prop.className "swt:collapse-title swt:after:text-primary swt:@md/main:after:!size-4 swt:@md/main:after:text-xl swt:flex swt:gap-4"
                     prop.children title
                 ]
-                Daisy.collapseContent [ prop.className "space-y-4 cursor-default"; prop.children content ]
+                //Daisy.collapseContent [
+                Html.div [
+                    prop.className "swt:collapse-content swt:space-y-4 swt:cursor-default"
+                    prop.children content
+                ]
             ]
         ]
 
@@ -59,16 +67,16 @@ type Generic =
             Html.div [
                 Html.h5 title
                 Html.div [
-                    prop.className "not-prose text-sm"
+                    prop.className "swt:not-prose swt:text-sm"
                     prop.children [ Html.span [ prop.text subtitle ] ]
                 ]
             ]
             if count.IsSome then
                 Html.div [
-                    prop.className "not-prose text-center ml-auto"
+                    prop.className "swt:not-prose swt:text-center swt:ml-auto"
                     prop.children [
                         Html.i [ prop.className "fa-solid fa-edit" ]
-                        Html.div [ prop.className "text-sm"; prop.text (count.Value) ]
+                        Html.div [ prop.className "swt:text-sm"; prop.text (count.Value) ]
                     ]
                 ]
         ]

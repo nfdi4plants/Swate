@@ -11,7 +11,7 @@ type Datamap =
 
         let content = [
             Html.div [
-                prop.className "flex gap-4 flex-col @lg/main:flex-row"
+                prop.className "swt:flex swt:gap-4 swt:flex-col swt:@lg/main:flex-row"
                 prop.children [
                     Daisy.button.button [
                         button.success

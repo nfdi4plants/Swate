@@ -23,8 +23,6 @@ let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactEl
                 displayWidget widget
         ]
 
-
-
 open Swate.Components.Shared
 open FileImport
 
@@ -59,13 +57,13 @@ let Main (model: Model, dispatch) =
 
     Html.div [
         prop.id "MainWindow"
-        prop.className "@container/main min-w-[400px] flex flex-col h-screen"
+        prop.className "swt:@container/main min-w-[400px] swt:flex swt:flex-col swt:h-screen"
         prop.children [
             MainComponents.Navbar.Main(model, dispatch, widgets, setWidgets)
             ModalDisplay(widgets, displayWidget)
             Html.div [
                 prop.id "TableContainer"
-                prop.className "flex grow flex-col h-full overflow-y-hidden"
+                prop.className "swt:flex swt:grow swt:flex-col swt:h-full swt:overflow-y-hidden"
                 prop.children [
                     //
                     match state.ArcFile with
@@ -86,7 +84,7 @@ let Main (model: Model, dispatch) =
                                 MainComponents.TableFooter.Main dispatch
                         | Spreadsheet.ActiveView.Metadata ->
                             Html.section [
-                                prop.className "overflow-y-auto h-full"
+                                prop.className "swt:overflow-y-auto swt:h-full"
                                 prop.children [
                                     Html.div [
                                         prop.children [

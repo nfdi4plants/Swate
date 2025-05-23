@@ -19,48 +19,98 @@ type BaseModal =
         ?footer: ReactElement,
         ?debug: string) =
 
-        Daisy.modal.div [
+        //Daisy.modal.div [
+        //    if debug.IsSome then
+        //        prop.testId ("modal_" + debug.Value)
+        //    modal.active
+        //    prop.children [
+        //        Daisy.modalBackdrop [ prop.onClick rmv ]
+        //        Daisy.modalBox.div [
+        //            prop.className [
+        //                "swt:w-4/5 swt:flex swt:flex-col swt:gap-2"
+        //                if modalClassInfo.IsSome then
+        //                    modalClassInfo.Value
+        //            ]
+        //            prop.children [
+        //                //Header
+        //                Daisy.cardTitle [
+        //                    prop.children [
+        //                        if header.IsSome then
+        //                            header.Value
+        //                        Components.DeleteButton(props = [ prop.className "swt:ml-auto"; prop.onClick rmv ])
+        //                    ]
+        //                ]
+        //                // Modal specific action
+        //                if modalActions.IsSome then
+        //                    Html.div [
+        //                        modalActions.Value
+        //                    ]
+        //                // Scrollable content
+        //                if content.IsSome then
+        //                    Html.div [
+        //                        if debug.IsSome then
+        //                            prop.testId ("modal_content_" + debug.Value)
+        //                        prop.className [
+        //                            if contentClassInfo.IsSome then
+        //                                contentClassInfo.Value
+        //                            else
+        //                                "swt:overflow-y-auto swt:space-y-2"
+        //                        ]
+        //                        prop.children content.Value
+        //                    ]
+        //                // Footer
+        //                if footer.IsSome then
+        //                    Daisy.cardActions [ footer.Value ]
+        //            ]
+        //        ]
+        //    ]
+        //]
+        Html.div [
             if debug.IsSome then
                 prop.testId ("modal_" + debug.Value)
-            modal.active
+            prop.className "swt:modal swt:modal-active"
             prop.children [
-                Daisy.modalBackdrop [ prop.onClick rmv ]
-                Daisy.modalBox.div [
+                Html.div [
+                    prop.className "swt:modal-backdrop"
+                    prop.onClick rmv
+                ]
+                Html.div [
                     prop.className [
-                        "w-4/5 flex flex-col gap-2"
+                        "swt:modal-box swt:w-4/5 swt:flex swt:flex-col swt:gap-2"
                         if modalClassInfo.IsSome then
                             modalClassInfo.Value
+                        else
+                            ""
                     ]
                     prop.children [
-                        //Header
-                        Daisy.cardTitle [
+                        Html.div [
+                            prop.className "swt:card-title"
                             prop.children [
-                                if header.IsSome then
-                                    header.Value
-                                Components.DeleteButton(props = [ prop.className "ml-auto"; prop.onClick rmv ])
+                                if header.IsSome then header.Value
+                                Components.DeleteButton(props = [ prop.className "swt:ml-auto"; prop.onClick rmv ])
                             ]
                         ]
-                        // Modal specific action
+
                         if modalActions.IsSome then
-                            Html.div [
-                                modalActions.Value
-                            ]
-                        // Scrollable content
+                            Html.div [ prop.children modalActions.Value ]
+
                         if content.IsSome then
                             Html.div [
                                 if debug.IsSome then
                                     prop.testId ("modal_content_" + debug.Value)
-                                prop.className [
-                                    if contentClassInfo.IsSome then
-                                        contentClassInfo.Value
-                                    else
-                                        "overflow-y-auto space-y-2"
-                                ]
+                                prop.className (
+                                    match contentClassInfo with
+                                    | Some cls -> cls
+                                    | None -> "swt:overflow-y-auto swt:space-y-2"
+                                )
                                 prop.children content.Value
                             ]
-                        // Footer
+
                         if footer.IsSome then
-                            Daisy.cardActions [ footer.Value ]
+                            Html.div [
+                                prop.className "swt:card-actions"
+                                prop.children footer.Value
+                            ]
                     ]
                 ]
             ]

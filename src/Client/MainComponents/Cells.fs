@@ -131,13 +131,13 @@ type Cell =
 
         Html.label [
             prop.className
-                "input flex flex-row items-center gap-2 grow m-0 w-full h-full rounded-none bg-transparent border-0"
+                "swt:input swt:flex swt:flex-row swt:items-center swt:gap-2 swt:grow swt:m-0 swt:w-full swt:h-full swt:rounded-none swt:bg-transparent swt:border-0"
             prop.children [
                 Html.input [
                     prop.defaultValue input
                     prop.readOnly isReadOnly
                     prop.autoFocus true
-                    prop.className "bg-transparent w-full h-full"
+                    prop.className "swt:bg-transparent swt:w-full swt:h-full"
                     prop.onBlur (fun _ ->
                         if isHeader then
                             setter state
@@ -173,7 +173,11 @@ type Cell =
                     prop.onChange (fun e -> if isHeader then setState e else dsetter e)
                 ]
                 if loading then
-                    Daisy.loading []
+                    //Daisy.loading []
+                    Html.div [
+                        prop.className "swt:loading"
+                    ]
+
             ]
         ]
 
@@ -458,7 +462,7 @@ type Cell =
                         style.cursor.notAllowed
                         style.userSelect.none
                     ]
-                    prop.className "flex grow items-center justify-center bg-base-300 opacity-60"
+                    prop.className "swt:flex swt:grow swt:items-center swt:justify-center swt:bg-base-300 swt:opacity-60"
                     prop.children [ Html.div "-" ]
                 ]
             ]
@@ -602,10 +606,10 @@ type Cell =
                 Html.div [
                     prop.children [
                         Html.div [
-                            prop.className "select w-full"
+                            prop.className "swt:select swt:w-full"
                             prop.children [
                                 Html.select [
-                                    prop.className "!rounded-none w-full"
+                                    prop.className "swt:!rounded-none swt:w-full"
                                     prop.value value
                                     prop.onChange (fun (e: string) -> setter e)
                                     prop.children [

@@ -24,7 +24,7 @@ module private UploadHandler =
     let id = "droparea"
 
     [<Literal>]
-    let HightlightBorderClasses = "border-2 border-primary"
+    let HightlightBorderClasses = "swt:border-2 swt:border-primary"
 
     let updateMsg = fun r -> r |> ImportXlsx |> InterfaceMsg
 
@@ -92,8 +92,9 @@ module private Helper =
                         ())
                 ]
                 Daisy.button.button [
-                    button.lg
-                    button.outline
+                    //button.lg
+                    //button.outline
+                    prop.className "swt:btn swt:btn-lg swt:btn-outline"
                     prop.onClick (fun e ->
                         e.preventDefault ()
                         let getUploadElement = Browser.Dom.document.getElementById uploadId
@@ -107,10 +108,11 @@ module private Helper =
     let createNewTableItem (txt: string, onclick: Event -> unit) =
         Html.li [
             Daisy.button.a [
-                button.block
-                button.ghost
-                button.sm
-                prop.className "justify-start"
+                //button.block
+                //button.ghost
+                //button.sm
+                prop.className "swt:btn swt:btn-block swt:btn-ghost swt:btn-sm swt:justify-start"
+                //prop.className "justify-start"
                 prop.onClick (fun e ->
                     log "inner"
                     onclick e)
@@ -120,16 +122,17 @@ module private Helper =
 
     let createNewFile (dispatch: Messages.Msg -> unit) =
 
-        Daisy.dropdown [
+        Html.div  [
+            prop.className "swt:dropdown"
             prop.children [
                 Html.div [
-                    prop.className "btn btn-lg btn-primary w-full"
+                    prop.className "swt:btn swt:btn-lg swt:btn-primary swt:w-full"
                     prop.tabIndex 0
                     prop.text "New File"
                 ]
-                Daisy.dropdownContent [
+                Html.ul [
                     prop.tabIndex 0
-                    prop.className "bg-base-300 [&_a]:rounded-none shadow-sm"
+                    prop.className "swt:dropdown-content swt:menu swt:p-2 swt:shadow swt:bg-base-300 swt:rounded-box swt:w-64"
                     prop.children [
                         Html.ul [
                             createNewTableItem (
@@ -148,10 +151,8 @@ module private Helper =
                             createNewTableItem (
                                 "Assay",
                                 fun _ ->
-                                    log "Test"
                                     let a = ArcAssay.init ("New Assay")
                                     let _ = a.InitTable("New Assay Table")
-                                    log "New Assay!"
                                     ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
                             Html.li [ Daisy.divider [ divider.horizontal ] ]
@@ -202,7 +203,7 @@ type NoFileElement =
             ]
             prop.children [
                 Html.div [
-                    prop.className "grid grid-cols-1 @md/main:grid-cols-2 gap-4"
+                    prop.className "swt:grid swt:grid-cols-1 swt:@md/main:grid-cols-2 swt:gap-4"
                     prop.children [ Helper.createNewFile args.dispatch; Helper.uploadNewTable args.dispatch ]
                 ]
             ]

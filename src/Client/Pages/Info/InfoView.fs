@@ -38,24 +38,29 @@ module private AboutHelper =
 
     let MediaContainer (content: ReactElement, imageSrc: string, imageHref: string) =
         Html.div [
-            prop.className "hero"
+            prop.className "swt:hero"
             prop.children [
                 Html.div [
-                    prop.className "hero-content flex-col"
+                    prop.className "swt:hero-content swt:flex-col"
                     prop.children [
-                        Html.div [ prop.className "prose"; prop.children content ]
+                        Html.div [ prop.className "swt:prose"; prop.children content ]
                         Html.div [
-                            prop.className "not-prose"
+                            prop.className "swt:not-prose"
                             prop.children [
-                                Daisy.button.a [
-                                    prop.href imageHref
-                                    button.square
-                                    button.primary
-                                    button.lg
-                                    prop.className [
+                                //Daisy.button.a [
+                                //    prop.href imageHref
+                                //    button.square
+                                //    button.primary
+                                //    button.lg
+                                //    prop.className [
 
-                                    ]
-                                    prop.children [ Html.img [ prop.src imageSrc; prop.className "size-12" ] ]
+                                //    ]
+                                Html.button [
+                                    prop.href imageHref
+                                    prop.className [
+                                        "swt:btn swt:btn-square swt:btn-primary swt:btn-lg"
+                                        ]
+                                    prop.children [ Html.img [ prop.src imageSrc; prop.className "swt:size-12" ] ]
                                 ]
                             ]
                         ]

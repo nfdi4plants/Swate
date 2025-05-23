@@ -19,7 +19,7 @@ type Error =
             prop.children [
                 Daisy.modalBackdrop [ prop.onClick closeMsg ]
                 Daisy.modalBox.div [
-                    prop.className "!p-0"
+                    prop.className "swt:!p-0"
                     prop.style [
                         style.width (length.percent 90)
                         style.maxHeight (length.percent 80)
@@ -27,7 +27,7 @@ type Error =
                     ]
                     prop.children [
                         Daisy.alert [
-                            prop.className "size-full"
+                            prop.className "swt:size-full"
                             alert.error
                             prop.children [
                                 Components.DeleteButton(props = [ prop.onClick closeMsg ])

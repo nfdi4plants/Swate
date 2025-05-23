@@ -46,20 +46,27 @@ module Settings =
                         "Enables search through the community build DPBO ontology and fast updates through our GitHub contribution model."
                 ]
                 Html.div [
-                    prop.className "form-control lg:max-w-md"
+                    prop.className "swt:form-control swt:lg:max-w-md"
                     prop.children [
                         Html.label [
-                            prop.className "label cursor-pointer"
+                            prop.className "swt:label swt:cursor-pointer"
                             prop.children [
-                                Html.span [ prop.className "label-text"; prop.text "Use Swate Default Search" ]
-                                Daisy.toggle [
+                                Html.span [ prop.className "swt:label-text"; prop.text "Use Swate Default Search" ]
+                                //Daisy.toggle [
+                                Html.input [
+                                    prop.className "swt:toggle toggle-primary"
                                     prop.isChecked model.PersistentStorageState.SwateDefaultSearch
                                     prop.id "swateDefaultSearch"
+                                    prop.type'.checkbox
 
-                                    toggle.primary
-
-                                    prop.onChange (fun (b: bool) ->
-                                        Messages.PersistentStorage.UpdateSwateDefaultSearch b
+                                    //prop.onChange (fun (b: bool) ->
+                                    //    Messages.PersistentStorage.UpdateSwateDefaultSearch b
+                                    //    |> PersistentStorageMsg
+                                    //    |> dispatch)
+                                    prop.onChange (fun (ev: Browser.Types.Event) ->
+                                        let target = ev.target :?> Browser.Types.HTMLInputElement
+                                        let checked = target.checked
+                                        Messages.PersistentStorage.UpdateSwateDefaultSearch checked
                                         |> PersistentStorageMsg
                                         |> dispatch)
                                 ]
@@ -79,21 +86,21 @@ module Settings =
                 "This catalogue is not found on TIB. Get in contact with the support team and remove it for now!"
 
             Html.div [
-                prop.className "flex flex-row gap-2 items-end"
+                prop.className "swt:flex swt:flex-row swt:gap-2 swt:items-end"
                 prop.children [
                     Html.label [
-                        prop.className "form-control w-full max-w-xs"
+                        prop.className "swt:form-control swt:w-full swt:max-w-xs"
                         prop.children [
                             Html.div [
-                                prop.className "label"
+                                prop.className "swt:label"
                                 prop.children [
-                                    Html.span [ prop.className "label-text"; prop.text "Choose your catalogue" ]
+                                    Html.span [ prop.className "swt:label-text"; prop.text "Choose your catalogue" ]
                                 ]
                             ]
                             Html.select [
                                 prop.value chosen
                                 prop.onChange (fun e -> select (e))
-                                prop.className "select"
+                                prop.className "swt:select"
                                 prop.children [
                                     for catalogue in catalogues.AllCatalogues do
                                         let disabled =
@@ -110,9 +117,9 @@ module Settings =
                                                 prop.title disconnectedMsg
                                             prop.className [
                                                 if disabled || disconnected then
-                                                    "bg-base-300 cursor-not-allowed"
+                                                    "swt:bg-base-300 swt:cursor-not-allowed"
                                                 if disconnected then
-                                                    "text-error"
+                                                    "swt:text-error"
                                             ]
                                         ]
                                 ]
@@ -120,7 +127,7 @@ module Settings =
                         ]
                     ]
                     Html.button [
-                        prop.className "btn btn-error btn-square"
+                        prop.className "swt:btn swt:btn-error swt:btn-square"
                         prop.onClick (fun _ -> rmv ())
                         prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ] ]
                     ]
@@ -134,10 +141,10 @@ module Settings =
                                     prop.children [
                                         Html.div [
                                             prop.className
-                                                "absolute top-0 right-0 left-0 bottom-0 animate-ping bg-yellow-400"
+                                                "swt:absolute swt:top-0 swt:right-0 swt:left-0 swt:bottom-0 swt:animate-ping swt:bg-yellow-400"
                                         ]
                                         Html.button [
-                                            prop.className "btn btn-warning btn-active btn-square no-animation"
+                                            prop.className "swt:btn swt:btn-warning swt:btn-active swt:btn-square swt:no-animation"
                                             prop.children [
                                                 Html.i [ prop.className "fa-solid fa-triangle-exclamation" ]
                                             ]
@@ -181,10 +188,10 @@ module Settings =
                 Html.p [ prop.text "Selecting multiple catalogues may impact search performance." ]
                 Html.p [ prop.textf "Selected: %A" (selectedCatalogues |> String.concat ", ") ]
                 Html.div [
-                    prop.className "flex flex-row gap-2"
+                    prop.className "swt:flex swt:flex-row swt:gap-2"
                     prop.children [
                         Html.button [
-                            prop.className "btn btn-primary btn-sm"
+                            prop.className "swt:btn swt:btn-primary swt:btn-sm"
                             prop.disabled (catalogues.UnusedCatalogues.Count = 0)
                             prop.onClick (fun _ ->
                                 if catalogues.UnusedCatalogues.Count <> 0 then
@@ -195,7 +202,7 @@ module Settings =
                             prop.children [ Html.i [ prop.className "fa-solid fa-plus" ]; Html.text "Add" ]
                         ]
                         Html.button [
-                            prop.className "btn btn-error btn-sm"
+                            prop.className "swt:btn swt:btn-error swt:btn-sm"
                             prop.disabled (selectedCatalogues.Count = 0)
                             prop.onClick (fun _ ->
                                 Messages.PersistentStorage.SetTIBSearchCatalogues Set.empty
@@ -207,7 +214,7 @@ module Settings =
                 ]
                 if loading then
                     Html.div [
-                        prop.className "flex justify-center"
+                        prop.className "swt:flex swt:justify-center"
                         prop.children [ Html.i [ prop.className "fa-solid fa-spinner fa-spin" ] ]
                     ]
                 elif catalogues.AllCatalogues.Count = 0 then
@@ -278,11 +285,14 @@ type Settings =
 </svg>"""
 
         Html.label [
-            prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
+            prop.className "swt:grid swt:lg:col-span-2 swt:grid-cols-subgrid swt:cursor-pointer swt:not-prose"
             prop.children [
-                Html.p [ prop.className "text-xl py-2"; prop.text "Theme" ]
+                Html.p [
+                    prop.className "swt:text-xl swt:py-2"
+                    prop.text "Theme"
+                ]
                 Html.button [
-                    prop.className "btn btn-block btn-primary"
+                    prop.className "swt:btn swt:btn-block swt:btn-primary"
                     //prop.text (if theme = "light" then dark else light)
                     prop.children [
                         Html.div [
@@ -303,23 +313,33 @@ type Settings =
 
     static member ToggleAutosaveConfig(model, dispatch) =
         Html.label [
-            prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
+            prop.className "swt:grid swt:lg:col-span-2 swt:grid-cols-subgrid swt:cursor-pointer swt:not-prose"
             prop.children [
-                Html.p [ prop.className "select-none text-xl"; prop.text "Autosave" ]
+                Html.p [
+                    prop.className "swt:select-none swt:text-xl"
+                    prop.text "Autosave"
+                ]
                 Html.div [
-                    prop.className "flex items-center pl-10"
+                    prop.className "swt:flex swt:items-center swt:pl-10"
                     prop.children [
-                        Daisy.toggle [
-                            prop.className "ml-14"
+                        //Daisy.toggle [
+                        Html.input [
+                            prop.className "swt:toggle swt:toggle-primary swt:ml-14"
                             prop.isChecked model.PersistentStorageState.Autosave
-                            toggle.primary
-                            prop.onChange (fun (b: bool) ->
-                                PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
+                            prop.type'.checkbox
+                            //prop.onChange (fun (b: bool) ->
+                            //    PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
+                            prop.onChange (fun (ev: Browser.Types.Event) ->
+                                let target = ev.target :?> Browser.Types.HTMLInputElement
+                                let checked = target.checked
+                                Messages.PersistentStorage.UpdateAutosave checked
+                                |> PersistentStorageMsg
+                                |> dispatch)
                         ]
                     ]
                 ]
                 Html.p [
-                    prop.className "text-sm text-gray-500"
+                    prop.className "swt:text-sm swt:text-gray-500"
                     prop.text "When you deactivate autosave, your local history will be deleted."
                 ]
             ]
@@ -330,7 +350,7 @@ type Settings =
             "General",
             content = [
                 Html.div [
-                    prop.className "grid grid-cols-1 gap-4 lg:grid-cols-2"
+                    prop.className "swt:grid swt:grid-cols-1 swt:gap-4 swt:lg:grid-cols-2"
                     prop.children [ Settings.ThemeToggle(); Settings.ToggleAutosaveConfig(model, dispatch) ]
                 ]
             ]
@@ -348,7 +368,7 @@ type Settings =
             "Display all recorded activities of this session.",
             content = [
                 Html.div [
-                    prop.className "overflow-y-auto max-h-[600px]"
+                    prop.className "swt:overflow-y-auto swt:max-h-[600px]"
                     prop.children [ ActivityLog.Main(model) ]
                 ]
             ]

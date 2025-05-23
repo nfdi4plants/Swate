@@ -44,3 +44,49 @@ type Icons =
 
     static member Contact() =
         Html.i [ prop.className "fa-solid fa-comments" ]
+
+    static member Save() =
+        Html.i [ prop.className "fa-solid fa-floppy-disk" ]
+
+    static member Delete() =
+        Html.i [ prop.className "fa-solid fa-trash-can" ]
+
+    static member Forward() =
+        Html.i [ prop.className "fa-solid fa-rotate-right" ]
+
+    static member Back() =
+        Html.i [ prop.className "fa-solid fa-rotate-left" ]
+
+    static member BuildingBlockInformation() =
+        Html.span [
+            Html.i [ prop.className "fa-solid fa-question pr-1" ]
+            Html.i [ prop.className "fa-solid fa-table-columns" ]
+        ]
+
+    static member RemoveBuildingBlock() =
+        Html.span [
+            Html.i [ prop.className "fa-solid fa-minus pr-1" ]
+            Html.i [ prop.className "fa-solid fa-table-columns" ]
+        ]
+
+    static member RectifyOntologyTerms(reactElement: ReactElement) =
+        Html.span [
+            Html.i [ prop.className "fa-solid fa-spell-check" ]
+            reactElement
+            Html.i [ prop.className "fa-solid fa-pen" ]
+        ]
+
+    static member AutoformatTable() =
+        Html.i [ prop.className "fa-solid fa-rotate" ]
+
+    static member CreateAnnotationTable() =
+        Html.span [
+            Html.i [ prop.className "fa-solid fa-plus" ]
+            Html.i [ prop.className "fa-solid fa-table" ]
+        ]
+
+    static member CreateMetadata() =
+        Html.span [
+            Html.i [ prop.className "fa-solid fa-plus" ]
+            Html.i [ prop.className "fa-solid fa-info" ]
+        ]

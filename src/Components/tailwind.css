@@ -1,7 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" prefix(swt);
 @plugin "@tailwindcss/typography";
 @plugin "daisyui" {
-    themes: light --default, dark --prefersdark;
+    themes: false;
 }
 
 @plugin "daisyui/theme" {

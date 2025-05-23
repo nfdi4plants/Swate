@@ -19,23 +19,23 @@ type LogItem =
         | InteropLogging.Warning -> Warning(System.DateTime.UtcNow, msg.MessageTxt)
 
     static member private DebugCell =
-        Html.td [ prop.className "bg-info text-info-content font-semibold"; prop.text "Debug" ]
+        Html.td [ prop.className "swt:bg-info swt:text-info-content swt:font-semibold"; prop.text "Debug" ]
 
     static member private InfoCell =
         Html.td [
-            prop.className "bg-primary text-primary-content font-semibold"
+            prop.className "swt:bg-primary swt:text-primary-content swt:font-semibold"
             prop.text "Info"
         ]
 
     static member private ErrorCell =
         Html.td [
-            prop.className "bg-error text-error-content font-semibold"
+            prop.className "swt:bg-error swt:text-error-content swt:font-semibold"
             prop.text "ERROR"
         ]
 
     static member private WarningCell =
         Html.td [
-            prop.className "bg-warning text-warning-content font-semibold"
+            prop.className "swt:bg-warning swt:text-warning-content swt:font-semibold"
             prop.text "Warning"
         ]
 

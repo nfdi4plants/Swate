@@ -58,17 +58,20 @@ type SelectiveImportModal =
             importConfig.DeselectedColumns |> Set.contains (tableIndex, columnIndex) |> not
 
         Html.div [
-            prop.className "flex justify-center"
+            prop.className "swt:flex swt:justify-center"
             prop.children [
-                Daisy.checkbox [
+                //Daisy.checkbox [
+                Html.input [
                     prop.type'.checkbox
+                    prop.className "swt:checkbox"
                     prop.disabled (not isActive)
                     prop.style [ style.height (length.perc 100) ]
                     prop.isChecked isChecked
-                    prop.onChange (fun (b: bool) ->
+                    prop.onChange (fun (ev: Browser.Types.Event) ->
                         if columns.Length > 0 then
                             let nextImportConfig = importConfig.toggleDeselectColumn (tableIndex, columnIndex)
-                            nextImportConfig |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch)
+                            nextImportConfig |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
+                    )
                 ]
             ]
         ]
@@ -78,14 +81,16 @@ type SelectiveImportModal =
         =
         let columns = table.Columns
 
-        Daisy.table [
+        //Daisy.table [
+        Html.table [
+            prop.className "swt:table"
             prop.children [
                 Html.thead [
                     Html.tr [
                         for columnIndex in 0 .. columns.Length - 1 do
                             Html.th [
                                 Html.label [
-                                    prop.className "join flex flex-row centered gap-2"
+                                    prop.className "swt:join swt:flex swt:flex-row swt:entered swt:gap-2"
                                     prop.children [
                                         SelectiveImportModal.CheckBoxForTableColumnSelection(
                                             columns,
@@ -120,17 +125,29 @@ type SelectiveImportModal =
             sprintf "%s Metadata" name,
             "fa-solid fa-lightbulb",
             React.fragment [
-                Daisy.fieldset [
-                    Daisy.label [
-                        prop.className "cursor-pointer"
-                        prop.children [
-                            Daisy.checkbox [ prop.type'.checkbox; prop.onChange (fun (b: bool) -> setActive b) ]
-                            Html.span [ prop.className "text-sm"; prop.text "Import" ]
+                //Daisy.fieldset [
+                Html.fieldSet [
+                    prop.className "swt:fieldset"
+                    prop.children [
+                        //Daisy.label [
+                        Html.label [
+                            prop.className "swt:label swt:cursor-pointer"
+                            prop.children [
+                                //Daisy.checkbox [
+                                Html.input [
+                                    prop.type'.checkbox
+                                    prop.className "swt:checkbox"
+                                    prop.onChange (fun (ev: Browser.Types.Event) ->
+                                        let target = ev.target :?> Browser.Types.HTMLInputElement
+                                        setActive target.checked)
+                                ]
+                                Html.span [ prop.className "swt:text-sm"; prop.text "Import" ]
+                            ]
                         ]
                     ]
                 ]
                 Html.span [
-                    prop.className "text-warning bg-warning-content flex flex-row gap-2 justify-center items-center"
+                    prop.className "swt:text-warning swt:bg-warning-content swt:flex flex-row swt:gap-2 swt:justify-center swt:items-center"
                     prop.children [
                         Html.i [ prop.className "fa-solid fa-exclamation-triangle" ]
                         Html.text " Importing metadata will overwrite the current file."
@@ -139,7 +156,7 @@ type SelectiveImportModal =
             ],
             className = [
                 if isActive then
-                    "!bg-info !text-info-content"
+                    "swt:!bg-info swt:!text-info-content"
             ]
         )
 
@@ -214,36 +231,41 @@ type SelectiveImportModal =
                         isDisabled
                     )
                 ]
-                Daisy.collapse [
-                    Html.input [ prop.type'.checkbox; prop.className "min-h-0 h-5" ]
-
-                    Daisy.collapseTitle [
-                        prop.className [
-                            "p-1 min-h-0 h-5 text-sm font-bold space-x-2"
-                            if isActive then "text-primary-content" else "text-success"
+                //Daisy.collapse [
+                Html.div [
+                    prop.className "swt:collapse"
+                    prop.children [
+                        Html.input [ prop.type'.checkbox; prop.className "swt:min-h-0 swt:h-5" ]
+                        //Daisy.collapseTitle [
+                        Html.div [
+                            prop.className [
+                                "swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
+                                if isActive then "swt:text-primary-content" else "swt:text-success"
+                            ]
+                            prop.children [
+                                Html.span (if isActive then "Select Columns" else "Preview Table")
+                                Html.i [ prop.className "fa-solid fa-magnifying-glass" ]
+                            ]
                         ]
-                        prop.children [
-                            Html.span (if isActive then "Select Columns" else "Preview Table")
-                            Html.i [ prop.className "fa-solid fa-magnifying-glass" ]
-                        ]
-                    ]
-                    Daisy.collapseContent [
-                        prop.className "overflow-x-auto"
-                        prop.children [
-                            SelectiveImportModal.TableWithImportColumnCheckboxes(
-                                table0,
-                                tableIndex,
-                                isActive,
-                                model,
-                                dispatch
-                            )
+                        //Daisy.collapseContent [
+                        Html.div [
+                            prop.className "swt:collapse-content swt:overflow-x-auto"
+                            prop.children [
+                                SelectiveImportModal.TableWithImportColumnCheckboxes(
+                                    table0,
+                                    tableIndex,
+                                    isActive,
+                                    model,
+                                    dispatch
+                                )
+                            ]
                         ]
                     ]
                 ]
             ],
             className = [
                 if isActive then
-                    "!bg-primary !text-primary-content"
+                    "swt:!bg-primary swt:!text-primary-content"
             ]
         )
 
@@ -299,12 +321,18 @@ type SelectiveImportModal =
 
         let footer =
             Html.div [
-                prop.className "justify-end flex gap-2"
+                prop.className "swt:justify-end swt:flex swt:gap-2"
                 prop.style [ style.marginLeft length.auto ]
                 prop.children [
-                    Daisy.button.button [ prop.onClick rmv; button.outline; prop.text "Cancel" ]
-                    Daisy.button.button [
-                        button.primary
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-outline"
+                        prop.text "Cancel"
+                        prop.onClick rmv
+                    ]
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary"
                         prop.style [ style.marginLeft length.auto ]
                         prop.text "Submit"
                         prop.onClick (fun e ->

@@ -65,7 +65,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
 
     Daisy.tab [
         if state.IsDraggedOver then
-            prop.className "dragover-footertab"
+            prop.className "swt:dragover-footertab"
         prop.draggable true
         prop.onDrop <| drop_handler (index, state, setState, dispatch)
         prop.onDragLeave <| dragleave_handler (state, setState)
@@ -111,7 +111,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                         setState { state with IsEditable = false }
 
                 Html.input [
-                    prop.className "bg-transparent px-2 border-0 focus:ring-0"
+                    prop.className "swt:bg-transparent swt:px-2 swt:border-0 swt:focus:ring-0"
                     prop.autoFocus (true)
                     prop.id (id + "input")
                     prop.onChange (fun e -> setState { state with Name = e })
@@ -132,7 +132,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                 ]
             else
                 Html.i [ prop.className "fa-solid fa-table" ]
-                Html.span [ prop.className "truncate"; prop.text table.Name ]
+                Html.span [ prop.className "swt:truncate"; prop.text table.Name ]
         ]
     ]
 
@@ -195,7 +195,7 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
         prop.key id
         prop.id id
         if state.IsDraggedOver then
-            prop.className "dragover-footertab"
+            prop.className "swt:dragover-footertab"
         prop.onDragEnter <| dragenter_handler (state, setState)
         prop.onDragLeave <| dragleave_handler (state, setState)
         prop.onDragOver drag_preventdefault
@@ -228,15 +228,15 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
             Messages.PageState.UpdateShowSidebar(not show)
             |> Messages.PageStateMsg
             |> dispatch)
-        prop.className "h-full cursor-pointer ml-auto"
+        prop.className "swt:h-full swt:cursor-pointer swt:ml-auto"
         prop.children [
             Html.label [
                 // prop.htmlFor "split-window-drawer"
                 prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full"
                 prop.children [
                     Html.input [ prop.type'.checkbox ]
-                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-left"; "swap-off" ] ]
-                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-right"; "swap-on" ] ]
+                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-left"; "swt:swap-off" ] ]
+                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-right"; "swt:swap-on" ] ]
                 ]
             ]
         ]
@@ -244,13 +244,13 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
 
 let SpreadsheetSelectionFooter (model: Model) dispatch =
     Html.div [
-        prop.className "sticky bottom-0 flex flex-row border-t-2"
+        prop.className "swt:sticky swt:bottom-0 swt:flex swt:flex-row swt:border-t-2"
         prop.children [
             Html.div [
                 prop.className
-                    "tabs tabs-lift w-full overflow-x-auto overflow-y-hidden
-                flex flex-row items-center pt-1
-                *:!border-b-0 *:gap-1 *:flex-nowrap"
+                    "swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden
+                swt:flex swt:flex-row swt:items-center swt:pt-1
+                swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
                 prop.children [
                     Daisy.tab [ prop.style [ style.width (length.px 20); style.custom ("order", -2) ] ]
                     MainMetadata(model, dispatch)

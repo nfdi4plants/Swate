@@ -7,26 +7,29 @@ open Swate.Components
 type Base =
 
     static member Divider() =
-        Daisy.divider [ prop.className "!m-0 pl-1 pr-3 h-2" ]
+        //Daisy.divider [ prop.className "swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2" ]
+        Html.div [
+            prop.className "swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2"
+        ]
 
     static member Item(content: ReactElement, ?onclick, ?icon: ReactElement, ?inactive: bool) =
         Html.li [
             if onclick.IsSome then
                 prop.onClick onclick.Value
             prop.className [
-                "bg-base-300 text-base-content"
-                "flex flex-row justify-between cursor-pointer"
-                "text-sm w-full gap-4 px-3 py-1"
+                "swt:bg-base-300 swt:text-base-content"
+                "swt:flex swt:flex-row swt:justify-between swt:cursor-pointer"
+                "swt:text-sm swt:w-full swt:gap-4 swt:px-3 swt:py-1"
                 if inactive.IsSome && inactive.Value then
-                    "cursor-not-allowed opacity-50"
+                    "swt:cursor-not-allowed swt:opacity-50"
                 else
-                    "transition-colors duration-200 hover:bg-base-200"
+                    "swt:transition-colors swt:duration-200 swt:hover:bg-base-200"
 
             ]
             prop.children [
                 content
                 if icon.IsSome then
-                    Html.div [ prop.className "ml-auto"; prop.children icon.Value ]
+                    Html.div [ prop.className "swt:ml-auto"; prop.children icon.Value ]
             ]
         ]
 
@@ -58,6 +61,6 @@ type Base =
         Html.div [
             prop.ref ref
             prop.style [ style.left mousex; style.top mousey ]
-            prop.className "fixed z-50 shadow-md rounded-md min-w-fit bg-base-300 text-black"
+            prop.className "swt:fixed swt:z-50 swt:shadow-md swt:rounded-md swt:min-w-fit swt:bg-base-300 swt:text-black"
             prop.children [ Html.ul (children rmv) ]
         ]

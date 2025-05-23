@@ -10,23 +10,23 @@ type EmptyTableElement =
         Daisy.button.button [
             button.primary
             button.square
-            prop.className "place-self-end gap-0"
+            prop.className "swt:place-self-end swt:gap-0"
             prop.onClick (fun _ -> onclick ())
             prop.children icons
         ]
 
     static member Main(openBuildingBlockWidget: unit -> unit, openTemplateWidget: unit -> unit) =
         Html.div [
-            prop.className "flex justify-center items-center"
+            prop.className "swt:flex swt:justify-center swt:items-center"
             prop.style [ style.height (length.perc 100) ]
             prop.children [
                 Daisy.card [
-                    prop.className "bg-base-300 shadow-xl"
+                    prop.className "swt:bg-base-300 swt:shadow-xl"
                     prop.children [
                         Daisy.cardBody [
-                            Html.h3 [ prop.className "font-bold text-xl"; prop.text "New Table!" ]
+                            Html.h3 [ prop.className "swt:font-bold swt:text-xl"; prop.text "New Table!" ]
                             Html.div [
-                                prop.className "grid grid-cols-[1fr,auto] gap-4 items-center"
+                                prop.className "swt:grid swt:grid-cols-[1fr,auto] swt:gap-4 swt:items-center"
                                 prop.children [
                                     Html.text "Start from an existing template!"
                                     EmptyTableElement.Button(

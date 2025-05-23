@@ -21,7 +21,7 @@ type QuickAccessButton =
 
         Html.button [
             prop.className [
-                "px-3 h-8 min-h-8 text-secondary-content transition-colors duration-300 inline-flex justify-center items-center hover:text-primary cursor-pointer disabled:cursor-not-allowed disabled:text-gray-500"
+                "swt:button swt:px-3 swt:h-8 swt:min-h-8 swt:text-secondary-content swt:transition-colors swt:duration-300 swt:inline-flex swt:justify-center swt:items-center swt:hover:text-primary swt:cursor-pointer swt:disabled:cursor-not-allowed swt:disabled:text-gray-500"
                 if classes.IsSome then
                     classes.Value
             ]

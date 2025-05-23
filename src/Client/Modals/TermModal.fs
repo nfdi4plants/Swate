@@ -36,20 +36,20 @@ type TermModal =
 
         let mkInfoPart (txt: string) (desc: string) =
             Html.div [
-                Html.h3 [ prop.className "text-lg font-semibold"; prop.text txt ]
+                Html.h3 [ prop.className "swt:text-lg swt:font-semibold"; prop.text txt ]
                 if desc <> "" then
                     Html.p [ prop.text desc ]
             ]
 
         let headerElement =
             Html.div [
-                Html.span [ prop.className "font-bold"; prop.text oa.NameText ]
-                Html.div [ prop.className "text-xs"; prop.text oa.TermAccessionShort ]
+                Html.span [ prop.className "swt:font-bold"; prop.text oa.NameText ]
+                Html.div [ prop.className "swt:text-xs"; prop.text oa.TermAccessionShort ]
             ]
 
         let modalActivity =
             Html.div [
-                prop.className "space-y-4"
+                prop.className "swt:space-y-4"
                 prop.children [
                     match state with
                     | Loading -> Html.p "loading .."
@@ -63,10 +63,10 @@ type TermModal =
                         mkInfoPart "Source Ontology" term.FK_Ontology
 
                         if term.IsObsolete then
-                            Html.p [ prop.className "text-error"; prop.text "Obsolete" ]
+                            Html.p [ prop.className "swt:text-error"; prop.text "Obsolete" ]
 
                         Html.a [
-                            prop.className "space-x-2 float-right link-primary"
+                            prop.className "swt:space-x-2 swt:float-right swt:link-primary"
                             prop.href (OntologyAnnotation.fromDBTerm term |> _.TermAccessionOntobeeUrl)
                             prop.target.blank
                             prop.children [ Html.span "Ref"; Html.i [ prop.className "fas fa-external-link-alt" ] ]

@@ -7,13 +7,14 @@ open Feliz.DaisyUI
 module DaisyUiExtensions =
 
     type modal with
-        static member active = prop.className "modal-open"
+        static member active = prop.className "swt:modal swt:modal-open"
 
 type Components =
 
     static member DeleteButton(?children, ?props) =
-        Daisy.button.button [
-            button.square
+        //Daisy.button.button [
+        Html.button [
+            prop.className [ "swt:btn swt:btn-square"]
             if props.IsSome then
                 yield! props.Value
             prop.children [
@@ -21,7 +22,7 @@ type Components =
                     yield! children.Value
                 Svg.svg [
                     svg.xmlns "http://www.w3.org/2000/svg"
-                    svg.className "h-6 w-6"
+                    svg.className "swt:h-6 swt:w-6"
                     svg.fill "none"
                     svg.viewBox (0, 0, 24, 24)
                     svg.stroke "currentColor"
@@ -40,7 +41,7 @@ type Components =
     static member CollapseButton(isCollapsed, setIsCollapsed, ?collapsedIcon, ?collapseIcon, ?classes: string) =
         Html.label [
             prop.className [
-                "btn btn-square swap swap-rotate grow-0"
+                "swt:btn swt:btn-square swt:swap swt:swap-rotate swt:grow-0"
                 if classes.IsSome then
                     classes.Value
             ]
@@ -56,7 +57,7 @@ type Components =
                 ]
                 Html.i [
                     prop.className [
-                        "swap-off fa-solid"
+                        "swt:swap-off fa-solid"
                         if collapsedIcon.IsSome then
                             collapsedIcon.Value
                         else
@@ -65,7 +66,7 @@ type Components =
                 ]
                 Html.i [
                     prop.className [
-                        "swap-on"
+                        "swt:swap-on"
                         if collapseIcon.IsSome then
                             collapseIcon.Value
                         else

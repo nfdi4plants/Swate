@@ -22,7 +22,7 @@ type MainPageView =
                 Html.a [
                     prop.className [
                         if isActive then
-                            "active"
+                            "swt:active"
                     ]
                     prop.text route.AsStringRdbl
                 ]
@@ -31,13 +31,24 @@ type MainPageView =
 
     static member DrawerSideContent(model: Model.Model, dispatch) =
         Html.div [
-            prop.className "bg-base-200 text-base-content min-h-full w-80 p-4"
+            prop.className "swt:bg-base-200 swt:text-base-content swt:min-h-full swt:w-80 swt:p-4"
             prop.children [
-                Daisy.button.button [
-                    prop.role "navigation"
+                //Daisy.button.button [
+                //    prop.role "navigation"
+                //    prop.ariaLabel "Back to spreadsheet view"
+                //    button.link
+                //    button.sm
+                //    prop.onClick (fun _ ->
+                //        UpdateModel {
+                //            model with
+                //                Model.PageState.MainPage = Routing.MainPage.Default
+                //        }
+                //        |> dispatch)
+                //    prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "Back" ]
+                //]
+                Html.button [
+                    prop.className "swt:btn swt:btn-link swt:btn-sm swt:navigation"
                     prop.ariaLabel "Back to spreadsheet view"
-                    button.link
-                    button.sm
                     prop.onClick (fun _ ->
                         UpdateModel {
                             model with
@@ -47,7 +58,7 @@ type MainPageView =
                     prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "Back" ]
                 ]
                 Html.ul [
-                    prop.className "menu gap-y-1"
+                    prop.className "swt:menu swt:gap-y-1"
                     prop.children [
                         MainPageView.DrawerSideContentItem(
                             model,
@@ -87,12 +98,12 @@ type MainPageView =
     static member Navbar(model: Model.Model, dispatch) =
         Components.BaseNavbar.Glow [
             Html.label [
-                prop.className "btn btn-square btn-ghost lg:hidden"
+                prop.className "swt:btn swt:btn-square swt:btn-ghost swt:lg:hidden"
                 prop.htmlFor DrawerId
                 prop.children [
                     Svg.svg [
                         svg.xmlns "http://www.w3.org/2000/svg"
-                        svg.className "size-5"
+                        svg.className "swt:size-5"
                         svg.fill "none"
                         svg.viewBox (0, 0, 24, 24)
                         svg.stroke "currentColor"
@@ -116,7 +127,7 @@ type MainPageView =
                             Model.PageState.MainPage = Routing.MainPage.Default
                     }
                     |> dispatch)
-                prop.className "cursor-pointer"
+                prop.className "swt:cursor-pointer"
                 prop.children [
                     Html.img [
                         prop.style [ style.maxHeight (length.perc 100); style.width 100 ]
@@ -133,26 +144,35 @@ type MainPageView =
         | Routing.MainPage.PrivacyPolicy -> Pages.PrivacyPolicy.Main()
         | _ ->
             Html.div [
-                prop.className "flex flex-col items-center"
-                prop.children [ Html.h1 [ prop.text "404"; prop.className "text-4xl" ] ]
+                prop.className "swt:flex swt:flex-col swt:items-center"
+                prop.children [ Html.h1 [ prop.text "404"; prop.className "swt:text-4xl" ] ]
             ]
 
     static member Main(model: Model.Model, dispatch) =
-        Daisy.drawer [
-            prop.className "md:drawer-open"
+        //Daisy.drawer [
+        Html.div [
+            prop.className "swt:drawer-open swt:md:drawer-open"
             prop.children [
-                Html.input [ prop.id DrawerId; prop.type'.checkbox; prop.className "drawer-toggle" ]
-                Daisy.drawerContent [
-                    prop.className "flex flex-col items-center overflow-y-auto"
+                Html.input [
+                    prop.id DrawerId
+                    prop.type'.checkbox
+                    prop.className "swt:drawer-toggle" ]
+                //Daisy.drawerContent [
+                Html.div [
+                    prop.className "swt:drawer-content swt:flex swt:flex-col swt:items-center swt:overflow-y-auto"
                     prop.children [
                         MainPageView.Navbar(model, dispatch)
                         MainPageView.MainContent(model, dispatch)
                     ]
                 ]
-                Daisy.drawerSide [
-                    prop.className "z-10"
+                //Daisy.drawerSide [
+                Html.div [
+                    prop.className "swt:drawer-side swt:z-10"
                     prop.children [
-                        Daisy.drawerOverlay [ prop.htmlFor DrawerId; prop.ariaLabel "Close sidebar" ]
+                        Daisy.drawerOverlay [
+                            prop.htmlFor DrawerId
+                            prop.ariaLabel "Close sidebar"
+                        ]
                         MainPageView.DrawerSideContent(model, dispatch)
                     ]
                 ]

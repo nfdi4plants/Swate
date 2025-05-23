@@ -29,11 +29,11 @@ type InputField =
         let autofocus = defaultArg autofocus false
 
         Html.div [
-            prop.className "flex flex-col gap-2"
+            prop.className "swt:flex swt:flex-col swt:gap-2"
             prop.children [
-                Html.label [ prop.className "label"; prop.text label ]
+                Html.label [ prop.className "swt:label"; prop.text label ]
                 Html.input [
-                    prop.className "input"
+                    prop.className "swt:input"
                     prop.autoFocus autofocus
                     prop.valueOrDefault v
                     prop.onChange (fun (input: string) -> setter input)
@@ -55,13 +55,13 @@ type InputField =
         let autofocus = defaultArg autofocus false
 
         Html.div [
-            prop.className "flex flex-col gap-2"
+            prop.className "swt:flex swt:flex-col swt:gap-2"
             prop.children [
-                Html.label [ prop.className "label"; prop.text label ]
+                Html.label [ prop.className "swt:label"; prop.text label ]
                 TermSearch.TermSearch(
                     setter,
                     term = v,
-                    classNames = Swate.Components.TermSearchStyle(U2.Case1 "border-current"),
+                    classNames = Swate.Components.TermSearchStyle(U2.Case1 "swt:border-current"),
                     advancedSearch = U2.Case2 true,
                     showDetails = true,
                     autoFocus = autofocus,
@@ -74,13 +74,26 @@ type InputField =
 
 type FooterButtons =
     static member Cancel(rmv: unit -> unit) =
-        Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
+        
+        //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
+        Html.button [
+            prop.className "swt:btn swt:btn-outline"
+            prop.text "Cancel"
+            prop.onClick (fun _ -> rmv ())
+        ]
+
+
 
     static member Submit(submitOnClick: unit -> unit) =
-        Daisy.button.button [
-            button.primary
+        //Daisy.button.button [
+        //    button.primary
+        //    prop.text "Submit"
+        //    prop.className "ml-auto"
+        //    prop.onClick (fun e -> submitOnClick ())
+        //]
+        Html.button [
+            prop.className "swt:btn swt:btn-primary swt:ml-auto"
             prop.text "Submit"
-            prop.className "ml-auto"
             prop.onClick (fun e -> submitOnClick ())
         ]
 
@@ -89,7 +102,7 @@ type CompositeCellModal =
 
     /// pr is required to make indicators on termsearch not overflow
     /// pl is required to make the input ouline when focused not cut of
-    static member BaseModalContentClassOverride = "overflow-y-auto space-y-2 pl-1 pr-4 py-1"
+    static member BaseModalContentClassOverride = "swt:overflow-y-auto swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
     static member TermModal
         (oa: OntologyAnnotation, setOa: OntologyAnnotation -> unit, rmv, ?relevantCompositeHeader: CompositeHeader)

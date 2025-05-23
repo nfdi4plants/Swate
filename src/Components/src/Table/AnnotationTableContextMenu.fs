@@ -12,7 +12,7 @@ type ATCMC =
 
     static member KbdHint (text: string, ?label: string) =
         let label = defaultArg label text
-        {| element = Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text text ]; label = label|}
+        {| element = Html.kbd [ prop.className "swt:ml-auto swt:kbd swt:kbd-sm"; prop.text text ]; label = label|}
 
 type AnnotationTableContextMenuUtil =
     static member clear (tableIndex: CellCoordinate, cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) : ArcTable =

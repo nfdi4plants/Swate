@@ -27,17 +27,17 @@ type private Term =
                 Html.div [
                     Html.label [ prop.text "Value:" ]
                     Html.div [
-                        prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px] flex items-center"
+                        prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 min-h-[42px] swt:flex swt:items-center"
                         prop.children [
                             Html.input [
-                                prop.className "flex-1 outline-hidden border-none bg-transparent"
+                                prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
                                 prop.valueOrDefault value
                                 prop.autoFocus true
                                 prop.onChange (fun input -> setValue input)
                             ]
                             if displayUnit then
                                 Html.span [
-                                    prop.className "text-gray-500 whitespace-nowrap pl-1 "
+                                    prop.className "swt:text-gray-500 swt:whitespace-nowrap swt:pl-1 "
                                     prop.text term.Value.name.Value
                                 ]
                         ]
@@ -49,7 +49,7 @@ type private Term =
                     TermSearch.TermSearch(
                         setTerm,
                         term = term,
-                        classNames = Swate.Components.TermSearchStyle(U2.Case1 "border-current join-item"),
+                        classNames = Swate.Components.TermSearchStyle(U2.Case1 "swt:border-current swt:join-item"),
                         advancedSearch = U2.Case2 true,
                         showDetails = true,
                         disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
@@ -65,7 +65,7 @@ type private Term =
             Html.div [
                 Html.label [ prop.text "Term-Source-Reference:" ]
                 Html.p [
-                    prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px]"
+                    prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px]"
                     prop.readOnly true
                     prop.text (
                         if term.IsSome && term.Value.source.IsSome then
@@ -78,7 +78,7 @@ type private Term =
             Html.div [
                 Html.label [ prop.text "Term-Accession-Number:" ]
                 Html.p [
-                    prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px]"
+                    prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 py-2 swt:min-h-[42px]"
                     prop.readOnly true
                     prop.text (
                         if term.IsSome && term.Value.id.IsSome then
@@ -103,10 +103,10 @@ type private Freetext =
         Html.div [
             Html.label [ prop.text "Value:" ]
             Html.div [
-                prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px] flex items-center"
+                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
-                        prop.className "flex-1 outline-hidden border-none bg-transparent"
+                        prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
                         prop.valueOrDefault value
                         prop.autoFocus true
                         prop.onChange (fun input -> setValue input)
@@ -135,27 +135,27 @@ type private Data =
         React.fragment [
             Html.label [ prop.text "Name:" ]
             Html.div [
-                prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px] flex items-center"
+                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
-                        prop.className "flex-1 outline-hidden border-none bg-transparent"
+                        prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
                         prop.valueOrDefault value
                         prop.autoFocus true
                         prop.onChange (fun input -> setValue input)
                     ]
                     if displaySelector then
                         Html.span [
-                            prop.className "text-gray-500 whitespace-nowrap pl-1 "
+                            prop.className "swt:text-gray-500 swt:whitespace-nowrap swt:pl-1 "
                             prop.text $"#{selector}"
                         ]
                 ]
             ]
             Html.label [ prop.text "Selector:" ]
             Html.div [
-                prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px] flex items-center"
+                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
-                        prop.className "flex-1 outline-hidden border-none bg-transparent"
+                        prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
                         prop.valueOrDefault selector
                         prop.onChange (fun input -> setSelector input)
                     ]
@@ -163,10 +163,10 @@ type private Data =
             ]
             Html.label [ prop.text "Format:" ]
             Html.div [
-                prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px] flex items-center"
+                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
-                        prop.className "flex-1 outline-hidden border-none bg-transparent"
+                        prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
                         prop.valueOrDefault format
                         prop.onChange (fun input -> setFormat input)
                     ]
@@ -174,10 +174,10 @@ type private Data =
             ]
             Html.label [ prop.text "Selector Format:" ]
             Html.div [
-                prop.className "border border-gray-300 rounded-sm px-3 py-2 min-h-[42px] flex items-center"
+                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
-                        prop.className "flex-1 outline-hidden border-none bg-transparent"
+                        prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
                         prop.valueOrDefault selectorFormat
                         prop.onChange (fun input -> setSelectorFormat input)
                     ]
@@ -206,28 +206,46 @@ type CompositeCollumnModal =
         let isButtonActive = defaultArg isButtonActive true
 
         Html.div [
-            Daisy.cardActions [
-                Daisy.button.button [
-                    button.primary
-                    prop.className "fa-solid fa-cog"
-                    prop.style [ style.marginLeft length.auto ]
-                    prop.onClick (fun _ -> setModalActivity modalActivity)
+            //Daisy.cardActions [
+            //    Daisy.button.button [
+            //        button.primary
+            //        prop.className "fa-solid fa-cog"
+            //        prop.style [ style.marginLeft length.auto ]
+            //        prop.onClick (fun _ -> setModalActivity modalActivity)
+            //    ]
+            //]
+            Html.div [
+                prop.className "swt:card-actions"
+                prop.children [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary fa-solid fa-cog"
+                        prop.style [ style.marginLeft length.auto ]
+                        prop.onClick (fun _ -> setModalActivity modalActivity)
+                    ]
                 ]
             ]
-            Daisy.button.button [
-                if isButtonActive then button.outline else button.disabled
-                button.wide
-                prop.style [ style.marginLeft length.auto ]
-                match potCell with
-                | Some cell when cell.isTerm -> prop.text "As Unit"
-                | Some cell when cell.isUnitized -> prop.text "As Term"
-                | Some cell when cell.isFreeText -> prop.text "As Data"
-                | Some cell when cell.isData -> prop.text "As Free Text"
-                | _ -> failwith "Not supported"
-                prop.onClick (fun e ->
-                    setModalActivity modalActivity
-                    transFormCell ()
-                    rmv e)
+
+            //Daisy.button.button [
+            //    if isButtonActive then button.outline else button.disabled
+            //    button.wide
+            //    prop.style [ style.marginLeft length.auto ]
+            //    match potCell with
+            //    | Some cell when cell.isTerm -> prop.text "As Unit"
+            //    | Some cell when cell.isUnitized -> prop.text "As Term"
+            //    | Some cell when cell.isFreeText -> prop.text "As Data"
+            //    | Some cell when cell.isData -> prop.text "As Free Text"
+            //    | _ -> failwith "Not supported"
+            //    prop.onClick (fun e ->
+            //        setModalActivity modalActivity
+            //        transFormCell ()
+            //        rmv e)
+            //]
+            Html.button [
+                prop.className "swt:btn swt:btn-wide"
+                if isButtonActive then
+                    prop.className "swt:btn swt:btn-wide swt:btn-outline"
+                else
+                    prop.className "swt:btn swt:btn-wide swt:btn-disabled"
             ]
         ]
 
@@ -277,21 +295,40 @@ type CompositeCollumnModal =
         Html.div [
             prop.style [ style.marginLeft length.auto ]
             prop.children [
-                Daisy.cardActions [
-                    Daisy.button.button [
-                        prop.ref cancelButtonRef
-                        button.outline
-                        prop.text "Cancel"
-                        prop.onClick (fun e -> rmv e)
+                //Daisy.cardActions [
+                //    Daisy.button.button [
+                //        prop.ref cancelButtonRef
+                //        button.outline
+                //        prop.text "Cancel"
+                //        prop.onClick (fun e -> rmv e)
+                //    ]
+                Html.div [
+                    prop.className "swt:card-actions"
+                    prop.children [
+                        Html.button [
+                            prop.className "swt:btn swt:btn-outline"
+                            prop.ref cancelButtonRef
+                            prop.text "Cancel"
+                            prop.onClick (fun e -> rmv e)
+                        ]
+                    //Daisy.button.button [
+                    //    prop.ref submitButtonRef
+                    //    button.primary
+                    //    prop.text "Submit"
+                    //    prop.onClick (fun e ->
+                    //        submitOnClick ()
+                    //        rmv e)
+                    //]
+                        Html.button [
+                            prop.className "swt:btn swt:btn-primary"
+                            prop.ref submitButtonRef
+                            prop.text "Submit"
+                            prop.onClick (fun e ->
+                                submitOnClick ()
+                                rmv e)
+                        ]
                     ]
-                    Daisy.button.button [
-                        prop.ref submitButtonRef
-                        button.primary
-                        prop.text "Submit"
-                        prop.onClick (fun e ->
-                            submitOnClick ()
-                            rmv e)
-                    ]
+                    
                 ]
             ]
         ]
