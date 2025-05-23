@@ -16,11 +16,10 @@ let FreeTextInputElement (onSubmit: string -> unit) =
     Html.div [
         prop.className "swt:flex swt:flex-row swt:gap-0 swt:p-0"
         prop.children [
-            Daisy.input [
-                join.item
-                input.sm
+            //Daisy.input [
+            Html.input [
                 prop.placeholder "..."
-                prop.className "swt:grow swt:truncate"
+                prop.className "swt:input swt;input-sm swt:join-item swt:grow swt:truncate"
                 prop.onClick (fun e -> e.stopPropagation ())
                 prop.onChange (fun (v: string) -> setInput v)
                 prop.onKeyDown (
@@ -30,10 +29,9 @@ let FreeTextInputElement (onSubmit: string -> unit) =
                         onSubmit inputS
                 )
             ]
-            Daisy.button.button [
-                join.item
-                button.accent
-                button.sm
+            //Daisy.button.button [
+            Html.button [
+                prop.className "swt:btn swt:btn-accent swt:btn-sm swt:join-item"
                 prop.onClick (fun e ->
                     e.stopPropagation ()
                     onSubmit inputS)
@@ -44,7 +42,11 @@ let FreeTextInputElement (onSubmit: string -> unit) =
 
 module private DropdownElements =
 
-    let divider = Daisy.divider [ prop.className "swt:mx-2 swt:my-0" ]
+    let divider =
+        //Daisy.divider [
+        Html.div [
+            prop.className "swt:divider swt:mx-2 swt:my-0"
+        ]
 
     let private annotationsPrinciplesLink =
         Html.a [
@@ -227,12 +229,11 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
     Components.BaseDropdown.Main(
         isOpen,
         setOpen,
-        Daisy.button.div [
-            button.primary
+        //Daisy.button.div [
+        Html.button [
             prop.onClick (fun _ -> setOpen (not isOpen))
             prop.role "button"
-            join.item
-            prop.className "swt:flex-nowrap"
+            prop.className "swt:btn swt:btn-primary swt:join-item swt:flex-nowrap"
             prop.children [
                 Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
                 Html.i [ prop.className "fa-solid fa-angle-down" ]
@@ -247,7 +248,7 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
             | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
                 DropdownElements.dropdownContentIOTypeColumns iotype state setState close model dispatch
         ],
-        style = Style.init ("join-item dropdown", Map [ "content", Style.init ("!min-w-64") ])
+        style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
     )
 // Daisy.dropdown [
 //     join.item

@@ -36,7 +36,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
         prop.children [
             QuickAccessButton.QuickAccessButton(
                 "Back",
-                React.fragment [ Icons.Back() ],
+                Icons.Back(),
                 (fun _ ->
                     let newPosition = state.HistoryCurrentPosition + 1
                     //let newPosition_clamped = System.Math.Min(newPosition, state.HistoryExistingItemCount)
@@ -49,7 +49,7 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
             )
             QuickAccessButton.QuickAccessButton(
                 "Forward",
-                React.fragment [Icons.Forward()],
+                Icons.Forward(),
                 (fun _ ->
                     let newPosition = state.HistoryCurrentPosition - 1
 
@@ -66,7 +66,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
         prop.children [
             QuickAccessButton.QuickAccessButton(
                 "Save",
-                React.fragment [Icons.Save()],
+                Icons.Save(),
                 (fun _ ->
                     match model.PersistentStorageState.Host with
                     | Some(Swatehost.Browser) ->
@@ -82,7 +82,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
             | Some Swatehost.Browser ->
                 QuickAccessButton.QuickAccessButton(
                     "Reset",
-                    React.fragment [Icons.Delete()],
+                    Icons.Delete(),
                     (fun _ ->
                         Model.ModalState.TableModals.ResetTable
                         |> Model.ModalState.ModalTypes.TableModal
@@ -135,8 +135,10 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
                 addTemplate
                 filePicker
                 dataAnnotator
-            | Spreadsheet.ActivePattern.IsDataMap -> dataAnnotator
-            | Spreadsheet.ActivePattern.IsMetadata -> Html.none
+            | Spreadsheet.ActivePattern.IsDataMap ->
+                dataAnnotator
+            | Spreadsheet.ActivePattern.IsMetadata ->
+                Html.none
         ]
     ]
 

@@ -52,10 +52,13 @@ type FileExporter =
         let state, setState = React.useState JsonExportState.init
 
         Html.div [
-            Daisy.join [
+            //Daisy.join [
+            Html.div [
+                prop.className "swt:join"
                 prop.children [
-                    Daisy.select [
-                        join.item
+                    //Daisy.select [
+                    Html.select [
+                        prop.className "swt:select swt:join-item"
                         prop.onChange (fun (e: Browser.Types.Event) ->
                             let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
                             { state with ExportFormat = jef } |> setState)
@@ -67,10 +70,9 @@ type FileExporter =
                             FileExporter.FileFormat(JsonExportFormat.ARCtrlCompressed, state, setState)
                         ]
                     ]
-                    Daisy.button.button [
-                        join.item
-                        button.block
-                        button.primary
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:btn-block swt:join-item"
                         prop.text "Download"
                         prop.onClick (fun _ ->
                             let host = model.PersistentStorageState.Host

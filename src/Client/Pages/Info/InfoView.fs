@@ -48,13 +48,6 @@ module private AboutHelper =
                             prop.className "swt:not-prose"
                             prop.children [
                                 //Daisy.button.a [
-                                //    prop.href imageHref
-                                //    button.square
-                                //    button.primary
-                                //    button.lg
-                                //    prop.className [
-
-                                //    ]
                                 Html.button [
                                     prop.href imageHref
                                     prop.className [
@@ -147,7 +140,7 @@ module private AboutHelper =
 type About =
     static member Main =
         Html.div [
-            prop.className "prose-sm md:prose lg:prose-lg divide-y-2 gap-y-2 py-1 lg:py-4"
+            prop.className "swt:prose-sm swt:md:prose swt:lg:prose-lg swt:divide-y-2 swt:gap-y-2 swt:py-1 swt:lg:py-4"
             prop.children [
                 Html.h1 "Swate"
                 AboutHelper.IntroductionElement

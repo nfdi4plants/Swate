@@ -23,16 +23,21 @@ open Fable.Core.JsInterop
 let private addButton (model: Model, dispatch) =
 
     Html.div [
-        prop.className "flex flex-row justify-center"
+        prop.className "swt:flex swt:flex-row swt:justify-center"
         prop.children [
-            Daisy.button.a [
+            //Daisy.button.a [
+            Html.button [
                 let hasTerm = model.TermSearchState.SelectedTerm.IsSome
 
-                if hasTerm then
-                    button.success
-                //Button.IsActive true
-                else
-                    button.error
+                prop.className [
+                    "swt:btn"
+                    if hasTerm then
+                        "swt:btn-success"
+                    else
+                        "swt:btn-error"
+                ]
+
+                if not hasTerm then
                     prop.disabled true
 
                 prop.onClick (fun _ ->

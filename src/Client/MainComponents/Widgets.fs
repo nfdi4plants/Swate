@@ -199,7 +199,7 @@ type Widget =
                     let config = createEmpty<AddEventListenerOptions>
                     config.once <- true
                     Browser.Dom.document.addEventListener ("mouseup", onmouseup, config))
-                prop.className "shadow-md border border-base-300 space-y-4 rounded-lg border-r-2 bg-base-100"
+                prop.className "swt:shadow-md swt:border swt:border-base-300 swt:space-y-4 swt:rounded-lg swt:border-r-2 swt:bg-base-100"
                 prop.style [
                     style.zIndex 40
                     style.cursor.eastWestResize //style.cursor.northWestSouthEastResize ;
@@ -225,7 +225,7 @@ type Widget =
         resizeElement
         <| Html.div [
             prop.onMouseDown (fun e -> e.stopPropagation ())
-            prop.className "cursor-default flex flex-col grow max-h-[60%] overflow-visible"
+            prop.className "swt:cursor-default swt:flex swt:flex-col swt:grow swt:max-h-[60%] swt:overflow-visible"
             prop.children [
                 Html.div [
                     prop.onMouseDown (fun e -> // move
@@ -240,11 +240,11 @@ type Widget =
                         let config = createEmpty<AddEventListenerOptions>
                         config.once <- true
                         Browser.Dom.document.addEventListener ("mouseup", onmouseup, config))
-                    prop.className "cursor-move flex justify-end bg-gradient-to-br from-primary to-base-200 rounded-lg"
+                    prop.className "swt:cursor-move swt:flex swt:justify-end swt:bg-gradient-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
                         Components.Components.DeleteButton(
                             props = [
-                                prop.className "btn-ghost glass"
+                                prop.className "swt:btn-ghost swt:glass"
                                 prop.onClick (fun e ->
                                     e.stopPropagation ()
                                     rmv e)
@@ -253,7 +253,7 @@ type Widget =
                     ]
                 ]
                 Html.div [
-                    prop.className "p-2 max-h-[80vh] overflow-visible flex flex-col"
+                    prop.className "swt:p-2 swt:max-h-[80vh] swt:overflow-visible swt:flex swt:flex-col"
                     prop.children [ content ]
                 ]
             ]
@@ -280,9 +280,9 @@ type Widget =
     static member FilePicker(model, dispatch, rmv) =
         let content =
             Html.div [
-                prop.className "flex flex-col gap-2"
+                prop.className "swt:flex swt:flex-col swt:gap-2"
                 prop.children [
-                    Pages.FilePicker.Main(model, dispatch, "@container/filePickerWidget min-w-32")
+                    Pages.FilePicker.Main(model, dispatch, "swt:@container/filePickerWidget swt:min-w-32")
                 ]
             ]
 
@@ -292,7 +292,7 @@ type Widget =
     static member DataAnnotator(model, dispatch, rmv) =
         let content =
             Html.div [
-                prop.className "min-w-80"
+                prop.className "swt:min-w-80"
                 prop.children [ Pages.DataAnnotator.Main(model, dispatch) ]
             ]
 

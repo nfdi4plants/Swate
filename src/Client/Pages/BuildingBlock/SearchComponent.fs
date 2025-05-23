@@ -13,35 +13,32 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
     let state = model.AddBuildingBlockState
 
     React.fragment [
-        Daisy.button.a [
-            join.item
-            button.outline
+        //Daisy.button.a [
+        Html.button [
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
-
-            if isActive then
-                button.primary
-
+            prop.className [
+                "swt:btn swt:btn-outline swt:join-item"
+                if isActive then
+                   "swt:btn-primary"
+            ]
+            prop.text "Term"
             prop.onClick (fun _ ->
                 BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Term
                 |> BuildingBlockMsg
                 |> dispatch)
-
-            prop.text "Term"
         ]
-        Daisy.button.a [
-            join.item
-            button.outline
+        Html.button [
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
-
-            if isActive then
-                button.primary
-
+            prop.className [
+                "swt:btn swt:btn-outline swt:join-item"
+                if isActive then
+                   "swt:btn-primary"
+            ]
+            prop.text "Unit"
             prop.onClick (fun _ ->
                 BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Unitized
                 |> BuildingBlockMsg
                 |> dispatch)
-
-            prop.text "Unit"
         ]
     ]
 
@@ -55,8 +52,9 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
         prop.ref element
         prop.style [ style.position.relative ]
         prop.children [
-            Daisy.join [
-                prop.className "w-full"
+            //Daisy.join [
+            Html.div [
+                prop.className "swt:join swt:w-full"
                 prop.children [
                     termOrUnitizedSwitch model dispatch
                     // helper for setting the body cell type
@@ -74,7 +72,7 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                             ?parentId=(parent |> Option.map _.TermAccessionShort),
                             ?portalTermDropdown= portalTermDropdown,
                             fullwidth=true,
-                            classNames = Swate.Components.TermSearchStyle(!^"border-current join-item"),
+                            classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
                             advancedSearch = !^true,
                             showDetails = true,
                             disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
@@ -98,16 +96,18 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
         prop.ref element // The ref must be place here, otherwise the portalled term select area will trigger daisy join syntax
         prop.style [ style.position.relative ]
         prop.children [
-            Daisy.join [
-                prop.className "w-full"
+            //Daisy.join [
+            Html.div [
+                prop.className "swt:join swt:w-full"
                 prop.children [
                     // Choose building block type dropdown element
                     // Dropdown building block type choice
                     Dropdown.Main(ui, setUi, model, dispatch)
                     // Term search field
                     if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
-                        Daisy.input [
-                            prop.className "join-item flex-grow"
+                        //Daisy.input [
+                        Html.div [
+                            prop.className "swt:input swt:join-item swt:flex-grow"
                             prop.readOnly false
                             prop.valueOrDefault (model.AddBuildingBlockState.CommentHeader)
                             prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
@@ -139,7 +139,9 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                             allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
                         )
                     elif state.HeaderCellType.HasIOType() then
-                        Daisy.input [
+                        //Daisy.input [
+                        Html.input [
+                            prop.className "swt:input"
                             prop.readOnly true
                             prop.valueOrDefault (state.TryHeaderIO() |> Option.get |> _.ToString())
                         ]
@@ -181,18 +183,24 @@ let private AddBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
 
     Html.div [
-        prop.className "flex justify-center"
+        prop.className "swt:flex swt:justify-center"
         prop.children [
-            Daisy.button.button [
+            //Daisy.button.button [
+            Html.button [
+
                 let header = Helper.createCompositeHeaderFromState state
                 let body = Helper.tryCreateCompositeCellFromState state
                 let isValid = Helper.isValidColumn header
-                button.wide
 
-                if isValid then
-                    button.success
-                else
-                    button.error
+                prop.className [
+                    "swt:btn swt:btn-wide"
+                    if isValid then
+                        "swt:btn-success"
+                    else
+                        "swt:btn-error"
+                ]
+
+                if not isValid then
                     prop.disabled true
 
                 prop.onClick (fun _ ->
@@ -224,7 +232,7 @@ let Main (model: Model) dispatch =
     //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
     //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
     Html.div [
-        prop.className "flex flex-col gap-4"
+        prop.className "swt:flex swt:flex-col swt:gap-4"
         prop.children [
             SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)
             if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then

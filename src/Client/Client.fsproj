@@ -5,7 +5,6 @@
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="tailwind.config.js" />
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />

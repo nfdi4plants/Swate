@@ -34,20 +34,9 @@ type MainPageView =
             prop.className "swt:bg-base-200 swt:text-base-content swt:min-h-full swt:w-80 swt:p-4"
             prop.children [
                 //Daisy.button.button [
-                //    prop.role "navigation"
-                //    prop.ariaLabel "Back to spreadsheet view"
-                //    button.link
-                //    button.sm
-                //    prop.onClick (fun _ ->
-                //        UpdateModel {
-                //            model with
-                //                Model.PageState.MainPage = Routing.MainPage.Default
-                //        }
-                //        |> dispatch)
-                //    prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "Back" ]
-                //]
                 Html.button [
-                    prop.className "swt:btn swt:btn-link swt:btn-sm swt:navigation"
+                    prop.className "swt:btn swt:btn-link swt:btn-sm "
+                    prop.role "navigation"
                     prop.ariaLabel "Back to spreadsheet view"
                     prop.onClick (fun _ ->
                         UpdateModel {

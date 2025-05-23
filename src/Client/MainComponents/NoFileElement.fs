@@ -91,9 +91,8 @@ module private Helper =
                         picker?value <- null
                         ())
                 ]
-                Daisy.button.button [
-                    //button.lg
-                    //button.outline
+                //Daisy.button.button [
+                Html.button [
                     prop.className "swt:btn swt:btn-lg swt:btn-outline"
                     prop.onClick (fun e ->
                         e.preventDefault ()
@@ -107,12 +106,9 @@ module private Helper =
 
     let createNewTableItem (txt: string, onclick: Event -> unit) =
         Html.li [
-            Daisy.button.a [
-                //button.block
-                //button.ghost
-                //button.sm
+            //Daisy.button.a [
+            Html.a [
                 prop.className "swt:btn swt:btn-block swt:btn-ghost swt:btn-sm swt:justify-start"
-                //prop.className "justify-start"
                 prop.onClick (fun e ->
                     log "inner"
                     onclick e)
@@ -121,7 +117,7 @@ module private Helper =
         ]
 
     let createNewFile (dispatch: Messages.Msg -> unit) =
-
+        //Daisy.dropdown
         Html.div  [
             prop.className "swt:dropdown"
             prop.children [
@@ -132,6 +128,7 @@ module private Helper =
                 ]
                 Html.ul [
                     prop.tabIndex 0
+                    //Daisy.dropdownContent
                     prop.className "swt:dropdown-content swt:menu swt:p-2 swt:shadow swt:bg-base-300 swt:rounded-box swt:w-64"
                     prop.children [
                         Html.ul [
@@ -155,7 +152,12 @@ module private Helper =
                                     let _ = a.InitTable("New Assay Table")
                                     ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
-                            Html.li [ Daisy.divider [ divider.horizontal ] ]
+                            Html.li [
+                                //Daisy.divider [
+                                Html.div [
+                                    prop.className "swt:divider swt:divider-horizontal"
+                                ]
+                            ]
                             createNewTableItem (
                                 "Template",
                                 fun _ ->

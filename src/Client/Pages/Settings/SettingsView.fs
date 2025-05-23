@@ -54,7 +54,7 @@ module Settings =
                                 Html.span [ prop.className "swt:label-text"; prop.text "Use Swate Default Search" ]
                                 //Daisy.toggle [
                                 Html.input [
-                                    prop.className "swt:toggle toggle-primary"
+                                    prop.className "swt:toggle swt:toggle-primary"
                                     prop.isChecked model.PersistentStorageState.SwateDefaultSearch
                                     prop.id "swateDefaultSearch"
                                     prop.type'.checkbox
@@ -133,11 +133,11 @@ module Settings =
                     ]
                     if disconnected then
                         Html.div [
-                            prop.className "tooltip"
+                            prop.className "swt:tooltip"
                             prop.custom ("data-tip", disconnectedMsg)
                             prop.children [
                                 Html.div [
-                                    prop.className "relative"
+                                    prop.className "swt:relative"
                                     prop.children [
                                         Html.div [
                                             prop.className

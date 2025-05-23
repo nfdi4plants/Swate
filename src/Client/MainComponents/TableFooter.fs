@@ -33,7 +33,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                     ]
                     //Daisy.button.a [
                     Html.button [
-                        prop.className [ "swt:btn swt:btn-outline swt:join-item" ]
+                        prop.className "swt:btn swt:btn-outline swt:join-item"
                         prop.onClick (fun _ ->
                             let inp = Browser.Dom.document.getElementById "n_row_input"
                             inp?Value <- init_RowsToAdd

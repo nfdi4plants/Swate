@@ -36,18 +36,22 @@ type SelectiveTemplateFromDB =
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
     static member ToProtocolSearchElement(model: Model, dispatch, ?className: Fable.Core.U2<string, string list>) =
-        Daisy.button.button [
+        //Daisy.button.button [
+        Html.button [
+            prop.text "Browse database"
+            prop.className [
+                "swt:btn swt:btn-primary"
+                if className.IsSome then
+                    match className.Value with // this can also be done with !^ , but i was too lazy to open Fable.Core
+                    | Fable.Core.Case1 className -> className
+                    | Fable.Core.U2.Case2 className -> String.concat " " className
+            ]
+
             prop.onClick (fun _ ->
                 Protocol.UpdateShowSearch true |> ProtocolMsg |> dispatch
 
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch)
-            button.primary
-            if className.IsSome then
-                match className.Value with // this can also be done with !^ , but i was too lazy to open Fable.Core
-                | Fable.Core.Case1 className -> prop.className className
-                | Fable.Core.U2.Case2 className -> prop.className className
-            prop.text "Browse database"
         ]
 
     // /// <summary>

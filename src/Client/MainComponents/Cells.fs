@@ -213,9 +213,9 @@ type Cell =
             prop.id $"Header_{columnIndex}_{columnType}"
             prop.readOnly readonly
             CellStyles.cellStyle [
-                "resize-x w-[300px] truncate" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
+                "swt:resize-x swt:w-[300px] swt:truncate" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
                 if columnType.IsRefColumn then
-                    "bg-base-200"
+                    "swt:bg-base-200"
             ]
             prop.onContextMenu (CellAux.contextMenuController (columnIndex, -1) model dispatch)
             prop.children [

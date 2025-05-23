@@ -13,19 +13,25 @@ type Datamap =
             Html.div [
                 prop.className "swt:flex swt:gap-4 swt:flex-col swt:@lg/main:flex-row"
                 prop.children [
-                    Daisy.button.button [
-                        button.success
-                        if datamap.IsSome then
-                            button.disabled
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className [
+                            "swt:btn swt:btn-success"
+                            if datamap.IsSome then
+                                "swt:btn-disabled"
+                        ]
                         prop.onClick (fun _ ->
                             let newDtm = DataMap.init ()
                             setDatamap (Some newDtm))
                         prop.children [ Html.i [ prop.className "fa-solid fa-map" ]; Html.span "Add Datamap" ]
                     ]
-                    Daisy.button.button [
-                        button.error
-                        if datamap.IsNone then
-                            button.disabled
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className [
+                            "swt:btn swt:btn-error"
+                            if datamap.IsNone then
+                                "swt:btn-disabled"
+                        ]
                         prop.onClick (fun _ -> setDatamap None)
                         prop.children [ Html.i [ prop.className "fa-solid fa-trash" ]; Html.span "Remove Datamap" ]
                     ]

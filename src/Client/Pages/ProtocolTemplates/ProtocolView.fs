@@ -35,7 +35,7 @@ type Templates =
                     Html.b "Search the database for templates."
                     Html.text " The building blocks from these templates can be inserted into the Swate table. "
                     Html.span [
-                        prop.className "text-error"
+                        prop.className "swt:text-error"
                         prop.text "Only missing building blocks will be added."
                     ]
                 ]
