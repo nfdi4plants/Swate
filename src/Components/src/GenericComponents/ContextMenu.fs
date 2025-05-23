@@ -203,7 +203,7 @@ type ContextMenu =
             if isOpen then
                 FloatingUI.FloatingOverlay(
                     lockScroll = true,
-                    className = "z-[9999]",
+                    className = "swt:z-[9999]",
                     children =
                         FloatingUI.FloatingFocusManager(
                             context = floating.context,
@@ -256,11 +256,11 @@ type ContextMenu =
                                                 Html.button [
                                                     prop.key index
                                                     prop.className
-                                                        "swt:col-span-3 swt:grid swt:grid-cols-subgrid swt:gap-x-2 swt:text-sm
-swt:text-base-content swt:px-2 swt:py-1
-swt:w-full swt:text-left
-swt:hover:bg-base-100
-swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-primary"
+                                                        "swt:col-span-3 swt:grid swt:grid-cols-subgrid swt:gap-x-2 swt:text-sm /
+                                                        swt:text-base-content swt:px-2 swt:py-1 /
+                                                        swt:w-full swt:text-left /
+                                                        swt:hover:bg-base-100 /
+                                                        swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-primary"
                                                     prop.children [
                                                         if child.icon.IsSome then
                                                             Html.div [
@@ -304,7 +304,7 @@ swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-p
             prop.ref containerRef
 
             prop.children [
-                Html.span [ prop.className "select-none"; prop.text "Click here for context menu!" ]
+                Html.span [ prop.className "swt:select-none"; prop.text "Click here for context menu!" ]
                 Html.button [
                     prop.className "swt:btn swt:btn-primary"
                     prop.text "Example Table Cell"
@@ -325,7 +325,10 @@ swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-p
                                     (if i = 3 then
                                          {|
                                              element =
-                                                 Html.kbd [ prop.className "swt:ml-auto swt:kbd swt:kbd-sm"; prop.text "Back" ]
+                                                 Html.kbd [
+                                                     prop.className "swt:ml-auto swt:kbd swt:kbd-sm"
+                                                     prop.text "Back"
+                                                 ]
                                              label = "Back"
                                          |}
                                          |> Some

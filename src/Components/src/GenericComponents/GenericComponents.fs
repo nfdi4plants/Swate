@@ -11,10 +11,14 @@ module DaisyUiExtensions =
 
 type Components =
 
-    static member DeleteButton(?children, ?props) =
+    static member DeleteButton(?children, ?className: string, ?props: IReactProperty list) =
         //Daisy.button.button [
         Html.button [
-            prop.className [ "swt:btn swt:btn-square"]
+            prop.className [
+                "swt:btn swt:btn-square"
+                if className.IsSome then
+                    className.Value
+            ]
             if props.IsSome then
                 yield! props.Value
             prop.children [

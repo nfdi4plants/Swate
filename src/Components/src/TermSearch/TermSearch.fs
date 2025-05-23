@@ -214,14 +214,10 @@ type TermSearch =
     static member private TermItem
         (term: TermSearchResult, onTermSelect: Term option -> unit, ?isActive: bool, ?key: string)
         =
-        let collapsed, setCollapsed = React.useState (false)
         let isObsolete = term.Term.isObsolete.IsSome && term.Term.isObsolete.Value
         let isDirectedSearch = term.IsDirectedSearchResult
 
-        let activeClasses =
-            "swt:group-[.collapse-open]:bg-secondary swt:group-[.collapse-open]:text-secondary-content"
-
-        let gridClasses = "swt:grid swt:grid-cols-subgrid swt:col-span-4"
+        let activeClasses = "swt:bg-secondary swt:text-secondary-content"
         let ref = React.useElementRef ()
 
         React.useEffect (
@@ -236,85 +232,70 @@ type TermSearch =
             [| box isActive |]
         )
 
-        Html.div [
+        Html.li [
             prop.ref ref
             prop.className [
-                "swt:group swt:collapse swt:rounded-none"
-                gridClasses
-                if collapsed || (isActive.IsSome && isActive.Value) then
-                    "swt:collapse-open"
+                "swt:list-row swt:items-center swt:cursor-pointer swt:min-w-0 swt:max-w-full swt:w-full /
+                swt:hover:bg-secondary swt:hover:text-secondary-content swt:transition-colors /
+                swt:rounded-none"
+                if isActive.IsSome && isActive.Value then
+                    activeClasses
             ]
+            prop.onClick (fun e ->
+                e.stopPropagation ()
+                onTermSelect (Some term.Term))
             prop.children [
-                Html.div [
-                    prop.onClick (fun e ->
-                        e.stopPropagation ()
-                        onTermSelect (Some term.Term))
-                    prop.className [ "swt:collapse-title swt:p-2 swt:min-h-fit swt:cursor-pointer"; gridClasses; activeClasses ]
-                    prop.children [
-                        Html.div [
-                            prop.className "swt:items-center swt:grid swt:col-span-4 swt:gap-2 swt:grid-cols-[auto,1fr,auto,auto]"
-                            prop.children [
-                                Html.i [
-                                    if isObsolete then
-                                        prop.title "Obsolete"
-                                    elif isDirectedSearch then
-                                        prop.title "Directed Search"
-                                    prop.className [
-                                        "swt:w-5"
-                                        if isObsolete then
-                                            "fa-solid fa-link-slash swt:text-error"
-                                        elif isDirectedSearch then
-                                            "fa-solid fa-diagram-project swt:text-primary"
-                                    ]
-                                ]
-                                Html.span [
-                                    let name = Option.defaultValue "<no-name>" term.Term.name
-                                    prop.title name
-
-                                    prop.className [
-                                        "swt:truncate swt:font-bold"
-                                        if isObsolete then
-                                            "swt:line-through"
-                                    ]
-
-                                    prop.text name
-                                ]
-                                Html.a [
-                                    let id = Option.defaultValue "<no-id>" term.Term.id
-
-                                    if term.Term.href.IsSome then
-                                        prop.onClick (fun e -> e.stopPropagation ())
-                                        prop.target.blank
-                                        prop.href term.Term.href.Value
-                                        prop.className "swt:link swt:link-primary"
-
-                                    prop.text id
-                                ]
-                                Components.CollapseButton(
-                                    collapsed,
-                                    setCollapsed,
-                                    classes = "swt:btn-sm swt:rounded-sm swt:justify-self-end"
-                                )
-                            ]
-                        ]
+                Html.i [
+                    if isObsolete then
+                        prop.title "Obsolete"
+                    elif isDirectedSearch then
+                        prop.title "Directed Search"
+                    prop.className [
+                        "swt:w-5"
+                        if isObsolete then
+                            "fa-solid fa-link-slash swt:text-error"
+                        elif isDirectedSearch then
+                            "fa-solid fa-diagram-project swt:text-primary"
                     ]
                 ]
-                Html.div [
-                    prop.className [ "swt:collapse-content swt:prose-sm"; "swt:col-span-4"; activeClasses ]
-                    prop.children [
-                        Html.p [
-                            prop.className "swt:text-sm"
-                            prop.children [ Html.text (Option.defaultValue "<no-description>" term.Term.description) ]
-                        ]
-                        if term.Term.data.IsSome then
-                            Html.pre [
-                                prop.className "swt:text-xs"
-                                prop.children [
-                                    Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
-                                ]
-                            ]
+                Html.span [
+                    let name = Option.defaultValue "<no-name>" term.Term.name
+                    prop.title name
+
+                    prop.className [
+                        "swt:truncate swt:font-bold"
+                        if isObsolete then
+                            "swt:line-through"
                     ]
+
+                    prop.text name
                 ]
+                Html.p [
+                    prop.className "swt:list-col-wrap swt:text-xs swt:text-wrap"
+                    prop.text (Option.defaultValue "<no-description>" term.Term.description)
+                // prop.children [
+                //     Html.p [
+                //     ]
+                //     if term.Term.data.IsSome then
+                //         Html.pre [
+                //             Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
+                //         ]
+                // ]
+                ]
+                Html.a [
+                    let id = Option.defaultValue "<no-id>" term.Term.id
+
+                    if term.Term.href.IsSome then
+                        prop.onClick (fun e -> e.stopPropagation ())
+                        prop.target.blank
+                        prop.href term.Term.href.Value
+                        prop.className "swt:link swt:link-primary"
+
+                    prop.text id
+                ]
+            // Html.div [
+            //     prop.className [ "swt:collapse-content swt:prose-sm"; "swt:col-span-4"; activeClasses ]
+            // ]
             ]
         ]
 
@@ -359,14 +340,14 @@ type TermSearch =
             advancedSearchToggle: (unit -> unit) option,
             keyboardNavState: KeyboardNavigationController
         ) =
-        Html.div [
+        Html.ul [
             prop.ref termDropdownRef
             prop.style [ style.scrollbarGutter.stable ]
             prop.className [
-                "swt:min-w-[400px] swt:not-prose"
-                "swt:absolute top-[100%] swt:left-0 swt:right-0 z-50"
-                "swt:grid swt:grid-cols-[auto,1fr,auto,auto]"
-                "swt:bg-base-200 swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto divide-y swt:divide-dashed swt:divide-base-100"
+                "swt:min-w-[400px] swt:not-prose /
+                swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 /
+                swt:bg-base-200 swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] /
+                swt:overflow-y-auto swt:list swt:[&_.swt\:list-row]:!p-1"
                 if state = SearchState.Idle then
                     "swt:hidden"
             ]
@@ -391,29 +372,36 @@ type TermSearch =
     static member private IndicatorItem
         (
             indicatorPosition: string,
-            tooltip,
-            tooltipPosition,
+            tooltip: string,
+            tooltipPosition: string,
             icon: string,
             onclick,
+            ?btnClasses: string,
             ?isActive: bool,
             ?props: IReactProperty list
         ) =
         let isActive = defaultArg isActive true
 
         Html.span [
+            if props.IsSome then
+                yield! props.Value
             prop.className [
-                "swt:indicator-item swt:text-sm swt:transition-[opacity] swt:opacity-0"
+                "swt:indicator-item swt:text-sm swt:transition-[swt:/opacity] swt:opacity-0 swt:z-10"
                 indicatorPosition
                 if isActive then
-                    "!opacity-100"
+                    "swt:!opacity-100"
             ]
             prop.children [
                 Html.button [
                     prop.custom ("data-tip", tooltip)
                     prop.onClick onclick
-                    for prop in defaultArg props [] do
-                        prop
-                    prop.className [ "swt:btn swt:btn-xs swt:btn-ghost swt:px-2"; "swt:tooltip"; tooltipPosition ]
+                    prop.className [
+                        "swt:btn swt:btn-square swt:btn-xs swt:px-2"
+                        "swt:tooltip"
+                        tooltipPosition
+                        if btnClasses.IsSome then
+                            btnClasses.Value
+                    ]
                     prop.children [ Html.i [ prop.className icon ] ]
                 ]
             ]
@@ -522,10 +510,10 @@ type TermSearch =
                     ]
                 ]
                 Html.label [
-                    prop.className "form-control w-full"
+                    prop.className "swt:w-full"
                     prop.children [
                         Html.div [
-                            prop.className "label"
+                            prop.className "swt:label"
                             prop.children [ Html.span [ prop.className "swt:label-text"; prop.text "Term Name" ] ]
                         ]
                         Html.input [
@@ -548,7 +536,9 @@ type TermSearch =
                     prop.children [
                         Html.div [
                             prop.className "label"
-                            prop.children [ Html.span [ prop.className "swt:label-text"; prop.text "Term Description" ] ]
+                            prop.children [
+                                Html.span [ prop.className "swt:label-text"; prop.text "Term Description" ]
+                            ]
                         ]
                         Html.input [
                             prop.testid "advanced-search-term-description-input"
@@ -667,7 +657,8 @@ type TermSearch =
                             ]
                             Html.div [
                                 prop.className
-                                    "swt:input swt:join-item swt:shrink swt:flex swt:justify-center swt:items-center swt:cursor-not-allowed swt:border-l-0 swt:select-none"
+                                    "swt:input swt:join-item swt:shrink swt:flex swt:justify-center /
+                                    swt:items-center swt:cursor-not-allowed swt:border-l-0 swt:select-none"
                                 prop.type'.text
                                 prop.text ($"/{BinCount}")
                             ]
@@ -1133,22 +1124,23 @@ type TermSearch =
                                 TermSearch.IndicatorItem(
                                     "",
                                     sprintf "%s - %s" term.name.Value term.id.Value,
-                                    "tooltip-left",
-                                    "fa-solid fa-square-check text-primary",
-                                    fun _ ->
+                                    "swt:tooltip-left",
+                                    "fa-solid fa-square-check",
+                                    (fun _ ->
                                         setModal (
                                             if modal.IsSome && modal.Value = Modals.Details then
                                                 None
                                             else
                                                 Some Modals.Details
-                                        )
+                                        )),
+                                    btnClasses = "swt:btn-primary"
                                 )
                         | _ when showDetails -> // show only when focused
                             TermSearch.IndicatorItem(
                                 "",
                                 "Details",
-                                "tooltip-left",
-                                "fa-solid fa-circle-info text-info",
+                                "swt:tooltip-left",
+                                "fa-solid fa-circle-info",
                                 (fun _ ->
                                     setModal (
                                         if modal.IsSome && modal.Value = Modals.Details then
@@ -1156,16 +1148,17 @@ type TermSearch =
                                         else
                                             Some Modals.Details
                                     )),
-                                focused
+                                btnClasses = "swt:btn-info",
+                                isActive = focused
                             )
                         | _ -> Html.none
 
                         if advancedSearch.IsSome then
                             TermSearch.IndicatorItem(
-                                "indicator-bottom",
+                                "swt:indicator-bottom",
                                 "Advanced Search",
-                                "tooltip-left",
-                                "fa-solid fa-magnifying-glass-plus text-primary",
+                                "swt:tooltip-left",
+                                "fa-solid fa-magnifying-glass-plus",
                                 (fun _ ->
                                     setModal (
                                         if modal.IsSome && modal.Value = Modals.AdvancedSearch then
@@ -1173,11 +1166,12 @@ type TermSearch =
                                         else
                                             Some Modals.AdvancedSearch
                                     )),
-                                focused,
-                                [ prop.testid "advanced-search-indicator" ]
+                                btnClasses = "swt:btn-primary",
+                                isActive = focused,
+                                props = [ prop.testid "advanced-search-indicator" ]
                             )
 
-                        Html.div [ // main search component
+                        Html.label [ // main search component
                             prop.className [
                                 "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full"
                                 if classNames.IsSome && classNames.Value.inputLabel.IsSome then
@@ -1192,7 +1186,7 @@ type TermSearch =
                                             || inputRef.current.IsSome
                                                && System.String.IsNullOrEmpty inputRef.current.Value.value |> not
                                         then
-                                            "!w-0 !opacity-0"
+                                            "swt:!w-0 swt:!opacity-0"
                                     ]
                                 ]
                                 Html.input [

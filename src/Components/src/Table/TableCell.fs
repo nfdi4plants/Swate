@@ -41,7 +41,8 @@ type TableCell =
             ts.Index.x,
             Html.input [
                 prop.autoFocus true
-                prop.className "rounded-none w-full h-full bg-base-100 text-base-content px-2 py-1 outline-hidden"
+                prop.className
+                    "swt:rounded-none swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content swt:px-2 swt:py-1 swt:outline-hidden"
                 if isStickyHeader then
                     prop.style [
                         style.position.sticky
@@ -86,7 +87,7 @@ type TableCell =
             let termDropdownRenderer =
                 fun (client: Browser.Types.ClientRect) (dropdown: ReactElement) ->
                     Html.div [
-                        prop.className "absolute z-50"
+                        prop.className "swt:absolute swt:z-50"
                         prop.style [
                             style.left (int (client.left + Browser.Dom.window.scrollX - 2.))
                             style.top (int (client.bottom + Browser.Dom.window.scrollY + 5.))
@@ -99,7 +100,10 @@ type TableCell =
                 term,
                 onBlur = (fun _ -> tableCellController.onBlur !!()),
                 onKeyDown = (fun e -> tableCellController.onKeyDown e),
-                classNames = TermSearchStyle(!^"rounded-none px-1 py-1 w-full h-full bg-base-100 text-base-content"),
+                classNames =
+                    TermSearchStyle(
+                        !^"swt:rounded-none swt:px-1 swt:py-1 swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content"
+                    ),
                 autoFocus = true,
                 portalModals = Browser.Dom.document.body,
                 portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer)
