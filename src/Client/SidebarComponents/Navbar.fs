@@ -206,7 +206,7 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
     //Daisy.modal.div [
     Html.div [
         // Add the "is-active" class to display the modal
-        prop.className "swt:modal swt:modal-active"
+        prop.className "swt:modal swt:modal-open"
         prop.children [
             //Daisy.modalBackdrop [ prop.onClick (fun _ -> closeModal ()) ]
             Html.div [

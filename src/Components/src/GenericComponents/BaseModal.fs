@@ -68,7 +68,7 @@ type BaseModal =
         Html.div [
             if debug.IsSome then
                 prop.testId ("modal_" + debug.Value)
-            prop.className "swt:modal swt:modal-active"
+            prop.className "swt:modal swt:modal-open"
             prop.children [
                 Html.div [
                     prop.className "swt:modal-backdrop"

@@ -64,7 +64,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     let id = $"ReorderMe_{index}_{table.Name}"
 
     //Daisy.tab [
-    Html.button [
+    Html.div [
         prop.className [
             "swt:tab"
             if state.IsDraggedOver then
@@ -115,7 +115,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                         setState { state with IsEditable = false }
 
                 Html.input [
-                    prop.className "swt:bg-transparent swt:px-2 swt:border-0 swt:focus:ring-0"
+                    prop.className "swt:input swt:bg-transparent swt:px-2 swt:border-0 swt:focus:ring-0"
                     prop.autoFocus (true)
                     prop.id (id + "input")
                     prop.onChange (fun e -> setState { state with Name = e })
@@ -147,7 +147,7 @@ let MainMetadata (model: Model, dispatch: Messages.Msg -> unit) =
     let order = nav.ViewIndex
 
     //Daisy.tab [
-    Html.button [
+    Html.div [
         prop.className [
             "swt:tab"
             if model.SpreadsheetModel.ActiveView = nav then
@@ -174,7 +174,7 @@ let MainDataMap (model: Model, dispatch: Messages.Msg -> unit) =
     let order = nav.ViewIndex
 
     //Daisy.tab [
-    Html.button [
+    Html.div [
         prop.className [
             "swt:tab"
             if model.SpreadsheetModel.ActiveView = nav then
@@ -204,7 +204,7 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Add-Spreadsheet-Button"
 
     //Daisy.tab [
-    Html.button [
+    Html.div [
         prop.className [
             "swt:dragover"
             if state.IsDraggedOver then
@@ -269,7 +269,7 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
                 swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
                 prop.children [
                     //Daisy.tab [
-                    Html.button [
+                    Html.div [
                         prop.className "swt:tab"
                         prop.style [
                             style.width (length.px 20)

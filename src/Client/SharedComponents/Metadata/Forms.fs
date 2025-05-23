@@ -169,11 +169,6 @@ module private Helper =
 
     let addButton (clickEvent: MouseEvent -> unit) =
         //Daisy.button.button [
-        //    prop.text "+"
-        //    button.wide
-        //    prop.onClick clickEvent
-        //    prop.className "swt:btn-accent swt:btn-outline"
-        //]
         Html.button [
             prop.className "swt:btn swt:btn-wide swt:btn-accent swt:btn-outline"
             prop.text "+"
@@ -225,7 +220,7 @@ module private Helper =
     let personModal (person: Person, confirm, back) =
         //Daisy.modal.div [
         Html.div [
-            prop.className "swt:modal swt:modal-active"
+            prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop []
                 Html.div [
@@ -271,7 +266,7 @@ module private Helper =
         //Daisy.modal.div [
         Html.div [
             //modal.active
-            prop.className "swt:modal swt:modal-active"
+            prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop []
                 Html.div [
@@ -373,7 +368,7 @@ module private Helper =
         //Daisy.modal.div [
         Html.div [
             //modal.active
-            prop.className "swt:modal swt:modal-active"
+            prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop []
                 Html.div [
@@ -417,7 +412,7 @@ module private Helper =
         //Daisy.modal.div [
         Html.div [
             //modal.active
-            prop.className "swt:modal swt:modal-active"
+            prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop [ prop.onClick back ]
                 Html.div [
@@ -639,12 +634,11 @@ type FormComponents =
                 //Daisy.label [
                 Html.label [
                     prop.className [
-                        "swt:label"
+                        "swt:label swt:flex swt:items-center swt:gap-2"
                         if isarea.IsSome && isarea.Value then
-                            "swt:labelswt:textarea"
+                            "swt:label swt:textarea"
                         else
-                            "swt:input"
-                        "swt:flex swt:items-center swt:gap-2"
+                            "swt:input swt:border-none swt:shadow-none focus:swt:outline-none focus:swt:ring-0 focus:swt:border-transparent"
                         if isJoin then
                             "swt:join-item"
                     ]
@@ -653,10 +647,9 @@ type FormComponents =
                         | Some true ->
                             //Daisy.textarea [
                             Html.textarea [
-                                prop.className "swt:textarea"
+                                prop.className "swt:textarea swt:grow swt:ghost"
                                 prop.disabled disabled
                                 prop.readOnly disabled
-                                prop.className "swt:grow swt:ghost"
                                 if placeholder.IsSome then
                                     prop.placeholder placeholder.Value
                                 prop.ref ref

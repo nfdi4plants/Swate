@@ -19,7 +19,7 @@ type ResetTable =
 
         //Daisy.modal.div [
         Html.div [
-            prop.className "swt:modal swt:modal-active"
+            prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop [ prop.onClick rmv ]
                 Html.div [
