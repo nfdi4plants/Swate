@@ -32,8 +32,15 @@ type Generic =
                         ]
                         if content.IsSome then
                             Html.div [
-                                prop.className "swt:space-y-4 swt:divide-y swt:divide-base-content"
-                                prop.children content.Value
+                                prop.className "swt:divide-y swt:divide-base-content"
+                                prop.children (
+                                    content.Value
+                                    |> List.map (fun element ->
+                                        Html.div [
+                                            prop.className "swt:py-2"
+                                            prop.children [ element ]
+                                        ])
+                                )
                             ]
                     ]
                 ]

@@ -76,7 +76,8 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                     | Some(Swatehost.ARCitect) ->
                         ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
                     | _ -> ()),
-                isDisabled = model.SpreadsheetModel.ArcFile.IsNone
+                isDisabled = model.SpreadsheetModel.ArcFile.IsNone,
+                classes = "swt:hover:!text-primary"
             )
             match model.PersistentStorageState.Host with
             | Some Swatehost.Browser ->

@@ -344,10 +344,11 @@ type TermSearch =
             prop.ref termDropdownRef
             prop.style [ style.scrollbarGutter.stable ]
             prop.className [
-                """swt:min-w-[400px] swt:not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200
-                swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto swt:list swt:[&_.swt\:list-row]:!p-1"""
                 if state = SearchState.Idle then
                     "swt:hidden"
+                else
+                    """swt:min-w-[400px] swt:not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200
+                    swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto swt:list swt:[&_.swt\:list-row]:!p-1"""
             ]
 
             prop.children [

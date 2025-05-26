@@ -627,7 +627,7 @@ type FormComponents =
                         if isarea.IsSome && isarea.Value then
                             "swt:label swt:textarea"
                         else
-                            "swt:input swt:border-none swt:shadow-none focus:swt:outline-none focus:swt:ring-0 focus:swt:border-transparent"
+                            "swt:input"
                         if isJoin then
                             "swt:join-item"
                         if classes.IsSome then
