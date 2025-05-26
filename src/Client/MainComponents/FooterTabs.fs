@@ -248,7 +248,7 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
         prop.children [
             Html.label [
                 // prop.htmlFor "split-window-drawer"
-                prop.className "swt:drawer-button swt:btn swt:btn-sm swt:px-2 swt:py-2 swt:swap swt:swap-rotate swt:rounded-none swt:h-full"
+                prop.className "swt:drawer swt:drawer-button swt:btn swt:btn-sm swt:px-2 swt:py-2 swt:swap swt:swap-rotate swt:rounded-none swt:h-full"
                 prop.children [
                     Html.input [ prop.type'.checkbox ]
                     Html.i [ prop.className [ "fa-solid"; "fa-chevron-left"; "swt:swap-off" ] ]
@@ -264,18 +264,16 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
         prop.children [
             Html.div [
                 prop.className
-                    "swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden
-                swt:flex swt:flex-row swt:items-center swt:pt-1
-                swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
+                    "swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
                 prop.children [
                     //Daisy.tab [
-                    Html.div [
-                        prop.className "swt:tab"
-                        prop.style [
-                            style.width (length.px 20)
-                            style.custom ("order", -2)
-                        ]
-                    ]
+                    //Html.div [
+                    //    prop.className "swt:tab"
+                    //    prop.style [
+                    //        style.width (length.px 20)
+                    //        style.custom ("order", -2)
+                    //    ]
+                    //]
                     MainMetadata(model, dispatch)
                     if model.SpreadsheetModel.HasDataMap() then
                         MainDataMap(model, dispatch)

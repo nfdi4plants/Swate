@@ -22,7 +22,8 @@ type QuickAccessButton =
 
         Html.button [
             prop.className [
-                "swt:btn swt:btn-ghost swt:btn-square"
+                "swt:btn swt:btn-ghost swt:btn-square swt:btn-transparent swt:bg-transparent swt:border-none swt:shadow-none"
+
                 match color with
                 | Some DaisyUIColors.Primary -> "swt:hover:!text-primary"
                 | Some DaisyUIColors.Secondary -> "swt:hover:!text-secondary"
@@ -35,6 +36,9 @@ type QuickAccessButton =
 
                 if classes.IsSome then
                     classes.Value
+
+                if not isDisabled then
+                    "swt:text-white"
             ]
             prop.tabIndex (if isDisabled then -1 else 0)
             prop.title desc

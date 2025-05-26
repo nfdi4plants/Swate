@@ -22,7 +22,7 @@ type MainPageView =
                 Html.a [
                     prop.className [
                         if isActive then
-                            "swt:active"
+                            "swt:btn swt:btn-outline"
                     ]
                     prop.text route.AsStringRdbl
                 ]
@@ -35,7 +35,7 @@ type MainPageView =
             prop.children [
                 //Daisy.button.button [
                 Html.button [
-                    prop.className "swt:btn swt:btn-link swt:btn-sm "
+                    prop.className "swt:btn swt:btn-link swt:btn-sm"
                     prop.role "navigation"
                     prop.ariaLabel "Back to spreadsheet view"
                     prop.onClick (fun _ ->
@@ -140,7 +140,7 @@ type MainPageView =
     static member Main(model: Model.Model, dispatch) =
         //Daisy.drawer [
         Html.div [
-            prop.className "swt:drawer-open swt:md:drawer-open"
+            prop.className "swt:drawer swt:md:drawer-open"
             prop.children [
                 Html.input [
                     prop.id DrawerId
@@ -158,7 +158,9 @@ type MainPageView =
                 Html.div [
                     prop.className "swt:drawer-side swt:z-10"
                     prop.children [
-                        Daisy.drawerOverlay [
+                        //Daisy.drawerOverlay [
+                        Html.div [
+                            prop.className "swt:drawer-overlay"
                             prop.htmlFor DrawerId
                             prop.ariaLabel "Close sidebar"
                         ]

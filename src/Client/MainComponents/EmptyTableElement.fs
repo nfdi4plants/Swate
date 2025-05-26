@@ -3,6 +3,7 @@ namespace MainComponents
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl
+open Swate.Components
 
 type EmptyTableElement =
 
@@ -31,22 +32,23 @@ type EmptyTableElement =
                                 Html.div [
                                     prop.className "swt:grid swt:grid-cols-[1fr,auto] swt:gap-4 swt:items-center"
                                     prop.children [
-                                        Html.text "Start from an existing template!"
-                                        EmptyTableElement.Button(
-                                            React.fragment [
-                                                Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                                                Html.i [ prop.className "fa-solid fa-table" ]
-                                            ],
-                                            fun _ -> openTemplateWidget ()
-                                        )
-                                        Html.text "Or start from scratch!"
-                                        EmptyTableElement.Button(
-                                            React.fragment [
-                                                Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                                                Html.i [ prop.className "fa-solid fa-table-columns" ]
-                                            ],
-                                            fun _ -> openBuildingBlockWidget ()
-                                        )
+                                        Html.span [
+                                            Html.text "Start from an existing template!"
+                                            EmptyTableElement.Button(
+                                                React.fragment [
+                                                    Html.i [ prop.className "fa-solid fa-circle-plus" ]
+                                                    Html.i [ prop.className "fa-solid fa-table" ]
+                                                ],
+                                                fun _ -> openTemplateWidget ()
+                                            )
+                                        ]
+                                        Html.span [
+                                            Html.text "Or start from scratch!"
+                                            EmptyTableElement.Button(
+                                                Icons.BuildingBlock(),
+                                                fun _ -> openBuildingBlockWidget ()
+                                            )
+                                        ]
                                     ]
                                 ]
                             ]
