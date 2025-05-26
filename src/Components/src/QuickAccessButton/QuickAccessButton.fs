@@ -31,7 +31,7 @@ type QuickAccessButton =
                 | Some DaisyUIColors.Info -> "swt:hover:!text-info"
                 | Some DaisyUIColors.Success -> "swt:hover:!text-success"
                 | Some DaisyUIColors.Warning -> "swt:hover:!text-warning"
-                | None -> ()
+                | None -> "swt:hover:!text-success"
 
                 if classes.IsSome then
                     classes.Value
