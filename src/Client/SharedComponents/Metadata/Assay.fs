@@ -26,7 +26,8 @@ let Main
                         fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s)
                         msg = "Invalid Identifier"
                     |},
-                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
+                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host,
+                    classes = "swt:w-full"
                 )
                 FormComponents.OntologyAnnotationInput(
                     assay.MeasurementType,

@@ -583,7 +583,8 @@ type FormComponents =
             ?placeholder: string,
             ?isarea: bool,
             ?isJoin,
-            ?disabled
+            ?disabled,
+            ?classes:string
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
@@ -629,6 +630,8 @@ type FormComponents =
                             "swt:input swt:border-none swt:shadow-none focus:swt:outline-none focus:swt:ring-0 focus:swt:border-transparent"
                         if isJoin then
                             "swt:join-item"
+                        if classes.IsSome then
+                            classes.Value
                     ]
                     prop.children [
                         match isarea with

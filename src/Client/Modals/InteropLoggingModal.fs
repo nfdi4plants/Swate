@@ -19,23 +19,34 @@ type InteropLogging =
 
         let logs = model.DisplayLogList
 
-        Daisy.modal.div [
-            modal.active
+        //Daisy.modal.div [
+        Html.div [
+            prop.className "swt:modal swt:modal-open"
             prop.children [
-                Daisy.modalBackdrop [ prop.onClick closeMsg ]
-                Daisy.modalBox.div [
+                //Daisy.modalBackdrop [ prop.onClick closeMsg ]
+                Html.div [
+                    prop.className "swt:modal-backdrop"
+                    prop.onClick closeMsg
+                ]
+                //Daisy.modalBox.div [
+                Html.div [
                     prop.style [ style.width (length.percent 80); style.maxHeight (length.percent 80) ]
-                    prop.className "swt:flex flex-col swt:gap-4"
+                    prop.className "swt:modal-box swt:flex flex-col swt:gap-4"
                     prop.children [
                         Html.div [
                             prop.className "swt:grow swt:flex swt:justify-end"
                             prop.children [ Components.DeleteButton(props = [ prop.onClick closeMsg ]) ]
                         ]
-                        Daisy.table [ table.xs; prop.children [ Html.tbody (logs |> List.map LogItem.toTableRow) ] ]
-                        Daisy.button.a [
-                            button.warning
-                            button.wide
-                            prop.className "swt:mx-auto"
+                        //Daisy.table [
+                        Html.div [
+                            prop.className "swt:table swt:table-xs"
+                            prop.children [
+                                Html.tbody (logs |> List.map LogItem.toTableRow)
+                            ]
+                        ]
+                        //Daisy.button.a [
+                        Html.div [
+                            prop.className "swt:btn swt:btn-warning swt:btn-wide swt:mx-auto"
                             prop.onClick closeMsg
                             prop.text "Continue"
                         ]
