@@ -72,8 +72,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                 | Some(Swatehost.ARCitect) ->
                     ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
                 | _ -> ()),
-            isDisabled = model.SpreadsheetModel.ArcFile.IsNone,
-            color = DaisyUIColors.Primary
+            isDisabled = model.SpreadsheetModel.ArcFile.IsNone
         )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Browser ->

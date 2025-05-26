@@ -1,4 +1,4 @@
-@import "tailwindcss" prefix(swt);
+@import "tailwindcss" prefix(swt) source("../");
 @plugin "@tailwindcss/typography";
 @plugin "daisyui" {
     themes: false;
