@@ -56,8 +56,9 @@ let View (model: Model) (dispatch: Msg -> unit) =
                         prop.children [
                             Html.input [
                                 prop.id "split-window-drawer"
-                                prop.type'.checkbox
                                 prop.className "swt:drawer-toggle"
+                                prop.type'.checkbox
+                                prop.isChecked isActive
                             ]
                             //Daisy.drawerContent [ SpreadsheetView.Main(model, dispatch) ]
                             Html.div [

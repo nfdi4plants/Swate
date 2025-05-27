@@ -12,10 +12,13 @@ type Tabs =
     static member private NavigationTab (pageLink: Routing.SidebarPage) (model: Model) (dispatch: Msg -> unit) =
         let isActive = pageLink = model.PageState.SidebarPage
 
-        Daisy.tab [
-            if isActive then
-                tab.active
-            prop.className "swt:navigation" // this class does not do anything, but disables <a> styling.
+        //Daisy.tab [
+        Html.div [
+            prop.className [
+                "swt:tab swt:navigation" // this class does not do anything, but disables <a> styling.
+                if isActive then
+                    "swt:tab-active"
+            ]
             prop.onClick (fun e ->
                 e.preventDefault ()
 
@@ -31,9 +34,9 @@ type Tabs =
     static member Main (model: Model) dispatch =
         let isIEBrowser: bool = Browser.Dom.window.document?documentMode
 
-        Daisy.tabs [
-            tabs.box
-            prop.className "swt:w-full"
+        //Daisy.tabs [
+        Html.div [
+            prop.className "swt:tabs swt:tabs-box swt:w-full"
             prop.children [
                 Tabs.NavigationTab Routing.SidebarPage.BuildingBlock model dispatch
                 Tabs.NavigationTab Routing.SidebarPage.TermSearch model dispatch

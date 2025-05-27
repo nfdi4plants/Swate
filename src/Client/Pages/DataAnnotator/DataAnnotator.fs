@@ -147,7 +147,7 @@ module private DataAnnotatorHelper =
             //Daisy.file [
             Html.input [
                 prop.type' "file"
-                prop.className "swt:file swt:file-primary swt:file-bordered swt:col-span-2"
+                prop.className "swt:file-input swt:file-input-primary swt:col-span-2"
                 prop.ref ref
                 prop.onChange uploadFile
             ]

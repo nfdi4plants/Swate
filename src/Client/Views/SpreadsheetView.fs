@@ -57,7 +57,7 @@ let Main (model: Model, dispatch) =
 
     Html.div [
         prop.id "MainWindow"
-        prop.className "swt:@container/main min-w-[400px] swt:flex swt:flex-col swt:h-screen"
+        prop.className "swt:@container/main swt:min-w-[400px] swt:flex swt:flex-col swt:h-screen"
         prop.children [
             MainComponents.Navbar.Main(model, dispatch, widgets, setWidgets)
             ModalDisplay(widgets, displayWidget)

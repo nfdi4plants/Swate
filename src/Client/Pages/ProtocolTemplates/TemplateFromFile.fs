@@ -84,7 +84,7 @@ type TemplateFromFile =
         //Daisy.file [
         Html.input  [
             prop.type'.file
-            prop.className "swt:file swt:file-bordered swt:w-full"
+            prop.className "swt:file-input swt:file-input-neutral swt:w-full"
             prop.onChange (fun (ev: File list) -> Helper.upload state setState dispatch ev)
             prop.onClick (fun e ->
                 log e
