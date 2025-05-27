@@ -30,25 +30,21 @@ type EmptyTableElement =
                             prop.children [
                                 Html.h3 [ prop.className "swt:font-bold swt:text-xl"; prop.text "New Table!" ]
                                 Html.div [
-                                    prop.className "swt:grid swt:grid-cols-[1fr,auto] swt:gap-4 swt:items-center"
+                                    prop.className "swt:grid swt:grid-cols-[auto_auto] swt:gap-4 swt:items-center"
                                     prop.children [
-                                        Html.span [
-                                            Html.text "Start from an existing template!"
-                                            EmptyTableElement.Button(
-                                                React.fragment [
-                                                    Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                                                    Html.i [ prop.className "fa-solid fa-table" ]
-                                                ],
-                                                fun _ -> openTemplateWidget ()
-                                            )
-                                        ]
-                                        Html.span [
-                                            Html.text "Or start from scratch!"
-                                            EmptyTableElement.Button(
-                                                Icons.BuildingBlock(),
-                                                fun _ -> openBuildingBlockWidget ()
-                                            )
-                                        ]
+                                        Html.span "Start from an existing template!"
+                                        EmptyTableElement.Button(
+                                            React.fragment [
+                                                Html.i [ prop.className "fa-solid fa-circle-plus" ]
+                                                Html.i [ prop.className "fa-solid fa-table" ]
+                                            ],
+                                            fun _ -> openTemplateWidget ()
+                                        )
+                                        Html.span "Or start from scratch!"
+                                        EmptyTableElement.Button(
+                                            Icons.BuildingBlock(),
+                                            fun _ -> openBuildingBlockWidget ()
+                                        )
                                     ]
                                 ]
                             ]
