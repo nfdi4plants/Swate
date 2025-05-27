@@ -6,7 +6,7 @@ import { ofArray, item, map, length, empty, FSharpList } from "../fable_modules/
 import { createObj, IDisposable, defaultOf } from "../fable_modules/fable-library-ts.4.24.0/Util.js";
 import { reactApi } from "../fable_modules/Feliz.2.9.0/./Interop.fs.js";
 import { float64, int32 } from "../fable_modules/fable-library-ts.4.24.0/Int32.js";
-import { FloatingFocusManager, FloatingOverlay, FloatingPortal, UseInteractionsReturn, useTypeahead, useListNavigation, useRole, useInteractions, useDismiss, UseFloatingReturn, autoUpdate, shift, flip, offset, useFloating } from "@floating-ui/react";
+import { FloatingFocusManager, FloatingOverlay, FloatingPortal, UseInteractionsReturn, useInteractions, useTypeahead, useListNavigation, useRole, useDismiss, UseFloatingReturn, autoUpdate, shift, flip, offset, useFloating } from "@floating-ui/react";
 import { useEffectWithDeps } from "../fable_modules/Feliz.2.9.0/./ReactInterop.js";
 import { map as map_2, empty as empty_1, collect, singleton, append, delay, toList, iterate } from "../fable_modules/fable-library-ts.4.24.0/Seq.js";
 import { addRangeInPlace } from "../fable_modules/fable-library-ts.4.24.0/Array.js";
@@ -27,7 +27,10 @@ export function ContextMenu(contextMenuInputProps: any): ReactElement {
     let patternInput: [any, ((arg0: any) => void)];
     const initial: any = defaultOf();
     patternInput = reactApi.useState<any, any>(initial);
+    const spawnData: any = patternInput[0];
+    const setSpawnData: ((arg0: any) => void) = patternInput[1];
     const patternInput_1: [FSharpList<ContextMenuItem>, ((arg0: FSharpList<ContextMenuItem>) => void)] = reactApi.useState<FSharpList<ContextMenuItem>, FSharpList<ContextMenuItem>>(empty<ContextMenuItem>());
+    const setChildren: ((arg0: FSharpList<ContextMenuItem>) => void) = patternInput_1[1];
     const children: FSharpList<ContextMenuItem> = patternInput_1[0];
     const onSpawn_1: ((arg0: MouseEvent) => Option<any>) = defaultArg(onSpawn, some);
     const patternInput_2: [boolean, ((arg0: boolean) => void)] = reactApi.useState<boolean, boolean>(false);
@@ -59,18 +62,21 @@ export function ContextMenu(contextMenuInputProps: any): ReactElement {
         },
     });
     const dismiss: any = useDismiss(floating_1.context);
-    const interactions: UseInteractionsReturn = useInteractions([useRole(floating_1.context, {
+    const role: any = useRole(floating_1.context, {
         role: "menu",
-    }), dismiss, useListNavigation(floating_1.context, {
+    });
+    const listNavigation: any = useListNavigation(floating_1.context, {
         listRef: listItemsRef,
         activeIndex: activeIndex,
         onNavigate: setActiveIndex,
-    }), useTypeahead(floating_1.context, {
+    });
+    const typeahead: any = useTypeahead(floating_1.context, {
         listRef: listContentRef,
         activeIndex: activeIndex,
         onMatch: setActiveIndex,
         enabled: isOpen,
-    })]);
+    });
+    const interactions: UseInteractionsReturn = useInteractions([role, dismiss, listNavigation, typeahead]);
     useEffectWithDeps((): IDisposable => {
         const myClearTimeout = (): void => {
             iterate<int32>((timeout_1: int32): void => {
@@ -86,12 +92,12 @@ export function ContextMenu(contextMenuInputProps: any): ReactElement {
             else {
                 const data: any = value_31(matchValue);
                 e_2.preventDefault();
-                patternInput[1](data);
+                setSpawnData(data);
                 const children_1: FSharpList<ContextMenuItem> = childInfo(data);
                 if (length(children_1) === 0) {
                     throw new Error("Context menu must have at least one item");
                 }
-                patternInput_1[1](children_1);
+                setChildren(children_1);
                 addRangeInPlace(map<ContextMenuItem, Option<string>>((child: ContextMenuItem): Option<string> => map_1<{ element: ReactElement, label: string }, string>((kbd: { element: ReactElement, label: string }): string => kbd.label, child.kbdbutton), children_1), listContentRef.current);
                 let rect: ClientRect;
                 rect = ((x = e_2.clientX, (y = e_2.clientY, (top = e_2.clientY, (left = e_2.clientX, (right = e_2.clientX, {
@@ -142,13 +148,24 @@ export function ContextMenu(contextMenuInputProps: any): ReactElement {
             myClearTimeout();
         });
     }, [floating_1.refs]);
+    const close = (): void => {
+        setIsOpen(false);
+        allowMouseUpCloseRef.current = true;
+        iterate<int32>((timeout_2: int32): void => {
+            clearTimeout(timeout_2);
+        }, toArray<int32>(timeout.current));
+    };
     return createElement(FloatingPortal, {
         children: isOpen ? createElement(FloatingOverlay, {
             children: createElement(FloatingFocusManager, {
                 context: floating_1.context,
                 children: createElement<any>("div", createObj(toList<IReactProperty>(delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["ref", floating_1.refs.setFloating] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["style", floating_1.floatingStyles] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => {
                     let o: any;
-                    return append<IReactProperty>(collect<[string, any], Iterable<IReactProperty>, IReactProperty>((matchValue_1: [string, any]): Iterable<IReactProperty> => singleton<IReactProperty>([matchValue_1[0], matchValue_1[1]] as [string, any]), (o = interactions.getFloatingProps(), Object.entries(o))), delay<IReactProperty>((): Iterable<IReactProperty> => {
+                    return append<IReactProperty>(collect<[string, any], Iterable<IReactProperty>, IReactProperty>((matchValue_1: [string, any]): Iterable<IReactProperty> => {
+                        const v: any = matchValue_1[1];
+                        const key_3: string = matchValue_1[0];
+                        return singleton<IReactProperty>([key_3, v] as [string, any]);
+                    }, (o = interactions.getFloatingProps(), Object.entries(o))), delay<IReactProperty>((): Iterable<IReactProperty> => {
                         let value_7: string;
                         return append<IReactProperty>(singleton<IReactProperty>((value_7 = "swt:grid swt:grid-cols-[auto_1fr_auto] swt:bg-base-100 swt:border-2 swt:border-base-300 swt:w-56 swt:rounded-md swt:focus:outline-hidden", ["className", value_7] as [string, any])), delay<IReactProperty>((): Iterable<IReactProperty> => {
                             let elems_1: Iterable<ReactElement>;
@@ -158,16 +175,12 @@ export function ContextMenu(contextMenuInputProps: any): ReactElement {
                                 const triggerEvent = (e_4: MouseEvent): void => {
                                     const d: { buttonEvent: MouseEvent, spawnData: any } = {
                                         buttonEvent: e_4,
-                                        spawnData: patternInput[0],
+                                        spawnData: spawnData,
                                     };
                                     iterate<((arg0: { buttonEvent: MouseEvent, spawnData: any }) => void)>((f: ((arg0: { buttonEvent: MouseEvent, spawnData: any }) => void)): void => {
                                         f(d);
                                     }, toArray<((arg0: { buttonEvent: MouseEvent, spawnData: any }) => void)>(child_1.onClick));
-                                    setIsOpen(false);
-                                    allowMouseUpCloseRef.current = true;
-                                    iterate<int32>((timeout_2: int32): void => {
-                                        clearTimeout(timeout_2);
-                                    }, toArray<int32>(timeout.current));
+                                    close();
                                 };
                                 let props: [string, any][];
                                 const o_1: any = interactions.getItemProps((tabIndex = ((((activeIndex != null) && (value_31(activeIndex) === index)) ? 0 : -1) | 0), {
@@ -195,7 +208,11 @@ export function ContextMenu(contextMenuInputProps: any): ReactElement {
                                         })) : empty_1<ReactElement>(), delay<ReactElement>((): Iterable<ReactElement> => ((child_1.kbdbutton != null) ? singleton<ReactElement>(createElement<any>("div", {
                                             className: "swt:col-start-3 swt:justify-self-end",
                                             children: value_31(child_1.kbdbutton).element,
-                                        })) : singleton<ReactElement>(defaultOf_1())))))))), ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])), delay<IReactProperty>((): Iterable<IReactProperty> => collect<[string, any], Iterable<IReactProperty>, IReactProperty>((matchValue_2: [string, any]): Iterable<IReactProperty> => singleton<IReactProperty>([matchValue_2[0], matchValue_2[1]] as [string, any]), props)));
+                                        })) : singleton<ReactElement>(defaultOf_1())))))))), ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])), delay<IReactProperty>((): Iterable<IReactProperty> => collect<[string, any], Iterable<IReactProperty>, IReactProperty>((matchValue_2: [string, any]): Iterable<IReactProperty> => {
+                                            const v_1: any = matchValue_2[1];
+                                            const key_17: string = matchValue_2[0];
+                                            return singleton<IReactProperty>([key_17, v_1] as [string, any]);
+                                        }, props)));
                                     }));
                                 })))))));
                             }, rangeDouble(0, 1, length(children) - 1)))), ["children", reactApi.Children.toArray(Array.from(elems_1))] as [string, any]));
@@ -243,10 +260,12 @@ export function Example(): ReactElement {
             const target = e_1.target as HTMLElement;
             const tableCell: Option<Element> = target.closest("[data-row][data-column]");
             if (tableCell != null) {
-                const cell_1 = value_31(tableCell) as HTMLElement;
+                const cell: Element = value_31(tableCell);
+                const cell_1 = cell as HTMLElement;
                 const row: int32 = cell_1.dataset.row | 0;
+                const col: int32 = cell_1.dataset.column | 0;
                 const indices: { x: int32, y: int32 } = {
-                    x: cell_1.dataset.column,
+                    x: col,
                     y: row,
                 };
                 console.log(indices);

@@ -1,7 +1,7 @@
 import { FSharpChoice$2_$union, FSharpChoice$2_Choice2Of2, FSharpChoice$2_Choice1Of2 } from "../fable_modules/fable-library-ts.4.24.0/Choice.js";
 import { last, empty, exists, map as map_1, collect, toArray as toArray_2, singleton, append, delay, toList, iterate } from "../fable_modules/fable-library-ts.4.24.0/Seq.js";
 import { int32 } from "../fable_modules/fable-library-ts.4.24.0/Int32.js";
-import { singleton as singleton_1, ofSeq, toArray as toArray_1, FSharpSet__get_MinimumElement, FSharpSet } from "../fable_modules/fable-library-ts.4.24.0/Set.js";
+import { singleton as singleton_1, toArray as toArray_1, ofSeq, FSharpSet__get_MinimumElement, FSharpSet } from "../fable_modules/fable-library-ts.4.24.0/Set.js";
 import { value as value_99, map, defaultArg, toArray, Option } from "../fable_modules/fable-library-ts.4.24.0/Option.js";
 import { createElement, ReactElement } from "react";
 import React from "react";
@@ -34,7 +34,8 @@ function TableHelper_$007CActiveTrigger$007CDefault$007C(eventCode: string): FSh
 
 function TableHelper_keyDownController(e: KeyboardEvent, selectedCells: { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> }, activeCellIndex: Option<{ x: int32, y: int32 }>, setActiveCellIndex: ((arg0: Option<{ x: int32, y: int32 }>) => void), onKeydown: Option<((arg0: [KeyboardEvent, { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> }, Option<{ x: int32, y: int32 }>]) => void)>): void {
     if (activeCellIndex == null) {
-        if (!selectedCells.selectBy(e) && (selectedCells.count > 0)) {
+        const nav: boolean = selectedCells.selectBy(e);
+        if (!nav && (selectedCells.count > 0)) {
             iterate<((arg0: [KeyboardEvent, { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> }, Option<{ x: int32, y: int32 }>]) => void)>((onKeydown_1: ((arg0: [KeyboardEvent, { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> }, Option<{ x: int32, y: int32 }>]) => void)): void => {
                 onKeydown_1([e, selectedCells, activeCellIndex] as [KeyboardEvent, { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> }, Option<{ x: int32, y: int32 }>]);
             }, toArray<((arg0: [KeyboardEvent, { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> }, Option<{ x: int32, y: int32 }>]) => void)>(onKeydown));
@@ -74,9 +75,12 @@ export function Table(tableInputProps: any): ReactElement {
         scrollPaddingStart: 1.5 * 40,
         scrollPaddingEnd: 1.5 * 40,
         overscan: 2,
-        rangeExtractor: (range: Range$): int32[] => toArray_1<int32>(ofSeq(toList<int32>(delay<int32>((): Iterable<int32> => append<int32>(singleton<int32>(0), delay<int32>((): Iterable<int32> => defaultRangeExtractor(range))))), {
-            Compare: comparePrimitives,
-        })),
+        rangeExtractor: (range: Range$): int32[] => {
+            const next: FSharpSet<int32> = ofSeq(toList<int32>(delay<int32>((): Iterable<int32> => append<int32>(singleton<int32>(0), delay<int32>((): Iterable<int32> => defaultRangeExtractor(range))))), {
+                Compare: comparePrimitives,
+            });
+            return toArray_1<int32>(next);
+        },
         gap: 0,
     });
     const columnVirtualizer: Virtualizer<any, any> = useVirtualizer<any, any>({
@@ -85,9 +89,12 @@ export function Table(tableInputProps: any): ReactElement {
         estimateSize: (_arg_1: int32): int32 => 200,
         scrollPaddingEnd: 1.5 * 200,
         overscan: 2,
-        rangeExtractor: (range_1: Range$): int32[] => toArray_1<int32>(ofSeq(toList<int32>(delay<int32>((): Iterable<int32> => append<int32>(singleton<int32>(0), delay<int32>((): Iterable<int32> => defaultRangeExtractor(range_1))))), {
-            Compare: comparePrimitives,
-        })),
+        rangeExtractor: (range_1: Range$): int32[] => {
+            const next_1: FSharpSet<int32> = ofSeq(toList<int32>(delay<int32>((): Iterable<int32> => append<int32>(singleton<int32>(0), delay<int32>((): Iterable<int32> => defaultRangeExtractor(range_1))))), {
+                Compare: comparePrimitives,
+            });
+            return toArray_1<int32>(next_1);
+        },
         horizontal: true,
         gap: 0,
     });
@@ -95,15 +102,16 @@ export function Table(tableInputProps: any): ReactElement {
         rowVirtualizer.scrollToIndex(coordinate.y);
         columnVirtualizer.scrollToIndex(coordinate.x);
     };
-    const patternInput: [Option<{ x: int32, y: int32 }>, ((arg0: Option<{ x: int32, y: int32 }>) => void)] = reactApi.useState<Option<{ x: int32, y: int32 }>, Option<{ x: int32, y: int32 }>>(undefined);
-    const setActiveCellIndex: ((arg0: Option<{ x: int32, y: int32 }>) => void) = patternInput[1];
-    const activeCellIndex: Option<{ x: int32, y: int32 }> = patternInput[0];
-    const GridSelect: { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> } = Feliz_React__React_useGridSelect_Static_4CE412FE(rowCount, columnCount, enableColumnHeaderSelect_1 ? 0 : 1, 1, (cell: { x: int32, y: int32 }, newCellRange: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>): void => {
+    const onSelect_2 = (cell: { x: int32, y: int32 }, newCellRange: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>): void => {
         iterate<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>((onSelect_1: ((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))): void => {
             onSelect_1(cell)(newCellRange);
         }, toArray<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>(map(curry2, onSelect)));
         scrollTo(cell);
-    });
+    };
+    const patternInput: [Option<{ x: int32, y: int32 }>, ((arg0: Option<{ x: int32, y: int32 }>) => void)] = reactApi.useState<Option<{ x: int32, y: int32 }>, Option<{ x: int32, y: int32 }>>(undefined);
+    const setActiveCellIndex: ((arg0: Option<{ x: int32, y: int32 }>) => void) = patternInput[1];
+    const activeCellIndex: Option<{ x: int32, y: int32 }> = patternInput[0];
+    const GridSelect: { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> } = Feliz_React__React_useGridSelect_Static_4CE412FE(rowCount, columnCount, enableColumnHeaderSelect_1 ? 0 : 1, 1, onSelect_2);
     const dependencies_1: any[] = [GridSelect.selectedCells];
     reactApi.useImperativeHandle<TableHandle>(ref, (): TableHandle => ({
         focus: (): void => {
@@ -232,10 +240,11 @@ export function Table(tableInputProps: any): ReactElement {
                 transform: `translateY(${virtualRow.start}px)`,
                 height: virtualRow.size,
             }] as [string, any], ["className", "swt:w-full"] as [string, any], (elems_4 = toList<ReactElement>(delay<ReactElement>((): Iterable<ReactElement> => collect<VirtualItem, Iterable<ReactElement>, ReactElement>((virtualColumn_1: VirtualItem): Iterable<ReactElement> => {
-                const controller_1: TableCellController = createController({
+                const index_2: { x: int32, y: int32 } = {
                     x: virtualColumn_1.index,
                     y: virtualRow.index,
-                });
+                };
+                const controller_1: TableCellController = createController(index_2);
                 return singleton<ReactElement>(createElement<any>("td", createObj(toList<IReactProperty>(delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["key", virtualColumn_1.key] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(Feliz_prop__prop_dataRow_Static_Z524259A4(virtualRow.index)), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(Feliz_prop__prop_dataColumn_Static_Z524259A4(virtualColumn_1.index)), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", join(" ", toList<string>(delay<string>((): Iterable<string> => (defaultStyleSelect_1 ? singleton<string>(get_TableCellStyle()) : empty<string>()))))] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(controller_1.IsActive ? singleton<IReactProperty>(["data-active", true] as [string, any]) : empty<IReactProperty>(), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(controller_1.IsSelected ? singleton<IReactProperty>(["data-selected", true] as [string, any]) : empty<IReactProperty>(), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(controller_1.IsOrigin ? singleton<IReactProperty>(["data-is-append-origin", true] as [string, any]) : empty<IReactProperty>(), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["style", createObj(toList<IStyleAttribute>(delay<IStyleAttribute>((): Iterable<IStyleAttribute> => append<IStyleAttribute>((virtualColumn_1.index === 0) ? append<IStyleAttribute>(singleton<IStyleAttribute>(["position", "sticky"] as [string, any]), delay<IStyleAttribute>((): Iterable<IStyleAttribute> => singleton<IStyleAttribute>(["zIndex", 10] as [string, any]))) : singleton<IStyleAttribute>(["position", "absolute"] as [string, any]), delay<IStyleAttribute>((): Iterable<IStyleAttribute> => append<IStyleAttribute>(singleton<IStyleAttribute>(["width", virtualColumn_1.size] as [string, any]), delay<IStyleAttribute>((): Iterable<IStyleAttribute> => append<IStyleAttribute>(singleton<IStyleAttribute>(["height", virtualRow.size] as [string, any]), delay<IStyleAttribute>((): Iterable<IStyleAttribute> => append<IStyleAttribute>(singleton<IStyleAttribute>(["top", 0] as [string, any]), delay<IStyleAttribute>((): Iterable<IStyleAttribute> => append<IStyleAttribute>(singleton<IStyleAttribute>(["left", 0] as [string, any]), delay<IStyleAttribute>((): Iterable<IStyleAttribute> => singleton<IStyleAttribute>(["transform", `translateX(${virtualColumn_1.start}px)`] as [string, any]))))))))))))))] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => {
                     let elems_3: Iterable<ReactElement>;
                     return singleton<IReactProperty>((elems_3 = toList<ReactElement>(delay<ReactElement>((): Iterable<ReactElement> => (controller_1.IsActive ? singleton<ReactElement>(renderActiveCell(controller_1)) : singleton<ReactElement>(renderCell(controller_1))))), ["children", reactApi.Children.toArray(Array.from(elems_3))] as [string, any]));
@@ -253,9 +262,12 @@ export function Entry(): ReactElement {
     let TableHandler: IRefValue$1<TableHandle>;
     const initialValue: TableHandle = defaultOf_1();
     TableHandler = (reactApi.useRef(initialValue));
+    const rowCount = 1000;
+    const columnCount = 1000;
     let patternInput: [string[][], ((arg0: string[][]) => void)];
-    const initial: string[][] = toArray_2<string[]>(delay<string[]>((): Iterable<string[]> => map_1<int32, string[]>((i: int32): string[] => toArray_2<string>(delay<string>((): Iterable<string> => map_1<int32, string>((j: int32): string => (`Row ${i}, Column ${j}`), rangeDouble(0, 1, 1000 - 1)))), rangeDouble(0, 1, 1000 - 1))));
+    const initial: string[][] = toArray_2<string[]>(delay<string[]>((): Iterable<string[]> => map_1<int32, string[]>((i: int32): string[] => toArray_2<string>(delay<string>((): Iterable<string> => map_1<int32, string>((j: int32): string => (`Row ${i}, Column ${j}`), rangeDouble(0, 1, columnCount - 1)))), rangeDouble(0, 1, rowCount - 1))));
     patternInput = reactApi.useState<string[][], string[][]>(initial);
+    const setData: ((arg0: string[][]) => void) = patternInput[1];
     const data: string[][] = patternInput[0];
     const render_1: ((arg0: TableCellController) => ReactElement) = memo<TableCellController>((ts: TableCellController): ReactElement => BaseCell<Iterable<IReactProperty>>(ts.Index.y, ts.Index.x, createElement<any>("div", createObj(toList<IReactProperty>(delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["key", `${ts.Index.x}-${ts.Index.y}`] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", "swt:truncate"] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>((ts.Index.x === 0) ? singleton<IReactProperty>(["children", ts.Index.y] as [string, any]) : singleton<IReactProperty>(["children", item(ts.Index.x, item(ts.Index.y, data))] as [string, any]), delay<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["onClick", (e: MouseEvent): void => {
         ts.onClick(e);
@@ -265,7 +277,7 @@ export function Entry(): ReactElement {
         data: item(ts_2.Index.x, item(ts_2.Index.y, data)),
         setData: (newData: string): void => {
             item(ts_2.Index.y, data)[ts_2.Index.x] = newData;
-            patternInput[1](data);
+            setData(data);
         },
     }), undefined, undefined, (ts_3: TableCellController): string => (`${ts_3.Index.x}-${ts_3.Index.y}`));
     return createElement<any>("div", createObj(ofArray([["className", "swt:flex swt:flex-col swt:gap-4"] as [string, any], (elems = [createElement<any>("button", {
@@ -282,8 +294,8 @@ export function Entry(): ReactElement {
             });
         },
     }), createElement(Table, {
-        rowCount: 1000,
-        columnCount: 1000,
+        rowCount: rowCount,
+        columnCount: columnCount,
         renderCell: render_1,
         renderActiveCell: renderActiveCell,
         ref: TableHandler,

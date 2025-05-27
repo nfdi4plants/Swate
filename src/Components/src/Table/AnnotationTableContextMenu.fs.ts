@@ -82,7 +82,8 @@ export function AnnotationTableContextMenu_CompositeCellContent_469BA83C(index: 
         icon: ATCMC_Icon_Z721C83C5("fa-solid fa-eraser"),
         kbdbutton: ATCMC_KbdHint_27AED5E3("Del"),
         onClick: (c: { buttonEvent: MouseEvent, spawnData: any }): void => {
-            setTable(AnnotationTableContextMenuUtil_clear_22CD38E6(c.spawnData, cellIndex, table, selectHandle));
+            const cc: { x: int32, y: int32 } = c.spawnData;
+            setTable(AnnotationTableContextMenuUtil_clear_22CD38E6(cc, cellIndex, table, selectHandle));
         },
     }, {
         isDivider: true,

@@ -8,8 +8,9 @@ import { Comment$ } from "../fable_modules/ARCtrl.Core.2.5.1/Comment.fs.js";
 import { OntologyAnnotation } from "../fable_modules/ARCtrl.Core.2.5.1/OntologyAnnotation.fs.js";
 import { SimpleJson_tryParse } from "../fable_modules/Fable.SimpleJson.3.24.0/./SimpleJson.fs.js";
 import { Json_$union } from "../fable_modules/Fable.SimpleJson.3.24.0/Json.fs.js";
-import { Convert_fromJson } from "../fable_modules/Fable.SimpleJson.3.24.0/./Json.Converter.fs.js";
 import { createTypeInfo } from "../fable_modules/Fable.SimpleJson.3.24.0/./TypeInfo.Converter.fs.js";
+import { TypeInfo_$union } from "../fable_modules/Fable.SimpleJson.3.24.0/TypeInfo.fs.js";
+import { Convert_fromJson } from "../fable_modules/Fable.SimpleJson.3.24.0/./Json.Converter.fs.js";
 import { isArrayLike, equals } from "../fable_modules/fable-library-ts.4.24.0/Util.js";
 import { join, isNullOrWhiteSpace } from "../fable_modules/fable-library-ts.4.24.0/String.js";
 
@@ -144,7 +145,9 @@ export function TermModule_fromOntologyAnnotation(oa: OntologyAnnotation): Term 
     const description: Option<string> = map<Comment$, string>((c_1: Comment$): string => {
         const matchValue: Option<Json_$union> = SimpleJson_tryParse(value_1(c_1.Value));
         if (matchValue != null) {
-            return Convert_fromJson<string>(value_1(matchValue), createTypeInfo(string_type));
+            const inputJson: Json_$union = value_1(matchValue);
+            const typeInfo: TypeInfo_$union = createTypeInfo(string_type);
+            return Convert_fromJson<string>(inputJson, typeInfo);
         }
         else {
             throw new Error("Couldn\'t parse the input JSON string because it seems to be invalid");
@@ -153,7 +156,9 @@ export function TermModule_fromOntologyAnnotation(oa: OntologyAnnotation): Term 
     const data: Option<any> = map<Comment$, any>((c_3: Comment$): any => {
         const matchValue_1: Option<Json_$union> = SimpleJson_tryParse(value_1(c_3.Value));
         if (matchValue_1 != null) {
-            return Convert_fromJson<any>(value_1(matchValue_1), createTypeInfo(obj_type));
+            const inputJson_1: Json_$union = value_1(matchValue_1);
+            const typeInfo_1: TypeInfo_$union = createTypeInfo(obj_type);
+            return Convert_fromJson<any>(inputJson_1, typeInfo_1);
         }
         else {
             throw new Error("Couldn\'t parse the input JSON string because it seems to be invalid");
@@ -162,7 +167,9 @@ export function TermModule_fromOntologyAnnotation(oa: OntologyAnnotation): Term 
     const source_3: Option<string> = map<Comment$, string>((c_5: Comment$): string => {
         const matchValue_2: Option<Json_$union> = SimpleJson_tryParse(value_1(c_5.Value));
         if (matchValue_2 != null) {
-            return Convert_fromJson<string>(value_1(matchValue_2), createTypeInfo(string_type));
+            const inputJson_2: Json_$union = value_1(matchValue_2);
+            const typeInfo_2: TypeInfo_$union = createTypeInfo(string_type);
+            return Convert_fromJson<string>(inputJson_2, typeInfo_2);
         }
         else {
             throw new Error("Couldn\'t parse the input JSON string because it seems to be invalid");
@@ -171,7 +178,9 @@ export function TermModule_fromOntologyAnnotation(oa: OntologyAnnotation): Term 
     const isObsolete: Option<boolean> = map<Comment$, boolean>((c_7: Comment$): boolean => {
         const matchValue_3: Option<Json_$union> = SimpleJson_tryParse(value_1(c_7.Value));
         if (matchValue_3 != null) {
-            return Convert_fromJson<boolean>(value_1(matchValue_3), createTypeInfo(bool_type));
+            const inputJson_3: Json_$union = value_1(matchValue_3);
+            const typeInfo_3: TypeInfo_$union = createTypeInfo(bool_type);
+            return Convert_fromJson<boolean>(inputJson_3, typeInfo_3);
         }
         else {
             throw new Error("Couldn\'t parse the input JSON string because it seems to be invalid");
@@ -190,10 +199,12 @@ export function TermModule_fromOntologyAnnotation(oa: OntologyAnnotation): Term 
 
 export function TermSearchStyleModule_resolveStyle(style: string | string[]): string {
     if (isArrayLike(style)) {
-        return join(" ", style as Iterable<string>);
+        const classNames: string[] = style;
+        return join(" ", classNames);
     }
     else {
-        return style;
+        const className: string = style;
+        return className;
     }
 }
 

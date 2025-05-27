@@ -180,14 +180,16 @@ export const SmallWindowedCompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = await canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
+    const modalContent = canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
 
     // Verify that the modal is open (checking for modal content)
     const header = canvas.getByText("Simple Header");
     const fooder = canvas.getByRole("button", { name: /Submit/i });
 
-    expect(header).toBeInTheDocument();
-    expect(fooder).toBeInTheDocument;
+    await waitFor(() => {
+      expect(header).toBeInTheDocument();
+      expect(fooder).toBeInTheDocument();
+    });
 
     // Get the element's position in the viewport
     const rect0 = header.getBoundingClientRect();

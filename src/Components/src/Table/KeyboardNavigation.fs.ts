@@ -36,7 +36,8 @@ export function GridSelectModule_Kbd_fromKey_Z721C83C5(key: string): GridSelectM
         return toFail(printf("Unknown key: %s"))(key);
     }
     else {
-        return value(matchValue);
+        const kbd: GridSelectModule_Kbd = value(matchValue);
+        return kbd;
     }
 }
 
@@ -119,7 +120,11 @@ export function GridSelectModule_SelectedCellRange_toString(range: Option<{ xEnd
     }
     else {
         const range_1: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 } = value(range);
-        return toText(printf("x: %d-%d, y: %d-%d"))(range_1.xStart)(range_1.xEnd)(range_1.yStart)(range_1.yEnd);
+        const xStart: int32 = range_1.xStart | 0;
+        const yStart: int32 = range_1.yStart | 0;
+        const xEnd: int32 = range_1.xEnd | 0;
+        const yEnd: int32 = range_1.yEnd | 0;
+        return toText(printf("x: %d-%d, y: %d-%d"))(xStart)(xEnd)(yStart)(yEnd);
     }
 }
 
@@ -160,7 +165,20 @@ function GridSelect__GetNextIndex_710D035D(this$: GridSelect, kbd: GridSelectMod
     let current: { x: int32, y: int32 };
     const matchValue: Option<{ x: int32, y: int32 }> = GridSelect__get_LastAppend(this$);
     const matchValue_1: Option<{ x: int32, y: int32 }> = GridSelect__get_Origin(this$);
-    current = ((matchValue == null) ? ((matchValue_1 == null) ? ((equals(kbd, "arrowDown") ? true : equals(kbd, "arrowRight")) ? FSharpSet__get_MaximumElement(selectedCells) : FSharpSet__get_MinimumElement(selectedCells)) : value(matchValue_1)) : value(matchValue));
+    if (matchValue == null) {
+        if (matchValue_1 == null) {
+            const isIncrease: boolean = equals(kbd, "arrowDown") ? true : equals(kbd, "arrowRight");
+            current = (isIncrease ? FSharpSet__get_MaximumElement(selectedCells) : FSharpSet__get_MinimumElement(selectedCells));
+        }
+        else {
+            const origin: { x: int32, y: int32 } = value(matchValue_1);
+            current = origin;
+        }
+    }
+    else {
+        const lastAppend: { x: int32, y: int32 } = value(matchValue);
+        current = lastAppend;
+    }
     if (jump) {
         switch (kbd) {
             case "arrowUp":
@@ -219,12 +237,15 @@ export function GridSelect__SelectBy_65E00AD4(this$: GridSelect, e: KeyboardEven
     else {
         const kbd_1: GridSelectModule_Kbd = value(kbd);
         e.preventDefault();
-        GridSelect__SelectBy_Z7448804D(this$, kbd_1, e.ctrlKey ? true : e.metaKey, e.shiftKey, selectedCells, setter, maxRow, maxCol, unwrap(minRow), unwrap(minCol), unwrap(onSelect));
+        const jump: boolean = e.ctrlKey ? true : e.metaKey;
+        GridSelect__SelectBy_Z7448804D(this$, kbd_1, jump, e.shiftKey, selectedCells, setter, maxRow, maxCol, unwrap(minRow), unwrap(minCol), unwrap(onSelect));
         return true;
     }
 }
 
 export function GridSelect__SelectBy_Z7448804D(this$: GridSelect, kbd: GridSelectModule_Kbd, jump: boolean, isAppend: boolean, selectedCells: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>, setter: ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void), maxRow: int32, maxCol: int32, minRow: Option<int32>, minCol: Option<int32>, onSelect: Option<((arg0: { x: int32, y: int32 }, arg1: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void)>): void {
+    const minRow_1: int32 = defaultArg<int32>(minRow, 0) | 0;
+    const minCol_1: int32 = defaultArg<int32>(minCol, 0) | 0;
     if (selectedCells == null) {
         throw new Error("No selected cells");
     }
@@ -232,10 +253,13 @@ export function GridSelect__SelectBy_Z7448804D(this$: GridSelect, kbd: GridSelec
         GridSelect__set_LastAppend_75FBA3FA(this$, undefined);
         GridSelect__set_Origin_75FBA3FA(this$, undefined);
     }
-    GridSelect__SelectAt_53B3F404(this$, GridSelect__GetNextIndex_710D035D(this$, kbd, jump, GridSelectModule_SelectedCellRange_toReducedSet(selectedCells), maxRow, maxCol, defaultArg<int32>(minRow, 0), defaultArg<int32>(minCol, 0)), isAppend, selectedCells, setter, unwrap(onSelect));
+    const selectedCellsSet: FSharpSet<{ x: int32, y: int32 }> = GridSelectModule_SelectedCellRange_toReducedSet(selectedCells);
+    const nextIndex: { x: int32, y: int32 } = GridSelect__GetNextIndex_710D035D(this$, kbd, jump, selectedCellsSet, maxRow, maxCol, minRow_1, minCol_1);
+    GridSelect__SelectAt_53B3F404(this$, nextIndex, isAppend, selectedCells, setter, unwrap(onSelect));
 }
 
 export function GridSelect__SelectAt_53B3F404(this$: GridSelect, nextIndex: { x: int32, y: int32 }, isAppend: boolean, selectedCellRange: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>, setter: ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void), onSelect: Option<((arg0: { x: int32, y: int32 }, arg1: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void)>): void {
+    let isEmpty: FSharpSet<{ x: int32, y: int32 }>;
     const matchValue: Option<{ x: int32, y: int32 }> = GridSelect__get_Origin(this$);
     if (isAppend) {
         if (matchValue == null) {
@@ -262,20 +286,29 @@ export function GridSelect__SelectAt_53B3F404(this$: GridSelect, nextIndex: { x:
     else {
         let selectedCells_1: FSharpSet<{ x: int32, y: int32 }>;
         const _arg: FSharpSet<{ x: int32, y: int32 }> = GridSelectModule_SelectedCellRange_toReducedSet(selectedCellRange);
-        selectedCells_1 = ((FSharpSet__get_Count(_arg) === 0) ? singleton<{ x: int32, y: int32 }>(nextIndex, {
-            Compare: compare,
-        }) : _arg);
+        if ((isEmpty = _arg, FSharpSet__get_Count(isEmpty) === 0)) {
+            const isEmpty_1: FSharpSet<{ x: int32, y: int32 }> = _arg;
+            selectedCells_1 = singleton<{ x: int32, y: int32 }>(nextIndex, {
+                Compare: compare,
+            });
+        }
+        else {
+            const x_2: FSharpSet<{ x: int32, y: int32 }> = _arg;
+            selectedCells_1 = x_2;
+        }
         const origin: { x: int32, y: int32 } = value(GridSelect__get_Origin(this$));
         const lastAppend: { x: int32, y: int32 } = defaultArg<{ x: int32, y: int32 }>(GridSelect__get_LastAppend(this$), value(GridSelect__get_Origin(this$)));
         const minRow: int32 = ((nextIndex.y <= origin.y) ? nextIndex.y : ((origin.y < lastAppend.y) ? origin.y : FSharpSet__get_MinimumElement(selectedCells_1).y)) | 0;
         const maxRow: int32 = ((nextIndex.y >= origin.y) ? nextIndex.y : ((origin.y > lastAppend.y) ? origin.y : FSharpSet__get_MaximumElement(selectedCells_1).y)) | 0;
         const minCol: int32 = ((nextIndex.x <= origin.x) ? nextIndex.x : ((origin.x < lastAppend.x) ? origin.x : FSharpSet__get_MinimumElement(selectedCells_1).x)) | 0;
-        newCellRange_1 = {
-            xEnd: (nextIndex.x >= origin.x) ? nextIndex.x : ((origin.x > lastAppend.x) ? origin.x : FSharpSet__get_MaximumElement(selectedCells_1).x),
+        const maxCol: int32 = ((nextIndex.x >= origin.x) ? nextIndex.x : ((origin.x > lastAppend.x) ? origin.x : FSharpSet__get_MaximumElement(selectedCells_1).x)) | 0;
+        const newCellRange: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 } = {
+            xEnd: maxCol,
             xStart: minCol,
             yEnd: maxRow,
             yStart: minRow,
         };
+        newCellRange_1 = newCellRange;
     }
     setter(newCellRange_1);
     iterate<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>((f: ((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))): void => {
@@ -309,6 +342,35 @@ export function Feliz_React__React_useGridSelect_Static_4CE412FE(rowCount: int32
     let select: IRefValue$1<GridSelect>;
     const initialValue: GridSelect = GridSelect_$ctor();
     select = (reactApi.useRef(initialValue));
+    const selectBy = (e: KeyboardEvent): boolean => {
+        if (selectedCells == null) {
+            return false;
+        }
+        else {
+            return GridSelect__SelectBy_65E00AD4(select.current, e, selectedCells, setSelectedCells, rowCount - 1, columnCount - 1, minRow_1, minCol_1, (newIndex: { x: int32, y: int32 }, newCellRange: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>): void => {
+                iterate<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>((onSelect_1: ((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))): void => {
+                    onSelect_1(newIndex)(newCellRange);
+                }, toArray<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>(map(curry2, onSelect)));
+            });
+        }
+    };
+    const selectAt = (tupledArg: [{ x: int32, y: int32 }, boolean]): void => {
+        const newIndex_1: { x: int32, y: int32 } = tupledArg[0];
+        const isAppend: boolean = tupledArg[1];
+        GridSelect__SelectAt_53B3F404(select.current, newIndex_1, isAppend, selectedCells, setSelectedCells, (newIndex_2: { x: int32, y: int32 }, newCellRange_1: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>): void => {
+            iterate<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>((onSelect_2: ((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))): void => {
+                onSelect_2(newIndex_2)(newCellRange_1);
+            }, toArray<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>(map(curry2, onSelect)));
+        });
+    };
+    const contains = (cell: { x: int32, y: int32 }): boolean => {
+        if ((((selectedCells != null) && (cell.x <= value(selectedCells).xEnd)) && (cell.x >= value(selectedCells).xStart)) && (cell.y <= value(selectedCells).yEnd)) {
+            return cell.y >= value(selectedCells).yStart;
+        }
+        else {
+            return false;
+        }
+    };
     const SelectOrigin: Option<{ x: int32, y: int32 }> = GridSelect__get_Origin(select.current);
     const lastAppend: Option<{ x: int32, y: int32 }> = GridSelect__get_LastAppend(select.current);
     const selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> = GridSelectModule_SelectedCellRange_toReducedSet(selectedCells);
@@ -318,35 +380,11 @@ export function Feliz_React__React_useGridSelect_Static_4CE412FE(rowCount: int32
             GridSelect__Clear(select.current);
             setSelectedCells(undefined);
         },
-        contains: (cell: { x: int32, y: int32 }): boolean => {
-            if ((((selectedCells != null) && (cell.x <= value(selectedCells).xEnd)) && (cell.x >= value(selectedCells).xStart)) && (cell.y <= value(selectedCells).yEnd)) {
-                return cell.y >= value(selectedCells).yStart;
-            }
-            else {
-                return false;
-            }
-        },
+        contains: contains,
         count: GridSelectModule_SelectedCellRange_count(selectedCells),
         lastAppend: unwrap(lastAppend),
-        selectAt: (tupledArg: [{ x: int32, y: int32 }, boolean]): void => {
-            GridSelect__SelectAt_53B3F404(select.current, tupledArg[0], tupledArg[1], selectedCells, setSelectedCells, (newIndex_2: { x: int32, y: int32 }, newCellRange_1: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>): void => {
-                iterate<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>((onSelect_2: ((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))): void => {
-                    onSelect_2(newIndex_2)(newCellRange_1);
-                }, toArray<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>(map(curry2, onSelect)));
-            });
-        },
-        selectBy: (e: KeyboardEvent): boolean => {
-            if (selectedCells == null) {
-                return false;
-            }
-            else {
-                return GridSelect__SelectBy_65E00AD4(select.current, e, selectedCells, setSelectedCells, rowCount - 1, columnCount - 1, minRow_1, minCol_1, (newIndex: { x: int32, y: int32 }, newCellRange: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>): void => {
-                    iterate<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>((onSelect_1: ((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))): void => {
-                        onSelect_1(newIndex)(newCellRange);
-                    }, toArray<((arg0: { x: int32, y: int32 }) => ((arg0: Option<{ xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }>) => void))>(map(curry2, onSelect)));
-                });
-            }
-        },
+        selectAt: selectAt,
+        selectBy: selectBy,
         selectedCells: unwrap(selectedCells),
         selectedCellsReducedSet: selectedCellsReducedSet,
     };

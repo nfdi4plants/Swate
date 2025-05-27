@@ -120,17 +120,25 @@ function TermSearchResult_addSearchResults(prevResults: TermSearchResult[], newR
                 const matchValue: TermSearchResult = prevResults[index];
                 if (matchValue.IsDirectedSearchResult) {
                     if (newResult.IsDirectedSearchResult) {
-                        setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(matchValue.Term, newResult.Term), true));
+                        const t2_3: Term = newResult.Term;
+                        const t1_3: Term = matchValue.Term;
+                        setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(t1_3, t2_3), true));
                     }
                     else {
-                        setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(matchValue.Term, newResult.Term), true));
+                        const t2_1: Term = newResult.Term;
+                        const t1_1: Term = matchValue.Term;
+                        setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(t1_1, t2_1), true));
                     }
                 }
                 else if (newResult.IsDirectedSearchResult) {
-                    setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(newResult.Term, matchValue.Term), true));
+                    const t2: Term = newResult.Term;
+                    const t1: Term = matchValue.Term;
+                    setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(t2, t1), true));
                 }
                 else {
-                    setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(matchValue.Term, newResult.Term), false));
+                    const t2_2: Term = newResult.Term;
+                    const t1_2: Term = matchValue.Term;
+                    setItem(prevResults, index, new TermSearchResult(TermModule_joinLeft(t1_2, t2_2), false));
                 }
             }
             else {
@@ -180,7 +188,8 @@ function SearchState_init(): SearchState_$union {
 
 function SearchState__get_Results(this$: SearchState_$union): TermSearchResult[] {
     if (this$.tag === /* SearchDone */ 1) {
-        return this$.fields[0];
+        const results: TermSearchResult[] = this$.fields[0];
+        return results;
     }
     else {
         return [];
@@ -277,6 +286,7 @@ function TermItem(termItemInputProps: any): ReactElement {
     const term: TermSearchResult = termItemInputProps.term;
     const isObsolete: boolean = (term.Term.isObsolete != null) && value_66(term.Term.isObsolete);
     const isDirectedSearch: boolean = term.IsDirectedSearchResult;
+    const activeClasses = "swt:bg-secondary swt:text-secondary-content";
     const ref: IRefValue$1<Option<HTMLElement>> = reactApi.useRef(undefined);
     const dependencies: any[] = [isActive];
     reactApi.useEffect((): void => {
@@ -286,7 +296,7 @@ function TermItem(termItemInputProps: any): ReactElement {
             });
         }
     }, dependencies);
-    return createElement<any>("li", createObj(ofArray([["ref", ref] as [string, any], ["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => append<string>(singleton<string>("swt:list-row swt:items-center swt:cursor-pointer swt:min-w-0 swt:max-w-full swt:w-full /\r\n                swt:hover:bg-secondary swt:hover:text-secondary-content swt:transition-colors /\r\n                swt:rounded-none"), delay_4<string>((): Iterable<string> => (((isActive != null) && value_66(isActive)) ? singleton<string>("swt:bg-secondary swt:text-secondary-content") : empty<string>()))))))] as [string, any], ["onClick", (e: MouseEvent): void => {
+    return createElement<any>("li", createObj(ofArray([["ref", ref] as [string, any], ["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => append<string>(singleton<string>("swt:list-row swt:items-center swt:cursor-pointer swt:min-w-0 swt:max-w-full swt:w-full /\r\n                swt:hover:bg-secondary swt:hover:text-secondary-content swt:transition-colors /\r\n                swt:rounded-none"), delay_4<string>((): Iterable<string> => (((isActive != null) && value_66(isActive)) ? singleton<string>(activeClasses) : empty<string>()))))))] as [string, any], ["onClick", (e: MouseEvent): void => {
         e.stopPropagation();
         onTermSelect(term.Term);
     }] as [string, any], (elems = [createElement<any>("i", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(isObsolete ? singleton<IReactProperty>(["title", "Obsolete"] as [string, any]) : (isDirectedSearch ? singleton<IReactProperty>(["title", "Directed Search"] as [string, any]) : empty<IReactProperty>()), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => append<string>(singleton<string>("swt:w-5"), delay_4<string>((): Iterable<string> => (isObsolete ? singleton<string>("fa-solid fa-link-slash swt:text-error") : (isDirectedSearch ? singleton<string>("fa-solid fa-diagram-project swt:text-primary") : empty<string>())))))))] as [string, any]))))))), createElement<any>("span", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => {
@@ -366,7 +376,7 @@ function IndicatorItem(indicatorPosition: string, tooltip: string, tooltipPositi
 }
 
 function DetailsModal(detailsModalInputProps: any): ReactElement {
-    let elems_1: Iterable<ReactElement>, elems_2: Iterable<ReactElement>;
+    let elems_1: Iterable<ReactElement>, elems_3: Iterable<ReactElement>;
     const config: FSharpList<[string, string]> = detailsModalInputProps.config;
     const term: Option<Term> = detailsModalInputProps.term;
     const rvm: ((arg0: MouseEvent) => void) = detailsModalInputProps.rvm;
@@ -408,25 +418,33 @@ function DetailsModal(detailsModalInputProps: any): ReactElement {
             children: "No term selected.",
         });
     }
-    const componentConfig: ReactElement = createElement<any>("div", createObj(ofArray([["className", "swt:grid swt:grid-cols-1 swt:md:grid-cols-[auto,1fr] swt:gap-4 swt:lg:gap-x-8"] as [string, any], (elems_2 = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => collect<[string, string], Iterable<ReactElement>, ReactElement>((matchValue: [string, string]): Iterable<ReactElement> => append<ReactElement>(singleton<ReactElement>(label(matchValue[0])), delay_4<ReactElement>((): Iterable<ReactElement> => singleton<ReactElement>(createElement<any>("div", {
-        children: [matchValue[1]],
-    })))), config))), ["children", reactApi.Children.toArray(Array.from(elems_2))] as [string, any])])));
+    const componentConfig: ReactElement = createElement<any>("div", createObj(ofArray([["className", "swt:flex swt:flex-col swt:gap-4"] as [string, any], (elems_3 = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => collect<[string, string], Iterable<ReactElement>, ReactElement>((matchValue: [string, string]): Iterable<ReactElement> => {
+        let elems_2: Iterable<ReactElement>;
+        const value_30: string = matchValue[1];
+        const key_14: string = matchValue[0];
+        return singleton<ReactElement>(createElement<any>("div", createObj(ofArray([["className", "swt:flex swt:flex-row swt:items-start swt:gap-4"] as [string, any], (elems_2 = [createElement<any>("label", {
+            className: "swt:w-80 swt:font-bold",
+            children: key_14,
+        }), createElement<any>("div", {
+            children: [value_30],
+        })], ["children", reactApi.Children.toArray(Array.from(elems_2))] as [string, any])]))));
+    }, config))), ["children", reactApi.Children.toArray(Array.from(elems_3))] as [string, any])])));
     let content: ReactElement;
     const children: FSharpList<ReactElement> = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
-        let elems_5: Iterable<ReactElement>;
+        let elems_6: Iterable<ReactElement>;
         return showConfig ? append<ReactElement>(singleton<ReactElement>(createElement<any>("button", createObj(ofArray([["className", "swt:btn swt:btn-xs swt:btn-outline swt:mb-2"] as [string, any], ["onClick", (_arg_1: MouseEvent): void => {
             setShowConfig(!showConfig);
-        }] as [string, any], (elems_5 = [createElement<any>("i", {
+        }] as [string, any], (elems_6 = [createElement<any>("i", {
             className: "fa-solid fa-arrow-left",
         }), createElement<any>("span", {
             children: ["back"],
-        })], ["children", reactApi.Children.toArray(Array.from(elems_5))] as [string, any])])))), delay_4<ReactElement>((): Iterable<ReactElement> => singleton<ReactElement>(componentConfig))) : append<ReactElement>(singleton<ReactElement>(termContent), delay_4<ReactElement>((): Iterable<ReactElement> => {
-            let elems_4: Iterable<ReactElement>, elems_3: Iterable<ReactElement>;
-            return singleton<ReactElement>(createElement<any>("div", createObj(ofArray([["className", "swt:w-full swt:flex swt:justify-end"] as [string, any], (elems_4 = [createElement<any>("button", createObj(ofArray([["className", "swt:btn swt:btn-primary swt:btn-xs"] as [string, any], ["onClick", (_arg: MouseEvent): void => {
+        })], ["children", reactApi.Children.toArray(Array.from(elems_6))] as [string, any])])))), delay_4<ReactElement>((): Iterable<ReactElement> => singleton<ReactElement>(componentConfig))) : append<ReactElement>(singleton<ReactElement>(termContent), delay_4<ReactElement>((): Iterable<ReactElement> => {
+            let elems_5: Iterable<ReactElement>, elems_4: Iterable<ReactElement>;
+            return singleton<ReactElement>(createElement<any>("div", createObj(ofArray([["className", "swt:w-full swt:flex swt:justify-end"] as [string, any], (elems_5 = [createElement<any>("button", createObj(ofArray([["className", "swt:btn swt:btn-primary swt:btn-xs"] as [string, any], ["onClick", (_arg: MouseEvent): void => {
                 setShowConfig(!showConfig);
-            }] as [string, any], (elems_3 = [createElement<any>("i", {
+            }] as [string, any], (elems_4 = [createElement<any>("i", {
                 className: "fa-solid fa-cog",
-            })], ["children", reactApi.Children.toArray(Array.from(elems_3))] as [string, any])])))], ["children", reactApi.Children.toArray(Array.from(elems_4))] as [string, any])]))));
+            })], ["children", reactApi.Children.toArray(Array.from(elems_4))] as [string, any])])))], ["children", reactApi.Children.toArray(Array.from(elems_5))] as [string, any])]))));
         }));
     }));
     content = createElement<any>("div", {
@@ -502,20 +520,30 @@ function AdvancedSearchModal(advancedSearchModalInputProps: any): ReactElement {
     const setPagination: ((arg0: int32) => void) = patternInput_2[1];
     const pagination: int32 = patternInput_2[0] | 0;
     const patternInput_3: [AdvancedSearchQuery, ((arg0: AdvancedSearchQuery) => void)] = reactApi.useState<(() => AdvancedSearchQuery), AdvancedSearchQuery>(AdvancedSearchQuery_init);
+    const setAdvancedSearchState: ((arg0: AdvancedSearchQuery) => void) = patternInput_3[1];
     const advancedSearchState: AdvancedSearchQuery = patternInput_3[0];
-    const advancedSearch_1: AdvancedSearch = (typeof advancedSearch0 === "boolean") ? ({
-        search: (): Promise<Term[]> => API_callAdvancedSearch(advancedSearchState),
-        form: AdvancedSearchDefault(advancedSearchState, patternInput_3[1]),
-    }) : advancedSearch0;
+    let advancedSearch_1: AdvancedSearch;
+    if (typeof advancedSearch0 === "boolean") {
+        advancedSearch_1 = ({
+            search: (): Promise<Term[]> => API_callAdvancedSearch(advancedSearchState),
+            form: AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState),
+        });
+    }
+    else {
+        const advancedSearch: AdvancedSearch = advancedSearch0;
+        advancedSearch_1 = advancedSearch;
+    }
+    const BinSize = 20;
     let BinCount: int32;
     const dependencies_1: any[] = [searchResults];
-    BinCount = reactApi.useMemo<int32>((): int32 => ~~(SearchState__get_Results(searchResults).length / 20), dependencies_1);
+    BinCount = reactApi.useMemo<int32>((): int32 => ~~(SearchState__get_Results(searchResults).length / BinSize), dependencies_1);
     const controller: AdvancedSearchController = {
         startSearch: (): void => {
             let pr_1: Promise<void>;
             const pr: Promise<Term[]> = advancedSearch_1.search();
             pr_1 = (pr.then((results: Term[]): void => {
-                setSearchResults(SearchState_SearchDone(map_1((t0: Term): TermSearchResult => (new TermSearchResult(t0, false)), results)));
+                const results_1: TermSearchResult[] = map_1((t0: Term): TermSearchResult => (new TermSearchResult(t0, false)), results);
+                setSearchResults(SearchState_SearchDone(results_1));
             }));
             pr_1.then();
         },
@@ -525,23 +553,32 @@ function AdvancedSearchModal(advancedSearchModalInputProps: any): ReactElement {
     reactApi.useEffect((): void => {
         setTempPagination(pagination + 1);
     }, dependencies_2);
-    const content: ReactElement = createElement<any>("div", createObj(ofArray([["className", "swt:flex swt:flex-col swt:gap-2 swt:overflow-hidden swt:p-2"] as [string, any], (elems_2 = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
-        let results_2: TermSearchResult[], xs_10: Iterable<ReactElement>, xs_1: Iterable<ReactElement>;
-        return (searchResults.tag === /* SearchDone */ 1) ? singleton<ReactElement>((results_2 = searchResults.fields[0], (xs_10 = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
+    const searchFormComponent = (): ReactElement => {
+        const xs_1: Iterable<ReactElement> = [advancedSearch_1.form(controller), createElement<any>("button", {
+            className: "swt:btn swt:btn-primary",
+            onClick: (_arg: MouseEvent): void => {
+                controller.startSearch();
+            },
+            children: "Submit",
+        })];
+        return react.createElement(react.Fragment, {}, ...xs_1);
+    };
+    const resultsComponent = (results_2: TermSearchResult[]): ReactElement => {
+        const xs_10: Iterable<ReactElement> = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
             let children: FSharpList<ReactElement>, fmt: any;
             return append<ReactElement>(singleton<ReactElement>((children = singleton_1(((fmt = printf("Results: %i"), fmt.cont((value_5: string): ReactElement => value_5)))(results_2.length)), createElement<any>("div", {
                 children: reactApi.Children.toArray(Array.from(children)),
             }))), delay_4<ReactElement>((): Iterable<ReactElement> => {
                 let elems: Iterable<ReactElement>;
                 return append<ReactElement>(singleton<ReactElement>(createElement<any>("ul", createObj(ofArray([["className", "swt:max-h-[50%] swt:overflow-y-auto swt:list"] as [string, any], (elems = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => map<TermSearchResult, ReactElement>((res: TermSearchResult): ReactElement => {
-                    const $keyZ79B21B34: any = JSON.stringify(res);
+                    const $key69EE7BC8: any = JSON.stringify(res);
                     return createElement(TermItem, {
                         term: res,
                         onTermSelect: onTermSelect,
-                        key: $keyZ79B21B34,
-                        $key: $keyZ79B21B34,
+                        key: $key69EE7BC8,
+                        $key: $key69EE7BC8,
                     });
-                }, getSubArray(results_2, pagination * 20, 20)))), ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])])))), delay_4<ReactElement>((): Iterable<ReactElement> => {
+                }, getSubArray(results_2, pagination * BinSize, BinSize)))), ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])])))), delay_4<ReactElement>((): Iterable<ReactElement> => {
                     let elems_1: Iterable<ReactElement>, value_17: int32, value_23: string;
                     return append<ReactElement>((BinCount > 1) ? singleton<ReactElement>(createElement<any>("div", createObj(ofArray([["className", "swt:join"] as [string, any], (elems_1 = [createElement<any>("input", createObj(ofArray([["className", "swt:input swt:join-item swt:grow"] as [string, any], ["type", "number"] as [string, any], ["min", 1] as [string, any], (value_17 = (defaultArg(tempPagination, pagination) | 0), ["ref", (e: Element): void => {
                         if (!(e == null) && !equals(e.value, value_17)) {
@@ -552,18 +589,24 @@ function AdvancedSearchModal(advancedSearchModalInputProps: any): ReactElement {
                         if (!(value_21 == null) && !Number.isNaN(value_21)) {
                             setTempPagination(min(max(round(value_21), 1), BinCount));
                         }
-                    }] as [string, any]]))), createElement<any>("div", createObj(ofArray([(value_23 = "swt:input swt:join-item swt:shrink swt:flex swt:justify-center /\r\n                                    swt:items-center swt:cursor-not-allowed swt:border-l-0 swt:select-none", ["className", value_23] as [string, any]), ["type", "text"] as [string, any], ["children", `/${BinCount}`] as [string, any]]))), createElement<any>("button", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", "swt:btn swt:btn-primary swt:join-item"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["disabled", (tempPagination == null) ? true : ((value_66(tempPagination) - 1) === pagination)] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["onClick", (_arg_1: MouseEvent): void => {
-                        iterate<int32>((arg: int32): void => {
-                            setPagination(arg - 1);
-                        }, toArray_1<int32>(tempPagination));
-                    }] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["children", "Go"] as [string, any]))))))))))), createElement<any>("button", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => {
+                    }] as [string, any]]))), createElement<any>("div", createObj(ofArray([(value_23 = "swt:input swt:join-item swt:shrink swt:flex swt:justify-center /\r\n                                    swt:items-center swt:cursor-not-allowed swt:border-l-0 swt:select-none", ["className", value_23] as [string, any]), ["type", "text"] as [string, any], ["children", `/${BinCount}`] as [string, any]]))), createElement<any>("button", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", "swt:btn swt:btn-primary swt:join-item"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => {
+                        const disabled: boolean = (tempPagination == null) ? true : ((value_66(tempPagination) - 1) === pagination);
+                        return append<IReactProperty>(singleton<IReactProperty>(["disabled", disabled] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["onClick", (_arg_1: MouseEvent): void => {
+                            iterate<int32>((arg: int32): void => {
+                                setPagination(arg - 1);
+                            }, toArray_1<int32>(tempPagination));
+                        }] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["children", "Go"] as [string, any])))));
+                    })))))), createElement<any>("button", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => {
                         const disabled_1: boolean = pagination === 0;
                         return append<IReactProperty>(singleton<IReactProperty>(["className", "swt:btn swt:join-item"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["disabled", disabled_1] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["onClick", (_arg_2: MouseEvent): void => {
                             setPagination(pagination - 1);
                         }] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["children", "Previous"] as [string, any])))))));
-                    })))), createElement<any>("button", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["disabled", pagination === (BinCount - 1)] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", "swt:btn swt:join-item"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["onClick", (_arg_3: MouseEvent): void => {
-                        setPagination(pagination + 1);
-                    }] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["children", "Next"] as [string, any])))))))))))], ["children", reactApi.Children.toArray(Array.from(elems_1))] as [string, any])])))) : empty<ReactElement>(), delay_4<ReactElement>((): Iterable<ReactElement> => singleton<ReactElement>(createElement<any>("button", {
+                    })))), createElement<any>("button", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => {
+                        const disabled_2: boolean = pagination === (BinCount - 1);
+                        return append<IReactProperty>(singleton<IReactProperty>(["disabled", disabled_2] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", "swt:btn swt:join-item"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["onClick", (_arg_3: MouseEvent): void => {
+                            setPagination(pagination + 1);
+                        }] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["children", "Next"] as [string, any])))))));
+                    }))))], ["children", reactApi.Children.toArray(Array.from(elems_1))] as [string, any])])))) : empty<ReactElement>(), delay_4<ReactElement>((): Iterable<ReactElement> => singleton<ReactElement>(createElement<any>("button", {
                         className: "swt:btn swt:btn-primary",
                         onClick: (_arg_4: MouseEvent): void => {
                             setSearchResults(SearchState_Idle());
@@ -572,13 +615,17 @@ function AdvancedSearchModal(advancedSearchModalInputProps: any): ReactElement {
                     }))));
                 }));
             }));
-        })), react.createElement(react.Fragment, {}, ...xs_10)))) : singleton<ReactElement>((xs_1 = [advancedSearch_1.form(controller), createElement<any>("button", {
-            className: "swt:btn swt:btn-primary",
-            onClick: (_arg: MouseEvent): void => {
-                controller.startSearch();
-            },
-            children: "Submit",
-        })], react.createElement(react.Fragment, {}, ...xs_1)));
+        }));
+        return react.createElement(react.Fragment, {}, ...xs_10);
+    };
+    const content: ReactElement = createElement<any>("div", createObj(ofArray([["className", "swt:flex swt:flex-col swt:gap-2 swt:overflow-hidden swt:p-2"] as [string, any], (elems_2 = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
+        if (searchResults.tag === /* SearchDone */ 1) {
+            const results_3: TermSearchResult[] = searchResults.fields[0];
+            return singleton<ReactElement>(resultsComponent(results_3));
+        }
+        else {
+            return singleton<ReactElement>(searchFormComponent());
+        }
     })), ["children", reactApi.Children.toArray(Array.from(elems_2))] as [string, any])])));
     return createElement(BaseModal, {
         rmv: rmv,
@@ -640,6 +687,7 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
     const focused: boolean = patternInput_3[0];
     const cancelled: IRefValue$1<boolean> = reactApi.useRef(false);
     const patternInput_4: [Option<Modals_$union>, ((arg0: Option<Modals_$union>) => void)] = reactApi.useState<Option<Modals_$union>, Option<Modals_$union>>(undefined);
+    const setModal: ((arg0: Option<Modals_$union>) => void) = patternInput_4[1];
     const modal: Option<Modals_$union> = patternInput_4[0];
     const inputText: string = defaultArg(bind<Term, string>((_arg: Term): Option<string> => _arg.name, term), "");
     useLayoutEffectWithDeps((_arg_1: any): IDisposable => {
@@ -653,7 +701,7 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
         if (modal_1 != null) {
             setSearchResults((_arg_2: SearchState_$union): SearchState_$union => SearchState_init());
         }
-        patternInput_4[1](modal_1);
+        setModal(modal_1);
     };
     const onTermSelect_1 = (term_1: Option<Term>): void => {
         if (inputRef.current != null) {
@@ -664,17 +712,24 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
         onTermSelect(term_1);
     };
     const startLoadingBy = (key: string): void => {
-        setLoading((l: FSharpSet<string>): FSharpSet<string> => FSharpSet__Add(l, "L_" + key));
+        setLoading((l: FSharpSet<string>): FSharpSet<string> => {
+            const key_1: string = "L_" + key;
+            return FSharpSet__Add(l, key_1);
+        });
     };
     const stopLoadingBy = (key_2: string): void => {
-        setLoading((l_1: FSharpSet<string>): FSharpSet<string> => FSharpSet__Remove(l_1, "L_" + key_2));
+        setLoading((l_1: FSharpSet<string>): FSharpSet<string> => {
+            const key_3: string = "L_" + key_2;
+            return FSharpSet__Remove(l_1, key_3);
+        });
     };
     const createTermSearch = (id: string): ((arg0: ((arg0: string) => Promise<Term[]>)) => ((arg0: string) => Promise<void>)) => ((search: ((arg0: string) => Promise<Term[]>)): ((arg0: string) => Promise<void>) => {
         const id_1: string = "T_" + id;
         return (query: string): Promise<void> => PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
             startLoadingBy(id_1);
             return search(query).then((_arg_4: Term[]): Promise<void> => {
-                const termSearchResults_1: TermSearchResult[] = map_1((t0: Term): TermSearchResult => (new TermSearchResult(t0, false)), _arg_4);
+                const termSearchResults: Term[] = _arg_4;
+                const termSearchResults_1: TermSearchResult[] = map_1((t0: Term): TermSearchResult => (new TermSearchResult(t0, false)), termSearchResults);
                 return (!cancelled.current ? ((setSearchResults((prevResults: SearchState_$union): SearchState_$union => SearchState_SearchDone(TermSearchResult_addSearchResults(SearchState__get_Results(prevResults), termSearchResults_1))), Promise.resolve())) : (Promise.resolve())).then(() => PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
                     stopLoadingBy(id_1);
                     return Promise.resolve();
@@ -684,23 +739,29 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
     });
     const createParentChildTermSearch = (id_2: string): ((arg0: ((arg0: [string, string]) => Promise<Term[]>)) => ((arg0: [string, string]) => Promise<void>)) => ((search_1: ((arg0: [string, string]) => Promise<Term[]>)): ((arg0: [string, string]) => Promise<void>) => {
         const id_3: string = "PC_" + id_2;
-        return (tupledArg: [string, string]): Promise<void> => PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
-            startLoadingBy(id_3);
-            return search_1([tupledArg[0], tupledArg[1]] as [string, string]).then((_arg_5: Term[]): Promise<void> => {
-                const termSearchResults_3: TermSearchResult[] = map_1((t0_1: Term): TermSearchResult => (new TermSearchResult(t0_1, true)), _arg_5);
-                return (!cancelled.current ? ((setSearchResults((prevResults_2: SearchState_$union): SearchState_$union => SearchState_SearchDone(TermSearchResult_addSearchResults(SearchState__get_Results(prevResults_2), termSearchResults_3))), Promise.resolve())) : (Promise.resolve())).then(() => PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
-                    stopLoadingBy(id_3);
-                    return Promise.resolve();
-                }));
-            });
-        }));
+        return (tupledArg: [string, string]): Promise<void> => {
+            const parentId_1: string = tupledArg[0];
+            const query_1: string = tupledArg[1];
+            return PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
+                startLoadingBy(id_3);
+                return search_1([parentId_1, query_1] as [string, string]).then((_arg_5: Term[]): Promise<void> => {
+                    const termSearchResults_2: Term[] = _arg_5;
+                    const termSearchResults_3: TermSearchResult[] = map_1((t0_1: Term): TermSearchResult => (new TermSearchResult(t0_1, true)), termSearchResults_2);
+                    return (!cancelled.current ? ((setSearchResults((prevResults_2: SearchState_$union): SearchState_$union => SearchState_SearchDone(TermSearchResult_addSearchResults(SearchState__get_Results(prevResults_2), termSearchResults_3))), Promise.resolve())) : (Promise.resolve())).then(() => PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
+                        stopLoadingBy(id_3);
+                        return Promise.resolve();
+                    }));
+                });
+            }));
+        };
     });
     const createAllChildTermSearch = (id_4: string): ((arg0: ((arg0: string) => Promise<Term[]>)) => ((arg0: string) => Promise<void>)) => ((search_2: ((arg0: string) => Promise<Term[]>)): ((arg0: string) => Promise<void>) => {
         const id_5: string = "AC_" + id_4;
         return (parentId_2: string): Promise<void> => PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
             startLoadingBy(id_5);
             return search_2(parentId_2).then((_arg_6: Term[]): Promise<void> => {
-                const termSearchResults_5: TermSearchResult[] = map_1((t0_2: Term): TermSearchResult => (new TermSearchResult(t0_2, true)), _arg_6);
+                const termSearchResults_4: Term[] = _arg_6;
+                const termSearchResults_5: TermSearchResult[] = map_1((t0_2: Term): TermSearchResult => (new TermSearchResult(t0_2, true)), termSearchResults_4);
                 return (!cancelled.current ? ((setSearchResults((prevResults_4: SearchState_$union): SearchState_$union => SearchState_SearchDone(TermSearchResult_addSearchResults(SearchState__get_Results(prevResults_4), termSearchResults_5))), Promise.resolve())) : (Promise.resolve())).then(() => PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
                     stopLoadingBy(id_5);
                     return Promise.resolve();
@@ -708,29 +769,51 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
             });
         }));
     });
-    let patternInput_5: [(() => void), ((arg0: string) => void)];
-    const stopDebounceLoading = (): void => {
-        stopLoadingBy("DEFAULT_DEBOUNCE_SIMPLE");
-    };
-    const func = (query_2: string): void => {
+    const termSearchFunc = (query_2: string): void => {
         let pr_1: Promise<void[]>;
-        const pr: FSharpList<Promise<void>> = toList<Promise<void>>(delay_4<Promise<void>>((): Iterable<Promise<void>> => append<Promise<void>>(((disableDefaultSearch != null) && value_66(disableDefaultSearch)) ? (empty<Promise<void>>()) : singleton<Promise<void>>(createTermSearch("DEFAULT_SIMPLE")(API_callSearch)(query_2)), delay_4<Promise<void>>((): Iterable<Promise<void>> => ((termSearchQueries != null) ? collect<[string, ((arg0: string) => Promise<Term[]>)], Iterable<Promise<void>>, Promise<void>>((matchValue: [string, ((arg0: string) => Promise<Term[]>)]): Iterable<Promise<void>> => singleton<Promise<void>>(createTermSearch(matchValue[0])(matchValue[1])(query_2)), value_66(termSearchQueries)) : empty<Promise<void>>())))));
+        const pr: FSharpList<Promise<void>> = toList<Promise<void>>(delay_4<Promise<void>>((): Iterable<Promise<void>> => append<Promise<void>>(((disableDefaultSearch != null) && value_66(disableDefaultSearch)) ? (empty<Promise<void>>()) : singleton<Promise<void>>(createTermSearch("DEFAULT_SIMPLE")(API_callSearch)(query_2)), delay_4<Promise<void>>((): Iterable<Promise<void>> => ((termSearchQueries != null) ? collect<[string, ((arg0: string) => Promise<Term[]>)], Iterable<Promise<void>>, Promise<void>>((matchValue: [string, ((arg0: string) => Promise<Term[]>)]): Iterable<Promise<void>> => {
+            const termSearch: ((arg0: string) => Promise<Term[]>) = matchValue[1];
+            const id_6: string = matchValue[0];
+            return singleton<Promise<void>>(createTermSearch(id_6)(termSearch)(query_2));
+        }, value_66(termSearchQueries)) : empty<Promise<void>>())))));
         pr_1 = (Promise.all(pr));
         pr_1.then();
     };
+    const parentSearch_1 = (query_4: string): void => {
+        let pr_3: Promise<void[]>;
+        const pr_2: FSharpList<Promise<void>> = toList<Promise<void>>(delay_4<Promise<void>>((): Iterable<Promise<void>> => ((parentId != null) ? append<Promise<void>>(((disableDefaultParentSearch != null) && value_66(disableDefaultParentSearch)) ? (empty<Promise<void>>()) : singleton<Promise<void>>(createParentChildTermSearch("DEFAULT_PARENTCHILD")((tupledArg_1: [string, string]): Promise<Term[]> => API_callParentSearch(tupledArg_1[0], tupledArg_1[1]))([value_66(parentId), query_4] as [string, string])), delay_4<Promise<void>>((): Iterable<Promise<void>> => ((parentSearchQueries != null) ? collect<[string, ((arg0: [string, string]) => Promise<Term[]>)], Iterable<Promise<void>>, Promise<void>>((matchValue_1: [string, ((arg0: [string, string]) => Promise<Term[]>)]): Iterable<Promise<void>> => {
+            const parentSearch: ((arg0: [string, string]) => Promise<Term[]>) = matchValue_1[1];
+            const id_7: string = matchValue_1[0];
+            return singleton<Promise<void>>(createParentChildTermSearch(id_7)(parentSearch)([value_66(parentId), query_4] as [string, string]));
+        }, value_66(parentSearchQueries)) : empty<Promise<void>>()))) : empty<Promise<void>>())));
+        pr_3 = (Promise.all(pr_2));
+        pr_3.then();
+    };
+    const allChildSearch_1 = (): void => {
+        let pr_5: Promise<void[]>;
+        const pr_4: FSharpList<Promise<void>> = toList<Promise<void>>(delay_4<Promise<void>>((): Iterable<Promise<void>> => ((parentId != null) ? append<Promise<void>>(((disableDefaultAllChildrenSearch != null) && value_66(disableDefaultAllChildrenSearch)) ? (empty<Promise<void>>()) : singleton<Promise<void>>(createAllChildTermSearch("DEFAULT_ALLCHILD")(API_callAllChildSearch)(value_66(parentId))), delay_4<Promise<void>>((): Iterable<Promise<void>> => ((allChildrenSearchQueries != null) ? collect<[string, ((arg0: string) => Promise<Term[]>)], Iterable<Promise<void>>, Promise<void>>((matchValue_2: [string, ((arg0: string) => Promise<Term[]>)]): Iterable<Promise<void>> => {
+            const id_8: string = matchValue_2[0];
+            const allChildSearch: ((arg0: string) => Promise<Term[]>) = matchValue_2[1];
+            return singleton<Promise<void>>(createAllChildTermSearch(id_8)(allChildSearch)(value_66(parentId)));
+        }, value_66(allChildrenSearchQueries)) : empty<Promise<void>>()))) : empty<Promise<void>>())));
+        pr_5 = (Promise.all(pr_4));
+        pr_5.then();
+    };
+    let patternInput_5: [(() => void), ((arg0: string) => void)];
+    const id_9 = "DEFAULT_DEBOUNCE_SIMPLE";
+    const startDebounceLoading = (): void => {
+        startLoadingBy(id_9);
+    };
+    const stopDebounceLoading = (): void => {
+        stopLoadingBy(id_9);
+    };
+    const func: ((arg0: string) => void) = termSearchFunc;
     const timeout: IRefValue$1<Option<int32>> = reactApi.useRef(undefined);
+    const delay_1 = 500;
     let debouncedCallBack: ((arg0: string) => void);
-    const dependencies_1_1: any[] = [func, 500];
+    const dependencies_1_1: any[] = [func, delay_1];
     debouncedCallBack = reactApi.useCallback<string, void>((arg: string): void => {
-        iterate<(() => void)>((f_1: (() => void)): void => {
-            f_1();
-        }, toArray_1<(() => void)>((): void => {
-            startLoadingBy("DEFAULT_DEBOUNCE_SIMPLE");
-        }));
-        iterate<int32>((token_1: int32): void => {
-            clearTimeout(token_1);
-        }, toArray_1<int32>(timeout.current));
-        timeout.current = setTimeout((): void => {
+        const later = (): void => {
             iterate<int32>((token: int32): void => {
                 clearTimeout(token);
             }, toArray_1<int32>(timeout.current));
@@ -738,39 +821,41 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
                 f();
             }, toArray_1<(() => void)>(stopDebounceLoading));
             func(arg);
-        }, 500);
+        };
+        iterate<(() => void)>((f_1: (() => void)): void => {
+            f_1();
+        }, toArray_1<(() => void)>(startDebounceLoading));
+        iterate<int32>((token_1: int32): void => {
+            clearTimeout(token_1);
+        }, toArray_1<int32>(timeout.current));
+        timeout.current = setTimeout(later, delay_1);
     }, dependencies_1_1);
-    patternInput_5 = ([reactApi.useCallback<void, void>((): void => {
+    const cancel: (() => void) = reactApi.useCallback<void, void>((): void => {
         if (timeout.current != null) {
             clearTimeout(value_66(timeout.current));
             iterate<(() => void)>((f_2: (() => void)): void => {
                 f_2();
             }, toArray_1<(() => void)>(stopDebounceLoading));
         }
-    }, []), debouncedCallBack] as [(() => void), ((arg0: string) => void)]);
+    }, []);
+    patternInput_5 = ([cancel, debouncedCallBack] as [(() => void), ((arg0: string) => void)]);
+    const search_3: ((arg0: string) => void) = patternInput_5[1];
+    const cancelSearch: (() => void) = patternInput_5[0];
     let patternInput_6: [(() => void), ((arg0: string) => void)];
+    const id_10 = "DEFAULT_DEBOUNCE_PARENT";
+    const startDebounceLoading_1 = (): void => {
+        startLoadingBy(id_10);
+    };
     const stopDebounceLoading_1 = (): void => {
-        stopLoadingBy("DEFAULT_DEBOUNCE_PARENT");
+        stopLoadingBy(id_10);
     };
-    const func_1 = (query_4: string): void => {
-        let pr_3: Promise<void[]>;
-        const pr_2: FSharpList<Promise<void>> = toList<Promise<void>>(delay_4<Promise<void>>((): Iterable<Promise<void>> => ((parentId != null) ? append<Promise<void>>(((disableDefaultParentSearch != null) && value_66(disableDefaultParentSearch)) ? (empty<Promise<void>>()) : singleton<Promise<void>>(createParentChildTermSearch("DEFAULT_PARENTCHILD")((tupledArg_1: [string, string]): Promise<Term[]> => API_callParentSearch(tupledArg_1[0], tupledArg_1[1]))([value_66(parentId), query_4] as [string, string])), delay_4<Promise<void>>((): Iterable<Promise<void>> => ((parentSearchQueries != null) ? collect<[string, ((arg0: [string, string]) => Promise<Term[]>)], Iterable<Promise<void>>, Promise<void>>((matchValue_1: [string, ((arg0: [string, string]) => Promise<Term[]>)]): Iterable<Promise<void>> => singleton<Promise<void>>(createParentChildTermSearch(matchValue_1[0])(matchValue_1[1])([value_66(parentId), query_4] as [string, string])), value_66(parentSearchQueries)) : empty<Promise<void>>()))) : empty<Promise<void>>())));
-        pr_3 = (Promise.all(pr_2));
-        pr_3.then();
-    };
+    const func_1: ((arg0: string) => void) = parentSearch_1;
     const timeout_1: IRefValue$1<Option<int32>> = reactApi.useRef(undefined);
+    const delay_1_1 = 500;
     let debouncedCallBack_1: ((arg0: string) => void);
-    const dependencies_1_3: any[] = [func_1, 500];
+    const dependencies_1_3: any[] = [func_1, delay_1_1];
     debouncedCallBack_1 = reactApi.useCallback<string, void>((arg_1: string): void => {
-        iterate<(() => void)>((f_1_1: (() => void)): void => {
-            f_1_1();
-        }, toArray_1<(() => void)>((): void => {
-            startLoadingBy("DEFAULT_DEBOUNCE_PARENT");
-        }));
-        iterate<int32>((token_1_1: int32): void => {
-            clearTimeout(token_1_1);
-        }, toArray_1<int32>(timeout_1.current));
-        timeout_1.current = setTimeout((): void => {
+        const later_1 = (): void => {
             iterate<int32>((token_2: int32): void => {
                 clearTimeout(token_2);
             }, toArray_1<int32>(timeout_1.current));
@@ -778,34 +863,34 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
                 f_3();
             }, toArray_1<(() => void)>(stopDebounceLoading_1));
             func_1(arg_1);
-        }, 500);
+        };
+        iterate<(() => void)>((f_1_1: (() => void)): void => {
+            f_1_1();
+        }, toArray_1<(() => void)>(startDebounceLoading_1));
+        iterate<int32>((token_1_1: int32): void => {
+            clearTimeout(token_1_1);
+        }, toArray_1<int32>(timeout_1.current));
+        timeout_1.current = setTimeout(later_1, delay_1_1);
     }, dependencies_1_3);
-    patternInput_6 = ([reactApi.useCallback<void, void>((): void => {
+    const cancel_1: (() => void) = reactApi.useCallback<void, void>((): void => {
         if (timeout_1.current != null) {
             clearTimeout(value_66(timeout_1.current));
             iterate<(() => void)>((f_2_1: (() => void)): void => {
                 f_2_1();
             }, toArray_1<(() => void)>(stopDebounceLoading_1));
         }
-    }, []), debouncedCallBack_1] as [(() => void), ((arg0: string) => void)]);
+    }, []);
+    patternInput_6 = ([cancel_1, debouncedCallBack_1] as [(() => void), ((arg0: string) => void)]);
+    const parentSearch_2: ((arg0: string) => void) = patternInput_6[1];
+    const cancelParentSearch: (() => void) = patternInput_6[0];
     let patternInput_7: [(() => void), (() => void)];
-    const func_2 = (): void => {
-        let pr_5: Promise<void[]>;
-        const pr_4: FSharpList<Promise<void>> = toList<Promise<void>>(delay_4<Promise<void>>((): Iterable<Promise<void>> => ((parentId != null) ? append<Promise<void>>(((disableDefaultAllChildrenSearch != null) && value_66(disableDefaultAllChildrenSearch)) ? (empty<Promise<void>>()) : singleton<Promise<void>>(createAllChildTermSearch("DEFAULT_ALLCHILD")(API_callAllChildSearch)(value_66(parentId))), delay_4<Promise<void>>((): Iterable<Promise<void>> => ((allChildrenSearchQueries != null) ? collect<[string, ((arg0: string) => Promise<Term[]>)], Iterable<Promise<void>>, Promise<void>>((matchValue_2: [string, ((arg0: string) => Promise<Term[]>)]): Iterable<Promise<void>> => singleton<Promise<void>>(createAllChildTermSearch(matchValue_2[0])(matchValue_2[1])(value_66(parentId))), value_66(allChildrenSearchQueries)) : empty<Promise<void>>()))) : empty<Promise<void>>())));
-        pr_5 = (Promise.all(pr_4));
-        pr_5.then();
-    };
+    const func_2: (() => void) = allChildSearch_1;
     const timeout_2: IRefValue$1<Option<int32>> = reactApi.useRef(undefined);
+    const delay_1_2 = 0;
     let debouncedCallBack_2: (() => void);
-    const dependencies_1_5: any[] = [func_2, 0];
+    const dependencies_1_5: any[] = [func_2, delay_1_2];
     debouncedCallBack_2 = reactApi.useCallback<void, void>((arg_2: void): void => {
-        iterate<(() => void)>((f_1_2: (() => void)): void => {
-            f_1_2();
-        }, toArray_1<(() => void)>(undefined));
-        iterate<int32>((token_1_2: int32): void => {
-            clearTimeout(token_1_2);
-        }, toArray_1<int32>(timeout_2.current));
-        timeout_2.current = setTimeout((): void => {
+        const later_2 = (): void => {
             iterate<int32>((token_3: int32): void => {
                 clearTimeout(token_3);
             }, toArray_1<int32>(timeout_2.current));
@@ -813,37 +898,53 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
                 f_4();
             }, toArray_1<(() => void)>(undefined));
             func_2();
-        }, 0);
+        };
+        iterate<(() => void)>((f_1_2: (() => void)): void => {
+            f_1_2();
+        }, toArray_1<(() => void)>(undefined));
+        iterate<int32>((token_1_2: int32): void => {
+            clearTimeout(token_1_2);
+        }, toArray_1<int32>(timeout_2.current));
+        timeout_2.current = setTimeout(later_2, delay_1_2);
     }, dependencies_1_5);
-    patternInput_7 = ([reactApi.useCallback<void, void>((): void => {
+    const cancel_2: (() => void) = reactApi.useCallback<void, void>((): void => {
         if (timeout_2.current != null) {
             clearTimeout(value_66(timeout_2.current));
             iterate<(() => void)>((f_2_2: (() => void)): void => {
                 f_2_2();
             }, toArray_1<(() => void)>(undefined));
         }
-    }, []), debouncedCallBack_2] as [(() => void), (() => void)]);
+    }, []);
+    patternInput_7 = ([cancel_2, debouncedCallBack_2] as [(() => void), (() => void)]);
+    const cancelAllChildSearch: (() => void) = patternInput_7[0];
+    const allChildSearch_2: (() => void) = patternInput_7[1];
     const cancel_3 = (): void => {
         setSearchResults((_arg_7: SearchState_$union): SearchState_$union => SearchState_init());
         cancelled.current = true;
         setLoading((_arg_8: FSharpSet<string>): FSharpSet<string> => empty_1<string>({
             Compare: comparePrimitives,
         }));
-        patternInput_5[0]();
-        patternInput_6[0]();
-        patternInput_7[0]();
+        cancelSearch();
+        cancelParentSearch();
+        cancelAllChildSearch();
         setKeyboardNavState(KeyboardNavigationController_init());
     };
     const startSearch = (query_6: string): void => {
         cancelled.current = false;
         setSearchResults((_arg_9: SearchState_$union): SearchState_$union => SearchState_init());
-        patternInput_5[1](query_6);
-        patternInput_6[1](query_6);
+        search_3(query_6);
+        parentSearch_2(query_6);
+    };
+    const startAllChildSearch = (): void => {
+        cancelled.current = false;
+        setSearchResults((_arg_10: SearchState_$union): SearchState_$union => SearchState_init());
+        allChildSearch_2();
     };
     const action_6 = (e: MouseEvent): void => {
-        let array: HTMLElement[];
         if (focused) {
-            if ((array = toArray<HTMLElement>(delay_4<HTMLElement>((): Iterable<HTMLElement> => append<HTMLElement>((containerRef.current != null) ? singleton<HTMLElement>(value_66(containerRef.current)) : empty<HTMLElement>(), delay_4<HTMLElement>((): Iterable<HTMLElement> => append<HTMLElement>((modalContainerRef.current != null) ? singleton<HTMLElement>(value_66(modalContainerRef.current)) : empty<HTMLElement>(), delay_4<HTMLElement>((): Iterable<HTMLElement> => ((termDropdownRef.current != null) ? singleton<HTMLElement>(value_66(termDropdownRef.current)) : empty<HTMLElement>()))))))), array.every((el: HTMLElement): boolean => !el.contains(e.target)))) {
+            const refs: HTMLElement[] = toArray<HTMLElement>(delay_4<HTMLElement>((): Iterable<HTMLElement> => append<HTMLElement>((containerRef.current != null) ? singleton<HTMLElement>(value_66(containerRef.current)) : empty<HTMLElement>(), delay_4<HTMLElement>((): Iterable<HTMLElement> => append<HTMLElement>((modalContainerRef.current != null) ? singleton<HTMLElement>(value_66(modalContainerRef.current)) : empty<HTMLElement>(), delay_4<HTMLElement>((): Iterable<HTMLElement> => ((termDropdownRef.current != null) ? singleton<HTMLElement>(value_66(termDropdownRef.current)) : empty<HTMLElement>())))))));
+            const refsContain: boolean = refs.every((el: HTMLElement): boolean => !el.contains(e.target));
+            if (refsContain) {
                 setFocused(false);
                 setSearchResults((_arg_11: SearchState_$union): SearchState_$union => SearchState_init());
                 if (onBlur != null) {
@@ -866,7 +967,7 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
     fn = reactApi.useMemo<((arg0: Event) => void)>((): ((arg0: Event) => void) => ((arg_3: Event): void => {
         action_6(arg_3);
     }), dependencies_1_9);
-    useEffect(useCallbackRef<void, IDisposable>((): IDisposable => {
+    const listener: (() => IDisposable) = useCallbackRef<void, IDisposable>((): IDisposable => {
         if (addOptions == null) {
             document.addEventListener("mousedown", fn);
         }
@@ -883,34 +984,157 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
                 document.removeEventListener("mousedown", fn, options_2);
             }
         });
+    });
+    useEffect(listener);
+    const keyboardNav = (e_1: KeyboardEvent): Promise<void> => PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
+        let matchValue_5: Option<int32>, i: int32, matchValue_6: Option<int32>, i_1: int32, res: TermSearchResult[], res_1: TermSearchResult[], res_2: TermSearchResult[];
+        if (focused) {
+            const matchValue_3: string = e_1.code;
+            let matchResult: int32, res_3: TermSearchResult[], res_4: TermSearchResult[], res_5: TermSearchResult[];
+            switch (matchValue_3) {
+                case "Escape": {
+                    matchResult = 0;
+                    break;
+                }
+                case "ArrowUp": {
+                    if (searchResults.tag === /* SearchDone */ 1) {
+                        if ((res = searchResults.fields[0], res.length > 0)) {
+                            matchResult = 1;
+                            res_3 = searchResults.fields[0];
+                        }
+                        else {
+                            matchResult = 5;
+                        }
+                    }
+                    else {
+                        matchResult = 5;
+                    }
+                    break;
+                }
+                case "ArrowDown": {
+                    if (searchResults.tag === /* Idle */ 0) {
+                        if ((inputRef.current != null) && !isNullOrWhiteSpace(value_66(inputRef.current).value)) {
+                            matchResult = 3;
+                        }
+                        else {
+                            matchResult = 5;
+                        }
+                    }
+                    else if ((res_1 = searchResults.fields[0], res_1.length > 0)) {
+                        matchResult = 2;
+                        res_4 = searchResults.fields[0];
+                    }
+                    else {
+                        matchResult = 5;
+                    }
+                    break;
+                }
+                case "Enter": {
+                    if (searchResults.tag === /* SearchDone */ 1) {
+                        if ((res_2 = searchResults.fields[0], keyboardNavState.SelectedTermSearchResult != null)) {
+                            matchResult = 4;
+                            res_5 = searchResults.fields[0];
+                        }
+                        else {
+                            matchResult = 5;
+                        }
+                    }
+                    else {
+                        matchResult = 5;
+                    }
+                    break;
+                }
+                default:
+                    matchResult = 5;
+            }
+            switch (matchResult) {
+                case 0: {
+                    cancel_3();
+                    return Promise.resolve();
+                }
+                case 1: {
+                    setKeyboardNavState(new KeyboardNavigationController((matchValue_5 = keyboardNavState.SelectedTermSearchResult, (matchValue_5 != null) ? ((value_66(matchValue_5) === 0) ? undefined : ((i = (value_66(matchValue_5) | 0), max(i - 1, 0)))) : undefined)));
+                    return Promise.resolve();
+                }
+                case 2: {
+                    setKeyboardNavState(new KeyboardNavigationController((matchValue_6 = keyboardNavState.SelectedTermSearchResult, (matchValue_6 != null) ? ((i_1 = (value_66(matchValue_6) | 0), min(i_1 + 1, SearchState__get_Results(searchResults).length - 1))) : 0)));
+                    return Promise.resolve();
+                }
+                case 3: {
+                    startSearch(value_66(inputRef.current).value);
+                    return Promise.resolve();
+                }
+                case 4: {
+                    onTermSelect_1(res_5![value_66(keyboardNavState.SelectedTermSearchResult)].Term);
+                    cancel_3();
+                    return Promise.resolve();
+                }
+                default: {
+                    return Promise.resolve();
+                }
+            }
+        }
+        else {
+            return Promise.resolve();
+        }
     }));
     let modalContainer: ReactElement;
     const configDetails: FSharpList<[string, string]> = reverse<[string, string]>(fold<[string, Option<string>], FSharpList<[string, string]>>((acc: FSharpList<[string, string]>, tupledArg_2: [string, Option<string>]): FSharpList<[string, string]> => {
+        const key_4: string = tupledArg_2[0];
         const value_8: Option<string> = tupledArg_2[1];
         if (value_8 != null) {
-            return cons([tupledArg_2[0], value_66(value_8)] as [string, string], acc);
+            const value_9: string = value_66(value_8);
+            return cons([key_4, value_9] as [string, string], acc);
         }
         else {
             return acc;
         }
     }, empty_2<[string, string]>(), ofArray([["Parent Id", parentId] as [string, Option<string>], ["Disable Default Search", map_2<boolean, string>(toString, disableDefaultSearch)] as [string, Option<string>], ["Disable Default Parent Search", map_2<boolean, string>(toString, disableDefaultParentSearch)] as [string, Option<string>], ["Disable Default All Children Search", map_2<boolean, string>(toString, disableDefaultAllChildrenSearch)] as [string, Option<string>], ["Custom Term Search Queries", map_2<[string, ((arg0: string) => Promise<Term[]>)][], string>((arg_4: [string, ((arg0: string) => Promise<Term[]>)][]): string => join("; ", map<[string, ((arg0: string) => Promise<Term[]>)], string>((tuple: [string, ((arg0: string) => Promise<Term[]>)]): string => tuple[0], arg_4)), termSearchQueries)] as [string, Option<string>], ["Custom Parent Search Queries", map_2<[string, ((arg0: [string, string]) => Promise<Term[]>)][], string>((arg_5: [string, ((arg0: [string, string]) => Promise<Term[]>)][]): string => join("; ", map<[string, ((arg0: [string, string]) => Promise<Term[]>)], string>((tuple_1: [string, ((arg0: [string, string]) => Promise<Term[]>)]): string => tuple_1[0], arg_5)), parentSearchQueries)] as [string, Option<string>], ["Custom All Children Search Queries", map_2<[string, ((arg0: string) => Promise<Term[]>)][], string>((arg_6: [string, ((arg0: string) => Promise<Term[]>)][]): string => join("; ", map<[string, ((arg0: string) => Promise<Term[]>)], string>((tuple_2: [string, ((arg0: string) => Promise<Term[]>)]): string => tuple_2[0], arg_6)), allChildrenSearchQueries)] as [string, Option<string>], ["Advanced Search", map_2<AdvancedSearch | boolean, string>((_arg_12: AdvancedSearch | boolean): string => ((typeof _arg_12 === "boolean") ? "Default" : "Custom"), advancedSearch)] as [string, Option<string>]])));
-    modalContainer = createElement<any>("div", createObj(ofArray([["className", "swt:z-[9999] swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"] as [string, any], ["ref", modalContainerRef] as [string, any], (elems = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => ((modal != null) ? ((value_66(modal).tag === /* AdvancedSearch */ 0) ? ((advancedSearch != null) ? singleton<ReactElement>(createElement(AdvancedSearchModal, {
-        rmv: (): void => {
-            setModal_1(undefined);
-        },
-        advancedSearch0: value_66(advancedSearch),
-        onTermSelect: (term_2: Option<Term>): void => {
-            onTermSelect_1(term_2);
-            setModal_1(undefined);
-        },
-        debug: debug_1,
-    })) : singleton<ReactElement>(defaultOf())) : singleton<ReactElement>(createElement(DetailsModal, {
-        rvm: (_arg_13: MouseEvent): void => {
-            setModal_1(undefined);
-        },
-        term: unwrap(term),
-        config: configDetails,
-    }))) : singleton<ReactElement>(defaultOf())))), ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])])));
+    modalContainer = createElement<any>("div", createObj(ofArray([["className", "swt:z-[9999] swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"] as [string, any], ["ref", modalContainerRef] as [string, any], (elems = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
+        let matchResult_1: int32;
+        if (modal != null) {
+            if (value_66(modal).tag === /* AdvancedSearch */ 0) {
+                if (advancedSearch != null) {
+                    matchResult_1 = 1;
+                }
+                else {
+                    matchResult_1 = 2;
+                }
+            }
+            else {
+                matchResult_1 = 0;
+            }
+        }
+        else {
+            matchResult_1 = 2;
+        }
+        switch (matchResult_1) {
+            case 0:
+                return singleton<ReactElement>(createElement(DetailsModal, {
+                    rvm: (_arg_13: MouseEvent): void => {
+                        setModal_1(undefined);
+                    },
+                    term: unwrap(term),
+                    config: configDetails,
+                }));
+            case 1: {
+                const onTermSelect_2 = (term_2: Option<Term>): void => {
+                    onTermSelect_1(term_2);
+                    setModal_1(undefined);
+                };
+                return singleton<ReactElement>(createElement(AdvancedSearchModal, {
+                    rmv: (): void => {
+                        setModal_1(undefined);
+                    },
+                    advancedSearch0: value_66(advancedSearch),
+                    onTermSelect: onTermSelect_2,
+                    debug: debug_1,
+                }));
+            }
+            default:
+                return singleton<ReactElement>(defaultOf());
+        }
+    })), ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])])));
     return createElement<any>("div", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(debug_1 ? append<IReactProperty>(singleton<IReactProperty>(["data-testid", "term-search-container"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["data-debug-loading", JSON.stringify(loading)] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["data-debug-searchresults", JSON.stringify(searchResults)] as [string, any]))))) : empty<IReactProperty>(), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => append<string>(singleton<string>("swt:form-control swt:not-prose swt:h-full"), delay_4<string>((): Iterable<string> => (fullwidth_1 ? singleton<string>("swt:w-full") : empty<string>()))))))] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>((props != null) ? map<IReactProperty, IReactProperty>((prop: IReactProperty): IReactProperty => prop, value_66(props)) : empty<IReactProperty>(), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["ref", containerRef] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => {
         let elems_3: Iterable<ReactElement>;
         return singleton<IReactProperty>((elems_3 = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => append<ReactElement>((portalModals != null) ? singleton<ReactElement>(createPortal(modalContainer, value_66(portalModals))) : singleton<ReactElement>(modalContainer), delay_4<ReactElement>((): Iterable<ReactElement> => {
@@ -943,107 +1167,14 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
                         }
                     }] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["onDoubleClick", (_arg_18: MouseEvent): void => {
                         if ((parentId != null) && isNullOrEmpty(value_66(inputRef.current).value)) {
-                            cancelled.current = false;
-                            setSearchResults((_arg_10: SearchState_$union): SearchState_$union => SearchState_init());
-                            patternInput_7[1]();
+                            startAllChildSearch();
                         }
                         else if (!isNullOrEmpty(value_66(inputRef.current).value)) {
                             startSearch(value_66(inputRef.current).value);
                         }
                     }] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["onKeyDown", (e_3: KeyboardEvent): void => {
                         e_3.stopPropagation();
-                        const pr_6: Promise<void> = PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => (PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => {
-                            let matchValue_5: Option<int32>, i: int32, matchValue_6: Option<int32>, res: TermSearchResult[], res_1: TermSearchResult[], res_2: TermSearchResult[];
-                            if (focused) {
-                                const matchValue_3: string = e_3.code;
-                                let matchResult: int32, res_3: TermSearchResult[], res_4: TermSearchResult[], res_5: TermSearchResult[];
-                                switch (matchValue_3) {
-                                    case "Escape": {
-                                        matchResult = 0;
-                                        break;
-                                    }
-                                    case "ArrowUp": {
-                                        if (searchResults.tag === /* SearchDone */ 1) {
-                                            if ((res = searchResults.fields[0], res.length > 0)) {
-                                                matchResult = 1;
-                                                res_3 = searchResults.fields[0];
-                                            }
-                                            else {
-                                                matchResult = 5;
-                                            }
-                                        }
-                                        else {
-                                            matchResult = 5;
-                                        }
-                                        break;
-                                    }
-                                    case "ArrowDown": {
-                                        if (searchResults.tag === /* Idle */ 0) {
-                                            if ((inputRef.current != null) && !isNullOrWhiteSpace(value_66(inputRef.current).value)) {
-                                                matchResult = 3;
-                                            }
-                                            else {
-                                                matchResult = 5;
-                                            }
-                                        }
-                                        else if ((res_1 = searchResults.fields[0], res_1.length > 0)) {
-                                            matchResult = 2;
-                                            res_4 = searchResults.fields[0];
-                                        }
-                                        else {
-                                            matchResult = 5;
-                                        }
-                                        break;
-                                    }
-                                    case "Enter": {
-                                        if (searchResults.tag === /* SearchDone */ 1) {
-                                            if ((res_2 = searchResults.fields[0], keyboardNavState.SelectedTermSearchResult != null)) {
-                                                matchResult = 4;
-                                                res_5 = searchResults.fields[0];
-                                            }
-                                            else {
-                                                matchResult = 5;
-                                            }
-                                        }
-                                        else {
-                                            matchResult = 5;
-                                        }
-                                        break;
-                                    }
-                                    default:
-                                        matchResult = 5;
-                                }
-                                switch (matchResult) {
-                                    case 0: {
-                                        cancel_3();
-                                        return Promise.resolve();
-                                    }
-                                    case 1: {
-                                        setKeyboardNavState(new KeyboardNavigationController((matchValue_5 = keyboardNavState.SelectedTermSearchResult, (matchValue_5 != null) ? ((value_66(matchValue_5) === 0) ? undefined : ((i = (value_66(matchValue_5) | 0), max(i - 1, 0)))) : undefined)));
-                                        return Promise.resolve();
-                                    }
-                                    case 2: {
-                                        setKeyboardNavState(new KeyboardNavigationController((matchValue_6 = keyboardNavState.SelectedTermSearchResult, (matchValue_6 != null) ? min(value_66(matchValue_6) + 1, SearchState__get_Results(searchResults).length - 1) : 0)));
-                                        return Promise.resolve();
-                                    }
-                                    case 3: {
-                                        startSearch(value_66(inputRef.current).value);
-                                        return Promise.resolve();
-                                    }
-                                    case 4: {
-                                        onTermSelect_1(res_5![value_66(keyboardNavState.SelectedTermSearchResult)].Term);
-                                        cancel_3();
-                                        return Promise.resolve();
-                                    }
-                                    default: {
-                                        return Promise.resolve();
-                                    }
-                                }
-                            }
-                            else {
-                                return Promise.resolve();
-                            }
-                        })).then((): Promise<void> => {
+                        const pr_6: Promise<void> = PromiseBuilder__Run_212F1D4B<void>(promise, PromiseBuilder__Delay_62FBFDE1<void>(promise, (): Promise<void> => (keyboardNav(e_3).then((): Promise<void> => {
                             if (onKeyDown != null) {
                                 value_66(onKeyDown)(e_3);
                                 return Promise.resolve();
@@ -1066,20 +1197,20 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
                             setModal_1(((modal != null) && equals(value_66(modal), Modals_AdvancedSearch())) ? undefined : Modals_AdvancedSearch());
                         }), advancedSearch);
                         const matchValue_8: Option<PortalTermDropdown> = portalTermDropdown;
-                        let matchResult_1: int32, portalTermSelectArea_1: PortalTermDropdown;
+                        let matchResult_2: int32, portalTermSelectArea_1: PortalTermDropdown;
                         if (matchValue_8 != null) {
                             if ((portalTermSelectArea = value_66(matchValue_8), containerRef.current != null)) {
-                                matchResult_1 = 0;
+                                matchResult_2 = 0;
                                 portalTermSelectArea_1 = value_66(matchValue_8);
                             }
                             else {
-                                matchResult_1 = 1;
+                                matchResult_2 = 1;
                             }
                         }
                         else {
-                            matchResult_1 = 1;
+                            matchResult_2 = 1;
                         }
-                        switch (matchResult_1) {
+                        switch (matchResult_2) {
                             case 0:
                                 return singleton<ReactElement>(createPortal(portalTermSelectArea_1!.renderer(value_66(containerRef.current).getBoundingClientRect(), TermDropdown(termDropdownRef, onTermSelect_1, searchResults, loading, advancedSearchToggle, keyboardNavState)), portalTermSelectArea_1!.portal));
                             default:
