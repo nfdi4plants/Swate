@@ -63,7 +63,7 @@ type SelectiveImportModal =
                 //Daisy.checkbox [
                 Html.input [
                     prop.type'.checkbox
-                    prop.className "swt:checkbox"
+                    prop.className "swt:checkbox swt:checkbox-neutral"
                     prop.disabled (not isActive)
                     prop.style [ style.height (length.perc 100) ]
                     prop.isChecked isChecked
@@ -244,7 +244,7 @@ type SelectiveImportModal =
                                     "swt:text-success"
                             ]
                             prop.children [
-                                Html.span (if isActive then "Select Columns" else "Preview Table")
+                                Html.span (if isActive then "Preview Select Columns" else "Preview Table")
                                 Html.i [ prop.className "fa-solid fa-magnifying-glass" ]
                             ]
                         ]

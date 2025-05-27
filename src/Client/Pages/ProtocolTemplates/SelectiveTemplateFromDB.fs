@@ -152,7 +152,7 @@ type SelectiveTemplateFromDB =
                 ]
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Html.div [
-                        prop.className "swt:flex gap-2 swt:flex-col swt:shrink swt:overflow-y-auto"
+                        prop.className "swt:flex swt:flex-col swt:gap-2 swt:shrink swt:overflow-y-auto"
                         prop.children [
                             SelectiveImportModal.RadioPluginsBox(
                                 "Import Type",

@@ -451,11 +451,16 @@ type TermSearch =
 
         let componentConfig =
             Html.div [
-                prop.className "swt:grid swt:grid-cols-1 swt:md:grid-cols-[auto,1fr] swt:gap-4 swt:lg:gap-x-8"
+                prop.className "swt:flex swt:flex-col swt:gap-4"
                 prop.children [
-                    for (key, value) in config do
-                        label key
-                        Html.div value
+                    for (key, value) in config ->
+                        Html.div [
+                            prop.className "swt:flex swt:flex-row swt:items-start swt:gap-4"
+                            prop.children [
+                                Html.label [ prop.className "swt:w-80 swt:font-bold"; prop.text key ]
+                                Html.div  value
+                            ]
+                        ]
                 ]
             ]
 
@@ -519,7 +524,7 @@ type TermSearch =
                             prop.testid "advanced-search-term-name-input"
                             prop.className "swt:input swt:w-full"
                             prop.type'.text
-                            prop.autoFocus true
+                            prop.autoFocus true //Due to react strict mode we render double -> could lead to losing focus
                             prop.value advancedSearchState.TermName
                             prop.onChange (fun e ->
                                 setAdvancedSearchState {

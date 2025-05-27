@@ -208,7 +208,7 @@ let private AddBuildingBlockButton (model: Model) dispatch =
 
                 prop.className [
                     "swt:btn swt:btn-wide"
-                    if isValid then "swt:btn-success" else "swt:btn-error"
+                    if isValid then "swt:btn-primary" else "swt:btn-error"
                 ]
 
                 if not isValid then

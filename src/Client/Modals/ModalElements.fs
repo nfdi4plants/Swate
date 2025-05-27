@@ -32,24 +32,31 @@ type ModalElements =
     static member RadioPlugin(radioGroup: string, txt: string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
         let isDisabled = defaultArg isDisabled false
 
-        Daisy.fieldset [
-            Daisy.label [
-                prop.className [
-                    "swt:cursor-pointer swt:transition-colors"
-                    if isDisabled then
-                        "swt:!cursor-not-allowed"
-                    else
-                        "swt:hover:bg-base-300"
-                ]
-                prop.children [
-                    Daisy.radio [
-                        prop.disabled isDisabled
-                        radio.xs
-                        prop.name radioGroup
-                        prop.isChecked isChecked
-                        prop.onChange onChange
+        //Daisy.fieldset [
+        Html.div [
+            prop.className "swt:fieldset"
+            prop.children [
+                //Daisy.label [
+                Html.label [
+                    prop.className [
+                        "swt:label swt:cursor-pointer swt:transition-colors"
+                        if isDisabled then
+                            "swt:!cursor-not-allowed"
+                        else
+                            "swt:hover:bg-base-300"
                     ]
-                    Html.span [ prop.className "swt:text-sm"; prop.text txt ]
+                    prop.children [
+                        //Daisy.radio [
+                        Html.input  [
+                            prop.className "swt:radio swt:radio-xs swt:radio-neutral"
+                            prop.type' "radio"
+                            prop.disabled isDisabled
+                            prop.name radioGroup
+                            prop.isChecked isChecked
+                            prop.onChange onChange
+                        ]
+                        Html.span [ prop.className "swt:text-sm"; prop.text txt ]
+                    ]
                 ]
             ]
         ]
