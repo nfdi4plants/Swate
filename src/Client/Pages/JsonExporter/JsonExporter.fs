@@ -58,7 +58,7 @@ type FileExporter =
                 prop.children [
                     //Daisy.select [
                     Html.select [
-                        prop.className "swt:select swt:join-item"
+                        prop.className "swt:select swt:join-item swt:min-w-fit"
                         prop.onChange (fun (e: Browser.Types.Event) ->
                             let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
                             { state with ExportFormat = jef } |> setState)

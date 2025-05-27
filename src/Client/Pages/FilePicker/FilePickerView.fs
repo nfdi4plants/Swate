@@ -254,5 +254,5 @@ type FilePicker =
                 "Select files from your computer and insert their names into Excel"
 
             // Colored container element for all uploaded file names and sort elements
-            FilePicker.Main(model, dispatch, "@md/sidebar:flex-row")
+            FilePicker.Main(model, dispatch, "swt:@md/sidebar:flex-row")
         ]

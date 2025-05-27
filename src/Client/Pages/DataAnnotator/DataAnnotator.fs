@@ -96,7 +96,7 @@ module private DataAnnotatorHelper =
                             Html.i [ prop.className "swt:indicator-item fa-solid fa-info-circle fa-lg swt:text-accent" ]
                             //Daisy.select [
                             Html.select [
-                                prop.className "swt:select swt:join-item"
+                                prop.className "swt:select swt:join-item swt:min-w-fit"
                                 prop.title infoText
                                 prop.defaultValue (string current)
                                 prop.onChange (fun (e: string) -> TargetColumn.fromString e |> setTarget)
