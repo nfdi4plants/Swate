@@ -249,7 +249,7 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
             Messages.PageState.UpdateShowSidebar(not show)
             |> Messages.PageStateMsg
             |> dispatch)
-        prop.className "swt:h-full swt:cursor-pointer swt:ml-auto"
+        prop.className "swt:h-full swt:cursor-pointer swt:ml-auto swt:overflow-hidden"
         prop.children [
             Html.label [
                 // prop.htmlFor "split-window-drawer"

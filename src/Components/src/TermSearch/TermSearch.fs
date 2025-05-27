@@ -477,7 +477,7 @@ type TermSearch =
                     ]
                 | true ->
                     Html.button [
-                        prop.className "swt:btn swt:btn-neutral swt:btn-xs swt:btn-outline swt:mb-2"
+                        prop.className "swt:btn swt:btn-xs swt:btn-outline swt:mb-2"
                         prop.onClick (fun _ -> setShowConfig (not showConfig))
                         prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "back" ]
                     ]
