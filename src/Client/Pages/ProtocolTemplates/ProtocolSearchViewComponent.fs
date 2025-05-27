@@ -321,9 +321,7 @@ module ComponentAux =
             Html.p "Select community"
             //Daisy.select [
             Html.select [
-                prop.className "swt:select swt:w-full"
-                select.sm
-                select.primary
+                prop.className "swt:select swt:select-sm swt:select-primary swt:w-full"
                 prop.value (state.CommunityFilter.ToStringRdb())
                 prop.onChange (fun (e: Browser.Types.Event) ->
                     let filter = Model.Protocol.CommunityFilter.fromString e.target?value

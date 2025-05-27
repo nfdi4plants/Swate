@@ -24,12 +24,12 @@ type SidebarView =
                   } -> TermSearch.Main(model, dispatch)
 
                 | {
-                      SidebarPage = Routing.SidebarPage.FilePicker
-                  } -> Pages.FilePicker.Sidebar(model, dispatch)
-
-                | {
                       SidebarPage = Routing.SidebarPage.Protocol
                   } -> Protocol.Templates.Main(model, dispatch)
+
+                | {
+                      SidebarPage = Routing.SidebarPage.FilePicker
+                  } -> Pages.FilePicker.Sidebar(model, dispatch)
 
                 | {
                       SidebarPage = Routing.SidebarPage.DataAnnotator
@@ -46,7 +46,7 @@ type SidebarView =
     static member Main(model: Model, dispatch: Msg -> unit) =
         Html.div [
             prop.className
-                "swt:min-h-full swt:flex swt:flex-col swt:bg-base-300 swt:min-w-[500px] swt:xl:min-w-[600px] swt:overflow-y-auto swt:h-40 [scrollbar-gutter:stable] swt:@container/sidebar"
+                "swt:min-h-full swt:flex swt:flex-col swt:bg-base-300 swt:min-w-[500px] swt:xl:min-w-[600px] swt:h-40 swt:overflow-y-auto swt:[scrollbar-gutter:stable] swt:@container/sidebar"
             prop.children [
 
                 SidebarComponents.Navbar.NavbarComponent model dispatch

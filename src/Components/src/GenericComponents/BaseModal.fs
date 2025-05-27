@@ -75,7 +75,7 @@ type BaseModal =
                 Html.div [ prop.className "swt:modal-backdrop"; prop.onClick rmv ]
                 Html.div [
                     prop.className [
-                        "swt:modal-box swt:w-4/5 swt:flex swt:flex-col swt:gap-2"
+                        "swt:card swt:modal-box swt:w-4/5 swt:flex swt:flex-col swt:gap-2"
                         if modalClassInfo.IsSome then
                             modalClassInfo.Value
                     ]
