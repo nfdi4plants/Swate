@@ -2,7 +2,7 @@ import { CompositeCellActiveRender, BaseCell } from "./TableCell.fs.js";
 import { ReactElement, createElement } from "react";
 import React from "react";
 import * as react from "react";
-import { arrayHash, equalArrays, curry2, defaultOf, createObj } from "../fable_modules/fable-library-ts.4.24.0/Util.js";
+import { arrayHash, equalArrays, defaultOf, createObj } from "../fable_modules/fable-library-ts.4.24.0/Util.js";
 import { isNullOrWhiteSpace, join } from "../fable_modules/fable-library-ts.4.24.0/String.js";
 import { map, toArray, empty, singleton, append, delay, toList } from "../fable_modules/fable-library-ts.4.24.0/Seq.js";
 import { some, unwrap, Option, value as value_15 } from "../fable_modules/fable-library-ts.4.24.0/Option.js";
@@ -57,17 +57,14 @@ export function AnnotationTable(annotationTableInputProps: any): ReactElement {
         if (compositeCell != null) {
             if (value_15(compositeCell) instanceof CompositeCell) {
                 const cell: CompositeCell_$union = value_15(compositeCell);
-                const text_1: string = toString(cell);
-                const icon: Option<ReactElement> = ((cell.isTerm ? true : cell.isUnitized) && !isNullOrWhiteSpace(cell.AsTerm.TermAccessionShort)) ? createElement<any>("i", {
+                return InactiveTextRender(toString(cell), tcc, unwrap(((cell.isTerm ? true : cell.isUnitized) && !isNullOrWhiteSpace(cell.AsTerm.TermAccessionShort)) ? createElement<any>("i", {
                     className: "fa-solid fa-check swt:text-primary",
                     title: cell.AsTerm.TermAccessionShort,
-                }) : undefined;
-                return InactiveTextRender(text_1, tcc, unwrap(icon));
+                }) : undefined));
             }
             else {
                 const header: CompositeHeader_$union = value_15(compositeCell);
-                const text: string = toString(header);
-                return InactiveTextRender(text, tcc);
+                return InactiveTextRender(toString(header), tcc);
             }
         }
         else {
@@ -75,18 +72,14 @@ export function AnnotationTable(annotationTableInputProps: any): ReactElement {
         }
     }, undefined, undefined, (tupledArg_1: [TableCellController, Option<CompositeCell_$union | CompositeHeader_$union>]): string => {
         const tcc_1: TableCellController = tupledArg_1[0];
-        const compositeCell_1: Option<CompositeCell_$union | CompositeHeader_$union> = tupledArg_1[1];
         return `${tcc_1.Index.x}-${tcc_1.Index.y}`;
     });
     const renderActiveCell: ((arg0: TableCellController) => ReactElement) = memo<TableCellController>((tcc_2: TableCellController): ReactElement => {
-        let cell_1: TableCellController;
-        if ((cell_1 = tcc_2, (tcc_2.Index.x > 0) && (tcc_2.Index.y > 0))) {
-            const cell_2: TableCellController = tcc_2;
-            const setCell = (cell_3: { x: int32, y: int32 }, cc: CompositeCell_$union): void => {
+        let cell_3: { x: int32, y: int32 };
+        if ((tcc_2.Index.x > 0) && (tcc_2.Index.y > 0)) {
+            return CompositeCellActiveRender(tcc_2, arcTable.GetCellAt(tcc_2.Index.x - 1, tcc_2.Index.y - 1), (cell_3 = tcc_2.Index, (cc: CompositeCell_$union): void => {
                 arcTable.SetCellAt(cell_3.x - 1, cell_3.y - 1, cc);
-            };
-            const cell_4: CompositeCell_$union = arcTable.GetCellAt(tcc_2.Index.x - 1, tcc_2.Index.y - 1);
-            return CompositeCellActiveRender(tcc_2, cell_4, curry2(setCell)(tcc_2.Index));
+            }));
         }
         else {
             return createElement<any>("div", {
@@ -118,14 +111,13 @@ export function AnnotationTable(annotationTableInputProps: any): ReactElement {
             }
             else {
                 const cell_5: CompositeCell_$union = arcTable.GetCellAt(cc_1.x - 1, cc_1.y - 1);
-                const setCell_1 = (cell_6: CompositeCell_$union): void => {
-                    arcTable.SetCellAt(cc_1.x - 1, cc_1.y - 1, cell_6);
-                    setArcTable(arcTable);
-                };
                 const header_2: CompositeHeader_$union = arcTable.Headers[cc_1.x - 1];
                 return singleton<ReactElement>(createElement(CompositeCellModal, {
                     compositeCell: cell_5,
-                    setCell: setCell_1,
+                    setCell: (cell_6: CompositeCell_$union): void => {
+                        arcTable.SetCellAt(cc_1.x - 1, cc_1.y - 1, cell_6);
+                        setArcTable(arcTable);
+                    },
                     rmv: (): void => {
                         tableRef.current.focus();
                         setDetailsModal(undefined);
@@ -174,9 +166,8 @@ export function AnnotationTable(annotationTableInputProps: any): ReactElement {
                 case 0: {
                     const cell_9 = cell_8! as HTMLElement;
                     const row: int32 = cell_9.dataset.row | 0;
-                    const col: int32 = cell_9.dataset.column | 0;
                     const indices: { x: int32, y: int32 } = {
-                        x: col,
+                        x: cell_9.dataset.column,
                         y: row,
                     };
                     console.log(indices);
@@ -191,17 +182,13 @@ export function AnnotationTable(annotationTableInputProps: any): ReactElement {
     }), createElement(Table, {
         rowCount: arcTable.RowCount + 1,
         columnCount: arcTable.ColumnCount + 1,
-        renderCell: (tcc_3: TableCellController): ReactElement => {
-            const cell_10: Option<CompositeCell_$union | CompositeHeader_$union> = (tcc_3.Index.x === 0) ? undefined : ((tcc_3.Index.y === 0) ? arcTable.Headers[tcc_3.Index.x - 1] : arcTable.GetCellAt(tcc_3.Index.x - 1, tcc_3.Index.y - 1));
-            return cellRender([tcc_3, cell_10] as [TableCellController, Option<CompositeCell_$union | CompositeHeader_$union>]);
-        },
+        renderCell: (tcc_3: TableCellController): ReactElement => cellRender([tcc_3, (tcc_3.Index.x === 0) ? undefined : ((tcc_3.Index.y === 0) ? arcTable.Headers[tcc_3.Index.x - 1] : arcTable.GetCellAt(tcc_3.Index.x - 1, tcc_3.Index.y - 1))] as [TableCellController, Option<CompositeCell_$union | CompositeHeader_$union>]),
         renderActiveCell: renderActiveCell,
         ref: tableRef,
         onKeydown: (tupledArg_2: [KeyboardEvent, { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> }, Option<{ x: int32, y: int32 }>]): void => {
             const e_1: KeyboardEvent = tupledArg_2[0];
             const selectedCells: { SelectOrigin?: { x: int32, y: int32 }, clear: (() => void), contains: ((arg0: { x: int32, y: int32 }) => boolean), count: int32, lastAppend?: { x: int32, y: int32 }, selectAt: ((arg0: [{ x: int32, y: int32 }, boolean]) => void), selectBy: ((arg0: KeyboardEvent) => boolean), selectedCells?: { xEnd: int32, xStart: int32, yEnd: int32, yStart: int32 }, selectedCellsReducedSet: FSharpSet<{ x: int32, y: int32 }> } = tupledArg_2[1];
-            const activeCell: Option<{ x: int32, y: int32 }> = tupledArg_2[2];
-            if ((((e_1.ctrlKey ? true : e_1.metaKey) && (e_1.code === "Enter")) && (activeCell == null)) && (selectedCells.count > 0)) {
+            if ((((e_1.ctrlKey ? true : e_1.metaKey) && (e_1.code === "Enter")) && (tupledArg_2[2] == null)) && (selectedCells.count > 0)) {
                 const cell_11: { x: int32, y: int32 } = FSharpSet__get_MinimumElement(selectedCells.selectedCellsReducedSet);
                 console.log(["set details modal for:", cell_11] as [string, { x: int32, y: int32 }]);
                 setDetailsModal(cell_11);
@@ -226,11 +213,9 @@ export function Entry(): ReactElement {
     arcTable.AddColumn(CompositeHeader_Output(IOType_Sample()), toArray<CompositeCell_$union>(delay<CompositeCell_$union>((): Iterable<CompositeCell_$union> => map<int32, CompositeCell_$union>((i_1: int32): CompositeCell_$union => CompositeCell.createFreeText(`Sample ${i_1}`), rangeDouble(0, 1, 100)))));
     arcTable.AddColumn(CompositeHeader_Component(new OntologyAnnotation("instrument model", "MS", "MS:2138970")), toArray<CompositeCell_$union>(delay<CompositeCell_$union>((): Iterable<CompositeCell_$union> => map<int32, CompositeCell_$union>((i_2: int32): CompositeCell_$union => CompositeCell.createTermFromString("SCIEX instrument model", "MS", "MS:11111231"), rangeDouble(0, 1, 100)))));
     const patternInput: [ArcTable, ((arg0: ArcTable) => void)] = reactApi.useState<ArcTable, ArcTable>(arcTable);
-    const table: ArcTable = patternInput[0];
-    const setTable: ((arg0: ArcTable) => void) = patternInput[1];
     return createElement(AnnotationTable, {
-        arcTable: table,
-        setArcTable: setTable,
+        arcTable: patternInput[0],
+        setArcTable: patternInput[1],
     });
 }
 

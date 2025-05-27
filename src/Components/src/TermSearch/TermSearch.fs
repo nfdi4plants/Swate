@@ -381,7 +381,7 @@ type TermSearch =
         ) =
         let isActive = defaultArg isActive true
 
-        Html.span [
+        Html.label [
             if props.IsSome then
                 yield! props.Value
             prop.className [
@@ -634,8 +634,8 @@ type TermSearch =
         let resultsComponent (results: ResizeArray<TermSearchResult>) =
             React.fragment [
                 Html.div [ Html.textf "Results: %i" results.Count ]
-                Html.div [
-                    prop.className "swt:max-h-[50%] swt:overflow-y-auto"
+                Html.ul [
+                    prop.className "swt:max-h-[50%] swt:overflow-y-auto swt:list"
                     prop.children [
                         for res in results.GetRange(pagination * BinSize, BinSize) do
                             TermSearch.TermItem(res, onTermSelect, key = JS.JSON.stringify res)

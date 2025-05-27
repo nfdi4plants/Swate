@@ -161,13 +161,11 @@ export function UnitizedModal(v: string, oa: OntologyAnnotation, setUnitized: ((
     const initTerm: Term = TermModule_fromOntologyAnnotation(oa);
     const patternInput: [string, ((arg0: string) => void)] = reactApi.useState<string, string>(v);
     const tempValue: string = patternInput[0];
-    const setTempValue: ((arg0: string) => void) = patternInput[1];
     const patternInput_1: [Term, ((arg0: Term) => void)] = reactApi.useState<Term, Term>(initTerm);
     const tempTerm: Term = patternInput_1[0];
     const setTempTerm: ((arg0: Term) => void) = patternInput_1[1];
     const submit = (): void => {
-        const oa_1: OntologyAnnotation = TermModule_toOntologyAnnotation(tempTerm);
-        setUnitized(tempValue, oa_1);
+        setUnitized(tempValue, TermModule_toOntologyAnnotation(tempTerm));
         rmv();
     };
     const parentOa: Option<OntologyAnnotation> = map<CompositeHeader_$union, OntologyAnnotation>((h: CompositeHeader_$union): OntologyAnnotation => h.ToTerm(), relevantCompositeHeader);
@@ -179,7 +177,7 @@ export function UnitizedModal(v: string, oa: OntologyAnnotation, setUnitized: ((
             children: ["Unitized"],
         }),
         content: (xs = [InputField_Input_Z7357B228(tempValue, (input: string): void => {
-            setTempValue(input);
+            patternInput[1](input);
         }, "Value", rmv, submit, true), InputField_TermCombi_85508A(tempTerm, (t: Option<Term>): void => {
             setTempTerm(defaultArg(t, {}));
         }, "Term Name", rmv, submit, undefined, unwrap(parentOa)), InputField_Input_Z7357B228(defaultArg(tempTerm.source, ""), (input_1: string): void => {
@@ -198,7 +196,6 @@ export function FreeTextModal(v: string, setV: ((arg0: string) => void), rmv: ((
     let xs: Iterable<ReactElement>, xs_1: Iterable<ReactElement>;
     const patternInput: [string, ((arg0: string) => void)] = reactApi.useState<string, string>(v);
     const tempValue: string = patternInput[0];
-    const setTempValue: ((arg0: string) => void) = patternInput[1];
     const submit = (): void => {
         setV(tempValue);
         rmv();
@@ -211,7 +208,7 @@ export function FreeTextModal(v: string, setV: ((arg0: string) => void), rmv: ((
             children: ["Freetext"],
         }),
         content: (xs = [InputField_Input_Z7357B228(tempValue, (input: string): void => {
-            setTempValue(input);
+            patternInput[1](input);
         }, "Value", rmv, submit, true)], react.createElement(react.Fragment, {}, ...xs)),
         contentClassInfo: get_BaseModalContentClassOverride(),
         footer: (xs_1 = [FooterButtons_Cancel_3A5B6456(rmv), FooterButtons_Submit_3A5B6456(submit)], react.createElement(react.Fragment, {}, ...xs_1)),
@@ -255,35 +252,22 @@ export function CompositeCellModal(compositeCellModalInputProps: any): ReactElem
     const setCell: ((arg0: CompositeCell_$union) => void) = compositeCellModalInputProps.setCell;
     const compositeCell: CompositeCell_$union = compositeCellModalInputProps.compositeCell;
     switch (compositeCell.tag) {
-        case /* Unitized */ 2: {
-            const v: string = compositeCell.fields[0];
-            const oa_2: OntologyAnnotation = compositeCell.fields[1];
-            const setUnitized = (v_1: string, oa_3: OntologyAnnotation): void => {
+        case /* Unitized */ 2:
+            return UnitizedModal(compositeCell.fields[0], compositeCell.fields[1], (v_1: string, oa_3: OntologyAnnotation): void => {
                 setCell(CompositeCell_Unitized(v_1, oa_3));
-            };
-            return UnitizedModal(v, oa_2, setUnitized, rmv, unwrap(relevantCompositeHeader));
-        }
-        case /* FreeText */ 1: {
-            const v_2: string = compositeCell.fields[0];
-            const setV = (v_3: string): void => {
+            }, rmv, unwrap(relevantCompositeHeader));
+        case /* FreeText */ 1:
+            return FreeTextModal(compositeCell.fields[0], (v_3: string): void => {
                 setCell(CompositeCell_FreeText(v_3));
-            };
-            return FreeTextModal(v_2, setV, rmv, unwrap(relevantCompositeHeader));
-        }
-        case /* Data */ 3: {
-            const v_4: Data = compositeCell.fields[0];
-            const setData = (v_5: Data): void => {
+            }, rmv, unwrap(relevantCompositeHeader));
+        case /* Data */ 3:
+            return DataModal(compositeCell.fields[0], (v_5: Data): void => {
                 setCell(CompositeCell_Data(v_5));
-            };
-            return DataModal(v_4, setData, rmv, unwrap(relevantCompositeHeader));
-        }
-        default: {
-            const oa: OntologyAnnotation = compositeCell.fields[0];
-            const setOa = (oa_1: OntologyAnnotation): void => {
+            }, rmv, unwrap(relevantCompositeHeader));
+        default:
+            return TermModal(compositeCell.fields[0], (oa_1: OntologyAnnotation): void => {
                 setCell(CompositeCell_Term(oa_1));
-            };
-            return TermModal(oa, setOa, rmv, unwrap(relevantCompositeHeader));
-        }
+            }, rmv, unwrap(relevantCompositeHeader));
     }
 }
 

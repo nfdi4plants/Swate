@@ -30,7 +30,7 @@ const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
   const openModal=() => setOpen(true) // Close modal when needed
   const submitButton =
     <BaseButton
-      className={"btn btn-primary"}
+      className={"swt:btn swt:btn-primary"}
       style={{ marginLeft: "auto"}}
       onClick={rmv}
     >Submit</BaseButton>
@@ -38,7 +38,7 @@ const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
     <div>
       {
         <BaseButton
-          className={"btn btn-primary"}
+          className={"swt:btn swt:btn-primary"}
           style={{ marginLeft: "auto"}}
           onClick={openModal}
           >Open Modal</BaseButton>
@@ -82,7 +82,7 @@ const content =
           {item}
         </div>
       ));
-const modalClassInfo: string = "max-w-none";
+const modalClassInfo: string = "swt:max-w-none";
 
 export const CompleteModal: Story = {
   args: {

@@ -20,11 +20,7 @@ function makeQueryParam(name: string, value: any): string {
 }
 
 function makeQueryParamStr(queryParams: FSharpList<[string, any]>): string {
-    return "?" + join("&", map<[string, any], string>((tupledArg: [string, any]): string => {
-        const name: string = tupledArg[0];
-        const value: any = tupledArg[1];
-        return makeQueryParam(name, value);
-    }, queryParams));
+    return "?" + join("&", map<[string, any], string>((tupledArg: [string, any]): string => makeQueryParam(tupledArg[0], tupledArg[1]), queryParams));
 }
 
 function appendQueryParams(url: string, queryParams: FSharpList<[string, any]>): string {
@@ -101,8 +97,7 @@ export class TIBApi {
             const baseUrl = `${"https://api.terminology.tib.eu/api"}/search`;
             let childrenOf_: Option<string> = undefined;
             return ((childrenOf != null) ? (TIBApi.tryGetIRIFromOboId(value_2(childrenOf)).then((_arg: Option<string>): Promise<void> => {
-                const parentIri: Option<string> = _arg;
-                childrenOf_ = parentIri;
+                childrenOf_ = _arg;
                 if ((childrenOf != null) && (childrenOf_ == null)) {
                     throw new Error("Could not find parent IRI for childrenOf: " + value_2(childrenOf));
                     return Promise.resolve();
@@ -112,8 +107,7 @@ export class TIBApi {
                 }
             })) : (Promise.resolve())).then(() => PromiseBuilder__Delay_62FBFDE1<Term[]>(promise, (): Promise<Term[]> => {
                 let pr_1: Promise<TIBTypes_SearchApi>, pr: Promise<Types_Response>;
-                const queryParams: FSharpList<[string, any]> = toList<[string, any]>(delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>(singleton_1<[string, any]>(["q", q] as [string, any]), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((rows != null) ? singleton_1<[string, any]>(["rows", value_2(rows)] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((obsoletes != null) ? singleton_1<[string, any]>(["obsoletes", value_2(obsoletes)] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((queryFields != null) ? singleton_1<[string, any]>(["queryFields", join(",", value_2(queryFields))] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((childrenOf_ != null) ? singleton_1<[string, any]>(["childrenOf", value_2(childrenOf_)] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => ((collection != null) ? append<[string, any]>(singleton_1<[string, any]>(["schema", "collection"] as [string, any]), delay<[string, any]>((): Iterable<[string, any]> => singleton_1<[string, any]>(["classification", value_2(collection)] as [string, any]))) : empty<[string, any]>())))))))))))));
-                const url: string = appendQueryParams(baseUrl, queryParams);
+                const url: string = appendQueryParams(baseUrl, toList<[string, any]>(delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>(singleton_1<[string, any]>(["q", q] as [string, any]), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((rows != null) ? singleton_1<[string, any]>(["rows", value_2(rows)] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((obsoletes != null) ? singleton_1<[string, any]>(["obsoletes", value_2(obsoletes)] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((queryFields != null) ? singleton_1<[string, any]>(["queryFields", join(",", value_2(queryFields))] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => append<[string, any]>((childrenOf_ != null) ? singleton_1<[string, any]>(["childrenOf", value_2(childrenOf_)] as [string, any]) : empty<[string, any]>(), delay<[string, any]>((): Iterable<[string, any]> => ((collection != null) ? append<[string, any]>(singleton_1<[string, any]>(["schema", "collection"] as [string, any]), delay<[string, any]>((): Iterable<[string, any]> => singleton_1<[string, any]>(["classification", value_2(collection)] as [string, any]))) : empty<[string, any]>()))))))))))))));
                 return ((pr_1 = ((pr = fetch$(url, ofArray([Types_RequestProperties_Method("GET"), Types_RequestProperties_Headers({
                     Accept: "application/json",
                 } as Types_IHttpRequestHeaders)])), pr.then((response: Types_Response): Promise<TIBTypes_SearchApi> => response.json<TIBTypes_SearchApi>()))), pr_1.then((searchApi: TIBTypes_SearchApi): Term[] => {
@@ -136,8 +130,7 @@ export class TIBApi {
         return TIBApi.search("*", rows_1, undefined, undefined, parentOboId, unwrap(collection));
     }
     static getCollections(): Promise<TIBTypes_SchemaValuesApi> {
-        const url = `${"https://api.terminology.tib.eu/api"}/ontologies/schemavalues?schema=collection&lang=en`;
-        const pr: Promise<Types_Response> = fetch$(url, ofArray([Types_RequestProperties_Method("GET"), Types_RequestProperties_Headers({
+        const pr: Promise<Types_Response> = fetch$(`${"https://api.terminology.tib.eu/api"}/ontologies/schemavalues?schema=collection&lang=en`, ofArray([Types_RequestProperties_Method("GET"), Types_RequestProperties_Headers({
             Accept: "application/json",
         } as Types_IHttpRequestHeaders)]));
         return pr.then((response: Types_Response): Promise<TIBTypes_SchemaValuesApi> => response.json<TIBTypes_SchemaValuesApi>());

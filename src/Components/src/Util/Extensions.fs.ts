@@ -13,18 +13,13 @@ export function ARCtrl_ArcTable__ArcTable_ClearCell_Z3227AE51(this$: ArcTable, c
 }
 
 export function ARCtrl_ArcTable__ArcTable_ClearSelectedCells_49F0F46F(this$: ArcTable, selectHandle: SelectHandle): void {
-    let c: int32;
-    const matchValue: int32 = selectHandle.getCount() | 0;
-    if ((c = (matchValue | 0), c <= 100)) {
-        const c_1: int32 = matchValue | 0;
-        const selectedCells: { x: int32, y: int32 }[] = selectHandle.getSelectedCells();
+    if (selectHandle.getCount() <= 100) {
         iterate<{ x: int32, y: int32 }>((i: { x: int32, y: int32 }): void => {
             const c_2: CompositeCell_$union = getItemFromDict(this$.Values, [i.x - 1, i.y - 1] as [int32, int32]);
             this$.Values.set([i.x - 1, i.y - 1] as [int32, int32], c_2.GetEmptyCell());
-        }, selectedCells);
+        }, selectHandle.getSelectedCells());
     }
     else {
-        const c_3: int32 = matchValue | 0;
         let enumerator: any = getEnumerator(this$.Values.keys());
         try {
             while (enumerator["System.Collections.IEnumerator.MoveNext"]()) {

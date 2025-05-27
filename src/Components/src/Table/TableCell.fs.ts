@@ -12,8 +12,8 @@ import { CompositeCell_$union, CompositeCell_Term, CompositeCell_Data, Composite
 import { OntologyAnnotation } from "../fable_modules/ARCtrl.Core.2.5.1/OntologyAnnotation.fs.js";
 import { Data } from "../fable_modules/ARCtrl.Core.2.5.1/Data.fs.js";
 import { Option_whereNot } from "../../../Shared/Extensions.fs.js";
-import { ofArray } from "../fable_modules/fable-library-ts.4.24.0/List.js";
 import { TermSearch } from "../TermSearch/TermSearch.fs.js";
+import { ofArray } from "../fable_modules/fable-library-ts.4.24.0/List.js";
 
 export function BaseCell<$a extends Iterable<IReactProperty>>(rowIndex: int32, columnIndex: int32, content: ReactElement, className?: string, props?: Option<$a>, debug?: boolean): ReactElement {
     const debug_1: boolean = defaultArg<boolean>(debug, false);
@@ -93,19 +93,10 @@ export function CompositeCellActiveRender(tableCellController: TableCellControll
         default: {
             const oa: OntologyAnnotation = cell.fields[0];
             const term: Option<Term> = oa.isEmpty() ? undefined : TermModule_fromOntologyAnnotation(oa);
-            const setTerm = (t: Option<Term>): void => {
-                const oa_1: OntologyAnnotation = defaultArg(map<Term, OntologyAnnotation>(TermModule_toOntologyAnnotation, t), new OntologyAnnotation());
-                setCell(CompositeCell_Term(oa_1));
-            };
-            const termDropdownRenderer = (client: ClientRect, dropdown: ReactElement): ReactElement => {
-                let elems: Iterable<ReactElement>;
-                return createElement<any>("div", createObj(ofArray([["className", "swt:absolute swt:z-50"] as [string, any], ["style", {
-                    left: ~~((client.left + window.scrollX) - 2),
-                    top: ~~((client.bottom + window.scrollY) + 5),
-                }] as [string, any], (elems = [dropdown], ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])])));
-            };
             return createElement(TermSearch, {
-                onTermSelect: setTerm,
+                onTermSelect: (t: Option<Term>): void => {
+                    setCell(CompositeCell_Term(defaultArg(map<Term, OntologyAnnotation>(TermModule_toOntologyAnnotation, t), new OntologyAnnotation())));
+                },
                 term: unwrap(term),
                 onBlur: (): void => {
                     tableCellController.onBlur();
@@ -115,7 +106,13 @@ export function CompositeCellActiveRender(tableCellController: TableCellControll
                 },
                 portalTermDropdown: {
                     portal: document.body,
-                    renderer: termDropdownRenderer,
+                    renderer: (client: ClientRect, dropdown: ReactElement): ReactElement => {
+                        let elems: Iterable<ReactElement>;
+                        return createElement<any>("div", createObj(ofArray([["className", "swt:absolute swt:z-50"] as [string, any], ["style", {
+                            left: ~~((client.left + window.scrollX) - 2),
+                            top: ~~((client.bottom + window.scrollY) + 5),
+                        }] as [string, any], (elems = [dropdown], ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])])));
+                    },
                 },
                 portalModals: document.body,
                 autoFocus: true,

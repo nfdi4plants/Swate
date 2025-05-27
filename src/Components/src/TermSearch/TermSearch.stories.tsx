@@ -114,12 +114,12 @@ const DefaultAdvancedSearch: Story = {
   }
 }
 
-function customAdvancedSearch (input: string, setInput: (value: string) => void) {
+function customAdvancedSearch (setInput: (value: string) => void) {
   return {
     search: () =>
       Promise.resolve([
         {
-          name: input,
+          name: "test input",
           id: "TST:00001",
           description: "Test Term",
           isObsolete: true,
@@ -128,7 +128,7 @@ function customAdvancedSearch (input: string, setInput: (value: string) => void)
       ]),
     form: (controller: { startSearch: () => void; cancel: () => void }) => (
       <input
-        className="input"
+        className="swt:input swt:w-full"
         data-testid="advanced-search-input"
         type="text"
         onChange={(e) => setInput(e.target.value)}
@@ -143,10 +143,10 @@ function renderCustomAdvancedTermSearch(args: any) {
   const [input, setInput] = React.useState("");
 
   // Create advancedSearch dynamically
-  const advancedSearchInstance = customAdvancedSearch(input, setInput);
+  const advancedSearchInstance = customAdvancedSearch(setInput);
 
   return (
-    <div className='container mx-auto flex flex-col p-2 gap-4 h-[400px]'>
+    <div className='swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:h-[400px]'>
       <TermSearch
         {...args}
         term={term}
@@ -222,7 +222,7 @@ export const CustomAdvancedSearch: Story = {
     const canvas = within(canvasElement);
     const indicator = canvas.getByTestId("advanced-search-indicator");
     expect(indicator).toBeInTheDocument();
-    userEvent.click(indicator);
+    await userEvent.click(indicator);
 
     const modal = await waitFor(() => canvas.getByTestId("modal_advanced-search-modal"));
     expect(modal).toBeInTheDocument();
@@ -235,7 +235,7 @@ export const CustomAdvancedSearch: Story = {
 
     await waitFor(() => {
       const r = canvas.getByText("test input")
-      expect(r).toHaveClass("line-through")
+      expect(r).toHaveClass("swt:line-through")
       expect(r).toBeInTheDocument()
     });
   }
