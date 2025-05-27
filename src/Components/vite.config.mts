@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
     plugins: [
-        react({ include: /\.(fs|js|jsx|ts|tsx)$/, jsxRuntime: "classic" },),
+        react({ include: /\.(fs|js|jsx|ts|tsx)$/ },),
         tailwindcss(),
         dts({
             include: ['src'],
@@ -43,4 +43,9 @@ export default defineConfig({
             },
         },
     },
-  });
+    server: {
+        watch: {
+            ignored: [ "**/*.fs" ]
+        },
+    }
+});

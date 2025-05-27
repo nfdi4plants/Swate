@@ -7,14 +7,15 @@
   "scripts": {},
   "devDependencies": {
     "@fable-org/fable-library-js": "^1.10.0",
-    "@tailwindcss/typography": "^0.5.15",
+    "@tailwindcss/typography": "^0.5.16",
+    "@tailwindcss/cli": "^4.1.7",
     "@tailwindcss/vite": "^4.1.7",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^20.10.3",
     "@types/testing-library__react": "^10.0.1",
-    "@vitejs/plugin-basic-ssl": "^1.0.2",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-basic-ssl": "^2.0.0",
+    "@vitejs/plugin-react": "^4.5.0",
     "daisyui": "^5.0.35",
     "jsdom": "^25.0.1",
     "mocha": "^10.8.2",
@@ -22,9 +23,9 @@
     "remotedev": "^0.2.7",
     "tailwindcss": "^4.1.7",
     "typescript": "^5.6.3",
-    "vite": "^5.0.5",
-    "vite-plugin-node-polyfills": "^0.22.0",
-    "vitest": "^2.1.5"
+    "vite": "^6.3.5",
+    "vite-plugin-node-polyfills": "^0.23.0",
+    "vitest": "^3.1.4"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

@@ -365,31 +365,34 @@ let Bundle () =
     ]
     |> runParallel
 
-let Run (db: bool) =
-    [
-        "server", dotnet [ "watch"; "run" ] serverPath
-        "client",
-        dotnet
-            [
-                "fable"
-                "watch"
-                "-o"
-                "output"
-                "-s"
-                "-e"
-                "fs.js"
-                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
-                "--run"
-                "npx"
-                "vite"
-                "--debug"
-                "transform"
-            ]
-            clientPath
-        if db then
-            "database", dockerCompose [ "-f"; dockerComposePath; "up"; "-d" ] __SOURCE_DIRECTORY__
-    ]
-    |> runParallel
+type Run =
+
+    static member ClientArgs =
+        [
+            "fable"
+            "watch"
+            "-o"
+            "output"
+            "-s"
+            "-e"
+            "fs.js"
+            yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+            "--run"
+            "npx"
+            "vite"
+            "--debug"
+            "transform"
+        ]
+
+
+    static member All(db: bool) =
+        [
+            "server", dotnet [ "watch"; "run" ] serverPath
+            "client", dotnet Run.ClientArgs clientPath
+            if db then
+                "database", dockerCompose [ "-f"; dockerComposePath; "up"; "-d" ] __SOURCE_DIRECTORY__
+        ]
+        |> runParallel
 
 //Target.create "officedebug" (fun config ->
 //    let args = config.Context.Arguments
@@ -479,10 +482,13 @@ let main args =
     | "run" :: a ->
         match a with
         | "db" :: a ->
-            Run(true)
+            Run.All(true)
+            0
+        | "client" :: a ->
+            run dotnet Run.ClientArgs clientPath
             0
         | _ ->
-            Run(false)
+            Run.All(false)
             0
     | "test" :: a ->
         Tests.buildSharedTests ()

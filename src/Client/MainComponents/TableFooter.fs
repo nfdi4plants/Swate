@@ -10,6 +10,7 @@ open Messages
 let Main (dispatch: Messages.Msg -> unit) =
     let init_RowsToAdd = 1
     let state_rows, setState_rows = React.useState (init_RowsToAdd)
+    let inputRef = React.useInputRef()
 
     Html.div [
         prop.id "ExpandTable"
@@ -24,7 +25,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                     Html.input [
                         prop.className "swt:input swt:join-item swt:border-current"
                         prop.type'.number
-                        prop.id "n_row_input"
+                        prop.ref inputRef
                         prop.min init_RowsToAdd
                         prop.onChange (fun e -> setState_rows e)
                         prop.onKeyDown (key.enter, fun _ -> Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch)
@@ -35,8 +36,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                     Html.button [
                         prop.className "swt:btn swt:btn-outline swt:join-item"
                         prop.onClick (fun _ ->
-                            let inp = Browser.Dom.document.getElementById "n_row_input"
-                            inp?Value <- init_RowsToAdd
+                            inputRef.current.Value.value <- unbox init_RowsToAdd
                             setState_rows init_RowsToAdd
                             Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch)
                         prop.children [ Html.i [ prop.className "fa-solid fa-plus" ] ]

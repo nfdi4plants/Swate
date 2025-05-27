@@ -10,10 +10,13 @@ const proxyTarget = "http://localhost:" + proxyPort;
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [
-        react(),
+        basicSsl(),
+        react({ include: /\.(fs|js|jsx|ts|tsx)$/ },),
         tailwindcss(),
-        basicSsl()
     ],
+    esbuild: {
+        jsx: 'automatic', // Enables React 17+ JSX Transform
+    },
     build: {
         outDir: "../../deploy/public",
     },

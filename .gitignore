@@ -1,6 +1,4 @@
 .fable/
-*.fs.js
-*.fs.js.map
 .fake/
 .farmer/
 .idea/
@@ -27,7 +25,9 @@ release.sh
 /tests/Client/output
 /.paket
 */**/fable_modules
-*/**/*.fs.ts
+# *.fs.ts
+# *.fs.js
+*.fs.js.map
 dist/
 output/
 
