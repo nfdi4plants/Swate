@@ -39,17 +39,22 @@ jobs:
         with:
           node-version: 20
 
+      - name: Remove root node_modules and lock file (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: rm -rf node_modules package-lock.json
+
+      - name: Remove Components node_modules and lock file (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: rm -rf node_modules package-lock.
+        working-directory: src/Components
+
       # Install npm dependencies
-      - name: Clean and install root dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
+      - name: Install root dependencies
+        run: npm i
 
       # Install component npm dependencies
-      - name: Clean and install components dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
+      - name: Install components dependencies
+        run: npm i
         working-directory: src/Components
 
       # Install playwright dependencies
