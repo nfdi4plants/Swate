@@ -40,12 +40,16 @@ jobs:
           node-version: 20
 
       # Install npm dependencies
-      - name: Install Node.js dependencies
-        run: npm install
+      - name: Clean and install root dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
 
       # Install component npm dependencies
-      - name: Install Node.js dependencies
-        run: npm install
+      - name: Clean and install components dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
         working-directory: src/Components
 
       # Install playwright dependencies
