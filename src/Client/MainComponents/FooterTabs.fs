@@ -53,9 +53,14 @@ let private dragenter_handler (state, setState) =
 ///<summary>Removes dragenter styling.</summary>
 let private dragleave_handler (state, setState) =
     fun (e: Browser.Types.DragEvent) ->
+        log "dragleave"
         e.preventDefault ()
         e.stopPropagation ()
         setState { state with IsDraggedOver = false }
+
+[<Literal>]
+let private DragOverClass =
+    "swt:!border swt:!border-dashed swt:!border-base-content"
 
 [<ReactComponent>]
 let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg -> unit) =
@@ -66,9 +71,9 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     //Daisy.tab [
     Html.div [
         prop.className [
-            "swt:tab"
+            "swt:tab swt:*:pointer-events-none"
             if state.IsDraggedOver then
-                "dragover-footertab"
+                DragOverClass
             if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then
                 "swt:tab-active"
         ]
@@ -206,10 +211,9 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
     //Daisy.tab [
     Html.div [
         prop.className [
-            "swt:tab"
-            "dragover"
+            "swt:tab swt:*:pointer-events-none"
             if state.IsDraggedOver then
-                "dragover-footertab"
+                DragOverClass
         ]
         prop.key id
         prop.id id
