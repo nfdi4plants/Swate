@@ -243,7 +243,7 @@ module ComponentAux =
                 prop.children [
                     //Daisy.label [
                     Html.label [
-                        prop.className "swt:label swt:input swt:input-sm swt:input-primary swt:flex swt:items-center"
+                        prop.className "swt:label swt:input swt:input-sm swt:input-primary swt:flex swt:w-full swt:items-center"
                         prop.children [
                             Html.input [
                                 prop.placeholder ".. protocol tag"
@@ -694,7 +694,7 @@ type Search =
         React.fragment [
             Html.div [
                 prop.className [
-                    "swt:grid swt:grid-cols-1 swt:gap-2"
+                    "swt:grid swt:grid-cols-1 swt:gap-2 swt:px-2"
                     if classes.IsSome then
                         classes.Value
                 ]
