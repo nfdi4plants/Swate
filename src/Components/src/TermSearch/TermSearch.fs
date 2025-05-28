@@ -458,7 +458,7 @@ type TermSearch =
                             prop.className "swt:flex swt:flex-row swt:items-start swt:gap-4"
                             prop.children [
                                 Html.label [ prop.className "swt:w-80 swt:font-bold"; prop.text key ]
-                                Html.div  value
+                                Html.div value
                             ]
                         ]
                 ]
@@ -1079,7 +1079,8 @@ type TermSearch =
                 |> List.rev
 
             Html.div [
-                prop.className "swt:z-[9999] swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"
+                prop.className
+                    "swt:z-[9999] swt:left-0 swt:top-0 swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"
                 prop.ref modalContainerRef
                 prop.children [
                     match modal with
@@ -1115,10 +1116,11 @@ type TermSearch =
                     prop
             prop.ref containerRef
             prop.children [
-                if portalModals.IsSome then
-                    ReactDOM.createPortal (modalContainer, portalModals.Value)
-                else
-                    modalContainer
+                if modal.IsSome then
+                    if portalModals.IsSome then
+                        ReactDOM.createPortal (modalContainer, portalModals.Value)
+                    else
+                        modalContainer
                 Html.div [
                     prop.className "swt:indicator swt:w-full swt:h-full"
                     prop.children [

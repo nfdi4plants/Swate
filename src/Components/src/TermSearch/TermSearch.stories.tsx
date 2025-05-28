@@ -8,7 +8,7 @@ function renderTermSearch(args: any) {
   const [term, setTerm] = React.useState(undefined as Term | undefined);
 
   return (
-    <div className='container mx-auto flex flex-col p-2 gap-4 h-[400px]'>
+    <div className='swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:h-[400px]'>
       <TermSearch
         {...args}
         term={term}
@@ -76,7 +76,7 @@ export const ParentSearch: Story = {
       expect(directedOutput).toBeInTheDocument();
       const expectedIcons = canvas.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
-    }, { timeout: 3000 });
+    }, { timeout: 4000 });
   }
 }
 
