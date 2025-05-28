@@ -21,6 +21,7 @@
     <Compile Include="JsBindings\Cytoscape.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Routing.fs" />
+    <Compile Include="ReactContext.fs" />
     <Compile Include="OfficeInterop\InteropLogging.fs" />
     <Compile Include="OfficeInterop\ARCtrlHelper.fs" />
     <Compile Include="OfficeInterop\ExcelHelper.fs" />

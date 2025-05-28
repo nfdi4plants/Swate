@@ -22,7 +22,7 @@ type MainPageView =
                 Html.a [
                     prop.className [
                         if isActive then
-                            "swt:btn swt:btn-outline"
+                            "swt:bg-primary swt:text-primary-content"
                     ]
                     prop.text route.AsStringRdbl
                 ]
@@ -129,7 +129,7 @@ type MainPageView =
     static member MainContent(model: Model.Model, dispatch) =
         match model.PageState.MainPage with
         | Routing.MainPage.Settings -> Pages.Settings.Main(model, dispatch)
-        | Routing.MainPage.About -> Pages.About.Main
+        | Routing.MainPage.About -> Pages.About.Main()
         | Routing.MainPage.PrivacyPolicy -> Pages.PrivacyPolicy.Main()
         | _ ->
             Html.div [
@@ -142,10 +142,7 @@ type MainPageView =
         Html.div [
             prop.className "swt:drawer swt:md:drawer-open"
             prop.children [
-                Html.input [
-                    prop.id DrawerId
-                    prop.type'.checkbox
-                    prop.className "swt:drawer-toggle" ]
+                Html.input [ prop.id DrawerId; prop.type'.checkbox; prop.className "swt:drawer-toggle" ]
                 //Daisy.drawerContent [
                 Html.div [
                     prop.className "swt:drawer-content swt:flex swt:flex-col swt:items-center swt:overflow-y-auto"

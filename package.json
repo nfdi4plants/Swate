@@ -7,8 +7,8 @@
   "scripts": {},
   "devDependencies": {
     "@fable-org/fable-library-js": "^1.10.0",
-    "@tailwindcss/typography": "^0.5.16",
     "@tailwindcss/cli": "^4.1.7",
+    "@tailwindcss/typography": "^0.5.16",
     "@tailwindcss/vite": "^4.1.7",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
@@ -16,7 +16,7 @@
     "@types/testing-library__react": "^10.0.1",
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "@vitejs/plugin-react": "^4.5.0",
-    "daisyui": "^5.0.35",
+    "daisyui": "^5.0.40",
     "jsdom": "^25.0.1",
     "mocha": "^10.8.2",
     "office-addin-mock": "^2.4.6",

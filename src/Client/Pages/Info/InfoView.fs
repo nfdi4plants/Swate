@@ -50,10 +50,8 @@ module private AboutHelper =
                                 //Daisy.button.a [
                                 Html.button [
                                     prop.href imageHref
-                                    prop.className [
-                                        "swt:btn swt:btn-square swt:btn-primary swt:btn-lg"
-                                        ]
-                                    prop.children [ Html.img [ prop.src imageSrc; prop.className "swt:size-12" ] ]
+                                    prop.className [ "swt:btn swt:btn-square swt:btn-primary swt:btn-lg" ]
+                                    prop.children [ Html.img [ prop.src imageSrc; prop.className "swt:size-8" ] ]
                                 ]
                             ]
                         ]
@@ -138,7 +136,7 @@ module private AboutHelper =
         ]
 
 type About =
-    static member Main =
+    static member Main() =
         Html.div [
             prop.className "swt:prose-sm swt:md:prose swt:lg:prose-lg swt:divide-y-2 swt:gap-y-2 swt:py-1 swt:lg:py-4"
             prop.children [

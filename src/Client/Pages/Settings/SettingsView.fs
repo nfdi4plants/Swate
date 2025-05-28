@@ -246,7 +246,13 @@ type Settings =
     [<ReactComponent>]
     static member ThemeToggle() =
 
-        let (theme, handleSetTheme) = React.useLocalStorage ("theme", "light")
+        let themeCtx = React.useContext ReactContext.ThemeCtx
+
+        let browser =
+            """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+	<rect width="24" height="24" fill="none" />
+	<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm4-2v4" />
+</svg>"""
 
         let animatedMoon =
             """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
@@ -279,26 +285,40 @@ type Settings =
     </g>
 </svg>"""
 
-        Html.label [
+        let mkOption (theme: Swate.Components.Theme) =
+            let txt = Swate.Components.Theme.toString theme
+            Html.option [ prop.value txt; prop.text txt ]
+
+        Html.div [
             prop.className "swt:grid swt:lg:col-span-2 swt:grid-cols-subgrid swt:cursor-pointer swt:not-prose"
             prop.children [
                 Html.p [ prop.className "swt:text-xl swt:py-2"; prop.text "Theme" ]
-                Html.button [
-                    prop.className "swt:btn swt:btn-block swt:btn-primary"
-                    //prop.text (if theme = "light" then dark else light)
+                Html.label [
+                    prop.className "swt:select"
                     prop.children [
-                        Html.div [
+                        Html.label [
+                            prop.className "swt:label"
                             prop.dangerouslySetInnerHTML (
-                                match theme.ToLower() with
-                                | "light" -> animatedSun
-                                | _ -> animatedMoon
+                                match themeCtx with
+                                | {
+                                      data = Swate.Components.Theme.Sunrise
+                                  } -> animatedSun
+                                | {
+                                      data = Swate.Components.Theme.Finster
+                                  } -> animatedMoon
+                                | { data = Swate.Components.Theme.Auto } -> browser
                             )
                         ]
+                        Html.select [
+                            prop.defaultValue (unbox<string> themeCtx.data)
+                            prop.onChange (fun (e: string) -> themeCtx.setData (Swate.Components.Theme.fromString e))
+                            prop.children [
+                                mkOption Swate.Components.Theme.Sunrise
+                                mkOption Swate.Components.Theme.Finster
+                                mkOption Swate.Components.Theme.Auto
+                            ]
+                        ]
                     ]
-                    prop.onClick (fun _ ->
-                        let newTheme = if theme = "light" then "dark" else "light"
-                        handleSetTheme newTheme // Save to localStorage
-                        document.documentElement.setAttribute ("data-theme", theme))
                 ]
             ]
         ]

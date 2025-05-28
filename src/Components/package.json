@@ -51,7 +51,8 @@
     "@fable-org/fable-library-js": "^1.8.0",
     "@floating-ui/react": "^0.27.7",
     "@fortawesome/fontawesome-free": "^6.7.2",
-    "@tanstack/react-virtual": "^3.13.2"
+    "@tanstack/react-virtual": "^3.13.2",
+    "@uidotdev/usehooks": "^2.4.1"
   },
   "peerDependencies": {
     "react": "^19.0.0",
@@ -79,12 +80,10 @@
     "@types/react-dom": "^18.0.0",
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/browser": "^3.1.4",
-    "daisyui": "^5.0.35",
     "globals": "^15.14.0",
     "playwright": "^1.49.1",
     "storybook": "^8.6.4",
     "typescript": "^5.6.3",
-    "vite": "^6.3.5",
     "vite-plugin-dts": "^4.5.0",
     "vitest": "^3.1.4"
   }

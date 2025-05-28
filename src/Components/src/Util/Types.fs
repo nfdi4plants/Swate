@@ -12,6 +12,28 @@ type DaisyUIColors =
     | Warning
     | Error
 
+type Context<'T> = { data: 'T; setData: 'T -> unit }
+
+[<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
+type Theme =
+    | Auto
+    | Sunrise
+    | Finster
+
+module Theme =
+    let toString (theme: Theme) =
+        match theme with
+        | Auto -> "auto"
+        | Sunrise -> "light"
+        | Finster -> "dark"
+
+    let fromString (theme: string) =
+        match theme with
+        | "auto" -> Auto
+        | "light" -> Sunrise
+        | "dark" -> Finster
+        | _ -> Auto
+
 type CellCoordinate = {| x: int; y: int |}
 
 type CellCoordinateRange = {|
