@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { within, expect, userEvent, waitFor } from '@storybook/test';
+import { within, expect, userEvent, waitFor, screen } from '@storybook/test';
 import BaseModal from "./BaseModal.fs.js";
 import { useState } from 'react';
 import React from 'react';
@@ -15,36 +15,25 @@ const TESTID_BASE_MODAL_CONTENT = "modal_content_base"
 const TESTID_SUBMIT_BUTTON = "submit_button_base"
 
 
-const BaseButton: React.FC<ButtonProps> = ({ className, style, children, onClick }) => {
-  return (
-    <button
-      className={className}
-      style={style}
-      onClick={onClick}>
-      {children}
-    </button>
-  );
-};
-
 const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
   const [open, setOpen] = useState(false);
   const rmv=() => setOpen(false) // Close modal when needed
   const openModal=() => setOpen(true) // Close modal when needed
   const submitButton =
-    <BaseButton
+    <button
       className={"swt:btn swt:btn-primary"}
       style={{ marginLeft: "auto"}}
       onClick={rmv}
-      data-testid={TESTID_BASE_MODAL_CONTENT}
-    >Submit</BaseButton>
+      data-testid={TESTID_SUBMIT_BUTTON}
+    >Submit</button>
   return (
     <div>
       {
-        <BaseButton
+        <button
           className={"swt:btn swt:btn-primary"}
           style={{ marginLeft: "auto"}}
           onClick={openModal}
-          >Open Modal</BaseButton>
+          >Open Modal</button>
       }
       {open && (
         <BaseModal
@@ -102,11 +91,11 @@ export const CompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
+    const modalContent = screen.getByTestId(TESTID_BASE_MODAL_CONTENT);
 
     // Verify that the modal is open (checking for modal content)
-    const item0 = canvas.getByText("Simple Content 0", { selector: 'div' });
-    const item1 = canvas.getByText("Simple Content 400", { selector: 'div' });
+    const item0 = screen.getByText("Simple Content 0", { selector: 'div' });
+    const item1 = screen.getByText("Simple Content 400", { selector: 'div' });
 
     expect(item0).toBeInTheDocument();
     expect(item1).toBeInTheDocument;
@@ -117,11 +106,11 @@ export const CompleteModal: Story = {
      });
 
      // Find the submit button (or trigger) and click to close the modal
-     const closeButton = canvas.getByTestId(TESTID_SUBMIT_BUTTON);
+     const closeButton = screen.getByTestId(TESTID_SUBMIT_BUTTON);
      await userEvent.click(closeButton);
 
      // Verify that the modal is closed (the content should no longer be in the document)
-     await waitFor(() => expect(canvas.queryByText("Simple Content 10")).not.toBeInTheDocument());
+     await waitFor(() => expect(screen.queryByText("Simple Content 10")).not.toBeInTheDocument());
   },
 }
 
@@ -140,11 +129,11 @@ export const WideCompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
+    const modalContent = screen.getByTestId(TESTID_BASE_MODAL_CONTENT);
 
     // Verify that the modal is open (checking for modal content)
-    const item0 = canvas.getByText("Simple Content 0", { selector: 'div' });
-    const item1 = canvas.getByText("Simple Content 400", { selector: 'div' });
+    const item0 = screen.getByText("Simple Content 0", { selector: 'div' });
+    const item1 = screen.getByText("Simple Content 400", { selector: 'div' });
 
     expect(item0).toBeInTheDocument();
     expect(item1).toBeInTheDocument;
@@ -155,11 +144,11 @@ export const WideCompleteModal: Story = {
      });
 
      // Find the submit button (or trigger) and click to close the modal
-     const closeButton = canvas.getByTestId(TESTID_SUBMIT_BUTTON);
+     const closeButton = screen.getByTestId(TESTID_SUBMIT_BUTTON);
      await userEvent.click(closeButton);
 
      // Verify that the modal is closed (the content should no longer be in the document)
-     await waitFor(() => expect(canvas.queryByText("Simple Content 10")).not.toBeInTheDocument());
+     await waitFor(() => expect(screen.queryByText("Simple Content 10")).not.toBeInTheDocument());
   },
 }
 
@@ -183,11 +172,11 @@ export const SmallWindowedCompleteModal: Story = {
     await userEvent.click(button);
 
     // Wait for the modal content to load and check for an item in content
-    const modalContent = canvas.getByTestId(TESTID_BASE_MODAL_CONTENT);
+    const modalContent = screen.getByTestId(TESTID_BASE_MODAL_CONTENT);
 
     // Verify that the modal is open (checking for modal content)
-    const header = canvas.getByText("Simple Header");
-    const fooder = canvas.getByTestId(TESTID_SUBMIT_BUTTON)
+    const header = screen.getByText("Simple Header");
+    const fooder = screen.getByTestId(TESTID_SUBMIT_BUTTON)
 
     await waitFor(() => {
       expect(header).toBeInTheDocument();
