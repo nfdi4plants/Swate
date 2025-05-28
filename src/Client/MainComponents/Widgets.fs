@@ -203,7 +203,7 @@ type Widget =
                     "swt:shadow-md swt:border swt:border-base-300 swt:space-y-4 swt:rounded-lg swt:border-r-2 swt:bg-base-100"
                 prop.style [
                     style.zIndex 40
-                    style.cursor.eastWestResize //style.cursor.northWestSouthEastResize ;
+                    style.cursor.eastWestResize //style.cursor.northWestSouthEastResize;
                     style.display.flex
                     style.position.fixedRelativeToWindow
                     style.minWidth.minContent
@@ -281,12 +281,7 @@ type Widget =
 
     static member FilePicker(model, dispatch, rmv) =
         let content =
-            Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-2"
-                prop.children [
-                    Pages.FilePicker.Main(model, dispatch, "swt:@container/filePickerWidget swt:min-w-32")
-                ]
-            ]
+            Pages.FilePicker.Main(model, dispatch, "swt:@container/filePickerWidget swt:min-w-32")
 
         let prefix = WidgetLiterals.FilePicker
         Widget.Base(content, prefix, rmv, prefix)

@@ -154,7 +154,7 @@ module private Helper =
                             )
                             Html.div [
                                 //Daisy.divider [
-                                prop.className "swt:divider swt:divider-neutral"
+                                prop.className "swt:divider swt:divider-neutral swt:m-0"
                             ]
                             createNewTableItem (
                                 "Template",

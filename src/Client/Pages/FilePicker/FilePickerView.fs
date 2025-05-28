@@ -85,7 +85,7 @@ type FilePicker =
             ]
         ]
 
-    static member private ActionButtons (model: Model) dispatch =
+    static member ActionButtons (model: Model) dispatch =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:justify-center swt:gap-2"
             prop.children [
@@ -117,7 +117,7 @@ type FilePicker =
             prop.children [ Html.i [ prop.classes [ "fa-lg"; icon ] ] ]
         ]
 
-    static member private FileSortElements (model: Model) dispatch =
+    static member FileSortElements (model: Model) dispatch =
         Html.div [
             //Daisy.join [
             Html.div [
@@ -202,9 +202,13 @@ type FilePicker =
         ]
 
     static member private MoveButtonList (id, fileName) (model: Model) dispatch =
-        Daisy.join [
-            FilePicker.MoveUpButton (id, fileName) model dispatch
-            FilePicker.MoveDownButton (id, fileName) model dispatch
+        //Daisy.join [
+        Html.div [
+            prop.className "swt:join"
+            prop.children [
+                FilePicker.MoveUpButton (id, fileName) model dispatch
+                FilePicker.MoveDownButton (id, fileName) model dispatch
+            ]
         ]
 
 
@@ -230,19 +234,22 @@ type FilePicker =
 
 
     static member Main(model: Model, dispatch, containerQueryClass: string) =
-
-        React.fragment [
-
-            match model.FilePickerState.FileNames with
-            | [] ->
-
-                FilePicker.UploadButtons(model, dispatch, containerQueryClass)
-            | _ ->
-                FilePicker.FileSortElements model dispatch
-
-                FilePicker.FileViewTable model dispatch
-                //fileNameElements model dispatch
-                FilePicker.ActionButtons model dispatch
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
+            prop.children [
+                if model.FilePickerState.FileNames.Length > 0 then
+                    FilePicker.FileSortElements model dispatch
+                Html.div [
+                    prop.className "swt:overflow-y-auto swt:overflow-x-hidden swt:py-2"
+                    prop.children [
+                        match model.FilePickerState.FileNames with
+                        | [] -> FilePicker.UploadButtons(model, dispatch, containerQueryClass)
+                        | _ -> FilePicker.FileViewTable model dispatch
+                    ]
+                ]
+                if model.FilePickerState.FileNames.Length > 0 then
+                    FilePicker.ActionButtons model dispatch
+            ]
         ]
 
     static member Sidebar(model: Model, dispatch: Messages.Msg -> unit) =
