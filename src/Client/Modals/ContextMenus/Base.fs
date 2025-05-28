@@ -9,7 +9,7 @@ type Base =
     static member Divider() =
         //Daisy.divider [ prop.className "swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2" ]
         Html.div [
-            prop.className "swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2"
+            prop.className "swt:divider swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2"
         ]
 
     static member Item(content: ReactElement, ?onclick, ?icon: ReactElement, ?inactive: bool) =

@@ -152,11 +152,9 @@ module private Helper =
                                     let _ = a.InitTable("New Assay Table")
                                     ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
-                            Html.li [
+                            Html.div [
                                 //Daisy.divider [
-                                Html.div [
-                                    prop.className "swt:divider swt:divider-horizontal"
-                                ]
+                                prop.className "swt:divider swt:divider-neutral"
                             ]
                             createNewTableItem (
                                 "Template",
