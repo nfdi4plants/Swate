@@ -12,6 +12,8 @@ interface ButtonProps {
 }
 
 const TESTID_BASE_MODAL_CONTENT = "modal_content_base"
+const TESTID_SUBMIT_BUTTON = "submit_button_base"
+
 
 const BaseButton: React.FC<ButtonProps> = ({ className, style, children, onClick }) => {
   return (
@@ -33,6 +35,7 @@ const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
       className={"swt:btn swt:btn-primary"}
       style={{ marginLeft: "auto"}}
       onClick={rmv}
+      data-testid={TESTID_BASE_MODAL_CONTENT}
     >Submit</BaseButton>
   return (
     <div>
@@ -114,7 +117,7 @@ export const CompleteModal: Story = {
      });
 
      // Find the submit button (or trigger) and click to close the modal
-     const closeButton = canvas.getByRole("button", { name: /Submit/i });
+     const closeButton = canvas.getByTestId(TESTID_SUBMIT_BUTTON);
      await userEvent.click(closeButton);
 
      // Verify that the modal is closed (the content should no longer be in the document)
@@ -152,7 +155,7 @@ export const WideCompleteModal: Story = {
      });
 
      // Find the submit button (or trigger) and click to close the modal
-     const closeButton = canvas.getByRole("button", { name: /Submit/i });
+     const closeButton = canvas.getByTestId(TESTID_SUBMIT_BUTTON);
      await userEvent.click(closeButton);
 
      // Verify that the modal is closed (the content should no longer be in the document)
@@ -184,7 +187,7 @@ export const SmallWindowedCompleteModal: Story = {
 
     // Verify that the modal is open (checking for modal content)
     const header = canvas.getByText("Simple Header");
-    const fooder = canvas.getByRole("button", { name: /Submit/i });
+    const fooder = canvas.getByTestId(TESTID_SUBMIT_BUTTON)
 
     await waitFor(() => {
       expect(header).toBeInTheDocument();
