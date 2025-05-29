@@ -132,11 +132,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ARCtrl.Javascript" Version="2.5.1" />
-    <PackageReference Include="Fable.Elmish" Version="4.2.0" />
+    <PackageReference Include="Fable.Elmish" Version="4.3.0" />
     <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />
     <PackageReference Include="Fable.Elmish.React" Version="4.0.0" />
-    <PackageReference Include="Fable.Elmish.Browser" Version="4.0.3" />
-    <PackageReference Include="Fable.Elmish.Debugger" Version="4.1.0" />
+    <PackageReference Include="Fable.Elmish.Browser" Version="4.1.0" />
+    <PackageReference Include="Fable.Elmish.Debugger" Version="4.2.2" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.SimpleJson" Version="3.24.0" />
     <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
