@@ -47,9 +47,9 @@ type ModalElements =
                     ]
                     prop.children [
                         //Daisy.radio [
-                        Html.input  [
-                            prop.className "swt:radio swt:radio-xs swt:radio-neutral"
-                            prop.type' "radio"
+                        Html.input [
+                            prop.className "swt:radio swt:radio-xs"
+                            prop.type'.radio
                             prop.disabled isDisabled
                             prop.name radioGroup
                             prop.isChecked isChecked

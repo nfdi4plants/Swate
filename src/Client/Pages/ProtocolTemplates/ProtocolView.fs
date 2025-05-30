@@ -48,13 +48,4 @@ type Templates =
                     Modals.SelectiveTemplateFromDB.Main(model, dispatch, false)
             ]
 
-            // Box 2
-            SidebarComponents.SidebarLayout.Description(
-                Html.p [
-                    Html.b "Import JSON files."
-                    Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
-                ]
-            )
-
-            TemplateFromFile.Main(model, dispatch)
         ]

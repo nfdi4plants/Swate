@@ -45,7 +45,7 @@ module private AboutHelper =
                     prop.children [
                         Html.div [ prop.className "swt:prose"; prop.children content ]
                         Html.div [
-                            prop.className "swt:not-prose"
+                            prop.className "not-prose"
                             prop.children [
                                 //Daisy.button.a [
                                 Html.button [

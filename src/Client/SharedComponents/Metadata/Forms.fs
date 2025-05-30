@@ -170,7 +170,7 @@ module private Helper =
     let addButton (clickEvent: MouseEvent -> unit) =
         //Daisy.button.button [
         Html.button [
-            prop.className "swt:btn swt:btn-wide swt:btn-accent swt:btn-outline"
+            prop.className "swt:btn swt:btn-wide swt:btn-info swt:btn-outline"
             prop.text "+"
             prop.onClick clickEvent
         ]
@@ -213,7 +213,7 @@ module private Helper =
 
     let cardFormGroup (content: ReactElement list) =
         Html.div [
-            prop.className "swt:grid swt:@md/main:grid-cols-2 swt:@xl/main:grid-flow-col swt:gap-4 swt:not-prose"
+            prop.className "swt:grid swt:@md/main:grid-cols-2 swt:@xl/main:grid-flow-col swt:gap-4 not-prose"
             prop.children content
         ]
 
@@ -584,7 +584,7 @@ type FormComponents =
             ?isarea: bool,
             ?isJoin,
             ?disabled,
-            ?classes:string
+            ?classes: string
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
@@ -616,7 +616,7 @@ type FormComponents =
                     debounceSetter e
 
         Html.div [
-            prop.className "swt:grow swt:not-prose"
+            prop.className "swt:grow not-prose"
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value

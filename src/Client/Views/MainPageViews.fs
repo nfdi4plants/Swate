@@ -87,7 +87,7 @@ type MainPageView =
     static member Navbar(model: Model.Model, dispatch) =
         Components.BaseNavbar.Glow [
             Html.label [
-                prop.className "swt:btn swt:btn-square swt:btn-ghost swt:lg:hidden"
+                prop.className "swt:btn swt:btn-square swt:btn-ghost swt:md:hidden"
                 prop.htmlFor DrawerId
                 prop.children [
                     Svg.svg [
@@ -108,22 +108,15 @@ type MainPageView =
                 ]
             ]
 
-            Html.div [
-                prop.ariaLabel "logo"
-                prop.onClick (fun _ ->
-                    UpdateModel {
-                        model with
-                            Model.PageState.MainPage = Routing.MainPage.Default
-                    }
-                    |> dispatch)
-                prop.className "swt:cursor-pointer"
-                prop.children [
-                    Html.img [
-                        prop.style [ style.maxHeight (length.perc 100); style.width 100 ]
-                        prop.src @"assets/Swate_logo_for_excel.svg"
-                    ]
-                ]
-            ]
+            Components.Logo.Main(
+                onClick =
+                    (fun _ ->
+                        UpdateModel {
+                            model with
+                                Model.PageState.MainPage = Routing.MainPage.Default
+                        }
+                        |> dispatch)
+            )
         ]
 
     static member MainContent(model: Model.Model, dispatch) =

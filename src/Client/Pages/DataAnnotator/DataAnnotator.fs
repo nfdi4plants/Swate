@@ -93,7 +93,9 @@ module private DataAnnotatorHelper =
                     Html.div [
                         prop.className "swt:indicator"
                         prop.children [
-                            Html.i [ prop.className "swt:indicator-item fa-solid fa-info-circle fa-lg swt:text-accent" ]
+                            Html.i [
+                                prop.className "swt:indicator-item fa-solid fa-info-circle fa-lg swt:text-accent"
+                            ]
                             //Daisy.select [
                             Html.select [
                                 prop.className "swt:select swt:join-item swt:min-w-fit"
@@ -118,7 +120,10 @@ module private DataAnnotatorHelper =
                 prop.onClick requestPath
                 prop.className "swt:join swt:flex"
                 prop.children [
-                    Html.button [ prop.className "swt:btn swt:btn-primary swt:join-item"; prop.text "Choose File" ]
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:join-item"
+                        prop.text "Choose File"
+                    ]
                     Html.input [
                         prop.title fileName
                         prop.className "swt:input swt:input-disabled swt:join-item swt:grow swt:w-full"
@@ -130,9 +135,7 @@ module private DataAnnotatorHelper =
                         prop.children [
                             if isLoading then
                                 //Daisy.loading []
-                                Html.div [
-                                    prop.className "swt:loading"
-                                ]
+                                Html.div [ prop.className "swt:loading" ]
 
                         ]
                     ]
@@ -162,6 +165,7 @@ module private DataAnnotatorHelper =
                 prop.text "Open Annotator"
                 prop.onClick mkOpen
             ]
+
     open DataAnnotatorButtons
 
 
@@ -199,94 +203,103 @@ module private DataAnnotatorHelper =
             prop.children [ Html.i [ prop.className "fa-solid fa-square-plus fa-lg" ] ]
         ]
 
-    let CellButton (isHeader: bool, content: string, dtrgt: DataTarget option, state: Set<DataTarget>, setState) =
-        let mkCell: IReactProperty list -> ReactElement =
-            if isHeader then Html.th else Html.td
+    let CellButton
+        (rowIndex: int, columnIndex: int, content: string, dtrgt: DataTarget option, state: Set<DataTarget>, setState)
+        =
 
-        match dtrgt with
-        | Some dtrgt ->
-            let isDirectlyActive = state.Contains dtrgt
+        let isDirectlyActive =
+            dtrgt
+            |> Option.map (fun dtrgt -> state.Contains dtrgt)
+            |> Option.defaultValue false
 
-            let isActive =
-                match dtrgt with
+        let isActive =
+            dtrgt
+            |> Option.map (function
                 | DataTarget.Column _
                 | DataTarget.Row _ -> isDirectlyActive
-                | DataTarget.Cell(ci, ri) -> state.Contains(DataTarget.Column ci) || state.Contains(DataTarget.Row ri)
+                | DataTarget.Cell(ci, ri) -> state.Contains(DataTarget.Column ci) || state.Contains(DataTarget.Row ri))
+            |> Option.defaultValue false
 
-            mkCell [
-                prop.className "swt:p-0"
-                prop.key $"DataAnnotator_{dtrgt.ToReactKey()}"
-                prop.children [
-                    //Daisy.button.button [
-
-                    Html.button [
-                        if isDirectlyActive || isActive then
-                            prop.className [
-                                "swt:w-full swt:rounded-none swt:border-0 swt:relative swt:btn-primary"
-                                if not isHeader then
-                                    "swt:font-light"
-                            ]
-                        else
-                            prop.className [
-                                "swt:w-full swt:rounded-none swt:border-0 swt:relative"
-                                if not isHeader then
-                                    "swt:font-light"
-                            ]
-                        prop.onClick (fun _ ->
-                            if isDirectlyActive then
-                                state.Remove dtrgt
-                            else
-                                state.Add dtrgt
-                            |> setState)
-                        prop.children [
-                            if isDirectlyActive then
-                                IsAddedIcon
-                            Html.text content
-                        ]
-                    ]
+        TableCell.BaseCell(
+            rowIndex,
+            columnIndex,
+            (match dtrgt with
+             | Some dtrgt ->
+                 Html.div [
+                     prop.className "swt:w-full swt:h-full swt:flex swt:items-center swt:px-2 swt:py-1"
+                     prop.onClick (fun _ ->
+                         if isDirectlyActive then
+                             state.Remove dtrgt
+                         else
+                             state.Add dtrgt
+                         |> setState)
+                     prop.children [
+                         if isDirectlyActive then
+                             IsAddedIcon
+                         Html.text content
+                     ]
+                 ]
+             | None -> Html.p "-"),
+            className =
+                String.concat " " [
+                    "swt:w-full swt:h-full"
+                    if isDirectlyActive || isActive then
+                        "swt:bg-primary swt:text-primary-content"
                 ]
-            ]
-        | None -> mkCell []
-        |> List.singleton
+        )
 
     let FileViewComponent (file: DataAnnotator.ParsedDataFile, state, setState) =
         let headerRow =
             file.HeaderRow
             |> Option.map (fun headerRow ->
                 let data = [
-                    (true, "", None, state, setState)
+                    (0, 0, "", None, state, setState)
                     for ci in 0 .. headerRow.Length - 1 do
-                        (true, file.HeaderRow.Value.[ci], (DataTarget.Column ci |> Some), state, setState)
+                        (0, ci, file.HeaderRow.Value.[ci], (DataTarget.Column ci |> Some), state, setState)
                 ]
 
-                {|
-                    data = data
-                    createCell = CellButton
-                |})
+                data)
 
         let bodyRows = [|
             for ri in 0 .. file.BodyRows.Length - 1 do
                 let row = file.BodyRows.[ri]
 
                 [
-                    (true, (string ri), (DataTarget.Row ri |> Some), state, setState)
+                    (ri, 0, (string ri), (DataTarget.Row ri |> Some), state, setState)
                     for ci in 0 .. row.Length - 1 do
-                        (false, row.[ci], (DataTarget.Cell(ci, ri) |> Some), state, setState)
+                        (ri, ci, row.[ci], (DataTarget.Cell(ci, ri) |> Some), state, setState)
                 ]
         |]
 
-        let rowHeight = 57.
+        let colCount = bodyRows |> Array.map (fun row -> row.Length) |> Array.max
+
+        let tableRef = React.useRef<TableHandle> null
+
+        let render =
+            React.memo (
+                (fun tcc ->
+                    if tcc.Index.y = 0 && file.HeaderRow.IsSome then
+                        // Header Row
+                        let content = headerRow.Value.[tcc.Index.x]
+                        CellButton content
+                    else
+                        // Body Row
+                        let input = bodyRows.[tcc.Index.y].[tcc.Index.x]
+                        CellButton input),
+                withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}")
+            )
 
         Html.div [
             prop.className "swt:overflow-hidden swt:flex"
             prop.children [
-                Components.LazyLoadTable.Main(
-                    "DataAnnotatorFileView",
-                    bodyRows,
-                    CellButton,
-                    ?headerRow = headerRow,
-                    rowHeight = rowHeight
-                )
+                Swate.Components.Table.Table(file.BodyRows.Length, colCount, render, (fun _ -> Html.div []), tableRef)
+            // Components.LazyLoadTable.Main(
+            //     "DataAnnotatorFileView",
+            //     bodyRows,
+            //     CellButton,
+            //     ?headerRow = headerRow,
+            //     rowHeight = rowHeight
+            // )
             ]
         ]
 
@@ -430,7 +443,11 @@ type DataAnnotator =
                   DataFile = Some _
                   ParsedFile = Some _
               },
-              true -> DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false)
+              true ->
+                ReactDOM.createPortal (
+                    DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false),
+                    Browser.Dom.document.body
+                ) // Create a portal to render the modal in the body
             | _, _ -> Html.none
         ]
 

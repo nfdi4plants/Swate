@@ -76,21 +76,14 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                     let parent = model.AddBuildingBlockState.TryHeaderOA()
                     let input = model.AddBuildingBlockState.TryBodyOA()
 
-                    Swate.Components.TermSearch.TermSearch(
-                        setter,
+                    Components.TermSearchImplementation.Main(
                         (input |> Option.map _.ToTerm()),
-                        ?parentId = (parent |> Option.map _.TermAccessionShort),
-                        ?portalTermDropdown = portalTermDropdown,
-                        fullwidth = true,
+                        setter,
+                        model,
                         classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
-                        advancedSearch = !^true,
-                        showDetails = true,
-                        disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
-                        parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                        allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
+                        fullwidth = true,
+                        ?parentId = (parent |> Option.map _.TermAccessionShort),
+                        ?portalTermDropdown = portalTermDropdown
                     )
                 ]
             ]
@@ -137,21 +130,15 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                         //selectHeader ui setUi h |> dispatch
                         let input = model.AddBuildingBlockState.TryHeaderOA()
 
-                        Swate.Components.TermSearch.TermSearch(
-                            setter,
+                        Components.TermSearchImplementation.Main(
                             (input |> Option.map _.ToTerm()),
-                            ?portalTermDropdown = portalTermDropdown,
-                            fullwidth = true,
+                            setter,
+                            model,
                             classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
-                            advancedSearch = !^true,
-                            showDetails = true,
-                            disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
-                            parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
+                            fullwidth = true,
+                            ?portalTermDropdown = portalTermDropdown
                         )
+
                     elif state.HeaderCellType.HasIOType() then
                         //Daisy.input [
                         Html.input [

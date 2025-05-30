@@ -89,7 +89,7 @@ type SelectiveImportModal =
                         for columnIndex in 0 .. columns.Length - 1 do
                             Html.th [
                                 Html.label [
-                                    prop.className "swt:join swt:flex swt:flex-row swt:entered swt:gap-2"
+                                    prop.className "swt:flex swt:flex-row swt:gap-2"
                                     prop.children [
                                         SelectiveImportModal.CheckBoxForTableColumnSelection(
                                             columns,
@@ -143,9 +143,8 @@ type SelectiveImportModal =
                         ]
                     ]
                 ]
-                Html.span [
-                    prop.className
-                        "swt:text-warning swt:bg-warning-content swt:flex flex-row swt:gap-2 swt:justify-center swt:items-center"
+                Html.div [
+                    prop.className "swt:alert swt:alert-warning"
                     prop.children [
                         Html.i [ prop.className "fa-solid fa-exclamation-triangle" ]
                         Html.text " Importing metadata will overwrite the current file."
@@ -154,7 +153,7 @@ type SelectiveImportModal =
             ],
             className = [
                 if isActive then
-                    "swt:!bg-info swt:!text-info-content"
+                    "swt:border swt:border-info"
             ]
         )
 
@@ -238,13 +237,14 @@ type SelectiveImportModal =
                         Html.div [
                             prop.className [
                                 "swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
-                                if isActive then
-                                    "swt:text-primary-content"
-                                else
-                                    "swt:text-success"
                             ]
                             prop.children [
-                                Html.span (if isActive then "Preview Select Columns" else "Preview Table")
+                                Html.span (
+                                    if isActive then
+                                        "Preview Select Columns"
+                                    else
+                                        "Preview Table"
+                                )
                                 Html.i [ prop.className "fa-solid fa-magnifying-glass" ]
                             ]
                         ]
@@ -266,7 +266,7 @@ type SelectiveImportModal =
             ],
             className = [
                 if isActive then
-                    "swt:!bg-primary swt:!text-primary-content"
+                    "swt:border swt:border-success"
             ]
         )
 

@@ -36,7 +36,7 @@ import { useCallbackRef, createDisposable } from "../fable_modules/Feliz.2.9.0/.
 import { Impl_createRemoveOptions, Impl_adjustPassive } from "../Util/./React.useListener.fs.js";
 import { createPortal } from "react-dom";
 
-type Modals_$union = 
+type Modals_$union =
     | Modals<0>
     | Modals<1>
 
@@ -152,7 +152,7 @@ function TermSearchResult_addSearchResults(prevResults: TermSearchResult[], newR
     return Array.from(prevResults);
 }
 
-type SearchState_$union = 
+type SearchState_$union =
     | SearchState<0>
     | SearchState<1>
 
@@ -351,7 +351,7 @@ function TermDropdown(termDropdownRef: IRefValue$1<Option<HTMLElement>>, onTermS
     let elems: Iterable<ReactElement>;
     return createElement<any>("ul", createObj(ofArray([["ref", termDropdownRef] as [string, any], ["style", {
         scrollbarGutter: "stable",
-    }] as [string, any], ["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => (equals(state, SearchState_Idle()) ? singleton<string>("swt:hidden") : singleton<string>("swt:min-w-[400px] swt:not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200\n                    swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto swt:list swt:[&_.swt\\:list-row]:!p-1")))))] as [string, any], (elems = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
+    }] as [string, any], ["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => (equals(state, SearchState_Idle()) ? singleton<string>("swt:hidden") : singleton<string>("swt:min-w-[400px] not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200\n                    swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto swt:list swt:[&_.swt\\:list-row]:!p-1")))))] as [string, any], (elems = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => {
         let searchResults: TermSearchResult[], searchResults_1: TermSearchResult[], searchResults_2: TermSearchResult[];
         return (state.tag === /* SearchDone */ 1) ? (((searchResults = state.fields[0], (searchResults.length === 0) && FSharpSet__get_IsEmpty(loading))) ? ((searchResults_1 = state.fields[0], singleton<ReactElement>(NoResultsElement(advancedSearchToggle)))) : ((searchResults_2 = state.fields[0], collect<int32, Iterable<ReactElement>, ReactElement>((i: int32): Iterable<ReactElement> => {
             const res: TermSearchResult = searchResults_2[i];
@@ -1135,7 +1135,7 @@ export function TermSearch(termSearchInputProps: any): ReactElement {
                 return singleton<ReactElement>(defaultOf());
         }
     })), ["children", reactApi.Children.toArray(Array.from(elems))] as [string, any])])));
-    return createElement<any>("div", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(debug_1 ? append<IReactProperty>(singleton<IReactProperty>(["data-testid", "term-search-container"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["data-debug-loading", JSON.stringify(loading)] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["data-debug-searchresults", JSON.stringify(searchResults)] as [string, any]))))) : empty<IReactProperty>(), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => append<string>(singleton<string>("swt:form-control swt:not-prose swt:h-full"), delay_4<string>((): Iterable<string> => (fullwidth_1 ? singleton<string>("swt:w-full") : empty<string>()))))))] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>((props != null) ? map<IReactProperty, IReactProperty>((prop: IReactProperty): IReactProperty => prop, value_66(props)) : empty<IReactProperty>(), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["ref", containerRef] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => {
+    return createElement<any>("div", createObj(toList<IReactProperty>(delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(debug_1 ? append<IReactProperty>(singleton<IReactProperty>(["data-testid", "term-search-container"] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["data-debug-loading", JSON.stringify(loading)] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => singleton<IReactProperty>(["data-debug-searchresults", JSON.stringify(searchResults)] as [string, any]))))) : empty<IReactProperty>(), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["className", join(" ", toList<string>(delay_4<string>((): Iterable<string> => append<string>(singleton<string>("swt:form-control not-prose swt:h-full"), delay_4<string>((): Iterable<string> => (fullwidth_1 ? singleton<string>("swt:w-full") : empty<string>()))))))] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>((props != null) ? map<IReactProperty, IReactProperty>((prop: IReactProperty): IReactProperty => prop, value_66(props)) : empty<IReactProperty>(), delay_4<IReactProperty>((): Iterable<IReactProperty> => append<IReactProperty>(singleton<IReactProperty>(["ref", containerRef] as [string, any]), delay_4<IReactProperty>((): Iterable<IReactProperty> => {
         let elems_3: Iterable<ReactElement>;
         return singleton<IReactProperty>((elems_3 = toList<ReactElement>(delay_4<ReactElement>((): Iterable<ReactElement> => append<ReactElement>((modal != null) ? ((portalModals != null) ? singleton<ReactElement>(createPortal(modalContainer, value_66(portalModals))) : singleton<ReactElement>(modalContainer)) : empty<ReactElement>(), delay_4<ReactElement>((): Iterable<ReactElement> => {
             let elems_2: Iterable<ReactElement>;

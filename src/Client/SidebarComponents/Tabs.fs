@@ -15,7 +15,7 @@ type Tabs =
         //Daisy.tab [
         Html.div [
             prop.className [
-                "swt:tab swt:navigation" // this class does not do anything, but disables <a> styling.
+                "swt:tab swt:navigation"
                 if isActive then
                     "swt:tab-active"
             ]
@@ -43,6 +43,7 @@ type Tabs =
                 Tabs.NavigationTab Routing.SidebarPage.Protocol model dispatch
                 Tabs.NavigationTab Routing.SidebarPage.FilePicker model dispatch
                 Tabs.NavigationTab Routing.SidebarPage.DataAnnotator model dispatch
+                Tabs.NavigationTab Routing.SidebarPage.JsonImport model dispatch
                 Tabs.NavigationTab Routing.SidebarPage.JsonExport model dispatch
             ]
         ]

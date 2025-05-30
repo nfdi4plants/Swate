@@ -38,6 +38,9 @@ type SidebarView =
                 | {
                       SidebarPage = Routing.SidebarPage.JsonExport
                   } -> JsonExporter.Core.FileExporter.Main(model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.JsonImport
+                  } -> Pages.JsonImport.Main(model, dispatch)
             ]
         ]
 

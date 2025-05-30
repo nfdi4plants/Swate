@@ -9,7 +9,10 @@ type Generic =
         host.IsSome && host.Value = Swatehost.ARCitect
 
     static member FieldTitle(title: string) =
-        Html.h5 [ prop.className "swt:text-primary swt:font-semibold swt:mt-6 swt:mb-2"; prop.text title ]
+        Html.h5 [
+            prop.className "swt:text-primary swt:font-semibold swt:mt-6 swt:mb-2"
+            prop.text title
+        ]
 
     static member BoxedField(?title: string, ?description: string, ?content: ReactElement list) =
         //Daisy.card [
@@ -27,7 +30,10 @@ type Generic =
                                 if title.IsSome then
                                     Html.h1 [ prop.className "swt:mt-0"; prop.text title.Value ]
                                 if description.IsSome then
-                                    Html.p [ prop.className "swt:text-sm swt:text-gray-500"; prop.text description.Value ]
+                                    Html.p [
+                                        prop.className "swt:text-sm swt:text-gray-500"
+                                        prop.text description.Value
+                                    ]
                             ]
                         ]
                         if content.IsSome then
@@ -36,10 +42,7 @@ type Generic =
                                 prop.children (
                                     content.Value
                                     |> List.map (fun element ->
-                                        Html.div [
-                                            prop.className "swt:py-2"
-                                            prop.children [ element ]
-                                        ])
+                                        Html.div [ prop.className "swt:py-2"; prop.children [ element ] ])
                                 )
                             ]
                     ]
@@ -48,17 +51,22 @@ type Generic =
         ]
 
     static member Section(children: ReactElement seq) =
-        Html.section [ prop.className "swt:container swt:py-2 swt:lg:py-8 swt:space-y-8"; prop.children children ]
+        Html.section [
+            prop.className "swt:container swt:py-2 swt:lg:py-8 swt:space-y-8"
+            prop.children children
+        ]
 
     static member Collapse (title: ReactElement seq) (content: ReactElement seq) =
         //Daisy.collapse [
         Html.div [
-            prop.className "swt:collapse swt:collapse-plus swt:grow swt:border swt:has-[:checked]:border-transparent swt:has-[:checked]:bg-base-200"
+            prop.className
+                "swt:collapse swt:collapse-plus swt:grow swt:border swt:has-[:checked]:border-transparent swt:has-[:checked]:bg-base-200"
             prop.children [
                 Html.input [ prop.type'.checkbox; prop.className "peer" ]
                 //Daisy.collapseTitle [
                 Html.div [
-                    prop.className "swt:collapse-title swt:after:text-primary swt:@md/main:after:!size-4 swt:@md/main:after:text-xl swt:flex swt:gap-4"
+                    prop.className
+                        "swt:collapse-title swt:after:text-primary swt:@md/main:after:!size-4 swt:@md/main:after:text-xl swt:flex swt:gap-4"
                     prop.children title
                 ]
                 //Daisy.collapseContent [
@@ -74,13 +82,13 @@ type Generic =
             Html.div [
                 Html.h5 title
                 Html.div [
-                    prop.className "swt:not-prose swt:text-sm"
+                    prop.className "not-prose swt:text-sm"
                     prop.children [ Html.span [ prop.text subtitle ] ]
                 ]
             ]
             if count.IsSome then
                 Html.div [
-                    prop.className "swt:not-prose swt:text-center swt:ml-auto"
+                    prop.className "not-prose swt:text-center swt:ml-auto"
                     prop.children [
                         Html.i [ prop.className "fa-solid fa-edit" ]
                         Html.div [ prop.className "swt:text-sm"; prop.text (count.Value) ]

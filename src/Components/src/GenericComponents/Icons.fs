@@ -18,6 +18,9 @@ type Icons =
     static member DataAnnotator() =
         Html.i [ prop.className "fa-solid fa-object-group" ]
 
+    static member FileImport() =
+        Html.i [ prop.className "fa-solid fa-file-import" ]
+
     static member FileExport() =
         Html.i [ prop.className "fa-solid fa-file-export" ]
 

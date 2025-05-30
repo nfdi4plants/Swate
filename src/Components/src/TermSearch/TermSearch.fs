@@ -217,7 +217,7 @@ type TermSearch =
         let isObsolete = term.Term.isObsolete.IsSome && term.Term.isObsolete.Value
         let isDirectedSearch = term.IsDirectedSearchResult
 
-        let activeClasses = "swt:bg-secondary swt:text-secondary-content"
+        let activeClasses = "swt:bg-neutral swt:text-neutral-content"
         let ref = React.useElementRef ()
 
         React.useEffect (
@@ -347,7 +347,7 @@ type TermSearch =
                 if state = SearchState.Idle then
                     "swt:hidden"
                 else
-                    """swt:min-w-[400px] swt:not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200
+                    """swt:min-w-[400px] not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200
                     swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto swt:list swt:[&_.swt\:list-row]:!p-1"""
             ]
 
@@ -1107,7 +1107,7 @@ type TermSearch =
                 prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "swt:form-control swt:not-prose swt:h-full"
+                "not-prose swt:h-full"
                 if fullwidth then
                     "swt:w-full"
             ]

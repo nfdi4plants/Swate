@@ -31,12 +31,15 @@ type SidebarLayout =
             //         style.custom("borderImageSource", $"linear-gradient({colorArr.[if order then 0 else 1]} {100-rndVal}%%, {colorArr.[if order then 1 else 0]})")
             //         order <- not order
             //     ]
-            prop.className "swt:relative swt:flex swt:p-4 swt:animated-border swt:shadow-md swt:gap-4 swt:flex-col" //experimental
+            prop.className "swt:relative swt:flex swt:p-4 animated-border swt:shadow-md swt:gap-4 swt:flex-col" //experimental
             prop.children children
         ]
 
     static member Container(children: ReactElement list) =
-        Html.div [ prop.className "swt:flex swt:flex-col swt:gap-2 swt:py-4"; prop.children children ]
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-2 swt:py-4"
+            prop.children children
+        ]
 
     static member Header(txt: string) =
         Html.h3 [ prop.className "swt:text-lg swt:font-semibold"; prop.text txt ]

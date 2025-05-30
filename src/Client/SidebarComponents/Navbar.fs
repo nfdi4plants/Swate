@@ -209,10 +209,7 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
         prop.className "swt:modal swt:modal-open"
         prop.children [
             //Daisy.modalBackdrop [ prop.onClick (fun _ -> closeModal ()) ]
-            Html.div [
-                prop.className "swt:modal-backdrop"
-                prop.onClick (fun _ -> closeModal ())
-            ]
+            Html.div [ prop.className "swt:modal-backdrop"; prop.onClick (fun _ -> closeModal ()) ]
             //Daisy.modalBox.div [
             Html.div [
                 prop.className "swt:modal-box swt:overflow-y-auto swt:h-[100%]"
@@ -231,17 +228,13 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
     [
         QuickAccessButton.QuickAccessButton(
             "Create Metadata",
-            React.fragment [
-                Icons.CreateMetadata()
-            ],
+            React.fragment [ Icons.CreateMetadata() ],
             toggleMetdadataModal
         )
 
         QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
-            React.fragment [
-                Icons.CreateAnnotationTable()
-            ],
+            React.fragment [ Icons.CreateAnnotationTable() ],
             (fun e ->
                 e.preventDefault ()
                 let e = e :?> Browser.Types.MouseEvent
@@ -269,16 +262,12 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         )
         QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
-            React.fragment [
-                Icons.RemoveBuildingBlock()
-            ],
+            React.fragment [ Icons.RemoveBuildingBlock() ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.QuickAccessButton(
             "Get Building Block Information",
-            React.fragment [
-                Icons.BuildingBlockInformation()
-            ],
+            React.fragment [ Icons.BuildingBlockInformation() ],
             (fun _ ->
                 promise {
                     let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails ()
@@ -313,15 +302,7 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
     Components.BaseNavbar.Glow [
         if state.ExcelMetadataModalActive then
             SelectModalDialog toggleMetdadataModal model dispatch
-        Html.div [
-            prop.ariaLabel "logo"
-            prop.children [
-                Html.img [
-                    prop.style [ style.maxHeight (length.perc 100); style.width 100 ]
-                    prop.src @"assets/Swate_logo_for_excel.svg"
-                ]
-            ]
-        ]
+        Components.Logo.Main()
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             Daisy.navbarCenter [ QuickAccessList toggleMetdadataModal model dispatch ]
@@ -335,12 +316,12 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
                 prop.className "swt:ml-auto"
                 prop.children [
                     Components.DeleteButton(
+                        className = "swt:btn-sm swt:btn-error",
                         props = [
                             prop.onClick (fun _ ->
                                 Messages.PageState.UpdateShowSidebar(not model.PageState.ShowSideBar)
                                 |> Messages.PageStateMsg
                                 |> dispatch)
-                            prop.className "swt:btn-sm swt:btn-glass"
                         ]
                     )
                 ]
