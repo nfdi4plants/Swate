@@ -78,10 +78,12 @@
 
 @plugin "daisyui/theme" {
   name: "planti";
+  default: false;
+  prefersdark: false;
   color-scheme: "dark";
-  --color-base-100: oklch(27% 0.046 192.524);
+  --color-base-100: oklch(43% 0.078 188.216);
   --color-base-200: oklch(38% 0.063 188.416);
-  --color-base-300: oklch(43% 0.078 188.216);
+  --color-base-300: oklch(27% 0.046 192.524);
   --color-base-content: oklch(95% 0.051 180.801);
   --color-primary: oklch(84% 0.143 164.978);
   --color-primary-content: oklch(0% 0 0);
@@ -108,7 +110,6 @@
   --depth: 1;
   --noise: 0;
 }
-
 
 @plugin "daisyui/theme" {
   name: "viola";
