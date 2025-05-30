@@ -110,6 +110,42 @@
 }
 
 
+@plugin "daisyui/theme" {
+  name: "viola";
+  default: false;
+  prefersdark: false;
+  color-scheme: "dark";
+  --color-base-100: oklch(43% 0.232 292.759);
+  --color-base-200: oklch(38% 0.189 293.745);
+  --color-base-300: oklch(28% 0.141 291.089);
+  --color-base-content: oklch(89% 0.057 293.283);
+  --color-primary: oklch(69% 0.17 162.48);
+  --color-primary-content: oklch(0% 0 0);
+  --color-secondary: oklch(74% 0.238 322.16);
+  --color-secondary-content: oklch(0% 0 0);
+  --color-accent: oklch(80% 0.114 19.571);
+  --color-accent-content: oklch(0% 0 0);
+  --color-neutral: oklch(26% 0 0);
+  --color-neutral-content: oklch(100% 0 0);
+  --color-info: oklch(54% 0.245 262.881);
+  --color-info-content: oklch(95% 0.045 203.388);
+  --color-success: oklch(72% 0.219 149.579);
+  --color-success-content: oklch(0% 0 0);
+  --color-warning: oklch(66% 0.179 58.318);
+  --color-warning-content: oklch(98% 0.016 73.684);
+  --color-error: oklch(63% 0.237 25.331);
+  --color-error-content: oklch(14% 0.004 49.25);
+  --radius-selector: 0.25rem;
+  --radius-field: 1rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 2px;
+  --depth: 1;
+  --noise: 1;
+}
+
+
 @utility container {
   margin-inline: auto;
   padding-inline: 1rem;
@@ -185,4 +221,11 @@
     .animated-border:nth-of-type(4)::before {
         animation-delay: 6s;
     }
+}
+
+@layer components {
+  .table-bordered th,
+  .table-bordered td {
+    @apply swt:border swt:border-white swt:text-left swt:border-collapse;
+  }
 }
