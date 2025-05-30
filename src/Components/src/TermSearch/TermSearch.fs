@@ -236,7 +236,7 @@ type TermSearch =
             prop.ref ref
             prop.className [
                 "swt:list-row swt:items-center swt:cursor-pointer swt:min-w-0 swt:max-w-full swt:w-full /
-                swt:hover:bg-secondary swt:hover:text-secondary-content swt:transition-colors /
+                swt:hover:bg-neutral swt:hover:text-neutral-content swt:transition-colors /
                 swt:rounded-none"
                 if isActive.IsSome && isActive.Value then
                     activeClasses
@@ -270,16 +270,22 @@ type TermSearch =
 
                     prop.text name
                 ]
-                Html.p [
+                Html.div [
                     prop.className "swt:list-col-wrap swt:text-xs swt:text-wrap"
-                    prop.text (Option.defaultValue "<no-description>" term.Term.description)
+                    prop.children [
+                        Html.p (Option.defaultValue "<no-description>" term.Term.description)
+                        if term.Term.data.IsSome then
+                            Html.pre [
+                                Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
+                            ]
+                    ]
                 // prop.children [
                 //     Html.p [
                 //     ]
                 //     if term.Term.data.IsSome then
-                //         Html.pre [
-                //             Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
-                //         ]
+                // Html.pre [
+                //     Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
+                // ]
                 // ]
                 ]
                 Html.a [

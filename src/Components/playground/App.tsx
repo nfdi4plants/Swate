@@ -3,10 +3,11 @@ import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 import {Entry as Table} from '../src/Table/Table.fs.ts';
 import {Entry as AnnotationTable} from '../src/Table/AnnotationTable.fs.ts';
 import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
-import { Menu } from "./NativeContextMenu";
+import {TIBApi} from '../src/Util/Api.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
+  const [term2, setTerm2] = React.useState(undefined);
   return <Fragment>
     <h2 className='swt:text-3xl'>TermSearch</h2>
     {/* <TermSearch
@@ -15,14 +16,44 @@ function TermSearchContainer() {
       showDetails
       debug={true}
     /> */}
-    <TermSearch
-      onTermSelect={(term) => setTerm(term as Term | undefined)}
-      term={term}
-      parentId="MS:1000031"
-      showDetails
-      debug={true}
-      advancedSearch
-    />
+    <div className='swt:max-w-2xl swt:flex swt:flex-col swt:gap-4'>
+      <div>
+        <label className='swt:text-gray-200'>
+          TIB Search
+        </label>
+        <TermSearch
+          onTermSelect={(term) => setTerm2(term as Term | undefined)}
+          term={term2}
+          disableDefaultSearch
+          disableDefaultParentSearch
+          disableDefaultAllChildrenSearch
+          showDetails
+          advancedSearch
+          termSearchQueries={[
+            ["tib_search", (query) => TIBApi.defaultSearch(query, 10, "DataPLANT")]
+          ]}
+          parentSearchQueries={[
+            ["tib_search", ([parentId, query]) => TIBApi.searchChildrenOf(query, parentId, 10, "DataPLANT")]
+          ]}
+          allChildrenSearchQueries={[
+            ["tib_search", (parentId) => TIBApi.searchAllChildrenOf(parentId, 500, "DataPLANT")]
+          ]}
+        />
+      </div>
+      <div>
+        <label className='swt:text-gray-200'>
+          Term Search
+        </label>
+        <TermSearch
+          onTermSelect={(term) => setTerm(term as Term | undefined)}
+          term={term}
+          parentId="MS:1000031"
+          showDetails
+          debug={true}
+          advancedSearch
+        />
+      </div>
+    </div>
   </Fragment>
 }
 
