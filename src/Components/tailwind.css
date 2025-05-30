@@ -1,6 +1,10 @@
 @import "tailwindcss" prefix(swt);
+@source "**/*.fs.ts";
 @plugin "@tailwindcss/typography";
-@plugin "daisyui" { }
+
+@plugin "daisyui" {
+    themes: all;
+}
 
 @plugin "daisyui/theme" {
   name: "finster";
@@ -37,8 +41,6 @@
   --noise: 0;
 }
 
-
-
 @plugin "daisyui/theme" {
   name: "sunrise";
   default: true;
@@ -74,6 +76,38 @@
   --noise: 0;
 }
 
+@plugin "daisyui/theme" {
+  name: "planti";
+  color-scheme: "dark";
+  --color-base-100: oklch(27% 0.046 192.524);
+  --color-base-200: oklch(38% 0.063 188.416);
+  --color-base-300: oklch(43% 0.078 188.216);
+  --color-base-content: oklch(95% 0.051 180.801);
+  --color-primary: oklch(84% 0.143 164.978);
+  --color-primary-content: oklch(0% 0 0);
+  --color-secondary: oklch(83% 0.128 66.29);
+  --color-secondary-content: oklch(0% 0 0);
+  --color-accent: oklch(80% 0.105 251.813);
+  --color-accent-content: oklch(0% 0 0);
+  --color-neutral: oklch(51% 0.096 186.391);
+  --color-neutral-content: oklch(98% 0.014 180.72);
+  --color-info: oklch(54% 0.245 262.881);
+  --color-info-content: oklch(100% 0 0);
+  --color-success: oklch(62% 0.194 149.214);
+  --color-success-content: oklch(100% 0 0);
+  --color-warning: oklch(66% 0.179 58.318);
+  --color-warning-content: oklch(100% 0 0);
+  --color-error: oklch(57% 0.245 27.325);
+  --color-error-content: oklch(100% 0 0);
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0rem;
+  --size-selector: 0.21875rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
 
 
 @utility container {
@@ -104,4 +138,51 @@
     padding-inline: 6rem;
     max-width: 1536px;
   }
+}
+
+
+@keyframes border-gradient-flow {
+    0% {
+        background-position: 50% 0%;
+    }
+    50% {
+        background-position: 50% 100%;
+    }
+    100% {
+        background-position: 50% 0%;
+    }
+}
+
+@layer utilities {
+    .animated-border::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: -1; /* Place it behind the content */
+      padding: 2px; /* Thickness of the border */
+      border-radius: 8px; /* Optional rounded corners */
+      background: linear-gradient(180deg, var(--color-primary), var(--color-neutral));
+      /* background: red; */
+      background-size: 200% 200%;
+      animation: border-gradient-flow 8s ease-in-out infinite;
+    }
+
+        /* Apply offsets to each container based on its order */
+    .animated-border:nth-of-type(1)::before {
+        animation-delay: 0s;
+    }
+
+    .animated-border:nth-of-type(2)::before {
+        animation-delay: 3s; /* Offset to create continuous flow */
+    }
+
+    .animated-border:nth-of-type(3)::before {
+        animation-delay: 4s;
+    }
+
+    .animated-border:nth-of-type(4)::before {
+        animation-delay: 6s;
+    }
 }
