@@ -10,14 +10,14 @@ type NavbarBurger =
         Html.label [
             prop.onClick toggle
             prop.className [
-                "swap swap-rotate text-white"
+                "swt:swap swt:swap-rotate swt:text-white"
                 if isOpen then
-                    "swap-active"
+                    "swt:swap-active"
             ]
             prop.children [
                 // hamburger icon
                 Svg.svg [
-                    svg.className "swap-off fill-current size-6"
+                    svg.className "swt:swap-off swt:fill-current swt:size-6"
                     svg.xmlns "http://www.w3.org/2000/svg"
                     svg.viewBox (0, 0, 512, 512)
                     svg.children [
@@ -27,7 +27,7 @@ type NavbarBurger =
 
                 // close icon
                 Svg.svg [
-                    svg.className "swap-on fill-current size-6"
+                    svg.className "swt:swap-on swt:fill-current swt:size-6"
                     svg.xmlns "http://www.w3.org/2000/svg"
                     svg.viewBox (0, 0, 512, 512)
                     svg.children [
@@ -44,7 +44,7 @@ type NavbarBurger =
         Html.li [
             Html.a [
                 props
-                prop.className "flex flex-row justify-between items-center"
+                prop.className "swt:flex swt:flex-row swt:justify-between swt:items-center"
                 prop.children [ Html.span [ prop.text text ]; icon ]
             ]
         ]
@@ -84,7 +84,7 @@ type NavbarBurger =
                 NavbarBurger.DropdownItem("Docs", Icons.Docs(), prop.href Swate.Components.Shared.URLs.SWATE_WIKI)
                 NavbarBurger.DropdownItem("Contact", Icons.Contact(), prop.href Swate.Components.Shared.URLs.CONTACT)
             ],
-            style = Style.init "dropdown-end flex text-base-content"
+            style = Style.init "swt:dropdown-end swt:flex swt:text-base-content"
         )
 
     [<ReactComponent>]

@@ -3,9 +3,51 @@ namespace Swate.Components
 open Fable.Core
 open Feliz
 
+type DaisyUIColors =
+    | Primary
+    | Secondary
+    | Accent
+    | Info
+    | Success
+    | Warning
+    | Error
+
+type Context<'T> = { data: 'T; setData: 'T -> unit }
+
+[<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
+type Theme =
+    | Auto
+    | Sunrise
+    | Finster
+    | Planti
+    | Viola
+
+module Theme =
+    let toString (theme: Theme) =
+        match theme with
+        | Auto -> "auto"
+        | Sunrise -> "light"
+        | Finster -> "dark"
+        | Planti -> "planti"
+        | Viola -> "viola"
+
+    let fromString (theme: string) =
+        match theme with
+        | "auto" -> Auto
+        | "light" -> Sunrise
+        | "dark" -> Finster
+        | "planti" -> Planti
+        | "viola" -> Viola
+        | _ -> Auto // Default to Auto if the string does not match any known theme
+
 type CellCoordinate = {| x: int; y: int |}
 
-type CellCoordinateRange = {| yStart: int; yEnd: int; xStart: int; xEnd: int|}
+type CellCoordinateRange = {|
+    yStart: int
+    yEnd: int
+    xStart: int
+    xEnd: int
+|}
 
 type TableCellController = {
     Index: CellCoordinate
@@ -16,22 +58,29 @@ type TableCellController = {
     onBlur: Browser.Types.FocusEvent -> unit
     onClick: Browser.Types.MouseEvent -> unit
 } with
-    static member init(index, isActive, isSelected, isOrigin, onKeyDown, onBlur, onClick) =
-        {
-            Index = index
-            IsActive = isActive
-            IsSelected = isSelected
-            IsOrigin = isOrigin
-            onKeyDown = onKeyDown
-            onBlur = onBlur
-            onClick = onClick
-        }
+
+    static member init(index, isActive, isSelected, isOrigin, onKeyDown, onBlur, onClick) = {
+        Index = index
+        IsActive = isActive
+        IsSelected = isSelected
+        IsOrigin = isOrigin
+        onKeyDown = onKeyDown
+        onBlur = onBlur
+        onClick = onClick
+    }
 
 [<AllowNullLiteral>]
 [<Global>]
 type SelectHandle
     [<ParamObjectAttribute; Emit("$0")>]
-    (contains: CellCoordinate -> bool, selectAt: (CellCoordinate * bool) -> unit, clear: unit -> unit, getSelectedCellRange, getSelectedCells, getCount) =
+    (
+        contains: CellCoordinate -> bool,
+        selectAt: (CellCoordinate * bool) -> unit,
+        clear: unit -> unit,
+        getSelectedCellRange,
+        getSelectedCells,
+        getCount
+    ) =
     member val contains: CellCoordinate -> bool = contains with get, set
     member val selectAt: (CellCoordinate * bool) -> unit = selectAt with get, set
     member val clear: unit -> unit = clear with get, set
@@ -124,51 +173,39 @@ module Term =
         let comments =
             ResizeArray [
                 if term.description.IsSome then
-                    Comment(
-                        ConvertLiterals.Description,
-                        JS.JSON.stringify term.description.Value
-                    )
+                    Comment(ConvertLiterals.Description, JS.JSON.stringify term.description.Value)
                 if term.data.IsSome then
-                    Comment(
-                        ConvertLiterals.Data,
-                        JS.JSON.stringify term.data.Value
-                    )
+                    Comment(ConvertLiterals.Data, JS.JSON.stringify term.data.Value)
                 if term.source.IsSome then
-                    Comment(
-                        ConvertLiterals.Source,
-                        JS.JSON.stringify term.source.Value
-                    )
+                    Comment(ConvertLiterals.Source, JS.JSON.stringify term.source.Value)
                 if term.isObsolete.IsSome then
-                    Comment(
-                        ConvertLiterals.IsObsolete,
-                        JS.JSON.stringify term.isObsolete.Value
-                    )
+                    Comment(ConvertLiterals.IsObsolete, JS.JSON.stringify term.isObsolete.Value)
             ]
             |> Option.whereNot Seq.isEmpty
-        ARCtrl.OntologyAnnotation(
-            ?name = term.name,
-            ?tsr = term.source,
-            ?tan = term.id,
-            ?comments = comments
-        )
+
+        ARCtrl.OntologyAnnotation(?name = term.name, ?tsr = term.source, ?tan = term.id, ?comments = comments)
 
     let fromOntologyAnnotation (oa: ARCtrl.OntologyAnnotation) =
         let description =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Description)
-            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+            |> Option.map (fun c -> Json.parseAs<string> (c.Value.Value))
+
         let data =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Data)
-            |> Option.map (fun c -> Json.parseAs<obj>(c.Value.Value))
+            |> Option.map (fun c -> Json.parseAs<obj> (c.Value.Value))
+
         let source =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Source)
-            |> Option.map (fun c -> Json.parseAs<string>(c.Value.Value))
+            |> Option.map (fun c -> Json.parseAs<string> (c.Value.Value))
+
         let isObsolete =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.IsObsolete)
-            |> Option.map (fun c -> Json.parseAs<bool>(c.Value.Value))
+            |> Option.map (fun c -> Json.parseAs<bool> (c.Value.Value))
+
         Term(
             ?name = oa.Name,
             ?id = oa.TermAccessionNumber,
@@ -208,7 +245,8 @@ type AdvancedSearch
 [<Global>]
 type PortalTermDropdown
     [<ParamObjectAttribute; Emit("$0")>]
-    (portal: Browser.Types.HTMLElement, renderer: Browser.Types.ClientRect -> ReactElement -> Fable.React.ReactElement) =
+    (portal: Browser.Types.HTMLElement, renderer: Browser.Types.ClientRect -> ReactElement -> Fable.React.ReactElement)
+    =
     member val portal = portal with get, set
     member val renderer = renderer with get, set
 

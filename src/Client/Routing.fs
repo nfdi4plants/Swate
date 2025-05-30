@@ -10,6 +10,7 @@ type SidebarPage =
     | TermSearch
     | FilePicker
     | Protocol
+    | JsonImport
     | JsonExport
     | DataAnnotator
 
@@ -19,6 +20,7 @@ type SidebarPage =
         | TermSearch -> "Terms"
         | FilePicker -> "File Picker"
         | Protocol -> "Templates"
+        | JsonImport -> "Json Import"
         | JsonExport -> "Json Export"
         | DataAnnotator -> "Data Annotator"
 
@@ -30,6 +32,7 @@ type SidebarPage =
         | TermSearch -> createElem <| Icons.Terms()
         | BuildingBlock -> createElem <| Icons.BuildingBlock()
         | Protocol -> createElem <| Icons.Templates()
+        | JsonImport -> createElem <| Icons.FileImport()
         | JsonExport -> createElem <| Icons.FileExport()
         | FilePicker -> createElem <| Icons.FilePicker()
         | DataAnnotator -> createElem <| Icons.DataAnnotator()

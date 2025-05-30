@@ -14,21 +14,27 @@ type Error =
     static member Main(error: exn, dispatch) =
         let closeMsg = Util.RMV_MODAL dispatch
 
-        Daisy.modal.div [
-            modal.active
+        //Daisy.modal.div [
+        Html.div [
+            prop.className "swt:modal swt:modal-open"
             prop.children [
-                Daisy.modalBackdrop [ prop.onClick closeMsg ]
-                Daisy.modalBox.div [
-                    prop.className "!p-0"
+                //Daisy.modalBackdrop [ prop.onClick closeMsg ]
+                Html.div [
+                    prop.className "swt:modal-backdrop"
+                    prop.onClick closeMsg
+                ]
+                //Daisy.modalBox.div [
+                Html.div [
+                    prop.className "swt:modal-box swt:!p-0"
                     prop.style [
                         style.width (length.percent 90)
                         style.maxHeight (length.percent 80)
                         style.overflow.auto
                     ]
                     prop.children [
-                        Daisy.alert [
-                            prop.className "size-full"
-                            alert.error
+                        //Daisy.alert [
+                        Html.div [
+                            prop.className "swt:alert swt:alert-error swt:size-full"
                             prop.children [
                                 Components.DeleteButton(props = [ prop.onClick closeMsg ])
                                 Html.span (error.GetPropagatedError())

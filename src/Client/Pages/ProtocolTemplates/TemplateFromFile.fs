@@ -81,9 +81,10 @@ type TemplateFromFile =
     static member private FileUploadButton
         (state: TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)
         =
-        Daisy.file [
-            file.bordered
-            prop.className "w-full"
+        //Daisy.file [
+        Html.input  [
+            prop.type'.file
+            prop.className "swt:file-input swt:file-input-neutral swt:w-full"
             prop.onChange (fun (ev: File list) -> Helper.upload state setState dispatch ev)
             prop.onClick (fun e ->
                 log e
@@ -112,8 +113,9 @@ type TemplateFromFile =
 
         SidebarComponents.SidebarLayout.LogicContainer [
             Html.div [
-                Daisy.join [
-                    prop.className "w-full"
+                //Daisy.join [
+                Html.div [
+                    prop.className "swt:join swt:w-full"
                     prop.children [
                         JsonExportFormat.ROCrate
                         |> fun jef ->
@@ -152,8 +154,9 @@ type TemplateFromFile =
             ]
 
             Html.div [
-                Daisy.join [
-                    prop.className "w-full"
+                //Daisy.join [
+                Html.div [
+                    prop.className "swt:join swt:w-full"
                     prop.children [
                         ArcFilesDiscriminate.Assay
                         |> fun ft ->

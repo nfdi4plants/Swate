@@ -12,7 +12,7 @@ open Feliz.DaisyUI
 type SidebarView =
     static member private content (model: Model) (dispatch: Msg -> unit) =
         Html.div [
-            prop.className "grow overflow-y-auto"
+            prop.className "swt:grow swt:overflow-y-auto"
             prop.children [
                 match model.PageState with
                 | {
@@ -24,12 +24,12 @@ type SidebarView =
                   } -> TermSearch.Main(model, dispatch)
 
                 | {
-                      SidebarPage = Routing.SidebarPage.FilePicker
-                  } -> Pages.FilePicker.Sidebar(model, dispatch)
-
-                | {
                       SidebarPage = Routing.SidebarPage.Protocol
                   } -> Protocol.Templates.Main(model, dispatch)
+
+                | {
+                      SidebarPage = Routing.SidebarPage.FilePicker
+                  } -> Pages.FilePicker.Sidebar(model, dispatch)
 
                 | {
                       SidebarPage = Routing.SidebarPage.DataAnnotator
@@ -38,6 +38,9 @@ type SidebarView =
                 | {
                       SidebarPage = Routing.SidebarPage.JsonExport
                   } -> JsonExporter.Core.FileExporter.Main(model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.JsonImport
+                  } -> Pages.JsonImport.Main(model, dispatch)
             ]
         ]
 
@@ -46,12 +49,12 @@ type SidebarView =
     static member Main(model: Model, dispatch: Msg -> unit) =
         Html.div [
             prop.className
-                "min-h-full flex flex-col bg-base-300 min-w-[500px] xl:min-w-[600px] overflow-y-auto h-40 [scrollbar-gutter:stable] @container/sidebar"
+                "swt:min-h-full swt:flex swt:flex-col swt:bg-base-300 swt:min-w-[500px] swt:xl:min-w-[600px] swt:h-40 swt:overflow-y-auto swt:overflow-x-hidden swt:[scrollbar-gutter:stable] swt:@container/sidebar"
             prop.children [
 
                 SidebarComponents.Navbar.NavbarComponent model dispatch
                 Html.div [
-                    prop.className "pl-4 pr-4 flex flex-col grow"
+                    prop.className "swt:pl-4 swt:pr-4 swt:flex swt:flex-col swt:grow"
                     prop.children [
                         SidebarComponents.Tabs.Main model dispatch
 

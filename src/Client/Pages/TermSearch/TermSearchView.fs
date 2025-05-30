@@ -23,16 +23,18 @@ open Fable.Core.JsInterop
 let private addButton (model: Model, dispatch) =
 
     Html.div [
-        prop.className "flex flex-row justify-center"
+        prop.className "swt:flex swt:flex-row swt:justify-center"
         prop.children [
-            Daisy.button.a [
+            //Daisy.button.a [
+            Html.button [
                 let hasTerm = model.TermSearchState.SelectedTerm.IsSome
 
-                if hasTerm then
-                    button.success
-                //Button.IsActive true
-                else
-                    button.error
+                prop.className [
+                    "swt:btn"
+                    if hasTerm then "swt:btn-success" else "swt:btn-error"
+                ]
+
+                if not hasTerm then
                     prop.disabled true
 
                 prop.onClick (fun _ ->
@@ -91,7 +93,7 @@ let Main (model: Model, dispatch) =
         | Some Swatehost.Excel ->
             fun _ ->
                 promise {
-                    let! parent = OfficeInterop.Core.Main.getParentTerm()
+                    let! parent = OfficeInterop.Core.Main.getParentTerm ()
                     TermSearch.UpdateParentTerm parent |> TermSearchMsg |> dispatch
                 }
                 |> Promise.start
@@ -104,21 +106,14 @@ let Main (model: Model, dispatch) =
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            Swate.Components.TermSearch.TermSearch(
-                setTerm,
+            Components.TermSearchImplementation.Main(
                 (model.TermSearchState.SelectedTerm |> Option.map _.ToTerm()),
-                ?parentId = (model.TermSearchState.ParentTerm |> Option.map _.TermAccessionShort),
-                advancedSearch = !^true,
-                ?onFocus = excelGetParentTerm,
+                setTerm,
+                model,
                 autoFocus = true,
-                classNames = Swate.Components.TermSearchStyle(!^"input-lg"),
-                disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
-                parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch,
-                showDetails = true
+                ?onFocus = excelGetParentTerm,
+                classNames = Swate.Components.TermSearchStyle(!^"swt:input-lg"),
+                ?parentId = (model.TermSearchState.ParentTerm |> Option.map _.TermAccessionShort)
             )
             addButton (model, dispatch)
         ]

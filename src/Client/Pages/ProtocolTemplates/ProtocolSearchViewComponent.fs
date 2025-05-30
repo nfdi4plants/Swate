@@ -83,19 +83,20 @@ module ComponentAux =
             Html.p $"Search by {state.Searchfield.toNameRdb}"
             let hasSearchAddon = state.Searchfield <> SearchFields.Name
 
-            Daisy.join [
-                prop.className "w-full"
+            //Daisy.join [
+            Html.div [
+                prop.className "swt:join swt:w-full"
                 prop.children [
                     if hasSearchAddon then
-                        Daisy.button.a [
-                            join.item
+                        //Daisy.button.a [
+                        Html.button [
+                            prop.className "swt:btn swt:btn-disabled swt:join-item swt:w-full swt:!text-base-content swt:!border-primary"
                             prop.readOnly true
-                            button.disabled
                             prop.text state.Searchfield.toStr
-                            prop.className "!text-base-content !border-primary"
                         ]
-                    Daisy.label [
-                        prop.className "join-item input input-bordered input-sm input-primary flex items-center w-full"
+                    //Daisy.label [
+                    Html.label [
+                        prop.className "swt:label swt:join-item swt:input swt:input-sm swt:input-primary swt:flex swt:items-center swt:w-full"
                         prop.children [
                             Html.input [
                                 prop.placeholder $".. {state.Searchfield.toNameRdb}"
@@ -137,12 +138,14 @@ module ComponentAux =
             isRemovable: bool,
             onclick: (Browser.Types.MouseEvent -> unit) option
         ) =
-        Daisy.badge [
+        //Daisy.badge [
+        Html.div [
             color
             prop.className [
+                "swt:badge"
                 if onclick.IsSome then
-                    "cursor-pointer"
-                "text-nowrap"
+                    "swt:cursor-pointer"
+                "swt:text-nowrap"
             ]
             if onclick.IsSome then
                 prop.onClick (onclick.Value)
@@ -152,7 +155,7 @@ module ComponentAux =
                         svg.xmlns "http://www.w3.org/2000/svg"
                         svg.fill "none"
                         svg.viewBox (0, 0, 24, 24)
-                        svg.className "inline-block h-4 w-4 stroke-current"
+                        svg.className "swt:inline-block swt:h-4 swt:w-4 swt:stroke-current"
                         svg.children [
                             Svg.path [
                                 svg.strokeLineCap "round"
@@ -176,9 +179,13 @@ module ComponentAux =
         ) =
         React.fragment [
             if title.IsSome then
-                Daisy.divider title.Value
+                //Daisy.divider title.Value
+                Html.div [
+                    prop.className "swt:divider"
+                    prop.text title.Value
+                ]
             Html.div [
-                prop.className "flex flex-wrap gap-2"
+                prop.className "swt:flex swt:flex-wrap swt:gap-2"
                 prop.children [
                     for tagSuggestion in tagList do
                         Tag(
@@ -232,10 +239,11 @@ module ComponentAux =
         Html.div [
             Html.p "Search for tags"
             Html.div [
-                prop.className "relative"
+                prop.className "swt:relative"
                 prop.children [
-                    Daisy.label [
-                        prop.className "input input-bordered input-sm input-primary flex items-center"
+                    //Daisy.label [
+                    Html.label [
+                        prop.className "swt:label swt:input swt:input-sm swt:input-primary swt:flex swt:w-full swt:items-center"
                         prop.children [
                             Html.input [
                                 prop.placeholder ".. protocol tag"
@@ -252,7 +260,7 @@ module ComponentAux =
                         ]
                     ]
                     Html.div [
-                        prop.className "absolute bg-base-300 shadow-lg rounded-md w-full z-10 p-2 text-base-content"
+                        prop.className "swt:absolute swt:bg-base-300 swt:shadow-lg rounded-md swt:w-full swt:z-10 swt:p-2 swt:text-base-content"
                         prop.style [
                             if hitTagList |> Array.isEmpty && hitErTagList |> Array.isEmpty then
                                 style.display.none
@@ -311,11 +319,9 @@ module ComponentAux =
 
         Html.div [
             Html.p "Select community"
-            Daisy.select [
-                prop.className "w-full"
-                select.sm
-                select.bordered
-                select.primary
+            //Daisy.select [
+            Html.select [
+                prop.className "swt:select swt:select-sm swt:select-primary swt:w-full"
                 prop.value (state.CommunityFilter.ToStringRdb())
                 prop.onChange (fun (e: Browser.Types.Event) ->
                     let filter = Model.Protocol.CommunityFilter.fromString e.target?value
@@ -337,9 +343,9 @@ module ComponentAux =
         Html.div [
             prop.style [ style.marginLeft length.auto ]
             prop.children [
-                Daisy.button.button [
-                    button.sm
-                    prop.onClick (fun _ -> setFilter (not tagIsFilterAnd))
+                //Daisy.button.button [
+                Html.button [
+                    prop.className "swt:btn swt:btn-sm"
                     prop.title (
                         if tagIsFilterAnd then
                             "Templates contain all tags."
@@ -347,16 +353,17 @@ module ComponentAux =
                             "Templates contain at least one tag."
                     )
                     prop.text (if tagIsFilterAnd then "And" else "Or")
+                    prop.onClick (fun _ -> setFilter (not tagIsFilterAnd))
                 ]
             ]
         ]
 
     let TagDisplayField (model: Model) (state: TemplateFilterConfig) (setState: TemplateFilterConfig -> unit) =
         Html.div [
-            prop.className "flex"
+            prop.className "swt:flex"
             prop.children [
                 Html.div [
-                    prop.className "flex flex-wrap gap-2"
+                    prop.className "swt:flex swt:flex-wrap swt:gap-2"
                     prop.children [
                         for selectedTag in state.ProtocolFilterErTags do
                             let rmv =
@@ -387,15 +394,26 @@ module ComponentAux =
             ]
         ]
 
-    let curatedTag = Daisy.badge [ prop.text "curated"; badge.primary ]
-    let communitytag = Daisy.badge [ prop.text "community"; badge.warning ]
+    let curatedTag =
+        //Daisy.badge [
+        Html.div [
+            prop.className "swt:badge swt:badge-primary"
+            prop.text "curated"
+        ]
+    let communitytag =
+        //Daisy.badge [
+        Html.div [
+            prop.className "swt:badge swt:badge-warning"
+            prop.text "community"
+        ]
 
     let curatedCommunityTag =
-        Daisy.badge [
+        //Daisy.badge [
+        Html.div [
+            prop.className "swt:badge swt:badge-success"
             prop.style [
                 style.custom ("background", "linear-gradient(90deg, rgba(31,194,167,1) 50%, rgba(255,192,0,1) 50%)")
             ]
-            badge.success
             prop.children [
                 Html.span [ prop.style [ style.marginRight (length.em 0.75) ]; prop.text "cur" ]
                 Html.span [
@@ -429,9 +447,9 @@ module ComponentAux =
             Html.tr [
                 prop.key $"{i}_{template.Id}"
                 prop.className [
-                    "base-content cursor-pointer hover:bg-base-200"
+                    "swt:base-content swt:cursor-pointer swt:hover:bg-base-200"
                     if List.contains template model.ProtocolState.TemplatesSelected then
-                        "bg-base-200 shadow-lg"
+                        "swt:bg-base-200 swt:shadow-lg"
 
                 ]
                 prop.onClick (fun e ->
@@ -476,7 +494,7 @@ module ComponentAux =
                     prop.colSpan 4
                     prop.children [
                         Html.div [
-                            prop.className "prose max-w-none p-3 flex flex-col gap-2"
+                            prop.className "swt:prose swt:max-w-none swt:p-3 swt:flex swt:flex-col swt:gap-2"
                             prop.children [
                                 Html.div [
                                     Html.div template.Description
@@ -502,7 +520,7 @@ module ComponentAux =
                             ]
                         ]
                         Html.div [
-                            prop.className "flex justify-center gap-2"
+                            prop.className "swt:flex swt:justify-center swt:gap-2"
                             prop.children [
                                 if List.contains template model.ProtocolState.TemplatesSelected then
                                     let templates = model.ProtocolState.TemplatesSelected |> Array.ofSeq
@@ -510,8 +528,9 @@ module ComponentAux =
                                     let templateIndex =
                                         Array.findIndex (fun selectedTemplate -> selectedTemplate = template) templates
 
-                                    Daisy.button.a [
-                                        button.sm
+                                    //Daisy.button.a [
+                                    Html.button [
+                                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
                                         prop.onClick (fun _ ->
                                             setIsShown (not isShown)
 
@@ -519,16 +538,15 @@ module ComponentAux =
                                                 List.removeAt templateIndex model.ProtocolState.TemplatesSelected
 
                                             SelectProtocols newTemplatesSelected |> ProtocolMsg |> dispatch)
-                                        button.primary
                                         prop.text "remove"
                                     ]
                                 else
-                                    Daisy.button.a [
-                                        button.sm
+                                    //Daisy.button.a [
+                                    Html.button [
+                                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
                                         prop.onClick (fun _ ->
                                             setIsShown (not isShown)
                                             AddProtocol template |> ProtocolMsg |> dispatch)
-                                        button.primary
                                         prop.text "select"
                                     ]
                             ]
@@ -629,7 +647,7 @@ type Search =
 
     static member InfoField() =
         Html.div [
-            prop.className "prose-sm prose-p:m-1 prose-ul:mt-1 max-w-none"
+            prop.className "swt:prose-sm swt:prose-p:m-1 swt:prose-ul:mt-1 swt:max-w-none"
             prop.children [
                 Html.p [
                     Html.b "Search for templates."
@@ -643,7 +661,7 @@ type Search =
                     Html.a [
                         prop.href URLs.Helpdesk.UrlTemplateTopic
                         prop.target "_Blank"
-                        prop.className [ "link" ]
+                        prop.className [ "swt:link" ]
                         prop.text "here"
                     ]
                     Html.text "."
@@ -676,7 +694,7 @@ type Search =
         React.fragment [
             Html.div [
                 prop.className [
-                    "grid grid-cols-1 gap-2"
+                    "swt:grid swt:grid-cols-1 swt:gap-2 swt:px-2"
                     if classes.IsSome then
                         classes.Value
                 ]
@@ -693,17 +711,20 @@ type Search =
 
     static member SelectTemplatesButton(model: Model.Model, dispatch) =
         Html.div [
-            prop.className "flex justify-center gap-2"
+            prop.className "swt:flex swt:justify-center swt:gap-2"
             prop.children [
-                Daisy.button.a [
-                    button.wide
+                //Daisy.button.a [
+                Html.button [
+                    prop.className [
+                        "swt:btn swt:btn-wide"
+                        if model.ProtocolState.TemplatesSelected.Length > 0 then
+                            "swt:btn-primary"
+                        else
+                            "swt:btn-disabled"
+                    ]
+                    prop.text "Add templates"
                     prop.onClick (fun _ ->
                         SelectProtocols model.ProtocolState.TemplatesSelected |> ProtocolMsg |> dispatch)
-                    if model.ProtocolState.TemplatesSelected.Length > 0 then
-                        button.primary
-                    else
-                        button.disabled
-                    prop.text "Add templates"
                 ]
             ]
         ]
@@ -715,11 +736,11 @@ type Search =
 
         Html.div [
             prop.style [ style.maxHeight maxheight ]
-            prop.className "shrink overflow-y-auto"
+            prop.className "swt:shrink swt:overflow-y-auto"
             prop.children [
-                Daisy.table [
-                    table.zebra
-                    table.pinCols
+                //Daisy.table [
+                Html.table [
+                    prop.className "swt:table swt:table-zebra swt:table-pinCols"
                     // prop.className "tableFixHead"
                     prop.children [
                         Html.thead [

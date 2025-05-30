@@ -145,7 +145,7 @@ type LazyLoadTable =
                         if tableClasses.IsSome then
                             tableClasses.Value |> String.concat " "
                         else
-                            "table"
+                            "swt:table"
                     ]
                     prop.children [
                         if headerRow.IsSome then

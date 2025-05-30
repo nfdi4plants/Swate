@@ -17,17 +17,32 @@ type Warning =
     static member Main(warning: string, dispatch) =
         let closeMsg = Util.RMV_MODAL dispatch
 
-        Daisy.modal.div [
-            modal.active
+        //Daisy.modal.div [
+        Html.div [
+            prop.className "swt:modal swt:modal-open"
             prop.children [
-                Daisy.modalBackdrop [ prop.onClick closeMsg ]
-                Daisy.modalBox.div [
-                    Daisy.alert [
-                        alert.warning
-                        prop.children [
-                            Components.DeleteButton(props = [ prop.onClick closeMsg ])
-                            Html.span warning
-                            Daisy.button.a [ button.warning; prop.onClick (fun e -> closeMsg e); prop.text "Continue" ]
+                //Daisy.modalBackdrop [ prop.onClick closeMsg ]
+                Html.div [
+                    prop.className "swt:modal swt:modal-backdrop"
+                    prop.onClick closeMsg
+                ]
+                //Daisy.modalBox.div [
+                Html.div [
+                    prop.className "swt:modal-bodx"
+                    prop.children [
+                        //Daisy.alert [
+                        Html.div [
+                            prop.className "swt:alert swt:alert-warning"
+                            prop.children [
+                                Components.DeleteButton(props = [ prop.onClick closeMsg ])
+                                Html.span warning
+                                //Daisy.button.a [
+                                Html.button [
+                                    prop.className "swt:btn swt:btn-warning"
+                                    prop.text "Continue"
+                                    prop.onClick (fun e -> closeMsg e)
+                                ]
+                            ]
                         ]
                     ]
                 ]

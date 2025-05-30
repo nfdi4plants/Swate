@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import basicSsl from '@vitejs/plugin-basic-ssl'
+import tailwindcss from '@tailwindcss/vite'
 
 
 const proxyPort = process.env.SERVER_PROXY_PORT || "5000";
@@ -9,9 +10,13 @@ const proxyTarget = "http://localhost:" + proxyPort;
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [
-        react(),
-        basicSsl()
+        basicSsl(),
+        react({ include: /\.(fs|js|jsx|ts|tsx)$/ },),
+        tailwindcss(),
     ],
+    esbuild: {
+        jsx: 'automatic', // Enables React 17+ JSX Transform
+    },
     build: {
         outDir: "../../deploy/public",
     },

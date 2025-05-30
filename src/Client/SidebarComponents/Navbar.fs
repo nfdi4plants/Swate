@@ -41,37 +41,41 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
         |> Promise.start
 
     Html.div [
-        prop.className "flex flex-col gap-4"
+        prop.className "swt:flex swt:flex-col swt:gap-4"
         prop.children [
-            Daisy.button.a [
+            Html.button [
+                prop.className "swt:btn"
+                prop.text "Investigation"
                 prop.onClick (fun _ ->
                     let investigation = ArcInvestigation.init ("New Investigation")
                     let arcfile = ArcFiles.Investigation investigation
                     createMetadata arcfile)
-                prop.text "Investigation"
             ]
-            Daisy.button.a [
+            Html.button [
+                prop.className "swt:btn"
+                prop.text "Study"
                 prop.onClick (fun _ ->
                     let study = ArcStudy.init ("New Study")
                     let arcfile = ArcFiles.Study(study, [])
                     createMetadata arcfile)
-                prop.text "Study"
             ]
-            Daisy.button.a [
+            Html.button [
+                prop.className "swt:btn"
+                prop.text "Assay"
                 prop.onClick (fun _ ->
                     let assay = ArcAssay.init ("New Assay")
                     let arcfile = ArcFiles.Assay assay
                     createMetadata arcfile)
-                prop.text "Assay"
             ]
-            Daisy.button.a [
+            Html.button [
+                prop.className "swt:btn"
+                prop.text "Template"
                 prop.onClick (fun _ ->
                     let template = Template.init ("New Template")
                     template.Version <- "0.0.0"
                     template.LastUpdated <- System.DateTime.Now
                     let arcfile = ArcFiles.Template template
                     createMetadata arcfile)
-                prop.text "Template"
             ]
         ]
     ]
@@ -141,10 +145,11 @@ let UpdateMetadataModalContent
             Components.Forms.Generic.BoxedField(
                 content = [
                     Html.div [
-                        prop.className "flex flex-col md:flex-row gap-4"
+                        prop.className "swt:flex swt:flex-col swt:md:flex-row swt:gap-4"
                         prop.children [
-                            Daisy.button.a [
-                                button.primary
+                            //Daisy.button.a [
+                            Html.button [
+                                prop.className "swt:btn swt:btn-primary"
                                 prop.text "Update Metadata Type"
                                 prop.onClick (fun _ ->
                                     if excelMetadataType.Metadata.IsSome then
@@ -156,8 +161,9 @@ let UpdateMetadataModalContent
                                     else
                                         logw ("Tried updating metadata sheet without given metadata"))
                             ]
-                            Daisy.button.a [
-                                button.error
+                            //Daisy.button.a [
+                            Html.button [
+                                prop.className "swt:btn swt:btn-error"
                                 prop.text "Delete Metadata Type"
                                 prop.onClick (fun _ ->
                                     OfficeInterop.DeleteTopLevelMetadata |> OfficeInteropMsg |> dispatch
@@ -197,13 +203,16 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
 
     React.useLayoutEffectOnce (refreshMetadataState >> Promise.start)
 
-    Daisy.modal.div [
+    //Daisy.modal.div [
+    Html.div [
         // Add the "is-active" class to display the modal
-        modal.active
+        prop.className "swt:modal swt:modal-open"
         prop.children [
-            Daisy.modalBackdrop [ prop.onClick (fun _ -> closeModal ()) ]
-            Daisy.modalBox.div [
-                prop.className "overflow-y-auto h-[100%]"
+            //Daisy.modalBackdrop [ prop.onClick (fun _ -> closeModal ()) ]
+            Html.div [ prop.className "swt:modal-backdrop"; prop.onClick (fun _ -> closeModal ()) ]
+            //Daisy.modalBox.div [
+            Html.div [
+                prop.className "swt:modal-box swt:overflow-y-auto swt:h-[100%]"
                 prop.children [
                     match excelMetadataType with
                     | { Loading = true } -> Modals.Loading.Component
@@ -219,19 +228,13 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
     [
         QuickAccessButton.QuickAccessButton(
             "Create Metadata",
-            React.fragment [
-                Html.i [ prop.className "fa-solid fa-plus" ]
-                Html.i [ prop.className "fa-solid fa-info" ]
-            ],
+            React.fragment [ Icons.CreateMetadata() ],
             toggleMetdadataModal
         )
 
         QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
-            React.fragment [
-                Html.i [ prop.className "fa-solid fa-plus" ]
-                Html.i [ prop.className "fa-solid fa-table" ]
-            ],
+            React.fragment [ Icons.CreateAnnotationTable() ],
             (fun e ->
                 e.preventDefault ()
                 let e = e :?> Browser.Types.MouseEvent
@@ -242,7 +245,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         | Some Swatehost.Excel ->
             QuickAccessButton.QuickAccessButton(
                 "Autoformat Table",
-                React.fragment [ Html.i [ prop.className "fa-solid fa-rotate" ] ],
+                React.fragment [ Icons.AutoformatTable() ],
                 (fun e ->
                     e.preventDefault ()
                     let e = e :?> Browser.Types.MouseEvent
@@ -253,26 +256,18 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         QuickAccessButton.QuickAccessButton(
             "Rectify Ontology Terms",
             React.fragment [
-                Html.i [ prop.className "fa-solid fa-spell-check" ]
-                Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString
-                Html.i [ prop.className "fa-solid fa-pen" ]
+                Icons.RectifyOntologyTerms(Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString)
             ],
             (fun _ -> SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
-            React.fragment [
-                Html.i [ prop.className "fa-solid fa-minus pr-1" ]
-                Html.i [ prop.className "fa-solid fa-table-columns" ]
-            ],
+            React.fragment [ Icons.RemoveBuildingBlock() ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.QuickAccessButton(
             "Get Building Block Information",
-            React.fragment [
-                Html.i [ prop.className "fa-solid fa-question pr-1" ]
-                Html.i [ prop.className "fa-solid fa-table-columns" ]
-            ],
+            React.fragment [ Icons.BuildingBlockInformation() ],
             (fun _ ->
                 promise {
                     let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails ()
@@ -307,35 +302,26 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
     Components.BaseNavbar.Glow [
         if state.ExcelMetadataModalActive then
             SelectModalDialog toggleMetdadataModal model dispatch
-        Html.div [
-            prop.ariaLabel "logo"
-            prop.children [
-                Html.img [
-                    prop.style [ style.maxHeight (length.perc 100); style.width 100 ]
-                    prop.src @"assets/Swate_logo_for_excel.svg"
-                ]
-            ]
-        ]
+        Components.Logo.Main()
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             Daisy.navbarCenter [ QuickAccessList toggleMetdadataModal model dispatch ]
 
             Html.div [
-                prop.className "ml-auto"
+                prop.className "swt:ml-auto"
                 prop.children [ NavbarBurger.Main(model, dispatch) ]
             ]
         | _ ->
             Html.div [
-                prop.className "ml-auto"
+                prop.className "swt:ml-auto"
                 prop.children [
                     Components.DeleteButton(
+                        className = "swt:btn-sm swt:btn-error",
                         props = [
                             prop.onClick (fun _ ->
                                 Messages.PageState.UpdateShowSidebar(not model.PageState.ShowSideBar)
                                 |> Messages.PageStateMsg
                                 |> dispatch)
-                            button.sm
-                            button.glass
                         ]
                     )
                 ]

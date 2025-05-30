@@ -63,7 +63,6 @@ open Feliz.DaisyUI
 //    mainFunctionContainer [
 //        Bulma.field.div [
 //            Daisy.button.button [
-
 //                let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
 //                Bulma.color.isSuccess
 //                if isValid then

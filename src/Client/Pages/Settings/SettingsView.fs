@@ -27,6 +27,7 @@ module Settings =
         FoundOnTIB: Set<string>
         Selected: Set<string>
     } with
+
         /// Found on TIB but not selected
         member this.UnusedCatalogues = Set.difference this.FoundOnTIB this.Selected
 
@@ -37,62 +38,40 @@ module Settings =
 
     type SearchConfig =
 
-        static member private SwateDefaultSearch(model: Model.Model, dispatch) =
-            Html.div [
-                Html.h2 [ prop.text "Swate Default Search" ]
-                Html.p [ prop.text "Enables search through the community build DPBO ontology and fast updates through our GitHub contribution model." ]
-                Html.div [
-                    prop.className "form-control lg:max-w-md"
-                    prop.children [
-                        Html.label [
-                            prop.className "label cursor-pointer"
-                            prop.children [
-                                Html.span [
-                                    prop.className "label-text"
-                                    prop.text "Use Swate Default Search"
-                                ]
-                                Daisy.toggle [
-                                    prop.isChecked model.PersistentStorageState.SwateDefaultSearch
-                                    prop.id "swateDefaultSearch"
-
-                                    toggle.primary
-
-                                    prop.onChange (fun (b: bool) ->
-                                        Messages.PersistentStorage.UpdateSwateDefaultSearch b |> PersistentStorageMsg |> dispatch)
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
 
         /// Element with label and select adding support for search through a single TIB catalogue.
-        static member private TIBSearchCatalogueElement(chosen: string, catalogues: Catalogues, select: string -> unit, rmv: unit -> unit) =
+        static member private TIBSearchCatalogueElement
+            (chosen: string, catalogues: Catalogues, select: string -> unit, rmv: unit -> unit)
+            =
             let disconnected = catalogues.DisconnectedCatalogues.Contains chosen
-            let disconnectedMsg = "This catalogue is not found on TIB. Get in contact with the support team and remove it for now!"
+
+            let disconnectedMsg =
+                "This catalogue is not found on TIB. Get in contact with the support team and remove it for now!"
+
             Html.div [
-                prop.className "flex flex-row gap-2 items-end"
+                prop.className "swt:flex swt:flex-row swt:gap-2 swt:items-end"
                 prop.children [
                     Html.label [
-                        prop.className "form-control w-full max-w-xs"
+                        prop.className "swt:form-control swt:w-full swt:max-w-xs"
                         prop.children [
                             Html.div [
-                                prop.className "label"
+                                prop.className "swt:label"
                                 prop.children [
-                                    Html.span [
-                                        prop.className "label-text"
-                                        prop.text "Choose your catalogue"
-                                    ]
+                                    Html.span [ prop.className "swt:label-text"; prop.text "Choose your catalogue" ]
                                 ]
                             ]
                             Html.select [
                                 prop.value chosen
-                                prop.onChange (fun e -> select(e))
-                                prop.className "select select-bordered"
+                                prop.onChange (fun e -> select (e))
+                                prop.className "swt:select"
                                 prop.children [
                                     for catalogue in catalogues.AllCatalogues do
-                                        let disabled = catalogues.DisconnectedCatalogues.Contains catalogue || catalogues.Selected.Contains catalogue
+                                        let disabled =
+                                            catalogues.DisconnectedCatalogues.Contains catalogue
+                                            || catalogues.Selected.Contains catalogue
+
                                         let disconnected = catalogues.DisconnectedCatalogues.Contains catalogue
+
                                         Html.option [
                                             prop.disabled (disconnected || disabled)
                                             prop.value catalogue
@@ -101,9 +80,9 @@ module Settings =
                                                 prop.title disconnectedMsg
                                             prop.className [
                                                 if disabled || disconnected then
-                                                    "bg-base-300 cursor-not-allowed"
+                                                    "swt:bg-base-300 swt:cursor-not-allowed"
                                                 if disconnected then
-                                                    "text-error"
+                                                    "swt:text-error"
                                             ]
                                         ]
                                 ]
@@ -111,27 +90,27 @@ module Settings =
                         ]
                     ]
                     Html.button [
-                        prop.className "btn btn-error btn-square"
-                        prop.onClick (fun _ -> rmv())
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-trash-can"]
-                        ]
+                        prop.className "swt:btn swt:btn-error swt:btn-square"
+                        prop.onClick (fun _ -> rmv ())
+                        prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ] ]
                     ]
                     if disconnected then
                         Html.div [
-                            prop.className "tooltip"
-                            prop.custom("data-tip", disconnectedMsg)
+                            prop.className "swt:tooltip"
+                            prop.custom ("data-tip", disconnectedMsg)
                             prop.children [
                                 Html.div [
-                                    prop.className "relative"
+                                    prop.className "swt:relative"
                                     prop.children [
                                         Html.div [
-                                            prop.className "absolute top-0 right-0 left-0 bottom-0 animate-ping bg-yellow-400"
+                                            prop.className
+                                                "swt:absolute swt:top-0 swt:right-0 swt:left-0 swt:bottom-0 swt:animate-ping swt:bg-yellow-400"
                                         ]
                                         Html.button [
-                                            prop.className "btn btn-warning btn-active btn-square no-animation"
+                                            prop.className
+                                                "swt:btn swt:btn-warning swt:btn-active swt:btn-square swt:no-animation"
                                             prop.children [
-                                                Html.i [prop.className "fa-solid fa-triangle-exclamation"]
+                                                Html.i [ prop.className "fa-solid fa-triangle-exclamation" ]
                                             ]
                                         ]
                                     ]
@@ -142,101 +121,118 @@ module Settings =
             ]
 
         [<ReactComponent>]
-        static member private TIBSearch(model: Model.Model, dispatch: Messages.Msg -> unit) =
+        static member TIBSearch(model: Model.Model, dispatch: Messages.Msg -> unit) =
             let selectedCatalogues = model.PersistentStorageState.TIBSearchCatalogues
-            let catalogues, setCatalogues = React.useState([||])
-            let loading, setLoading = React.useState(true)
-            React.useEffectOnce(fun _ -> // get all currently supported catalogues
+            let catalogues, setCatalogues = React.useState ([||])
+            let loading, setLoading = React.useState (true)
+
+            React.useEffectOnce (fun _ -> // get all currently supported catalogues
                 promise {
-                    let! catalogues = Swate.Components.Api.TIBApi.getCollections()
+                    let! catalogues = Swate.Components.Api.TIBApi.getCollections ()
                     setCatalogues catalogues.content
                     setLoading false
-                } |> ignore
-            )
+                }
+                |> ignore)
+
             let catalogues: Catalogues =
-                React.useMemo((fun () ->
-                    {
+                React.useMemo (
+                    (fun () -> {
                         FoundOnTIB = catalogues |> Set.ofArray
                         Selected = selectedCatalogues
-                    }
-                ), [|catalogues; selectedCatalogues|])
+                    }),
+                    [| catalogues; selectedCatalogues |]
+                )
+
             Html.div [
-                Html.h2 [ prop.text "TIB Search" ]
-                Html.p [ prop.text "Adds support for high performance TIB term search. Choose a catalogue of terms to search through." ]
-                Html.p [ prop.text "Selecting multiple catalogues may impact search performance." ]
-                Html.p [ prop.textf "Selected: %A" (selectedCatalogues |> String.concat ", ") ]
                 Html.div [
-                    prop.className "flex flex-row gap-2"
+                    prop.className "swt:flex swt:flex-row swt:gap-2"
                     prop.children [
                         Html.button [
-                            prop.className "btn btn-primary btn-sm"
+                            prop.className "swt:btn swt:btn-primary swt:btn-sm"
                             prop.disabled (catalogues.UnusedCatalogues.Count = 0)
                             prop.onClick (fun _ ->
                                 if catalogues.UnusedCatalogues.Count <> 0 then
-                                    Messages.PersistentStorage.AddTIBSearchCatalogue catalogues.UnusedCatalogues.MinimumElement
+                                    Messages.PersistentStorage.AddTIBSearchCatalogue
+                                        catalogues.UnusedCatalogues.MinimumElement
                                     |> PersistentStorageMsg
-                                    |> dispatch
-                            )
-                            prop.children [
-                                Html.i [prop.className "fa-solid fa-plus"]
-                                Html.text "Add"
-                            ]
+                                    |> dispatch)
+                            prop.children [ Html.i [ prop.className "fa-solid fa-plus" ]; Html.text "Add" ]
                         ]
                         Html.button [
-                            prop.className "btn btn-error btn-sm"
+                            prop.className "swt:btn swt:btn-error swt:btn-sm"
                             prop.disabled (selectedCatalogues.Count = 0)
                             prop.onClick (fun _ ->
                                 Messages.PersistentStorage.SetTIBSearchCatalogues Set.empty
                                 |> PersistentStorageMsg
-                                |> dispatch
-                            )
-                            prop.children [
-                                Html.i [prop.className "fa-solid fa-trash-can"]
-                                Html.text "Clear"
-                            ]
+                                |> dispatch)
+                            prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ]; Html.text "Clear" ]
                         ]
                     ]
                 ]
                 if loading then
                     Html.div [
-                        prop.className "flex justify-center"
-                        prop.children [
-                            Html.i [prop.className "fa-solid fa-spinner fa-spin"]
-                        ]
+                        prop.className "swt:flex swt:justify-center"
+                        prop.children [ Html.i [ prop.className "fa-solid fa-spinner fa-spin" ] ]
                     ]
                 elif catalogues.AllCatalogues.Count = 0 then
                     Html.div [
-                        prop.className "flex justify-center"
-                        prop.children [
-                            Html.p [ prop.text "No catalogues found." ]
-                        ]
+                        prop.className "swt:flex swt:justify-center"
+                        prop.children [ Html.p [ prop.text "No catalogues found." ] ]
                     ]
                 else
                     for catalogue in selectedCatalogues do
-                        let rmv = fun () ->
-                            Messages.PersistentStorage.RemoveTIBSearchCatalogue catalogue
-                            |> PersistentStorageMsg
-                            |> dispatch
-                        let setter = fun (s: string) ->
-                            (selectedCatalogues |> Set.remove catalogue |> Set.add s)
-                            |> PersistentStorage.SetTIBSearchCatalogues
-                            |> PersistentStorageMsg
-                            |> dispatch
-                        SearchConfig.TIBSearchCatalogueElement (catalogue, catalogues, setter, rmv)
-            ]
+                        let rmv =
+                            fun () ->
+                                Messages.PersistentStorage.RemoveTIBSearchCatalogue catalogue
+                                |> PersistentStorageMsg
+                                |> dispatch
 
-        static member Main(model, dispatch) =
-            React.fragment [
-                SearchConfig.SwateDefaultSearch(model, dispatch)
-                SearchConfig.TIBSearch(model, dispatch)
+                        let setter =
+                            fun (s: string) ->
+                                (selectedCatalogues |> Set.remove catalogue |> Set.add s)
+                                |> PersistentStorage.SetTIBSearchCatalogues
+                                |> PersistentStorageMsg
+                                |> dispatch
+
+                        SearchConfig.TIBSearchCatalogueElement(catalogue, catalogues, setter, rmv)
             ]
 
 type Settings =
 
+    static member SettingColumnElement(title: string, settingElement: ReactElement, ?description: ReactElement) =
+        Html.div [
+            prop.className "swt:grid swt:grid-cols-1 swt:md:grid-cols-2 swt:gap-2 swt:py-2"
+            prop.children [
+                Html.p [ prop.className "swt:text-xl not-prose"; prop.text title ]
+                Html.div [ prop.className "not-prose"; prop.children [ settingElement ] ]
+                if description.IsSome then
+                    Html.div [
+                        prop.className "swt:text-sm swt:text-gray-500 swt:md:col-span-2 swt:prose"
+                        prop.children description.Value
+                    ]
+            ]
+        ]
+
+    static member SettingColumnElement(title: string, settingElement: ReactElement, ?description: string) =
+        let description = description |> Option.map (fun d -> Html.p d)
+        Settings.SettingColumnElement(title, settingElement, ?description = description)
+
+    static member SettingColumnElement(title: string, settingElement: ReactElement) =
+        Settings.SettingColumnElement(title, settingElement, ?description = unbox<ReactElement option> None)
+
+
     [<ReactComponent>]
     static member ThemeToggle() =
 
-        let (theme, handleSetTheme) = React.useLocalStorage ("theme", "light")
+        let themeCtx = React.useContext ReactContext.ThemeCtx
+
+        let iconRef = React.useElementRef ()
+
+        let browser =
+            """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+	<rect width="24" height="24" fill="none" />
+	<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm4-2v4" />
+</svg>"""
 
         let animatedMoon =
             """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
@@ -269,69 +265,117 @@ type Settings =
     </g>
 </svg>"""
 
-        Html.label [
-            prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
-            prop.children [
-                Html.p [ prop.className "text-xl py-2"; prop.text "Theme" ]
-                Html.button [
-                    prop.className "btn btn-block btn-primary"
-                    //prop.text (if theme = "light" then dark else light)
-                    prop.children [
-                        Html.div [
-                            prop.dangerouslySetInnerHTML (
-                                match theme.ToLower() with
-                                | "light" -> animatedSun
-                                | _ -> animatedMoon
-                            )
+        let planti =
+            """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+	<rect width="24" height="24" fill="none" />
+	<path fill="currentColor" d="M23 4.1V2.3l-1.8-.2c-.1 0-.7-.1-1.7-.1c-4.1 0-7.1 1.2-8.8 3.3C9.4 4.5 7.6 4 5.5 4c-1 0-1.7.1-1.7.1l-1.9.3l.1 1.7c.1 3 1.6 8.7 6.8 8.7H9v3.4c-3.8.5-7 1.8-7 1.8v2h20v-2s-3.2-1.3-7-1.8V15c6.3-.1 8-7.2 8-10.9M12 18h-1v-5.6S10.8 9 8 9c0 0 1.5.8 1.9 3.7c-.4.1-.8.1-1.1.1C4.2 12.8 4 6.1 4 6.1S4.6 6 5.5 6c1.9 0 5 .4 5.9 3.1C11.9 4.6 17 4 19.5 4c.9 0 1.5.1 1.5.1s0 9-6.3 9H14c0-2 2-5 2-5c-3 1-3 4.9-3 4.9v5z" />
+</svg>"""
+
+        let viola =
+            """<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+	<rect width="32" height="32" fill="none" />
+	<path fill="currentColor" d="M16 1C7.716 1 1 7.716 1 16s6.716 15 15 15s15-6.716 15-15S24.284 1 16 1m1.5 2.086L3.086 17.5a13 13 0 0 1-.072-2.1L15.4 3.015a13 13 0 0 1 2.1.072m2.338.49q.81.25 1.572.6L4.176 21.41a13 13 0 0 1-.6-1.572zM5.19 23.224L23.224 5.19q.645.433 1.234.938l-18.33 18.33q-.505-.588-.938-1.234m2.352 2.648l18.33-18.33q.506.588.938 1.234L8.776 26.81q-.646-.432-1.234-.938m3.048 1.952L27.824 10.59q.35.761.6 1.572L12.162 28.424a13 13 0 0 1-1.572-.6m3.91 1.09L28.914 14.5a13 13 0 0 1 .072 2.1L16.6 28.985a13 13 0 0 1-2.1-.072m5.561-.56l8.292-8.293a13.03 13.03 0 0 1-8.292 8.292M3.647 11.938a13.03 13.03 0 0 1 8.292-8.292z" />
+</svg>"""
+
+        React.useLayoutEffect (
+            (fun () ->
+                let icon =
+                    match themeCtx.data with
+                    | Swate.Components.Theme.Sunrise -> animatedSun
+                    | Swate.Components.Theme.Finster -> animatedMoon
+                    | Swate.Components.Theme.Planti -> planti
+                    | Swate.Components.Theme.Viola -> viola
+                    | Swate.Components.Theme.Auto -> browser
+                    | _ -> "missing"
+
+                iconRef.current?innerHTML <- icon
+                ()),
+            [| box themeCtx.data |]
+        )
+
+        let mkOption (theme: Swate.Components.Theme) =
+            let txt = Swate.Components.Theme.toString theme
+            Html.option [ prop.value txt; prop.text txt ]
+
+        Settings.SettingColumnElement(
+            "Theme",
+            Html.label [
+                prop.className "swt:select"
+                prop.children [
+                    Html.label [ prop.className "swt:label"; prop.ref iconRef ]
+                    Html.select [
+                        prop.defaultValue (Swate.Components.Theme.toString themeCtx.data)
+                        prop.onChange (fun (e: string) -> themeCtx.setData (Swate.Components.Theme.fromString e))
+                        prop.children [
+                            mkOption Swate.Components.Theme.Sunrise
+                            mkOption Swate.Components.Theme.Finster
+                            mkOption Swate.Components.Theme.Planti
+                            mkOption Swate.Components.Theme.Viola
+                            mkOption Swate.Components.Theme.Auto
                         ]
                     ]
-                    prop.onClick (fun _ ->
-                        let newTheme = if theme = "light" then "dark" else "light"
-                        handleSetTheme newTheme // Save to localStorage
-                        document.documentElement.setAttribute ("data-theme", theme))
                 ]
             ]
-        ]
+        )
 
     static member ToggleAutosaveConfig(model, dispatch) =
-        Html.label [
-            prop.className "grid lg:col-span-2 grid-cols-subgrid cursor-pointer not-prose"
-            prop.children [
-                Html.p [ prop.className "select-none text-xl"; prop.text "Autosave" ]
-                Html.div [
-                    prop.className "flex items-center pl-10"
-                    prop.children [
-                        Daisy.toggle [
-                            prop.className "ml-14"
-                            prop.isChecked model.PersistentStorageState.Autosave
-                            toggle.primary
-                            prop.onChange (fun (b: bool) ->
-                                PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
-                        ]
-                    ]
-                ]
-                Html.p [
-                    prop.className "text-sm text-gray-500"
-                    prop.text "When you deactivate autosave, your local history will be deleted."
-                ]
-            ]
-        ]
+        Settings.SettingColumnElement(
+            "Autosave",
+            Html.input [
+                prop.className "swt:toggle swt:toggle-primary"
+                prop.isChecked model.PersistentStorageState.Autosave
+                prop.type'.checkbox
+                prop.onChange (fun (b: bool) ->
+                    Messages.PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
+            ],
+            "When you deactivate autosave, your local history will be deleted."
+        )
 
     static member General(model, dispatch) =
         Components.Forms.Generic.BoxedField(
             "General",
-            content = [
-                Html.div [
-                    prop.className "grid grid-cols-1 gap-4 lg:grid-cols-2"
-                    prop.children [ Settings.ThemeToggle(); Settings.ToggleAutosaveConfig(model, dispatch) ]
+            content = [ Settings.ThemeToggle(); Settings.ToggleAutosaveConfig(model, dispatch) ]
+        )
+
+    [<ReactComponent>]
+    static member SwateDefaultSearch(model, dispatch) =
+        Settings.SettingColumnElement(
+            "Swate Default Search",
+            Html.input [
+                prop.className "swt:toggle swt:toggle-primary"
+                prop.isChecked model.PersistentStorageState.SwateDefaultSearch
+                prop.type'.checkbox
+
+                prop.onChange (fun (b: bool) ->
+                    Messages.PersistentStorage.UpdateSwateDefaultSearch b
+                    |> PersistentStorageMsg
+                    |> dispatch)
+            ],
+            "When you deactivate this, the default search will not be used."
+        )
+
+    [<ReactComponent>]
+    static member TIBSearchComponent(model, dispatch) =
+        Settings.SettingColumnElement(
+            "TIB Search",
+            Settings.SearchConfig.TIBSearch(model, dispatch),
+            React.fragment [
+                Html.p [
+                    prop.text
+                        "Adds support for high performance TIB term search. Choose a catalogue of terms to search through."
                 ]
+                Html.p [ prop.text "Selecting multiple catalogues may impact search performance." ]
             ]
         )
 
     static member SearchConfig(model, dispatch) =
         Components.Forms.Generic.BoxedField(
             "Term Search Configuration",
-            content = [ Settings.SearchConfig.Main(model, dispatch) ]
+            content = [
+                Settings.SwateDefaultSearch(model, dispatch)
+
+                Settings.TIBSearchComponent(model, dispatch)
+            ]
         )
 
     static member ActivityLog model =
@@ -340,7 +384,7 @@ type Settings =
             "Display all recorded activities of this session.",
             content = [
                 Html.div [
-                    prop.className "overflow-y-auto max-h-[600px]"
+                    prop.className "swt:overflow-y-auto swt:max-h-[600px]"
                     prop.children [ ActivityLog.Main(model) ]
                 ]
             ]
