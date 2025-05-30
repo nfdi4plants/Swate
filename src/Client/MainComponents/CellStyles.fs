@@ -19,7 +19,7 @@ type CellStyles =
     static member cellStyle(adjusted: string list) =
         prop.className [
             "swt:min-w-48 swt:max-w-xl"
-            "swt:h-[38px] swt:min-h-[38px] swt:max-h-[38px] swt:overflow-visible swt:border swt:border-solid swt:border-base-content swt:cursor-pointer"
+            "swt:overflow-visible swt:border swt:border-solid swt:border-base-content swt:cursor-pointer"
             adjusted |> String.concat " "
         ]
 
@@ -83,7 +83,9 @@ type CellStyles =
             prop.children [
                 Html.span [ prop.className "swt:grow"; prop.text displayValue ]
                 if hasValidOA then
-                    Html.i [ prop.className [ "swt:ml-auto swt:text-primary"; "fa-solid"; "fa-check"; "swt:size-4" ] ]
+                    Html.i [
+                        prop.className [ "swt:ml-auto swt:text-primary"; "fa-solid"; "fa-check"; "swt:size-4" ]
+                    ]
             ]
         ]
 
@@ -93,25 +95,7 @@ type CellStyles =
     /// <param name="rowIndex"></param>
     static member RowLabel(rowIndex: int) =
         Html.th [
-            //prop.style [style.resize.none; style.border(length.px 1, borderStyle.solid, "darkgrey")]
-            //prop.children [
-            //    Daisy.button.button [
-            //        prop.className "px-2 py-1"
-            //        prop.style [style.custom ("border", "unset"); style.borderRadius 0]
-            //        button.block
-            //        Daisy.button.isStatic
-            //        prop.tabIndex -1
-            //        prop.text (if rowIndex < 0 then "" else $"{rowIndex+1}")
-            //    ]
-            //]
-            prop.className "swt:border swt:border-solid swt:border-base-content"
+            prop.className "swt:items-center swt:w-min swt:px-2 swt:py-1"
             prop.style [ style.resize.none ]
-            prop.children [
-                Html.div [
-                    prop.style [ style.height (length.perc 100) ]
-                    prop.className "swt:flex swt:items-center swt:justify-center swt:px-2 swt:py-1"
-                    prop.disabled true
-                    prop.children [ Html.b (if rowIndex < 0 then "" else $"{rowIndex + 1}") ]
-                ]
-            ]
+            prop.children [ Html.b (if rowIndex < 0 then "" else $"{rowIndex + 1}") ]
         ]

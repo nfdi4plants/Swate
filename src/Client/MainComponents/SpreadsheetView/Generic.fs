@@ -43,9 +43,10 @@ let Main (data, createCell, headers, createHeaderCell, model: Model, dispatch: M
                 35,
                 tableClasses = [|
                     //sticky header
-                    "swt:[&_thead_>_tr]:sticky swt:[&_thead_>_tr]:top-0 [swt:&_thead_>_tr]:bg-base-100"
+                    "swt:[&_thead_>_tr]:sticky swt:[&_thead_>_tr]:top-0 swt:[&_thead_>_tr]:bg-base-100"
                     // sticky row
                     "swt:[&_tbody_>_tr_>_th]:sticky swt:[&_tbody_>_tr_>_th]:left-0 swt:[&_tbody_>_tr_>_th]:bg-base-100"
+                    "table-bordered"
                 |],
                 containerClasses = [| "swt:pr-[10vw] swt:pb-[20vw]" |],
                 rowLabel = {| styling = Some createRowLabel |}

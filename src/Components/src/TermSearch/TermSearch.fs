@@ -1185,7 +1185,8 @@ type TermSearch =
 
                         Html.label [ // main search component
                             prop.className [
-                                "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full"
+                                "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full
+                                swt:focus:!outline-0 swt:focus-within:!outline-0"
                                 if classNames.IsSome && classNames.Value.inputLabel.IsSome then
                                     TermSearchStyle.resolveStyle classNames.Value.inputLabel.Value
                             ]

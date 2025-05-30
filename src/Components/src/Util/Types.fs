@@ -20,6 +20,7 @@ type Theme =
     | Sunrise
     | Finster
     | Planti
+    | Viola
 
 module Theme =
     let toString (theme: Theme) =
@@ -28,6 +29,7 @@ module Theme =
         | Sunrise -> "light"
         | Finster -> "dark"
         | Planti -> "planti"
+        | Viola -> "viola"
 
     let fromString (theme: string) =
         match theme with
@@ -35,6 +37,7 @@ module Theme =
         | "light" -> Sunrise
         | "dark" -> Finster
         | "planti" -> Planti
+        | "viola" -> Viola
         | _ -> Auto // Default to Auto if the string does not match any known theme
 
 type CellCoordinate = {| x: int; y: int |}

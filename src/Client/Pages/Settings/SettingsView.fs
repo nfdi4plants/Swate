@@ -271,6 +271,12 @@ type Settings =
 	<path fill="currentColor" d="M23 4.1V2.3l-1.8-.2c-.1 0-.7-.1-1.7-.1c-4.1 0-7.1 1.2-8.8 3.3C9.4 4.5 7.6 4 5.5 4c-1 0-1.7.1-1.7.1l-1.9.3l.1 1.7c.1 3 1.6 8.7 6.8 8.7H9v3.4c-3.8.5-7 1.8-7 1.8v2h20v-2s-3.2-1.3-7-1.8V15c6.3-.1 8-7.2 8-10.9M12 18h-1v-5.6S10.8 9 8 9c0 0 1.5.8 1.9 3.7c-.4.1-.8.1-1.1.1C4.2 12.8 4 6.1 4 6.1S4.6 6 5.5 6c1.9 0 5 .4 5.9 3.1C11.9 4.6 17 4 19.5 4c.9 0 1.5.1 1.5.1s0 9-6.3 9H14c0-2 2-5 2-5c-3 1-3 4.9-3 4.9v5z" />
 </svg>"""
 
+        let viola =
+            """<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+	<rect width="32" height="32" fill="none" />
+	<path fill="currentColor" d="M16 1C7.716 1 1 7.716 1 16s6.716 15 15 15s15-6.716 15-15S24.284 1 16 1m1.5 2.086L3.086 17.5a13 13 0 0 1-.072-2.1L15.4 3.015a13 13 0 0 1 2.1.072m2.338.49q.81.25 1.572.6L4.176 21.41a13 13 0 0 1-.6-1.572zM5.19 23.224L23.224 5.19q.645.433 1.234.938l-18.33 18.33q-.505-.588-.938-1.234m2.352 2.648l18.33-18.33q.506.588.938 1.234L8.776 26.81q-.646-.432-1.234-.938m3.048 1.952L27.824 10.59q.35.761.6 1.572L12.162 28.424a13 13 0 0 1-1.572-.6m3.91 1.09L28.914 14.5a13 13 0 0 1 .072 2.1L16.6 28.985a13 13 0 0 1-2.1-.072m5.561-.56l8.292-8.293a13.03 13.03 0 0 1-8.292 8.292M3.647 11.938a13.03 13.03 0 0 1 8.292-8.292z" />
+</svg>"""
+
         React.useLayoutEffect (
             (fun () ->
                 let icon =
@@ -278,7 +284,9 @@ type Settings =
                     | Swate.Components.Theme.Sunrise -> animatedSun
                     | Swate.Components.Theme.Finster -> animatedMoon
                     | Swate.Components.Theme.Planti -> planti
+                    | Swate.Components.Theme.Viola -> viola
                     | Swate.Components.Theme.Auto -> browser
+                    | _ -> "missing"
 
                 iconRef.current?innerHTML <- icon
                 ()),
@@ -302,6 +310,7 @@ type Settings =
                             mkOption Swate.Components.Theme.Sunrise
                             mkOption Swate.Components.Theme.Finster
                             mkOption Swate.Components.Theme.Planti
+                            mkOption Swate.Components.Theme.Viola
                             mkOption Swate.Components.Theme.Auto
                         ]
                     ]
