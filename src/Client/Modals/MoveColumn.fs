@@ -14,24 +14,29 @@ type MoveColumn =
     [<ReactComponent>]
     static member InputField(index: int, set, max: int, input: int, setInput: int -> unit) =
         Html.div [
-            prop.className "flex gap-4 justify-between"
+            prop.className "swt:flex gswt:ap-4 swt:justify-between"
             prop.children [
                 Html.div [
                     Html.p "Preview"
-                    Daisy.join [
-                        Daisy.input [
-                            join.item
-                            prop.className "input-bordered"
-                            prop.type'.number
-                            prop.onChange (fun i -> setInput i)
-                            prop.defaultValue input
-                            prop.min 0
-                            prop.max max
-                        ]
-                        Daisy.button.button [
-                            join.item
-                            prop.onClick (fun _ -> set (index, input))
-                            prop.text "Preview"
+                    //Daisy.join [
+                    Html.div [
+                        prop.className "swt:join"
+                        prop.children [
+                            //Daisy.input [
+                            Html.input [
+                                prop.className "swt:input swt:join-item"
+                                prop.type'.number
+                                prop.onChange (fun i -> setInput i)
+                                prop.defaultValue input
+                                prop.min 0
+                                prop.max max
+                            ]
+                            //Daisy.button.button [
+                            Html.button [
+                                prop.className "swt:btn swt:join-item"
+                                prop.text "Preview"
+                                prop.onClick (fun _ -> set (index, input))
+                            ]
                         ]
                     ]
                 ]
@@ -59,40 +64,46 @@ type MoveColumn =
 
         let modalActivity =
             Html.div [
-                prop.children [
-                    MoveColumn.InputField(index, updateIndex, state.Length-1, input, setInput)
-                ]
+                prop.children [ MoveColumn.InputField(index, updateIndex, state.Length - 1, input, setInput) ]
             ]
+
         let content =
             React.fragment [
-                Daisy.table [
-                    Html.thead [
-                        Html.tr [
-                            Html.th "Index"
-                            Html.th "Column"
-                        ]
-                    ]
-                    Html.tbody [
-                        for i in 0 .. state.Length-1 do
-                            Html.tr [
-                                if i = index then
-                                    prop.className "bg-error text-error-content"
-                                prop.children [
-                                    Html.td i
-                                    Html.td (state.[i].ToString())
+                //Daisy.table [
+                Html.table [
+                    prop.className "swt:table"
+                    prop.children [
+                        Html.thead [ Html.tr [ Html.th "Index"; Html.th "Column" ] ]
+                        Html.tbody [
+                            for i in 0 .. state.Length - 1 do
+                                Html.tr [
+                                    if i = index then
+                                        prop.className "swt:bg-error swt:text-error-content"
+                                    prop.children [ Html.td i; Html.td (state.[i].ToString()) ]
                                 ]
-                            ]
+                        ]
                     ]
                 ]
             ]
+
         let fooder submit input rmv =
             Html.div [
-                prop.className "justify-end flex gap-2"
+                prop.className "swt:justify-end swt:flex swt:gap-2"
                 prop.style [ style.marginLeft length.auto ]
                 prop.children [
-                    Daisy.button.button [ prop.onClick rmv; button.outline; prop.text "Cancel" ]
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-outline"
+                        prop.text "Cancel"
+                        prop.onClick rmv
+                    ]
                     //Html.p "Update Table"
-                    Daisy.button.a [ button.primary; prop.onClick (submit input); prop.text "Submit" ]
+                    //Daisy.button.a [
+                    Html.a [
+                        prop.className "swt:btn swt:btn-primary"
+                        prop.text "Submit"
+                        prop.onClick (submit input)
+                    ]
                 ]
             ]
 
@@ -100,7 +111,7 @@ type MoveColumn =
             rmv,
             header = Html.p "Move Column",
             modalActions = modalActivity,
-            contentClassInfo = "overflow-y-auto max-w-[700px]",
+            contentClassInfo = "swt:overflow-y-auto swt:max-w-[700px]",
             content = content,
             footer = fooder submit input rmv
         )

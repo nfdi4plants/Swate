@@ -38,17 +38,21 @@ module private Components =
         String.Join("", s0), String.Join("", s1), String.Join("", s2)
 
     let Tab (targetPage: FunctionPage, currentPage, setPage) =
-        Daisy.tab [
-            if targetPage = currentPage then
-                tab.active
+        //Daisy.tab [
+        Html.button [
+            prop.className [
+                "swt:tab"
+                if targetPage = currentPage then
+                    "swt:tab-active"
+            ]
             prop.onClick (fun _ -> setPage targetPage)
             prop.children [ Html.a [ prop.text (targetPage.ToString()) ] ]
         ]
 
     let TabNavigation (currentPage, setPage) =
-        Daisy.tabs [
-            prop.className "grow"
-            tabs.bordered
+        //Daisy.tabs [
+        Html.div [
+            prop.className "swt:tabs swt:tabs-bordered swt:grow"
             prop.children [
                 Tab(FunctionPage.Create, currentPage, setPage)
                 Tab(FunctionPage.Update, currentPage, setPage)
@@ -61,32 +65,34 @@ module private Components =
             Html.td [
                 let s0, marked, s2 = split (fst markedIndices) (snd markedIndices) cell0
                 Html.span s0
-                Html.mark [ prop.className "bg-info text-info-content"; prop.text marked ]
+                Html.mark [ prop.className "swt:bg-info swt:text-info-content"; prop.text marked ]
                 Html.span s2
             ]
             Html.td (cell)
         ]
 
-    let PreviewTable(column: CompositeColumn, cellValues: string [], regex) =
+    let PreviewTable (column: CompositeColumn, cellValues: string[], regex) =
         React.fragment [
-            Daisy.label [
-                Daisy.labelText "Preview"
-            ]
+            //Daisy.label [
+            Html.label [ prop.className "swt:label"; prop.text "Preview" ]
             Html.div [
-                prop.className "overflow-x-auto grow"
+                prop.className "swt:overflow-x-auto swt:grow"
                 prop.children [
-                    Daisy.table [
-                        Html.thead [
-                            Html.tr [Html.th "";Html.th "Before"; Html.th "After"]
-                        ]
-                        Html.tbody [
-                            let previewCount = 5
-                            let preview = Array.takeSafe previewCount cellValues
-                            for i in 0 .. (preview.Length-1) do
-                                let cell0 = column.Cells.[i].ToString()
-                                let cell = preview.[i]
-                                let regexMarkedIndex = calculateRegex regex cell0
-                                PreviewRow(i,cell0,cell,regexMarkedIndex)
+                    //Daisy.table [
+                    Html.table [
+                        prop.className "swt:table"
+                        prop.children [
+                            Html.thead [ Html.tr [ Html.th ""; Html.th "Before"; Html.th "After" ] ]
+                            Html.tbody [
+                                let previewCount = 5
+                                let preview = Array.takeSafe previewCount cellValues
+
+                                for i in 0 .. (preview.Length - 1) do
+                                    let cell0 = column.Cells.[i].ToString()
+                                    let cell = preview.[i]
+                                    let regexMarkedIndex = calculateRegex regex cell0
+                                    PreviewRow(i, cell0, cell, regexMarkedIndex)
+                            ]
                         ]
                     ]
                 ]
@@ -109,28 +115,36 @@ type UpdateColumn =
             |> setPreview
 
         React.fragment [
-            Daisy.formControl [
-                Daisy.label [ Daisy.labelText "Base" ]
-                Daisy.input [
-                    input.bordered
-                    prop.className "input-xs sm:input-sm md:input-md"
-                    prop.autoFocus true
-                    prop.valueOrDefault baseStr
-                    prop.onChange (fun s ->
-                        setBaseStr s
-                        updateCells s suffix)
-                ]
-            ]
-            Daisy.formControl [
-                Daisy.label [
-                    prop.className "cursor-pointer"
-                    prop.children [
-                        Daisy.labelText "Add number suffix"
-                        Daisy.checkbox [
-                            prop.isChecked suffix
-                            prop.onChange (fun e ->
-                                setSuffix e
-                                updateCells baseStr e)
+            //Daisy.fieldset [
+            Html.div [
+                prop.className "swt:fieldset"
+                prop.children [
+                    //Daisy.fieldsetLegend "Base"
+                    Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Base" ]
+                    //Daisy.input [
+                    Html.input [
+                        prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
+                        prop.autoFocus true
+                        prop.valueOrDefault baseStr
+                        prop.onChange (fun (ev: Browser.Types.Event) ->
+                            let target = ev.target :?> Browser.Types.HTMLInputElement
+                            let value = target.value
+                            setBaseStr value
+                            updateCells value suffix)
+                    ]
+                    //Daisy.label [
+                    Html.label [
+                        prop.className "swt:label swt:cursor-pointer"
+                        prop.children [
+                            Html.span "Add number suffix"
+                            Html.input [
+                                prop.type'.checkbox
+                                prop.className "swt:checkbox"
+                                prop.isChecked suffix
+                                prop.onChange (fun (b: bool) ->
+                                    setSuffix b
+                                    updateCells baseStr b)
+                            ]
                         ]
                     ]
                 ]
@@ -162,29 +176,37 @@ type UpdateColumn =
                 ()
 
         Html.div [
-            prop.className "flex gap-2"
+            prop.className "swt:flex gap-2"
             prop.children [
-                Daisy.formControl [
-                    Daisy.label [ Daisy.labelText "Regex" ]
-                    Daisy.input [
-                        prop.autoFocus true
-                        input.bordered
-                        prop.className "input-xs sm:input-sm md:input-md"
-                        prop.valueOrDefault regex
-                        prop.onChange (fun s ->
-                            setRegex s
-                            updateCells replacement s)
-                    ]
-                ]
-                Daisy.formControl [
-                    Daisy.label [ Daisy.labelText "Replacement" ]
-                    Daisy.input [
-                        input.bordered
-                        prop.className "input-xs sm:input-sm md:input-md"
-                        prop.valueOrDefault replacement
-                        prop.onChange (fun s ->
-                            setReplacement s
-                            updateCells s regex)
+                //Daisy.fieldset [
+                Html.div [
+                    prop.className "swt:fieldset"
+                    prop.children [
+                        //Daisy.fieldsetLabel "Regex"
+                        Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Regex" ]
+                        //Daisy.input [
+                        Html.input [
+                            prop.autoFocus true
+                            prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
+                            prop.valueOrDefault regex
+                            prop.onChange (fun (ev: Browser.Types.Event) ->
+                                let target = ev.target :?> Browser.Types.HTMLInputElement
+                                let value = target.value
+                                setRegex value
+                                updateCells replacement value)
+                        ]
+                        //Daisy.fieldsetLabel "Replacement"
+                        Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Replacement" ]
+                        //Daisy.input [
+                        Html.input [
+                            prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
+                            prop.valueOrDefault replacement
+                            prop.onChange (fun (ev: Browser.Types.Event) ->
+                                let target = ev.target :?> Browser.Types.HTMLInputElement
+                                let value = target.value
+                                setReplacement value
+                                updateCells value regex)
+                        ]
                     ]
                 ]
             ]
@@ -237,12 +259,18 @@ type UpdateColumn =
 
         let footer =
             Html.div [
-                prop.className "justify-end flex gap-2"
+                prop.className "swt:justify-end swt:flex swt:gap-2"
                 prop.style [ style.marginLeft length.auto ]
                 prop.children [
-                    Daisy.button.button [ prop.onClick rmv; button.outline; prop.text "Cancel" ]
-                    Daisy.button.button [
-                        button.primary
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-outline"
+                        prop.text "Cancel"
+                        prop.onClick rmv
+                    ]
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary"
                         prop.style [ style.marginLeft length.auto ]
                         prop.text "Submit"
                         prop.onClick (fun e ->
@@ -255,9 +283,9 @@ type UpdateColumn =
         Swate.Components.BaseModal.BaseModal(
             rmv,
             header = Html.p "Update Column",
-            modalClassInfo = "max-h-screen max-w-4xl flex",
+            modalClassInfo = "swt:max-h-screen swt:max-w-4xl swt:flex",
             modalActions = modalActivity,
-            contentClassInfo = "shrink-1 overflow-y-auto",
+            contentClassInfo = "swt:shrink-1 swt:overflow-y-auto",
             content = content,
             footer = footer
         )

@@ -36,18 +36,22 @@ type SelectiveTemplateFromDB =
     /// <param name="model"></param>
     /// <param name="dispatch"></param>
     static member ToProtocolSearchElement(model: Model, dispatch, ?className: Fable.Core.U2<string, string list>) =
-        Daisy.button.button [
+        //Daisy.button.button [
+        Html.button [
+            prop.text "Browse database"
+            prop.className [
+                "swt:btn swt:btn-primary"
+                if className.IsSome then
+                    match className.Value with // this can also be done with !^ , but i was too lazy to open Fable.Core
+                    | Fable.Core.Case1 className -> className
+                    | Fable.Core.U2.Case2 className -> String.concat " " className
+            ]
+
             prop.onClick (fun _ ->
                 Protocol.UpdateShowSearch true |> ProtocolMsg |> dispatch
 
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Protocol.RemoveSelectedProtocols |> ProtocolMsg |> dispatch)
-            button.primary
-            if className.IsSome then
-                match className.Value with // this can also be done with !^ , but i was too lazy to open Fable.Core
-                | Fable.Core.Case1 className -> prop.className className
-                | Fable.Core.U2.Case2 className -> prop.className className
-            prop.text "Browse database"
         ]
 
     // /// <summary>
@@ -129,18 +133,18 @@ type SelectiveTemplateFromDB =
         let radioGroup = if isWidget then "Widget" else ""
 
         Html.div [
-            prop.className "flex flex-col gap-2 lg:gap-4 overflow-hidden"
+            prop.className "swt:flex swt:flex-col swt:gap-2 swt:lg:gap-4 swt:overflow-hidden"
             prop.children [
                 Html.div [
-                    prop.className "grid grid-cols-2 gap-2"
+                    prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
                     prop.children [
                         SelectiveTemplateFromDB.ToProtocolSearchElement(
                             model,
                             dispatch,
                             Fable.Core.U2.Case2 [
-                                "grow"
+                                "swt:grow"
                                 if model.ProtocolState.TemplatesSelected.Length > 0 then
-                                    "btn-outline"
+                                    "swt:btn swt:btn-outline"
                             ]
                         )
                         SelectiveTemplateFromDB.AddTemplatesFromDBToTableButton("Import", model, dispatch)
@@ -148,7 +152,7 @@ type SelectiveTemplateFromDB =
                 ]
                 if model.ProtocolState.TemplatesSelected.Length > 0 then
                     Html.div [
-                        prop.className "flex gap-2 flex-col shrink overflow-y-auto"
+                        prop.className "swt:flex swt:flex-col swt:gap-2 swt:shrink swt:overflow-y-auto"
                         prop.children [
                             SelectiveImportModal.RadioPluginsBox(
                                 "Import Type",

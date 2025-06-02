@@ -5,7 +5,6 @@
     <DefineConstants>FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="tailwind.config.js" />
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
@@ -22,6 +21,7 @@
     <Compile Include="JsBindings\Cytoscape.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Routing.fs" />
+    <Compile Include="ReactContext.fs" />
     <Compile Include="OfficeInterop\InteropLogging.fs" />
     <Compile Include="OfficeInterop\ARCtrlHelper.fs" />
     <Compile Include="OfficeInterop\ExcelHelper.fs" />
@@ -66,6 +66,8 @@
     <Compile Include="Spreadsheet\Controller\Table.fs" />
     <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
     <Compile Include="Spreadsheet\Controller\DataMap.fs" />
+    <Compile Include="SharedComponents\TermSearchImplementation.fs" />
+    <Compile Include="SharedComponents\Logo.fs" />
     <Compile Include="SharedComponents\BaseDropdown.fs" />
     <Compile Include="SharedComponents\LazyLoadTable.fs" />
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
@@ -101,6 +103,7 @@
     <Compile Include="Pages\Info\InfoView.fs" />
     <Compile Include="Pages\Settings\ActivityLogView.fs" />
     <Compile Include="Pages\Settings\SettingsView.fs" />
+    <Compile Include="Pages\JsonImport\JsonImport.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
     <Compile Include="Pages\DataAnnotator\DataAnnotator.fs" />
     <Compile Include="MainComponents\CellStyles.fs" />

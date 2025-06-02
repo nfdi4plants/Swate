@@ -15,8 +15,8 @@ module private TableHelper =
 
         if
             (lower.StartsWith("key")
-            || lower.StartsWith("digit")
-            || lower.StartsWith("numpad"))
+             || lower.StartsWith("digit")
+             || lower.StartsWith("numpad"))
             || lower.StartsWith("backspace")
         then
             ActiveTrigger
@@ -51,12 +51,12 @@ module private TableHelper =
 type Table =
 
     static member TableCellStyle =
-        """data-[selected=true]:text-secondary-content data-[selected=true]:bg-secondary
-data-[is-append-origin=true]:border data-[is-append-origin=true]:border-base-content
-data-[active=true]:border-2 data-[active=true]:border-primary data-[active=true]:!bg-transparent
-cursor-pointer
-select-none
-p-0"""
+        """swt:data-[selected=true]:text-secondary-content swt:data-[selected=true]:bg-secondary
+swt:data-[is-append-origin=true]:border swt:data-[is-append-origin=true]:border-base-content
+swt:data-[active=true]:border-2 swt:data-[active=true]:border-primary swt:data-[active=true]:!bg-transparent
+swt:cursor-pointer
+swt:select-none
+swt:p-0"""
 
     [<ReactComponent(true)>]
     static member Table
@@ -147,8 +147,8 @@ p-0"""
                             contains = GridSelect.contains,
                             selectAt = GridSelect.selectAt,
                             clear = GridSelect.clear,
-                            getSelectedCells = (
-                                fun () ->
+                            getSelectedCells =
+                                (fun () ->
                                     match GridSelect.selectedCells with
                                     | Some range ->
                                         ResizeArray [|
@@ -156,8 +156,7 @@ p-0"""
                                                 for y in range.yStart .. range.yEnd do
                                                     yield {| x = x; y = y |}
                                         |]
-                                    | None -> ResizeArray ()
-                            ),
+                                    | None -> ResizeArray()),
                             getSelectedCellRange = (fun () -> GridSelect.selectedCells),
                             getCount = (fun () -> GridSelect.count)
                         )
@@ -231,7 +230,7 @@ p-0"""
                 prop.onKeyDown (fun e ->
                     TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown)
                 prop.tabIndex 0
-                prop.className "overflow-auto h-96 w-full border border-primary rounded"
+                prop.className "swt:overflow-auto swt:h-96 swt:w-full swt:border swt:border-primary swt:rounded-sm"
                 if debug then
                     prop.testId "virtualized-table"
                 prop.children [
@@ -243,15 +242,16 @@ p-0"""
                         ]
                         prop.children [
                             Html.table [
-                                prop.className "w-full h-full border-collapse"
+                                prop.className "swt:w-full swt:h-full swt:border-collapse"
                                 prop.children [
                                     Html.thead [
                                         prop.key "table-thead"
-                                        prop.className "[&>tr>th]:border [&>tr>th]:border-neutral"
+                                        prop.className "swt:[&>tr>th]:border swt:[&>tr>th]:border-neutral"
                                         prop.children [
                                             Html.tr [
                                                 prop.key "header"
-                                                prop.className "sticky top-0 left-0 z-10 bg-base-100 text-left"
+                                                prop.className
+                                                    "swt:sticky swt:top-0 swt:left-0 swt:z-10 swt:bg-base-100 swt:text-left"
                                                 prop.style [ style.height Constants.Table.DefaultRowHeight ]
                                                 prop.children [
                                                     for virtualColumn in columnVirtualizer.getVirtualItems () do
@@ -264,10 +264,10 @@ p-0"""
                                                             prop.key virtualColumn.key
                                                             prop.className [
                                                                 if virtualColumn.index <> 0 then
-                                                                    "min-w-32"
+                                                                    "swt:min-w-32"
                                                                 else
-                                                                    "min-w-min"
-                                                                "h-full resize-x overflow-x-auto"
+                                                                    "swt:min-w-min"
+                                                                "swt:h-full swt:resize-x swt:overflow-x-auto"
                                                                 if defaultStyleSelect then
                                                                     Table.TableCellStyle
                                                             ]
@@ -298,7 +298,8 @@ p-0"""
                                                                             |> Seq.last
                                                                         ),
                                                                         className =
-                                                                            "px-2 py-1 flex items-center cursor-not-allowed w-full h-full min-w-8 bg-base-200 text-transparent"
+                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 /
+                                                                            swt:bg-base-200 swt:text-transparent"
                                                                     )
                                                                 elif controller.IsActive then
                                                                     renderActiveCell controller
@@ -312,7 +313,7 @@ p-0"""
                                     ]
                                     Html.tbody [
                                         prop.style [ style.marginTop Constants.Table.DefaultRowHeight ]
-                                        prop.className "[&>tr>td]:border [&>tr>td]:border-neutral"
+                                        prop.className "swt:[&>tr>td]:border swt:[&>tr>td]:border-neutral"
                                         prop.children [
                                             for virtualRow in rowVirtualizer.getVirtualItems () do
                                                 if virtualRow.index = 0 then
@@ -330,7 +331,7 @@ p-0"""
                                                             )
                                                             style.height virtualRow.size
                                                         ]
-                                                        prop.className "w-full"
+                                                        prop.className "swt:w-full"
                                                         prop.children [
                                                             for virtualColumn in columnVirtualizer.getVirtualItems () do
                                                                 let index = {|
@@ -413,7 +414,7 @@ p-0"""
                         ts.Index.x,
                         Html.div [
                             prop.key $"{ts.Index.x}-{ts.Index.y}"
-                            prop.className "truncate"
+                            prop.className "swt:truncate"
                             if ts.Index.x = 0 then
                                 prop.text ts.Index.y
                             else
@@ -438,10 +439,10 @@ p-0"""
             )
 
         Html.div [
-            prop.className "flex flex-col gap-4"
+            prop.className "swt:flex swt:flex-col swt:gap-4"
             prop.children [
                 Html.button [
-                    prop.className "btn btn-primary"
+                    prop.className "swt:btn swt:btn-primary"
                     prop.text "scroll to 500, 500"
                     prop.onClick (fun _ ->
                         TableHandler.current.SelectHandle.selectAt ({| x = 500; y = 500 |}, false)

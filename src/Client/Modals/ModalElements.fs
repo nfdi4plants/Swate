@@ -15,12 +15,15 @@ type ModalElements =
     static member Button(text: string, onClickAction, buttonInput, ?isDisabled: bool, ?className: string) =
         let isDisabled = defaultArg isDisabled false
 
-        Daisy.button.a [
-            button.primary
-            if isDisabled then
-                button.error
-            if className.IsSome then
-                prop.className className.Value
+        //Daisy.button.a [
+        Html.button [
+            prop.className [
+                "swt:btn swt:btn-primary"
+                if isDisabled then
+                    "swt:btn-error"
+                if className.IsSome then
+                    className.Value
+            ]
             prop.disabled isDisabled
             prop.onClick (fun _ -> onClickAction buttonInput)
             prop.text text
@@ -29,24 +32,31 @@ type ModalElements =
     static member RadioPlugin(radioGroup: string, txt: string, isChecked, onChange: bool -> unit, ?isDisabled: bool) =
         let isDisabled = defaultArg isDisabled false
 
-        Daisy.formControl [
-            Daisy.label [
-                prop.className [
-                    "cursor-pointer transition-colors"
-                    if isDisabled then
-                        "!cursor-not-allowed"
-                    else
-                        "hover:bg-base-300"
-                ]
-                prop.children [
-                    Daisy.radio [
-                        prop.disabled isDisabled
-                        radio.xs
-                        prop.name radioGroup
-                        prop.isChecked isChecked
-                        prop.onChange onChange
+        //Daisy.fieldset [
+        Html.div [
+            prop.className "swt:fieldset"
+            prop.children [
+                //Daisy.label [
+                Html.label [
+                    prop.className [
+                        "swt:label swt:cursor-pointer swt:transition-colors"
+                        if isDisabled then
+                            "swt:!cursor-not-allowed"
+                        else
+                            "swt:hover:bg-base-300"
                     ]
-                    Html.span [ prop.className "text-sm"; prop.text txt ]
+                    prop.children [
+                        //Daisy.radio [
+                        Html.input [
+                            prop.className "swt:radio swt:radio-xs"
+                            prop.type'.radio
+                            prop.disabled isDisabled
+                            prop.name radioGroup
+                            prop.isChecked isChecked
+                            prop.onChange onChange
+                        ]
+                        Html.span [ prop.className "swt:text-sm"; prop.text txt ]
+                    ]
                 ]
             ]
         ]
@@ -54,13 +64,13 @@ type ModalElements =
     static member Box(title: string, icon: string, content: ReactElement, ?className: string list) =
         Html.div [
             prop.className [
-                "rounded shadow p-2 flex flex-col gap-2 border"
+                "swt:rounded-sm swt:shadow-sm swt:p-2 swt:flex swt:flex-col swt:gap-2 swt:border swt:border-3"
                 if className.IsSome then
                     className.Value |> String.concat " "
             ]
             prop.children [
                 Html.h3 [
-                    prop.className "font-semibold gap-2 flex flex-row items-center"
+                    prop.className "swt:font-semibold swt:gap-2 swt:flex swt:flex-row swt:items-center"
                     prop.children [ Html.i [ prop.className icon ]; Html.span title ]
                 ]
                 content
@@ -70,13 +80,16 @@ type ModalElements =
     static member SelectorButton<'a when 'a: equality>
         (targetselector: 'a, selector: 'a, setSelector: 'a -> unit, ?isDisabled)
         =
-        Daisy.button.button [
-            join.item
+        //Daisy.button.button [
+        Html.button [
+            prop.className [
+                "swt:btn swt:join-item"
+                if (targetselector = selector) then
+                    "swt:btn-primary"
+            ]
             if isDisabled.IsSome then
                 prop.disabled isDisabled.Value
             prop.style [ style.flexGrow 1 ]
-            if (targetselector = selector) then
-                button.primary
             prop.onClick (fun _ -> setSelector targetselector)
             prop.text (string targetselector)
         ]

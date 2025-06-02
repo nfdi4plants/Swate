@@ -53,9 +53,14 @@ let private dragenter_handler (state, setState) =
 ///<summary>Removes dragenter styling.</summary>
 let private dragleave_handler (state, setState) =
     fun (e: Browser.Types.DragEvent) ->
+        log "dragleave"
         e.preventDefault ()
         e.stopPropagation ()
         setState { state with IsDraggedOver = false }
+
+[<Literal>]
+let private DragOverClass =
+    "swt:!border swt:!border-dashed swt:!border-base-content"
 
 [<ReactComponent>]
 let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg -> unit) =
@@ -63,9 +68,15 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     let state, setState = React.useState (FooterTab.init (table.Name))
     let id = $"ReorderMe_{index}_{table.Name}"
 
-    Daisy.tab [
-        if state.IsDraggedOver then
-            prop.className "dragover-footertab"
+    //Daisy.tab [
+    Html.div [
+        prop.className [
+            "swt:tab swt:*:pointer-events-none"
+            if state.IsDraggedOver then
+                DragOverClass
+            if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then
+                "swt:tab-active"
+        ]
         prop.draggable true
         prop.onDrop <| drop_handler (index, state, setState, dispatch)
         prop.onDragLeave <| dragleave_handler (state, setState)
@@ -82,8 +93,6 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
         // Use this to ensure updating reactelement correctly
         prop.key id
         prop.id id
-        if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then
-            tab.active
         prop.onClick (fun _ ->
             Spreadsheet.UpdateActiveView(Spreadsheet.ActiveView.Table index)
             |> Messages.SpreadsheetMsg
@@ -111,7 +120,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                         setState { state with IsEditable = false }
 
                 Html.input [
-                    prop.className "bg-transparent px-2 border-0 focus:ring-0"
+                    prop.className "swt:input swt:bg-transparent swt:px-2 swt:border-0 swt:focus:ring-0"
                     prop.autoFocus (true)
                     prop.id (id + "input")
                     prop.onChange (fun e -> setState { state with Name = e })
@@ -132,7 +141,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                 ]
             else
                 Html.i [ prop.className "fa-solid fa-table" ]
-                Html.span [ prop.className "truncate"; prop.text table.Name ]
+                Html.span [ prop.className "swt:truncate"; prop.text table.Name ]
         ]
     ]
 
@@ -142,9 +151,13 @@ let MainMetadata (model: Model, dispatch: Messages.Msg -> unit) =
     let nav = Spreadsheet.ActiveView.Metadata
     let order = nav.ViewIndex
 
-    Daisy.tab [
-        if model.SpreadsheetModel.ActiveView = nav then
-            tab.active
+    //Daisy.tab [
+    Html.div [
+        prop.className [
+            "swt:tab"
+            if model.SpreadsheetModel.ActiveView = nav then
+                "swt:tab-active"
+        ]
         prop.key id
         prop.id id
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
@@ -165,9 +178,13 @@ let MainDataMap (model: Model, dispatch: Messages.Msg -> unit) =
     let nav = Spreadsheet.ActiveView.DataMap
     let order = nav.ViewIndex
 
-    Daisy.tab [
-        if model.SpreadsheetModel.ActiveView = nav then
-            tab.active
+    //Daisy.tab [
+    Html.div [
+        prop.className [
+            "swt:tab"
+            if model.SpreadsheetModel.ActiveView = nav then
+                "swt:tab-active"
+        ]
         prop.key id
         prop.id id
         prop.onClick (fun _ -> Spreadsheet.UpdateActiveView nav |> Messages.SpreadsheetMsg |> dispatch)
@@ -191,11 +208,15 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
     let order = System.Int32.MaxValue - 1 // MaxValue will be sidebar toggle
     let id = "Add-Spreadsheet-Button"
 
-    Daisy.tab [
+    //Daisy.tab [
+    Html.div [
+        prop.className [
+            "swt:tab swt:*:pointer-events-none"
+            if state.IsDraggedOver then
+                DragOverClass
+        ]
         prop.key id
         prop.id id
-        if state.IsDraggedOver then
-            prop.className "dragover-footertab"
         prop.onDragEnter <| dragenter_handler (state, setState)
         prop.onDragLeave <| dragleave_handler (state, setState)
         prop.onDragOver drag_preventdefault
@@ -228,15 +249,16 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
             Messages.PageState.UpdateShowSidebar(not show)
             |> Messages.PageStateMsg
             |> dispatch)
-        prop.className "h-full cursor-pointer ml-auto"
+        prop.className "swt:h-full swt:cursor-pointer swt:ml-auto swt:overflow-hidden"
         prop.children [
             Html.label [
                 // prop.htmlFor "split-window-drawer"
-                prop.className "drawer-button btn btn-sm px-2 py-2 swap swap-rotate rounded-none h-full"
+                prop.className
+                    "swt:drawer swt:drawer-button swt:btn swt:btn-sm swt:px-2 swt:py-2 swt:swap swt:swap-rotate swt:rounded-none swt:h-full"
                 prop.children [
                     Html.input [ prop.type'.checkbox ]
-                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-left"; "swap-off" ] ]
-                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-right"; "swap-on" ] ]
+                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-left"; "swt:swap-off" ] ]
+                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-right"; "swt:swap-on" ] ]
                 ]
             ]
         ]
@@ -244,15 +266,20 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
 
 let SpreadsheetSelectionFooter (model: Model) dispatch =
     Html.div [
-        prop.className "sticky bottom-0 flex flex-row border-t-2"
+        prop.className "swt:sticky swt:bottom-0 swt:flex swt:flex-row swt:border-t-2"
         prop.children [
             Html.div [
                 prop.className
-                    "tabs tabs-lifted w-full overflow-x-auto overflow-y-hidden
-                flex flex-row items-center pt-1
-                *:!border-b-0 *:gap-1 *:flex-nowrap"
+                    "swt:*:[--tab-border-color:var(--color-base-content)] swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
                 prop.children [
-                    Daisy.tab [ prop.style [ style.width (length.px 20); style.custom ("order", -2) ] ]
+                    //Daisy.tab [
+                    //Html.div [
+                    //    prop.className "swt:tab"
+                    //    prop.style [
+                    //        style.width (length.px 20)
+                    //        style.custom ("order", -2)
+                    //    ]
+                    //]
                     MainMetadata(model, dispatch)
                     if model.SpreadsheetModel.HasDataMap() then
                         MainDataMap(model, dispatch)

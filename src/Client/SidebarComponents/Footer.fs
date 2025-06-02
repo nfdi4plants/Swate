@@ -19,12 +19,12 @@ type Footer =
             |> Async.StartImmediate)
 
         Html.div [
-            prop.className "flex items-center justify-center p-2 text-sm @md/sidebar:text-md"
+            prop.className "swt:flex swt:items-center swt:justify-center swt:p-2 swt:text-sm swt:@md/sidebar:text-md"
             prop.children [
                 Html.div [
                     Html.text "Swate Release Version "
                     Html.a [
-                        prop.className "link-primary"
+                        prop.className "swt:link-primary"
                         prop.href "https://github.com/nfdi4plants/Swate/releases"
                         prop.target.blank
                         prop.text model.PersistentStorageState.AppVersion

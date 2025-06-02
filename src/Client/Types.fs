@@ -2,6 +2,7 @@
 module Types
 
 open ARCtrl
+open Fable.Core
 
 module Feliz =
 

@@ -15,13 +15,25 @@ type QuickAccessButton =
             onclick: Event -> unit,
             ?isDisabled: bool,
             ?props: IReactProperty seq,
+            ?color: DaisyUIColors,
             ?classes: string
         ) =
         let isDisabled = defaultArg isDisabled false
 
         Html.button [
             prop.className [
-                "px-3 h-8 min-h-8 text-secondary-content transition-colors duration-300 inline-flex justify-center items-center hover:text-primary cursor-pointer disabled:cursor-not-allowed disabled:text-gray-500"
+                "swt:btn swt:btn-ghost swt:btn-square swt:btn-transparent swt:bg-transparent swt:border-none swt:shadow-none"
+
+                match color with
+                | Some DaisyUIColors.Primary -> "swt:hover:!text-primary"
+                | Some DaisyUIColors.Secondary -> "swt:hover:!text-secondary"
+                | Some DaisyUIColors.Accent -> "swt:hover:!text-accent"
+                | Some DaisyUIColors.Error -> "swt:hover:!text-error"
+                | Some DaisyUIColors.Info -> "swt:hover:!text-info"
+                | Some DaisyUIColors.Success -> "swt:hover:!text-success"
+                | Some DaisyUIColors.Warning -> "swt:hover:!text-warning"
+                | None -> "swt:hover:!text-primary"
+
                 if classes.IsSome then
                     classes.Value
             ]

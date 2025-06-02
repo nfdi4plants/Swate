@@ -18,17 +18,17 @@ type AnnotationTable =
             Html.div [
                 prop.className [
                     if not tcc.IsSelected && tcc.Index.y = 0 then
-                        "bg-base-300"
-                    "flex flex-row gap-2 items-center h-full max-w-full px-2 py-1 w-full"
+                        "swt:bg-base-300"
+                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-1 swt:w-full"
                 ]
                 prop.children [
                     if icon.IsSome then
                         icon.Value
-                    Html.div [ prop.className "truncate"; prop.text text ]
+                    Html.div [ prop.className "swt:truncate"; prop.text text ]
                 ]
             ],
             props = [ prop.title text; prop.onClick (fun e -> tcc.onClick e) ],
-            className = "w-full h-full"
+            className = "swt:w-full swt:h-full"
         )
 
     [<ReactComponent(true)>]
@@ -47,7 +47,7 @@ type AnnotationTable =
                             tcc.Index.x,
                             Html.text tcc.Index.y,
                             className =
-                                "px-2 py-1 flex items-center justify-center cursor-not-allowed w-full h-full bg-base-200"
+                                "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200"
                         )
                     | Some (U2.Case2 header) ->
                         let text = header.ToString()
@@ -61,7 +61,7 @@ type AnnotationTable =
                                 && System.String.IsNullOrWhiteSpace cell.AsTerm.TermAccessionShort |> not
                             then
                                 Html.i [
-                                    prop.className "fa-solid fa-check text-primary"
+                                    prop.className "fa-solid fa-check swt:text-primary"
                                     prop.title cell.AsTerm.TermAccessionShort
                                 ]
                                 |> Some
@@ -92,7 +92,7 @@ type AnnotationTable =
             prop.children [
                 Html.div [
                     Html.button [
-                        prop.className "btn btn-primary"
+                        prop.className "swt:btn swt:btn-primary"
                         prop.onClick (fun _ ->
                             let iscontained = tableRef.current.SelectHandle.contains {| x = 2; y = 2 |}
                             console.log ("iscontained", iscontained))

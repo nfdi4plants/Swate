@@ -32,6 +32,7 @@
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
+    <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
@@ -49,7 +50,7 @@
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />
     <PackageReference Include="Fable.Core" Version="4.5.0" />
     <PackageReference Include="Feliz" Version="2.9.0" />
-    <PackageReference Include="Feliz.DaisyUI" Version="4.2.1" />
+    <PackageReference Include="Feliz.DaisyUI" Version="5.2.0" />
     <PackageReference Include="Fable.Browser.Dom" Version="2.18.0" />
     <PackageReference Include="ARCtrl.Core" Version="2.5.1" />
   </ItemGroup>

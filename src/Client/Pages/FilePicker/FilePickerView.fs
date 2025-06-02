@@ -39,7 +39,7 @@ type FilePicker =
         let inputId = "filePicker_OnFilePickerMainFunc"
 
         Html.div [
-            prop.className [ "flex flex-col gap-2"; parentContainerResizeClass ]
+            prop.className [ "swt:flex swt:flex-col swt:gap-2"; parentContainerResizeClass ]
             prop.children [
                 Html.input [
                     prop.style [ style.display.none ]
@@ -60,63 +60,68 @@ type FilePicker =
                 ]
                 match model.PersistentStorageState.Host with
                 | Some Swatehost.ARCitect ->
-                    Daisy.button.button [
-                        button.primary
-                        button.block
-                        prop.onClick (fun _ -> Start false |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch)
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:btn-block"
                         prop.text "Pick Files"
+                        prop.onClick (fun _ -> Start false |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch)
                     ]
 
-                    Daisy.button.button [
-                        button.primary
-                        button.block
-                        prop.onClick (fun _ -> Start true |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch)
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:btn-block"
                         prop.text "Pick Directories"
+                        prop.onClick (fun _ -> Start true |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch)
                     ]
                 | _ ->
-                    Daisy.button.button [
-                        button.primary
-                        button.block
+                    //Daisy.button.button [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:btn-block"
+                        prop.text "Pick file names"
                         prop.onClick (fun _ ->
                             let getUploadElement = Browser.Dom.document.getElementById inputId
                             getUploadElement.click ())
-                        prop.text "Pick file names"
                     ]
             ]
         ]
 
-    static member private ActionButtons (model: Model) dispatch =
+    static member ActionButtons (model: Model) dispatch =
         Html.div [
-            prop.className "flex flex-row justify-center gap-2"
+            prop.className "swt:flex swt:flex-row swt:justify-center swt:gap-2"
             prop.children [
 
-                Daisy.button.button [
-                    button.neutral
-                    button.outline
-                    prop.onClick (fun _ -> Messages.FilePicker.UpdateFileNames [] |> FilePickerMsg |> dispatch)
+                //Daisy.button.button [
+                Html.button [
+                    prop.className "swt:btn swt:btn-neutral swt:btn-outline swt:bg-neutral swt:text-white swt:hover:btn-primary"
                     prop.text "Cancel"
+                    prop.onClick (fun _ -> Messages.FilePicker.UpdateFileNames [] |> FilePickerMsg |> dispatch)
                 ]
 
-                Daisy.button.button [
-                    button.primary
+                //Daisy.button.button [
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.text "Insert file names"
                     prop.onClick (fun _ ->
                         let fileNames = model.FilePickerState.FileNames |> List.map snd
                         SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch)
-                    prop.text "Insert file names"
                 ]
             ]
         ]
 
     static member private SortButton icon msg =
-        Daisy.button.a [
+        //Daisy.button.a [
+        Html.button [
             join.item
+            prop.className "swt:btn swt:join-item"
             prop.onClick msg
             prop.children [ Html.i [ prop.classes [ "fa-lg"; icon ] ] ]
         ]
 
-    static member private FileSortElements (model: Model) dispatch =
+    static member FileSortElements (model: Model) dispatch =
         Html.div [
-            Daisy.join [
+            //Daisy.join [
+            Html.div [
+                prop.className "swt:join"
                 prop.children [
                     FilePicker.SortButton "fa-solid fa-arrow-down-a-z" (fun _ ->
                         let sortedList =
@@ -146,16 +151,14 @@ type FilePicker =
                         |> List.mapi (fun i (_, name) -> i + 1, name)
 
                     newList |> UpdateFileNames |> FilePickerMsg |> dispatch)
-                button.xs
-                button.error
-                button.outline
+                prop.className "swt:btn-xs swt:btn-error wt:btn-outline"
             ]
         )
 
     static member private MoveUpButton (id, fileName) (model: Model) dispatch =
-        Daisy.button.a [
-            button.xs
-            join.item
+        //Daisy.button.a [
+        Html.button [
+            prop.className "swt:btn swt:btn-xs swt:join-item"
             prop.onClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
@@ -176,9 +179,9 @@ type FilePicker =
         ]
 
     static member private MoveDownButton (id, fileName) (model: Model) dispatch =
-        Daisy.button.a [
-            button.xs
-            join.item
+        //Daisy.button.a [
+        Html.button [
+            prop.className "swt:btn swt:btn-xs swt:join-item"
             prop.onClick (fun _ ->
                 let sortedList =
                     model.FilePickerState.FileNames
@@ -199,16 +202,20 @@ type FilePicker =
         ]
 
     static member private MoveButtonList (id, fileName) (model: Model) dispatch =
-        Daisy.join [
-            FilePicker.MoveUpButton (id, fileName) model dispatch
-            FilePicker.MoveDownButton (id, fileName) model dispatch
+        //Daisy.join [
+        Html.div [
+            prop.className "swt:join"
+            prop.children [
+                FilePicker.MoveUpButton (id, fileName) model dispatch
+                FilePicker.MoveDownButton (id, fileName) model dispatch
+            ]
         ]
 
 
     static member private FileViewTable (model: Model) dispatch =
-        Daisy.table [
-            table.zebra
-            table.xs
+        //Daisy.table [
+        Html.table [
+            prop.className "swt:table swt:table-zebra swt:table-xs"
             prop.children [
                 Html.tbody [
                     for index, fileName in model.FilePickerState.FileNames do
@@ -227,19 +234,22 @@ type FilePicker =
 
 
     static member Main(model: Model, dispatch, containerQueryClass: string) =
-
-        React.fragment [
-
-            match model.FilePickerState.FileNames with
-            | [] ->
-
-                FilePicker.UploadButtons(model, dispatch, containerQueryClass)
-            | _ ->
-                FilePicker.FileSortElements model dispatch
-
-                FilePicker.FileViewTable model dispatch
-                //fileNameElements model dispatch
-                FilePicker.ActionButtons model dispatch
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
+            prop.children [
+                if model.FilePickerState.FileNames.Length > 0 then
+                    FilePicker.FileSortElements model dispatch
+                Html.div [
+                    prop.className "swt:overflow-y-auto swt:overflow-x-hidden swt:py-2"
+                    prop.children [
+                        match model.FilePickerState.FileNames with
+                        | [] -> FilePicker.UploadButtons(model, dispatch, containerQueryClass)
+                        | _ -> FilePicker.FileViewTable model dispatch
+                    ]
+                ]
+                if model.FilePickerState.FileNames.Length > 0 then
+                    FilePicker.ActionButtons model dispatch
+            ]
         ]
 
     static member Sidebar(model: Model, dispatch: Messages.Msg -> unit) =
@@ -251,5 +261,5 @@ type FilePicker =
                 "Select files from your computer and insert their names into Excel"
 
             // Colored container element for all uploaded file names and sort elements
-            FilePicker.Main(model, dispatch, "@md/sidebar:flex-row")
+            FilePicker.Main(model, dispatch, "swt:@md/sidebar:flex-row")
         ]

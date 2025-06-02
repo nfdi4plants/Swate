@@ -35,7 +35,7 @@ type Templates =
                     Html.b "Search the database for templates."
                     Html.text " The building blocks from these templates can be inserted into the Swate table. "
                     Html.span [
-                        prop.className "text-error"
+                        prop.className "swt:text-error"
                         prop.text "Only missing building blocks will be added."
                     ]
                 ]
@@ -48,13 +48,4 @@ type Templates =
                     Modals.SelectiveTemplateFromDB.Main(model, dispatch, false)
             ]
 
-            // Box 2
-            SidebarComponents.SidebarLayout.Description(
-                Html.p [
-                    Html.b "Import JSON files."
-                    Html.text " You can use \"Json Export\" to create these files from existing Swate tables. "
-                ]
-            )
-
-            TemplateFromFile.Main(model, dispatch)
         ]

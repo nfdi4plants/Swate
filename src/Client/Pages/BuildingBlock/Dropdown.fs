@@ -14,13 +14,12 @@ let FreeTextInputElement (onSubmit: string -> unit) =
     let inputS, setInput = React.useState ""
 
     Html.div [
-        prop.className "flex flex-row gap-0 p-0"
+        prop.className "swt:flex swt:flex-row swt:gap-0 swt:p-0"
         prop.children [
-            Daisy.input [
-                join.item
-                input.sm
+            //Daisy.input [
+            Html.input [
                 prop.placeholder "..."
-                prop.className "grow truncate"
+                prop.className "swt:input swt;input-sm swt:join-item swt:grow swt:truncate"
                 prop.onClick (fun e -> e.stopPropagation ())
                 prop.onChange (fun (v: string) -> setInput v)
                 prop.onKeyDown (
@@ -30,10 +29,9 @@ let FreeTextInputElement (onSubmit: string -> unit) =
                         onSubmit inputS
                 )
             ]
-            Daisy.button.button [
-                join.item
-                button.accent
-                button.sm
+            //Daisy.button.button [
+            Html.button [
+                prop.className "swt:btn swt:btn-accent swt:btn-sm swt:join-item"
                 prop.onClick (fun e ->
                     e.stopPropagation ()
                     onSubmit inputS)
@@ -44,7 +42,11 @@ let FreeTextInputElement (onSubmit: string -> unit) =
 
 module private DropdownElements =
 
-    let divider = Daisy.divider [ prop.className "mx-2 my-0" ]
+    let divider =
+        //Daisy.divider [
+        Html.div [
+            prop.className "swt:divider swt:mx-2 swt:my-0"
+        ]
 
     let private annotationsPrinciplesLink =
         Html.a [
@@ -52,7 +54,7 @@ module private DropdownElements =
             prop.onClick (fun _ ->
                 Browser.Dom.window.``open`` (Swate.Components.Shared.URLs.AnnotationPrinciplesUrl, "_blank")
                 |> ignore)
-            prop.className "ml-auto link-info"
+            prop.className "swt:ml-auto swt:link-info"
             prop.text "info"
         ]
 
@@ -68,7 +70,7 @@ module private DropdownElements =
                 setState { state with DropdownPage = subpage })
             prop.children [
                 Html.div [
-                    prop.className "flex flex-row justify-between"
+                    prop.className "swt:flex swt:flex-row swt:justify-between"
                     prop.children [
                         Html.span subpage.toString
                         Html.i [ prop.className "fa-solid fa-arrow-right" ]
@@ -80,7 +82,7 @@ module private DropdownElements =
     /// Navigation element back to main page
     let DropdownContentInfoFooter setState (hasBack: bool) =
         Html.li [
-            prop.className "flex flex-row justify-between pt-1"
+            prop.className "swt:flex swt:flex-row swt:justify-between swt:pt-1"
             prop.onClick (fun e ->
                 e.preventDefault ()
                 e.stopPropagation ()
@@ -92,7 +94,7 @@ module private DropdownElements =
             prop.children [
                 if hasBack then
                     Html.a [
-                        prop.className "content-center"
+                        prop.className "swt:content-center"
                         prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ] ]
                     ]
                 annotationsPrinciplesLink
@@ -227,12 +229,11 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
     Components.BaseDropdown.Main(
         isOpen,
         setOpen,
-        Daisy.button.div [
-            button.primary
+        //Daisy.button.div [
+        Html.button [
             prop.onClick (fun _ -> setOpen (not isOpen))
             prop.role "button"
-            join.item
-            prop.className "flex-nowrap"
+            prop.className "swt:btn swt:btn-primary swt:join-item swt:flex-nowrap"
             prop.children [
                 Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
                 Html.i [ prop.className "fa-solid fa-angle-down" ]
@@ -247,7 +248,7 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
             | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
                 DropdownElements.dropdownContentIOTypeColumns iotype state setState close model dispatch
         ],
-        style = Style.init ("join-item dropdown", Map [ "content", Style.init ("!min-w-64") ])
+        style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
     )
 // Daisy.dropdown [
 //     join.item
@@ -255,7 +256,7 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
 //     prop.children [
 
 //         Daisy.dropdownContent [
-//             prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2 shadow"
+//             prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2"
 //             prop.children
 //         ]
 //     ]

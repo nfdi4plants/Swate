@@ -23,45 +23,52 @@ open Browser.Dom
 [<ReactComponent>]
 let View (model: Model) (dispatch: Msg -> unit) =
 
-    //Set the initial theme
-    let (theme, handleSetTheme) = React.useLocalStorage ("theme", "light")
-    let newTheme = if String.IsNullOrEmpty theme then "light" else theme
-    handleSetTheme newTheme
-    document.documentElement.setAttribute ("data-theme", newTheme)
-
     React.strictMode [
-        Html.div [
-            prop.id "ClientView"
-            prop.className "flex w-full overflow-auto h-screen"
-            prop.children [
-                Modals.ModalProvider.Main(model, dispatch)
-                match model.PageState.IsHome, model.PersistentStorageState.Host with
-                | false, _ -> View.MainPageView.Main(model, dispatch)
-                | _, Some Swatehost.Excel ->
-                    Html.div [
-                        prop.className "flex flex-col w-full h-full"
-                        prop.children [ SidebarView.SidebarView.Main(model, dispatch) ]
-                    ]
-                | _, _ ->
-                    let isActive =
-                        model.SpreadsheetModel.TableViewIsActive() && model.PageState.ShowSideBar
+        Swate.Components.ThemeProvider.ThemeProvider(
+            ReactContext.ThemeCtx,
+            Html.div [
+                prop.id "ClientView"
+                prop.className "swt:flex swt:w-full swt:overflow-auto swt:h-screen"
+                prop.children [
+                    Modals.ModalProvider.Main(model, dispatch)
+                    match model.PageState.IsHome, model.PersistentStorageState.Host with
+                    | false, _ -> View.MainPageView.Main(model, dispatch)
+                    | _, Some Swatehost.Excel ->
+                        Html.div [
+                            prop.className "swt:flex swt:flex-col swt:w-full swt:h-full"
+                            prop.children [ SidebarView.SidebarView.Main(model, dispatch) ]
+                        ]
+                    | _, _ ->
+                        let isActive =
+                            model.SpreadsheetModel.TableViewIsActive() && model.PageState.ShowSideBar
 
-                    Daisy.drawer [
-                        prop.className [
-                            "drawer-end"
-                            if isActive then
-                                "drawer-open"
-                        ]
-                        prop.children [
-                            Html.input [
-                                prop.id "split-window-drawer"
-                                prop.type'.checkbox
-                                prop.className "drawer-toggle"
+                        //Daisy.drawer [
+                        Html.div [
+                            prop.className [
+                                "swt:drawer swt:drawer-end"
+                                if isActive then
+                                    "swt:drawer-open"
                             ]
-                            Daisy.drawerContent [ SpreadsheetView.Main(model, dispatch) ]
-                            Daisy.drawerSide [ SidebarView.SidebarView.Main(model, dispatch) ]
+                            prop.children [
+                                Html.input [
+                                    prop.id "split-window-drawer"
+                                    prop.className "swt:drawer-toggle"
+                                    prop.type'.checkbox
+                                    prop.isChecked isActive
+                                ]
+                                //Daisy.drawerContent [ SpreadsheetView.Main(model, dispatch) ]
+                                Html.div [
+                                    prop.className "swt:drawer-content"
+                                    prop.children [ SpreadsheetView.Main(model, dispatch) ]
+                                ]
+                                //Daisy.drawerSide [ SidebarView.SidebarView.Main(model, dispatch) ]
+                                Html.div [
+                                    prop.className "swt:drawer-side"
+                                    prop.children [ SidebarView.SidebarView.Main(model, dispatch) ]
+                                ]
+                            ]
                         ]
-                    ]
+                ]
             ]
-        ]
+        )
     ]

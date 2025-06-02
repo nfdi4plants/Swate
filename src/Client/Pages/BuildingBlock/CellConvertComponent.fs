@@ -39,10 +39,16 @@ type CellConvertComponent =
             React.useState (CellDiscriminateState.init)
 
         Html.div [
-
             Html.div [
-                Daisy.button.button [
-                    button.success
+                //Daisy.button.button [
+                //    button.success
+                //    prop.text "Refresh"
+                //    prop.onClick (fun _ ->
+                //        CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
+                //        |> Promise.start)
+                //]
+                Html.button [
+                    prop.className "swt:btn swt:btn-success"
                     prop.text "Refresh"
                     prop.onClick (fun _ ->
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
@@ -51,15 +57,32 @@ type CellConvertComponent =
                 Html.div (string cellDiscriminateState.SelectedCellState)
             ]
             Html.div [
-                Daisy.button.button [
+                //Daisy.button.button [
+                //    if cellDiscriminateState.TargetCellState.IsSome then
+                //        button.success
+                //        prop.disabled false
+                //        prop.text $"Convert {cellDiscriminateState.SelectedCellState.Value} to"
+                //    else
+                //        button.error
+                //        prop.disabled true
+                //        prop.text $"Unconvertible"
+                //    prop.onClick (fun _ ->
+                //        CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
+                //        |> Promise.start
+
+                //        OfficeInterop.Core.Main.convertBuildingBlock () |> Promise.start)
+                //]
+
+                Html.button [
                     if cellDiscriminateState.TargetCellState.IsSome then
-                        button.success
+                        prop.className "swt:btn swt:btn-success"
                         prop.disabled false
                         prop.text $"Convert {cellDiscriminateState.SelectedCellState.Value} to"
                     else
-                        button.error
+                        prop.className "swt:btn swt:btn-error"
                         prop.disabled true
                         prop.text $"Unconvertible"
+
                     prop.onClick (fun _ ->
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
                         |> Promise.start

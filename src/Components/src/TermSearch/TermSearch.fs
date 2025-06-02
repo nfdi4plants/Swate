@@ -214,14 +214,10 @@ type TermSearch =
     static member private TermItem
         (term: TermSearchResult, onTermSelect: Term option -> unit, ?isActive: bool, ?key: string)
         =
-        let collapsed, setCollapsed = React.useState (false)
         let isObsolete = term.Term.isObsolete.IsSome && term.Term.isObsolete.Value
         let isDirectedSearch = term.IsDirectedSearchResult
 
-        let activeClasses =
-            "group-[.collapse-open]:bg-secondary group-[.collapse-open]:text-secondary-content"
-
-        let gridClasses = "grid grid-cols-subgrid col-span-4"
+        let activeClasses = "swt:bg-neutral swt:text-neutral-content"
         let ref = React.useElementRef ()
 
         React.useEffect (
@@ -236,91 +232,82 @@ type TermSearch =
             [| box isActive |]
         )
 
-        Html.div [
+        Html.li [
             prop.ref ref
             prop.className [
-                "group collapse rounded-none"
-                gridClasses
-                if collapsed || (isActive.IsSome && isActive.Value) then
-                    "collapse-open"
+                "swt:list-row swt:items-center swt:cursor-pointer swt:min-w-0 swt:max-w-full swt:w-full /
+                swt:hover:bg-neutral swt:hover:text-neutral-content swt:transition-colors /
+                swt:rounded-none"
+                if isActive.IsSome && isActive.Value then
+                    activeClasses
             ]
+            prop.onClick (fun e ->
+                e.stopPropagation ()
+                onTermSelect (Some term.Term))
             prop.children [
-                Html.div [
-                    prop.onClick (fun e ->
-                        e.stopPropagation ()
-                        onTermSelect (Some term.Term))
-                    prop.className [ "collapse-title p-2 min-h-fit cursor-pointer"; gridClasses; activeClasses ]
-                    prop.children [
-                        Html.div [
-                            prop.className "items-center grid col-span-4 gap-2 grid-cols-[auto,1fr,auto,auto]"
-                            prop.children [
-                                Html.i [
-                                    if isObsolete then
-                                        prop.title "Obsolete"
-                                    elif isDirectedSearch then
-                                        prop.title "Directed Search"
-                                    prop.className [
-                                        "w-5"
-                                        if isObsolete then
-                                            "fa-solid fa-link-slash text-error"
-                                        elif isDirectedSearch then
-                                            "fa-solid fa-diagram-project text-primary"
-                                    ]
-                                ]
-                                Html.span [
-                                    let name = Option.defaultValue "<no-name>" term.Term.name
-                                    prop.title name
-
-                                    prop.className [
-                                        "truncate font-bold"
-                                        if isObsolete then
-                                            "line-through"
-                                    ]
-
-                                    prop.text name
-                                ]
-                                Html.a [
-                                    let id = Option.defaultValue "<no-id>" term.Term.id
-
-                                    if term.Term.href.IsSome then
-                                        prop.onClick (fun e -> e.stopPropagation ())
-                                        prop.target.blank
-                                        prop.href term.Term.href.Value
-                                        prop.className "link link-primary"
-
-                                    prop.text id
-                                ]
-                                Components.CollapseButton(
-                                    collapsed,
-                                    setCollapsed,
-                                    classes = "btn-sm rounded justify-self-end"
-                                )
-                            ]
-                        ]
+                Html.i [
+                    if isObsolete then
+                        prop.title "Obsolete"
+                    elif isDirectedSearch then
+                        prop.title "Directed Search"
+                    prop.className [
+                        "swt:w-5"
+                        if isObsolete then
+                            "fa-solid fa-link-slash swt:text-error"
+                        elif isDirectedSearch then
+                            "fa-solid fa-diagram-project swt:text-primary"
                     ]
                 ]
+                Html.span [
+                    let name = Option.defaultValue "<no-name>" term.Term.name
+                    prop.title name
+
+                    prop.className [
+                        "swt:truncate swt:font-bold"
+                        if isObsolete then
+                            "swt:line-through"
+                    ]
+
+                    prop.text name
+                ]
                 Html.div [
-                    prop.className [ "collapse-content prose-sm"; "col-span-4"; activeClasses ]
+                    prop.className "swt:list-col-wrap swt:text-xs swt:text-wrap"
                     prop.children [
-                        Html.p [
-                            prop.className "text-sm"
-                            prop.children [ Html.text (Option.defaultValue "<no-description>" term.Term.description) ]
-                        ]
+                        Html.p (Option.defaultValue "<no-description>" term.Term.description)
                         if term.Term.data.IsSome then
                             Html.pre [
-                                prop.className "text-xs"
-                                prop.children [
-                                    Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
-                                ]
+                                Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
                             ]
                     ]
+                // prop.children [
+                //     Html.p [
+                //     ]
+                //     if term.Term.data.IsSome then
+                // Html.pre [
+                //     Html.code (Fable.Core.JS.JSON.stringify (term.Term.data.Value, space = '\t'))
+                // ]
+                // ]
                 ]
+                Html.a [
+                    let id = Option.defaultValue "<no-id>" term.Term.id
+
+                    if term.Term.href.IsSome then
+                        prop.onClick (fun e -> e.stopPropagation ())
+                        prop.target.blank
+                        prop.href term.Term.href.Value
+                        prop.className "swt:link swt:link-primary"
+
+                    prop.text id
+                ]
+            // Html.div [
+            //     prop.className [ "swt:collapse-content swt:prose-sm"; "swt:col-span-4"; activeClasses ]
+            // ]
             ]
         ]
 
     static member private NoResultsElement(advancedSearchToggle: (unit -> unit) option) =
         Html.div [
-            prop.className "gap-y-2 py-2 px-4"
+            prop.className "swt:gap-y-2 swt:py-2 swt:px-4"
             prop.children [
                 Html.div "No terms found matching your input."
                 if advancedSearchToggle.IsSome then
@@ -328,7 +315,7 @@ type TermSearch =
                         prop.children [
                             Html.span "Can't find the term you are looking for? "
                             Html.a [
-                                prop.className "link link-primary"
+                                prop.className "swt:link swt:link-primary"
                                 prop.onClick (fun e ->
                                     e.preventDefault ()
                                     e.stopPropagation ()
@@ -343,24 +330,31 @@ type TermSearch =
                         prop.href @"https://github.com/nfdi4plants/nfdi4plants_ontology/issues/new/choose"
                         prop.target.blank
                         prop.text "contact"
-                        prop.className "link link-primary"
+                        prop.className "swt:link swt:link-primary"
                     ]
                     Html.span " with us!"
                 ]
             ]
         ]
 
-    static member private TermDropdown(termDropdownRef: IRefValue<option<HTMLElement>>, onTermSelect, state: SearchState, loading: Set<string>, advancedSearchToggle: (unit -> unit) option, keyboardNavState: KeyboardNavigationController) =
-        Html.div [
+    static member private TermDropdown
+        (
+            termDropdownRef: IRefValue<option<HTMLElement>>,
+            onTermSelect,
+            state: SearchState,
+            loading: Set<string>,
+            advancedSearchToggle: (unit -> unit) option,
+            keyboardNavState: KeyboardNavigationController
+        ) =
+        Html.ul [
             prop.ref termDropdownRef
-            prop.style [style.scrollbarGutter.stable]
+            prop.style [ style.scrollbarGutter.stable ]
             prop.className [
-                "min-w-[400px] not-prose"
-                "absolute top-[100%] left-0 right-0 z-50"
-                "grid grid-cols-[auto,1fr,auto,auto]"
-                "bg-base-200 rounded shadow-lg border-2 border-primary max-h-[400px] overflow-y-auto divide-y divide-dashed divide-base-100"
                 if state = SearchState.Idle then
-                    "hidden"
+                    "swt:hidden"
+                else
+                    """swt:min-w-[400px] not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200
+                    swt:rounded-sm swt:shadow-lg swt:border-2 swt:border-primary swt:max-h-[400px] swt:overflow-y-auto swt:list swt:[&_.swt\:list-row]:!p-1"""
             ]
 
             prop.children [
@@ -383,29 +377,36 @@ type TermSearch =
     static member private IndicatorItem
         (
             indicatorPosition: string,
-            tooltip,
-            tooltipPosition,
+            tooltip: string,
+            tooltipPosition: string,
             icon: string,
             onclick,
+            ?btnClasses: string,
             ?isActive: bool,
             ?props: IReactProperty list
         ) =
         let isActive = defaultArg isActive true
 
-        Html.span [
+        Html.label [
+            if props.IsSome then
+                yield! props.Value
             prop.className [
-                "indicator-item text-sm transition-[opacity] opacity-0"
+                "swt:indicator-item swt:text-sm swt:transition-[swt:/opacity] swt:opacity-0 swt:z-10"
                 indicatorPosition
                 if isActive then
-                    "!opacity-100"
+                    "swt:!opacity-100"
             ]
             prop.children [
                 Html.button [
                     prop.custom ("data-tip", tooltip)
                     prop.onClick onclick
-                    for prop in defaultArg props [] do
-                        prop
-                    prop.className [ "btn btn-xs btn-ghost px-2"; "tooltip"; tooltipPosition ]
+                    prop.className [
+                        "swt:btn swt:btn-square swt:btn-xs swt:px-2"
+                        "swt:tooltip"
+                        tooltipPosition
+                        if btnClasses.IsSome then
+                            btnClasses.Value
+                    ]
                     prop.children [ Html.i [ prop.className icon ] ]
                 ]
             ]
@@ -416,13 +417,13 @@ type TermSearch =
         let showConfig, setShowConfig = React.useState (false)
 
         let label (str: string) =
-            Html.div [ prop.className "font-bold"; prop.text str ]
+            Html.div [ prop.className "swt:font-bold"; prop.text str ]
 
         let termContent =
             match term with
             | Some term ->
                 Html.div [
-                    prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
+                    prop.className "swt:grid swt:grid-cols-1 swt:md:grid-cols-[auto,1fr] swt:gap-4 swt:lg:gap-x-8"
                     prop.children [
                         label "Name"
                         Html.div (Option.defaultValue "<no-name>" term.name)
@@ -436,65 +437,66 @@ type TermSearch =
                             label "Data"
 
                             Html.pre [
-                                prop.className "text-xs"
+                                prop.className "swt:text-xs"
                                 prop.children [
                                     Html.code (Fable.Core.JS.JSON.stringify (term.data.Value, space = '\t'))
                                 ]
                             ]
                         if term.isObsolete.IsSome && term.isObsolete.Value then
-                            Html.div [ prop.className "text-error"; prop.text "obsolete" ]
+                            Html.div [ prop.className "swt:text-error"; prop.text "obsolete" ]
                         if term.href.IsSome then
                             Html.a [
-                                prop.className "link link-primary"
+                                prop.className "swt:link swt:link-primary"
                                 prop.href term.href.Value
                                 prop.target.blank
                                 prop.text "Source Link"
                             ]
                     ]
                 ]
-            | _ ->
-                Html.div [
-                    prop.text "No term selected."
-                ]
-        let componentConfig = Html.div [
-            prop.className "grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 lg:gap-x-8"
-            prop.children [
-                for (key, value) in config do
-                    label key
-                    Html.div value
-            ]
-        ]
-        let content = Html.div [
-            match showConfig with
-            | false ->
-                termContent
-                Html.div [
-                    prop.className "w-full flex justify-end"
-                    prop.children [
-                        Html.button [
-                            prop.className "btn btn-primary btn-xs"
-                            prop.onClick(fun _ -> setShowConfig (not showConfig))
+            | _ -> Html.div [ prop.text "No term selected." ]
+
+        let componentConfig =
+            Html.div [
+                prop.className "swt:flex swt:flex-col swt:gap-4"
+                prop.children [
+                    for (key, value) in config ->
+                        Html.div [
+                            prop.className "swt:flex swt:flex-row swt:items-start swt:gap-4"
                             prop.children [
-                                Html.i [
-                                    prop.className "fa-solid fa-cog"
-                                ]
+                                Html.label [ prop.className "swt:w-80 swt:font-bold"; prop.text key ]
+                                Html.div value
+                            ]
+                        ]
+                ]
+            ]
+
+        let content =
+            React.fragment [
+                match showConfig with
+                | false ->
+                    termContent
+
+                    Html.div [
+                        prop.className "swt:w-full swt:flex swt:justify-end"
+                        prop.children [
+                            Html.button [
+                                prop.className "swt:btn swt:btn-primary swt:btn-xs"
+                                prop.onClick (fun _ -> setShowConfig (not showConfig))
+                                prop.children [ Html.i [ prop.className "fa-solid fa-cog" ] ]
                             ]
                         ]
                     ]
-                ]
-            | true ->
-                Html.button [
-                    prop.className "btn btn-neutral btn-xs btn-outline mb-2"
-                    prop.onClick(fun _ -> setShowConfig (not showConfig))
-                    prop.children [
-                        Html.i [
-                            prop.className "fa-solid fa-arrow-left"
-                        ]
-                        Html.span "back"
+                | true ->
+
+                    componentConfig
+
+                    Html.button [
+                        prop.className "swt:btn swt:btn-xs swt:btn-neutral"
+                        prop.onClick (fun _ -> setShowConfig (not showConfig))
+                        prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "back" ]
                     ]
-                ]
-                componentConfig
-        ]
+            ]
+
         BaseModal.BaseModal(rvm, header = Html.div "Details", content = content)
 
     static member private AdvancedSearchDefault
@@ -503,7 +505,7 @@ type TermSearch =
         fun (cc: AdvancedSearchController) ->
             React.fragment [
                 Html.div [
-                    prop.className "prose"
+                    prop.className "swt:prose"
                     prop.children [
                         Html.p "Use the following fields to search for terms."
                         Html.p [
@@ -512,24 +514,24 @@ type TermSearch =
                                 prop.href @"https://lucene.apache.org/core/2_9_4/queryparsersyntax.html"
                                 prop.target.blank
                                 prop.text "Learn more!"
-                                prop.className "text-xs"
+                                prop.className "swt:text-xs"
                             ]
                         ]
 
                     ]
                 ]
                 Html.label [
-                    prop.className "form-control w-full"
+                    prop.className "swt:w-full"
                     prop.children [
                         Html.div [
-                            prop.className "label"
-                            prop.children [ Html.span [ prop.className "label-text"; prop.text "Term Name" ] ]
+                            prop.className "swt:label"
+                            prop.children [ Html.span [ prop.className "swt:label-text"; prop.text "Term Name" ] ]
                         ]
                         Html.input [
                             prop.testid "advanced-search-term-name-input"
-                            prop.className "input input-bordered w-full"
+                            prop.className "swt:input swt:w-full"
                             prop.type'.text
-                            prop.autoFocus true
+                            prop.autoFocus true //Due to react strict mode we render double -> could lead to losing focus
                             prop.value advancedSearchState.TermName
                             prop.onChange (fun e ->
                                 setAdvancedSearchState {
@@ -541,15 +543,17 @@ type TermSearch =
                     ]
                 ]
                 Html.label [
-                    prop.className "form-control w-full"
+                    prop.className "swt:form-control swt:w-full"
                     prop.children [
                         Html.div [
                             prop.className "label"
-                            prop.children [ Html.span [ prop.className "label-text"; prop.text "Term Description" ] ]
+                            prop.children [
+                                Html.span [ prop.className "swt:label-text"; prop.text "Term Description" ]
+                            ]
                         ]
                         Html.input [
                             prop.testid "advanced-search-term-description-input"
-                            prop.className "input input-bordered w-full"
+                            prop.className "swt:input swt:w-full"
                             prop.type'.text
                             prop.value advancedSearchState.TermDefinition
                             prop.onChange (fun e ->
@@ -562,14 +566,14 @@ type TermSearch =
                     ]
                 ]
                 Html.div [
-                    prop.className "form-control max-w-xs"
+                    prop.className "swt:form-control swt:max-w-xs"
                     prop.children [
                         Html.label [
-                            prop.className "label cursor-pointer"
+                            prop.className "swt:label swt:cursor-pointer"
                             prop.children [
-                                Html.span [ prop.className "label-text"; prop.text "Keep Obsolete" ]
+                                Html.span [ prop.className "swt:label-text"; prop.text "Keep Obsolete" ]
                                 Html.input [
-                                    prop.className "checkbox"
+                                    prop.className "swt:checkbox"
                                     prop.type'.checkbox
                                     prop.isChecked advancedSearchState.KeepObsolete
                                     prop.onChange (fun e ->
@@ -585,13 +589,17 @@ type TermSearch =
             ]
 
     [<ReactComponent>]
-    static member private AdvancedSearchModal(rmv, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool) =
-        let searchResults, setSearchResults = React.useState(SearchState.init)
+    static member private AdvancedSearchModal
+        (rmv, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool)
+        =
+        let searchResults, setSearchResults = React.useState (SearchState.init)
         /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
-        let (tempPagination: int option), setTempPagination = React.useState(None)
-        let pagination, setPagination = React.useState(0)
+        let (tempPagination: int option), setTempPagination = React.useState (None)
+        let pagination, setPagination = React.useState (0)
         // Only used if advancedSearch is set to default
-        let advancedSearchState, setAdvancedSearchState = React.useState (Swate.Components.Shared.DTOs.AdvancedSearchQuery.init)
+        let advancedSearchState, setAdvancedSearchState =
+            React.useState (Swate.Components.Shared.DTOs.AdvancedSearchQuery.init)
+
         let advancedSearch =
             match advancedSearch0 with
             | U2.Case1 advancedSearch -> advancedSearch
@@ -600,105 +608,120 @@ type TermSearch =
                     (fun () -> API.callAdvancedSearch advancedSearchState),
                     TermSearch.AdvancedSearchDefault(advancedSearchState, setAdvancedSearchState)
                 )
+
         let BinSize = 20
-        let BinCount = React.useMemo((fun () -> searchResults.Results.Count / BinSize), [|box searchResults|])
-        let controller = AdvancedSearchController(
-            startSearch = (fun () ->
-                advancedSearch.search()
-                |> Promise.map(fun results ->
-                    let results = results.ConvertAll(fun t0 ->
-                        {Term = t0; IsDirectedSearchResult = false})
-                    setSearchResults (SearchState.SearchDone results)
-                )
-                |> Promise.start
-            ),
-            cancel = rmv
-        )
+
+        let BinCount =
+            React.useMemo ((fun () -> searchResults.Results.Count / BinSize), [| box searchResults |])
+
+        let controller =
+            AdvancedSearchController(
+                startSearch =
+                    (fun () ->
+                        advancedSearch.search ()
+                        |> Promise.map (fun results ->
+                            let results =
+                                results.ConvertAll(fun t0 -> {
+                                    Term = t0
+                                    IsDirectedSearchResult = false
+                                })
+
+                            setSearchResults (SearchState.SearchDone results))
+                        |> Promise.start),
+                cancel = rmv
+            )
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
-        React.useEffect(
-            (fun () -> setTempPagination (pagination + 1 |> Some)),
-            [|box pagination|]
-        )
-        let searchFormComponent() = React.fragment [
-            advancedSearch.form controller
-            Html.button [
-                prop.className "btn btn-primary"
-                prop.onClick(fun _ ->
-                    controller.startSearch()
-                )
-                prop.text "Submit"
-            ]
-        ]
-        let resultsComponent (results: ResizeArray<TermSearchResult>) = React.fragment [
-            Html.div [
-                Html.textf "Results: %i" results.Count
-            ]
-            Html.div [
-                prop.className "max-h-[50%] overflow-y-auto"
-                prop.children [
-                    for res in results.GetRange(pagination * BinSize, BinSize) do
-                        TermSearch.TermItem(res, onTermSelect, key = JS.JSON.stringify res)
+        React.useEffect ((fun () -> setTempPagination (pagination + 1 |> Some)), [| box pagination |])
+
+        let searchFormComponent () =
+            React.fragment [
+                advancedSearch.form controller
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.onClick (fun _ -> controller.startSearch ())
+                    prop.text "Submit"
                 ]
             ]
-            if BinCount > 1 then
-                Html.div [
-                    prop.className "join"
+
+        let resultsComponent (results: ResizeArray<TermSearchResult>) =
+            React.fragment [
+                Html.div [ Html.textf "Results: %i" results.Count ]
+                Html.ul [
+                    prop.className "swt:max-h-[50%] swt:overflow-y-auto swt:list"
                     prop.children [
-                        Html.input [
-                            prop.className "input input-bordered join-item grow"
-                            prop.type'.number
-                            prop.min 1
-                            prop.valueOrDefault (tempPagination |> Option.defaultValue pagination)
-                            prop.max BinCount
-                            prop.onChange (fun (e: int) -> System.Math.Min(System.Math.Max(e, 1), BinCount) |> Some |> setTempPagination)
-                        ]
-                        Html.div [
-                            prop.className "input input-bordered join-item shrink flex justify-center items-center bg-opacity-60 cursor-not-allowed border-l-0 select-none"
-                            prop.type'.text
-                            prop.text ($"/{BinCount}")
-                        ]
-                        Html.button [
-                            prop.className "btn btn-primary join-item"
-                            let disabled = tempPagination.IsNone || (tempPagination.Value-1) = pagination
-                            prop.disabled disabled
-                            prop.onClick(fun _ ->
-                                tempPagination |> Option.iter ((fun x -> x-1) >> setPagination)
-                            )
-                            prop.text "Go"
-                        ]
-                        Html.button [
-                            let disabled = pagination = 0
-                            prop.className "btn join-item"
-                            prop.disabled disabled
-                            prop.onClick(fun _ -> setPagination (pagination - 1))
-                            prop.text "Previous"
-                        ]
-                        Html.button [
-                            let disabled = pagination = BinCount-1
-                            prop.disabled disabled
-                            prop.className "btn join-item"
-                            prop.onClick(fun _ -> setPagination (pagination + 1))
-                            prop.text "Next"
-                        ]
+                        for res in results.GetRange(pagination * BinSize, BinSize) do
+                            TermSearch.TermItem(res, onTermSelect, key = JS.JSON.stringify res)
                     ]
                 ]
-            Html.button [
-                prop.className "btn btn-primary"
-                prop.onClick(fun _ -> setSearchResults SearchState.Idle)
-                prop.text "Back"
+                if BinCount > 1 then
+                    Html.div [
+                        prop.className "swt:join"
+                        prop.children [
+                            Html.input [
+                                prop.className "swt:input swt:join-item swt:grow"
+                                prop.type'.number
+                                prop.min 1
+                                prop.valueOrDefault (tempPagination |> Option.defaultValue pagination)
+                                prop.max BinCount
+                                prop.onChange (fun (e: int) ->
+                                    System.Math.Min(System.Math.Max(e, 1), BinCount) |> Some |> setTempPagination)
+                            ]
+                            Html.div [
+                                prop.className
+                                    "swt:input swt:join-item swt:shrink swt:flex swt:justify-center /
+                                    swt:items-center swt:cursor-not-allowed swt:border-l-0 swt:select-none"
+                                prop.type'.text
+                                prop.text ($"/{BinCount}")
+                            ]
+                            Html.button [
+                                prop.className "swt:btn swt:btn-primary swt:join-item"
+                                let disabled = tempPagination.IsNone || (tempPagination.Value - 1) = pagination
+                                prop.disabled disabled
+
+                                prop.onClick (fun _ ->
+                                    tempPagination |> Option.iter ((fun x -> x - 1) >> setPagination))
+
+                                prop.text "Go"
+                            ]
+                            Html.button [
+                                let disabled = pagination = 0
+                                prop.className "swt:btn swt:join-item"
+                                prop.disabled disabled
+                                prop.onClick (fun _ -> setPagination (pagination - 1))
+                                prop.text "Previous"
+                            ]
+                            Html.button [
+                                let disabled = pagination = BinCount - 1
+                                prop.disabled disabled
+                                prop.className "swt:btn swt:join-item"
+                                prop.onClick (fun _ -> setPagination (pagination + 1))
+                                prop.text "Next"
+                            ]
+                        ]
+                    ]
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.onClick (fun _ -> setSearchResults SearchState.Idle)
+                    prop.text "Back"
+                ]
             ]
-        ]
-        let content = Html.div [
-            prop.className "flex flex-col gap-2 overflow-hidden p-2"
-            prop.children [
-                match searchResults with
-                | SearchState.Idle ->
-                    searchFormComponent()
-                | SearchState.SearchDone results ->
-                    resultsComponent results
+
+        let content =
+            Html.div [
+                prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-hidden swt:p-2"
+                prop.children [
+                    match searchResults with
+                    | SearchState.Idle -> searchFormComponent ()
+                    | SearchState.SearchDone results -> resultsComponent results
+                ]
             ]
-        ]
-        BaseModal.BaseModal(!!rmv, header = Html.div "Advanced Search", content = content, ?debug = (Option.map (fun _ -> "advanced-search-modal") debug))
+
+        BaseModal.BaseModal(
+            !!rmv,
+            header = Html.div "Advanced Search",
+            content = content,
+            ?debug = (Option.map (fun _ -> "advanced-search-modal") debug)
+        )
 
     ///
     /// Customizable react component for term search. Utilizing SwateDB search by default.
@@ -709,29 +732,30 @@ type TermSearch =
     // [<ExportDefaultAttribute; NamedParams>]
     // #endif
     [<ReactComponent(true)>]
-    static member TermSearch(
-        onTermSelect: Term option -> unit,
-        term: Term option,
-        ?parentId: string,
-        ?termSearchQueries: ResizeArray<string * SearchCall>,
-        ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
-        ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
-        ?advancedSearch: U2<AdvancedSearch, bool>,
-        ?onFocus: unit -> unit,
-        ?onBlur: unit -> unit,
-        ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
-        ?showDetails: bool,
-        ?debug: bool,
-        ?disableDefaultSearch: bool,
-        ?disableDefaultParentSearch: bool,
-        ?disableDefaultAllChildrenSearch: bool,
-        ?portalTermDropdown: PortalTermDropdown,
-        ?portalModals: HTMLElement,
-        ?fullwidth: bool,
-        ?autoFocus: bool,
-        ?classNames: TermSearchStyle,
-        ?props: IReactProperty list
-    ) =
+    static member TermSearch
+        (
+            onTermSelect: Term option -> unit,
+            term: Term option,
+            ?parentId: string,
+            ?termSearchQueries: ResizeArray<string * SearchCall>,
+            ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
+            ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
+            ?advancedSearch: U2<AdvancedSearch, bool>,
+            ?onFocus: unit -> unit,
+            ?onBlur: unit -> unit,
+            ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
+            ?showDetails: bool,
+            ?debug: bool,
+            ?disableDefaultSearch: bool,
+            ?disableDefaultParentSearch: bool,
+            ?disableDefaultAllChildrenSearch: bool,
+            ?portalTermDropdown: PortalTermDropdown,
+            ?portalModals: HTMLElement,
+            ?fullwidth: bool,
+            ?autoFocus: bool,
+            ?classNames: TermSearchStyle,
+            ?props: IReactProperty list
+        ) =
 
         let showDetails = defaultArg showDetails false
         let debug = defaultArg debug false
@@ -741,16 +765,18 @@ type TermSearch =
         let (keyboardNavState: KeyboardNavigationController), setKeyboardNavState =
             React.useState (KeyboardNavigationController.init)
 
-        let (searchResults: SearchState), setSearchResults = React.useStateWithUpdater(SearchState.init())
+        let (searchResults: SearchState), setSearchResults =
+            React.useStateWithUpdater (SearchState.init ())
+
         /// Set of string ids for each action started. As long as one id is still contained, shows loading spinner
-        let (loading: Set<string>), setLoading = React.useStateWithUpdater(Set.empty)
-        let inputRef = React.useInputRef()
-        let containerRef: IRefValue<option<HTMLElement>> = React.useElementRef()
-        let termDropdownRef: IRefValue<option<HTMLElement>> = React.useElementRef()
-        let modalContainerRef: IRefValue<option<HTMLElement>> = React.useElementRef()
+        let (loading: Set<string>), setLoading = React.useStateWithUpdater (Set.empty)
+        let inputRef = React.useInputRef ()
+        let containerRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
+        let termDropdownRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
+        let modalContainerRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
         /// Used to show indicator buttons only when focused
-        let focused, setFocused = React.useState(false)
-        let cancelled = React.useRef(false)
+        let focused, setFocused = React.useState (false)
+        let cancelled = React.useRef (false)
 
         let (modal: Modals option), setModal = React.useState None
 
@@ -773,12 +799,14 @@ type TermSearch =
 
                 setModal modal
 
-        let onTermSelect = fun (term: Term option) ->
-            if inputRef.current.IsSome then
-                let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
-                inputRef.current.Value.value <- v
-            setSearchResults (fun _ -> SearchState.init())
-            onTermSelect term
+        let onTermSelect =
+            fun (term: Term option) ->
+                if inputRef.current.IsSome then
+                    let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
+                    inputRef.current.Value.value <- v
+
+                setSearchResults (fun _ -> SearchState.init ())
+                onTermSelect term
 
         let startLoadingBy =
             fun (key: string) ->
@@ -961,7 +989,7 @@ type TermSearch =
                 allChildSearch ()
 
         // Handles click outside events to close dropdown
-        React.useListener.onMouseDown(
+        React.useListener.onMouseDown (
             (fun e ->
                 if focused then
                     // these are the refs, which must be checked. It boils down to: base ref (containerRef)
@@ -974,53 +1002,61 @@ type TermSearch =
                         if termDropdownRef.current.IsSome then
                             termDropdownRef.current.Value
                     |]
+
                     let refsContain =
-                        refs
-                        |> Array.forall(fun el ->
-                            not (el.contains(unbox e.target))
-                        )
+                        refs |> Array.forall (fun el -> not (el.contains (unbox e.target)))
+
                     match refsContain with
                     | true ->
                         setFocused false
-                        setSearchResults(fun _ -> SearchState.init())
+                        setSearchResults (fun _ -> SearchState.init ())
+
                         if onBlur.IsSome then
-                            onBlur.Value ()
-                        cancel()
-                    | _ -> ()
-            )
+                            onBlur.Value()
+
+                        cancel ()
+                    | _ -> ())
         )
 
         // keyboard navigation
-        let keyboardNav = (fun (e:Browser.Types.KeyboardEvent) ->
-            promise {
+        let keyboardNav =
+            (fun (e: Browser.Types.KeyboardEvent) -> promise {
                 if focused then // only run when focused
                     match searchResults, e.code with
-                    | _, kbdEventCode.escape ->
-                        cancel()
+                    | _, kbdEventCode.escape -> cancel ()
                     | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
-                        setKeyboardNavState(
+                        setKeyboardNavState (
                             match keyboardNavState.SelectedTermSearchResult with
                             | Some 0 -> None
                             | Some i -> Some(System.Math.Max(i - 1, 0))
                             | _ -> None
-                            |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                            |> fun x -> {
+                                keyboardNavState with
+                                    SelectedTermSearchResult = x
+                            }
                         )
                     | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
-                        setKeyboardNavState(
+                        setKeyboardNavState (
                             match keyboardNavState.SelectedTermSearchResult with
                             | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
                             | _ -> Some(0)
-                            |> fun x -> {keyboardNavState with SelectedTermSearchResult = x}
+                            |> fun x -> {
+                                keyboardNavState with
+                                    SelectedTermSearchResult = x
+                            }
                         )
-                    | SearchState.Idle, kbdEventCode.arrowDown when inputRef.current.IsSome && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not -> // down
+                    | SearchState.Idle, kbdEventCode.arrowDown when
+                        inputRef.current.IsSome
+                        && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not
+                        -> // down
                         startSearch inputRef.current.Value.value
-                    | SearchState.SearchDone res, kbdEventCode.enter when keyboardNavState.SelectedTermSearchResult.IsSome -> // enter
+                    | SearchState.SearchDone res, kbdEventCode.enter when
+                        keyboardNavState.SelectedTermSearchResult.IsSome
+                        -> // enter
                         onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
-                        cancel()
-                    | _ ->
-                        ()
-            }
-        )
+                        cancel ()
+                    | _ -> ()
+            })
 
         /// Could move this outside, but there are so many variable to pass to...
         let modalContainer =
@@ -1032,27 +1068,42 @@ type TermSearch =
                     "Disable Default All Children Search", Option.map string disableDefaultAllChildrenSearch
                     "Custom Term Search Queries", Option.map (Seq.map fst >> String.concat "; ") termSearchQueries
                     "Custom Parent Search Queries", Option.map (Seq.map fst >> String.concat "; ") parentSearchQueries
-                    "Custom All Children Search Queries", Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
-                    "Advanced Search", Option.map (function | U2.Case1 _ -> "Custom" | U2.Case2 _ -> "Default") advancedSearch
+                    "Custom All Children Search Queries",
+                    Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
+                    "Advanced Search",
+                    Option.map
+                        (function
+                        | U2.Case1 _ -> "Custom"
+                        | U2.Case2 _ -> "Default")
+                        advancedSearch
                 ]
-                |> List.fold(fun acc (key, value) ->
-                    match value with
-                    | Some value -> (key, value)::acc
-                    | _ -> acc
-                ) []
+                |> List.fold
+                    (fun acc (key, value) ->
+                        match value with
+                        | Some value -> (key, value) :: acc
+                        | _ -> acc)
+                    []
                 |> List.rev
+
             Html.div [
-                prop.className "z-[9999] fixed w-screen h-screen pointer-events-none"
+                prop.className
+                    "swt:z-[9999] swt:left-0 swt:top-0 swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"
                 prop.ref modalContainerRef
                 prop.children [
                     match modal with
-                    | Some Modals.Details ->
-                        TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
-                    | Some Modals.AdvancedSearch when advancedSearch.IsSome->
-                        let onTermSelect = fun (term: Term option) ->
-                            onTermSelect term
-                            setModal None
-                        TermSearch.AdvancedSearchModal((fun _ -> setModal None), advancedSearch.Value, onTermSelect, debug)
+                    | Some Modals.Details -> TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
+                    | Some Modals.AdvancedSearch when advancedSearch.IsSome ->
+                        let onTermSelect =
+                            fun (term: Term option) ->
+                                onTermSelect term
+                                setModal None
+
+                        TermSearch.AdvancedSearchModal(
+                            (fun _ -> setModal None),
+                            advancedSearch.Value,
+                            onTermSelect,
+                            debug
+                        )
                     | _ -> Html.none
                 ]
             ]
@@ -1060,26 +1111,25 @@ type TermSearch =
         Html.div [
             if debug then
                 prop.testId "term-search-container"
-                prop.custom("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
-                prop.custom("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
+                prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
+                prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "form-control not-prose h-full"
-                if fullwidth then "w-full"
+                "not-prose swt:h-full"
+                if fullwidth then
+                    "swt:w-full"
             ]
             if props.IsSome then
                 for prop in props.Value do
                     prop
             prop.ref containerRef
             prop.children [
-                if portalModals.IsSome then
-                    ReactDOM.createPortal(
-                        modalContainer,
-                        portalModals.Value
-                    )
-                else
-                    modalContainer
+                if modal.IsSome then
+                    if portalModals.IsSome then
+                        ReactDOM.createPortal (modalContainer, portalModals.Value)
+                    else
+                        modalContainer
                 Html.div [
-                    prop.className "indicator w-full h-full"
+                    prop.className "swt:indicator swt:w-full swt:h-full"
                     prop.children [
                         match term with
                         | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
@@ -1087,22 +1137,23 @@ type TermSearch =
                                 TermSearch.IndicatorItem(
                                     "",
                                     sprintf "%s - %s" term.name.Value term.id.Value,
-                                    "tooltip-left",
-                                    "fa-solid fa-square-check text-primary",
-                                    fun _ ->
+                                    "swt:tooltip-left",
+                                    "fa-solid fa-square-check",
+                                    (fun _ ->
                                         setModal (
                                             if modal.IsSome && modal.Value = Modals.Details then
                                                 None
                                             else
                                                 Some Modals.Details
-                                        )
+                                        )),
+                                    btnClasses = "swt:btn-primary"
                                 )
                         | _ when showDetails -> // show only when focused
                             TermSearch.IndicatorItem(
                                 "",
                                 "Details",
-                                "tooltip-left",
-                                "fa-solid fa-circle-info text-info",
+                                "swt:tooltip-left",
+                                "fa-solid fa-circle-info",
                                 (fun _ ->
                                     setModal (
                                         if modal.IsSome && modal.Value = Modals.Details then
@@ -1110,16 +1161,17 @@ type TermSearch =
                                         else
                                             Some Modals.Details
                                     )),
-                                focused
+                                btnClasses = "swt:btn-info",
+                                isActive = focused
                             )
                         | _ -> Html.none
 
                         if advancedSearch.IsSome then
                             TermSearch.IndicatorItem(
-                                "indicator-bottom",
+                                "swt:indicator-bottom",
                                 "Advanced Search",
-                                "tooltip-left",
-                                "fa-solid fa-magnifying-glass-plus text-primary",
+                                "swt:tooltip-left",
+                                "fa-solid fa-magnifying-glass-plus",
                                 (fun _ ->
                                     setModal (
                                         if modal.IsSome && modal.Value = Modals.AdvancedSearch then
@@ -1127,30 +1179,32 @@ type TermSearch =
                                         else
                                             Some Modals.AdvancedSearch
                                     )),
-                                focused,
-                                [ prop.testid "advanced-search-indicator" ]
+                                btnClasses = "swt:btn-primary",
+                                isActive = focused,
+                                props = [ prop.testid "advanced-search-indicator" ]
                             )
 
-                        Html.div [ // main search component
+                        Html.label [ // main search component
                             prop.className [
-                                "input input-bordered flex flex-row items-center relative w-full"
+                                "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full
+                                swt:focus:!outline-0 swt:focus-within:!outline-0"
                                 if classNames.IsSome && classNames.Value.inputLabel.IsSome then
                                     TermSearchStyle.resolveStyle classNames.Value.inputLabel.Value
                             ]
                             prop.children [
                                 Html.i [
                                     prop.className [
-                                        "fa-solid fa-search text-primary pr-2 transition-all w-6 overflow-x-hidden opacity-100"
+                                        "fa-solid fa-search swt:text-primary swt:pr-2 swt:transition-all swt:w-6 swt:overflow-x-hidden swt:opacity-100"
                                         if
                                             focused
                                             || inputRef.current.IsSome
                                                && System.String.IsNullOrEmpty inputRef.current.Value.value |> not
                                         then
-                                            "!w-0 !opacity-0"
+                                            "swt:!w-0 swt:!opacity-0"
                                     ]
                                 ]
                                 Html.input [
-                                    prop.className "grow shrink min-w-[50px] w-full"
+                                    prop.className "swt:grow swt:shrink swt:min-w-[50px] swt:w-full"
                                     if debug then
                                         prop.testid "term-search-input"
                                     prop.ref (inputRef)
@@ -1174,38 +1228,65 @@ type TermSearch =
                                         elif System.String.IsNullOrEmpty inputRef.current.Value.value |> not then
                                             startSearch inputRef.current.Value.value)
                                     prop.onKeyDown (fun e ->
-                                        e.stopPropagation()
+                                        e.stopPropagation ()
+
                                         promise {
                                             do! keyboardNav e
+
                                             if onKeyDown.IsSome then
                                                 onKeyDown.Value e
                                         }
-                                        |> Promise.start
-                                    )
-                                    prop.onFocus(fun _ ->
+                                        |> Promise.start)
+                                    prop.onFocus (fun _ ->
                                         if onFocus.IsSome then
                                             onFocus.Value()
-                                        setFocused true
-                                    )
+
+                                        setFocused true)
                                 ]
-                                Daisy.loading [
+                                //Daisy.loading [
+                                Html.div [
                                     prop.className [
-                                        "text-primary loading-sm"
+                                        "swt:loading swt:text-primary swt:loading-sm"
                                         if loading.IsEmpty then
-                                            "invisible"
+                                            "swt:invisible"
                                     ]
                                 ]
-                                let advancedSearchToggle = advancedSearch |> Option.map (fun _ -> fun _ -> setModal (if modal.IsSome && modal.Value = Modals.AdvancedSearch then None else Some Modals.AdvancedSearch))
+
+                                let advancedSearchToggle =
+                                    advancedSearch
+                                    |> Option.map (fun _ ->
+                                        fun _ ->
+                                            setModal (
+                                                if modal.IsSome && modal.Value = Modals.AdvancedSearch then
+                                                    None
+                                                else
+                                                    Some Modals.AdvancedSearch
+                                            ))
+
                                 match portalTermDropdown with
                                 | Some portalTermSelectArea when containerRef.current.IsSome ->
-                                    ReactDOM.createPortal(
+                                    ReactDOM.createPortal (
                                         (portalTermSelectArea.renderer
-                                            (containerRef.current.Value.getBoundingClientRect())
-                                            (TermSearch.TermDropdown(termDropdownRef, onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState))),
+                                            (containerRef.current.Value.getBoundingClientRect ())
+                                            (TermSearch.TermDropdown(
+                                                termDropdownRef,
+                                                onTermSelect,
+                                                searchResults,
+                                                loading,
+                                                advancedSearchToggle,
+                                                keyboardNavState
+                                            ))),
                                         portalTermSelectArea.portal
                                     )
                                 | _ ->
-                                    TermSearch.TermDropdown(termDropdownRef, onTermSelect, searchResults, loading, advancedSearchToggle, keyboardNavState)
+                                    TermSearch.TermDropdown(
+                                        termDropdownRef,
+                                        onTermSelect,
+                                        searchResults,
+                                        loading,
+                                        advancedSearchToggle,
+                                        keyboardNavState
+                                    )
                             ]
                         ]
                     ]
