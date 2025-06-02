@@ -21,12 +21,26 @@ let private FileName (model: Model) =
         | Some(ArcFiles.Template t) -> t.FileName
         | _ -> ""
 
+    let letter =
+        match model.SpreadsheetModel.ArcFile with
+        | Some(ArcFiles.Assay a) -> "A"
+        | Some(ArcFiles.Study(s, _)) -> "S"
+        | Some(ArcFiles.Investigation i) -> "I"
+        | Some(ArcFiles.Template t) -> "T"
+        | _ -> ""
+
     match model.SpreadsheetModel.ArcFile with
     | Some _ ->
         Html.div [
             prop.className
                 "swt:text-white swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-[125px] swt:px-2 swt:truncate"
-            prop.text txt
+            prop.children [
+                Html.span [ prop.className "swt:hidden swt:lg:block"; prop.text txt ]
+                Html.span [
+                    prop.className "swt:block swt:lg:hidden"
+                    prop.text letter // Truncate for smaller screens
+                ]
+            ]
             prop.title txt
         ]
     | None -> Html.none
@@ -140,7 +154,7 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
         Html.div [ prop.className "swt:grow-0"; prop.children [ FileName model ] ]
         //Daisy.navbarCenter [
         Html.div [
-            prop.className "swt:navbar-center"
+            prop.className "swt:navbar-center swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
             prop.children [
                 QuickAccessButtonListStart model.History dispatch
                 WidgetNavbarList(model, dispatch, addWidget)
@@ -158,7 +172,7 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
         //     ]
         // | _ -> Html.none
         Html.div [
-            prop.className "swt:ml-auto"
+            prop.className "swt:ml-auto swt:grow-0 swt:shrink-0"
             prop.children [ QuickAccessButtonListEnd model dispatch ]
         ]
     ]

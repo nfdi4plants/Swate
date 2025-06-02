@@ -13,7 +13,7 @@ type BaseDropdown =
         Html.div [
             prop.ref ref
             prop.className [
-                "swt:dropdown"
+                "swt:dropdown swt:!z-[9999999999999]"
                 if isOpen then
                     "swt:dropdown-open"
                 if style.IsSome then
@@ -21,13 +21,15 @@ type BaseDropdown =
             ]
             prop.children [
                 toggle
-                Html.ul [
-                    prop.className [
-                        "swt:dropdown-content swt:min-w-48 swt:menu swt:bg-base-200 swt:rounded-box swt:z-[1] swt:p-2 swt:shadow-sm swt:!top-[110%]"
-                        if style.IsSome then
-                            style.Value.GetSubclassStyle "content"
+                if isOpen then
+                    Html.ul [
+                        prop.tabIndex 0
+                        prop.className [
+                            "swt:dropdown-content swt:min-w-48 swt:menu swt:bg-base-200 swt:rounded-box swt:z-[9999999999999] swt:p-2 swt:shadow-sm swt:!top-[110%]"
+                            if style.IsSome then
+                                style.Value.GetSubclassStyle "content"
+                        ]
+                        prop.children children
                     ]
-                    prop.children children
-                ]
             ]
         ]
