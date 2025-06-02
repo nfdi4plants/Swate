@@ -27,8 +27,7 @@ export function Regex_$007CRegex$007C_$007C(pattern: string, input: string): Opt
 }
 
 export function Route_builder(typeName: string, methodName: string): string {
-    const prefix = "https://swate-alpha.nfdi4plants.org";
-    return toText(printf("%s/api/%s/%s"))(prefix)(typeName)(methodName);
+    return toText(printf("%s/api/%s/%s"))("https://swate-alpha.nfdi4plants.org")(typeName)(methodName);
 }
 
 export function SorensenDice_createBigrams(s: string): FSharpSet<string> {
@@ -44,8 +43,7 @@ export function SorensenDice_createBigrams(s: string): FSharpSet<string> {
 export function SorensenDice_sortBySimilarity<a>(searchStr: string, f: ((arg0: a) => string), arrayToSort: a[]): a[] {
     const searchSet: FSharpSet<string> = SorensenDice_createBigrams(searchStr);
     return sortByDescending<a, float64>((result: a): float64 => {
-        const resultSet: FSharpSet<string> = SorensenDice_createBigrams(f(result));
-        const x: FSharpSet<string> = resultSet;
+        const x: FSharpSet<string> = SorensenDice_createBigrams(f(result));
         const y: FSharpSet<string> = searchSet;
         const matchValue: int32 = FSharpSet__get_Count(x) | 0;
         const matchValue_1: int32 = FSharpSet__get_Count(y) | 0;
@@ -178,9 +176,7 @@ export function SwateObsolete_Regex_parseTermAccession(headerStr: string): Optio
         const activePatternResult_1: Option<any> = Regex_$007CRegex$007C_$007C(SwateObsolete_Regex_Pattern_TermAnnotationURIPattern, matchValue);
         if (activePatternResult_1 != null) {
             const value_1: any = value_2(activePatternResult_1);
-            const idspace: string = (value_1.groups && value_1.groups.idspace) || "";
-            const localid: string = (value_1.groups && value_1.groups.localid) || "";
-            return (idspace + ":") + localid;
+            return (((value_1.groups && value_1.groups.idspace) || "") + ":") + ((value_1.groups && value_1.groups.localid) || "");
         }
         else {
             return undefined;
