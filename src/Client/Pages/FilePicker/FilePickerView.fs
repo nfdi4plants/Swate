@@ -92,7 +92,7 @@ type FilePicker =
 
                 //Daisy.button.button [
                 Html.button [
-                    prop.className "swt:btn swt:btn-neutral swt:btn-outline"
+                    prop.className "swt:btn swt:btn-neutral swt:btn-outline swt:bg-neutral swt:text-white swt:hover:btn-primary"
                     prop.text "Cancel"
                     prop.onClick (fun _ -> Messages.FilePicker.UpdateFileNames [] |> FilePickerMsg |> dispatch)
                 ]
