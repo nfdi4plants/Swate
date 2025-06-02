@@ -471,7 +471,7 @@ type TermSearch =
             ]
 
         let content =
-            Html.div [
+            React.fragment [
                 match showConfig with
                 | false ->
                     termContent
@@ -487,13 +487,14 @@ type TermSearch =
                         ]
                     ]
                 | true ->
+
+                    componentConfig
+
                     Html.button [
-                        prop.className "swt:btn swt:btn-xs swt:btn-outline swt:mb-2"
+                        prop.className "swt:btn swt:btn-xs swt:btn-neutral"
                         prop.onClick (fun _ -> setShowConfig (not showConfig))
                         prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "back" ]
                     ]
-
-                    componentConfig
             ]
 
         BaseModal.BaseModal(rvm, header = Html.div "Details", content = content)
