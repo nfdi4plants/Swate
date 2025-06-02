@@ -42,7 +42,7 @@ let Main (data, createCell, headers, createHeaderCell, model: Model, dispatch: M
                 |},
                 35,
                 tableClasses = [|
-                    "swt:table"
+                    "swt:table swt:w-min"
                     //sticky header
                     "swt:[&_thead_>_tr]:sticky swt:[&_thead_>_tr]:top-0 swt:[&_thead_>_tr]:bg-base-100"
                     // sticky row

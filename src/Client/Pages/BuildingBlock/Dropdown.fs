@@ -14,12 +14,13 @@ let FreeTextInputElement (onSubmit: string -> unit) =
     let inputS, setInput = React.useState ""
 
     Html.div [
-        prop.className "swt:flex swt:flex-row swt:gap-0 swt:p-0"
+        prop.className "swt:flex swt:flex-row swt:gap-0 swt:p-0 swt:join"
         prop.children [
             //Daisy.input [
             Html.input [
                 prop.placeholder "..."
-                prop.className "swt:input swt;input-sm swt:join-item swt:grow swt:truncate"
+                prop.className
+                    "swt:input swt:input-sm swt:join-item swt:grow swt:truncate swt:!rounded-l-[var(--radius-field)] swt:!rounded-r-none"
                 prop.onClick (fun e -> e.stopPropagation ())
                 prop.onChange (fun (v: string) -> setInput v)
                 prop.onKeyDown (
@@ -44,9 +45,7 @@ module private DropdownElements =
 
     let divider =
         //Daisy.divider [
-        Html.div [
-            prop.className "swt:divider swt:mx-2 swt:my-0"
-        ]
+        Html.div [ prop.className "swt:divider swt:mx-2 swt:my-0" ]
 
     let private annotationsPrinciplesLink =
         Html.a [

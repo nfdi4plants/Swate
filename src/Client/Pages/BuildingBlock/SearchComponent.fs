@@ -12,16 +12,16 @@ open Swate.Components.Shared
 let private termOrUnitizedSwitch (model: Model) dispatch =
     let state = model.AddBuildingBlockState
 
+    let mkClasses (isActive: bool) = [
+        "swt:btn swt:join-item swt:border swt:!border-base-content"
+        if isActive then "swt:btn-primary" else "swt:btn-neutral/50"
+    ]
+
     React.fragment [
-        //Daisy.button.a [
         Html.button [
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
 
-            prop.className [
-                "swt:btn swt:btn-outline swt:join-item"
-                if isActive then
-                    "swt:btn-primary swt:bg-primary swt:text-secondary-content"
-            ]
+            prop.className (mkClasses isActive)
 
             prop.text "Term"
 
@@ -33,11 +33,7 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
         Html.button [
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
 
-            prop.className [
-                "swt:btn swt:btn-outline swt:join-item"
-                if isActive then
-                    "swt:btn-primary swt:bg-primary swt:text-secondary-content"
-            ]
+            prop.className (mkClasses isActive)
 
             prop.text "Unit"
 

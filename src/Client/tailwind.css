@@ -225,8 +225,8 @@
 }
 
 @layer components {
-  .table-bordered th,
-  .table-bordered td {
-    @apply swt:border swt:border-white swt:text-left swt:border-collapse;
+  .swt\:table-bordered th,
+  .swt\:table-bordered td {
+    @apply swt:!border swt:!border-base-content swt:text-left swt:border-collapse;
   }
 }
