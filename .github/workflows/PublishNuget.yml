@@ -30,6 +30,9 @@ jobs:
       - name: Restore Dependencies
         run: dotnet restore src/Components/src/Swate.Components.fsproj
 
+      - name: Install root NPM Dependencies
+        run: npm install
+
       - name: Install NPM Dependencies
         run: npm install
         working-directory: src/Components

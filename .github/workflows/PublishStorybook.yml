@@ -39,6 +39,9 @@ jobs:
       - name: Restore .NET dependencies
         run: dotnet tool restore
 
+      - name: Install root NPM Dependencies
+        run: npm install
+
       # Install dependencies
       - name: Install npm dependencies
         run: npm install
