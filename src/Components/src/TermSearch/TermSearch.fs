@@ -401,7 +401,7 @@ type TermSearch =
                     prop.custom ("data-tip", tooltip)
                     prop.onClick onclick
                     prop.className [
-                        "swt:btn swt:btn-square swt:btn-xs swt:px-2"
+                        "swt:btn swt:btn-square swt:btn-xs swt:px-2 swt:!rounded-[var(--radius-field)]"
                         "swt:tooltip"
                         tooltipPosition
                         if btnClasses.IsSome then
