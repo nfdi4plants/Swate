@@ -266,7 +266,7 @@ type SelectiveImportModal =
             ],
             className = [
                 if isActive then
-                    "swt:border swt:border-success"
+                    "swt:border-success"
             ]
         )
 

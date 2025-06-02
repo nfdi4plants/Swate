@@ -245,7 +245,7 @@ type Widget =
                         "swt:cursor-move swt:flex swt:justify-end swt:bg-gradient-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
                         Components.Components.DeleteButton(
-                            className = "swt:btn-ghost swt:glass",
+                            className = "swt:btn-ghost swt:bg-primary/30",
                             props = [
                                 prop.onClick (fun e ->
                                     e.stopPropagation ()

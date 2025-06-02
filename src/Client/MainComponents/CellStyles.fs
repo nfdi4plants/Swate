@@ -19,13 +19,13 @@ type CellStyles =
     static member cellStyle(adjusted: string list) =
         prop.className [
             "swt:min-w-48 swt:max-w-xl"
-            "swt:overflow-visible swt:border swt:border-solid swt:border-base-content swt:cursor-pointer"
+            "swt:overflow-visible swt:border swt:border-solid swt:border-base-content swt:cursor-pointer swt:p-0"
             adjusted |> String.concat " "
         ]
 
     static member private cellInnerContainerStyle(adjusted: string list) =
         prop.className [
-            "swt:flex swt:justify-between swt:flex-row swt:flex-nowrap swt:size-full swt:items-center *:truncate *:min-w-0 px-2 swt:py-1 swt:max-w-xl"
+            "swt:flex swt:justify-between swt:flex-row swt:flex-nowrap swt:size-full swt:items-center swt:*:truncate swt:*:min-w-0 swt:px-2 swt:py-1 swt:max-w-xl"
             adjusted |> String.concat " "
         ]
 
@@ -95,7 +95,7 @@ type CellStyles =
     /// <param name="rowIndex"></param>
     static member RowLabel(rowIndex: int) =
         Html.th [
-            prop.className "swt:items-center swt:w-min swt:px-2 swt:py-1"
+            prop.className "swt:items-center swt:text-center swt:w-min swt:px-2 swt:py-1"
             prop.style [ style.resize.none ]
             prop.children [ Html.b (if rowIndex < 0 then "" else $"{rowIndex + 1}") ]
         ]
