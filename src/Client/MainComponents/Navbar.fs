@@ -8,8 +8,8 @@ open Messages
 open Components
 open MainComponents
 open Model
-open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Shared
 open ARCtrl
 
 let private FileName (model: Model) =
@@ -48,8 +48,8 @@ let private FileName (model: Model) =
 let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     React.fragment [
         QuickAccessButton.QuickAccessButton(
-            "Back",
-            Icons.Back(),
+            "Backward",
+            Icons.Backward(),
             (fun _ ->
                 let newPosition = state.HistoryCurrentPosition + 1
                 //let newPosition_clamped = System.Math.Min(newPosition, state.HistoryExistingItemCount)
