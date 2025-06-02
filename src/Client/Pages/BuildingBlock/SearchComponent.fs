@@ -18,9 +18,9 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
 
             prop.className [
-                "swt:btn swt:join-item"
+                "swt:btn swt:btn-outline swt:join-item"
                 if isActive then
-                    "swt:btn-primary"
+                    "swt:btn-primary swt:bg-primary swt:text-secondary-content"
             ]
 
             prop.text "Term"
@@ -34,9 +34,9 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
 
             prop.className [
-                "swt:btn swt:join-item"
+                "swt:btn swt:btn-outline swt:join-item"
                 if isActive then
-                    "swt:btn-primary"
+                    "swt:btn-primary swt:bg-primary swt:text-secondary-content"
             ]
 
             prop.text "Unit"
