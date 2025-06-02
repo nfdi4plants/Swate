@@ -124,7 +124,8 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
         QuickAccessButton.QuickAccessButton(
             "Data Annotator",
             Icons.DataAnnotator(),
-            (fun _ -> addWidget Widget._DataAnnotator)
+            (fun _ -> addWidget Widget._DataAnnotator),
+            classes = "swt:w-min"
         )
 
     React.fragment [
