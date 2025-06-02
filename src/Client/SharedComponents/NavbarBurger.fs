@@ -12,7 +12,7 @@ type NavbarBurger =
                 Html.label [
                     prop.onClick (fun _ -> setIsOpen (not isOpen))
                     prop.className [
-                        "swt:swap swt:swap-rotate swt:text-white swt:z-[10] swt:cursor-pointer"
+                        "swt:swap swt:swap-rotate swt:z-[10] swt:cursor-pointer"
                         if isOpen then
                             "swt:swap-active"
                     ]

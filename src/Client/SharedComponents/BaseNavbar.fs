@@ -7,7 +7,7 @@ type BaseNavbar =
     static member Main(children: ReactElement) =
         //Daisy.navbar [
         Html.div [
-            prop.className "swt:navbar swt:bg-neutral swt:gap-2"
+            prop.className "swt:navbar swt:bg-base-300 swt:text-base-content swt:gap-2"
             prop.role "navigation"
             prop.ariaLabel "main navigation"
             prop.style [ style.minHeight (length.rem 3.25) ]
@@ -26,7 +26,7 @@ type BaseNavbar =
             prop.children [
                 Html.div [
                     prop.className
-                        "swt:absolute swt:inset-0 swt:bg-gradient-to-r swt:from-primary swt:to-neutral swt:blur-2xl swt:opacity-75"
+                        "swt:absolute swt:inset-0 swt:bg-gradient-to-r swt:from-primary swt:to-base-100 swt:blur-2xl swt:opacity-75"
                 ]
                 Html.div [
                     prop.className "swt:z-10 swt:flex swt:flex-row swt:gap-2 swt:w-full swt:items-center"

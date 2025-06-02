@@ -33,7 +33,7 @@ let private FileName (model: Model) =
     | Some _ ->
         Html.div [
             prop.className
-                "swt:text-white swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-[125px] swt:px-2 swt:truncate"
+                "swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-[125px] swt:px-2 swt:truncate"
             prop.children [
                 Html.span [ prop.className "swt:hidden swt:lg:block"; prop.text txt ]
                 Html.span [
@@ -153,7 +153,6 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
 
     Components.BaseNavbar.Main [
         Html.div [ prop.className "swt:grow-0"; prop.children [ FileName model ] ]
-        //Daisy.navbarCenter [
         Html.div [
             prop.className "swt:navbar-center swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
             prop.children [
