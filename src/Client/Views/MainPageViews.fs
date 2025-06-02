@@ -3,6 +3,7 @@ namespace View
 open Feliz
 open Feliz.DaisyUI
 open Messages
+open Swate.Components
 
 module private MainPageUtil =
     [<Literal>]
@@ -44,7 +45,7 @@ type MainPageView =
                                 Model.PageState.MainPage = Routing.MainPage.Default
                         }
                         |> dispatch)
-                    prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "Back" ]
+                    prop.children [ Icons.Back(); Html.span "Back" ]
                 ]
                 Html.ul [
                     prop.className "swt:menu swt:gap-y-1"
@@ -149,7 +150,7 @@ type MainPageView =
                     prop.className "swt:drawer-side swt:z-10"
                     prop.children [
                         //Daisy.drawerOverlay [
-                        Html.div [
+                        Html.label [
                             prop.className "swt:drawer-overlay"
                             prop.htmlFor DrawerId
                             prop.ariaLabel "Close sidebar"
@@ -158,5 +159,4 @@ type MainPageView =
                     ]
                 ]
             ]
-
         ]

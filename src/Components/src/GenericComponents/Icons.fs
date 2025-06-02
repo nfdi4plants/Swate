@@ -57,7 +57,7 @@ type Icons =
     static member Forward() =
         Html.i [ prop.className "fa-solid fa-rotate-right" ]
 
-    static member Back() =
+    static member Backward() =
         Html.i [ prop.className "fa-solid fa-rotate-left" ]
 
     static member BuildingBlockInformation() =
@@ -93,3 +93,6 @@ type Icons =
             Html.i [ prop.className "fa-solid fa-plus" ]
             Html.i [ prop.className "fa-solid fa-info" ]
         ]
+
+    static member Back() =
+        Html.i [ prop.className "fa-solid fa-arrow-left" ]
