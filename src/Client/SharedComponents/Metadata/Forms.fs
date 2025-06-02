@@ -170,7 +170,7 @@ module private Helper =
     let addButton (clickEvent: MouseEvent -> unit) =
         //Daisy.button.button [
         Html.button [
-            prop.className "swt:btn swt:btn-wide swt:btn-info swt:btn-outline"
+            prop.className "swt:btn swt:btn-info"
             prop.text "+"
             prop.onClick clickEvent
         ]

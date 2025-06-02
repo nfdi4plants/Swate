@@ -270,7 +270,7 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
         prop.children [
             Html.div [
                 prop.className
-                    "swt:*:!border-base-content swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
+                    "swt:*:[--tab-border-color:var(--color-base-content)] swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
                 prop.children [
                     //Daisy.tab [
                     //Html.div [
