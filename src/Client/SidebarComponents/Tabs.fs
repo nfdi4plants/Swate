@@ -15,7 +15,7 @@ type Tabs =
         //Daisy.tab [
         Html.div [
             prop.className [
-                "swt:tab swt:navigation"
+                "swt:tab"
                 if isActive then
                     "swt:tab-active"
             ]
@@ -36,14 +36,20 @@ type Tabs =
 
         //Daisy.tabs [
         Html.div [
-            prop.className "swt:tabs swt:tabs-box swt:w-full"
+            prop.className "swt:flex swt:w-full"
             prop.children [
-                Tabs.NavigationTab Routing.SidebarPage.BuildingBlock model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.TermSearch model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.Protocol model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.FilePicker model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.DataAnnotator model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.JsonImport model dispatch
-                Tabs.NavigationTab Routing.SidebarPage.JsonExport model dispatch
+                Html.div [
+                    prop.className
+                        "swt:tabs swt:tabs-box swt:my-1 swt:w-fit swt:mx-auto swt:*:[--tab-bg:var(--color-secondary)] swt:*:[&.swt\:tab-active]:text-secondary-content"
+                    prop.children [
+                        Tabs.NavigationTab Routing.SidebarPage.BuildingBlock model dispatch
+                        Tabs.NavigationTab Routing.SidebarPage.TermSearch model dispatch
+                        Tabs.NavigationTab Routing.SidebarPage.Protocol model dispatch
+                        Tabs.NavigationTab Routing.SidebarPage.FilePicker model dispatch
+                        Tabs.NavigationTab Routing.SidebarPage.DataAnnotator model dispatch
+                        Tabs.NavigationTab Routing.SidebarPage.JsonImport model dispatch
+                        Tabs.NavigationTab Routing.SidebarPage.JsonExport model dispatch
+                    ]
+                ]
             ]
         ]
