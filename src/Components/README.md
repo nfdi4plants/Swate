@@ -36,7 +36,8 @@
 
 #### NPM
 
-1. `npm version <new_version>`
+0. Release normally and copy `<new_version>` from console output.
+1. `npm version <new_version> --no-git-tag-version`
 2. `npm run build` (transpiles with fable, creates tsc types, and bundles with rollup)
 3. (Due to [#701](https://github.com/nfdi4plants/Swate/issues/701)) replace `@layer base` with `@layer swt-base` in `dist/swate-components.css`
-4. `npm publish --access public [--tag next]` (Use `--tag next` for prerelease)
+4. `npm publish --access public --tag next` (Use `--tag next` for prerelease)
