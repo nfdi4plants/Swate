@@ -1,4 +1,12 @@
-@import "tailwindcss" prefix(swt);
+/* @import "tailwindcss" prefix(swt); */
+
+/* https://github.com/tailwindlabs/tailwindcss/discussions/18123#discussioncomment-13245038 */
+/* https://github.com/saadeghi/daisyui/issues/3937 */
+@layer swt-theme, swt-base, swt-components, swt-utilities;
+@import "tailwindcss/theme.css" layer(swt-theme) prefix(swt);
+@import "tailwindcss/preflight.css" layer(swt-base) prefix(swt);
+@import "tailwindcss/utilities.css" layer(swt-utilities) prefix(swt);
+
 @source "**/*.fs.ts";
 @plugin "@tailwindcss/typography";
 
@@ -192,29 +200,27 @@
     }
 }
 
-@layer utilities {
+@layer swt-utilities {
     .animated-border::before {
       content: '';
       position: absolute;
       top: 0;
       left: 0;
       bottom: 0;
-      z-index: -1; /* Place it behind the content */
-      padding: 2px; /* Thickness of the border */
-      border-radius: 8px; /* Optional rounded corners */
+      z-index: -1;
+      padding: 2px;
+      border-radius: 8px;
       background: linear-gradient(180deg, var(--color-primary), var(--color-neutral));
-      /* background: red; */
       background-size: 200% 200%;
       animation: border-gradient-flow 8s ease-in-out infinite;
     }
 
-        /* Apply offsets to each container based on its order */
     .animated-border:nth-of-type(1)::before {
         animation-delay: 0s;
     }
 
     .animated-border:nth-of-type(2)::before {
-        animation-delay: 3s; /* Offset to create continuous flow */
+        animation-delay: 3s;
     }
 
     .animated-border:nth-of-type(3)::before {
@@ -226,7 +232,7 @@
     }
 }
 
-@layer components {
+@layer swt-components {
   .table-bordered th,
   .table-bordered td {
     @apply swt:border swt:border-white swt:text-left swt:border-collapse;

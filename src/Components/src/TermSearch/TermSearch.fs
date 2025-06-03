@@ -1114,7 +1114,7 @@ type TermSearch =
                 prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "not-prose swt:h-full"
+                "not-prose"
                 if fullwidth then
                     "swt:w-full"
             ]

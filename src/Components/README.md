@@ -36,6 +36,7 @@
 
 #### NPM
 
-1. Update version in `./package.json`.
-2. `npm run bundle` (transpiles with fable, creates tsc types, and bundles with rollup)
-3. `npm publish [--tag next]` (Use `--tag next` for prerelease)
+1. `npm version <new_version>`
+2. `npm run build` (transpiles with fable, creates tsc types, and bundles with rollup)
+3. (Due to [#701](https://github.com/nfdi4plants/Swate/issues/701)) replace `@layer base` with `@layer swt-base` in `dist/swate-components.css`
+4. `npm publish --access public [--tag next]` (Use `--tag next` for prerelease)
