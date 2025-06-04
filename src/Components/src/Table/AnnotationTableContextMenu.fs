@@ -129,7 +129,6 @@ type AnnotationTableContextMenuUtil =
 type AnnotationTableContextMenu =
     static member CompositeCellContent (index: CellCoordinate, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle) =
         let cellIndex = (index.x - 1, index.y - 1)
-        let cell = table.Values[cellIndex]
         [
             ContextMenuItem(
                 Html.div "Details",
