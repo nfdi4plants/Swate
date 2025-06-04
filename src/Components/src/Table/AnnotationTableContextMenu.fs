@@ -5,6 +5,19 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Feliz
 
+[<AutoOpenAttribute>]
+module Helper =
+
+    type Clipboard =
+        abstract member writeText: string -> JS.Promise<unit>
+        abstract member readText: unit -> JS.Promise<string>
+
+    type Navigator =
+        abstract member clipboard: Clipboard
+
+    [<Emit("navigator")>]
+    let navigator: Navigator = jsNative
+
 /// AnnotationTableContextMenu Components
 type ATCMC =
     static member Icon (className: string) =
@@ -22,6 +35,95 @@ type AnnotationTableContextMenuUtil =
             table.ClearCell(cellIndex)
         table.Copy()
 
+    static member copy (cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) =
+
+        let result =
+            if selectHandle.getCount() > 1 then
+
+                let cellCoordinates =
+                    selectHandle.getSelectedCells()
+                    |> Array.ofSeq
+                    |> Array.groupBy (fun item -> item.y)
+
+                let cells =
+                    cellCoordinates
+                    |> Array.map (fun (_, row) ->
+                        row
+                        |> Array.map (fun coordinate ->
+                            table.GetCellAt(coordinate.x - 1, coordinate.y - 1)
+                        )
+                    )
+
+                CompositeCell.ToTableTxt(cells)
+            else
+                let cell = table.GetCellAt(cellIndex)
+                cell.ToTabStr()
+
+        navigator.clipboard.writeText result
+        |> Promise.start
+
+    static member paste ((columnIndex, rowIndex): (int * int), table: ArcTable, selectHandle: SelectHandle, setTable) =
+        promise {
+            let! copiedValue = navigator.clipboard.readText()
+            let rows = copiedValue.Split([|System.Environment.NewLine|], System.StringSplitOptions.None)
+
+            if selectHandle.getCount() > 1 then
+
+                let cellCoordinates =
+                    selectHandle.getSelectedCells()
+                    |> Array.ofSeq
+
+                let headers =
+                    let columnIndices =
+                        cellCoordinates
+                        |> Array.distinctBy (fun item -> item.x)
+                    columnIndices
+                    |> Array.map (fun index -> table.GetColumn(index.x - 1).Header)
+
+                let getIndex startIndex length =
+                    let rec loop index length =
+                        if index < length then
+                            index
+                        else
+                            loop (index - length) length
+                    loop startIndex length
+
+                let rowCells =
+                    let cells =
+                        rows
+                        |> Array.map (fun row ->
+                            row.Split([|"\t"|], System.StringSplitOptions.None))
+                    cells
+                    |> Array.map (fun row ->
+                        headers
+                        |> Array.mapi (fun i header ->
+                            let index = getIndex i row.Length
+                            CompositeCell.fromTabStr(row.[index], header)))
+
+                let groupedCellCoordinates =
+                    cellCoordinates
+                    |> Array.ofSeq
+                    |> Array.groupBy (fun item -> item.y)
+
+                groupedCellCoordinates
+                |> Array.iteri (fun yi (_, row) ->
+                    let yIndex = getIndex yi rowCells.Length
+                    row
+                    |> Array.iteri (fun xi coordinate ->
+                        let xIndex = getIndex xi rowCells.[0].Length
+                        table.SetCellAt(coordinate.x - 1, coordinate.y - 1, rowCells.[yIndex].[xIndex])
+                    )
+                )
+                table.Copy()
+                |> setTable
+            else
+                let selectedHeader = table.GetColumn(columnIndex).Header
+                let newCell = CompositeCell.fromTabStr(copiedValue, selectedHeader)
+                table.SetCellAt(columnIndex, rowIndex, newCell)
+            table.Copy()
+            |> setTable
+        }
+        |> Promise.start
 
 [<Erase>]
 type AnnotationTableContextMenu =
@@ -52,23 +154,34 @@ type AnnotationTableContextMenu =
                     let cc = c.spawnData |> unbox<CellCoordinate>
                     AnnotationTableContextMenuUtil.clear(cc, cellIndex, table, selectHandle)
                     |> setTable
-
             )
             ContextMenuItem(isDivider=true)
             ContextMenuItem(
                 Html.div "Copy",
                 icon = ATCMC.Icon "fa-solid fa-copy",
-                kbdbutton = ATCMC.KbdHint("C")
+                kbdbutton = ATCMC.KbdHint("C"),
+                onClick = fun c ->
+                    let cc = c.spawnData |> unbox<CellCoordinate>
+                    AnnotationTableContextMenuUtil.copy(cellIndex, table, selectHandle)
+
             )
             ContextMenuItem(
                 Html.div "Cut",
                 icon = ATCMC.Icon "fa-solid fa-scissors",
-                kbdbutton = ATCMC.KbdHint("X")
+                kbdbutton = ATCMC.KbdHint("X"),
+                onClick = fun c ->
+                    let cc = c.spawnData |> unbox<CellCoordinate>
+                    AnnotationTableContextMenuUtil.copy(cellIndex, table, selectHandle)
+                    AnnotationTableContextMenuUtil.clear(cc, cellIndex, table, selectHandle)
+                    |> setTable
             )
             ContextMenuItem(
                 Html.div "Paste",
                 icon = ATCMC.Icon "fa-solid fa-paste",
-                kbdbutton = ATCMC.KbdHint("V")
+                kbdbutton = ATCMC.KbdHint("V"),
+                onClick = fun c ->
+                    let cc = c.spawnData |> unbox<CellCoordinate>
+                    AnnotationTableContextMenuUtil.paste(cellIndex, table, selectHandle, setTable)
             )
             ContextMenuItem(isDivider=true)
             ContextMenuItem(
