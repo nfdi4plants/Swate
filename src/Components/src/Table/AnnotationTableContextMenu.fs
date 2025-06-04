@@ -28,11 +28,36 @@ type ATCMC =
         {| element = Html.kbd [ prop.className "swt:ml-auto swt:kbd swt:kbd-sm"; prop.text text ]; label = label|}
 
 type AnnotationTableContextMenuUtil =
+
     static member clear (tableIndex: CellCoordinate, cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) : ArcTable =
         if selectHandle.contains tableIndex then
             table.ClearSelectedCells(selectHandle)
         else
             table.ClearCell(cellIndex)
+        table.Copy()
+
+    static member deleteRow (tableIndex: CellCoordinate, cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) : ArcTable =
+        if selectHandle.contains tableIndex then
+            let lastCellCoordinate =
+                selectHandle.getSelectedCells()
+                |> Array.ofSeq
+                |> Array.last
+
+            table.RemoveRow(lastCellCoordinate.y - 1)
+        else
+            table.RemoveRow(fst cellIndex)
+        table.Copy()
+
+    static member deleteColumn (tableIndex: CellCoordinate, cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) : ArcTable =
+        if selectHandle.contains tableIndex then
+            let lastCellCoordinate =
+                selectHandle.getSelectedCells()
+                |> Array.ofSeq
+                |> Array.last
+
+            table.RemoveColumn(lastCellCoordinate.x - 1)
+        else
+            table.RemoveRow(fst cellIndex)
         table.Copy()
 
     static member copy (cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) =
@@ -186,12 +211,20 @@ type AnnotationTableContextMenu =
             ContextMenuItem(
                 Html.div "Delete Row",
                 icon = ATCMC.Icon "fa-solid fa-delete-left",
-                kbdbutton = ATCMC.KbdHint("DelR")
+                kbdbutton = ATCMC.KbdHint("DelR"),
+                onClick = fun c ->
+                    let cc = c.spawnData |> unbox<CellCoordinate>
+                    AnnotationTableContextMenuUtil.deleteRow(cc, cellIndex, table, selectHandle)
+                    |> setTable
             )
             ContextMenuItem(
                 Html.div "Delete Column",
                 icon = ATCMC.Icon "fa-solid fa-delete-left fa-rotate-270",
-                kbdbutton = ATCMC.KbdHint("DelC")
+                kbdbutton = ATCMC.KbdHint("DelC"),
+                onClick = fun c ->
+                    let cc = c.spawnData |> unbox<CellCoordinate>
+                    AnnotationTableContextMenuUtil.deleteColumn(cc, cellIndex, table, selectHandle)
+                    |> setTable
             )
             ContextMenuItem(
                 Html.div "Move Column",
