@@ -87,7 +87,6 @@ type AnnotationTableContextMenuUtil =
                 cell.ToTabStr()
 
         navigator.clipboard.writeText result
-        |> Promise.start
 
     static member paste ((columnIndex, rowIndex): (int * int), table: ArcTable, selectHandle: SelectHandle, setTable) =
         promise {
@@ -150,7 +149,6 @@ type AnnotationTableContextMenuUtil =
             table.Copy()
             |> setTable
         }
-        |> Promise.start
 
 [<Erase>]
 type AnnotationTableContextMenu =
@@ -189,6 +187,7 @@ type AnnotationTableContextMenu =
                 onClick = fun c ->
                     let cc = c.spawnData |> unbox<CellCoordinate>
                     AnnotationTableContextMenuUtil.copy(cellIndex, table, selectHandle)
+                    |> Promise.start
 
             )
             ContextMenuItem(
@@ -208,6 +207,7 @@ type AnnotationTableContextMenu =
                 onClick = fun c ->
                     let cc = c.spawnData |> unbox<CellCoordinate>
                     AnnotationTableContextMenuUtil.paste(cellIndex, table, selectHandle, setTable)
+                    |> Promise.start
             )
             ContextMenuItem(isDivider=true)
             ContextMenuItem(
