@@ -93,12 +93,16 @@ type AnnotationTableContextMenuUtil =
             let! copiedValue = navigator.clipboard.readText()
             let rows = copiedValue.Split([|System.Environment.NewLine|], System.StringSplitOptions.None)
 
+            //Check amount of selected cells
+            //When multiple cells are selected a different handling is required
             if selectHandle.getCount() > 1 then
 
+                //Convert cell coordinates to array
                 let cellCoordinates =
                     selectHandle.getSelectedCells()
                     |> Array.ofSeq
 
+                //Get allr required headers for cells
                 let headers =
                     let columnIndices =
                         cellCoordinates
@@ -106,6 +110,7 @@ type AnnotationTableContextMenuUtil =
                     columnIndices
                     |> Array.map (fun index -> table.GetColumn(index.x - 1).Header)
 
+                //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
                 let getIndex startIndex length =
                     let rec loop index length =
                         if index < length then
@@ -114,6 +119,7 @@ type AnnotationTableContextMenuUtil =
                             loop (index - length) length
                     loop startIndex length
 
+                //Converts the cells of each row
                 let rowCells =
                     let cells =
                         rows
@@ -126,16 +132,20 @@ type AnnotationTableContextMenuUtil =
                             let index = getIndex i row.Length
                             CompositeCell.fromTabStr(row.[index], header)))
 
+                //Group all cells based on their row
                 let groupedCellCoordinates =
                     cellCoordinates
                     |> Array.ofSeq
                     |> Array.groupBy (fun item -> item.y)
 
+                //Map over all selected cells
                 groupedCellCoordinates
                 |> Array.iteri (fun yi (_, row) ->
+                    //Restart row index, when the amount of selected rows is bigger than copied rows
                     let yIndex = getIndex yi rowCells.Length
                     row
                     |> Array.iteri (fun xi coordinate ->
+                        //Restart column index, when the amount of selected columns is bigger than copied columns
                         let xIndex = getIndex xi rowCells.[0].Length
                         table.SetCellAt(coordinate.x - 1, coordinate.y - 1, rowCells.[yIndex].[xIndex])
                     )
