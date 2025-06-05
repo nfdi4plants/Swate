@@ -38,26 +38,28 @@ type AnnotationTableContextMenuUtil =
 
     static member deleteRow (tableIndex: CellCoordinate, cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) : ArcTable =
         if selectHandle.contains tableIndex then
-            let lastCellCoordinate =
+            let rowCoordinates =
                 selectHandle.getSelectedCells()
                 |> Array.ofSeq
-                |> Array.last
+                |> Array.distinctBy (fun coordinate -> coordinate.y)
+                |> Array.map (fun coordinate -> coordinate.y - 1)
 
-            table.RemoveRow(lastCellCoordinate.y - 1)
+            table.RemoveRows(rowCoordinates)
         else
-            table.RemoveRow(fst cellIndex)
+            table.RemoveRow(snd cellIndex)
         table.Copy()
 
     static member deleteColumn (tableIndex: CellCoordinate, cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) : ArcTable =
         if selectHandle.contains tableIndex then
-            let lastCellCoordinate =
+            let columnCoordinates =
                 selectHandle.getSelectedCells()
                 |> Array.ofSeq
-                |> Array.last
+                |> Array.distinctBy (fun coordinate -> coordinate.x)
+                |> Array.map (fun coordinate -> coordinate.x - 1)
 
-            table.RemoveColumn(lastCellCoordinate.x - 1)
+            table.RemoveColumns(columnCoordinates)
         else
-            table.RemoveRow(fst cellIndex)
+            table.RemoveColumn(fst cellIndex)
         table.Copy()
 
     static member copy (cellIndex: (int * int), table: ArcTable, selectHandle: SelectHandle) =
