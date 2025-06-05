@@ -28,6 +28,7 @@
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
+    <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />

@@ -12,7 +12,6 @@
     <Compile Include="Util\ElmishHelper.fs" />
     <Compile Include="Util\MessageInterop.fs" />
     <Compile Include="Util\Helper.fs" />
-    <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\SwateHost.fs" />
     <Compile Include="LocalStorage\AutosaveConfig.fs" />
     <Compile Include="LocalStorage\SwateSearchConfig.fs" />

@@ -626,10 +626,13 @@ module Extensions =
                 | anyElse -> failwithf "Invalid content to parse to CompositeCell: %A" anyElse
 
         member this.ToTabStr() =
-            this.GetContentSwate() |> String.concat "\t"
+            if this.isFreeText then
+                this.GetContentSwate() |> String.concat "\t"
+            else
+                this.GetContentSwate() |> String.concat ","
 
-        static member fromTabStr (str: string) (header: CompositeHeader) =
-            let content = str.Split('\t') |> Array.map _.Trim()
+        static member fromTabStr (str: string, header: CompositeHeader) =
+            let content = str.Split([| '\t'; ',' |]) |> Array.map _.Trim()
             CompositeCell.fromContentValid (content, header)
 
         static member ToTabTxt(cells: CompositeCell[]) =
@@ -637,11 +640,21 @@ module Extensions =
             |> Array.map (fun c -> c.ToTabStr())
             |> String.concat (System.Environment.NewLine)
 
+        static member ToTableTxt(cells: CompositeCell[][]) =
+            let rows =
+                cells
+                |> Array.map (fun row ->
+                    row
+                    |> Array.map (fun cell -> cell.ToTabStr())
+                    |> String.concat "\t")
+            rows
+            |> String.concat (System.Environment.NewLine)
+
         static member fromTabTxt (tabTxt: string) (header: CompositeHeader) =
             let lines =
                 tabTxt.Split([| System.Environment.NewLine |], System.StringSplitOptions.None)
 
-            let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr line header)
+            let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr(line, header))
             cells
 
         member this.ConvertToValidCell(header: CompositeHeader) =
