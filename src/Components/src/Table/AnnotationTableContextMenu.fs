@@ -88,10 +88,26 @@ type AnnotationTableContextMenuUtil =
 
         navigator.clipboard.writeText result
 
+    static member getCopiedCells() =
+        promise {
+            let! copiedValue = navigator.clipboard.readText()
+
+            let rows =
+                copiedValue.Split([|System.Environment.NewLine|], System.StringSplitOptions.RemoveEmptyEntries)
+                |> Array.map (fun item ->
+                    item.Split('\t')
+                    |> Array.map _.Trim())
+            return rows
+        }
+
     static member paste ((columnIndex, rowIndex): (int * int), table: ArcTable, selectHandle: SelectHandle, setTable) =
         promise {
             let! copiedValue = navigator.clipboard.readText()
-            let rows = copiedValue.Split([|System.Environment.NewLine|], System.StringSplitOptions.None)
+            let rows =
+                copiedValue.Split([|System.Environment.NewLine|], System.StringSplitOptions.RemoveEmptyEntries)
+                |> Array.map (fun item ->
+                    item.Split('\t')
+                    |> Array.map _.Trim())
 
             //Check amount of selected cells
             //When multiple cells are selected a different handling is required
@@ -121,16 +137,9 @@ type AnnotationTableContextMenuUtil =
 
                 //Converts the cells of each row
                 let rowCells =
-                    let cells =
-                        rows
-                        |> Array.map (fun row ->
-                            row.Split([|"\t"|], System.StringSplitOptions.None))
-                    cells
+                    rows
                     |> Array.map (fun row ->
-                        headers
-                        |> Array.mapi (fun i header ->
-                            let index = getIndex i row.Length
-                            CompositeCell.fromTabStr(row.[index], header)))
+                        CompositeCell.fromTableStr(row, headers))
 
                 //Group all cells based on their row
                 let groupedCellCoordinates =
@@ -150,25 +159,26 @@ type AnnotationTableContextMenuUtil =
                         table.SetCellAt(coordinate.x - 1, coordinate.y - 1, rowCells.[yIndex].[xIndex])
                     )
                 )
-                table.Copy()
-                |> setTable
             else
                 let selectedHeader = table.GetColumn(columnIndex).Header
-                let newCell = CompositeCell.fromTabStr(copiedValue, selectedHeader)
-                table.SetCellAt(columnIndex, rowIndex, newCell)
+                let newCell = CompositeCell.fromTableStr(rows.[0], [|selectedHeader|])
+                table.SetCellAt(columnIndex, rowIndex, newCell.[0])
             table.Copy()
             |> setTable
         }
 
 [<Erase>]
 type AnnotationTableContextMenu =
-    static member CompositeCellContent (index: CellCoordinate, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle) =
+    static member CompositeCellContent (index: CellCoordinate, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle, setDetailsModal: CellCoordinate option -> unit, setHeadersModal, setBody, setCoordinate) =
         let cellIndex = (index.x - 1, index.y - 1)
         [
             ContextMenuItem(
                 Html.div "Details",
                 icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
-                kbdbutton = ATCMC.KbdHint("D")
+                kbdbutton = ATCMC.KbdHint("D"),
+                onClick = fun c ->
+                    let cc = c.spawnData |> unbox<CellCoordinate> |> Some
+                    setDetailsModal cc
             )
             ContextMenuItem(
                 Html.div "Fill Column",
@@ -206,7 +216,7 @@ type AnnotationTableContextMenu =
                 kbdbutton = ATCMC.KbdHint("X"),
                 onClick = fun c ->
                     let cc = c.spawnData |> unbox<CellCoordinate>
-                    AnnotationTableContextMenuUtil.copy(cellIndex, table, selectHandle)
+                    AnnotationTableContextMenuUtil.copy(cellIndex, table, selectHandle) |> ignore
                     AnnotationTableContextMenuUtil.clear(cc, cellIndex, table, selectHandle)
                     |> setTable
             )
@@ -215,8 +225,29 @@ type AnnotationTableContextMenu =
                 icon = ATCMC.Icon "fa-solid fa-paste",
                 kbdbutton = ATCMC.KbdHint("V"),
                 onClick = fun c ->
-                    let cc = c.spawnData |> unbox<CellCoordinate>
-                    AnnotationTableContextMenuUtil.paste(cellIndex, table, selectHandle, setTable)
+                    promise {
+                        let cc = c.spawnData |> unbox<CellCoordinate>
+                        let checkForHeaders (row: string []) =
+                            let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
+                            let areHeaders =
+                                headers
+                                |> Array.collect (fun header ->
+                                    row
+                                    |> Array.map (fun cell -> cell.StartsWith(header)))
+                            Array.contains true areHeaders
+
+                        let! rows = AnnotationTableContextMenuUtil.getCopiedCells()
+
+                        if checkForHeaders rows.[0] then
+                            setCoordinate (Some cc)
+                            setHeadersModal rows.[0]
+                            if rows.Length > 1 then
+                                rows.[1..]
+                                |> setBody 
+                        else
+                            let! result = AnnotationTableContextMenuUtil.paste(cellIndex, table, selectHandle, setTable)
+                            result
+                    }
                     |> Promise.start
             )
             ContextMenuItem(isDivider=true)

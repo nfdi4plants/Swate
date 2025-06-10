@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl
+open ARCtrl.Spreadsheet
 
 [<Mangle(false); Erase>]
 type AnnotationTable =
@@ -36,6 +37,9 @@ type AnnotationTable =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (detailsModal: CellCoordinate option), setDetailsModal = React.useState (None)
+        let (coordinate: CellCoordinate option), setCoordinate = React.useState (None)
+        let (headersModal: string []), setHeadersModal = React.useState ([||])
+        let (body: string [][]), setBody = React.useState ([||])
 
         let cellRender =
             React.memo (
@@ -131,6 +135,61 @@ type AnnotationTable =
                     ],
                     Browser.Dom.document.body
                 )
+                ReactDOM.createPortal (
+                    React.fragment [
+                        match headersModal with
+                        | headers when headers.Length > 0 ->
+                            let rmv =
+                                fun _ ->
+                                    tableRef.current.focus ()
+                                    setCoordinate None
+                                    setHeadersModal [||]
+
+                            let addColumnsBtn compositeColumns =
+                                Html.button [
+                                    prop.className "swt:btn swt:btn-outline swt:btn-primary"
+                                    prop.text "Confirm"
+                                    prop.onClick (fun _ ->
+                                        arcTable.AddColumns(compositeColumns, coordinate.Value.x, false, false)
+                                        arcTable.Copy()
+                                        |> setArcTable
+                                        rmv())
+                                ]
+
+                            let columns = Seq.append [ headers ] body |> Seq.transpose
+                            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+                            let compositeColumns = ArcTable.composeColumns columnsList
+
+                            BaseModal.BaseModal(
+                                (fun _ -> rmv ()),
+                                header = Html.div "Headers have been detected",
+                                content =
+                                    React.fragment [
+                                        Html.div [
+                                            prop.className "swt:overflow-x-auto"
+                                            prop.children [
+                                                Html.text "Preview"
+                                                Html.table [
+                                                    prop.className "swt:table swt:table-xs"
+                                                    prop.children (
+                                                        Html.thead [
+                                                            Html.tr (
+                                                                compositeColumns
+                                                                |> Array.map (fun compositeColumn -> Html.th (compositeColumn.Header.ToString()))
+                                                            )
+                                                        ]
+                                                    )
+                                                ]
+                                            ]
+                                        ]
+                                    ],
+                                footer = React.fragment [ FooterButtons.Cancel(rmv); addColumnsBtn compositeColumns],
+                                contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+                            )
+                        | _ -> Html.none
+                    ],
+                    Browser.Dom.document.body
+                )
                 ContextMenu.ContextMenu(
                     (fun data ->
                         let index = data |> unbox<CellCoordinate>
@@ -151,7 +210,11 @@ type AnnotationTable =
                                 {| x = index.x; y = index.y |},
                                 arcTable,
                                 setArcTable,
-                                tableRef.current.SelectHandle
+                                tableRef.current.SelectHandle,
+                                setDetailsModal,
+                                setHeadersModal,
+                                setBody,
+                                setCoordinate
                             )
 
                         // [

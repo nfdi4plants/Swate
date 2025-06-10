@@ -159,9 +159,6 @@ module Term =
         let Data = "data"
 
         [<Literal>]
-        let Source = "source"
-
-        [<Literal>]
         let IsObsolete = "isObsolete"
 
     open Swate.Components.Shared
@@ -176,8 +173,6 @@ module Term =
                     Comment(ConvertLiterals.Description, JS.JSON.stringify term.description.Value)
                 if term.data.IsSome then
                     Comment(ConvertLiterals.Data, JS.JSON.stringify term.data.Value)
-                if term.source.IsSome then
-                    Comment(ConvertLiterals.Source, JS.JSON.stringify term.source.Value)
                 if term.isObsolete.IsSome then
                     Comment(ConvertLiterals.IsObsolete, JS.JSON.stringify term.isObsolete.Value)
             ]
@@ -196,11 +191,6 @@ module Term =
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Data)
             |> Option.map (fun c -> Json.parseAs<obj> (c.Value.Value))
 
-        let source =
-            oa.Comments
-            |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Source)
-            |> Option.map (fun c -> Json.parseAs<string> (c.Value.Value))
-
         let isObsolete =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.IsObsolete)
@@ -210,7 +200,7 @@ module Term =
             ?name = oa.Name,
             ?id = oa.TermAccessionNumber,
             ?description = description,
-            ?source = source,
+            ?source = oa.TermSourceREF,
             ?href = Option.whereNot System.String.IsNullOrWhiteSpace oa.TermAccessionOntobeeUrl,
             ?isObsolete = isObsolete,
             ?data = data

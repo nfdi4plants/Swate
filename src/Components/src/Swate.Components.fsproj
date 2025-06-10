@@ -42,10 +42,12 @@
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
     <Compile Include="Table\AnnotationTable.fs" />
+    <Compile Include="Table\TestCopyCompositeColumns.fsx" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ARCtrl.Spreadsheet" Version="2.5.1" />
     <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />
