@@ -49,6 +49,13 @@ type CellCoordinateRange = {|
     xEnd: int
 |}
 
+module CellCoordinateRange =
+
+    let count (range: CellCoordinateRange) : int =
+        (range.yEnd - range.yStart + 1) * (range.xEnd - range.xStart + 1)
+
+// [<AllowNullLiteral>]
+// [<Global>]
 type TableCellController = {
     Index: CellCoordinate
     IsActive: bool

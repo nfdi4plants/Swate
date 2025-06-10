@@ -38,8 +38,8 @@ type AnnotationTable =
         let tableRef = React.useRef<TableHandle> (null)
         let (detailsModal: CellCoordinate option), setDetailsModal = React.useState (None)
         let (coordinate: CellCoordinate option), setCoordinate = React.useState (None)
-        let (headersModal: string []), setHeadersModal = React.useState ([||])
-        let (body: string [][]), setBody = React.useState ([||])
+        let (headersModal: string[]), setHeadersModal = React.useState ([||])
+        let (body: string[][]), setBody = React.useState ([||])
 
         let cellRender =
             React.memo (
@@ -53,10 +53,10 @@ type AnnotationTable =
                             className =
                                 "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200"
                         )
-                    | Some (U2.Case2 header) ->
+                    | Some(U2.Case2 header) ->
                         let text = header.ToString()
                         AnnotationTable.InactiveTextRender(text, tcc)
-                    | Some (U2.Case1 cell) ->
+                    | Some(U2.Case1 cell) ->
                         let text = cell.ToString()
 
                         let icon =
@@ -72,9 +72,10 @@ type AnnotationTable =
                             else
                                 None
 
-                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)
-                ),
-                withKey = fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) -> $"{tcc.Index.x}-{tcc.Index.y}"
+                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)),
+                withKey =
+                    fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
+                        $"{tcc.Index.x}-{tcc.Index.y}"
             )
 
         let renderActiveCell =
@@ -91,6 +92,7 @@ type AnnotationTable =
                     | _ -> Html.div "Unknown cell type")
 
             )
+
         Html.div [
             prop.ref containerRef
             prop.children [
@@ -151,9 +153,8 @@ type AnnotationTable =
                                     prop.text "Confirm"
                                     prop.onClick (fun _ ->
                                         arcTable.AddColumns(compositeColumns, coordinate.Value.x, false, false)
-                                        arcTable.Copy()
-                                        |> setArcTable
-                                        rmv())
+                                        arcTable.Copy() |> setArcTable
+                                        rmv ())
                                 ]
 
                             let columns = Seq.append [ headers ] body |> Seq.transpose
@@ -175,7 +176,8 @@ type AnnotationTable =
                                                         Html.thead [
                                                             Html.tr (
                                                                 compositeColumns
-                                                                |> Array.map (fun compositeColumn -> Html.th (compositeColumn.Header.ToString()))
+                                                                |> Array.map (fun compositeColumn ->
+                                                                    Html.th (compositeColumn.Header.ToString()))
                                                             )
                                                         ]
                                                     )
@@ -183,7 +185,7 @@ type AnnotationTable =
                                             ]
                                         ]
                                     ],
-                                footer = React.fragment [ FooterButtons.Cancel(rmv); addColumnsBtn compositeColumns],
+                                footer = React.fragment [ FooterButtons.Cancel(rmv); addColumnsBtn compositeColumns ],
                                 contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
                             )
                         | _ -> Html.none
@@ -193,18 +195,11 @@ type AnnotationTable =
                 ContextMenu.ContextMenu(
                     (fun data ->
                         let index = data |> unbox<CellCoordinate>
+
                         if index.x = 0 then // index col
-                            AnnotationTableContextMenu.IndexColumnContent(
-                                index.y,
-                                arcTable,
-                                setArcTable
-                            )
+                            AnnotationTableContextMenu.IndexColumnContent(index.y, arcTable, setArcTable)
                         elif index.y = 0 then // header Row
-                            AnnotationTableContextMenu.CompositeHeaderContent(
-                                index.x,
-                                arcTable,
-                                setArcTable
-                            )
+                            AnnotationTableContextMenu.CompositeHeaderContent(index.x, arcTable, setArcTable)
                         else // standard cell
                             AnnotationTableContextMenu.CompositeCellContent(
                                 {| x = index.x; y = index.y |},
@@ -217,23 +212,23 @@ type AnnotationTable =
                                 setCoordinate
                             )
 
-                        // [
-                        //     for i in 0..5 do
-                        //         ContextMenuItem(
-                        //             text = Html.span $"Item {i}",
-                        //             ?icon =
-                        //                 (if i = 4 then
-                        //                     Html.i [ prop.className "fa-solid fa-check" ] |> Some
-                        //                 else
-                        //                     None),
-                        //             ?kbdbutton = (if i = 3 then {| element = Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]; label = "Back"|} |> Some else None),
-                        //             onClick =
-                        //                 (fun e ->
-                        //                     e.buttonEvent.stopPropagation ()
-                        //                     let index = e.spawnData |> unbox<CellCoordinate>
-                        //                     console.log (sprintf "Item clicked: %i" i, index))
-                        //         )
-                        // ]
+                    // [
+                    //     for i in 0..5 do
+                    //         ContextMenuItem(
+                    //             text = Html.span $"Item {i}",
+                    //             ?icon =
+                    //                 (if i = 4 then
+                    //                     Html.i [ prop.className "fa-solid fa-check" ] |> Some
+                    //                 else
+                    //                     None),
+                    //             ?kbdbutton = (if i = 3 then {| element = Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]; label = "Back"|} |> Some else None),
+                    //             onClick =
+                    //                 (fun e ->
+                    //                     e.buttonEvent.stopPropagation ()
+                    //                     let index = e.spawnData |> unbox<CellCoordinate>
+                    //                     console.log (sprintf "Item clicked: %i" i, index))
+                    //         )
+                    // ]
                     ),
                     ref = containerRef,
                     onSpawn =
@@ -255,16 +250,17 @@ type AnnotationTable =
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,
-                    renderCell = (fun (tcc: TableCellController) ->
-                        let cell =
-                            if tcc.Index.x = 0 then
-                                None
-                            elif tcc.Index.y = 0 then
-                                Some (arcTable.Headers.[tcc.Index.x - 1] |> U2.Case2)
-                            else
-                                Some (arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
-                        cellRender (tcc, cell)
-                    ),
+                    renderCell =
+                        (fun (tcc: TableCellController) ->
+                            let cell =
+                                if tcc.Index.x = 0 then
+                                    None
+                                elif tcc.Index.y = 0 then
+                                    Some(arcTable.Headers.[tcc.Index.x - 1] |> U2.Case2)
+                                else
+                                    Some(arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
+
+                            cellRender (tcc, cell)),
                     renderActiveCell = renderActiveCell,
                     ref = tableRef,
                     onKeydown =
@@ -280,9 +276,7 @@ type AnnotationTable =
                                 setDetailsModal (Some cell)
                             elif e.code = kbdEventCode.delete && selectedCells.count > 0 then
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
-                                arcTable.Copy()
-                                |> setArcTable
-                            ),
+                                arcTable.Copy() |> setArcTable),
                     enableColumnHeaderSelect = true
                 )
             ]

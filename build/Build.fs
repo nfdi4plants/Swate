@@ -367,22 +367,21 @@ let Bundle () =
 
 type Run =
 
-    static member ClientArgs =
-        [
-            "fable"
-            "watch"
-            "-o"
-            "output"
-            "-s"
-            "-e"
-            "fs.js"
-            yield! DEFINE_SWATE_ENVIRONMENT_FABLE
-            "--run"
-            "npx"
-            "vite"
-            "--debug"
-            "transform"
-        ]
+    static member ClientArgs = [
+        "fable"
+        "watch"
+        "-o"
+        "output"
+        "-s"
+        "-e"
+        "fs.js"
+        yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+        "--run"
+        "npx"
+        "vite"
+        "--debug"
+        "transform"
+    ]
 
 
     static member All(db: bool) =
@@ -443,6 +442,27 @@ module Tests =
         ]
         |> runParallel
 
+    let WatchJs () =
+        runParallel [
+            "client",
+            dotnet
+                [
+                    "fable"
+                    "watch"
+                    "-o"
+                    "output"
+                    "-s"
+                    yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                    "--run"
+                    "npx"
+                    "mocha"
+                    $"{clientTestsPath}/output/Client.Tests.js"
+                    "--watch"
+                    "--parallel"
+                ]
+                clientTestsPath
+        ]
+
     let Run () =
         [
             "server", dotnet [ "run" ] serverTestsPath
@@ -491,12 +511,15 @@ let main args =
             Run.All(false)
             0
     | "test" :: a ->
-        Tests.buildSharedTests ()
         Tests.disableUserData ()
+        Tests.buildSharedTests ()
 
         match a with
         | "watch" :: _ ->
             Tests.Watch()
+            0
+        | "js" :: _ ->
+            Tests.WatchJs()
             0
         | _ ->
             Tests.Run()
