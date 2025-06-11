@@ -17,11 +17,17 @@ let checkForHeaders (row: string[]) =
 let predictPasteBehavior
     (currentTable: ArcTable, clickedCell: CellCoordinate, selectedCells: CellCoordinateRange, rows: string[][])
     =
-    PasteColumns {|
-        data = rows
-        columnIndex = clickedCell.x
-        rowIndex = clickedCell.y
-    |}
+    if checkForHeaders rows.[0] then
+        AddColumns {|
+            data = rows
+            columnIndex = clickedCell.x
+        |}
+    else
+        PasteColumns {|
+            data = rows
+            columnIndex = clickedCell.x
+            rowIndex = clickedCell.y
+        |}
 
 let pasteIntoTable (currentTable: ArcTable, pasteObj: PasteCases) : ArcTable =
     match pasteObj with
