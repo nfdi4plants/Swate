@@ -159,9 +159,15 @@ type AnnotationTable =
 
                             let headers = addColumns.data.[0]
                             let body = addColumns.data.[1..]
-                            let columns = Seq.append [ headers ] body |> Seq.transpose
+                            let columns = Array.append [| headers |] body |> Array.transpose
                             let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
                             let compositeColumns = ArcTable.composeColumns columnsList
+
+                            let rows =
+                                compositeColumns
+                                    |> Array.map (fun compositeColumn ->
+                                        compositeColumn.Cells)
+                                |> Array.transpose
 
                             BaseModal.BaseModal(
                                 (fun _ -> rmv ()),
@@ -174,7 +180,7 @@ type AnnotationTable =
                                                 Html.text "Preview"
                                                 Html.table [
                                                     prop.className "swt:table swt:table-xs"
-                                                    prop.children (
+                                                    prop.children [
                                                         Html.thead [
                                                             Html.tr (
                                                                 compositeColumns
@@ -182,7 +188,15 @@ type AnnotationTable =
                                                                     Html.th (compositeColumn.Header.ToString()))
                                                             )
                                                         ]
-                                                    )
+                                                        Html.tbody (
+                                                            rows
+                                                                |> Array.map (fun compositeColumn ->
+                                                                Html.tr (
+                                                                    compositeColumn
+                                                                    |> Array.map (fun cell -> Html.td (cell.ToString())))
+                                                            )
+                                                        )
+                                                    ]
                                                 ]
                                             ]
                                         ]
@@ -190,8 +204,11 @@ type AnnotationTable =
                                 footer = React.fragment [ FooterButtons.Cancel(rmv); addColumnsBtn compositeColumns (addColumns.columnIndex + 1)],
                                 contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
                             )
-                        | Some (PasteColumns pasteColumns)->
+                        | Some (PasteColumns pasteColumns) ->
                             AnnotationTableContextMenuUtil.paste((pasteColumns.columnIndex, pasteColumns.rowIndex), arcTable, pasteColumns.data, tableRef.current.SelectHandle, setArcTable)
+                            setPastCases None
+                        | Some (PasteSinglesAsTerm singleColumns) ->
+                            AnnotationTableContextMenuUtil.insertPotentialTermColumns(arcTable, singleColumns.data, singleColumns.headers, singleColumns.groupedCellCoordinates, setArcTable)
                             setPastCases None
                         | _ -> Html.none
                     ],

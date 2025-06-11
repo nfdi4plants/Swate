@@ -632,11 +632,9 @@ module Extensions =
             let content = str.Split('\t') |> Array.map _.Trim()
             CompositeCell.fromContentValid (content, header)
 
-        //static member predicCase (content: string [], headers: CompositeHeader []) =
+        static member getHeaderParsingInfo (headers: CompositeHeader []) =
 
-        static member fromTableStr (content: string [], headers: CompositeHeader []) =
-            //let content = str.Split('\t') |> Array.map _.Trim()
-            let termIndices, expectedLength =
+            let termIndices, lengthWithoutTerms =
                 let termIndices, expectedLength =
                     headers
                     |> Array.mapi (fun i header ->
@@ -648,7 +646,11 @@ module Extensions =
                     |> Array.unzip
                 termIndices |> Array.filter (fun item -> item > -1),
                 expectedLength |> Array.sum
+            termIndices, lengthWithoutTerms
 
+        static member fromTableStr (content: string [], headers: CompositeHeader []) =
+
+            let termIndices, expectedLength = CompositeCell.getHeaderParsingInfo(headers)
             let expectedTermLength = expectedLength + (3 * termIndices.Length)
             let expectedUnitLength = expectedLength + (4 * termIndices.Length)
 
