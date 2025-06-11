@@ -121,13 +121,6 @@ type AnnotationTableContextMenuUtil =
             PasteCases.PasteColumns {|columnIndex = columnIndex; rowIndex = rowIndex; data = data|}
 
     static member paste ((columnIndex, rowIndex): (int * int), table: ArcTable, data:string[][], selectHandle: SelectHandle, setTable) =
-        //let! copiedValue = navigator.clipboard.readText()
-        //let rows =
-        //    copiedValue.Split([|System.Environment.NewLine|], System.StringSplitOptions.RemoveEmptyEntries)
-        //    |> Array.map (fun item ->
-        //        item.Split('\t')
-        //        |> Array.map _.Trim())
-
         //Check amount of selected cells
         //When multiple cells are selected a different handling is required
         if selectHandle.getCount() > 1 then

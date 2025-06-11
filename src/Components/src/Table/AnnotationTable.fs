@@ -57,19 +57,22 @@ type AnnotationTable =
                     | Some(U2.Case1 cell) ->
                         let text = cell.ToString()
 
+                        let termAccession =
+                            match cell with
+                            | term when term.isTerm -> cell.AsTerm.TermAccessionShort
+                            | unit when unit.isUnitized -> (snd cell.AsUnitized).TermAccessionShort
+                            | _ -> ""
+
                         let icon =
-                            if
-                                (cell.isTerm || cell.isUnitized)
-                                && System.String.IsNullOrWhiteSpace cell.AsTerm.TermAccessionShort |> not
+                            if System.String.IsNullOrWhiteSpace termAccession |> not
                             then
                                 Html.i [
                                     prop.className "fa-solid fa-check swt:text-primary"
-                                    prop.title cell.AsTerm.TermAccessionShort
+                                    prop.title termAccession
                                 ]
                                 |> Some
                             else
                                 None
-
                         AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)),
                 withKey =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->

@@ -632,25 +632,31 @@ module Extensions =
             let content = str.Split('\t') |> Array.map _.Trim()
             CompositeCell.fromContentValid (content, header)
 
+        //static member predicCase (content: string [], headers: CompositeHeader []) =
+
         static member fromTableStr (content: string [], headers: CompositeHeader []) =
             //let content = str.Split('\t') |> Array.map _.Trim()
-            let expectedLength, termCount =
-                let expectedLength, termCount =
+            let termIndices, expectedLength =
+                let termIndices, expectedLength =
                     headers
-                    |> Array.map (fun header ->
+                    |> Array.mapi (fun i header ->
                         match header with
-                        | item when item.IsSingleColumn -> 1, 0
-                        | item when item.IsDataColumn -> 4, 0
-                        | item when item.IsTermColumn -> 0, 1
+                        | item when item.IsSingleColumn -> -1, 1
+                        | item when item.IsDataColumn -> -1, 4
+                        | item when item.IsTermColumn -> i, 0
                     )
                     |> Array.unzip
-                expectedLength |> Array.sum,
-                termCount |> Array.sum
+                termIndices |> Array.filter (fun item -> item > -1),
+                expectedLength |> Array.sum
 
-            let expectedTermLength = expectedLength + (3 * termCount)
-            let expectedUnitLength = expectedLength + (4 * termCount)
+            let expectedTermLength = expectedLength + (3 * termIndices.Length)
+            let expectedUnitLength = expectedLength + (4 * termIndices.Length)
 
             printfn "expectedTermLength: %i" expectedTermLength
+            printfn "expectedUnitLength: %i" expectedUnitLength
+
+            let allTerm = content.Length = expectedTermLength
+            let allUnit = content.Length = expectedUnitLength
 
             let parseRow (row: string []) (headers: CompositeHeader []) =
                 let rec loop index result =
@@ -666,17 +672,15 @@ module Extensions =
                             let content = Array.sub row index 4
                             let cell = CompositeCell.fromContentValid(content, header)
                             loop (index + 4) (cell::result)
-                        | x when x.IsTermColumn ->
+                        | x when x.IsTermColumn && allTerm ->
                             let content = Array.sub row index 3
                             let cell = CompositeCell.fromContentValid(content, header)
                             loop (index + 3) (cell::result)
+                        | x when x.IsTermColumn && allUnit ->
+                            let content = Array.sub row index 4
+                            let cell = CompositeCell.fromContentValid(content, header)
+                            loop (index + 4) (cell::result)
                 loop 0 []
-            
-            //match content.Length with
-            //| length when length = expectedTermLength -> ()
-            //| length when length = expectedUnitLength -> ()
-            //| _ -> ()
-
             parseRow content headers
 
         static member ToTabTxt(cells: CompositeCell[]) =
