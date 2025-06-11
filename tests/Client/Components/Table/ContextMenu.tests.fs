@@ -4,11 +4,6 @@ open Fable.Mocha
 open ARCtrl
 open ARCtrl.Spreadsheet
 open Swate.Components
-open Swate.Components
-
-type PasteBehavior =
-    | PasteColumns of {| data: string[][]; ColumnIndex: int |}
-    | Default
 
 let checkForHeaders (row: string[]) =
     let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
@@ -25,19 +20,26 @@ let predictPasteBehavior
     if checkForHeaders rows.[0] then
         PasteColumns {|
             data = rows
-            ColumnIndex = clickedCell.x
+            columnIndex = clickedCell.x
+            rowIndex = clickedCell.y
         |}
     else
-        Default
+        Default {|
+            data = rows
+            columnIndex = clickedCell.x
+            rowIndex = clickedCell.y
+        |}
 
-let pasteIntoTable (currentTable: ArcTable, pasteObj: PasteBehavior) : ArcTable =
+let pasteIntoTable (currentTable: ArcTable, pasteObj: PasteCases) : ArcTable =
     match pasteObj with
     | PasteColumns columnInfo ->
         let columns = ArcTable.composeColumns columnInfo.data
 
-        currentTable.AddColumns(columns, columnInfo.ColumnIndex)
+        let newTable = currentTable.Copy()
 
-        currentTable.Copy()
+        newTable.AddColumns(columns, columnInfo.columnIndex)
+
+        newTable
 
 
 module MockData =
@@ -113,7 +115,8 @@ let Main =
                     pasteBehavior
                     (PasteColumns {|
                         data = PasteData
-                        ColumnIndex = clickedCell.x
+                        columnIndex = clickedCell.x
+                        rowIndex = clickedCell.y
                     |})
                     "Should predict paste columns behavior"
         ]

@@ -36,10 +36,8 @@ type AnnotationTable =
     static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?debug: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
-        let (detailsModal: CellCoordinate option), setDetailsModal = React.useState (None)
-        let (coordinate: CellCoordinate option), setCoordinate = React.useState (None)
-        let (headersModal: string[]), setHeadersModal = React.useState ([||])
-        let (body: string[][]), setBody = React.useState ([||])
+        let (detailsModal: CellCoordinate option), setDetailsModal = React.useState None
+        let (pastCases: PasteCases option), setPastCases = React.useState None
 
         let cellRender =
             React.memo (
@@ -139,24 +137,25 @@ type AnnotationTable =
                 )
                 ReactDOM.createPortal (
                     React.fragment [
-                        match headersModal with
-                        | headers when headers.Length > 0 ->
+                        match pastCases with
+                        | Some (PasteCases.AddColumns addColumns) ->
                             let rmv =
                                 fun _ ->
                                     tableRef.current.focus ()
-                                    setCoordinate None
-                                    setHeadersModal [||]
+                                    setPastCases None
 
-                            let addColumnsBtn compositeColumns =
+                            let addColumnsBtn compositeColumns columnIndex =
                                 Html.button [
                                     prop.className "swt:btn swt:btn-outline swt:btn-primary"
                                     prop.text "Confirm"
                                     prop.onClick (fun _ ->
-                                        arcTable.AddColumns(compositeColumns, coordinate.Value.x, false, false)
+                                        arcTable.AddColumns(compositeColumns, columnIndex, false, false)
                                         arcTable.Copy() |> setArcTable
                                         rmv ())
                                 ]
 
+                            let headers = addColumns.data.[0]
+                            let body = addColumns.data.[1..]
                             let columns = Seq.append [ headers ] body |> Seq.transpose
                             let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
                             let compositeColumns = ArcTable.composeColumns columnsList
@@ -185,9 +184,12 @@ type AnnotationTable =
                                             ]
                                         ]
                                     ],
-                                footer = React.fragment [ FooterButtons.Cancel(rmv); addColumnsBtn compositeColumns ],
+                                footer = React.fragment [ FooterButtons.Cancel(rmv); addColumnsBtn compositeColumns (addColumns.columnIndex + 1)],
                                 contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
                             )
+                        | Some (PasteColumns pasteColumns)->
+                            AnnotationTableContextMenuUtil.paste((pasteColumns.columnIndex, pasteColumns.rowIndex), arcTable, pasteColumns.data, tableRef.current.SelectHandle, setArcTable)
+                            setPastCases None
                         | _ -> Html.none
                     ],
                     Browser.Dom.document.body
@@ -207,9 +209,7 @@ type AnnotationTable =
                                 setArcTable,
                                 tableRef.current.SelectHandle,
                                 setDetailsModal,
-                                setHeadersModal,
-                                setBody,
-                                setCoordinate
+                                setPastCases
                             )
 
                     // [
