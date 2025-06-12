@@ -2,6 +2,7 @@
 
 /* https://github.com/tailwindlabs/tailwindcss/discussions/18123#discussioncomment-13245038 */
 /* https://github.com/saadeghi/daisyui/issues/3937 */
+/* https://github.com/tailwindlabs/tailwindcss/discussions/18294 */
 @layer swt-theme, swt-base, swt-components, swt-utilities;
 @import "tailwindcss/theme.css" layer(swt-theme) prefix(swt);
 @import "tailwindcss/preflight.css" layer(swt-base) prefix(swt);
