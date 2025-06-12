@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
 open ARCtrl
+open ARCtrl.Spreadsheet
 
 [<Mangle(false); Erase>]
 type AnnotationTable =
@@ -32,10 +33,11 @@ type AnnotationTable =
         )
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?debug: bool) =
+    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
-        let (detailsModal: CellCoordinate option), setDetailsModal = React.useState (None)
+        let (detailsModal: CellCoordinate option), setDetailsModal = React.useState None
+        let (pastCases: PasteCases option), setPastCases = React.useState None
 
         let cellRender =
             React.memo (
@@ -49,28 +51,32 @@ type AnnotationTable =
                             className =
                                 "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200"
                         )
-                    | Some (U2.Case2 header) ->
+                    | Some(U2.Case2 header) ->
                         let text = header.ToString()
                         AnnotationTable.InactiveTextRender(text, tcc)
-                    | Some (U2.Case1 cell) ->
+                    | Some(U2.Case1 cell) ->
                         let text = cell.ToString()
 
+                        let termAccession =
+                            match cell with
+                            | term when term.isTerm -> cell.AsTerm.TermAccessionShort
+                            | unit when unit.isUnitized -> (snd cell.AsUnitized).TermAccessionShort
+                            | _ -> ""
+
                         let icon =
-                            if
-                                (cell.isTerm || cell.isUnitized)
-                                && System.String.IsNullOrWhiteSpace cell.AsTerm.TermAccessionShort |> not
-                            then
+                            if System.String.IsNullOrWhiteSpace termAccession |> not then
                                 Html.i [
                                     prop.className "fa-solid fa-check swt:text-primary"
-                                    prop.title cell.AsTerm.TermAccessionShort
+                                    prop.title termAccession
                                 ]
                                 |> Some
                             else
                                 None
 
-                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)
-                ),
-                withKey = fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) -> $"{tcc.Index.x}-{tcc.Index.y}"
+                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)),
+                withKey =
+                    fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
+                        $"{tcc.Index.x}-{tcc.Index.y}"
             )
 
         let renderActiveCell =
@@ -87,18 +93,10 @@ type AnnotationTable =
                     | _ -> Html.div "Unknown cell type")
 
             )
+
         Html.div [
             prop.ref containerRef
             prop.children [
-                Html.div [
-                    Html.button [
-                        prop.className "swt:btn swt:btn-primary"
-                        prop.onClick (fun _ ->
-                            let iscontained = tableRef.current.SelectHandle.contains {| x = 2; y = 2 |}
-                            console.log ("iscontained", iscontained))
-                        prop.text "Verify 2,2"
-                    ]
-                ]
                 ReactDOM.createPortal (
                     React.fragment [
                         match detailsModal with
@@ -131,47 +129,127 @@ type AnnotationTable =
                     ],
                     Browser.Dom.document.body
                 )
+                ReactDOM.createPortal (
+                    React.fragment [
+                        match pastCases with
+                        | Some(PasteCases.AddColumns addColumns) ->
+                            let rmv =
+                                fun _ ->
+                                    tableRef.current.focus ()
+                                    setPastCases None
+
+                            let addColumnsBtn compositeColumns columnIndex =
+                                Html.button [
+                                    prop.className "swt:btn swt:btn-outline swt:btn-primary"
+                                    prop.text "Confirm"
+                                    prop.onClick (fun _ ->
+                                        arcTable.AddColumns(compositeColumns, columnIndex, false, false)
+                                        arcTable.Copy() |> setArcTable
+                                        rmv ())
+                                ]
+
+                            let headers = addColumns.data.[0]
+                            let body = addColumns.data.[1..]
+                            let columns = Array.append [| headers |] body |> Array.transpose
+                            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+                            let compositeColumns = ArcTable.composeColumns columnsList
+
+                            let rows =
+                                compositeColumns
+                                |> Array.map (fun compositeColumn -> compositeColumn.Cells)
+                                |> Array.transpose
+
+                            BaseModal.BaseModal(
+                                (fun _ -> rmv ()),
+                                header = Html.div "Headers have been detected",
+                                content =
+                                    React.fragment [
+                                        Html.div [
+                                            prop.className "swt:overflow-x-auto"
+                                            prop.children [
+                                                Html.text "Preview"
+                                                Html.table [
+                                                    prop.className "swt:table swt:table-xs"
+                                                    prop.children [
+                                                        Html.thead [
+                                                            Html.tr (
+                                                                compositeColumns
+                                                                |> Array.map (fun compositeColumn ->
+                                                                    Html.th (compositeColumn.Header.ToString()))
+                                                            )
+                                                        ]
+                                                        Html.tbody (
+                                                            rows
+                                                            |> Array.map (fun compositeColumn ->
+                                                                Html.tr (
+                                                                    compositeColumn
+                                                                    |> Array.map (fun cell ->
+                                                                        Html.td (cell.ToString()))
+                                                                ))
+                                                        )
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ],
+                                footer =
+                                    React.fragment [
+                                        FooterButtons.Cancel(rmv)
+                                        addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
+                                    ],
+                                contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+                            )
+                        | Some(PasteColumns pasteColumns) ->
+                            AnnotationTableContextMenuUtil.paste (
+                                (pasteColumns.columnIndex, pasteColumns.rowIndex),
+                                arcTable,
+                                pasteColumns.data,
+                                tableRef.current.SelectHandle,
+                                setArcTable
+                            )
+
+                            setPastCases None
+                        | Some(PasteSinglesAsTerm singleColumns) ->
+                            AnnotationTableContextMenuUtil.insertPotentialTermColumns (
+                                arcTable,
+                                singleColumns.data,
+                                singleColumns.headers,
+                                singleColumns.groupedCellCoordinates,
+                                setArcTable
+                            )
+
+                            setPastCases None
+                        | _ -> Html.none
+                    ],
+                    Browser.Dom.document.body
+                )
                 ContextMenu.ContextMenu(
                     (fun data ->
                         let index = data |> unbox<CellCoordinate>
+
                         if index.x = 0 then // index col
                             AnnotationTableContextMenu.IndexColumnContent(
                                 index.y,
                                 arcTable,
-                                setArcTable
+                                setArcTable,
+                                tableRef.current.SelectHandle
                             )
                         elif index.y = 0 then // header Row
                             AnnotationTableContextMenu.CompositeHeaderContent(
                                 index.x,
                                 arcTable,
-                                setArcTable
+                                setArcTable,
+                                tableRef.current.SelectHandle
                             )
                         else // standard cell
                             AnnotationTableContextMenu.CompositeCellContent(
                                 {| x = index.x; y = index.y |},
                                 arcTable,
                                 setArcTable,
-                                tableRef.current.SelectHandle
-                            )
-
-                        // [
-                        //     for i in 0..5 do
-                        //         ContextMenuItem(
-                        //             text = Html.span $"Item {i}",
-                        //             ?icon =
-                        //                 (if i = 4 then
-                        //                     Html.i [ prop.className "fa-solid fa-check" ] |> Some
-                        //                 else
-                        //                     None),
-                        //             ?kbdbutton = (if i = 3 then {| element = Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]; label = "Back"|} |> Some else None),
-                        //             onClick =
-                        //                 (fun e ->
-                        //                     e.buttonEvent.stopPropagation ()
-                        //                     let index = e.spawnData |> unbox<CellCoordinate>
-                        //                     console.log (sprintf "Item clicked: %i" i, index))
-                        //         )
-                        // ]
-                    ),
+                                tableRef.current.SelectHandle,
+                                setDetailsModal,
+                                setPastCases
+                            )),
                     ref = containerRef,
                     onSpawn =
                         (fun e ->
@@ -192,18 +270,20 @@ type AnnotationTable =
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,
-                    renderCell = (fun (tcc: TableCellController) ->
-                        let cell =
-                            if tcc.Index.x = 0 then
-                                None
-                            elif tcc.Index.y = 0 then
-                                Some (arcTable.Headers.[tcc.Index.x - 1] |> U2.Case2)
-                            else
-                                Some (arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
-                        cellRender (tcc, cell)
-                    ),
+                    renderCell =
+                        (fun (tcc: TableCellController) ->
+                            let cell =
+                                if tcc.Index.x = 0 then
+                                    None
+                                elif tcc.Index.y = 0 then
+                                    Some(arcTable.Headers.[tcc.Index.x - 1] |> U2.Case2)
+                                else
+                                    Some(arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
+
+                            cellRender (tcc, cell)),
                     renderActiveCell = renderActiveCell,
                     ref = tableRef,
+                    ?height = height,
                     onKeydown =
                         (fun (e, selectedCells, activeCell) ->
                             if
@@ -217,9 +297,7 @@ type AnnotationTable =
                                 setDetailsModal (Some cell)
                             elif e.code = kbdEventCode.delete && selectedCells.count > 0 then
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
-                                arcTable.Copy()
-                                |> setArcTable
-                            ),
+                                arcTable.Copy() |> setArcTable),
                     enableColumnHeaderSelect = true
                 )
             ]

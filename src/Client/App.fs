@@ -25,6 +25,20 @@ module Subscriptions =
                 Model.ARCitect.ResponseFile file |> Messages.ARCitectMsg |> dispatch
                 return true
             }
+        Refresh =
+            fun () -> promise {
+                ApiCall.Start() |> Model.ARCitect.Init |> Messages.ARCitectMsg |> dispatch
+                return true
+            }
+        SetARCFile =
+            fun (file, name) -> promise {
+                ApiCall.Finished(file, name)
+                |> Model.ARCitect.Init
+                |> Messages.ARCitectMsg
+                |> dispatch
+
+                return true
+            }
     }
 
     let subscription (initial: Model.Model) : (SubId * Subscribe<Messages.Msg>) list =

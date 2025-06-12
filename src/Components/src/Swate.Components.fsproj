@@ -28,6 +28,7 @@
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
+    <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
@@ -36,15 +37,16 @@
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
-    <Compile Include="Table\AnnotationTableContextMenu.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
-    <Compile Include="Table\AnnotationTable.fs" />
+    <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
+    <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ARCtrl.Spreadsheet" Version="2.5.1" />
     <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />

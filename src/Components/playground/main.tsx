@@ -4,6 +4,7 @@ import App from './App';
 import '@fortawesome/fontawesome-free/css/all.min.css'
 import './../tailwind.css';
 
+
 ReactDOM.createRoot(document.getElementById('app')!).render(
     <React.StrictMode>
         <App />

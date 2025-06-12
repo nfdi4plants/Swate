@@ -32,7 +32,8 @@ export default defineConfig({
                 '@fable-org/fable-library-js',
                 "@floating-ui/react",
                 "@fortawesome/fontawesome-free",
-                "@tanstack/react-virtual"
+                "@tanstack/react-virtual",
+                "@nfdi4plants/arctrl"
             ],
             output: {
                 globals: {
@@ -47,5 +48,8 @@ export default defineConfig({
         watch: {
             ignored: [ "**/*.fs" ]
         },
-    }
+    },
+    define: {
+        'process.env': {},
+    },
 });

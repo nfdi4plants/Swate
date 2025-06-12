@@ -2,19 +2,20 @@ module Client.Tests
 
 open Fable.Mocha
 
-let client = testList "Client" [
-    Components.Tests.Table.KeyboardNavigation.Main
-]
+let client =
+    testList "Client" [
+        Components.Tests.Table.ContextMenu.Main
+        Components.Tests.Table.KeyboardNavigation.Main
+        OfficeAddIn.AnnotationTable.Successful.Main
+    ]
 
 let all =
-    testList "All"
-        [
+    testList "All" [
 #if FABLE_COMPILER // This preprocessor directive makes editor happy
-            Swate.Components.Shared.Tests.shared
+        Swate.Components.Shared.Tests.shared
 #endif
-            OfficeAddIn.AnnotationTable.Successful.Main
-            client
-        ]
+        client
+    ]
 
 [<EntryPoint>]
 let main _ = Mocha.runTests all

@@ -14,7 +14,8 @@ type ThemeProvider =
             reactContext: IContext<Context<Theme>>,
             children: ReactElement,
             ?dataAttribute: string,
-            ?localStorageKey: string
+            ?localStorageKey: string,
+            ?enforceTheme: Theme
         ) =
         let localStorageKey = defaultArg localStorageKey "swate-theme-ctx"
         let dataAttribute = defaultArg dataAttribute "data-theme"
@@ -30,6 +31,14 @@ type ThemeProvider =
 
             ),
             [| box theme |]
+        )
+
+        React.useLayoutEffect (
+            (fun () ->
+                match enforceTheme with
+                | Some enforcedTheme when enforcedTheme <> theme -> setTheme enforcedTheme
+                | _ -> ()),
+            [| box enforceTheme |]
         )
 
         React.contextProvider (reactContext, { data = theme; setData = setTheme }, children)
