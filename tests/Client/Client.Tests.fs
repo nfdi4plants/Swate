@@ -5,8 +5,8 @@ open Fable.Mocha
 let client =
     testList "Client" [
         Components.Tests.Table.ContextMenu.Main
-    // Components.Tests.Table.KeyboardNavigation.Main
-    // OfficeAddIn.AnnotationTable.Successful.Main
+        Components.Tests.Table.KeyboardNavigation.Main
+        OfficeAddIn.AnnotationTable.Successful.Main
     ]
 
 let all =
