@@ -23,6 +23,11 @@ open Browser.Dom
 [<ReactComponent>]
 let View (model: Model) (dispatch: Msg -> unit) =
 
+    let enforceLightTheme =
+        match model.PersistentStorageState.Host with
+        | Some Swatehost.ARCitect -> Some Swate.Components.Theme.Sunrise
+        | _ -> None
+
     React.strictMode [
         Swate.Components.ThemeProvider.ThemeProvider(
             ReactContext.ThemeCtx,
@@ -69,6 +74,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                 ]
-            ]
+            ],
+            ?enforceTheme = enforceLightTheme
         )
     ]
