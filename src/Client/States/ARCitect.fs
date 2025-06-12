@@ -41,6 +41,7 @@ module Interop =
         ResponsePaths: string[] -> JS.Promise<bool>
         ResponseFile: InteropTypes.ARCitectFile -> JS.Promise<bool>
         Refresh: unit -> JS.Promise<bool>
+        SetARCFile: InteropTypes.ARCFile * string -> JS.Promise<bool>
     }
 
 

@@ -1,0 +1,59 @@
+name: Run Tests
+
+on:
+  # Event for the workflow to run on
+  push:
+    branches: ['nightly']
+  workflow_dispatch: # Allows manual runs from the Actions tab
+
+jobs:
+
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure all tags are fetched
+
+      - name: Extract Latest Tag as Version
+        id: get_version
+        run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> "$GITHUB_ENV"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      - name: Install root NPM Dependencies
+        run: npm install
+
+      - name: Build client
+        run: dotnet run --project ./build/Build.fsproj bundle client
+
+      - name: zip deploy files
+        run: |
+          zip -r "$GITHUB_WORKSPACE/SwateClient.zip" .
+        working-directory: ./deploy/public
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          make_latest: true
+          tag_name: ${{ env.GIT_TAG_LATEST }}
+          files: |
+            ./deploy/public
+

@@ -343,6 +343,24 @@ Target.create "InstallClient" (fun _ -> run npm [ "install" ] ".")
 
 let InstallClient () = run npm [ "install" ] "."
 
+let BundleClient () =
+    run
+        dotnet
+        [
+            "fable"
+            "-o"
+            "output"
+            "-s"
+            "-e"
+            "fs.js"
+            yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+            "--run"
+            "npx"
+            "vite"
+            "build"
+        ]
+        clientPath
+
 let Bundle () =
     [
         "server", dotnet [ "publish"; "-c"; "Release"; "-o"; deployPath ] serverPath
@@ -497,8 +515,14 @@ let main args =
     match argv with
     | "bundle" :: a ->
         InstallClient()
-        Bundle()
-        0
+
+        match a with
+        | "client" :: _ ->
+            BundleClient()
+            0
+        | _ ->
+            Bundle()
+            0
     | "run" :: a ->
         match a with
         | "db" :: a ->
