@@ -150,12 +150,7 @@ swt:p-0"""
                             getSelectedCells =
                                 (fun () ->
                                     match GridSelect.selectedCells with
-                                    | Some range ->
-                                        ResizeArray [|
-                                            for x in range.xStart .. range.xEnd do
-                                                for y in range.yStart .. range.yEnd do
-                                                    yield {| x = x; y = y |}
-                                        |]
+                                    | Some range -> CellCoordinateRange.toArray range
                                     | None -> ResizeArray()),
                             getSelectedCellRange = (fun () -> GridSelect.selectedCells),
                             getCount = (fun () -> GridSelect.count)

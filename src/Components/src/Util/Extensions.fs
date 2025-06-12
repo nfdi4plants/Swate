@@ -6,21 +6,23 @@ open ARCtrl
 [<AutoOpen>]
 module ARCtrl =
     type ArcTable with
-        member this.ClearCell(cellIndex) =
-            let c = this.Values.[cellIndex]
-            this.Values.[cellIndex] <- c.GetEmptyCell()
+        member this.ClearCell(cellIndex: CellCoordinate) =
+            let index = (cellIndex.x, cellIndex.y)
+            let c = this.Values.[index]
+            this.Values.[index] <- c.GetEmptyCell()
 
         member this.ClearSelectedCells(selectHandle: SelectHandle) =
-            match selectHandle.getCount() with
+            match selectHandle.getCount () with
             | c when c <= 100 ->
-                let selectedCells = selectHandle.getSelectedCells()
-                selectedCells |> Seq.iter (fun i ->
+                let selectedCells = selectHandle.getSelectedCells ()
+
+                selectedCells
+                |> Seq.iter (fun i ->
                     let c = this.Values.[(i.x - 1, i.y - 1)]
-                    this.Values.[(i.x - 1, i.y - 1)] <- c.GetEmptyCell()
-                )
+                    this.Values.[(i.x - 1, i.y - 1)] <- c.GetEmptyCell())
             | c ->
-                for (x,y) in this.Values.Keys do
-                    if selectHandle.contains ({|x = x + 1; y = y + 1|}) then
+                for (x, y) in this.Values.Keys do
+                    if selectHandle.contains ({| x = x + 1; y = y + 1 |}) then
                         let c = this.Values.[(x, y)]
                         this.Values.[(x, y)] <- c.GetEmptyCell()
 
@@ -30,8 +32,8 @@ module Extensions =
     type prop with
         static member testid(value: string) = prop.custom ("data-testid", value)
 
-        static member dataRow (value: int) = prop.custom("data-row", value)
-        static member dataColumn (value: int) = prop.custom("data-column", value)
+        static member dataRow(value: int) = prop.custom ("data-row", value)
+        static member dataColumn(value: int) = prop.custom ("data-column", value)
 
 [<RequireQualifiedAccess>]
 module kbdEventCode =
@@ -65,10 +67,11 @@ module kbdEventCode =
     [<Literal>]
     let backspace = "Backspace"
 
-    let key (key:string) = key.ToUpper() |> sprintf "Key%s"
+    let key (key: string) = key.ToUpper() |> sprintf "Key%s"
 
 open Fable.Core
 open Fable.Core.JsInterop
+
 [<Fable.Core.Global>]
 type console =
     [<Emit("console.log($0)")>]

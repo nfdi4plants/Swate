@@ -54,6 +54,15 @@ module CellCoordinateRange =
     let count (range: CellCoordinateRange) : int =
         (range.yEnd - range.yStart + 1) * (range.xEnd - range.xStart + 1)
 
+    let toArray (range: CellCoordinateRange) : ResizeArray<CellCoordinate> =
+        let result = ResizeArray<CellCoordinate>()
+
+        for y in range.yStart .. range.yEnd do
+            for x in range.xStart .. range.xEnd do
+                result.Add({| x = x; y = y |})
+
+        result
+
 // [<AllowNullLiteral>]
 // [<Global>]
 type TableCellController = {

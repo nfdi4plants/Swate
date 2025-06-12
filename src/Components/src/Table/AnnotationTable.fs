@@ -64,8 +64,7 @@ type AnnotationTable =
                             | _ -> ""
 
                         let icon =
-                            if System.String.IsNullOrWhiteSpace termAccession |> not
-                            then
+                            if System.String.IsNullOrWhiteSpace termAccession |> not then
                                 Html.i [
                                     prop.className "fa-solid fa-check swt:text-primary"
                                     prop.title termAccession
@@ -73,6 +72,7 @@ type AnnotationTable =
                                 |> Some
                             else
                                 None
+
                         AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)),
                 withKey =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
@@ -141,7 +141,7 @@ type AnnotationTable =
                 ReactDOM.createPortal (
                     React.fragment [
                         match pastCases with
-                        | Some (PasteCases.AddColumns addColumns) ->
+                        | Some(PasteCases.AddColumns addColumns) ->
                             let rmv =
                                 fun _ ->
                                     tableRef.current.focus ()
@@ -165,8 +165,7 @@ type AnnotationTable =
 
                             let rows =
                                 compositeColumns
-                                    |> Array.map (fun compositeColumn ->
-                                        compositeColumn.Cells)
+                                |> Array.map (fun compositeColumn -> compositeColumn.Cells)
                                 |> Array.transpose
 
                             BaseModal.BaseModal(
@@ -190,25 +189,44 @@ type AnnotationTable =
                                                         ]
                                                         Html.tbody (
                                                             rows
-                                                                |> Array.map (fun compositeColumn ->
+                                                            |> Array.map (fun compositeColumn ->
                                                                 Html.tr (
                                                                     compositeColumn
-                                                                    |> Array.map (fun cell -> Html.td (cell.ToString())))
-                                                            )
+                                                                    |> Array.map (fun cell ->
+                                                                        Html.td (cell.ToString()))
+                                                                ))
                                                         )
                                                     ]
                                                 ]
                                             ]
                                         ]
                                     ],
-                                footer = React.fragment [ FooterButtons.Cancel(rmv); addColumnsBtn compositeColumns (addColumns.columnIndex + 1)],
+                                footer =
+                                    React.fragment [
+                                        FooterButtons.Cancel(rmv)
+                                        addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
+                                    ],
                                 contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
                             )
-                        | Some (PasteColumns pasteColumns) ->
-                            AnnotationTableContextMenuUtil.paste((pasteColumns.columnIndex, pasteColumns.rowIndex), arcTable, pasteColumns.data, tableRef.current.SelectHandle, setArcTable)
+                        | Some(PasteColumns pasteColumns) ->
+                            AnnotationTableContextMenuUtil.paste (
+                                (pasteColumns.columnIndex, pasteColumns.rowIndex),
+                                arcTable,
+                                pasteColumns.data,
+                                tableRef.current.SelectHandle,
+                                setArcTable
+                            )
+
                             setPastCases None
-                        | Some (PasteSinglesAsTerm singleColumns) ->
-                            AnnotationTableContextMenuUtil.insertPotentialTermColumns(arcTable, singleColumns.data, singleColumns.headers, singleColumns.groupedCellCoordinates, setArcTable)
+                        | Some(PasteSinglesAsTerm singleColumns) ->
+                            AnnotationTableContextMenuUtil.insertPotentialTermColumns (
+                                arcTable,
+                                singleColumns.data,
+                                singleColumns.headers,
+                                singleColumns.groupedCellCoordinates,
+                                setArcTable
+                            )
+
                             setPastCases None
                         | _ -> Html.none
                     ],
@@ -219,9 +237,19 @@ type AnnotationTable =
                         let index = data |> unbox<CellCoordinate>
 
                         if index.x = 0 then // index col
-                            AnnotationTableContextMenu.IndexColumnContent(index.y, arcTable, setArcTable)
+                            AnnotationTableContextMenu.IndexColumnContent(
+                                index.y,
+                                arcTable,
+                                setArcTable,
+                                tableRef.current.SelectHandle
+                            )
                         elif index.y = 0 then // header Row
-                            AnnotationTableContextMenu.CompositeHeaderContent(index.x, arcTable, setArcTable)
+                            AnnotationTableContextMenu.CompositeHeaderContent(
+                                index.x,
+                                arcTable,
+                                setArcTable,
+                                tableRef.current.SelectHandle
+                            )
                         else // standard cell
                             AnnotationTableContextMenu.CompositeCellContent(
                                 {| x = index.x; y = index.y |},
@@ -230,26 +258,7 @@ type AnnotationTable =
                                 tableRef.current.SelectHandle,
                                 setDetailsModal,
                                 setPastCases
-                            )
-
-                    // [
-                    //     for i in 0..5 do
-                    //         ContextMenuItem(
-                    //             text = Html.span $"Item {i}",
-                    //             ?icon =
-                    //                 (if i = 4 then
-                    //                     Html.i [ prop.className "fa-solid fa-check" ] |> Some
-                    //                 else
-                    //                     None),
-                    //             ?kbdbutton = (if i = 3 then {| element = Html.kbd [ prop.className "ml-auto kbd kbd-sm"; prop.text "Back" ]; label = "Back"|} |> Some else None),
-                    //             onClick =
-                    //                 (fun e ->
-                    //                     e.buttonEvent.stopPropagation ()
-                    //                     let index = e.spawnData |> unbox<CellCoordinate>
-                    //                     console.log (sprintf "Item clicked: %i" i, index))
-                    //         )
-                    // ]
-                    ),
+                            )),
                     ref = containerRef,
                     onSpawn =
                         (fun e ->
