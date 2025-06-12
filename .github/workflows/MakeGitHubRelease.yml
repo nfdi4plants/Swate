@@ -1,4 +1,4 @@
-name: Run Tests
+name: GitHub Release
 
 on:
   # Event for the workflow to run on
