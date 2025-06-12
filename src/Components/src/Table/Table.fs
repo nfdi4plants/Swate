@@ -66,6 +66,7 @@ swt:p-0"""
             renderCell: TableCellController -> ReactElement,
             renderActiveCell: TableCellController -> ReactElement,
             ref: IRefValue<TableHandle>,
+            ?height: int,
             ?onSelect: GridSelect.OnSelect,
             ?onKeydown: (Browser.Types.KeyboardEvent * GridSelect.GridSelectHandle * CellCoordinate option) -> unit,
             ?enableColumnHeaderSelect: bool,
@@ -225,7 +226,12 @@ swt:p-0"""
                 prop.onKeyDown (fun e ->
                     TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown)
                 prop.tabIndex 0
-                prop.className "swt:overflow-auto swt:h-96 swt:w-full swt:border swt:border-primary swt:rounded-sm"
+                prop.style [
+                    if height.IsSome then
+                        style.height (height.Value)
+                ]
+                prop.className
+                    "swt:overflow-auto swt:h-full swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-100"
                 if debug then
                     prop.testId "virtualized-table"
                 prop.children [

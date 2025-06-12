@@ -15,10 +15,10 @@ const preview: Preview = {
   decorators: [
     withThemeByDataAttribute ({
       themes: {
-        light: 'light',
-        dark: 'dark'
+        light: 'sunrise',
+        dark: 'finster'
       },
-      defaultTheme: 'light',
+      defaultTheme: 'sunrise',
       attributeName: 'data-theme'
     })
   ]

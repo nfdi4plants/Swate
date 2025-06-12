@@ -33,7 +33,7 @@ type AnnotationTable =
         )
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?debug: bool) =
+    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (detailsModal: CellCoordinate option), setDetailsModal = React.useState None
@@ -97,15 +97,6 @@ type AnnotationTable =
         Html.div [
             prop.ref containerRef
             prop.children [
-                Html.div [
-                    Html.button [
-                        prop.className "swt:btn swt:btn-primary"
-                        prop.onClick (fun _ ->
-                            let iscontained = tableRef.current.SelectHandle.contains {| x = 2; y = 2 |}
-                            console.log ("iscontained", iscontained))
-                        prop.text "Verify 2,2"
-                    ]
-                ]
                 ReactDOM.createPortal (
                     React.fragment [
                         match detailsModal with
@@ -292,6 +283,7 @@ type AnnotationTable =
                             cellRender (tcc, cell)),
                     renderActiveCell = renderActiveCell,
                     ref = tableRef,
+                    ?height = height,
                     onKeydown =
                         (fun (e, selectedCells, activeCell) ->
                             if

@@ -1,7 +1,8 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useEffect } from 'react';
 import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 import {Entry as Table} from '../src/Table/Table.fs.ts';
-import {Entry as AnnotationTable} from '../src/Table/AnnotationTable.fs.ts';
+import {Entry as AnnotationTable} from '../src/AnnotationTable/AnnotationTable.fs.ts';
+import TableCom from '../src/AnnotationTable/AnnotationTable.fs.ts';
 import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
 import {TIBApi} from '../src/Util/Api.fs.ts';
 

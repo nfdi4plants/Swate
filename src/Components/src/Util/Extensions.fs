@@ -30,10 +30,10 @@ module ARCtrl =
 module Extensions =
 
     type prop with
-        static member testid(value: string) = prop.custom ("data-testid", value)
+        static member inline testid(value: string) : IReactProperty = unbox ("data-testid", value)
 
-        static member dataRow(value: int) = prop.custom ("data-row", value)
-        static member dataColumn(value: int) = prop.custom ("data-column", value)
+        static member inline dataRow(value: int) : IReactProperty = unbox ("data-row", value)
+        static member inline dataColumn(value: int) : IReactProperty = unbox ("data-column", value)
 
 [<RequireQualifiedAccess>]
 module kbdEventCode =
@@ -76,3 +76,18 @@ open Fable.Core.JsInterop
 type console =
     [<Emit("console.log($0)")>]
     static member inline log e = jsNative
+
+[<Erase>]
+type Clipboard =
+    abstract member writeText: string -> JS.Promise<unit>
+    abstract member readText: unit -> JS.Promise<string>
+
+[<Erase>]
+type Navigator =
+    abstract member clipboard: Clipboard
+
+[<AutoOpen>]
+module GlobalBindings =
+
+    [<Emit("navigator")>]
+    let navigator: Navigator = jsNative

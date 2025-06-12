@@ -23,16 +23,6 @@ module Helper =
                 groupedCellCoordinates: CellCoordinate[][]
             |}
 
-    type Clipboard =
-        abstract member writeText: string -> JS.Promise<unit>
-        abstract member readText: unit -> JS.Promise<string>
-
-    type Navigator =
-        abstract member clipboard: Clipboard
-
-    [<Emit("navigator")>]
-    let navigator: Navigator = jsNative
-
 /// AnnotationTableContextMenu Components
 type ATCMC =
     static member Icon(className: string) = Html.i [ prop.className className ]
