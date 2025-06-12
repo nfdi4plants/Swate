@@ -55,5 +55,5 @@ jobs:
           make_latest: true
           tag_name: ${{ env.GIT_TAG_LATEST }}
           files: |
-            ./deploy/public
+            ./SwateClient.zip
 
