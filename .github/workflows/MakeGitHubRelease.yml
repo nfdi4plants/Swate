@@ -41,7 +41,7 @@ jobs:
         run: npm install
 
       - name: Build client
-        run: dotnet run --project ./build/Build.fsproj bundle client
+        run: dotnet run --project ./build/Build.fsproj bundle client standalone
 
       - name: zip deploy files
         run: |

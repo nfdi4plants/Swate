@@ -343,29 +343,13 @@ Target.create "InstallClient" (fun _ -> run npm [ "install" ] ".")
 
 let InstallClient () = run npm [ "install" ] "."
 
-let BundleClient () =
-    run
-        dotnet
-        [
-            "fable"
-            "-o"
-            "output"
-            "-s"
-            "-e"
-            "fs.js"
-            yield! DEFINE_SWATE_ENVIRONMENT_FABLE
-            "--run"
-            "npx"
-            "vite"
-            "build"
-        ]
-        clientPath
 
-let Bundle () =
-    [
-        "server", dotnet [ "publish"; "-c"; "Release"; "-o"; deployPath ] serverPath
-        "client",
-        dotnet
+type Bundle =
+    static member Client(?forSwate: bool) =
+        let forSwate = defaultArg forSwate true
+
+        run
+            dotnet
             [
                 "fable"
                 "-o"
@@ -373,15 +357,36 @@ let Bundle () =
                 "-s"
                 "-e"
                 "fs.js"
-                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                if forSwate then
+                    yield! DEFINE_SWATE_ENVIRONMENT_FABLE
                 "--run"
                 "npx"
                 "vite"
                 "build"
             ]
             clientPath
-    ]
-    |> runParallel
+
+    static member All() =
+        [
+            "server", dotnet [ "publish"; "-c"; "Release"; "-o"; deployPath ] serverPath
+            "client",
+            dotnet
+                [
+                    "fable"
+                    "-o"
+                    "output"
+                    "-s"
+                    "-e"
+                    "fs.js"
+                    yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                    "--run"
+                    "npx"
+                    "vite"
+                    "build"
+                ]
+                clientPath
+        ]
+        |> runParallel
 
 type Run =
 
@@ -517,11 +522,16 @@ let main args =
         InstallClient()
 
         match a with
-        | "client" :: _ ->
-            BundleClient()
-            0
+        | "client" :: a ->
+            match a with
+            | "standalone" :: _ ->
+                Bundle.Client(false)
+                0
+            | _ ->
+                Bundle.Client(true)
+                0
         | _ ->
-            Bundle()
+            Bundle.All()
             0
     | "run" :: a ->
         match a with
