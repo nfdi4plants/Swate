@@ -18,7 +18,7 @@ const preview: Preview = {
         light: 'sunrise',
         dark: 'finster'
       },
-      defaultTheme: 'sunrise',
+      defaultTheme: 'light',
       attributeName: 'data-theme'
     })
   ]
