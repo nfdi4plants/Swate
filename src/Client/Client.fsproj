@@ -8,6 +8,7 @@
     <None Include="vite.config.mts" />
     <None Include="..\..\.editorconfig" Link=".editorconfig" />
     <None Include="index.html" />
+    <Compile Include="Version.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Util\ElmishHelper.fs" />
     <Compile Include="Util\MessageInterop.fs" />
