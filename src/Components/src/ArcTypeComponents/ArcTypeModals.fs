@@ -29,11 +29,11 @@ type InputField =
         let autofocus = defaultArg autofocus false
 
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:gap-2"
+            prop.className "swt:flex swt:flex-col swt:gap-2 swt:w-full"
             prop.children [
                 Html.label [ prop.className "swt:label"; prop.text label ]
                 Html.input [
-                    prop.className "swt:input"
+                    prop.className "swt:input swt:w-full"
                     prop.autoFocus autofocus
                     prop.valueOrDefault v
                     prop.onChange (fun (input: string) -> setter input)
@@ -61,7 +61,7 @@ type InputField =
                 TermSearch.TermSearch(
                     setter,
                     term = v,
-                    classNames = Swate.Components.TermSearchStyle(U2.Case1 "swt:border-current"),
+                    classNames = TermSearchStyle(U2.Case1 "swt:border-current"),
                     advancedSearch = U2.Case2 true,
                     showDetails = true,
                     autoFocus = autofocus,
@@ -74,7 +74,7 @@ type InputField =
 
 type FooterButtons =
     static member Cancel(rmv: unit -> unit) =
-        
+
         //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
         Html.button [
             prop.className "swt:btn swt:btn-outline"
@@ -97,12 +97,14 @@ type FooterButtons =
             prop.onClick (fun e -> submitOnClick ())
         ]
 
+
 [<Mangle(false); Erase>]
 type CompositeCellModal =
 
     /// pr is required to make indicators on termsearch not overflow
     /// pl is required to make the input ouline when focused not cut of
-    static member BaseModalContentClassOverride = "swt:overflow-y-auto swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
+    static member BaseModalContentClassOverride =
+        "swt:overflow-y-auto swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
     static member TermModal
         (oa: OntologyAnnotation, setOa: OntologyAnnotation -> unit, rmv, ?relevantCompositeHeader: CompositeHeader)
@@ -135,7 +137,8 @@ type CompositeCellModal =
                         (tempTerm.source |> Option.defaultValue ""),
                         (fun input ->
                             tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)),
+                            setTempTerm (tempTerm)
+                        ),
                         "Source",
                         rmv,
                         submit
@@ -144,7 +147,8 @@ type CompositeCellModal =
                         (tempTerm.id |> Option.defaultValue ""),
                         (fun input ->
                             tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)),
+                            setTempTerm (tempTerm)
+                        ),
                         "Accession Number",
                         rmv,
                         submit
@@ -199,7 +203,8 @@ type CompositeCellModal =
                         (tempTerm.source |> Option.defaultValue ""),
                         (fun input ->
                             tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)),
+                            setTempTerm (tempTerm)
+                        ),
                         "Source",
                         rmv,
                         submit
@@ -208,7 +213,8 @@ type CompositeCellModal =
                         (tempTerm.id |> Option.defaultValue ""),
                         (fun input ->
                             tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)),
+                            setTempTerm (tempTerm)
+                        ),
                         "Accession Number",
                         rmv,
                         submit
@@ -263,7 +269,8 @@ type CompositeCellModal =
                         (tempData.FilePath |> Option.defaultValue ""),
                         (fun input ->
                             tempData.FilePath <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempData tempData),
+                            setTempData tempData
+                        ),
                         "File Path",
                         rmv,
                         submit,
@@ -273,7 +280,8 @@ type CompositeCellModal =
                         (tempData.Selector |> Option.defaultValue ""),
                         (fun input ->
                             tempData.Selector <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempData tempData),
+                            setTempData tempData
+                        ),
                         "Selector",
                         rmv,
                         submit
@@ -282,7 +290,8 @@ type CompositeCellModal =
                         (tempData.SelectorFormat |> Option.defaultValue ""),
                         (fun input ->
                             tempData.SelectorFormat <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempData tempData),
+                            setTempData tempData
+                        ),
                         "Selector Format",
                         rmv,
                         submit
@@ -320,3 +329,81 @@ type CompositeCellModal =
         | CompositeCell.Data v ->
             let setData = fun v -> setCell (CompositeCell.Data v)
             CompositeCellModal.DataModal(v, setData, rmv, ?relevantCompositeHeader = relevantCompositeHeader)
+
+
+type CellPasteModals =
+    static member PasteFullColumnsModal
+        (
+            arcTable: ArcTable,
+            setArcTable,
+            addColumns: {| columnIndex: int; data: string[][] |},
+            setModal: AnnotationTable.ModalTypes -> unit,
+            tableRef: IRefValue<TableHandle>
+        ) =
+        let rmv =
+            fun _ ->
+                tableRef.current.focus ()
+                setModal AnnotationTable.ModalTypes.None
+
+        let addColumnsBtn compositeColumns columnIndex =
+            Html.button [
+                prop.className "swt:btn swt:btn-outline swt:btn-primary"
+                prop.text "Confirm"
+                prop.onClick (fun _ ->
+                    arcTable.AddColumns(compositeColumns, columnIndex, false, false)
+                    arcTable.Copy() |> setArcTable
+                    rmv ()
+                )
+            ]
+
+        let headers = addColumns.data.[0]
+        let body = addColumns.data.[1..]
+        let columns = Array.append [| headers |] body |> Array.transpose
+        let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+        let compositeColumns = ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList
+
+        let rows =
+            compositeColumns
+            |> Array.map (fun compositeColumn -> compositeColumn.Cells)
+            |> Array.transpose
+
+        BaseModal.BaseModal(
+            (fun _ -> rmv ()),
+            header = Html.div "Headers have been detected",
+            content =
+                React.fragment [
+                    Html.div [
+                        prop.className "swt:overflow-x-auto"
+                        prop.children [
+                            Html.text "Preview"
+                            Html.table [
+                                prop.className "swt:table swt:table-xs"
+                                prop.children [
+                                    Html.thead [
+                                        Html.tr (
+                                            compositeColumns
+                                            |> Array.map (fun compositeColumn ->
+                                                Html.th (compositeColumn.Header.ToString())
+                                            )
+                                        )
+                                    ]
+                                    Html.tbody (
+                                        rows
+                                        |> Array.map (fun compositeColumn ->
+                                            Html.tr (
+                                                compositeColumn |> Array.map (fun cell -> Html.td (cell.ToString()))
+                                            )
+                                        )
+                                    )
+                                ]
+                            ]
+                        ]
+                    ]
+                ],
+            footer =
+                React.fragment [
+                    FooterButtons.Cancel(rmv)
+                    addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
+                ],
+            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+        )

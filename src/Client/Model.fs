@@ -19,7 +19,10 @@ type LogItem =
         | InteropLogging.Warning -> Warning(System.DateTime.UtcNow, msg.MessageTxt)
 
     static member private DebugCell =
-        Html.td [ prop.className "swt:bg-info swt:text-info-content swt:font-semibold"; prop.text "Debug" ]
+        Html.td [
+            prop.className "swt:bg-info swt:text-info-content swt:font-semibold"
+            prop.text "Debug"
+        ]
 
     static member private InfoCell =
         Html.td [
@@ -127,7 +130,7 @@ type PersistentStorageState = {
                 for c in this.TIBSearchCatalogues do
                     let n = "TIB_" + c
 
-                    let query: Swate.Components.SearchCall =
+                    let query: Swate.Components.Types.SearchCall =
                         fun (q: string) -> Swate.Components.Api.TIBApi.defaultSearch (q, 10, c)
 
                     yield (n, query)
@@ -137,7 +140,7 @@ type PersistentStorageState = {
                 for c in this.TIBSearchCatalogues do
                     let n = "TIB_" + c
 
-                    let query: Swate.Components.ParentSearchCall =
+                    let query: Swate.Components.Types.ParentSearchCall =
                         fun (parent: string, query: string) ->
                             Swate.Components.Api.TIBApi.searchChildrenOf (query, parent, 10, c)
 
@@ -148,7 +151,7 @@ type PersistentStorageState = {
                 for c in this.TIBSearchCatalogues do
                     let n = "TIB_" + c
 
-                    let query: Swate.Components.AllChildrenSearchCall =
+                    let query: Swate.Components.Types.AllChildrenSearchCall =
                         fun (p: string) -> Swate.Components.Api.TIBApi.searchAllChildrenOf (p, 300, collection = c)
 
                     yield (n, query)

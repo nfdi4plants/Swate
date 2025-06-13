@@ -5,23 +5,7 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Feliz
 
-[<AutoOpenAttribute>]
-module Helper =
-
-    type PasteCases =
-        | AddColumns of {| data: string[][]; columnIndex: int |}
-        | PasteColumns of
-            {|
-                data: string[][]
-                columnIndex: int
-                rowIndex: int
-            |}
-        | PasteSinglesAsTerm of
-            {|
-                data: string[][]
-                headers: CompositeHeader[]
-                groupedCellCoordinates: CellCoordinate[][]
-            |}
+open Types.AnnotationTableContextMenu
 
 /// AnnotationTableContextMenu Components
 type ATCMC =
@@ -93,7 +77,8 @@ type AnnotationTableContextMenuUtil =
                     cellCoordinates
                     |> Array.map (fun (_, row) ->
                         row
-                        |> Array.map (fun coordinate -> table.GetCellAt(coordinate.x - 1, coordinate.y - 1)))
+                        |> Array.map (fun coordinate -> table.GetCellAt(coordinate.x - 1, coordinate.y - 1))
+                    )
 
                 CompositeCell.ToTableTxt(cells)
             else
@@ -230,7 +215,8 @@ type AnnotationTableContextMenuUtil =
                 match header with
                 | x when x.IsSingleColumn -> x.ToString(), [ 1 ]
                 | x when x.IsDataColumn -> x.ToString(), [ 4 ]
-                | x when x.IsTermColumn -> x.ToString(), [ 1; 2; 3; 4 ])
+                | x when x.IsTermColumn -> x.ToString(), [ 1; 2; 3; 4 ]
+            )
 
         let fitHeaders (strings: string[]) (headers: (string * int list)[]) =
             let rec tryFit index headerList =
@@ -246,7 +232,8 @@ type AnnotationTableContextMenuUtil =
                             | Some restResult -> Some((name, segment) :: restResult)
                             | None -> None
                         else
-                            None)
+                            None
+                    )
 
             tryFit 0 (Array.toList headers)
 
@@ -271,7 +258,9 @@ type AnnotationTableContextMenuUtil =
             |> Array.iteri (fun xi coordinate ->
                 //Restart column index, when the amount of selected columns is bigger than copied columns
                 let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, compositeCells.[0].Length)
-                table.SetCellAt(coordinate.x - 1, coordinate.y - 1, compositeCells.[yIndex].[xIndex])))
+                table.SetCellAt(coordinate.x - 1, coordinate.y - 1, compositeCells.[yIndex].[xIndex])
+            )
+        )
 
         table.Copy() |> setTable
 
@@ -311,7 +300,9 @@ type AnnotationTableContextMenuUtil =
                 |> Array.iteri (fun xi coordinate ->
                     //Restart column index, when the amount of selected columns is bigger than copied columns
                     let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, rowCells.[0].Length)
-                    table.SetCellAt(coordinate.x - 1, coordinate.y - 1, rowCells.[yIndex].[xIndex])))
+                    table.SetCellAt(coordinate.x - 1, coordinate.y - 1, rowCells.[yIndex].[xIndex])
+                )
+            )
         else
             let selectedHeader = table.GetColumn(columnIndex).Header
             let newCell = CompositeCell.fromTableStr (data.[0], [| selectedHeader |])
@@ -324,11 +315,10 @@ type AnnotationTableContextMenu =
     static member CompositeCellContent
         (
             index: CellCoordinate,
-            table: ArcTable,
-            setTable: ArcTable -> unit,
+            arcTable: ArcTable,
+            setArcTable: ArcTable -> unit,
             selectHandle: SelectHandle,
-            setDetailsModal: CellCoordinate option -> unit,
-            setPastCases
+            setModal: Types.AnnotationTable.ModalTypes -> unit
         ) =
         let cellIndex = {| x = index.x - 1; y = index.y - 1 |}
 
@@ -337,10 +327,7 @@ type AnnotationTableContextMenu =
                 Html.div "Details",
                 icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
                 kbdbutton = ATCMC.KbdHint("D"),
-                onClick =
-                    fun c ->
-                        let cc = c.spawnData |> unbox<CellCoordinate> |> Some
-                        setDetailsModal cc
+                onClick = fun c -> AnnotationTable.ModalTypes.Details index |> setModal
             )
             ContextMenuItem(Html.div "Fill Column", icon = ATCMC.Icon "fa-solid fa-pen", kbdbutton = ATCMC.KbdHint("F"))
             ContextMenuItem(
@@ -356,8 +343,8 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.clear (cc, cellIndex, table, selectHandle)
-                        |> setTable
+                        AnnotationTableContextMenuUtil.clear (cc, cellIndex, arcTable, selectHandle)
+                        |> setArcTable
             )
             ContextMenuItem(isDivider = true)
             ContextMenuItem(
@@ -368,7 +355,7 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.copy (cellIndex, table, selectHandle)
+                        AnnotationTableContextMenuUtil.copy (cellIndex, arcTable, selectHandle)
                         |> Promise.start
 
             )
@@ -379,10 +366,12 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-                        AnnotationTableContextMenuUtil.copy (cellIndex, table, selectHandle) |> ignore
 
-                        AnnotationTableContextMenuUtil.clear (cc, cellIndex, table, selectHandle)
-                        |> setTable
+                        AnnotationTableContextMenuUtil.copy (cellIndex, arcTable, selectHandle)
+                        |> ignore
+
+                        AnnotationTableContextMenuUtil.clear (cc, cellIndex, arcTable, selectHandle)
+                        |> setArcTable
             )
             ContextMenuItem(
                 Html.div "Paste",
@@ -395,15 +384,36 @@ type AnnotationTableContextMenu =
 
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
 
-                            Some(
+                            let prediction =
                                 AnnotationTableContextMenuUtil.predictPasteBehaviour (
                                     cellIndex,
-                                    table,
+                                    arcTable,
                                     selectHandle,
                                     data
                                 )
-                            )
-                            |> setPastCases
+
+                            match prediction with
+                            | PasteCases.AddColumns addColumns ->
+                                setModal (
+                                    AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
+                                )
+                            | PasteColumns pasteColumns ->
+                                AnnotationTableContextMenuUtil.paste (
+                                    (pasteColumns.columnIndex, pasteColumns.rowIndex),
+                                    arcTable,
+                                    pasteColumns.data,
+                                    selectHandle,
+                                    setArcTable
+                                )
+                            | PasteSinglesAsTerm singleColumns ->
+                                AnnotationTableContextMenuUtil.insertPotentialTermColumns (
+                                    arcTable,
+                                    singleColumns.data,
+                                    singleColumns.headers,
+                                    singleColumns.groupedCellCoordinates,
+                                    setArcTable
+                                )
+
                         }
                         |> Promise.start
             )
@@ -416,8 +426,8 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteRow (cc, cellIndex.y, table, selectHandle)
-                        |> setTable
+                        AnnotationTableContextMenuUtil.deleteRow (cc, cellIndex.y, arcTable, selectHandle)
+                        |> setArcTable
             )
             ContextMenuItem(
                 Html.div "Delete Column",
@@ -427,8 +437,8 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteColumn (cc, cellIndex.x, table, selectHandle)
-                        |> setTable
+                        AnnotationTableContextMenuUtil.deleteColumn (cc, cellIndex.x, arcTable, selectHandle)
+                        |> setArcTable
             )
             ContextMenuItem(
                 Html.div "Move Column",

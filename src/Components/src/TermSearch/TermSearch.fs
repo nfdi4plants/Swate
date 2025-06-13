@@ -228,7 +228,8 @@ type TermSearch =
                             // o.behavior <- Browser.Types.ScrollBehavior.Smooth
                             o.block <- Browser.Types.ScrollAlignment.Nearest // Only scroll if needed
                         )
-                    )),
+                    )
+            ),
             [| box isActive |]
         )
 
@@ -243,7 +244,8 @@ type TermSearch =
             ]
             prop.onClick (fun e ->
                 e.stopPropagation ()
-                onTermSelect (Some term.Term))
+                onTermSelect (Some term.Term)
+            )
             prop.children [
                 Html.i [
                     if isObsolete then
@@ -319,7 +321,8 @@ type TermSearch =
                                 prop.onClick (fun e ->
                                     e.preventDefault ()
                                     e.stopPropagation ()
-                                    advancedSearchToggle.Value())
+                                    advancedSearchToggle.Value()
+                                )
                                 prop.text "Try Advanced Search!"
                             ]
                         ]
@@ -537,7 +540,8 @@ type TermSearch =
                                 setAdvancedSearchState {
                                     advancedSearchState with
                                         TermName = e
-                                })
+                                }
+                            )
                             prop.onKeyDown (key.enter, fun _ -> cc.startSearch ())
                         ]
                     ]
@@ -560,7 +564,8 @@ type TermSearch =
                                 setAdvancedSearchState {
                                     advancedSearchState with
                                         TermDefinition = e
-                                })
+                                }
+                            )
                             prop.onKeyDown (key.enter, fun _ -> cc.startSearch ())
                         ]
                     ]
@@ -580,7 +585,8 @@ type TermSearch =
                                         setAdvancedSearchState {
                                             advancedSearchState with
                                                 KeepObsolete = e
-                                        })
+                                        }
+                                    )
                                 ]
                             ]
                         ]
@@ -626,8 +632,10 @@ type TermSearch =
                                     IsDirectedSearchResult = false
                                 })
 
-                            setSearchResults (SearchState.SearchDone results))
-                        |> Promise.start),
+                            setSearchResults (SearchState.SearchDone results)
+                        )
+                        |> Promise.start
+                    ),
                 cancel = rmv
             )
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
@@ -664,7 +672,8 @@ type TermSearch =
                                 prop.valueOrDefault (tempPagination |> Option.defaultValue pagination)
                                 prop.max BinCount
                                 prop.onChange (fun (e: int) ->
-                                    System.Math.Min(System.Math.Max(e, 1), BinCount) |> Some |> setTempPagination)
+                                    System.Math.Min(System.Math.Max(e, 1), BinCount) |> Some |> setTempPagination
+                                )
                             ]
                             Html.div [
                                 prop.className
@@ -679,7 +688,8 @@ type TermSearch =
                                 prop.disabled disabled
 
                                 prop.onClick (fun _ ->
-                                    tempPagination |> Option.iter ((fun x -> x - 1) >> setPagination))
+                                    tempPagination |> Option.iter ((fun x -> x - 1) >> setPagination)
+                                )
 
                                 prop.text "Go"
                             ]
@@ -787,7 +797,8 @@ type TermSearch =
                 if inputRef.current.IsSome then
                     inputRef.current.Value.value <- inputText
 
-                ()),
+                ()
+            ),
             [| box term |]
         )
 
@@ -812,13 +823,15 @@ type TermSearch =
             fun (key: string) ->
                 setLoading (fun l ->
                     let key = "L_" + key
-                    l.Add key)
+                    l.Add key
+                )
 
         let stopLoadingBy =
             fun (key: string) ->
                 setLoading (fun l ->
                     let key = "L_" + key
-                    l.Remove key)
+                    l.Remove key
+                )
 
         let createTermSearch =
             fun (id: string) (search: SearchCall) ->
@@ -837,7 +850,8 @@ type TermSearch =
                     if not cancelled.current then
                         setSearchResults (fun prevResults ->
                             TermSearchResult.addSearchResults prevResults.Results termSearchResults
-                            |> SearchState.SearchDone)
+                            |> SearchState.SearchDone
+                        )
 
                     stopLoadingBy id
                 }
@@ -859,7 +873,8 @@ type TermSearch =
                     if not cancelled.current then
                         setSearchResults (fun prevResults ->
                             TermSearchResult.addSearchResults prevResults.Results termSearchResults
-                            |> SearchState.SearchDone)
+                            |> SearchState.SearchDone
+                        )
 
                     stopLoadingBy id
                 }
@@ -881,7 +896,8 @@ type TermSearch =
                     if not cancelled.current then
                         setSearchResults (fun prevResults ->
                             TermSearchResult.addSearchResults prevResults.Results termSearchResults
-                            |> SearchState.SearchDone)
+                            |> SearchState.SearchDone
+                        )
 
                     stopLoadingBy id
                 }
@@ -988,6 +1004,16 @@ type TermSearch =
                 setSearchResults (fun _ -> SearchState.init ())
                 allChildSearch ()
 
+        React.useEffectOnce (fun () ->
+            if autoFocus && inputRef.current.IsSome then
+
+                let id = Fable.Core.JS.setTimeout (fun () -> inputRef.current.Value.focus ()) 0
+
+                React.createDisposable (fun () -> Fable.Core.JS.clearTimeout id)
+            else
+                React.createDisposable (fun () -> ())
+        )
+
         // Handles click outside events to close dropdown
         React.useListener.onMouseDown (
             (fun e ->
@@ -1015,7 +1041,8 @@ type TermSearch =
                             onBlur.Value()
 
                         cancel ()
-                    | _ -> ())
+                    | _ -> ()
+            )
         )
 
         // keyboard navigation
@@ -1081,7 +1108,8 @@ type TermSearch =
                     (fun acc (key, value) ->
                         match value with
                         | Some value -> (key, value) :: acc
-                        | _ -> acc)
+                        | _ -> acc
+                    )
                     []
                 |> List.rev
 
@@ -1145,7 +1173,8 @@ type TermSearch =
                                                 None
                                             else
                                                 Some Modals.Details
-                                        )),
+                                        )
+                                    ),
                                     btnClasses = "swt:btn-primary"
                                 )
                         | _ when showDetails -> // show only when focused
@@ -1160,7 +1189,8 @@ type TermSearch =
                                             None
                                         else
                                             Some Modals.Details
-                                    )),
+                                    )
+                                ),
                                 btnClasses = "swt:btn-info",
                                 isActive = focused
                             )
@@ -1178,7 +1208,8 @@ type TermSearch =
                                             None
                                         else
                                             Some Modals.AdvancedSearch
-                                    )),
+                                    )
+                                ),
                                 btnClasses = "swt:btn-primary",
                                 isActive = focused,
                                 props = [ prop.testid "advanced-search-indicator" ]
@@ -1207,6 +1238,7 @@ type TermSearch =
                                     prop.className "swt:grow swt:shrink swt:min-w-[50px] swt:w-full"
                                     if debug then
                                         prop.testid "term-search-input"
+                                        prop.custom ("data-debug-focus", $"{autoFocus}-{focused}")
                                     prop.ref (inputRef)
                                     prop.defaultValue inputText
                                     prop.placeholder "..."
@@ -1217,7 +1249,8 @@ type TermSearch =
                                             cancel ()
                                         else
                                             onTermSelect (Some <| Term(e))
-                                            startSearch e)
+                                            startSearch e
+                                    )
                                     prop.onDoubleClick (fun _ ->
                                         // if we have parent id and the input is empty, we search all children of the parent
                                         if
@@ -1226,7 +1259,8 @@ type TermSearch =
                                             startAllChildSearch ()
                                         // if we have input we start search
                                         elif System.String.IsNullOrEmpty inputRef.current.Value.value |> not then
-                                            startSearch inputRef.current.Value.value)
+                                            startSearch inputRef.current.Value.value
+                                    )
                                     prop.onKeyDown (fun e ->
                                         e.stopPropagation ()
 
@@ -1236,12 +1270,14 @@ type TermSearch =
                                             if onKeyDown.IsSome then
                                                 onKeyDown.Value e
                                         }
-                                        |> Promise.start)
+                                        |> Promise.start
+                                    )
                                     prop.onFocus (fun _ ->
                                         if onFocus.IsSome then
                                             onFocus.Value()
 
-                                        setFocused true)
+                                        setFocused true
+                                    )
                                 ]
                                 //Daisy.loading [
                                 Html.div [
@@ -1261,7 +1297,8 @@ type TermSearch =
                                                     None
                                                 else
                                                     Some Modals.AdvancedSearch
-                                            ))
+                                            )
+                                    )
 
                                 match portalTermDropdown with
                                 | Some portalTermSelectArea when containerRef.current.IsSome ->

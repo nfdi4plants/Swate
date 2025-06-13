@@ -70,6 +70,7 @@ module MockData =
         |]
 
 open Swate.Components
+open Types.AnnotationTableContextMenu
 
 let Main =
     testList "Context Menu" [

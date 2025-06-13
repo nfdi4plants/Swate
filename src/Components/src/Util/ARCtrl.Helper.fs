@@ -123,7 +123,8 @@ module Table =
                     let isEqual = h = header
                     let isInput = h.isInput && header.isInput
                     let isOutput = h.isOutput && header.isOutput
-                    isEqual || isInput || isOutput)
+                    isEqual || isInput || isOutput
+                )
 
             if containsAtIndex.IsSome then
                 columnsToRemove <- containsAtIndex.Value :: columnsToRemove
@@ -191,7 +192,8 @@ module Table =
                 else
                     c1
 
-            tablecopy.UpdateColumn(i, c2.Header, c2.Cells))
+            tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
+        )
 
         tablecopy
 
@@ -406,7 +408,7 @@ module Extensions =
         static member private IsObsoleteCommentKey = "isObsolete"
         static member empty() = OntologyAnnotation.create ()
 
-        static member fromTerm(term: Swate.Components.Term) =
+        static member fromTerm(term: Swate.Components.Types.Term) =
             let comments =
                 ResizeArray [
                     if term.description.IsSome then
@@ -443,7 +445,7 @@ module Extensions =
                 |> Option.bind (fun c -> c.Value)
                 |> Option.map System.Boolean.Parse
 
-            Swate.Components.Term(
+            Swate.Components.Types.Term(
                 ?name = this.Name,
                 ?source = this.TermSourceREF,
                 ?id = this.TermAccessionNumber,
@@ -628,11 +630,11 @@ module Extensions =
         member this.ToTabStr() =
             this.GetContentSwate() |> String.concat "\t"
 
-        static member fromTabStr (str: string, header: CompositeHeader) =
+        static member fromTabStr(str: string, header: CompositeHeader) =
             let content = str.Split('\t') |> Array.map _.Trim()
             CompositeCell.fromContentValid (content, header)
 
-        static member getHeaderParsingInfo (headers: CompositeHeader []) =
+        static member getHeaderParsingInfo(headers: CompositeHeader[]) =
 
             let termIndices, lengthWithoutTerms =
                 let termIndices, expectedLength =
@@ -644,13 +646,14 @@ module Extensions =
                         | item when item.IsTermColumn -> i, 0
                     )
                     |> Array.unzip
-                termIndices |> Array.filter (fun item -> item > -1),
-                expectedLength |> Array.sum
+
+                termIndices |> Array.filter (fun item -> item > -1), expectedLength |> Array.sum
+
             termIndices, lengthWithoutTerms
 
-        static member fromTableStr (content: string [], headers: CompositeHeader []) =
+        static member fromTableStr(content: string[], headers: CompositeHeader[]) =
 
-            let termIndices, expectedLength = CompositeCell.getHeaderParsingInfo(headers)
+            let termIndices, expectedLength = CompositeCell.getHeaderParsingInfo (headers)
             let expectedTermLength = expectedLength + (3 * termIndices.Length)
             let expectedUnitLength = expectedLength + (4 * termIndices.Length)
 
@@ -660,29 +663,32 @@ module Extensions =
             let allTerm = content.Length = expectedTermLength
             let allUnit = content.Length = expectedUnitLength
 
-            let parseRow (row: string []) (headers: CompositeHeader []) =
+            let parseRow (row: string[]) (headers: CompositeHeader[]) =
                 let rec loop index result =
                     if index >= headers.Length then
                         result |> List.rev |> Array.ofList
                     else
                         let header = headers.[index]
+
                         match header with
                         | x when x.IsSingleColumn ->
-                            let cell = CompositeCell.fromContentValid([|row.[index]|], header)
-                            loop (index + 1) (cell::result)
+                            let cell = CompositeCell.fromContentValid ([| row.[index] |], header)
+                            loop (index + 1) (cell :: result)
                         | x when x.IsDataColumn ->
                             let content = Array.sub row index 4
-                            let cell = CompositeCell.fromContentValid(content, header)
-                            loop (index + 4) (cell::result)
+                            let cell = CompositeCell.fromContentValid (content, header)
+                            loop (index + 4) (cell :: result)
                         | x when x.IsTermColumn && allTerm ->
                             let content = Array.sub row index 3
-                            let cell = CompositeCell.fromContentValid(content, header)
-                            loop (index + 3) (cell::result)
+                            let cell = CompositeCell.fromContentValid (content, header)
+                            loop (index + 3) (cell :: result)
                         | x when x.IsTermColumn && allUnit ->
                             let content = Array.sub row index 4
-                            let cell = CompositeCell.fromContentValid(content, header)
-                            loop (index + 4) (cell::result)
+                            let cell = CompositeCell.fromContentValid (content, header)
+                            loop (index + 4) (cell :: result)
+
                 loop 0 []
+
             parseRow content headers
 
         static member ToTabTxt(cells: CompositeCell[]) =
@@ -693,18 +699,15 @@ module Extensions =
         static member ToTableTxt(cells: CompositeCell[][]) =
             let rows =
                 cells
-                |> Array.map (fun row ->
-                    row
-                    |> Array.map (fun cell -> cell.ToTabStr())
-                    |> String.concat "\t")
-            rows
-            |> String.concat (System.Environment.NewLine)
+                |> Array.map (fun row -> row |> Array.map (fun cell -> cell.ToTabStr()) |> String.concat "\t")
+
+            rows |> String.concat (System.Environment.NewLine)
 
         static member fromTabTxt (tabTxt: string) (header: CompositeHeader) =
             let lines =
                 tabTxt.Split([| System.Environment.NewLine |], System.StringSplitOptions.None)
 
-            let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr(line, header))
+            let cells = lines |> Array.map (fun line -> CompositeCell.fromTabStr (line, header))
             cells
 
         member this.ConvertToValidCell(header: CompositeHeader) =

@@ -19,7 +19,8 @@ module ARCtrl =
                 selectedCells
                 |> Seq.iter (fun i ->
                     let c = this.Values.[(i.x - 1, i.y - 1)]
-                    this.Values.[(i.x - 1, i.y - 1)] <- c.GetEmptyCell())
+                    this.Values.[(i.x - 1, i.y - 1)] <- c.GetEmptyCell()
+                )
             | c ->
                 for (x, y) in this.Values.Keys do
                     if selectHandle.contains ({| x = x + 1; y = y + 1 |}) then
@@ -76,6 +77,11 @@ open Fable.Core.JsInterop
 type console =
     [<Emit("console.log($0)")>]
     static member inline log e = jsNative
+
+    [<Emit("console.warn($0)")>]
+    static member inline warn e =
+        // Fable.Core emits console.warn as a function call, so we use Emit to ensure it is called correctly
+        jsNative
 
 [<Erase>]
 type Clipboard =
