@@ -573,7 +573,7 @@ type Cell =
                                 | _ -> ()
 
                         let setter =
-                            fun (termOpt: Swate.Components.Term option) ->
+                            fun (termOpt: Swate.Components.Types.Term option) ->
                                 let oa =
                                     termOpt
                                     |> Option.map OntologyAnnotation.fromTerm
@@ -602,7 +602,7 @@ type Cell =
                             onBlur = onBlur,
                             onKeyDown = onKeyDown,
                             classNames =
-                                (Swate.Components.TermSearchStyle(
+                                (Swate.Components.Types.TermSearchStyle(
                                     !^"swt:h-[29px] swt:!rounded-none swt:w-full swt:!border-0"
                                 )),
                             disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,

@@ -9,10 +9,13 @@ open Feliz.DaisyUI
 open ARCtrl
 open ARCtrl.Spreadsheet
 
+open Types.AnnotationTableContextMenu
+open Types.AnnotationTable
+
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
+    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
         TableCell.BaseCell(
             tcc.Index.y,
             tcc.Index.x,
@@ -32,12 +35,97 @@ type AnnotationTable =
             className = "swt:w-full swt:h-full"
         )
 
+    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal) =
+        ContextMenu.ContextMenu(
+            (fun data ->
+                let index = data |> unbox<CellCoordinate>
+
+                if index.x = 0 then // index col
+                    AnnotationTableContextMenu.IndexColumnContent(
+                        index.y,
+                        arcTable,
+                        setArcTable,
+                        tableRef.current.SelectHandle
+                    )
+                elif index.y = 0 then // header Row
+                    AnnotationTableContextMenu.CompositeHeaderContent(
+                        index.x,
+                        arcTable,
+                        setArcTable,
+                        tableRef.current.SelectHandle
+                    )
+                else // standard cell
+                    AnnotationTableContextMenu.CompositeCellContent(
+                        {| x = index.x; y = index.y |},
+                        arcTable,
+                        setArcTable,
+                        tableRef.current.SelectHandle,
+                        setModal
+                    )
+            ),
+            ref = containerRef,
+            onSpawn =
+                (fun e ->
+                    let target = e.target :?> Browser.Types.HTMLElement
+
+                    match target.closest ("[data-row][data-column]"), containerRef.current with
+                    | Some cell, Some container when container.contains (cell) ->
+                        let cell = cell :?> Browser.Types.HTMLElement
+                        let row = int cell?dataset?row
+                        let col = int cell?dataset?column
+                        let indices: CellCoordinate = {| y = row; x = col |}
+                        console.log (indices)
+                        Some indices
+                    | _ ->
+                        console.log ("No table cell found")
+                        None
+                )
+        )
+
+    static member private ModalController
+        (arcTable: ArcTable, setArcTable, modal: AnnotationTable.ModalTypes, setModal, tableRef: IRefValue<TableHandle>)
+        =
+        React.fragment [
+            match modal with
+            | ModalTypes.None -> Html.none
+            | ModalTypes.Details cc ->
+                if cc.x = 0 then // no details modal for index col
+                    Html.none
+                elif cc.y = 0 then // headers
+                    let header = arcTable.Headers.[cc.x - 1]
+                    Html.none
+                else
+                    let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+
+                    let setCell =
+                        fun (cell: CompositeCell) ->
+                            arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                            setArcTable arcTable
+
+                    let header = arcTable.Headers.[cc.x - 1]
+
+                    CompositeCellModal.CompositeCellModal(
+                        cell,
+                        setCell,
+                        (fun _ ->
+                            tableRef.current.focus ()
+                            setModal ModalTypes.None
+                        ),
+                        header
+                    )
+            | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->
+                CellPasteModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
+            | anyElse ->
+                console.warn ("Unknown modal type", anyElse)
+                Html.none
+        ]
+
+
     [<ReactComponent(true)>]
     static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
-        let (detailsModal: CellCoordinate option), setDetailsModal = React.useState None
-        let (pastCases: PasteCases option), setPastCases = React.useState None
+        let (modal: ModalTypes), setModal = React.useState ModalTypes.None
 
         let cellRender =
             React.memo (
@@ -73,7 +161,8 @@ type AnnotationTable =
                             else
                                 None
 
-                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)),
+                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)
+                ),
                 withKey =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
                         $"{tcc.Index.x}-{tcc.Index.y}"
@@ -90,183 +179,19 @@ type AnnotationTable =
 
                         let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
                         TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index)
-                    | _ -> Html.div "Unknown cell type")
+                    | _ -> Html.div "Unknown cell type"
+                )
 
             )
 
         Html.div [
             prop.ref containerRef
             prop.children [
-                ReactDOM.createPortal (
-                    React.fragment [
-                        match detailsModal with
-                        | None -> Html.none
-                        | Some cc ->
-                            if cc.x = 0 then // no details modal for index col
-                                Html.none
-                            elif cc.y = 0 then // headers
-                                let header = arcTable.Headers.[cc.x - 1]
-                                Html.none
-                            else
-                                let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
-
-                                let setCell =
-                                    fun (cell: CompositeCell) ->
-                                        arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
-                                        setArcTable arcTable
-
-                                let header = arcTable.Headers.[cc.x - 1]
-
-                                CompositeCellModal.CompositeCellModal(
-                                    cell,
-                                    setCell,
-                                    (fun _ ->
-                                        tableRef.current.focus ()
-                                        setDetailsModal None),
-                                    header
-                                )
-
-                    ],
+                ReactDOM.createPortal ( // Modals
+                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef),
                     Browser.Dom.document.body
                 )
-                ReactDOM.createPortal (
-                    React.fragment [
-                        match pastCases with
-                        | Some(PasteCases.AddColumns addColumns) ->
-                            let rmv =
-                                fun _ ->
-                                    tableRef.current.focus ()
-                                    setPastCases None
-
-                            let addColumnsBtn compositeColumns columnIndex =
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-outline swt:btn-primary"
-                                    prop.text "Confirm"
-                                    prop.onClick (fun _ ->
-                                        arcTable.AddColumns(compositeColumns, columnIndex, false, false)
-                                        arcTable.Copy() |> setArcTable
-                                        rmv ())
-                                ]
-
-                            let headers = addColumns.data.[0]
-                            let body = addColumns.data.[1..]
-                            let columns = Array.append [| headers |] body |> Array.transpose
-                            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
-                            let compositeColumns = ArcTable.composeColumns columnsList
-
-                            let rows =
-                                compositeColumns
-                                |> Array.map (fun compositeColumn -> compositeColumn.Cells)
-                                |> Array.transpose
-
-                            BaseModal.BaseModal(
-                                (fun _ -> rmv ()),
-                                header = Html.div "Headers have been detected",
-                                content =
-                                    React.fragment [
-                                        Html.div [
-                                            prop.className "swt:overflow-x-auto"
-                                            prop.children [
-                                                Html.text "Preview"
-                                                Html.table [
-                                                    prop.className "swt:table swt:table-xs"
-                                                    prop.children [
-                                                        Html.thead [
-                                                            Html.tr (
-                                                                compositeColumns
-                                                                |> Array.map (fun compositeColumn ->
-                                                                    Html.th (compositeColumn.Header.ToString()))
-                                                            )
-                                                        ]
-                                                        Html.tbody (
-                                                            rows
-                                                            |> Array.map (fun compositeColumn ->
-                                                                Html.tr (
-                                                                    compositeColumn
-                                                                    |> Array.map (fun cell ->
-                                                                        Html.td (cell.ToString()))
-                                                                ))
-                                                        )
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    ],
-                                footer =
-                                    React.fragment [
-                                        FooterButtons.Cancel(rmv)
-                                        addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
-                                    ],
-                                contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
-                            )
-                        | Some(PasteColumns pasteColumns) ->
-                            AnnotationTableContextMenuUtil.paste (
-                                (pasteColumns.columnIndex, pasteColumns.rowIndex),
-                                arcTable,
-                                pasteColumns.data,
-                                tableRef.current.SelectHandle,
-                                setArcTable
-                            )
-
-                            setPastCases None
-                        | Some(PasteSinglesAsTerm singleColumns) ->
-                            AnnotationTableContextMenuUtil.insertPotentialTermColumns (
-                                arcTable,
-                                singleColumns.data,
-                                singleColumns.headers,
-                                singleColumns.groupedCellCoordinates,
-                                setArcTable
-                            )
-
-                            setPastCases None
-                        | _ -> Html.none
-                    ],
-                    Browser.Dom.document.body
-                )
-                ContextMenu.ContextMenu(
-                    (fun data ->
-                        let index = data |> unbox<CellCoordinate>
-
-                        if index.x = 0 then // index col
-                            AnnotationTableContextMenu.IndexColumnContent(
-                                index.y,
-                                arcTable,
-                                setArcTable,
-                                tableRef.current.SelectHandle
-                            )
-                        elif index.y = 0 then // header Row
-                            AnnotationTableContextMenu.CompositeHeaderContent(
-                                index.x,
-                                arcTable,
-                                setArcTable,
-                                tableRef.current.SelectHandle
-                            )
-                        else // standard cell
-                            AnnotationTableContextMenu.CompositeCellContent(
-                                {| x = index.x; y = index.y |},
-                                arcTable,
-                                setArcTable,
-                                tableRef.current.SelectHandle,
-                                setDetailsModal,
-                                setPastCases
-                            )),
-                    ref = containerRef,
-                    onSpawn =
-                        (fun e ->
-                            let target = e.target :?> Browser.Types.HTMLElement
-
-                            match target.closest ("[data-row][data-column]"), containerRef.current with
-                            | Some cell, Some container when container.contains (cell) ->
-                                let cell = cell :?> Browser.Types.HTMLElement
-                                let row = int cell?dataset?row
-                                let col = int cell?dataset?column
-                                let indices: CellCoordinate = {| y = row; x = col |}
-                                console.log (indices)
-                                Some indices
-                            | _ ->
-                                console.log ("No table cell found")
-                                None)
-                )
+                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal)
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,
@@ -280,7 +205,8 @@ type AnnotationTable =
                                 else
                                     Some(arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
 
-                            cellRender (tcc, cell)),
+                            cellRender (tcc, cell)
+                        ),
                     renderActiveCell = renderActiveCell,
                     ref = tableRef,
                     ?height = height,
@@ -293,11 +219,11 @@ type AnnotationTable =
                                 && selectedCells.count > 0
                             then
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
-                                console.log ("set details modal for:", cell)
-                                setDetailsModal (Some cell)
+                                setModal (ModalTypes.Details cell)
                             elif e.code = kbdEventCode.delete && selectedCells.count > 0 then
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
-                                arcTable.Copy() |> setArcTable),
+                                arcTable.Copy() |> setArcTable
+                        ),
                     enableColumnHeaderSelect = true
                 )
             ]
@@ -333,4 +259,4 @@ type AnnotationTable =
 
         let table, setTable = React.useState (arcTable)
 
-        AnnotationTable.AnnotationTable(table, setTable)
+        AnnotationTable.AnnotationTable(table, setTable, height = 600)

@@ -40,7 +40,8 @@ let private addButton (model: Model, dispatch) =
                 prop.onClick (fun _ ->
                     if hasTerm then
                         let oa = model.TermSearchState.SelectedTerm.Value
-                        SpreadsheetInterface.InsertOntologyAnnotation oa |> InterfaceMsg |> dispatch)
+                        SpreadsheetInterface.InsertOntologyAnnotation oa |> InterfaceMsg |> dispatch
+                )
 
                 prop.text "Fill selected cells with this term"
             ]
@@ -84,7 +85,7 @@ let private addButton (model: Model, dispatch) =
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
     let setTerm =
-        fun (term: Swate.Components.Term option) ->
+        fun (term: Swate.Components.Types.Term option) ->
             let term = term |> Option.map OntologyAnnotation.fromTerm
             TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
 
@@ -112,7 +113,7 @@ let Main (model: Model, dispatch) =
                 model,
                 autoFocus = true,
                 ?onFocus = excelGetParentTerm,
-                classNames = Swate.Components.TermSearchStyle(!^"swt:input-lg"),
+                classNames = Swate.Components.Types.TermSearchStyle(!^"swt:input-lg"),
                 ?parentId = (model.TermSearchState.ParentTerm |> Option.map _.TermAccessionShort)
             )
             addButton (model, dispatch)

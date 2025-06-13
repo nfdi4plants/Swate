@@ -132,7 +132,8 @@ module Settings =
                     setCatalogues catalogues.content
                     setLoading false
                 }
-                |> ignore)
+                |> ignore
+            )
 
             let catalogues: Catalogues =
                 React.useMemo (
@@ -155,7 +156,8 @@ module Settings =
                                     Messages.PersistentStorage.AddTIBSearchCatalogue
                                         catalogues.UnusedCatalogues.MinimumElement
                                     |> PersistentStorageMsg
-                                    |> dispatch)
+                                    |> dispatch
+                            )
                             prop.children [ Html.i [ prop.className "fa-solid fa-plus" ]; Html.text "Add" ]
                         ]
                         Html.button [
@@ -164,7 +166,8 @@ module Settings =
                             prop.onClick (fun _ ->
                                 Messages.PersistentStorage.SetTIBSearchCatalogues Set.empty
                                 |> PersistentStorageMsg
-                                |> dispatch)
+                                |> dispatch
+                            )
                             prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ]; Html.text "Clear" ]
                         ]
                     ]
@@ -281,20 +284,21 @@ type Settings =
             (fun () ->
                 let icon =
                     match themeCtx.data with
-                    | Swate.Components.Theme.Sunrise -> animatedSun
-                    | Swate.Components.Theme.Finster -> animatedMoon
-                    | Swate.Components.Theme.Planti -> planti
-                    | Swate.Components.Theme.Viola -> viola
-                    | Swate.Components.Theme.Auto -> browser
+                    | Swate.Components.Types.Theme.Sunrise -> animatedSun
+                    | Swate.Components.Types.Finster -> animatedMoon
+                    | Swate.Components.Types.Planti -> planti
+                    | Swate.Components.Types.Viola -> viola
+                    | Swate.Components.Types.Auto -> browser
                     | _ -> "missing"
 
                 iconRef.current?innerHTML <- icon
-                ()),
+                ()
+            ),
             [| box themeCtx.data |]
         )
 
-        let mkOption (theme: Swate.Components.Theme) =
-            let txt = Swate.Components.Theme.toString theme
+        let mkOption (theme: Swate.Components.Types.Theme) =
+            let txt = Swate.Components.Types.Theme.toString theme
             Html.option [ prop.value txt; prop.text txt ]
 
         Settings.SettingColumnElement(
@@ -304,14 +308,14 @@ type Settings =
                 prop.children [
                     Html.label [ prop.className "swt:label"; prop.ref iconRef ]
                     Html.select [
-                        prop.defaultValue (Swate.Components.Theme.toString themeCtx.data)
-                        prop.onChange (fun (e: string) -> themeCtx.setData (Swate.Components.Theme.fromString e))
+                        prop.defaultValue (Swate.Components.Types.Theme.toString themeCtx.data)
+                        prop.onChange (fun (e: string) -> themeCtx.setData (Swate.Components.Types.Theme.fromString e))
                         prop.children [
-                            mkOption Swate.Components.Theme.Sunrise
-                            mkOption Swate.Components.Theme.Finster
-                            mkOption Swate.Components.Theme.Planti
-                            mkOption Swate.Components.Theme.Viola
-                            mkOption Swate.Components.Theme.Auto
+                            mkOption Swate.Components.Types.Theme.Sunrise
+                            mkOption Swate.Components.Types.Theme.Finster
+                            mkOption Swate.Components.Types.Theme.Planti
+                            mkOption Swate.Components.Types.Theme.Viola
+                            mkOption Swate.Components.Types.Theme.Auto
                         ]
                     ]
                 ]
@@ -326,7 +330,8 @@ type Settings =
                 prop.isChecked model.PersistentStorageState.Autosave
                 prop.type'.checkbox
                 prop.onChange (fun (b: bool) ->
-                    Messages.PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch)
+                    Messages.PersistentStorage.UpdateAutosave b |> PersistentStorageMsg |> dispatch
+                )
             ],
             "When you deactivate autosave, your local history will be deleted."
         )
@@ -349,7 +354,8 @@ type Settings =
                 prop.onChange (fun (b: bool) ->
                     Messages.PersistentStorage.UpdateSwateDefaultSearch b
                     |> PersistentStorageMsg
-                    |> dispatch)
+                    |> dispatch
+                )
             ],
             "When you deactivate this, the default search will not be used."
         )

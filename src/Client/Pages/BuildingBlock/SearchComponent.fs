@@ -28,7 +28,8 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
             prop.onClick (fun _ ->
                 BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Term
                 |> BuildingBlockMsg
-                |> dispatch)
+                |> dispatch
+            )
         ]
         Html.button [
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
@@ -40,7 +41,8 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
             prop.onClick (fun _ ->
                 BuildingBlock.UpdateBodyCellType CompositeCellDiscriminate.Unitized
                 |> BuildingBlockMsg
-                |> dispatch)
+                |> dispatch
+            )
         ]
     ]
 
@@ -52,7 +54,7 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
 
     let portalTermDropdown =
         element.current
-        |> Option.map (fun e -> Swate.Components.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
+        |> Option.map (fun e -> Swate.Components.Types.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
 
     Html.div [
         prop.ref element
@@ -64,7 +66,7 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                 prop.children [
                     termOrUnitizedSwitch model dispatch
                     // helper for setting the body cell type
-                    let setter (termOpt: Swate.Components.Term option) =
+                    let setter (termOpt: Swate.Components.Types.Term option) =
                         let oa = termOpt |> Option.map OntologyAnnotation.fromTerm
                         let case = oa |> Option.map (fun oa -> !^oa)
                         BuildingBlock.UpdateBodyArg case |> BuildingBlockMsg |> dispatch
@@ -76,7 +78,7 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                         (input |> Option.map _.ToTerm()),
                         setter,
                         model,
-                        classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
+                        classNames = Swate.Components.Types.TermSearchStyle(!^"swt:border-current swt:join-item"),
                         fullwidth = true,
                         ?parentId = (parent |> Option.map _.TermAccessionShort),
                         ?portalTermDropdown = portalTermDropdown
@@ -93,7 +95,7 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
 
     let portalTermDropdown =
         element.current
-        |> Option.map (fun e -> Swate.Components.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
+        |> Option.map (fun e -> Swate.Components.Types.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
 
     Html.div [
         prop.ref element // The ref must be place here, otherwise the portalled term select area will trigger daisy join syntax
@@ -115,10 +117,11 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                             prop.valueOrDefault (model.AddBuildingBlockState.CommentHeader)
                             prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
                             prop.onChange (fun (ev: string) ->
-                                BuildingBlock.UpdateCommentHeader ev |> BuildingBlockMsg |> dispatch)
+                                BuildingBlock.UpdateCommentHeader ev |> BuildingBlockMsg |> dispatch
+                            )
                         ]
                     elif state.HeaderCellType.HasOA() then
-                        let setter (oaOpt: Swate.Components.Term option) =
+                        let setter (oaOpt: Swate.Components.Types.Term option) =
                             let case =
                                 oaOpt |> Option.map (fun oa -> OntologyAnnotation.fromTerm >> U2.Case1 <| oa)
 
@@ -130,7 +133,7 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                             (input |> Option.map _.ToTerm()),
                             setter,
                             model,
-                            classNames = Swate.Components.TermSearchStyle(!^"swt:border-current swt:join-item"),
+                            classNames = Swate.Components.Types.TermSearchStyle(!^"swt:border-current swt:join-item"),
                             fullwidth = true,
                             ?portalTermDropdown = portalTermDropdown
                         )
@@ -213,7 +216,8 @@ let private AddBuildingBlockButton (model: Model) dispatch =
 
                     SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
                     let id = $"Header_{index}_Main"
-                    scrollIntoViewRetry id)
+                    scrollIntoViewRetry id
+                )
 
                 prop.text "Add Column"
             ]

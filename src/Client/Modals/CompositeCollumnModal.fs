@@ -16,7 +16,7 @@ type private Term =
     static member header = Html.p "Term"
 
     static member content
-        (model, term: Swate.Components.Term option, setTerm, ?value: string, ?setValue: string -> unit)
+        (model, term: Swate.Components.Types.Term option, setTerm, ?value: string, ?setValue: string -> unit)
         =
         React.fragment [
             if value.IsSome && setValue.IsSome then
@@ -27,7 +27,8 @@ type private Term =
                 Html.div [
                     Html.label [ prop.text "Value:" ]
                     Html.div [
-                        prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 min-h-[42px] swt:flex swt:items-center"
+                        prop.className
+                            "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 min-h-[42px] swt:flex swt:items-center"
                         prop.children [
                             Html.input [
                                 prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
@@ -49,7 +50,7 @@ type private Term =
                     TermSearch.TermSearch(
                         setTerm,
                         term = term,
-                        classNames = Swate.Components.TermSearchStyle(U2.Case1 "swt:border-current swt:join-item"),
+                        classNames = Swate.Components.Types.TermSearchStyle(U2.Case1 "swt:border-current swt:join-item"),
                         advancedSearch = U2.Case2 true,
                         showDetails = true,
                         disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
@@ -103,7 +104,8 @@ type private Freetext =
         Html.div [
             Html.label [ prop.text "Value:" ]
             Html.div [
-                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
+                prop.className
+                    "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
                         prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
@@ -135,7 +137,8 @@ type private Data =
         React.fragment [
             Html.label [ prop.text "Name:" ]
             Html.div [
-                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
+                prop.className
+                    "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
                         prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
@@ -152,7 +155,8 @@ type private Data =
             ]
             Html.label [ prop.text "Selector:" ]
             Html.div [
-                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
+                prop.className
+                    "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
                         prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
@@ -163,7 +167,8 @@ type private Data =
             ]
             Html.label [ prop.text "Format:" ]
             Html.div [
-                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
+                prop.className
+                    "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
                         prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
@@ -174,7 +179,8 @@ type private Data =
             ]
             Html.label [ prop.text "Selector Format:" ]
             Html.div [
-                prop.className "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
+                prop.className
+                    "swt:border swt:border-gray-300 swt:rounded-sm swt:px-3 swt:py-2 swt:min-h-[42px] swt:flex swt:items-center"
                 prop.children [
                     Html.input [
                         prop.className "swt:flex-1 swt:outline-hidden swt:border-none swt:bg-transparent"
@@ -273,7 +279,8 @@ type CompositeCollumnModal =
                     Browser.Dom.document.removeEventListener (
                         "keydown",
                         handleKeyDown cancelButtonRef Swate.Components.kbdEventCode.escape
-                    ))
+                    )
+                )
             , [||]
         )
 
@@ -288,7 +295,8 @@ type CompositeCollumnModal =
                     Browser.Dom.document.removeEventListener (
                         "keydown",
                         handleKeyDown submitButtonRef Swate.Components.kbdEventCode.enter
-                    ))
+                    )
+                )
             , [||]
         )
 
@@ -311,24 +319,25 @@ type CompositeCollumnModal =
                             prop.text "Cancel"
                             prop.onClick (fun e -> rmv e)
                         ]
-                    //Daisy.button.button [
-                    //    prop.ref submitButtonRef
-                    //    button.primary
-                    //    prop.text "Submit"
-                    //    prop.onClick (fun e ->
-                    //        submitOnClick ()
-                    //        rmv e)
-                    //]
+                        //Daisy.button.button [
+                        //    prop.ref submitButtonRef
+                        //    button.primary
+                        //    prop.text "Submit"
+                        //    prop.onClick (fun e ->
+                        //        submitOnClick ()
+                        //        rmv e)
+                        //]
                         Html.button [
                             prop.className "swt:btn swt:btn-primary"
                             prop.ref submitButtonRef
                             prop.text "Submit"
                             prop.onClick (fun e ->
                                 submitOnClick ()
-                                rmv e)
+                                rmv e
+                            )
                         ]
                     ]
-                    
+
                 ]
             ]
         ]

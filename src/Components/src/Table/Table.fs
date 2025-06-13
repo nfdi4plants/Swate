@@ -91,7 +91,8 @@ swt:p-0"""
                 rangeExtractor =
                     (fun range ->
                         let next = set [ 0; yield! Virtual.defaultRangeExtractor range ]
-                        Set.toArray next)
+                        Set.toArray next
+                    )
             )
 
         let columnVirtualizer =
@@ -112,7 +113,8 @@ swt:p-0"""
                                 yield! Virtual.defaultRangeExtractor range
                             ]
 
-                        Set.toArray next)
+                        Set.toArray next
+                    )
             )
 
         let scrollTo =
@@ -152,11 +154,13 @@ swt:p-0"""
                                 (fun () ->
                                     match GridSelect.selectedCells with
                                     | Some range -> CellCoordinateRange.toArray range
-                                    | None -> ResizeArray()),
+                                    | None -> ResizeArray()
+                                ),
                             getSelectedCellRange = (fun () -> GridSelect.selectedCells),
                             getCount = (fun () -> GridSelect.count)
                         )
-                )),
+                )
+            ),
             [| GridSelect.selectedCells |]
         )
 
@@ -201,7 +205,8 @@ swt:p-0"""
                             setActiveCellIndex (None)
                             scrollContainerRef.current.Value.focus ()
                             GridSelect.clear ()
-                        | _ -> ()),
+                        | _ -> ()
+                    ),
                 onBlur = (fun _ -> setActiveCellIndex (None)),
                 onClick =
                     (fun e ->
@@ -217,14 +222,16 @@ swt:p-0"""
                                 if GridSelect.selectedCellsReducedSet = nextSet then
                                     GridSelect.clear ()
                                 else
-                                    GridSelect.selectAt (index, e.shiftKey))
+                                    GridSelect.selectAt (index, e.shiftKey)
+                    )
             )
 
         React.fragment [
             Html.div [
                 prop.ref scrollContainerRef
                 prop.onKeyDown (fun e ->
-                    TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown)
+                    TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown
+                )
                 prop.tabIndex 0
                 prop.style [
                     if height.IsSome then
@@ -422,7 +429,8 @@ swt:p-0"""
                                 prop.text data.[ts.Index.y].[ts.Index.x]
                             prop.onClick (fun e -> ts.onClick e)
                         ]
-                    )),
+                    )
+                ),
                 withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}")
             )
 
@@ -434,8 +442,10 @@ swt:p-0"""
                         data.[ts.Index.y].[ts.Index.x],
                         (fun newData ->
                             data.[ts.Index.y].[ts.Index.x] <- newData
-                            setData data)
-                    )),
+                            setData data
+                        )
+                    )
+                ),
                 withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}")
             )
 
@@ -447,14 +457,16 @@ swt:p-0"""
                     prop.text "scroll to 500, 500"
                     prop.onClick (fun _ ->
                         TableHandler.current.SelectHandle.selectAt ({| x = 500; y = 500 |}, false)
-                        TableHandler.current.scrollTo ({| x = 500; y = 500 |}))
+                        TableHandler.current.scrollTo ({| x = 500; y = 500 |})
+                    )
                 ]
                 Table.Table(
                     rowCount = rowCount,
                     columnCount = columnCount,
                     renderCell = render,
                     renderActiveCell = renderActiveCell,
-                    ref = TableHandler
+                    ref = TableHandler,
+                    height = 400
                 )
             ]
         ]

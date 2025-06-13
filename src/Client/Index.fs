@@ -25,7 +25,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
 
     let enforceLightTheme =
         match model.PersistentStorageState.Host with
-        | Some Swatehost.ARCitect -> Some Swate.Components.Theme.Sunrise
+        | Some Swatehost.ARCitect -> Some Swate.Components.Types.Theme.Sunrise
         | _ -> None
 
     React.strictMode [

@@ -1,4 +1,5 @@
-namespace Swate.Components
+[<AutoOpenAttribute>]
+module Swate.Components.Types
 
 open Fable.Core
 open Feliz
@@ -273,3 +274,32 @@ type ParentSearchCall = (string * string) -> JS.Promise<ResizeArray<Term>>
 /// @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
 ///
 type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
+
+module AnnotationTableContextMenu =
+
+    open ARCtrl
+
+    type PasteCases =
+        | AddColumns of {| data: string[][]; columnIndex: int |}
+        | PasteColumns of
+            {|
+                data: string[][]
+                columnIndex: int
+                rowIndex: int
+            |}
+        | PasteSinglesAsTerm of
+            {|
+                data: string[][]
+                headers: CompositeHeader[]
+                groupedCellCoordinates: CellCoordinate[][]
+            |}
+
+module AnnotationTable =
+
+    open AnnotationTableContextMenu
+
+    [<RequireQualifiedAccess>]
+    type ModalTypes =
+        | Details of CellCoordinate
+        | PasteCaseUserInput of PasteCases
+        | None
