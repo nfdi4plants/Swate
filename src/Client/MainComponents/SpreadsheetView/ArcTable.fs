@@ -29,7 +29,7 @@ let private CreateBodyCells (columnIndex, rowIndex, state: Set<int>, model: Mode
             Cell.BodyTSR(index, cell, model, dispatch)
             Cell.BodyTAN(index, cell, model, dispatch)
         elif header.IsDataColumn && isExtended then
-            if cell.isData then
+            if cell.isData && isExtended then
                 Cell.BodyDataSelector(index, cell, model, dispatch)
                 Cell.BodyDataFormat(index, cell, model, dispatch)
                 Cell.BodyDataSelectorFormat(index, cell, model, dispatch)
