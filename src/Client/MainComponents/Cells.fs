@@ -143,7 +143,8 @@ type Cell =
                             setter state
 
                         debounceStorage.current.ClearAndRun()
-                        makeIdle ())
+                        makeIdle ()
+                    )
                     prop.onKeyDown (fun e ->
                         e.stopPropagation ()
 
@@ -168,15 +169,14 @@ type Cell =
                         | Swate.Components.kbdEventCode.escape -> //escape
                             debounceStorage.current.Clear()
                             makeIdle ()
-                        | _ -> ())
+                        | _ -> ()
+                    )
                     // Only change cell value while typing to increase performance.
                     prop.onChange (fun e -> if isHeader then setState e else dsetter e)
                 ]
                 if loading then
                     //Daisy.loading []
-                    Html.div [
-                        prop.className "swt:loading"
-                    ]
+                    Html.div [ prop.className "swt:loading" ]
 
             ]
         ]
@@ -213,7 +213,7 @@ type Cell =
             prop.id $"Header_{columnIndex}_{columnType}"
             prop.readOnly readonly
             CellStyles.cellStyle [
-                "swt:resize-x swt:w-[300px] swt:truncate" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
+                "swt:h-[29px] swt:resize-x swt:w-[300px] swt:truncate" // horizontal resize property sets width, but cannot override style.width. Therefore we set width as class, which makes it overridable by resize property.
                 if columnType.IsRefColumn then
                     "swt:bg-base-200"
             ]
@@ -225,9 +225,17 @@ type Cell =
                             e.preventDefault ()
                             e.stopPropagation ()
                             UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                        )
+
+                        prop.onDoubleClick (fun e ->
+                            e.preventDefault ()
+                            e.stopPropagation ()
 
                             if isIdle then
-                                makeActive ())
+                                makeActive ()
+
+                            UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                        )
                     prop.children [
                         if isActive then
                             Cell.CellInputElement(
@@ -462,7 +470,8 @@ type Cell =
                         style.cursor.notAllowed
                         style.userSelect.none
                     ]
-                    prop.className "swt:flex swt:grow swt:items-center swt:justify-center swt:bg-base-300 swt:opacity-60"
+                    prop.className
+                        "swt:flex swt:grow swt:items-center swt:justify-center swt:bg-base-300 swt:opacity-60"
                     prop.children [ Html.div "-" ]
                 ]
             ]
@@ -502,6 +511,9 @@ type Cell =
         let makeActive () =
             UpdateActiveCell(Some(!^index, columnType)) |> SpreadsheetMsg |> dispatch
 
+        let makeSelected () =
+            UpdateSelectedCells(Set.singleton index) |> SpreadsheetMsg |> dispatch
+
         let cellId = Controller.Cells.mkCellId columnIndex rowIndex state
         // let ref = React.useElementRef()
         Html.td [
@@ -512,7 +524,7 @@ type Cell =
             prop.tabIndex 0
             CellStyles.cellStyle [
                 if isSelected then
-                    "!bg-base-300"
+                    "swt:!bg-secondary/50 swt:!text-secondary-content"
             ]
             prop.readOnly readonly
             prop.onContextMenu (CellAux.contextMenuController index model dispatch)
@@ -521,10 +533,11 @@ type Cell =
                 e.stopPropagation ()
 
                 if not readonly && isIdle then
-                    makeActive ()
+                    makeSelected ()
 
                 if isIdle then
-                    EventPresets.onClickSelect (index, isIdle, state.SelectedCells, model, dispatch) e)
+                    EventPresets.onClickSelect (index, isIdle, state.SelectedCells, model, dispatch) e
+            )
             prop.onDoubleClick (fun e ->
                 e.preventDefault ()
                 e.stopPropagation ()
@@ -533,34 +546,47 @@ type Cell =
                     if isIdle then
                         makeActive ()
 
-                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch)
+                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+            )
             prop.onKeyDown (fun e ->
                 if e.code = Swate.Components.kbdEventCode.enter then
-                    buildingBlockModalController index dispatch)
+                    buildingBlockModalController index dispatch
+            )
             //if isIdle then prop.onClick <| EventPresets.onClickSelect(index, isIdle, state.SelectedCells, model, dispatch)
             prop.onMouseDown (fun e ->
                 if isIdle then
-                    e.preventDefault ())
+                    e.preventDefault ()
+            )
             prop.children [
                 if isActive then
                     // Update change to mainState and exit active input.
                     if oasetter.IsSome then
                         let input = oasetter.Value.oa.ToTerm() |> Some
-                        let onBlur = fun e -> makeIdle();
-                        let onKeyDown = fun (e: Browser.Types.KeyboardEvent) ->
-                            match e.code with
+                        let onBlur = fun e -> makeIdle ()
+
+                        let onKeyDown =
+                            fun (e: Browser.Types.KeyboardEvent) ->
+                                match e.code with
                                 | Swate.Components.kbdEventCode.enter //enter
                                 | Swate.Components.kbdEventCode.escape -> //escape
-                                    makeIdle()
+                                    makeIdle ()
                                 | _ -> ()
-                        let setter = fun (termOpt: Swate.Components.Term option) ->
-                            let oa = termOpt |> Option.map OntologyAnnotation.fromTerm |> Option.defaultWith OntologyAnnotation
-                            oasetter.Value.setter oa
+
+                        let setter =
+                            fun (termOpt: Swate.Components.Term option) ->
+                                let oa =
+                                    termOpt
+                                    |> Option.map OntologyAnnotation.fromTerm
+                                    |> Option.defaultWith OntologyAnnotation
+
+                                oasetter.Value.setter oa
+
                         let headerOA =
                             if state.TableViewIsActive() then
                                 state.ActiveTable.Headers.[columnIndex].TryOA()
                                 |> Option.bind (fun x ->
-                                    x.TermAccessionShort |> Option.whereNot System.String.IsNullOrWhiteSpace)
+                                    x.TermAccessionShort |> Option.whereNot System.String.IsNullOrWhiteSpace
+                                )
                             else
                                 None
                         // Components.TermSearch.Input(
@@ -575,7 +601,10 @@ type Cell =
                             autoFocus = true,
                             onBlur = onBlur,
                             onKeyDown = onKeyDown,
-                            classNames = (Swate.Components.TermSearchStyle(!^"h-[35px] !rounded-none w-full !border-0")),
+                            classNames =
+                                (Swate.Components.TermSearchStyle(
+                                    !^"swt:h-[29px] swt:!rounded-none swt:w-full swt:!border-0"
+                                )),
                             disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
                             disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
                             disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
