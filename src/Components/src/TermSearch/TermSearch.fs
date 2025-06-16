@@ -118,6 +118,16 @@ type private SearchState =
         | SearchDone results -> results
         | _ -> ResizeArray()
 
+module private TermSearchHelper =
+
+    let (|SearchOngoing|SearchIsDoneEmpty|SearchIsDone|) (state: SearchState) =
+        match state with
+        | SearchState.Idle -> SearchOngoing
+        | SearchState.SearchDone res when res.Count = 0 -> SearchIsDoneEmpty
+        | SearchState.SearchDone res -> SearchIsDone res
+
+open TermSearchHelper
+
 module private API =
 
     module Mocks =
@@ -217,7 +227,7 @@ type TermSearch =
         let isObsolete = term.Term.isObsolete.IsSome && term.Term.isObsolete.Value
         let isDirectedSearch = term.IsDirectedSearchResult
 
-        let activeClasses = "swt:bg-neutral swt:text-neutral-content"
+        let activeClasses = "swt:bg-base-300 swt:text-base-content"
         let ref = React.useElementRef ()
 
         React.useEffect (
@@ -237,7 +247,8 @@ type TermSearch =
             prop.ref ref
             prop.className [
                 "swt:list-row swt:items-center swt:cursor-pointer swt:min-w-0 swt:max-w-full swt:w-full /
-                swt:hover:bg-neutral swt:hover:text-neutral-content swt:transition-colors /
+                swt:bg-base-100 swt:text-base-content /
+                swt:hover:bg-base-300 swt:hover:text-base-content swt:transition-colors /
                 swt:rounded-none"
                 if isActive.IsSome && isActive.Value then
                     activeClasses
@@ -340,6 +351,8 @@ type TermSearch =
             ]
         ]
 
+    [<ReactComponent>]
+
     static member private TermDropdown
         (
             termDropdownRef: IRefValue<option<HTMLElement>>,
@@ -349,11 +362,17 @@ type TermSearch =
             advancedSearchToggle: (unit -> unit) option,
             keyboardNavState: KeyboardNavigationController
         ) =
+
+        let searchIsDone =
+            match state with
+            | SearchIsDone _ -> true
+            | _ -> false
+
         Html.ul [
             prop.ref termDropdownRef
             prop.style [ style.scrollbarGutter.stable ]
             prop.className [
-                if state = SearchState.Idle then
+                if not searchIsDone then
                     "swt:hidden"
                 else
                     """swt:min-w-[400px] not-prose swt:absolute swt:top-[100%] swt:left-0 swt:right-0 swt:z-50 swt:bg-base-200
@@ -363,9 +382,8 @@ type TermSearch =
             prop.children [
                 match state with
                 // when search is not idle and all loading is done, but no results are found
-                | SearchState.SearchDone searchResults when searchResults.Count = 0 && loading.IsEmpty ->
-                    TermSearch.NoResultsElement(advancedSearchToggle)
-                | SearchState.SearchDone searchResults ->
+                | SearchIsDoneEmpty -> TermSearch.NoResultsElement(advancedSearchToggle)
+                | SearchIsDone searchResults ->
                     for i in 0 .. searchResults.Count - 1 do
                         let res = searchResults.[i]
 
@@ -373,7 +391,7 @@ type TermSearch =
                             keyboardNavState.SelectedTermSearchResult |> Option.map (fun x -> x = i)
 
                         TermSearch.TermItem(res, onTermSelect, ?isActive = isActive)
-                | _ -> Html.none
+                | SearchOngoing -> Html.none
             ]
         ]
 
