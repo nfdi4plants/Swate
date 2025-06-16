@@ -456,6 +456,7 @@ module Extensions =
 
     type ArcTable with
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
+
             SanityChecks.validateColumn
             <| CompositeColumn.create (this.Headers.[columnIndex], [| cell |])
 
@@ -657,9 +658,6 @@ module Extensions =
             let expectedTermLength = expectedLength + (3 * termIndices.Length)
             let expectedUnitLength = expectedLength + (4 * termIndices.Length)
 
-            printfn "expectedTermLength: %i" expectedTermLength
-            printfn "expectedUnitLength: %i" expectedUnitLength
-
             let allTerm = content.Length = expectedTermLength
             let allUnit = content.Length = expectedUnitLength
 
@@ -686,7 +684,6 @@ module Extensions =
                             let content = Array.sub row index 4
                             let cell = CompositeCell.fromContentValid (content, header)
                             loop (index + 4) (cell :: result)
-
                 loop 0 []
 
             parseRow content headers

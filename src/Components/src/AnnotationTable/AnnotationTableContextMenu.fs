@@ -97,87 +97,14 @@ type AnnotationTableContextMenuUtil =
         return rows
     }
 
-    static member predictPasteBehaviour
-        (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
-        =
-
-        let checkForHeaders (row: string[]) =
-            let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
-
-            let areHeaders =
-                headers
-                |> Array.collect (fun header -> row |> Array.map (fun cell -> cell.StartsWith(header)))
-
-            Array.contains true areHeaders
-
-        if checkForHeaders data.[0] then
-            PasteCases.AddColumns {|
-                columnIndex = cellIndex.x
-                data = data
-            |}
-        else if selectHandle.getCount () > 1 then
-
-            //Convert cell coordinates to array
-            let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
-
-            //Group all cells based on their row
-            let groupedCellCoordinates =
-                cellCoordinates
-                |> Array.ofSeq
-                |> Array.groupBy (fun item -> item.y)
-                |> Array.map (fun (_, row) -> row)
-
-            //Get all required headers for cells
-            let headers =
-                let columnIndices = cellCoordinates |> Array.distinctBy (fun item -> item.x)
-
-                columnIndices
-                |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
-
-            let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo (headers)
-
-            if
-                termIndices.Length > 0
-                && data.[0].Length >= termIndices.Length + lengthWithoutTerms
-            then
-                PasteCases.PasteSinglesAsTerm {|
-                    data = data
-                    headers = headers
-                    groupedCellCoordinates = groupedCellCoordinates
-                |}
-            else
-                PasteCases.PasteColumns {|
-                    columnIndex = cellIndex.x
-                    rowIndex = cellIndex.y
-                    data = data
-                |}
-        else
-            PasteCases.PasteColumns {|
-                columnIndex = cellIndex.x
-                rowIndex = cellIndex.y
-                data = data
-            |}
-
-    //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
-    static member getIndex(startIndex, length) =
-        let rec loop index length =
-            if index < length then
-                index
-            else
-                loop (index - length) length
-
-        loop startIndex length
-
-    static member insertPotentialTermColumns
+    static member getAdaptiveData
         (
-            table: ArcTable,
             data: string[][],
             headers: CompositeHeader[],
-            groupedCellCoordinates: CellCoordinate[][],
-            setTable
+            groupedCellCoordinates: CellCoordinate[][]
         ) =
 
-        let parseRow (row: string[][]) (headers: CompositeHeader[]) =
+        let fitColumnsToTarget (row: string[][]) (headers: CompositeHeader[]) =
             let rec loop index result =
                 if index >= headers.Length then
                     result |> List.rev |> Array.ofList
@@ -246,33 +173,52 @@ type AnnotationTableContextMenuUtil =
             |> Array.choose (fun row -> row)
             |> Array.map (fun row -> row |> List.map (fun (_, cells) -> cells) |> Array.ofList)
 
-        let compositeCells = result |> Array.map (fun row -> parseRow row headers)
+        let compositeCells = result |> Array.map (fun row -> fitColumnsToTarget row headers)
 
-        //Map over all selected cells
-        groupedCellCoordinates
-        |> Array.iteri (fun yi row ->
-            //Restart row index, when the amount of selected rows is bigger than copied rows
-            let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, compositeCells.Length)
+        PasteCases.PasteFittedColumns {|
+            data = compositeCells
+            coordinates = groupedCellCoordinates
+        |}
 
-            row
-            |> Array.iteri (fun xi coordinate ->
-                //Restart column index, when the amount of selected columns is bigger than copied columns
-                let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, compositeCells.[0].Length)
-                table.SetCellAt(coordinate.x - 1, coordinate.y - 1, compositeCells.[yIndex].[xIndex])
-            )
-        )
-
-        table.Copy() |> setTable
-
-    static member paste
-        ((columnIndex, rowIndex): (int * int), table: ArcTable, data: string[][], selectHandle: SelectHandle, setTable)
+    static member predictPasteBehaviour
+        (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
         =
-        //Check amount of selected cells
-        //When multiple cells are selected a different handling is required
-        if selectHandle.getCount () > 1 then
 
-            //Convert cell coordinates to array
-            let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
+        //Convert cell coordinates to array
+        let cellCoordinates =
+            selectHandle.getSelectedCells () |> Array.ofSeq
+
+        //Get all required headers for cells
+        let headers =
+            let columnIndices = cellCoordinates |> Array.distinctBy (fun item -> item.x)
+
+            columnIndices
+            |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
+
+        let checkForHeaders (row: string[]) =
+            let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
+
+            let areHeaders =
+                headers
+                |> Array.collect (fun header -> row |> Array.map (fun cell -> cell.StartsWith(header)))
+
+            Array.contains true areHeaders
+
+        if checkForHeaders data.[0] then
+
+            let body =
+                let rest = data.[1..]
+                if rest.Length > 0 then rest
+                else [||]
+            let columns = Array.append [| data.[0] |] body |> Array.transpose
+            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+            let compositeColumns = ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList |> ResizeArray
+
+            PasteCases.AddColumns {|
+                data = compositeColumns
+                columnIndex = cellIndex.x
+            |}
+        else if selectHandle.getCount () > 1 then
 
             //Group all cells based on their row
             let groupedCellCoordinates =
@@ -281,34 +227,96 @@ type AnnotationTableContextMenuUtil =
                 |> Array.groupBy (fun item -> item.y)
                 |> Array.map (fun (_, row) -> row)
 
-            //Get all required headers for cells
-            let headers =
-                let columnIndices = cellCoordinates |> Array.distinctBy (fun item -> item.x)
-                columnIndices |> Array.map (fun index -> table.GetColumn(index.x - 1).Header)
+            let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo (headers)
 
-            //Converts the cells of each row
-            let rowCells =
-                data |> Array.map (fun row -> CompositeCell.fromTableStr (row, headers))
+            if
+                termIndices.Length > 0
+                && data.[0].Length >= termIndices.Length + lengthWithoutTerms
+            then
+                AnnotationTableContextMenuUtil.getAdaptiveData(
+                    data,
+                    headers,
+                    groupedCellCoordinates
+                )
+            else
+                //Converts the cells of each row
+                let rowCells =
+                    data |> Array.map (fun row -> CompositeCell.fromTableStr (row, headers))
+
+                rowCells
+                |> Array.iter (fun item -> printfn "rowCell: %s" (item.ToString()))
+
+                PasteCases.PasteColumns {|
+                    data = rowCells
+                    coordinates = groupedCellCoordinates
+                |}
+        else
+            let rowCells = CompositeCell.fromTableStr (data.[0], headers)
+            PasteCases.PasteColumns {|
+                data = [|[|rowCells.[0]|]|]
+                coordinates = [|[|cellCoordinates.[0]|]|]
+            |}
+
+    //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
+    static member getIndex(startIndex, length) =
+        let rec loop index length =
+            if index < length then
+                index
+            else
+                loop (index - length) length
+
+        loop startIndex length
+
+    static member pasteDefault
+        (pasteColumns: {| data: CompositeCell [][]; coordinates: CellCoordinate [][] |}, coordinate: CellCoordinate, table: ArcTable, selectHandle: SelectHandle, setTable)
+        =
+        //Check amount of selected cells
+        //When multiple cells are selected a different handling is required
+        if selectHandle.getCount () > 1 then
 
             //Map over all selected cells
-            groupedCellCoordinates
+            pasteColumns.coordinates
             |> Array.iteri (fun yi row ->
                 //Restart row index, when the amount of selected rows is bigger than copied rows
-                let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, rowCells.Length)
+                let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, pasteColumns.data.Length)
 
                 row
                 |> Array.iteri (fun xi coordinate ->
                     //Restart column index, when the amount of selected columns is bigger than copied columns
-                    let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, rowCells.[0].Length)
-                    table.SetCellAt(coordinate.x - 1, coordinate.y - 1, rowCells.[yIndex].[xIndex])
+                    let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.[0].Length)
+                    table.SetCellAt(coordinate.x - 1, coordinate.y - 1, pasteColumns.data.[yIndex].[xIndex])
                 )
             )
         else
-            let selectedHeader = table.GetColumn(columnIndex).Header
-            let newCell = CompositeCell.fromTableStr (data.[0], [| selectedHeader |])
-            table.SetCellAt(columnIndex, rowIndex, newCell.[0])
+            table.SetCellAt(coordinate.x - 1, coordinate.y - 1, pasteColumns.data.[0].[0])
 
         table.Copy() |> setTable
+
+    static member paste
+        (pasteCases: PasteCases, coordinate:CellCoordinate, table: ArcTable, setModal, selectHandle: SelectHandle, setTable)
+        =
+
+        match pasteCases with
+        | PasteCases.AddColumns addColumns ->
+            setModal (
+                AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
+            )
+        | PasteColumns pasteColumns ->
+            AnnotationTableContextMenuUtil.pasteDefault (
+                pasteColumns,
+                coordinate,
+                table,
+                selectHandle,
+                setTable
+            )
+        | PasteFittedColumns fittedColumns ->
+            AnnotationTableContextMenuUtil.pasteDefault (
+                fittedColumns,
+                coordinate,
+                table,
+                selectHandle,
+                setTable
+            )
 
 [<Erase>]
 type AnnotationTableContextMenu =
@@ -380,7 +388,7 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         promise {
-                            let cc = c.spawnData |> unbox<CellCoordinate>
+                            //let coordinate = c.spawnData |> unbox<CellCoordinate>
 
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
 
@@ -392,28 +400,14 @@ type AnnotationTableContextMenu =
                                     data
                                 )
 
-                            match prediction with
-                            | PasteCases.AddColumns addColumns ->
-                                setModal (
-                                    AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
-                                )
-                            | PasteColumns pasteColumns ->
-                                AnnotationTableContextMenuUtil.paste (
-                                    (pasteColumns.columnIndex, pasteColumns.rowIndex),
-                                    arcTable,
-                                    pasteColumns.data,
-                                    selectHandle,
-                                    setArcTable
-                                )
-                            | PasteSinglesAsTerm singleColumns ->
-                                AnnotationTableContextMenuUtil.insertPotentialTermColumns (
-                                    arcTable,
-                                    singleColumns.data,
-                                    singleColumns.headers,
-                                    singleColumns.groupedCellCoordinates,
-                                    setArcTable
-                                )
-
+                            AnnotationTableContextMenuUtil.paste(
+                                prediction,
+                                cellIndex,
+                                arcTable,
+                                setModal,
+                                selectHandle,
+                                setArcTable
+                            )
                         }
                         |> Promise.start
             )

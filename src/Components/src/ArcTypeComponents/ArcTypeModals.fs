@@ -336,7 +336,7 @@ type CellPasteModals =
         (
             arcTable: ArcTable,
             setArcTable,
-            addColumns: {| columnIndex: int; data: string[][] |},
+            addColumns: {| data: ResizeArray<CompositeColumn>; columnIndex: int |},
             setModal: AnnotationTable.ModalTypes -> unit,
             tableRef: IRefValue<TableHandle>
         ) =
@@ -344,6 +344,8 @@ type CellPasteModals =
             fun _ ->
                 tableRef.current.focus ()
                 setModal AnnotationTable.ModalTypes.None
+
+        let compositeColumns = addColumns.data |> Array.ofSeq
 
         let addColumnsBtn compositeColumns columnIndex =
             Html.button [
@@ -356,12 +358,6 @@ type CellPasteModals =
                 )
             ]
 
-        let headers = addColumns.data.[0]
-        let body = addColumns.data.[1..]
-        let columns = Array.append [| headers |] body |> Array.transpose
-        let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
-        let compositeColumns = ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList
-
         let rows =
             compositeColumns
             |> Array.map (fun compositeColumn -> compositeColumn.Cells)
@@ -373,28 +369,30 @@ type CellPasteModals =
             content =
                 React.fragment [
                     Html.div [
-                        prop.className "swt:overflow-x-auto"
-                        prop.children [
-                            Html.text "Preview"
-                            Html.table [
-                                prop.className "swt:table swt:table-xs"
-                                prop.children [
-                                    Html.thead [
-                                        Html.tr (
-                                            compositeColumns
+                        Html.text "Preview"
+                        Html.div [
+                            prop.className "swt:overflow-x-auto"
+                            prop.children [
+                                Html.table [
+                                    prop.className "swt:table swt:table-xs"
+                                    prop.children [
+                                        Html.thead [
+                                            Html.tr (
+                                                compositeColumns
+                                                |> Array.map (fun compositeColumn ->
+                                                    Html.th (compositeColumn.Header.ToString())
+                                                )
+                                            )
+                                        ]
+                                        Html.tbody (
+                                            rows
                                             |> Array.map (fun compositeColumn ->
-                                                Html.th (compositeColumn.Header.ToString())
+                                                Html.tr (
+                                                    compositeColumn |> Array.map (fun cell -> Html.td (cell.ToString()))
+                                                )
                                             )
                                         )
                                     ]
-                                    Html.tbody (
-                                        rows
-                                        |> Array.map (fun compositeColumn ->
-                                            Html.tr (
-                                                compositeColumn |> Array.map (fun cell -> Html.td (cell.ToString()))
-                                            )
-                                        )
-                                    )
                                 ]
                             ]
                         ]

@@ -280,18 +280,20 @@ module AnnotationTableContextMenu =
     open ARCtrl
 
     type PasteCases =
-        | AddColumns of {| data: string[][]; columnIndex: int |}
+        | AddColumns of
+            {|
+                data: ResizeArray<CompositeColumn>
+                columnIndex: int
+            |}
         | PasteColumns of
             {|
-                data: string[][]
-                columnIndex: int
-                rowIndex: int
+                data: CompositeCell[][]
+                coordinates: CellCoordinate [][]
             |}
-        | PasteSinglesAsTerm of
+        | PasteFittedColumns of
             {|
-                data: string[][]
-                headers: CompositeHeader[]
-                groupedCellCoordinates: CellCoordinate[][]
+                data: CompositeCell[][]
+                coordinates: CellCoordinate[][]
             |}
 
 module AnnotationTable =
