@@ -9,7 +9,7 @@ open Swate.Components.Shared
 open Fable.Core
 open Browser.Types
 
-module ArcTypeModalsUtil =
+module private ArcTypeModalsUtil =
     let inputKeydownHandler =
         fun (e: KeyboardEvent) submit cancel ->
             match e.code with
@@ -24,7 +24,7 @@ module ArcTypeModalsUtil =
                 cancel ()
             | _ -> ()
 
-type InputField =
+type private InputField =
     static member Input(v: string, setter: string -> unit, label: string, rmv, submit, ?autofocus: bool) =
         let autofocus = defaultArg autofocus false
 
@@ -72,7 +72,7 @@ type InputField =
             ]
         ]
 
-type FooterButtons =
+type private FooterButtons =
     static member Cancel(rmv: unit -> unit) =
 
         //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
@@ -331,7 +331,7 @@ type CompositeCellModal =
             CompositeCellModal.DataModal(v, setData, rmv, ?relevantCompositeHeader = relevantCompositeHeader)
 
 
-type CellPasteModals =
+type ContextMenuModals =
     static member PasteFullColumnsModal
         (
             arcTable: ArcTable,
@@ -406,4 +406,137 @@ type CellPasteModals =
                     addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
                 ],
             contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+        )
+
+    [<ReactComponent>]
+    static member MoveColumnModal
+        (
+            arcTable: ArcTable,
+            setArcTable: ArcTable -> unit,
+            arcTableIndex: CellCoordinate,
+            uiTableIndex: CellCoordinate,
+            setModal: AnnotationTable.ModalTypes -> unit,
+            tableRef: IRefValue<TableHandle>
+        ) =
+        let rmv =
+            fun _ ->
+                tableRef.current.focus ()
+                setModal AnnotationTable.ModalTypes.None
+
+        let isInSelected = tableRef.current.SelectHandle.contains (uiTableIndex)
+
+        console.log ("Calculate column move")
+        // console.log (index)
+        // console.log (tableRef.current.SelectHandle.getSelectedCellRange ())
+
+        let columnIndices =
+            if isInSelected then
+                printfn "is in selected"
+                let range = tableRef.current.SelectHandle.getSelectedCellRange().Value
+                [| range.xStart - 1 .. range.xEnd - 1 |]
+            else
+                [| arcTableIndex.x |]
+
+        console.log columnIndices
+
+        let Subtable = arcTable.Subtable(columnIndices)
+
+        let tempTable, setTempTable =
+            React.useState (fun () ->
+                let table = arcTable.Copy()
+                table.RemoveColumns columnIndices
+                table
+            )
+
+        /// We try to avoid any out of bounds errors by limiting the range of the index
+        let MaxIndex = tempTable.ColumnCount - 1
+
+        let selectedIndex, setSelectedIndex = React.useState (0)
+
+        let submit =
+            fun _ ->
+                let table = tempTable.Copy()
+                table.Join(Subtable, selectedIndex, TableJoinOptions.WithValues, skipFillMissing = true)
+                setArcTable (table)
+                rmv ()
+
+        let modalActivity =
+            Html.label [
+                prop.className "swt:input swt:w-fit"
+                prop.children [
+                    Html.input [
+                        prop.type'.number
+                        prop.onChange (fun (input: int) -> setSelectedIndex (input - 1))
+                        prop.defaultValue (selectedIndex + 1)
+                        prop.min 1
+                        prop.max (MaxIndex + 2)
+                    ]
+                    Html.span [
+                        prop.className "swt:label"
+                        prop.textf "%i|%i" (selectedIndex + 1) (MaxIndex + 2)
+                    ]
+                ]
+            ]
+
+        let content =
+            let mkRow (index: int, value: string option, isInserted) =
+                Html.tr [
+                    if isInserted then
+                        prop.className "swt:bg-success swt:success-content swt:border-success-content"
+                    prop.children [
+                        Html.td (if value.IsSome then sprintf "%i" (index + 1) else "")
+                        Html.td (value |> Option.defaultValue "")
+                    ]
+                ]
+
+            React.fragment [
+                //Daisy.table [
+                Html.table [
+                    prop.className "swt:table"
+                    prop.children [
+                        Html.thead [ Html.tr [ Html.th "Index"; Html.th "Column" ] ]
+                        Html.tbody [
+                            for i in 0 .. tempTable.ColumnCount do // do columncount instead of columncount - 1 to included append option
+                                if i = selectedIndex then
+                                    for subIndex in 0 .. Subtable.ColumnCount - 1 do
+                                        mkRow (i + subIndex, Subtable.Headers.[subIndex].ToString() |> Some, true)
+
+                                if i < tempTable.ColumnCount then
+                                    let index = if i < selectedIndex then i else i + Subtable.ColumnCount
+                                    mkRow (index, tempTable.Headers.[i].ToString() |> Some, false)
+                        ]
+                    ]
+                ]
+            ]
+
+        let footer =
+            Html.div [
+                prop.className "swt:justify-end swt:flex swt:gap-2"
+                prop.style [ style.marginLeft length.auto ]
+                prop.children [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-outline"
+                        prop.text "Cancel"
+                        prop.onClick rmv
+                    ]
+                    Html.a [
+                        prop.className "swt:btn swt:btn-primary"
+                        prop.text "Submit"
+                        prop.onClick submit
+                    ]
+                ]
+            ]
+
+        Swate.Components.BaseModal.BaseModal(
+            rmv,
+            header =
+                Html.p (
+                    if Subtable.ColumnCount > 1 then
+                        "Move Columns"
+                    else
+                        "Move Column"
+                ),
+            modalActions = modalActivity,
+            content = content,
+            footer = footer
         )

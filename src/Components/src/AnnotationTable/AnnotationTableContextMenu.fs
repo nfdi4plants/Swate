@@ -385,12 +385,7 @@ type AnnotationTableContextMenu =
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
 
                             let prediction =
-                                AnnotationTableContextMenuUtil.predictPasteBehaviour (
-                                    cellIndex,
-                                    arcTable,
-                                    selectHandle,
-                                    data
-                                )
+                                AnnotationTableContextMenuUtil.predictPasteBehaviour (cc, arcTable, selectHandle, data)
 
                             match prediction with
                             | PasteCases.AddColumns addColumns ->
@@ -443,7 +438,11 @@ type AnnotationTableContextMenu =
             ContextMenuItem(
                 Html.div "Move Column",
                 icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
-                kbdbutton = ATCMC.KbdHint("MC")
+                kbdbutton = ATCMC.KbdHint("MC"),
+                onClick =
+                    fun c ->
+                        let cc = c.spawnData |> unbox<CellCoordinate>
+                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, cellIndex))
             )
         ]
 
