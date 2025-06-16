@@ -652,42 +652,6 @@ module Extensions =
 
             termIndices, lengthWithoutTerms
 
-        static member fromTableStr(content: string[], headers: CompositeHeader[]) =
-
-            let termIndices, expectedLength = CompositeCell.getHeaderParsingInfo (headers)
-            let expectedTermLength = expectedLength + (3 * termIndices.Length)
-            let expectedUnitLength = expectedLength + (4 * termIndices.Length)
-
-            let allTerm = content.Length = expectedTermLength
-            let allUnit = content.Length = expectedUnitLength
-
-            let parseRow (row: string[]) (headers: CompositeHeader[]) =
-                let rec loop index result =
-                    if index >= headers.Length then
-                        result |> List.rev |> Array.ofList
-                    else
-                        let header = headers.[index]
-
-                        match header with
-                        | x when x.IsSingleColumn ->
-                            let cell = CompositeCell.fromContentValid ([| row.[index] |], header)
-                            loop (index + 1) (cell :: result)
-                        | x when x.IsDataColumn ->
-                            let content = Array.sub row index 4
-                            let cell = CompositeCell.fromContentValid (content, header)
-                            loop (index + 4) (cell :: result)
-                        | x when x.IsTermColumn && allTerm ->
-                            let content = Array.sub row index 3
-                            let cell = CompositeCell.fromContentValid (content, header)
-                            loop (index + 3) (cell :: result)
-                        | x when x.IsTermColumn && allUnit ->
-                            let content = Array.sub row index 4
-                            let cell = CompositeCell.fromContentValid (content, header)
-                            loop (index + 4) (cell :: result)
-                loop 0 []
-
-            parseRow content headers
-
         static member ToTabTxt(cells: CompositeCell[]) =
             cells
             |> Array.map (fun c -> c.ToTabStr())

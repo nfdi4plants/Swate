@@ -78,6 +78,14 @@ type Fixture =
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
+    static member Body_Component_InstrumentModel_SingleRow_Term = [|
+            [| "Test"; "Testi"; "SCIEX instrument model"; "MS"; "MS:424242" |]
+        |]
+
+    static member Body_Component_InstrumentModel_SingleRow_Unit = [|
+            [| "Test"; "Testi"; "My Mass Spec"; "SCIEX instrument model"; "MS"; "MS:424242" |]
+        |]
+
     static member Body_Component_InstrumentModel_TwoRows = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
             [| "SCIEX instrument model"; "MS"; "MS:434343" |]

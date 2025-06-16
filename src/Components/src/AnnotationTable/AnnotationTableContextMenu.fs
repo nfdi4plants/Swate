@@ -97,21 +97,21 @@ type AnnotationTableContextMenuUtil =
         return rows
     }
 
-    static member getAdaptiveData
+    static member getFittedCells
         (
             data: string[][],
-            headers: CompositeHeader[],
-            groupedCellCoordinates: CellCoordinate[][]
+            headers: CompositeHeader[]
         ) =
 
         let fitColumnsToTarget (row: string[][]) (headers: CompositeHeader[]) =
+
             let rec loop index result =
                 if index >= headers.Length then
                     result |> List.rev |> Array.ofList
                 else
                     let header = headers.[index]
 
-                    let index =
+                    let newIndex =
                         if index >= row.Length then
                             AnnotationTableContextMenuUtil.getIndex (index, row.Length)
                         else
@@ -119,17 +119,17 @@ type AnnotationTableContextMenuUtil =
 
                     match header with
                     | x when x.IsSingleColumn ->
-                        let cell = CompositeCell.fromContentValid (row.[index], header)
+                        let cell = CompositeCell.fromContentValid (row.[newIndex], header)
                         loop (index + 1) (cell :: result)
                     | x when x.IsDataColumn ->
-                        let cell = CompositeCell.fromContentValid (row.[index], header)
+                        let cell = CompositeCell.fromContentValid (row.[newIndex], header)
                         loop (index + 1) (cell :: result)
                     | x when x.IsTermColumn ->
                         let value =
-                            if row.[index].Length = 2 then
-                                [| row.[index].[0] |]
+                            if row.[newIndex].Length = 2 then
+                                [| row.[newIndex].[0] |]
                             else
-                                row.[index]
+                                row.[newIndex]
 
                         let cell = CompositeCell.fromContentValid (value, header)
                         loop (index + 1) (cell :: result)
@@ -145,24 +145,30 @@ type AnnotationTableContextMenuUtil =
                 | x when x.IsTermColumn -> x.ToString(), [ 1; 2; 3; 4 ]
             )
 
-        let fitHeaders (strings: string[]) (headers: (string * int list)[]) =
-            let rec tryFit index headerList =
-                match headerList with
-                | [] -> if index = strings.Length then Some [] else None
+        let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) =
+            let rec tryFit (cell: string[]) index (headerSizesList: (string * int list) list) =
+                match headerSizesList with
+                | [] -> Some []  // Always return Some, even if there are unused strings left
                 | (name, sizes) :: rest ->
+                    // Sort sizes descending to try larger sizes first
                     sizes
-                    |> List.tryPick (fun size ->
-                        if index + size <= strings.Length then
-                            let segment = strings.[index .. index + size - 1]
+                    |> List.sortDescending
+                    |> List.choose (fun size ->
+                        let actualSize = 
+                            if index + size <= cell.Length then size 
+                            elif index < cell.Length then cell.Length - index
+                            else 0
 
-                            match tryFit (index + size) rest with
+                        if actualSize > 0 then
+                            let segment = cell.[index .. index + actualSize - 1]
+                            match tryFit cell (index + actualSize) rest with
                             | Some restResult -> Some((name, segment) :: restResult)
                             | None -> None
                         else
                             None
                     )
-
-            tryFit 0 (Array.toList headers)
+                    |> List.tryHead
+            tryFit strings 0 (Array.toList headersSizes)
 
         let fittingHeaders = getHeadersWithLength headers
 
@@ -173,12 +179,8 @@ type AnnotationTableContextMenuUtil =
             |> Array.choose (fun row -> row)
             |> Array.map (fun row -> row |> List.map (fun (_, cells) -> cells) |> Array.ofList)
 
-        let compositeCells = result |> Array.map (fun row -> fitColumnsToTarget row headers)
-
-        PasteCases.PasteFittedColumns {|
-            data = compositeCells
-            coordinates = groupedCellCoordinates
-        |}
+        result
+        |> Array.map (fun row -> fitColumnsToTarget row headers)
 
     static member predictPasteBehaviour
         (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
@@ -186,7 +188,7 @@ type AnnotationTableContextMenuUtil =
 
         //Convert cell coordinates to array
         let cellCoordinates =
-            selectHandle.getSelectedCells () |> Array.ofSeq
+            selectHandle.getSelectedCells() |> Array.ofSeq
 
         //Get all required headers for cells
         let headers =
@@ -227,33 +229,41 @@ type AnnotationTableContextMenuUtil =
                 |> Array.groupBy (fun item -> item.y)
                 |> Array.map (fun (_, row) -> row)
 
-            let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo (headers)
+            let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo(headers)
 
             if
                 termIndices.Length > 0
                 && data.[0].Length >= termIndices.Length + lengthWithoutTerms
             then
-                AnnotationTableContextMenuUtil.getAdaptiveData(
-                    data,
-                    headers,
-                    groupedCellCoordinates
-                )
+                let fittedCells =
+                    AnnotationTableContextMenuUtil.getFittedCells(
+                        data,
+                        headers
+                    )
+
+                PasteCases.PasteFittedColumns {|
+                    data = fittedCells
+                    coordinates = groupedCellCoordinates
+                |}
             else
                 //Converts the cells of each row
-                let rowCells =
-                    data |> Array.map (fun row -> CompositeCell.fromTableStr (row, headers))
-
-                rowCells
-                |> Array.iter (fun item -> printfn "rowCell: %s" (item.ToString()))
+                let fittedCells =
+                    AnnotationTableContextMenuUtil.getFittedCells(
+                        data,
+                        headers)
 
                 PasteCases.PasteColumns {|
-                    data = rowCells
+                    data = fittedCells
                     coordinates = groupedCellCoordinates
                 |}
         else
-            let rowCells = CompositeCell.fromTableStr (data.[0], headers)
+            let fittedCells =
+                AnnotationTableContextMenuUtil.getFittedCells(
+                    [|data.[0]|],
+                    headers)
+
             PasteCases.PasteColumns {|
-                data = [|[|rowCells.[0]|]|]
+                data = fittedCells
                 coordinates = [|[|cellCoordinates.[0]|]|]
             |}
 
@@ -270,16 +280,16 @@ type AnnotationTableContextMenuUtil =
     static member pasteDefault
         (pasteColumns: {| data: CompositeCell [][]; coordinates: CellCoordinate [][] |}, coordinate: CellCoordinate, table: ArcTable, selectHandle: SelectHandle, setTable)
         =
+
         //Check amount of selected cells
         //When multiple cells are selected a different handling is required
-        if selectHandle.getCount () > 1 then
+        if selectHandle.getCount() > 1 then
 
             //Map over all selected cells
             pasteColumns.coordinates
             |> Array.iteri (fun yi row ->
                 //Restart row index, when the amount of selected rows is bigger than copied rows
                 let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, pasteColumns.data.Length)
-
                 row
                 |> Array.iteri (fun xi coordinate ->
                     //Restart column index, when the amount of selected columns is bigger than copied columns
@@ -288,7 +298,7 @@ type AnnotationTableContextMenuUtil =
                 )
             )
         else
-            table.SetCellAt(coordinate.x - 1, coordinate.y - 1, pasteColumns.data.[0].[0])
+            table.SetCellAt(coordinate.x, coordinate.y, pasteColumns.data.[0].[0])
 
         table.Copy() |> setTable
 
