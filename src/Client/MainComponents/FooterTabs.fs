@@ -85,7 +85,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
             let data = FooterReorderData.create index id
             let dataJson = data.toJson ()
             e.dataTransfer.setData ("text", dataJson) |> ignore
-            ())
+            ()
+        )
         prop.onDragEnter <| dragenter_handler (state, setState)
         prop.onDragOver drag_preventdefault
         // This will determine the position of the tab
@@ -96,7 +97,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
         prop.onClick (fun _ ->
             Spreadsheet.UpdateActiveView(Spreadsheet.ActiveView.Table index)
             |> Messages.SpreadsheetMsg
-            |> dispatch)
+            |> dispatch
+        )
         prop.onContextMenu (fun e ->
             e.stopPropagation ()
             e.preventDefault ()
@@ -106,7 +108,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
             let modal =
                 Modals.ContextMenus.FooterTabs.Table(mouseX, mouseY, index, startEdit, dispatch)
 
-            Model.ModalState.Force modal |> Some |> Messages.UpdateModal |> dispatch)
+            Model.ModalState.Force modal |> Some |> Messages.UpdateModal |> dispatch
+        )
         prop.draggable true
         prop.children [
             if state.IsEditable then
@@ -136,7 +139,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                                     IsEditable = false
                                     Name = table.Name
                             }
-                        | _ -> ())
+                        | _ -> ()
+                    )
                     prop.defaultValue table.Name
                 ]
             else
@@ -193,7 +197,8 @@ let MainDataMap (model: Model, dispatch: Messages.Msg -> unit) =
             e.preventDefault ()
             let mouseX, mouseY = int e.pageX, (int e.pageY - 20)
             let modal = Modals.ContextMenus.FooterTabs.DataMap(mouseX, mouseY, dispatch)
-            Model.ModalState.Force modal |> Some |> Messages.UpdateModal |> dispatch)
+            Model.ModalState.Force modal |> Some |> Messages.UpdateModal |> dispatch
+        )
         prop.style [
             style.custom ("order", order)
             style.height (length.percent 100)
@@ -224,13 +229,15 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
         prop.onClick (fun e ->
             SpreadsheetInterface.CreateAnnotationTable e.ctrlKey
             |> Messages.InterfaceMsg
-            |> dispatch)
+            |> dispatch
+        )
         prop.onContextMenu (fun e ->
             e.stopPropagation ()
             e.preventDefault ()
             let mouseX, mouseY = int e.pageX, (int e.pageY - 20)
             let modal = Modals.ContextMenus.FooterTabs.Plus(mouseX, mouseY, dispatch)
-            Model.ModalState.Force modal |> Some |> Messages.UpdateModal |> dispatch)
+            Model.ModalState.Force modal |> Some |> Messages.UpdateModal |> dispatch
+        )
         prop.style [
             style.custom ("order", order)
             style.height (length.percent 100)
@@ -248,7 +255,8 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
         prop.onClick (fun _ ->
             Messages.PageState.UpdateShowSidebar(not show)
             |> Messages.PageStateMsg
-            |> dispatch)
+            |> dispatch
+        )
         prop.className "swt:h-full swt:cursor-pointer swt:ml-auto swt:overflow-hidden"
         prop.children [
             Html.label [
@@ -270,16 +278,15 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
         prop.children [
             Html.div [
                 prop.className
-                    "swt:*:[--tab-border-color:var(--color-base-content)] swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:*:flex-nowrap"
+                    "swt:*:[--tab-border-color:var(--color-base-content)] swt:tabs swt:tabs-lift swt:w-full \
+                    swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center \
+                    swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:flex-nowrap swt:*:flex-nowrap"
                 prop.children [
                     //Daisy.tab [
-                    //Html.div [
-                    //    prop.className "swt:tab"
-                    //    prop.style [
-                    //        style.width (length.px 20)
-                    //        style.custom ("order", -2)
-                    //    ]
-                    //]
+                    Html.div [
+                        prop.className "swt:tab swt:max-w-min swt:!px-2"
+                        prop.style [ style.custom ("order", -2) ]
+                    ]
                     MainMetadata(model, dispatch)
                     if model.SpreadsheetModel.HasDataMap() then
                         MainDataMap(model, dispatch)
