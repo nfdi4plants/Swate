@@ -9,37 +9,37 @@ open Fixture
 
 type TestCases =
     static member AddColumns () =
-                let pasteData = Fixture.Column_Component_InstrumentModel
+        let pasteData = Fixture.Column_Component_InstrumentModel
 
-                let newCompositeColumns =
-                    let body =
-                        let rest = pasteData.[1..]
-                        if rest.Length > 0 then rest
-                        else [||]
-                    let columns = Array.append [| pasteData.[0] |] body |> Array.transpose
-                    let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
-                    ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList |> ResizeArray
+        let newCompositeColumns =
+            let body =
+                let rest = pasteData.[1..]
+                if rest.Length > 0 then rest
+                else [||]
+            let columns = Array.append [| pasteData.[0] |] body |> Array.transpose
+            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+            ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList |> ResizeArray
 
-                let currentTable = Fixture.mkTable ()
-                let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
+        let currentTable = Fixture.mkTable ()
+        let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
 
-                let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 2, 1, 3)
+        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 2, 1, 3)
 
-                let pasteBehavior =
-                    Swate.Components.AnnotationTableContextMenuUtil.predictPasteBehaviour (
-                        clickedCell,
-                        currentTable,
-                        selectHandle,
-                        pasteData
-                    )
+        let pasteBehavior =
+            Swate.Components.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                clickedCell,
+                currentTable,
+                selectHandle,
+                pasteData
+            )
 
-                Expect.equal
-                    pasteBehavior
-                    (PasteCases.AddColumns {|
-                        data = newCompositeColumns
-                        columnIndex = clickedCell.x
-                    |})
-                    "Should predict add columns behavior"
+        Expect.equal
+            pasteBehavior
+            (PasteCases.AddColumns {|
+                data = newCompositeColumns
+                columnIndex = clickedCell.x
+            |})
+            "Should predict add columns behavior"
 
     static member AddSingleCell () =
         let pasteData = Fixture.Body_Component_InstrumentModel_SingleRow
@@ -93,8 +93,6 @@ type TestCases =
 
         let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo (headers)
 
-        printfn "compositeCells: %i" compositeCells.Length
-
         if
             termIndices.Length > 0
             && pasteData.[0].Length >= termIndices.Length + lengthWithoutTerms then
@@ -116,7 +114,7 @@ type TestCases =
 
     static member AddFittingTerm (startColumn:int, startRow:int, pasteData:string[][]) =
         let currentTable = Fixture.mkTable ()
-        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 3, 3)
+        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 4, 4)
         let cellCoordinates = Fixture.getRangeOfSelectedCells(selectHandle)
 
         let headers =
@@ -125,7 +123,7 @@ type TestCases =
             columnIndices
             |> Array.map (fun index -> currentTable.GetColumn(index.x - 1).Header)
 
-        let clickedCell: CellCoordinate = {| x = 3; y = 1 |}
+        let clickedCell: CellCoordinate = {| x = 4; y = 1 |}
 
         let adaptedData =
             pasteData.[startRow..]
@@ -193,6 +191,9 @@ let Main =
                 <| fun _ ->
                     TestCases.AddFittingTerm(1, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
             testCase $"Add fitting Term and 2 freetexts"
+                <| fun _ ->
+                    TestCases.AddFittingTerm(0, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
+            testCase $"Add unit value"
                 <| fun _ ->
                     TestCases.AddFittingTerm(0, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
         ]

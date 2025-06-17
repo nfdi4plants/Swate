@@ -82,7 +82,14 @@ type FooterButtons =
             prop.onClick (fun _ -> rmv ())
         ]
 
+    static member Ok(rmv: unit -> unit) =
 
+        //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
+        Html.button [
+            prop.className "swt:btn swt:bg-neutral-content swt:btn-outline"
+            prop.text "Ok"
+            prop.onClick (fun _ -> rmv ())
+        ]
 
     static member Submit(submitOnClick: unit -> unit) =
         //Daisy.button.button [
@@ -104,7 +111,7 @@ type CompositeCellModal =
     /// pr is required to make indicators on termsearch not overflow
     /// pl is required to make the input ouline when focused not cut of
     static member BaseModalContentClassOverride =
-        "swt:overflow-y-auto swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
+        "swt:overflow-y-auto swt:overflow-x-hidden swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
     static member TermModal
         (oa: OntologyAnnotation, setOa: OntologyAnnotation -> unit, rmv, ?relevantCompositeHeader: CompositeHeader)
@@ -402,6 +409,32 @@ type CellPasteModals =
                 React.fragment [
                     FooterButtons.Cancel(rmv)
                     addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
+                ],
+            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+        )
+
+type ErrorModal =
+    static member DisplayError (
+        exn:string,
+        setModal: AnnotationTable.ModalTypes -> unit,
+        tableRef: IRefValue<TableHandle>) =
+
+        let rmv =
+            fun _ ->
+                tableRef.current.focus ()
+                setModal AnnotationTable.ModalTypes.None
+
+        BaseModal.BaseModal(
+            (fun _ -> rmv ()),
+            modalClassInfo = "swt:border-2 swt:bg-error",
+            header = Html.div "An error occured!",
+            content =
+                React.fragment [
+                    Html.text exn
+                ],
+            footer =
+                React.fragment [
+                    FooterButtons.Ok(rmv)
                 ],
             contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
         )

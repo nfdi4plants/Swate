@@ -147,10 +147,14 @@ type AnnotationTableContextMenuUtil =
 
         let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) =
             let rec tryFit (cell: string[]) index (headerSizesList: (string * int list) list) =
+                let index =
+                    if index >= strings.Length then
+                        0
+                    else
+                        index
                 match headerSizesList with
-                | [] -> Some []  // Always return Some, even if there are unused strings left
+                | [] -> Some []
                 | (name, sizes) :: rest ->
-                    // Sort sizes descending to try larger sizes first
                     sizes
                     |> List.sortDescending
                     |> List.choose (fun size ->
@@ -158,11 +162,11 @@ type AnnotationTableContextMenuUtil =
                             if index + size <= cell.Length then size 
                             elif index < cell.Length then cell.Length - index
                             else 0
-
                         if actualSize > 0 then
                             let segment = cell.[index .. index + actualSize - 1]
                             match tryFit cell (index + actualSize) rest with
-                            | Some restResult -> Some((name, segment) :: restResult)
+                            | Some restResult ->
+                                Some((name, segment) :: restResult)
                             | None -> None
                         else
                             None
@@ -178,8 +182,6 @@ type AnnotationTableContextMenuUtil =
             fittedRows
             |> Array.choose (fun row -> row)
             |> Array.map (fun row -> row |> List.map (fun (_, cells) -> cells) |> Array.ofList)
-
-        printfn "result: %A" result
 
         result
         |> Array.map (fun row -> fitColumnsToTarget row headers)
@@ -283,6 +285,19 @@ type AnnotationTableContextMenuUtil =
         (pasteColumns: {| data: CompositeCell [][]; coordinates: CellCoordinate [][] |}, coordinate: CellCoordinate, table: ArcTable, selectHandle: SelectHandle, setTable)
         =
 
+        let getCorrectTarget (currentCell: CompositeCell) (table: ArcTable) (targetCoordinate: CellCoordinate) adaption =
+            if currentCell.isUnitized then
+                let targetCell = table.GetCellAt(targetCoordinate.x - adaption, targetCoordinate.y - adaption)
+                let value, unit = currentCell.AsUnitized
+                if targetCell.isUnitized && unit.isEmpty() then
+                    let _, targetUnit = targetCell.AsUnitized
+                    let newTarget = CompositeCell.createUnitized(value, targetUnit)
+                    newTarget
+                else
+                    currentCell
+            else
+                currentCell
+
         //Check amount of selected cells
         //When multiple cells are selected a different handling is required
         if selectHandle.getCount() > 1 then
@@ -296,11 +311,15 @@ type AnnotationTableContextMenuUtil =
                 |> Array.iteri (fun xi coordinate ->
                     //Restart column index, when the amount of selected columns is bigger than copied columns
                     let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.[0].Length)
-                    table.SetCellAt(coordinate.x - 1, coordinate.y - 1, pasteColumns.data.[yIndex].[xIndex])
+                    let currentCell = pasteColumns.data.[yIndex].[xIndex]
+                    let newTarget = getCorrectTarget currentCell table coordinate 1
+                    table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
                 )
             )
         else
-            table.SetCellAt(coordinate.x, coordinate.y, pasteColumns.data.[0].[0])
+            let currentCell = pasteColumns.data.[0].[0]
+            let newTarget = getCorrectTarget currentCell table coordinate 0
+            table.SetCellAt(coordinate.x, coordinate.y, newTarget)
 
         table.Copy() |> setTable
 
@@ -404,22 +423,27 @@ type AnnotationTableContextMenu =
 
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
 
-                            let prediction =
-                                AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                            try
+                                let prediction =
+                                    AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                                        cellIndex,
+                                        arcTable,
+                                        selectHandle,
+                                        data
+                                    )
+
+                                AnnotationTableContextMenuUtil.paste(
+                                    prediction,
                                     cellIndex,
                                     arcTable,
+                                    setModal,
                                     selectHandle,
-                                    data
+                                    setArcTable
                                 )
-
-                            AnnotationTableContextMenuUtil.paste(
-                                prediction,
-                                cellIndex,
-                                arcTable,
-                                setModal,
-                                selectHandle,
-                                setArcTable
-                            )
+                            with exn ->
+                                setModal (
+                                    AnnotationTable.ModalTypes.Error(exn.Message)
+                                )
                         }
                         |> Promise.start
             )
@@ -456,8 +480,6 @@ type AnnotationTableContextMenu =
     static member CompositeHeaderContent
         (index: int, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle)
         =
-        let header = table.Headers.[index]
-
         [
             ContextMenuItem(
                 Html.div "Delete Column",

@@ -601,7 +601,14 @@ module Extensions =
             if header.IsSome then
                 let header = header.Value
 
+                let isNumber (input: string) =
+                    let success, _ = System.Double.TryParse(input)
+                    success
+
                 match content with
+                | [| value |] when header.IsTermColumn && isNumber value ->
+                    CompositeCell.createUnitizedFromString (value)
+                    |> _.ConvertToValidCell(header)
                 | [| freetext |] when header.IsSingleColumn -> CompositeCell.createFreeText freetext
                 | [| freetext |] -> CompositeCell.createFreeText freetext |> _.ConvertToValidCell(header)
                 | [| name; tsr; tan |] when header.IsTermColumn -> CompositeCell.createTermFromString (name, tsr, tan)

@@ -304,4 +304,5 @@ module AnnotationTable =
     type ModalTypes =
         | Details of CellCoordinate
         | PasteCaseUserInput of PasteCases
+        | Error of string
         | None

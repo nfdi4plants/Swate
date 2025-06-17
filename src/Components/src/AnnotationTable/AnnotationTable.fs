@@ -115,6 +115,8 @@ type AnnotationTable =
                     )
             | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->
                 CellPasteModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
+            | ModalTypes.Error(exn) ->
+                ErrorModal.DisplayError(exn, setModal, tableRef)
             | anyElse ->
                 console.warn ("Unknown modal type", anyElse)
                 Html.none

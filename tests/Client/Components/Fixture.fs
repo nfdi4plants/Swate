@@ -42,6 +42,14 @@ type Fixture =
             |]
         )
 
+        arcTable.AddColumn(
+            CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")),
+            [|
+                for i in 0..100 do
+                    CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
+            |]
+        )
+
         arcTable
 
     static member getRangeOfSelectedCells (selectHande: SelectHandle) =
@@ -89,4 +97,8 @@ type Fixture =
     static member Body_Component_InstrumentModel_TwoRows = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
             [| "SCIEX instrument model"; "MS"; "MS:434343" |]
+        |]
+
+    static member Body_Unit_Value_Only = [|
+            [| "4" |]
         |]
