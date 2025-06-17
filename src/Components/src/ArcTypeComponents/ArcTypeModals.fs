@@ -425,37 +425,30 @@ type ContextMenuModals =
 
         let isInSelected = tableRef.current.SelectHandle.contains (uiTableIndex)
 
-        console.log ("Calculate column move")
-        // console.log (index)
-        // console.log (tableRef.current.SelectHandle.getSelectedCellRange ())
-
         let columnIndices =
             if isInSelected then
-                printfn "is in selected"
                 let range = tableRef.current.SelectHandle.getSelectedCellRange().Value
                 [| range.xStart - 1 .. range.xEnd - 1 |]
             else
                 [| arcTableIndex.x |]
 
-        console.log columnIndices
-
         let Subtable = arcTable.Subtable(columnIndices)
 
-        let tempTable, setTempTable =
-            React.useState (fun () ->
+        let tempTable =
+            React.useRef (
                 let table = arcTable.Copy()
                 table.RemoveColumns columnIndices
                 table
             )
 
         /// We try to avoid any out of bounds errors by limiting the range of the index
-        let MaxIndex = tempTable.ColumnCount - 1
+        let MaxIndex = tempTable.current.ColumnCount - 1
 
         let selectedIndex, setSelectedIndex = React.useState (0)
 
         let submit =
             fun _ ->
-                let table = tempTable.Copy()
+                let table = tempTable.current.Copy()
                 table.Join(Subtable, selectedIndex, TableJoinOptions.WithValues, skipFillMissing = true)
                 setArcTable (table)
                 rmv ()
@@ -496,14 +489,14 @@ type ContextMenuModals =
                     prop.children [
                         Html.thead [ Html.tr [ Html.th "Index"; Html.th "Column" ] ]
                         Html.tbody [
-                            for i in 0 .. tempTable.ColumnCount do // do columncount instead of columncount - 1 to included append option
+                            for i in 0 .. tempTable.current.ColumnCount do // do columncount instead of columncount - 1 to included append option
                                 if i = selectedIndex then
                                     for subIndex in 0 .. Subtable.ColumnCount - 1 do
                                         mkRow (i + subIndex, Subtable.Headers.[subIndex].ToString() |> Some, true)
 
-                                if i < tempTable.ColumnCount then
+                                if i < tempTable.current.ColumnCount then
                                     let index = if i < selectedIndex then i else i + Subtable.ColumnCount
-                                    mkRow (index, tempTable.Headers.[i].ToString() |> Some, false)
+                                    mkRow (index, tempTable.current.Headers.[i].ToString() |> Some, false)
                         ]
                     ]
                 ]
