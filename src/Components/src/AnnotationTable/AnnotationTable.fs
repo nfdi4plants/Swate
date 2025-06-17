@@ -257,6 +257,14 @@ type AnnotationTable =
             |]
         )
 
+        arcTable.AddColumn(
+            CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")),
+            [|
+                for i in 0..100 do
+                    CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
+            |]
+        )
+
         let table, setTable = React.useState (arcTable)
 
         AnnotationTable.AnnotationTable(table, setTable, height = 600)

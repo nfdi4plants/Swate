@@ -93,6 +93,8 @@ type TestCases =
 
         let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo (headers)
 
+        printfn "compositeCells: %i" compositeCells.Length
+
         if
             termIndices.Length > 0
             && pasteData.[0].Length >= termIndices.Length + lengthWithoutTerms then
@@ -187,5 +189,11 @@ let Main =
             testCase $"Add fitting Term"
                 <| fun _ ->
                     TestCases.AddFittingTerm(2, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
+            testCase $"Add fitting Term and 1 freetext"
+                <| fun _ ->
+                    TestCases.AddFittingTerm(1, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
+            testCase $"Add fitting Term and 2 freetexts"
+                <| fun _ ->
+                    TestCases.AddFittingTerm(0, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
         ]
     ]

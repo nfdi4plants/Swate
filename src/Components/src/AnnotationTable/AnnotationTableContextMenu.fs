@@ -179,6 +179,8 @@ type AnnotationTableContextMenuUtil =
             |> Array.choose (fun row -> row)
             |> Array.map (fun row -> row |> List.map (fun (_, cells) -> cells) |> Array.ofList)
 
+        printfn "result: %A" result
+
         result
         |> Array.map (fun row -> fitColumnsToTarget row headers)
 
