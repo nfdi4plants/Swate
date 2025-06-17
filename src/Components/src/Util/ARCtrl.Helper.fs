@@ -479,6 +479,17 @@ module Extensions =
             let updateBody = Helper.dictMoveColumn currentIndex nextIndex this.Values
             ()
 
+        /// <summary>
+        /// Returns a new ArcTable from all columns defined by ``indices``.
+        /// </summary>
+        member this.Subtable(indices: int[]) =
+            let cols = indices |> Array.sort |> Array.map this.GetColumn
+            let table = ArcTable.init (this.Name + " Subtable")
+
+            for col in cols do
+                table.AddColumn(col.Header, col.Cells)
+
+            table
 
     type Template with
         member this.FileName = this.Name.Replace(" ", "_") + ".xlsx"

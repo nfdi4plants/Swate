@@ -113,8 +113,18 @@ type AnnotationTable =
                         ),
                         header
                     )
+            | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
+                ContextMenuModals.MoveColumnModal(
+                    arcTable,
+                    setArcTable,
+                    arcTableIndex,
+                    uiTableIndex,
+                    setModal,
+                    tableRef
+                )
+
             | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->
-                CellPasteModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
+                ContextMenuModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
             | anyElse ->
                 console.warn ("Unknown modal type", anyElse)
                 Html.none
