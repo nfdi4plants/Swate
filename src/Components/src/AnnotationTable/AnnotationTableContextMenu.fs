@@ -473,7 +473,11 @@ type AnnotationTableContextMenu =
             ContextMenuItem(
                 Html.div "Move Column",
                 icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
-                kbdbutton = ATCMC.KbdHint("MC")
+                kbdbutton = ATCMC.KbdHint("MC"),
+                onClick =
+                    fun c ->
+                        let cc = c.spawnData |> unbox<CellCoordinate>
+                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, cellIndex))
             )
         ]
 

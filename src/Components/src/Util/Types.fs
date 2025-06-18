@@ -304,5 +304,7 @@ module AnnotationTable =
     type ModalTypes =
         | Details of CellCoordinate
         | PasteCaseUserInput of PasteCases
+        /// 👀 Uses CellCoordinate to identify if clicked cell is part of selected range
+        | MoveColumn of uiTableIndex: CellCoordinate * arcTableIndex: CellCoordinate
         | Error of string
         | None
