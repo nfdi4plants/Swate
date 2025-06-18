@@ -82,15 +82,6 @@ type private FooterButtons =
             prop.onClick (fun _ -> rmv ())
         ]
 
-    static member Ok(rmv: unit -> unit) =
-
-        //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
-        Html.button [
-            prop.className "swt:btn swt:bg-neutral-content swt:btn-outline swt:ml-auto"
-            prop.text "Ok"
-            prop.onClick (fun _ -> rmv ())
-        ]
-
     static member Submit(submitOnClick: unit -> unit) =
         //Daisy.button.button [
         //    button.primary
@@ -553,9 +544,5 @@ type ContextMenuModals =
 
         ErrorBaseModal.ErrorBaseModal(
             (fun _ -> rmv ()),
-            exn,
-            footer =
-                React.fragment [
-                    FooterButtons.Ok(rmv)
-                ]
+            exn
         )

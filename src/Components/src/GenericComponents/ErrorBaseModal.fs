@@ -17,55 +17,61 @@ type ErrorBaseModal =
         (
             rmv,
             error: string,
-            ?modalClassInfo: string,
-            ?header: ReactElement,
-            ?modalActions: ReactElement,
-            ?footer: ReactElement,
+            ?width: int,
+            ?height: int,
             ?debug: string
         ) =
 
         Html.div [
             if debug.IsSome then
-                prop.testId ("modal_" + debug.Value)
+                prop.testId ("errorModal_" + debug.Value)
             prop.className "swt:modal swt:modal-open"
+            prop.onClick rmv
             prop.children [
                 Html.div [
-                    prop.className "swt:modal-backdrop"
-                    prop.onClick rmv
-                ]
-                Html.div [
-                    prop.className [
-                        "swt:modal-box swt:!p-0"
-                        if modalClassInfo.IsSome then
-                            modalClassInfo.Value
-                    ]
+                    prop.onClick (fun ev -> ev.stopPropagation())
                     prop.style [
-                        style.width (length.percent 90)
-                        style.maxHeight (length.percent 80)
+                        if width.IsSome then 
+                            style.width (length.percent width.Value)
+                        else
+                            style.minWidth 200
+                        if height.IsSome then
+                            style.maxHeight (length.percent height.Value)
                         style.overflow.auto
                     ]
                     prop.children [
                         Html.div [
-                            prop.className "swt:card-title"
+                            prop.className "swt:alert swt:alert-error"
                             prop.children [
-                                if header.IsSome then
-                                    header.Value
-                            ]
-                        ]
-
-                        if modalActions.IsSome then
-                            Html.div [ prop.children modalActions.Value ]
-
-                        Html.div [
-                            prop.className "swt:alert swt:alert-error swt:size-full"
-                            prop.children [
-                                Html.div [
-                                    Components.CircularExitButton(props = [ prop.onClick rmv ])
+                                Svg.svg [
+                                    svg.className "swt:w-6 swt:h-6 swt:stroke-current"
+                                    svg.viewBox (0, 0, 24, 24)
+                                    svg.fill "none"
+                                    svg.children [
+                                        Svg.path [
+                                            svg.d "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                            svg.strokeLineCap "round"
+                                            svg.strokeLineJoin "round"
+                                            svg.strokeWidth 2
+                                        ]
+                                    ]
                                 ]
-                                Html.span error
 
-                                if footer.IsSome then
-                                    Html.div [ prop.children footer.Value ]
+                                Html.div [
+                                    Html.h3 [
+                                        prop.className "swt:font-bold"
+                                        prop.text "An error occured!"
+                                    ]
+                                    Html.div [
+                                        prop.text error
+                                    ]
+                                ]
+
+                                Html.button [
+                                    prop.className "swt:btn swt:bg-neutral-content swt:btn-outline swt:ml-auto"
+                                    prop.text "Ok"
+                                    prop.onClick rmv
+                                ]
                             ]
                         ]
                     ]
