@@ -125,6 +125,8 @@ type AnnotationTable =
 
             | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->
                 ContextMenuModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
+            | ModalTypes.Error(exn) ->
+                ContextMenuModals.ErrorModal(exn, setModal, tableRef)
             | anyElse ->
                 console.warn ("Unknown modal type", anyElse)
                 Html.none
@@ -264,6 +266,14 @@ type AnnotationTable =
             [|
                 for i in 0..100 do
                     CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
+            |]
+        )
+
+        arcTable.AddColumn(
+            CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")),
+            [|
+                for i in 0..100 do
+                    CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
             |]
         )
 

@@ -42,6 +42,36 @@ type Components =
             ]
         ]
 
+    static member CircularExitButton(?children, ?className: string, ?props: IReactProperty list) =
+        Html.button [
+            prop.className [
+                "swt:btn swt:btn-outline swt:btn-circle"
+                if className.IsSome then
+                    className.Value
+            ]
+            if props.IsSome then
+                yield! props.Value
+            prop.children [
+                if children.IsSome then
+                    yield! children.Value
+                Svg.svg [
+                    svg.xmlns "http://www.w3.org/2000/svg"
+                    svg.className "swt:h-6 swt:w-6"
+                    svg.fill "none"
+                    svg.viewBox (0, 0, 24, 24)
+                    svg.stroke "currentColor"
+                    svg.children [
+                        Svg.path [
+                            svg.strokeLineCap "round"
+                            svg.strokeLineJoin "round"
+                            svg.strokeWidth 2
+                            svg.d "M6 18L18 6M6 6l12 12"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
     static member CollapseButton(isCollapsed, setIsCollapsed, ?collapsedIcon, ?collapseIcon, ?classes: string) =
         Html.label [
             prop.className [

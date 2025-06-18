@@ -280,18 +280,15 @@ module AnnotationTableContextMenu =
     open ARCtrl
 
     type PasteCases =
-        | AddColumns of {| data: string[][]; columnIndex: int |}
+        | AddColumns of
+            {|
+                data: ResizeArray<CompositeColumn>
+                columnIndex: int
+            |}
         | PasteColumns of
             {|
-                data: string[][]
-                columnIndex: int
-                rowIndex: int
-            |}
-        | PasteSinglesAsTerm of
-            {|
-                data: string[][]
-                headers: CompositeHeader[]
-                groupedCellCoordinates: CellCoordinate[][]
+                data: CompositeCell[][]
+                coordinates: CellCoordinate [][]
             |}
 
 module AnnotationTable =
@@ -304,4 +301,5 @@ module AnnotationTable =
         | PasteCaseUserInput of PasteCases
         /// 👀 Uses CellCoordinate to identify if clicked cell is part of selected range
         | MoveColumn of uiTableIndex: CellCoordinate * arcTableIndex: CellCoordinate
+        | Error of string
         | None

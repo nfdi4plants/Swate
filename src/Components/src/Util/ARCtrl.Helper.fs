@@ -456,6 +456,7 @@ module Extensions =
 
     type ArcTable with
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
+
             SanityChecks.validateColumn
             <| CompositeColumn.create (this.Headers.[columnIndex], [| cell |])
 
@@ -611,7 +612,14 @@ module Extensions =
             if header.IsSome then
                 let header = header.Value
 
+                let isNumber (input: string) =
+                    let success, _ = System.Double.TryParse(input)
+                    success
+
                 match content with
+                | [| value |] when header.IsTermColumn && isNumber value ->
+                    CompositeCell.createUnitizedFromString (value)
+                    |> _.ConvertToValidCell(header)
                 | [| freetext |] when header.IsSingleColumn -> CompositeCell.createFreeText freetext
                 | [| freetext |] -> CompositeCell.createFreeText freetext |> _.ConvertToValidCell(header)
                 | [| name; tsr; tan |] when header.IsTermColumn -> CompositeCell.createTermFromString (name, tsr, tan)
@@ -661,46 +669,6 @@ module Extensions =
                 termIndices |> Array.filter (fun item -> item > -1), expectedLength |> Array.sum
 
             termIndices, lengthWithoutTerms
-
-        static member fromTableStr(content: string[], headers: CompositeHeader[]) =
-
-            let termIndices, expectedLength = CompositeCell.getHeaderParsingInfo (headers)
-            let expectedTermLength = expectedLength + (3 * termIndices.Length)
-            let expectedUnitLength = expectedLength + (4 * termIndices.Length)
-
-            printfn "expectedTermLength: %i" expectedTermLength
-            printfn "expectedUnitLength: %i" expectedUnitLength
-
-            let allTerm = content.Length = expectedTermLength
-            let allUnit = content.Length = expectedUnitLength
-
-            let parseRow (row: string[]) (headers: CompositeHeader[]) =
-                let rec loop index result =
-                    if index >= headers.Length then
-                        result |> List.rev |> Array.ofList
-                    else
-                        let header = headers.[index]
-
-                        match header with
-                        | x when x.IsSingleColumn ->
-                            let cell = CompositeCell.fromContentValid ([| row.[index] |], header)
-                            loop (index + 1) (cell :: result)
-                        | x when x.IsDataColumn ->
-                            let content = Array.sub row index 4
-                            let cell = CompositeCell.fromContentValid (content, header)
-                            loop (index + 4) (cell :: result)
-                        | x when x.IsTermColumn && allTerm ->
-                            let content = Array.sub row index 3
-                            let cell = CompositeCell.fromContentValid (content, header)
-                            loop (index + 3) (cell :: result)
-                        | x when x.IsTermColumn && allUnit ->
-                            let content = Array.sub row index 4
-                            let cell = CompositeCell.fromContentValid (content, header)
-                            loop (index + 4) (cell :: result)
-
-                loop 0 []
-
-            parseRow content headers
 
         static member ToTabTxt(cells: CompositeCell[]) =
             cells

@@ -68,7 +68,6 @@ type ArcTable with
             headerRange.load (U2.Case2(ResizeArray [| "values" |])) |> ignore
             bodyRowRange.load (U2.Case2(ResizeArray [| "values" |])) |> ignore
 
-
         return!
             context
                 .sync()

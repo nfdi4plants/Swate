@@ -32,6 +32,7 @@
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
+    <Compile Include="GenericComponents\ErrorBaseModal.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
