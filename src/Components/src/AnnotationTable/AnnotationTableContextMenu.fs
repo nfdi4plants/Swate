@@ -158,8 +158,8 @@ type AnnotationTableContextMenuUtil =
                     sizes
                     |> List.sortDescending
                     |> List.choose (fun size ->
-                        let actualSize = 
-                            if index + size <= cell.Length then size 
+                        let actualSize =
+                            if index + size <= cell.Length then size
                             elif index < cell.Length then cell.Length - index
                             else 0
                         if actualSize > 0 then
