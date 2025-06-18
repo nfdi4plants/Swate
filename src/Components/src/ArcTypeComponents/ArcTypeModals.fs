@@ -86,7 +86,7 @@ type private FooterButtons =
 
         //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
         Html.button [
-            prop.className "swt:btn swt:bg-neutral-content swt:btn-outline"
+            prop.className "swt:btn swt:bg-neutral-content swt:btn-outline swt:ml-auto"
             prop.text "Ok"
             prop.onClick (fun _ -> rmv ())
         ]
@@ -539,28 +539,23 @@ type ContextMenuModals =
             footer = footer
         )
 
-type ErrorModal =
-    static member DisplayError (
+    [<ReactComponent>]
+    static member ErrorModal (
         exn:string,
         setModal: AnnotationTable.ModalTypes -> unit,
-        tableRef: IRefValue<TableHandle>) =
+        tableRef: IRefValue<TableHandle>
+        ) =
 
         let rmv =
             fun _ ->
                 tableRef.current.focus ()
                 setModal AnnotationTable.ModalTypes.None
 
-        BaseModal.BaseModal(
+        ErrorBaseModal.ErrorBaseModal(
             (fun _ -> rmv ()),
-            modalClassInfo = "swt:border-2 swt:bg-error",
-            header = Html.div "An error occured!",
-            content =
-                React.fragment [
-                    Html.text exn
-                ],
+            exn,
             footer =
                 React.fragment [
                     FooterButtons.Ok(rmv)
-                ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+                ]
         )

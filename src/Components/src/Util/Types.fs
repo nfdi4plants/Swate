@@ -290,11 +290,6 @@ module AnnotationTableContextMenu =
                 data: CompositeCell[][]
                 coordinates: CellCoordinate [][]
             |}
-        | PasteFittedColumns of
-            {|
-                data: CompositeCell[][]
-                coordinates: CellCoordinate[][]
-            |}
 
 module AnnotationTable =
 

@@ -98,7 +98,7 @@ type TestCases =
             && pasteData.[0].Length >= termIndices.Length + lengthWithoutTerms then
             Expect.equal
                 pasteBehavior
-                (PasteCases.PasteFittedColumns {|
+                (PasteCases.PasteColumns {|
                     data = compositeCells
                     coordinates = cellCoordinates
                 |})
@@ -146,7 +146,7 @@ type TestCases =
 
             Expect.equal
                 pasteBehavior
-                (PasteCases.PasteFittedColumns {|
+                (PasteCases.PasteColumns {|
                     data = fittedCells
                     coordinates = cellCoordinates
                 |})

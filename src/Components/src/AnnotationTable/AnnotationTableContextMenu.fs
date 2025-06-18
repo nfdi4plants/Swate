@@ -224,7 +224,7 @@ type AnnotationTableContextMenuUtil =
                 data = compositeColumns
                 columnIndex = cellIndex.x
             |}
-        else if selectHandle.getCount () > 1 then
+        else
 
             //Group all cells based on their row
             let groupedCellCoordinates =
@@ -233,42 +233,15 @@ type AnnotationTableContextMenuUtil =
                 |> Array.groupBy (fun item -> item.y)
                 |> Array.map (fun (_, row) -> row)
 
-            let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo(headers)
-
-            if
-                termIndices.Length > 0
-                && data.[0].Length >= termIndices.Length + lengthWithoutTerms
-            then
-                let fittedCells =
-                    AnnotationTableContextMenuUtil.getFittedCells(
-                        data,
-                        headers
-                    )
-
-                PasteCases.PasteFittedColumns {|
-                    data = fittedCells
-                    coordinates = groupedCellCoordinates
-                |}
-            else
-                //Converts the cells of each row
-                let fittedCells =
-                    AnnotationTableContextMenuUtil.getFittedCells(
-                        data,
-                        headers)
-
-                PasteCases.PasteColumns {|
-                    data = fittedCells
-                    coordinates = groupedCellCoordinates
-                |}
-        else
             let fittedCells =
                 AnnotationTableContextMenuUtil.getFittedCells(
-                    [|data.[0]|],
-                    headers)
+                    data,
+                    headers
+                )
 
             PasteCases.PasteColumns {|
                 data = fittedCells
-                coordinates = [|[|cellCoordinates.[0]|]|]
+                coordinates = groupedCellCoordinates
             |}
 
     //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
@@ -335,14 +308,6 @@ type AnnotationTableContextMenuUtil =
         | PasteColumns pasteColumns ->
             AnnotationTableContextMenuUtil.pasteDefault (
                 pasteColumns,
-                coordinate,
-                table,
-                selectHandle,
-                setTable
-            )
-        | PasteFittedColumns fittedColumns ->
-            AnnotationTableContextMenuUtil.pasteDefault (
-                fittedColumns,
                 coordinate,
                 table,
                 selectHandle,
@@ -422,7 +387,7 @@ type AnnotationTableContextMenu =
                             //let coordinate = c.spawnData |> unbox<CellCoordinate>
 
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
-
+                            
                             try
                                 let prediction =
                                     AnnotationTableContextMenuUtil.predictPasteBehaviour (
