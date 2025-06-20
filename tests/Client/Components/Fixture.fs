@@ -99,6 +99,10 @@ type Fixture =
             [| "SCIEX instrument model"; "MS"; "MS:434343" |]
         |]
 
-    static member Body_Unit_Value_Only = [|
+    static member Body_Integer = [|
             [| "4" |]
+        |]
+
+    static member Body_Empty = [|
+            [| "" |]
         |]
