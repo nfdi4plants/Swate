@@ -127,6 +127,8 @@ type AnnotationTable =
                 ContextMenuModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
             | ModalTypes.Error(exn) ->
                 ContextMenuModals.ErrorModal(exn, setModal, tableRef)
+            | ModalTypes.UnknownPasteCase(Unknown unknownPasteCase) ->
+                ContextMenuModals.UnknownPasteCase(unknownPasteCase.data, unknownPasteCase.headers, setModal, tableRef)
             | anyElse ->
                 console.warn ("Unknown modal type", anyElse)
                 Html.none

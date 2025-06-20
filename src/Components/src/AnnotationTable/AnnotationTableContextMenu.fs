@@ -1,5 +1,6 @@
 namespace Swate.Components
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
 open ARCtrl
@@ -239,10 +240,25 @@ type AnnotationTableContextMenuUtil =
                     headers
                 )
 
-            PasteCases.PasteColumns {|
-                data = fittedCells
-                coordinates = groupedCellCoordinates
-            |}
+            let isEmpty =
+                Array.isEmpty fittedCells ||
+                fittedCells
+                |> Array.map (fun row ->
+                    Array.isEmpty row ||
+                    Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace (cell.ToTabStr())) row
+                )
+                |> Array.contains true
+
+            if isEmpty then
+                PasteCases.Unknown {|
+                    data = data
+                    headers = headers
+                |}
+            else
+                PasteCases.PasteColumns {|
+                    data = fittedCells
+                    coordinates = groupedCellCoordinates
+                |}
 
     //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
     static member getIndex(startIndex, length) =
@@ -301,7 +317,7 @@ type AnnotationTableContextMenuUtil =
         =
 
         match pasteCases with
-        | PasteCases.AddColumns addColumns ->
+        | AddColumns addColumns ->
             setModal (
                 AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
             )
@@ -312,6 +328,10 @@ type AnnotationTableContextMenuUtil =
                 table,
                 selectHandle,
                 setTable
+            )
+        | Unknown unknownPasteCase ->
+            setModal (
+                AnnotationTable.ModalTypes.UnknownPasteCase(PasteCases.Unknown unknownPasteCase)
             )
 
 [<Erase>]
