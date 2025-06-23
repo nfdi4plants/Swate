@@ -55,7 +55,7 @@ module Spreadsheet =
                             (fun newHistory -> Messages.History.UpdateAnd(newHistory, cmd) |> HistoryMsg)
                             (curry GenericError Cmd.none >> DevMsg)
                     else
-                        Cmd.none
+                        cmd
 
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
