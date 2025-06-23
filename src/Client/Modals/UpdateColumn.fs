@@ -111,7 +111,8 @@ type UpdateColumn =
             |> Array.mapi (fun i c ->
                 match suffix with
                 | true -> baseStr + string (i + 1)
-                | false -> baseStr)
+                | false -> baseStr
+            )
             |> setPreview
 
         React.fragment [
@@ -130,7 +131,8 @@ type UpdateColumn =
                             let target = ev.target :?> Browser.Types.HTMLInputElement
                             let value = target.value
                             setBaseStr value
-                            updateCells value suffix)
+                            updateCells value suffix
+                        )
                     ]
                     //Daisy.label [
                     Html.label [
@@ -143,7 +145,8 @@ type UpdateColumn =
                                 prop.isChecked suffix
                                 prop.onChange (fun (b: bool) ->
                                     setSuffix b
-                                    updateCells baseStr b)
+                                    updateCells baseStr b
+                                )
                             ]
                         ]
                     ]
@@ -156,6 +159,7 @@ type UpdateColumn =
         let replacement, setReplacement = React.useState ("")
 
         let updateCells (replacement: string) (regex: string) =
+
             if regex <> "" then
                 try
                     let regex = Regex(regex)
@@ -166,9 +170,15 @@ type UpdateColumn =
 
                         match m.Success with
                         | true ->
-                            let replaced = c.Replace(m.Value, replacement)
+
+                            let replaced =
+                                let front = c.[.. m.Index - 1]
+                                let tail = c.[m.Index + m.Length ..]
+                                front + replacement + tail
+
                             replaced
-                        | false -> c)
+                        | false -> c
+                    )
                     |> setPreview
                 with _ ->
                     ()
@@ -189,11 +199,10 @@ type UpdateColumn =
                             prop.autoFocus true
                             prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
                             prop.valueOrDefault regex
-                            prop.onChange (fun (ev: Browser.Types.Event) ->
-                                let target = ev.target :?> Browser.Types.HTMLInputElement
-                                let value = target.value
-                                setRegex value
-                                updateCells replacement value)
+                            prop.onChange (fun (v: string) ->
+                                setRegex v
+                                updateCells replacement v
+                            )
                         ]
                         //Daisy.fieldsetLabel "Replacement"
                         Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Replacement" ]
@@ -205,7 +214,8 @@ type UpdateColumn =
                                 let target = ev.target :?> Browser.Types.HTMLInputElement
                                 let value = target.value
                                 setReplacement value
-                                updateCells value regex)
+                                updateCells value regex
+                            )
                         ]
                     ]
                 ]
@@ -275,7 +285,8 @@ type UpdateColumn =
                         prop.text "Submit"
                         prop.onClick (fun e ->
                             submit ()
-                            rmv e)
+                            rmv e
+                        )
                     ]
                 ]
             ]
