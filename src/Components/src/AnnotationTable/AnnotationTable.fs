@@ -52,7 +52,8 @@ type AnnotationTable =
                         index.x,
                         arcTable,
                         setArcTable,
-                        tableRef.current.SelectHandle
+                        tableRef.current.SelectHandle,
+                        setModal
                     )
                 else // standard cell
                     AnnotationTableContextMenu.CompositeCellContent(

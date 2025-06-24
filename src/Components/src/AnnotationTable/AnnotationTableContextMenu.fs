@@ -489,9 +489,17 @@ type AnnotationTableContextMenu =
         ]
 
     static member CompositeHeaderContent
-        (index: int, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle)
+        (index: int, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle, setModal: Types.AnnotationTable.ModalTypes -> unit)
         =
+        let cellCoordinate : CellCoordinate = {| y = 1; x = index |}
         [
+            ContextMenuItem(
+                Html.div "Edit",
+                icon = ATCMC.Icon "fa-solid fa-pen-to-square",
+                kbdbutton = ATCMC.KbdHint("E"),
+                onClick = fun _ -> AnnotationTable.ModalTypes.Edit cellCoordinate |> setModal
+            )
+            ContextMenuItem(isDivider = true)
             ContextMenuItem(
                 Html.div "Delete Column",
                 icon = ATCMC.Icon "fa-solid fa-delete-left fa-rotate-270",
@@ -502,6 +510,15 @@ type AnnotationTableContextMenu =
 
                         AnnotationTableContextMenuUtil.deleteColumn (cc, index, table, selectHandle)
                         |> setTable
+            )
+            ContextMenuItem(
+                Html.div "Move Column",
+                icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
+                kbdbutton = ATCMC.KbdHint("MC"),
+                onClick =
+                    fun c ->
+                        let cc = c.spawnData |> unbox<CellCoordinate>
+                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, cc))
             )
         ]
 
