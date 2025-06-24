@@ -156,7 +156,7 @@ type CreateColumnModal =
             ]
 
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:h-full swt:gap-4"
+            prop.className "swt:flex swt:flex-col swt:h-full swt:gap-4 swt:min-h-[500px]"
             prop.children [
                 Html.div [
                     prop.className "swt:border-b swt:pb-2 swt:mb-2"

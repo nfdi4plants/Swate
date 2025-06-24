@@ -274,6 +274,7 @@ type EditColumnModal =
                 ]
                 Html.button [
                     prop.className "swt:btn swt:btn-primary"
+                    prop.style [ style.marginLeft length.auto ]
                     prop.text "Submit"
                     prop.onClick (fun _ -> submit ())
                 ]
@@ -287,7 +288,7 @@ type EditColumnModal =
         let state, setState = React.useState (State.init column.Header.AsDiscriminate)
 
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:h-full swt:gap-4"
+            prop.className "swt:flex swt:flex-col swt:h-full swt:gap-4 swt:min-h-[500px]"
             prop.children [
                 Html.div [
                     prop.className "swt:border-b swt:pb-2 swt:mb-2"
