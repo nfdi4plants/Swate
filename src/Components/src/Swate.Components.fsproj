@@ -38,7 +38,7 @@
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
-    <Compile Include="ArcTypeComponents\ArcTypeEditModal.fs" />
+    <Compile Include="ArcTypeComponents\ArcTypeTransformModal.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />

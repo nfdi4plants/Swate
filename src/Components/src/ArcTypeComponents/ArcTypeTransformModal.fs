@@ -181,15 +181,15 @@ type CompositeCellEditModal =
         let tHeaders =
             [|
                 Html.th (header.ToString())
-                Html.th ("FilePath")
                 Html.th ("Selector")
-                Html.th ("SelectorFormat")
+                Html.th ("Format")
+                Html.th ("Selector Format")
             |]
         let tBody =
             [|
                 Html.td ($"{data.Name}")
-                Html.td ($"{data.FilePath}")
                 Html.td ($"{data.Selector}")
+                Html.td ($"{data.Format}")
                 Html.td ($"{data.SelectorFormat}")
             |]
 
