@@ -113,6 +113,48 @@ type AnnotationTable =
                         ),
                         header
                     )
+            | ModalTypes.Transform cc ->
+                if cc.x = 0 then // no details modal for index col
+                    Html.none
+                elif cc.y = 0 then // headers
+                    let header = arcTable.Headers.[cc.x - 1]
+                    Html.none
+                else
+                    let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+
+                    let setCell =
+                        fun (cell: CompositeCell) ->
+                            arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                            setArcTable arcTable
+
+                    let header = arcTable.Headers.[cc.x - 1]
+
+                    CompositeCellEditModal.CompositeCellTransformModal(
+                        cell,
+                        header,
+                        setCell,
+                        (fun _ ->
+                            tableRef.current.focus ()
+                            setModal ModalTypes.None
+                        ),
+                        header
+                    )
+            | ModalTypes.Edit cc ->
+                if cc.x = 0 then // no details modal for index col
+                    Html.none
+                elif cc.y = 0 then // headers
+                    let header = arcTable.Headers.[cc.x - 1]
+                    Html.none
+                else
+                    let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+
+                    let setCell =
+                        fun (cell: CompositeCell) ->
+                            arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                            setArcTable arcTable
+
+                    let header = arcTable.Headers.[cc.x - 1]
+                    Html.none
             | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
                 ContextMenuModals.MoveColumnModal(
                     arcTable,
@@ -256,14 +298,6 @@ type AnnotationTable =
         )
 
         arcTable.AddColumn(
-            CompositeHeader.Output IOType.Sample,
-            [|
-                for i in 0..100 do
-                    CompositeCell.createFreeText $"Sample {i}"
-            |]
-        )
-
-        arcTable.AddColumn(
             CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")),
             [|
                 for i in 0..100 do
@@ -276,6 +310,15 @@ type AnnotationTable =
             [|
                 for i in 0..100 do
                     CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
+            |]
+        )
+
+        arcTable.AddColumn(
+            CompositeHeader.Output IOType.Data,
+            [|
+                for i in 0..100 do
+                    let newData = Data.create(string i, $"Sample {i}", DataFile.RawDataFile, "Some Format", $"Selector Format {i}", ResizeArray[Comment.create("Test", string i)])
+                    CompositeCell.createData(newData)
             |]
         )
 

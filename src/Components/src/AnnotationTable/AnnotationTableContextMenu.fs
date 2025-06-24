@@ -282,6 +282,10 @@ type AnnotationTableContextMenuUtil =
                     let _, targetUnit = targetCell.AsUnitized
                     let newTarget = CompositeCell.createUnitized(value, targetUnit)
                     newTarget
+                elif targetCell.isTerm && unit.isEmpty() then
+                    let targetTerm = targetCell.AsTerm
+                    let newTarget = CompositeCell.createUnitized(value, targetTerm)
+                    newTarget
                 else
                     currentCell
             else
@@ -345,15 +349,36 @@ type AnnotationTableContextMenu =
             setModal: Types.AnnotationTable.ModalTypes -> unit
         ) =
         let cellIndex = {| x = index.x - 1; y = index.y - 1 |}
+        let cell = arcTable.GetCellAt(cellIndex.x, cellIndex.y)
+        let header = arcTable.GetColumn(cellIndex.x).Header
 
+        let transformName =
+            match cell with
+            | CompositeCell.Term _ -> "Transform to Unit"
+            | CompositeCell.Unitized _ -> "Transform to Term"
+            | CompositeCell.Data _ -> "Transform to Text"
+            | CompositeCell.FreeText _ ->
+                if header.IsDataColumn then "Transform to Text"
+                else ""
         [
             ContextMenuItem(
                 Html.div "Details",
                 icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
                 kbdbutton = ATCMC.KbdHint("D"),
-                onClick = fun c -> AnnotationTable.ModalTypes.Details index |> setModal
+                onClick = fun _ -> AnnotationTable.ModalTypes.Details index |> setModal
             )
-            ContextMenuItem(Html.div "Fill Column", icon = ATCMC.Icon "fa-solid fa-pen", kbdbutton = ATCMC.KbdHint("F"))
+            ContextMenuItem(
+                Html.div "Fill Column",
+                icon = ATCMC.Icon "fa-solid fa-pen",
+                kbdbutton = ATCMC.KbdHint("F")
+            )
+            if not (String.IsNullOrWhiteSpace(transformName)) then
+                ContextMenuItem(
+                    Html.div transformName,
+                    icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
+                    kbdbutton = ATCMC.KbdHint("T"),
+                    onClick = fun _ -> AnnotationTable.ModalTypes.Transform index |> setModal
+                )
             ContextMenuItem(
                 Html.div "Edit",
                 icon = ATCMC.Icon "fa-solid fa-pen-to-square",
@@ -376,9 +401,7 @@ type AnnotationTableContextMenu =
                 icon = ATCMC.Icon "fa-solid fa-copy",
                 kbdbutton = ATCMC.KbdHint("C"),
                 onClick =
-                    fun c ->
-                        let cc = c.spawnData |> unbox<CellCoordinate>
-
+                    fun _ ->
                         AnnotationTableContextMenuUtil.copy (cellIndex, arcTable, selectHandle)
                         |> Promise.start
 
@@ -402,7 +425,7 @@ type AnnotationTableContextMenu =
                 icon = ATCMC.Icon "fa-solid fa-paste",
                 kbdbutton = ATCMC.KbdHint("V"),
                 onClick =
-                    fun c ->
+                    fun _ ->
                         promise {
                             //let coordinate = c.spawnData |> unbox<CellCoordinate>
 

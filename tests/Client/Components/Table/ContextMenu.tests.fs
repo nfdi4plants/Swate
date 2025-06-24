@@ -101,7 +101,7 @@ type TestCases =
 
     static member AddFittingTerm (startColumn:int, startRow:int, pasteData:string[][]) =
         let currentTable = Fixture.mkTable ()
-        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 4, 4)
+        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 3, 3)
         let cellCoordinates = Fixture.getRangeOfSelectedCells(selectHandle)
 
         let headers =
@@ -208,6 +208,9 @@ let Main =
                 <| fun _ ->
                     TestCases.AddFittingTerm(0, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
             testCase $"Add unit value"
+                <| fun _ ->
+                    TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer)
+            testCase $"Convert term to unit"
                 <| fun _ ->
                     TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer)
             testCase $"Add unknown value"

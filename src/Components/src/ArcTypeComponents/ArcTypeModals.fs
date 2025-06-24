@@ -9,6 +9,7 @@ open Swate.Components.Shared
 open Fable.Core
 open Browser.Types
 
+
 module private ArcTypeModalsUtil =
     let inputKeydownHandler =
         fun (e: KeyboardEvent) submit cancel ->
@@ -24,7 +25,7 @@ module private ArcTypeModalsUtil =
                 cancel ()
             | _ -> ()
 
-type private InputField =
+type InputField =
     static member Input(v: string, setter: string -> unit, label: string, rmv, submit, ?autofocus: bool) =
         let autofocus = defaultArg autofocus false
 
@@ -72,7 +73,7 @@ type private InputField =
             ]
         ]
 
-type private FooterButtons =
+type FooterButtons =
     static member Cancel(rmv: unit -> unit) =
 
         //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
