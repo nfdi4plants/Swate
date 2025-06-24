@@ -16,11 +16,11 @@ type EditConfig =
             Html.div [
                 prop.children [
                     Html.div [
-                        Html.text $"Transform the existing cell type into {targetType} and adapt the values as depicted on submit."
-                        Html.div [
-                            Html.text "Preview:"
+                        prop.className "swt:flex swt:flex-col swt:gap-2"
+                        prop.children [
+                            Html.small $"Transform the existing cell type into {targetType} and adapt the values as depicted on submit."
                             Html.div [
-                                prop.className "swt:overflow-x-auto"
+                                prop.className "swt:overflow-x-auto swt:border swt:border-base-content/5"
                                 prop.children [
                                     Html.table [
                                         prop.className "swt:table swt:table-xs"
@@ -198,7 +198,7 @@ type CompositeCellEditModal =
             header = Html.div "Text to Data",
             content =
                 React.fragment [
-                    EditConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Text)
+                    EditConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Data)
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride

@@ -358,7 +358,7 @@ type AnnotationTableContextMenu =
             | CompositeCell.Unitized _ -> "Transform to Term"
             | CompositeCell.Data _ -> "Transform to Text"
             | CompositeCell.FreeText _ ->
-                if header.IsDataColumn then "Transform to Text"
+                if header.IsDataColumn then "Transform to Data"
                 else ""
         [
             ContextMenuItem(
