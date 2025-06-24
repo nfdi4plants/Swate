@@ -532,7 +532,7 @@ type ContextMenuModals =
 
     [<ReactComponent>]
     static member ErrorModal (
-        exn:string,
+        exn: string,
         setModal: AnnotationTable.ModalTypes -> unit,
         tableRef: IRefValue<TableHandle>
         ) =
@@ -545,4 +545,33 @@ type ContextMenuModals =
         ErrorBaseModal.ErrorBaseModal(
             (fun _ -> rmv ()),
             exn
+        )
+
+    [<ReactComponent>]
+    static member UnknownPasteCase (
+        data: string [] [],
+        headers: CompositeHeader [],
+        setModal: AnnotationTable.ModalTypes -> unit,
+        tableRef: IRefValue<TableHandle>
+        ) =
+
+        let rmv =
+            fun _ ->
+                tableRef.current.focus ()
+                setModal AnnotationTable.ModalTypes.None
+
+        let sHeaders = headers |> Array.map (fun header -> header.ToString())
+
+        let msg =
+            [|
+                $"We cannot determine the paste case for the data in combination with the selected headers."
+                $"data: {data}"
+                $"headers: {sHeaders}"
+                "Please, create an Issue on Github and provide the data and headers!"
+            |]
+            |> String.concat System.Environment.NewLine
+
+        ErrorBaseModal.ErrorBaseModal(
+            (fun _ -> rmv ()),
+            msg
         )
