@@ -230,20 +230,3 @@ type CompositeCellEditModal =
                 CompositeCellEditModal.FreeTextToData(compositeCell, header, setData, rmv)
             else
                 Html.none
-        | _ -> Html.none
-        //| CompositeCell.Unitized(v, oa) ->
-        //    let setUnitized = fun v oa -> setCell (CompositeCell.Unitized(v, oa))
-
-        //    CompositeCellEditModal.UnitizedModal(
-        //        v,
-        //        oa,
-        //        setUnitized,
-        //        rmv,
-        //        ?relevantCompositeHeader = relevantCompositeHeader
-        //    )
-        //| CompositeCell.FreeText v ->
-        //    let setV = fun v -> setCell (CompositeCell.FreeText v)
-        //    CompositeCellEditModal.FreeTextModal(v, setV, rmv, ?relevantCompositeHeader = relevantCompositeHeader)
-        //| CompositeCell.Data v ->
-        //    let setData = fun v -> setCell (CompositeCell.Data v)
-        //    CompositeCellEditModal.DataModal(v, setData, rmv, ?relevantCompositeHeader = relevantCompositeHeader)
