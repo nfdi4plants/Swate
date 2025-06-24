@@ -368,6 +368,12 @@ type AnnotationTableContextMenu =
                 onClick = fun _ -> AnnotationTable.ModalTypes.Details index |> setModal
             )
             ContextMenuItem(
+                Html.div "Edit",
+                icon = ATCMC.Icon "fa-solid fa-pen-to-square",
+                kbdbutton = ATCMC.KbdHint("E"),
+                onClick = fun _ -> AnnotationTable.ModalTypes.Edit index |> setModal
+            )
+            ContextMenuItem(
                 Html.div "Fill Column",
                 icon = ATCMC.Icon "fa-solid fa-pen",
                 kbdbutton = ATCMC.KbdHint("F")
@@ -379,11 +385,6 @@ type AnnotationTableContextMenu =
                     kbdbutton = ATCMC.KbdHint("T"),
                     onClick = fun _ -> AnnotationTable.ModalTypes.Transform index |> setModal
                 )
-            ContextMenuItem(
-                Html.div "Edit",
-                icon = ATCMC.Icon "fa-solid fa-pen-to-square",
-                kbdbutton = ATCMC.KbdHint("E")
-            )
             ContextMenuItem(
                 Html.div "Clear",
                 icon = ATCMC.Icon "fa-solid fa-eraser",
@@ -427,8 +428,6 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun _ ->
                         promise {
-                            //let coordinate = c.spawnData |> unbox<CellCoordinate>
-
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
                             
                             try

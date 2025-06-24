@@ -37,6 +37,10 @@
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
+    <Compile Include="ArcTypeComponents\CreateColumnModal.fs" />
+    <Compile Include="ArcTypeComponents\UpdateColumnModal.fs" />
+    <Compile Include="ArcTypeComponents\EditColumnModal.fs" />
+    <Compile Include="ArcTypeComponents\ArcTypeEditModal.fs" />
     <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
     <Compile Include="ArcTypeComponents\ArcTypeTransformModal.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />

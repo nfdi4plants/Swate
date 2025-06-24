@@ -85,6 +85,12 @@ type AnnotationTable =
     static member private ModalController
         (arcTable: ArcTable, setArcTable, modal: AnnotationTable.ModalTypes, setModal, tableRef: IRefValue<TableHandle>)
         =
+
+        let rmv =
+            fun _ ->
+                tableRef.current.focus ()
+                setModal ModalTypes.None
+
         React.fragment [
             match modal with
             | ModalTypes.None -> Html.none
@@ -107,10 +113,7 @@ type AnnotationTable =
                     CompositeCellModal.CompositeCellModal(
                         cell,
                         setCell,
-                        (fun _ ->
-                            tableRef.current.focus ()
-                            setModal ModalTypes.None
-                        ),
+                        rmv,
                         header
                     )
             | ModalTypes.Transform cc ->
@@ -133,11 +136,7 @@ type AnnotationTable =
                         cell,
                         header,
                         setCell,
-                        (fun _ ->
-                            tableRef.current.focus ()
-                            setModal ModalTypes.None
-                        ),
-                        header
+                        rmv
                     )
             | ModalTypes.Edit cc ->
                 if cc.x = 0 then // no details modal for index col
@@ -146,15 +145,8 @@ type AnnotationTable =
                     let header = arcTable.Headers.[cc.x - 1]
                     Html.none
                 else
-                    let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv)
 
-                    let setCell =
-                        fun (cell: CompositeCell) ->
-                            arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
-                            setArcTable arcTable
-
-                    let header = arcTable.Headers.[cc.x - 1]
-                    Html.none
             | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
                 ContextMenuModals.MoveColumnModal(
                     arcTable,

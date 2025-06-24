@@ -9,7 +9,7 @@ open Swate.Components.Shared
 open Fable.Core
 
 
-type EditConfig =
+type TransformConfig =
 
     static member ConvertCellType (tHeaders: ReactElement[], tBody: ReactElement[], targetType: CompositeCellDiscriminate) =
         Html.div [
@@ -88,7 +88,7 @@ type CompositeCellEditModal =
             header = Html.div "Term to Unit",
             content =
                 React.fragment [
-                    EditConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Unitized)
+                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Unitized)
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
@@ -125,7 +125,7 @@ type CompositeCellEditModal =
             header = Html.div "Unit to Term",
             content =
                 React.fragment [
-                    EditConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Term)
+                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Term)
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
@@ -159,7 +159,7 @@ type CompositeCellEditModal =
             header = Html.div "Data to Text",
             content =
                 React.fragment [
-                    EditConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Text)
+                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Text)
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
@@ -198,7 +198,7 @@ type CompositeCellEditModal =
             header = Html.div "Text to Data",
             content =
                 React.fragment [
-                    EditConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Data)
+                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Data)
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
@@ -210,8 +210,7 @@ type CompositeCellEditModal =
             compositeCell: CompositeCell,
             header: CompositeHeader,
             setCell: CompositeCell -> unit,
-            rmv: unit -> unit,
-            ?relevantCompositeHeader: CompositeHeader
+            rmv: unit -> unit
         ) =
 
         match compositeCell with
@@ -224,7 +223,7 @@ type CompositeCellEditModal =
         | CompositeCell.Data _ ->
             let setText = fun text -> setCell (CompositeCell.FreeText text)
             CompositeCellEditModal.DataToFreeText(compositeCell, header, setText, rmv)
-        | CompositeCell.FreeText text ->
+        | CompositeCell.FreeText _ ->
             if header.IsDataColumn then
                 let setData = fun (data: Data) -> setCell (CompositeCell.Data data)
                 CompositeCellEditModal.FreeTextToData(compositeCell, header, setData, rmv)

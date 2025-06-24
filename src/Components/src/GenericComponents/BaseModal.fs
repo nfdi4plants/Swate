@@ -99,7 +99,7 @@ type BaseModal =
                                 prop.className (
                                     match contentClassInfo with
                                     | Some cls -> cls
-                                    | None -> "swt:overflow-y-auto swt:space-y-2 swt:py-2"
+                                    | None ->"swt:space-y-2 swt:py-2"
                                 )
                                 prop.children content.Value
                             ]
