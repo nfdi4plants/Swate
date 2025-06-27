@@ -89,7 +89,8 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
             isDisabled = model.SpreadsheetModel.ArcFile.IsNone
         )
         match model.PersistentStorageState.Host with
-        | Some Swatehost.Browser ->
+        | Some Swatehost.Browser
+        | Some Swatehost.ARCitect ->
             QuickAccessButton.QuickAccessButton(
                 "Reset",
                 Icons.Delete(),
