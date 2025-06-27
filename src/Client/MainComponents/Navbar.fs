@@ -96,7 +96,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
 
             NavbarBurger.Main(model, dispatch)
         | Some Swatehost.ARCitect ->
-            if autoSaveConfig.IsSome && autoSaveConfig.Value then
+            if autoSaveConfig.IsSome && not autoSaveConfig.Value then
                 QuickAccessButton.QuickAccessButton(
                     "Save",
                     Icons.Save(),
