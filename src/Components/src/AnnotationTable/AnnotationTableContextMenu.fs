@@ -462,7 +462,6 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-
                         AnnotationTableContextMenuUtil.deleteRow (cc, cellIndex.y, arcTable, selectHandle)
                         |> setArcTable
             )
@@ -473,7 +472,6 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-
                         AnnotationTableContextMenuUtil.deleteColumn (cc, cellIndex.x, arcTable, selectHandle)
                         |> setArcTable
             )
@@ -489,10 +487,16 @@ type AnnotationTableContextMenu =
         ]
 
     static member CompositeHeaderContent
-        (index: int, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle, setModal: Types.AnnotationTable.ModalTypes -> unit)
+        (columnIndex: int, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle, setModal: Types.AnnotationTable.ModalTypes -> unit)
         =
-        let cellCoordinate : CellCoordinate = {| y = 1; x = index |}
+        let cellCoordinate : CellCoordinate = {| y = 0; x = columnIndex |}
         [
+            ContextMenuItem(
+                Html.div "Details",
+                icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
+                kbdbutton = ATCMC.KbdHint("D"),
+                onClick = fun _ -> AnnotationTable.ModalTypes.Details cellCoordinate |> setModal
+            )
             ContextMenuItem(
                 Html.div "Edit",
                 icon = ATCMC.Icon "fa-solid fa-pen-to-square",
@@ -508,7 +512,7 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteColumn (cc, index, table, selectHandle)
+                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex, table, selectHandle)
                         |> setTable
             )
             ContextMenuItem(

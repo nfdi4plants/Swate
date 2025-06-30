@@ -100,7 +100,27 @@ type AnnotationTable =
                     Html.none
                 elif cc.y = 0 then // headers
                     let header = arcTable.Headers.[cc.x - 1]
-                    Html.none
+
+                    let setHeader = 
+                        fun (newHeader: CompositeHeader) ->
+                            try
+                                arcTable.UpdateHeader(cc.x - 1, newHeader)
+                                setArcTable arcTable
+                            with exn ->
+                                let exnMessage =
+                                    if exn.Message.StartsWith("Tried setting header for column with invalid type of cells.") then
+                                        "Your change does not work with Details. Use \"Edit\" instead."
+                                    else
+                                        exn.Message
+                                setModal (ModalTypes.Error exnMessage)
+                                failwith exn.Message
+
+                    CompositeCellModal.CompositeHeaderModal(
+                        header,
+                        setHeader,
+                        rmv
+                    )
+
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
 
@@ -121,8 +141,21 @@ type AnnotationTable =
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
+                    let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+
+                    let setCell =
+                        fun (cell: CompositeCell) ->
+                            arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                            setArcTable arcTable
+
                     let header = arcTable.Headers.[cc.x - 1]
-                    Html.none
+
+                    CompositeCellEditModal.CompositeCellTransformModal(
+                        cell,
+                        header,
+                        setCell,
+                        rmv
+                    )
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
 
@@ -143,11 +176,9 @@ type AnnotationTable =
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
-                    let header = arcTable.Headers.[cc.x - 1]
-                    Html.none
+                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv)
                 else
                     EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv)
-
             | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
                 ContextMenuModals.MoveColumnModal(
                     arcTable,

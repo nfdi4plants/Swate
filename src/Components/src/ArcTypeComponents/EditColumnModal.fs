@@ -85,7 +85,7 @@ type EditColumnModal =
     static member Preview(column: CompositeColumn) =
         let parsedStrList =
             ARCtrl.Spreadsheet.CompositeColumn.toStringCellColumns column |> List.transpose
-
+        printfn "parsedStrList: %s" (parsedStrList.ToString())
         let headers, body =
             if column.Cells.Length >= 2 then
                 parsedStrList.[0], parsedStrList.[1..]
