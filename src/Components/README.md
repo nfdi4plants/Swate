@@ -41,3 +41,14 @@
 2. `npm run build` (transpiles with fable, creates tsc types, and bundles with rollup)
 3. (Due to [#701](https://github.com/nfdi4plants/Swate/issues/701)) replace `@layer base` with `@layer swt-base` in `dist/swate-components.css`
 4. `npm publish --access public --tag next` (Use `--tag next` for prerelease)
+
+#### Build cmd
+
+1. go to main branch
+2. ensure latest commit is locally pulled
+3. Open powershell / cmd in swate root
+4. ./build.cmd release pre
+5. Wait for version editting. Write beta.XX where XX is the current beta version
+6. Wait for tests
+7. Confirm force push to nightly
+8. Wait a few minutes and check if gh-actions for release finished successfully: https://github.com/nfdi4plants/Swate/actions
