@@ -21,7 +21,7 @@
   <ItemGroup>
     <PackageReference Include="ARCtrl" Version="2.2.4" />
     <PackageReference Include="Saturn" Version="0.16.1" />
-    <PackageReference Include="Fable.Remoting.Giraffe" Version="5.19.0" />
+    <PackageReference Include="Fable.Remoting.Giraffe" Version="5.24.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
     <PackageReference Include="Neo4j.Driver" Version="5.18.1" />
   </ItemGroup>
