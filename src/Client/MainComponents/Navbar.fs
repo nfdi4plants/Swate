@@ -94,6 +94,18 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                 isDisabled = model.SpreadsheetModel.ArcFile.IsNone
             )
 
+            QuickAccessButton.QuickAccessButton(
+                "Reset",
+                Icons.Delete(),
+                (fun _ ->
+                    Model.ModalState.TableModals.ResetTable
+                    |> Model.ModalState.ModalTypes.TableModal
+                    |> Some
+                    |> Messages.UpdateModal
+                    |> dispatch),
+                color = DaisyUIColors.Error
+            )
+
             NavbarBurger.Main(model, dispatch)
         | Some Swatehost.ARCitect ->
             if autoSaveConfig.IsSome && not autoSaveConfig.Value then
