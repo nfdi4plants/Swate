@@ -35,7 +35,7 @@ type AnnotationTable =
             className = "swt:w-full swt:h-full"
         )
 
-    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal) =
+    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool) =
         ContextMenu.ContextMenu(
             (fun data ->
                 let index = data |> unbox<CellCoordinate>
@@ -80,7 +80,12 @@ type AnnotationTable =
                     | _ ->
                         console.log ("No table cell found")
                         None
-                )
+                ),
+            debug =
+                if debug.IsSome then
+                    debug.Value
+                else
+                    false
         )
 
     static member private ModalController
@@ -206,7 +211,7 @@ type AnnotationTable =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
-
+        let debug = defaultArg debug false
         let cellRender =
             React.memo (
                 (fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
@@ -247,7 +252,6 @@ type AnnotationTable =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
                         $"{tcc.Index.x}-{tcc.Index.y}"
             )
-
         let renderActiveCell =
             React.memo (
                 (fun (tcc: TableCellController) ->
@@ -266,12 +270,14 @@ type AnnotationTable =
 
         Html.div [
             prop.ref containerRef
+            if debug then
+                prop.testId "annotation_table"
             prop.children [
                 ReactDOM.createPortal ( // Modals
                     AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef),
                     Browser.Dom.document.body
                 )
-                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal)
+                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug)
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,
@@ -304,7 +310,8 @@ type AnnotationTable =
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
                         ),
-                    enableColumnHeaderSelect = true
+                    enableColumnHeaderSelect = true,
+                    debug = debug
                 )
             ]
         ]

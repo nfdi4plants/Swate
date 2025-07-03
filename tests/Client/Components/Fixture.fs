@@ -1,9 +1,18 @@
 namespace Fixture
 
-open Fable.Mocha
 open ARCtrl
 open ARCtrl.Spreadsheet
+
+open Browser.Types
+
 open Swate.Components
+
+open Fable.Mocha
+open Fable.React
+open Fable.React.Props
+open Fable.Core.JsInterop
+
+open Feliz
 
 type Fixture =
 
@@ -51,6 +60,10 @@ type Fixture =
         )
 
         arcTable
+
+    static member BaseCell(rowIndex, columnIndex, data) =
+        let content = Html.div (data.ToString())
+        TableCell.BaseCell(rowIndex, columnIndex, content, debug = true)
 
     static member getRangeOfSelectedCells (selectHande: SelectHandle) =
         selectHande.getSelectedCells ()
@@ -106,3 +119,54 @@ type Fixture =
     static member Body_Empty = [|
             [| "" |]
         |]
+
+    static member AnnotationTable(arcTable, setArcTable) =
+        AnnotationTable.AnnotationTable(arcTable, setArcTable, height = 600, debug = true)
+
+    static member ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal) =
+        ContextMenu.ContextMenu(
+            (fun data ->
+                let index = data |> unbox<CellCoordinate>
+
+                if index.x = 0 then // index col
+                    AnnotationTableContextMenu.IndexColumnContent(
+                        index.y,
+                        arcTable,
+                        setArcTable,
+                        tableRef.current.SelectHandle
+                    )
+                elif index.y = 0 then // header Row
+                    AnnotationTableContextMenu.CompositeHeaderContent(
+                        index.x,
+                        arcTable,
+                        setArcTable,
+                        tableRef.current.SelectHandle,
+                        setModal
+                    )
+                else // standard cell
+                    AnnotationTableContextMenu.CompositeCellContent(
+                        {| x = index.x; y = index.y |},
+                        arcTable,
+                        setArcTable,
+                        tableRef.current.SelectHandle,
+                        setModal
+                    )
+            ),
+            ref = containerRef,
+            onSpawn =
+                (fun e ->
+                    let target = e.target :?> Browser.Types.HTMLElement
+
+                    match target.closest ("[data-row][data-column]"), containerRef.current with
+                    | Some cell, Some container when container.contains (cell) ->
+                        let cell = cell :?> Browser.Types.HTMLElement
+                        let row = int cell?dataset?row
+                        let col = int cell?dataset?column
+                        let indices: CellCoordinate = {| y = row; x = col |}
+                        console.log (indices)
+                        Some indices
+                    | _ ->
+                        console.log ("No table cell found")
+                        None
+                )
+        )

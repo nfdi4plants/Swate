@@ -1,11 +1,19 @@
 module Components.Tests.Table.ContextMenu
 
 open Fable.Mocha
+open Fable.React
+open Fable.React.Props
+open Fable.Core.JsInterop
+open Browser.Types
 open ARCtrl
 open ARCtrl.Spreadsheet
 open Swate.Components
 open AnnotationTableContextMenu
 open Fixture
+open Feliz
+open Types.AnnotationTable
+
+importSideEffects "jsdom-global/register.js"
 
 type TestCases =
     static member AddColumns () =
@@ -137,10 +145,9 @@ type TestCases =
             |})
             "Should predict paste fitted cells behavior"
 
-    static member AddUnknown (pasteData:string[][]) =
+    static member AddUnknownPattern (pasteData:string[][]) =
         let currentTable = Fixture.mkTable ()
         let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 4, 4)
-        let cellCoordinates = Fixture.getRangeOfSelectedCells(selectHandle)
 
         let headers =
             let columnIndices = selectHandle.getSelectedCells() |> Array.ofSeq |> Array.distinctBy (fun item -> item.x)
@@ -161,11 +168,6 @@ type TestCases =
                 selectHandle,
                 adaptedData
             )
-
-        let fittedCells =
-            AnnotationTableContextMenuUtil.getFittedCells(
-                adaptedData,
-                headers)
         Expect.equal
             pasteBehavior
             (PasteCases.Unknown {|
@@ -173,6 +175,57 @@ type TestCases =
                 headers = headers
             |})
             "Should predict paste fitted cells behavior"
+
+    [<ReactComponent>]
+    static member AnnotationTableWrapper() =
+        let arcTable = Fixture.mkTable()
+        let table, setTable = React.useState(arcTable)
+
+        Fixture.AnnotationTable(table, setTable)
+
+    [<ReactComponent>]
+    static member CellWrapper() =
+        Fixture.BaseCell(1, 1, "Test")
+
+    static member AnnotationTableRendering () =
+        let rtl = importAll "@testing-library/react"
+        let element = TestCases.AnnotationTableWrapper()
+        let renderResult = rtl?render(element)
+        let table = renderResult?getByTestId("annotation_table")
+        Expect.isNotNull table "The annotation table should be rendered"
+
+    static member CellRendering () =
+        let rtl = importAll "@testing-library/react"
+        let element = TestCases.CellWrapper()
+        let renderResult = rtl?render(element)
+        let cell = renderResult?getByTestId("cell-1-1")
+        Expect.isNotNull cell "The cell should be rendered"
+
+    static member TableRendering () =
+        let rtl = importAll "@testing-library/react"
+        let element = TestCases.AnnotationTableWrapper()
+        let renderResult = rtl?render(element)
+        let cell = renderResult?getByTestId("virtualized-table")
+        Expect.isNotNull cell "Should get the virtualized table"
+
+    static member CellInTableRendering () =
+        let rtl = importAll "@testing-library/react"
+
+        let element = TestCases.AnnotationTableWrapper()
+        let renderResult = rtl?render(element)
+
+        let cell = renderResult?getByTestId("cell-0-0")
+        Expect.isNotNull cell "Should get the cell in the virtualized table"
+
+    static member ContextMenuRendering () =
+        let rtl = importAll "@testing-library/react"
+        let fireEvent: obj = importMember "@testing-library/react"
+
+        let element = TestCases.AnnotationTableWrapper()
+        let renderResult = rtl?render(element)
+        fireEvent?contextMenu(renderResult) |> ignore
+        let contextMenu = renderResult?queryByTestId("context_menu")
+        Expect.isNotNull contextMenu "The context menu should be rendered after right-click"
 
 let Main =
     testList "Context Menu" [
@@ -215,6 +268,21 @@ let Main =
                     TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer)
             testCase $"Add unknown value"
                 <| fun _ ->
-                    TestCases.AddUnknown(Fixture.Body_Empty)
+                    TestCases.AddUnknownPattern(Fixture.Body_Empty)
+            testCase $"Test render annotation table"
+                <| fun _ ->
+                    TestCases.AnnotationTableRendering()
+            testCase $"Test render cell-1-1"
+                <| fun _ ->
+                    TestCases.CellRendering()
+            testCase $"Test render virtualized table"
+                <| fun _ ->
+                    TestCases.TableRendering()
+            testCase $"Test render cell in virtualized table"
+                <| fun _ ->
+                    TestCases.CellInTableRendering()
+            //testCase $"Test render context menu"
+            //    <| fun _ ->
+            //        TestCases.ContextMenuRendering()
         ]
     ]
