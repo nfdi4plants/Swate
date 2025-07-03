@@ -77,7 +77,66 @@ swt:p-0"""
         let enableColumnHeaderSelect = defaultArg enableColumnHeaderSelect false
         let defaultStyleSelect = defaultArg defaultStyleSelect true
 
-        let scrollContainerRef = React.useElementRef ()
+        let scrollContainerRef = React.useElementRef()
+
+        if debug then
+            React.useEffectOnce((fun () ->
+                match scrollContainerRef.current with
+                | None ->
+                    console.log "None"
+                    ()
+                | Some el ->
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "clientHeight", 
+                      createObj [
+                        "get" ==> (fun () -> 600)
+                        "configurable" ==> true
+                      ])
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "offsetHeight", 
+                      createObj [
+                        "get" ==> (fun () -> 600)
+                        "configurable" ==> true
+                      ])
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "clientWidth", 
+                      createObj [
+                        "get" ==> (fun () -> 1000)
+                        "configurable" ==> true
+                      ])
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "offsetWidth", 
+                      createObj [
+                        "get" ==> (fun () -> 1000)
+                        "configurable" ==> true
+                      ])
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "scrollWidth",
+                      createObj [
+                        "get" ==> (fun () -> 1200)
+                        "configurable" ==> true
+                    ]) |> ignore
+
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "scrollHeight",
+                      createObj [
+                        "get" ==> (fun () -> 1200)
+                        "configurable" ==> true
+                    ]) |> ignore
+
+                    let mutable scrollTopValue = 0
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "scrollTop",
+                      createObj [
+                        "get" ==> (fun () -> scrollTopValue)
+                        "set" ==> (fun (value: int) -> 
+                          scrollTopValue <- value
+                          let ev = Browser.Dom.document.createEvent("Event")
+                          ev.initEvent("scroll", true, true)
+                          scrollContainerRef?dispatchEvent(ev) |> ignore
+                        )
+                        "configurable" ==> true
+                      ])
+            ))
+
+        console.log $"scrollContainerRef.current: {scrollContainerRef.current.IsSome}"
+        if scrollContainerRef.current.IsSome then
+            console.log $"scrollContainerRef.current.value: {scrollContainerRef.current.Value = null}"
+            console.log $"scrollContainerRef.current.value.clientHeight: {scrollContainerRef.current.Value.clientHeight}"
+            console.log $"scrollContainerRef.current.value.clientWidth: {scrollContainerRef.current.Value.clientWidth}"
 
         let rowVirtualizer =
             Virtual.useVirtualizer (
@@ -94,7 +153,7 @@ swt:p-0"""
                         Set.toArray next
                     )
             )
-
+        
         let columnVirtualizer =
             Virtual.useVirtualizer (
                 count = columnCount,
@@ -106,13 +165,7 @@ swt:p-0"""
                 horizontal = true,
                 rangeExtractor =
                     (fun range ->
-                        let next =
-                            set [
-                                0
-
-                                yield! Virtual.defaultRangeExtractor range
-                            ]
-
+                        let next = set [ 0; yield! Virtual.defaultRangeExtractor range ]
                         Set.toArray next
                     )
             )
@@ -225,6 +278,10 @@ swt:p-0"""
                                     GridSelect.selectAt (index, e.shiftKey)
                     )
             )
+        console.log $"rowVirtualizer.getTotalSize (): {rowVirtualizer.getTotalSize ()}"
+        console.log $"columnVirtualizer.getTotalSize (): {columnVirtualizer.getTotalSize ()}"
+        console.log $"rowVirtualizer.getVirtualItems().Length: {rowVirtualizer.getVirtualItems().Length}"
+        console.log $"columnVirtualizer.getVirtualItems().Length: {columnVirtualizer.getVirtualItems().Length}"
 
         React.fragment [
             Html.div [
@@ -235,7 +292,7 @@ swt:p-0"""
                 prop.tabIndex 0
                 prop.style [
                     if height.IsSome then
-                        style.height (height.Value)
+                        style.height height.Value
                 ]
                 prop.className
                     "swt:overflow-auto swt:h-full swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-100"
@@ -263,6 +320,7 @@ swt:p-0"""
                                                 prop.style [ style.height Constants.Table.DefaultRowHeight ]
                                                 prop.children [
                                                     for virtualColumn in columnVirtualizer.getVirtualItems () do
+                                                        console.log $"virtualColumn.start: {virtualColumn.start}"
                                                         let controller =
                                                             createController {| x = virtualColumn.index; y = 0 |}
 
@@ -307,7 +365,8 @@ swt:p-0"""
                                                                         ),
                                                                         className =
                                                                             "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 /
-                                                                            swt:bg-base-200 swt:text-transparent"
+                                                                            swt:bg-base-200 swt:text-transparent",
+                                                                        debug = debug
                                                                     )
                                                                 elif controller.IsActive then
                                                                     renderActiveCell controller

@@ -47,7 +47,8 @@ type ContextMenu =
         (
             childInfo: obj -> ContextMenuItem list,
             ?ref: IRefValue<HTMLElement option>,
-            ?onSpawn: Browser.Types.MouseEvent -> obj option
+            ?onSpawn: Browser.Types.MouseEvent -> obj option,
+            ?debug
         ) =
 
         let (spawnData: obj), setSpawnData = React.useState (null)
@@ -211,6 +212,8 @@ type ContextMenu =
                             children =
                                 Html.div [
                                     prop.ref floating.refs.setFloating
+                                    if debug.IsSome && debug.Value then
+                                        prop.testId "context_menu"
                                     prop.custom ("style", floating.floatingStyles)
                                     for key, v in
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do

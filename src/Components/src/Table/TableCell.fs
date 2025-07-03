@@ -16,7 +16,6 @@ type TableCell =
         (rowIndex: int, columnIndex: int, content: ReactElement, ?className: string, ?props, ?debug: bool)
         =
         let debug = defaultArg debug false
-
         Html.div [
             prop.key $"{rowIndex}-{columnIndex}"
             if debug then
