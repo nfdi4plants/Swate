@@ -177,67 +177,6 @@ type Fixture =
             [| "" |]
         |]
 
-    [<ReactComponent>]
-    static member TestTable (arcTable: ArcTable, rowCount, columnCount) =
-
-        let tableRef = React.useRef<TableHandle> (null)
-
-        let render =
-            React.memo (
-                (fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
-                    TableCell.BaseCell(
-                        tcc.Index.y,
-                        tcc.Index.x,
-                        Html.text (
-                            if tcc.Index.x = 0 then
-                                tcc.Index.y.ToString()
-                            else
-                                $"{tcc.Index.y}-{tcc.Index.x}"
-                        )
-                    )
-                ),
-                withKey =
-                    fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
-                        $"tcc.Index.x-{tcc.Index.x}-tcc.Index.y-{tcc.Index.y}"
-            )
-
-        let renderCell =
-            (fun (tcc: TableCellController) ->
-                let cell =
-                    if tcc.Index.x = 0 then
-                        None
-                    elif tcc.Index.y = 0 then
-                        Some(arcTable.Headers.[tcc.Index.x - 1] |> U2.Case2)
-                    else
-                        Some(arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
-                render (tcc, cell)
-                //Html.div "Test"
-            )
-
-        let renderActiveCell =
-            React.memo (
-                (fun (tcc: TableCellController) ->
-                    let setCell =
-                        fun (cell: CellCoordinate) (cc: CompositeCell) ->
-                            arcTable.SetCellAt(cell.x - 1, cell.y, cc)
-                            //if cell.y > 0 then
-                            //    arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
-                            //else
-                            //    arcTable.SetCellAt(cell.x - 1, cell.y, cc)
-
-                    let cell =
-                        arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y)
-                        //if tcc.Index.y > 0 then
-                        //    arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
-                        //else
-                        //    arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y)
-                    TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index)
-                    //Html.div "Test"
-                )
-            )
-
-        Table.Table(rowCount, columnCount, renderCell, renderActiveCell, tableRef, height = 600, width = 1000, debug = true)
-
     static member AnnotationTable(arcTable, setArcTable) =
         AnnotationTable.AnnotationTable(arcTable, setArcTable, height = 600, debug = true)
 
