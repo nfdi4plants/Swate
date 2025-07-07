@@ -184,6 +184,11 @@ type TestCases =
         Fixture.AnnotationTable(table, setTable)
 
     [<ReactComponent>]
+    static member TableWrapper() =
+        let arcTable = Fixture.mkTable()
+        Fixture.TestTable(arcTable, arcTable.RowCount + 1, arcTable.ColumnCount + 1)
+
+    [<ReactComponent>]
     static member CellWrapper() =
         Fixture.BaseCell(1, 1, "Test")
 
@@ -214,7 +219,7 @@ type TestCases =
         let element = TestCases.AnnotationTableWrapper()
         let renderResult = rtl?render(element)
 
-        let cell = renderResult?getByTestId("cell-0-0")
+        let cell = renderResult?getByTestId("cell-1-1")
         Expect.isNotNull cell "Should get the cell in the virtualized table"
 
     static member ContextMenuRendering () =

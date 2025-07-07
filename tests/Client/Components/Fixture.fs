@@ -14,6 +14,18 @@ open Fable.Core.JsInterop
 
 open Feliz
 
+open Swate.Components.Shared
+open Swate.Components
+open Fable.Core
+open Fable.Core.JsInterop
+open Feliz
+open Feliz.DaisyUI
+open ARCtrl
+open ARCtrl.Spreadsheet
+
+open Types.AnnotationTableContextMenu
+open Types.AnnotationTable
+
 type Fixture =
 
     /// <summary>
@@ -59,6 +71,51 @@ type Fixture =
             |]
         )
 
+        arcTable
+
+    static member hugeRenderingTable () =
+        let arcTable =
+            ARCtrl.ArcTable("TestTableHuge", ResizeArray(), System.Collections.Generic.Dictionary())
+
+        let inputColumn =
+            let cells =
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createFreeText $"Source {i}"
+                |]
+            CompositeColumn.create(CompositeHeader.Input IOType.Source, cells)
+        let outPutColumn =
+            let cells =
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createFreeText $"Sample {i}"
+                |]
+            CompositeColumn.create(CompositeHeader.Output IOType.Sample, cells)
+        let componentColumns =
+            let cells = 
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
+                |]
+            let componentColumn = CompositeColumn.create(CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")), cells)
+            Array.create 50 componentColumn
+        let parameterColumns =
+            let cells = 
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
+                |]
+            let parameterColumn = CompositeColumn.create(CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")), cells)
+            Array.create 50 parameterColumn
+
+        let compositeColumns =
+            let collection =
+                Array.append componentColumns parameterColumns
+                |> List.ofArray
+                |> (fun list -> list @ [outPutColumn])
+            inputColumn::collection
+            |> Array.ofList
+        arcTable.AddColumns(compositeColumns)
         arcTable
 
     static member BaseCell(rowIndex, columnIndex, data) =
@@ -119,6 +176,67 @@ type Fixture =
     static member Body_Empty = [|
             [| "" |]
         |]
+
+    [<ReactComponent>]
+    static member TestTable (arcTable: ArcTable, rowCount, columnCount) =
+
+        let tableRef = React.useRef<TableHandle> (null)
+
+        let render =
+            React.memo (
+                (fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
+                    TableCell.BaseCell(
+                        tcc.Index.y,
+                        tcc.Index.x,
+                        Html.text (
+                            if tcc.Index.x = 0 then
+                                tcc.Index.y.ToString()
+                            else
+                                $"{tcc.Index.y}-{tcc.Index.x}"
+                        )
+                    )
+                ),
+                withKey =
+                    fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
+                        $"tcc.Index.x-{tcc.Index.x}-tcc.Index.y-{tcc.Index.y}"
+            )
+
+        let renderCell =
+            (fun (tcc: TableCellController) ->
+                let cell =
+                    if tcc.Index.x = 0 then
+                        None
+                    elif tcc.Index.y = 0 then
+                        Some(arcTable.Headers.[tcc.Index.x - 1] |> U2.Case2)
+                    else
+                        Some(arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
+                render (tcc, cell)
+                //Html.div "Test"
+            )
+
+        let renderActiveCell =
+            React.memo (
+                (fun (tcc: TableCellController) ->
+                    let setCell =
+                        fun (cell: CellCoordinate) (cc: CompositeCell) ->
+                            arcTable.SetCellAt(cell.x - 1, cell.y, cc)
+                            //if cell.y > 0 then
+                            //    arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
+                            //else
+                            //    arcTable.SetCellAt(cell.x - 1, cell.y, cc)
+
+                    let cell =
+                        arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y)
+                        //if tcc.Index.y > 0 then
+                        //    arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
+                        //else
+                        //    arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y)
+                    TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index)
+                    //Html.div "Test"
+                )
+            )
+
+        Table.Table(rowCount, columnCount, renderCell, renderActiveCell, tableRef, height = 600, width = 1000, debug = true)
 
     static member AnnotationTable(arcTable, setArcTable) =
         AnnotationTable.AnnotationTable(arcTable, setArcTable, height = 600, debug = true)

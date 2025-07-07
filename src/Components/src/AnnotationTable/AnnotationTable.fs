@@ -15,7 +15,7 @@ open Types.AnnotationTable
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
+    static member InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
         TableCell.BaseCell(
             tcc.Index.y,
             tcc.Index.x,
@@ -81,11 +81,7 @@ type AnnotationTable =
                         console.log ("No table cell found")
                         None
                 ),
-            debug =
-                if debug.IsSome then
-                    debug.Value
-                else
-                    false
+            ?debug = debug
         )
 
     static member private ModalController
@@ -250,7 +246,7 @@ type AnnotationTable =
                 ),
                 withKey =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
-                        $"{tcc.Index.x}-{tcc.Index.y}"
+                        $"cellRender-{tcc.Index.x}-{tcc.Index.y}"
             )
         let renderActiveCell =
             React.memo (
@@ -265,7 +261,6 @@ type AnnotationTable =
                         TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index)
                     | _ -> Html.div "Unknown cell type"
                 )
-
             )
 
         Html.div [

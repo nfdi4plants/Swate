@@ -17,7 +17,7 @@ type TableCell =
         =
         let debug = defaultArg debug false
         Html.div [
-            prop.key $"{rowIndex}-{columnIndex}"
+            prop.key $"BaseCell-{rowIndex}-{columnIndex}"
             if debug then
                 prop.testId $"cell-{rowIndex}-{columnIndex}"
             prop.className [
