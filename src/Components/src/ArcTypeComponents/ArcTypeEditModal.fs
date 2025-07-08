@@ -74,7 +74,8 @@ type EditConfig =
             columnIndex,
             table: ArcTable,
             setArcTable,
-            rmv: unit -> unit
+            rmv: unit -> unit,
+            ?debug: bool
         ) =
 
         let selectedTab, setSelectedTab = React.useState(0)
@@ -84,6 +85,11 @@ type EditConfig =
                 table.UpdateColumn(columnIndex, column.Header, column.Cells)
                 setArcTable table
 
+        let debubString =
+            if debug.IsSome && debug.Value then
+                Some "Edit"
+            else
+                None
         BaseModal.BaseModal(
             (fun _ -> rmv ()),
             header = Html.div "Edit Column",
@@ -91,5 +97,6 @@ type EditConfig =
                 React.fragment [
                     EditConfig.EditTabs(columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv)
                 ],
-            contentClassInfo = "swt:space-y-2 swt:py-2"
+            contentClassInfo = "swt:space-y-2 swt:py-2",
+            ?debug = debubString
         )

@@ -236,6 +236,7 @@ type TestCases =
 
     static member ContextMenuRendering (cellCoordinate:string, testId: string, ?useTestId) =
         let rtl = importAll "@testing-library/react"
+        let body = Browser.Dom.document.body
         let fireEvent: obj = importMember "@testing-library/react"
 
         let element = TestCases.AnnotationTableWrapper(?testId = useTestId)
@@ -244,24 +245,18 @@ type TestCases =
 
         fireEvent?contextMenu(target) |> ignore
 
-        let body = Browser.Dom.document.body
         body.querySelector($"[data-testid='{testId}']")
 
     static member ContextMenuRenderingTest (cellCoordinate:string, testId: string, ?useTestId) =
         let contextMenu = TestCases.ContextMenuRendering(cellCoordinate, testId, ?useTestId = useTestId)
         Expect.isNotNull contextMenu "The context menu should be rendered after right-click"
 
-    static member ContextMenuButtonClick (cellCoordinate:string, testId: string, ?useTestId) =
-        let rtl = importAll "@testing-library/react"
+    static member ContextMenuButtonClick (cellCoordinate:string, testId: string, button: string) =
         let fireEvent: obj = importMember "@testing-library/react"
-
-        let element = TestCases.AnnotationTableWrapper(?testId = useTestId)
-        let renderResult = rtl?render(element)
-        let target = renderResult?queryByTestId(cellCoordinate)
-
-        fireEvent?contextMenu(target) |> ignore
-
         let body = Browser.Dom.document.body
+
+        TestCases.ContextMenuRendering(cellCoordinate, testId) |> ignore
+
         let contextMenuButtons =
             let nodes = body.querySelectorAll("button")
             let nodeArray = Array.zeroCreate nodes.length
@@ -272,12 +267,13 @@ type TestCases =
         let details =
             contextMenuButtons
             |> Seq.cast<Browser.Types.Element>
-            |> Seq.tryFind (fun element -> element.textContent.Contains("Details"))
+            |> Seq.tryFind (fun element ->
+                element.textContent.Contains(button))
 
         fireEvent?click(details) |> ignore
         let detailsModal = body.querySelector($"[data-testid='{testId}']")
 
-        Expect.isNotNull detailsModal "The details modal should be rendered"
+        Expect.isNotNull detailsModal $"The {testId} modal should be rendered"
 
 let Main =
 
@@ -350,15 +346,27 @@ let Main =
                     TestCases.ContextMenuRenderingTest("cell-1-1", "body", true)
             testCase $"Click details free text button in context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuButtonClick("cell-1-1", "modal_Details_FreeText")
+                    TestCases.ContextMenuButtonClick("cell-1-1", "modal_Details_FreeText", "Details")
             testCase $"Click details data button in context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuButtonClick("cell-1-2", "modal_Details_Data")
+                    TestCases.ContextMenuButtonClick("cell-1-2", "modal_Details_Data", "Details")
             testCase $"Click details term button in context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuButtonClick("cell-1-3", "modal_Details_Term")
+                    TestCases.ContextMenuButtonClick("cell-1-3", "modal_Details_Term", "Details")
             testCase $"Click details unitized button in context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuButtonClick("cell-1-4", "modal_Details_Unitized")
+                    TestCases.ContextMenuButtonClick("cell-1-4", "modal_Details_Unitized", "Details")
+            testCase $"Click edit free text button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-1", "modal_Edit", "Edit")
+            testCase $"Click edit data button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-2", "modal_Edit", "Edit")
+            testCase $"Click edit term button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-3", "modal_Edit", "Edit")
+            testCase $"Click edit unitized button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-4", "modal_Edit", "Edit")
         ]
     ]

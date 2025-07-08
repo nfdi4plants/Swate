@@ -179,9 +179,9 @@ type AnnotationTable =
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
-                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv)
+                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv, ?debug = debug)
                 else
-                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv)
+                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv, ?debug = debug)
             | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
                 ContextMenuModals.MoveColumnModal(
                     arcTable,
