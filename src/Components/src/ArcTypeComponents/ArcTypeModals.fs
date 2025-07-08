@@ -120,7 +120,7 @@ type CompositeCellModal =
         "swt:overflow-y-auto swt:overflow-x-hidden swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
     static member TermModal
-        (oa: OntologyAnnotation, rmv, ?relevantCompositeHeader: CompositeHeader, ?setOa: OntologyAnnotation -> unit, ?setHeader: CompositeHeader -> unit)
+        (oa: OntologyAnnotation, rmv, ?relevantCompositeHeader: CompositeHeader, ?setOa: OntologyAnnotation -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
         =
         let initTerm = Term.fromOntologyAnnotation oa
         let tempTerm, setTempTerm = React.useState (initTerm)
@@ -161,7 +161,7 @@ type CompositeCellModal =
                         "Term Name",
                         rmv,
                         submit,
-                        autofocus = true,
+                        autofocus = debug.IsNone,
                         ?parentOa = parentOa
                     )
                     InputField.Input(
@@ -186,7 +186,8 @@ type CompositeCellModal =
                     )
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            ?debug = debug
         )
 
     static member UnitizedModal
@@ -195,7 +196,8 @@ type CompositeCellModal =
             oa: OntologyAnnotation,
             setUnitized: string -> OntologyAnnotation -> unit,
             rmv,
-            ?relevantCompositeHeader: CompositeHeader
+            ?relevantCompositeHeader: CompositeHeader,
+            ?debug
         ) =
         let initTerm = Term.fromOntologyAnnotation oa
         let tempValue, setTempValue = React.useState (value)
@@ -208,7 +210,6 @@ type CompositeCellModal =
                 rmv ()
 
         let parentOa = relevantCompositeHeader |> Option.map (fun h -> h.ToTerm())
-
         BaseModal.BaseModal(
             (fun _ -> rmv ()),
             header = Html.div "Unitized",
@@ -220,7 +221,7 @@ type CompositeCellModal =
                         "Value",
                         rmv,
                         submit,
-                        autofocus = true
+                        autofocus = debug.IsNone
                     )
                     InputField.TermCombi(
                         Some tempTerm,
@@ -252,7 +253,8 @@ type CompositeCellModal =
                     )
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            ?debug = debug
         )
 
     static member private submit ((setValue:('a -> unit) option), (setHeader: (CompositeHeader -> unit) option), value, headerValue, rmv) =
@@ -269,7 +271,7 @@ type CompositeCellModal =
                 failwith "At least one set parameter must be given!"
         with _ -> ()
 
-    static member FreeTextModal(value: string, rmv, ?setText: string -> unit, ?setHeader: CompositeHeader -> unit) =
+    static member FreeTextModal(value: string, rmv, ?setText: string -> unit, ?setHeader: CompositeHeader -> unit, ?debug) =
         let tempValue, setTempValue = React.useState (value)
 
         let submit =
@@ -288,15 +290,16 @@ type CompositeCellModal =
                         "Value",
                         rmv,
                         submit,
-                        autofocus = true
+                        autofocus = debug.IsNone
                     )
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            ?debug = debug
         )
 
     static member DataModal
-        (value: ARCtrl.Data, rmv, ?relevantCompositeHeader: CompositeHeader, ?setData: ARCtrl.Data -> unit, ?setHeader: CompositeHeader -> unit)
+        (value: ARCtrl.Data, rmv, ?relevantCompositeHeader: CompositeHeader, ?setData: ARCtrl.Data -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
         =
         let tempData, setTempData = React.useState (value)
 
@@ -321,7 +324,7 @@ type CompositeCellModal =
                         "File Path",
                         rmv,
                         submit,
-                        autofocus = true
+                        autofocus = debug.IsNone
                     )
                     if setData.IsSome then
                         InputField.Input(
@@ -346,7 +349,8 @@ type CompositeCellModal =
                         )
                 ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            ?debug = debug
         )
 
     [<ReactComponent>]
@@ -355,28 +359,50 @@ type CompositeCellModal =
             compositeCell: CompositeCell,
             setCell: CompositeCell -> unit,
             rmv: unit -> unit,
-            ?relevantCompositeHeader: CompositeHeader
+            ?relevantCompositeHeader: CompositeHeader,
+            ?debug: bool
         ) =
+
         match compositeCell with
         | CompositeCell.Term oa ->
             let setOa = fun oa -> setCell (CompositeCell.Term oa)
-            CompositeCellModal.TermModal(oa, rmv, ?relevantCompositeHeader = relevantCompositeHeader, setOa = setOa)
+            let debug =
+                if debug.IsSome && debug.Value then
+                    Some "Details_Term"
+                else
+                    None
+            CompositeCellModal.TermModal(oa, rmv, ?relevantCompositeHeader = relevantCompositeHeader, setOa = setOa, ?debug = debug)
         | CompositeCell.Unitized(v, oa) ->
             let setUnitized = fun v oa -> setCell (CompositeCell.Unitized(v, oa))
-
+            let debug =
+                if debug.IsSome && debug.Value then
+                    Some "Details_Unitized"
+                else
+                    None
             CompositeCellModal.UnitizedModal(
                 v,
                 oa,
                 setUnitized,
                 rmv,
-                ?relevantCompositeHeader = relevantCompositeHeader
+                ?relevantCompositeHeader = relevantCompositeHeader,
+                ?debug = debug
             )
         | CompositeCell.FreeText text ->
             let setText = fun text -> setCell (CompositeCell.FreeText text)
-            CompositeCellModal.FreeTextModal(text, rmv, setText = setText)
+            let debug =
+                if debug.IsSome && debug.Value then
+                    Some "Details_FreeText"
+                else
+                    None
+            CompositeCellModal.FreeTextModal(text, rmv, setText = setText, ?debug = debug)
         | CompositeCell.Data data ->
             let setData = fun data -> setCell (CompositeCell.Data data)
-            CompositeCellModal.DataModal(data, rmv, setData = setData, ?relevantCompositeHeader = relevantCompositeHeader)
+            let debug =
+                if debug.IsSome && debug.Value then
+                    Some "Details_Data"
+                else
+                    None
+            CompositeCellModal.DataModal(data, rmv, setData = setData, ?relevantCompositeHeader = relevantCompositeHeader, ?debug = debug)
 
     [<ReactComponent>]
     static member CompositeHeaderModal

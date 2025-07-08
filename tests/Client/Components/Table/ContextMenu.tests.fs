@@ -245,8 +245,39 @@ type TestCases =
         fireEvent?contextMenu(target) |> ignore
 
         let body = Browser.Dom.document.body
-        let contextMenu = body.querySelector($"[data-testid='{testId}']")
+        body.querySelector($"[data-testid='{testId}']")
+
+    static member ContextMenuRenderingTest (cellCoordinate:string, testId: string, ?useTestId) =
+        let contextMenu = TestCases.ContextMenuRendering(cellCoordinate, testId, ?useTestId = useTestId)
         Expect.isNotNull contextMenu "The context menu should be rendered after right-click"
+
+    static member ContextMenuButtonClick (cellCoordinate:string, testId: string, ?useTestId) =
+        let rtl = importAll "@testing-library/react"
+        let fireEvent: obj = importMember "@testing-library/react"
+
+        let element = TestCases.AnnotationTableWrapper(?testId = useTestId)
+        let renderResult = rtl?render(element)
+        let target = renderResult?queryByTestId(cellCoordinate)
+
+        fireEvent?contextMenu(target) |> ignore
+
+        let body = Browser.Dom.document.body
+        let contextMenuButtons =
+            let nodes = body.querySelectorAll("button")
+            let nodeArray = Array.zeroCreate nodes.length
+            for i in 0 .. nodes.length - 1 do
+                nodeArray.[i] <- nodes.item (float i)
+            nodeArray
+
+        let details =
+            contextMenuButtons
+            |> Seq.cast<Browser.Types.Element>
+            |> Seq.tryFind (fun element -> element.textContent.Contains("Details"))
+
+        fireEvent?click(details) |> ignore
+        let detailsModal = body.querySelector($"[data-testid='{testId}']")
+
+        Expect.isNotNull detailsModal "The details modal should be rendered"
 
 let Main =
 
@@ -307,15 +338,27 @@ let Main =
                     TestCases.CellInTableRendering()
             testCase $"Test render context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuRendering("cell-1-1", "context_menu")
+                    TestCases.ContextMenuRenderingTest("cell-1-1", "context_menu")
             testCase $"Test render header context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuRendering("cell-0-1", "header", true)
+                    TestCases.ContextMenuRenderingTest("cell-0-1", "header", true)
             testCase $"Test render index context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuRendering("cell-0-0", "index", true)
+                    TestCases.ContextMenuRenderingTest("cell-0-0", "index", true)
             testCase $"Test render body context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuRendering("cell-1-1", "body", true)
+                    TestCases.ContextMenuRenderingTest("cell-1-1", "body", true)
+            testCase $"Click details free text button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-1", "modal_Details_FreeText")
+            testCase $"Click details data button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-2", "modal_Details_Data")
+            testCase $"Click details term button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-3", "modal_Details_Term")
+            testCase $"Click details unitized button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-4", "modal_Details_Unitized")
         ]
     ]

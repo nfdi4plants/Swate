@@ -86,7 +86,7 @@ type AnnotationTable =
         )
 
     static member private ModalController
-        (arcTable: ArcTable, setArcTable, modal: AnnotationTable.ModalTypes, setModal, tableRef: IRefValue<TableHandle>)
+        (arcTable: ArcTable, setArcTable, modal: AnnotationTable.ModalTypes, setModal, tableRef: IRefValue<TableHandle>, ?debug: bool)
         =
 
         let rmv =
@@ -137,7 +137,8 @@ type AnnotationTable =
                         cell,
                         setCell,
                         rmv,
-                        header
+                        header,
+                        ?debug = debug
                     )
             | ModalTypes.Transform cc ->
                 if cc.x = 0 then // no details modal for index col
@@ -270,7 +271,7 @@ type AnnotationTable =
                 prop.testId "annotation_table"
             prop.children [
                 ReactDOM.createPortal ( // Modals
-                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef),
+                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, debug = debug),
                     Browser.Dom.document.body
                 )
                 AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug, ?testId = testId)

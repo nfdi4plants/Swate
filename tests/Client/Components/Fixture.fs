@@ -48,10 +48,10 @@ type Fixture =
         )
 
         arcTable.AddColumn(
-            CompositeHeader.Output IOType.Sample,
+            CompositeHeader.Output IOType.Data,
             [|
                 for i in 0..100 do
-                    CompositeCell.createFreeText $"Sample {i}"
+                    CompositeCell.createDataFromString(string i, format = "xlsx", selectorFormat = ";")
             |]
         )
 
