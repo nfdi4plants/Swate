@@ -177,8 +177,8 @@ type Fixture =
             [| "" |]
         |]
 
-    static member AnnotationTable(arcTable, setArcTable) =
-        AnnotationTable.AnnotationTable(arcTable, setArcTable, height = 600, debug = true)
+    static member AnnotationTable(arcTable, setArcTable, ?testId: bool) =
+        AnnotationTable.AnnotationTable(arcTable, setArcTable, height = 600, debug = true, ?testId = testId)
 
     static member ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal) =
         ContextMenu.ContextMenu(

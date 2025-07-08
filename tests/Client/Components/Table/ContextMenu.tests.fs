@@ -194,11 +194,11 @@ type TestCases =
             "Should predict paste fitted cells behavior"
 
     [<ReactComponent>]
-    static member AnnotationTableWrapper() =
+    static member AnnotationTableWrapper(?testId: bool) =
         let arcTable = Fixture.mkTable()
         let table, setTable = React.useState(arcTable)
 
-        Fixture.AnnotationTable(table, setTable)
+        Fixture.AnnotationTable(table, setTable, ?testId = testId)
 
     [<ReactComponent>]
     static member CellWrapper() =
@@ -234,18 +234,18 @@ type TestCases =
         let cell = renderResult?getByTestId("cell-1-1")
         Expect.isNotNull cell "Should get the cell in the virtualized table"
 
-    static member ContextMenuRendering () =
+    static member ContextMenuRendering (cellCoordinate:string, testId: string, ?useTestId) =
         let rtl = importAll "@testing-library/react"
         let fireEvent: obj = importMember "@testing-library/react"
 
-        let element = TestCases.AnnotationTableWrapper()
+        let element = TestCases.AnnotationTableWrapper(?testId = useTestId)
         let renderResult = rtl?render(element)
-        let target = renderResult?queryByTestId("cell-1-1")
+        let target = renderResult?queryByTestId(cellCoordinate)
 
         fireEvent?contextMenu(target) |> ignore
 
         let body = Browser.Dom.document.body
-        let contextMenu = body.querySelector("[data-testid='context_menu']")
+        let contextMenu = body.querySelector($"[data-testid='{testId}']")
         Expect.isNotNull contextMenu "The context menu should be rendered after right-click"
 
 let Main =
@@ -307,6 +307,15 @@ let Main =
                     TestCases.CellInTableRendering()
             testCase $"Test render context menu"
                 <| fun _ ->
-                    TestCases.ContextMenuRendering()
+                    TestCases.ContextMenuRendering("cell-1-1", "context_menu")
+            testCase $"Test render header context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuRendering("cell-0-1", "header", true)
+            testCase $"Test render index context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuRendering("cell-0-0", "index", true)
+            testCase $"Test render body context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuRendering("cell-1-1", "body", true)
         ]
     ]

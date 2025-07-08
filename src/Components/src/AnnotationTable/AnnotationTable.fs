@@ -35,11 +35,12 @@ type AnnotationTable =
             className = "swt:w-full swt:h-full"
         )
 
-    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool) =
+    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool, ?testId: bool) =
+
         ContextMenu.ContextMenu(
             (fun data ->
                 let index = data |> unbox<CellCoordinate>
-
+                console.log $"testId: {testId}"
                 if index.x = 0 then // index col
                     AnnotationTableContextMenu.IndexColumnContent(
                         index.y,
@@ -81,7 +82,8 @@ type AnnotationTable =
                         console.log ("No table cell found")
                         None
                 ),
-            ?debug = debug
+            ?debug = debug,
+            ?testId = testId
         )
 
     static member private ModalController
@@ -203,7 +205,7 @@ type AnnotationTable =
 
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool) =
+    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool, ?testId: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
@@ -272,7 +274,7 @@ type AnnotationTable =
                     AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef),
                     Browser.Dom.document.body
                 )
-                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug)
+                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug, ?testId = testId)
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,

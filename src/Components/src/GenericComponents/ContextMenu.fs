@@ -48,7 +48,8 @@ type ContextMenu =
             childInfo: obj -> ContextMenuItem list,
             ?ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option,
-            ?debug
+            ?debug,
+            ?testId: bool
         ) =
 
         let (spawnData: obj), setSpawnData = React.useState (null)
@@ -66,6 +67,9 @@ type ContextMenu =
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
         let listContentRef = React.useRef (ResizeArray())
+
+        let debug = defaultArg debug false
+        let testId = defaultArg testId false
 
         let floating =
             FloatingUI.useFloating (
@@ -198,7 +202,7 @@ type ContextMenu =
 
                 timeout.current
                 |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
-
+        console.log $"children: {children.Length}"
         FloatingUI.FloatingPortal(
             if isOpen then
                 FloatingUI.FloatingOverlay(
@@ -212,8 +216,15 @@ type ContextMenu =
                             children =
                                 Html.div [
                                     prop.ref floating.refs.setFloating
-                                    if debug.IsSome && debug.Value then
+                                    if debug && not testId then
                                         prop.testId "context_menu"
+                                    if testId && debug then
+                                        if children.Length <= 1 then
+                                            prop.testId "index"
+                                        elif children.Length > 1 && children.Length <= 5 then
+                                            prop.testId "header"
+                                        else
+                                            prop.testId "body"
                                     prop.custom ("style", floating.floatingStyles)
                                     for key, v in
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do
