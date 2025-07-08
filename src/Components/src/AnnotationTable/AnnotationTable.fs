@@ -40,7 +40,6 @@ type AnnotationTable =
         ContextMenu.ContextMenu(
             (fun data ->
                 let index = data |> unbox<CellCoordinate>
-                console.log $"testId: {testId}"
                 if index.x = 0 then // index col
                     AnnotationTableContextMenu.IndexColumnContent(
                         index.y,

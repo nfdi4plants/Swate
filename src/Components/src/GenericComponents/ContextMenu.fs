@@ -202,7 +202,6 @@ type ContextMenu =
 
                 timeout.current
                 |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
-        console.log $"children: {children.Length}"
         FloatingUI.FloatingPortal(
             if isOpen then
                 FloatingUI.FloatingOverlay(
