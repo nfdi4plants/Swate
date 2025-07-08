@@ -3,6 +3,7 @@ module Components.Tests.Table.ContextMenu
 open Fable.Mocha
 open Fable.React
 open Fable.React.Props
+open Fable.Core
 open Fable.Core.JsInterop
 open Browser.Types
 open ARCtrl
@@ -15,7 +16,23 @@ open Types.AnnotationTable
 
 importSideEffects "jsdom-global/register.js"
 
+module JS =
+    [<Emit("globalThis")>]
+    let globalThis : obj = jsNative
+
+    [<Emit("typeof $0")>]
+    let typeofJs  (x: obj) : string = jsNative
+
+    let isUndefined (x: obj) =
+        x = null || typeofJs x = "undefined"
+
+    let setupAnimationFramePolyFill () =
+        if isUndefined globalThis?requestAnimationFrame then
+            globalThis?requestAnimationFrame <- fun (callback:unit -> unit) -> Browser.Dom.window.setTimeout(callback, 0)
+            globalThis?cancelAnimationFrame <- fun (id: int) -> Browser.Dom.window.clearTimeout(id)
+
 type TestCases =
+
     static member AddColumns () =
         let pasteData = Fixture.Column_Component_InstrumentModel
 
@@ -184,11 +201,6 @@ type TestCases =
         Fixture.AnnotationTable(table, setTable)
 
     [<ReactComponent>]
-    static member TableWrapper() =
-        let arcTable = Fixture.mkTable()
-        Fixture.TestTable(arcTable, arcTable.RowCount + 1, arcTable.ColumnCount + 1)
-
-    [<ReactComponent>]
     static member CellWrapper() =
         Fixture.BaseCell(1, 1, "Test")
 
@@ -228,11 +240,18 @@ type TestCases =
 
         let element = TestCases.AnnotationTableWrapper()
         let renderResult = rtl?render(element)
-        fireEvent?contextMenu(renderResult) |> ignore
-        let contextMenu = renderResult?queryByTestId("context_menu")
+        let target = renderResult?queryByTestId("cell-1-1")
+
+        fireEvent?contextMenu(target) |> ignore
+
+        let body = Browser.Dom.document.body
+        let contextMenu = body.querySelector("[data-testid='context_menu']")
         Expect.isNotNull contextMenu "The context menu should be rendered after right-click"
 
 let Main =
+
+    JS.setupAnimationFramePolyFill()
+
     testList "Context Menu" [
         testList "Prediction" [
             testCase "Add columns"
@@ -286,8 +305,8 @@ let Main =
             testCase $"Test render cell in virtualized table"
                 <| fun _ ->
                     TestCases.CellInTableRendering()
-            //testCase $"Test render context menu"
-            //    <| fun _ ->
-            //        TestCases.ContextMenuRendering()
+            testCase $"Test render context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuRendering()
         ]
     ]

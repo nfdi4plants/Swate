@@ -104,6 +104,7 @@ swt:p-0"""
                         "get" ==> (fun () -> 1000)
                         "configurable" ==> true
                         ]))
+
         let rowVirtualizer =
             Virtual.useVirtualizer (
                 count = rowCount,
