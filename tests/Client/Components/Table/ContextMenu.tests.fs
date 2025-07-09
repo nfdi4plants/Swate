@@ -194,8 +194,7 @@ type TestCases =
             "Should predict paste fitted cells behavior"
 
     [<ReactComponent>]
-    static member AnnotationTableWrapper(?testId: bool) =
-        let arcTable = Fixture.mkTable()
+    static member AnnotationTableWrapper(arcTable: ArcTable, ?testId: bool) =
         let table, setTable = React.useState(arcTable)
 
         Fixture.AnnotationTable(table, setTable, ?testId = testId)
@@ -204,9 +203,9 @@ type TestCases =
     static member CellWrapper() =
         Fixture.BaseCell(1, 1, "Test")
 
-    static member AnnotationTableRendering () =
+    static member AnnotationTableRendering (arcTable) =
         let rtl = importAll "@testing-library/react"
-        let element = TestCases.AnnotationTableWrapper()
+        let element = TestCases.AnnotationTableWrapper(arcTable)
         let renderResult = rtl?render(element)
         let table = renderResult?getByTestId("annotation_table")
         Expect.isNotNull table "The annotation table should be rendered"
@@ -220,26 +219,27 @@ type TestCases =
 
     static member TableRendering () =
         let rtl = importAll "@testing-library/react"
-        let element = TestCases.AnnotationTableWrapper()
+        let arcTable = Fixture.mkTable()
+        let element = TestCases.AnnotationTableWrapper(arcTable)
         let renderResult = rtl?render(element)
         let cell = renderResult?getByTestId("virtualized-table")
         Expect.isNotNull cell "Should get the virtualized table"
 
     static member CellInTableRendering () =
         let rtl = importAll "@testing-library/react"
-
-        let element = TestCases.AnnotationTableWrapper()
+        let arcTable = Fixture.mkTable()
+        let element = TestCases.AnnotationTableWrapper(arcTable)
         let renderResult = rtl?render(element)
 
         let cell = renderResult?getByTestId("cell-1-1")
         Expect.isNotNull cell "Should get the cell in the virtualized table"
 
-    static member ContextMenuRendering (cellCoordinate:string, testId: string, ?useTestId) =
+    static member ContextMenuRendering (arcTable, cellCoordinate:string, testId: string, ?useTestId) =
         let rtl = importAll "@testing-library/react"
         let body = Browser.Dom.document.body
         let fireEvent: obj = importMember "@testing-library/react"
-
-        let element = TestCases.AnnotationTableWrapper(?testId = useTestId)
+        
+        let element = TestCases.AnnotationTableWrapper(arcTable, ?testId = useTestId)
         let renderResult = rtl?render(element)
         let target = renderResult?queryByTestId(cellCoordinate)
 
@@ -247,15 +247,17 @@ type TestCases =
 
         body.querySelector($"[data-testid='{testId}']")
 
-    static member ContextMenuRenderingTest (cellCoordinate:string, testId: string, ?useTestId) =
-        let contextMenu = TestCases.ContextMenuRendering(cellCoordinate, testId, ?useTestId = useTestId)
+    static member ContextMenuRenderingTest (cellCoordinate: string, testId: string, ?useTestId) =
+        let arcTable = Fixture.mkTable()
+        let contextMenu = TestCases.ContextMenuRendering(arcTable, cellCoordinate, testId, ?useTestId = useTestId)
         Expect.isNotNull contextMenu "The context menu should be rendered after right-click"
 
-    static member ContextMenuButtonClick (cellCoordinate:string, testId: string, button: string) =
+    static member ContextMenuButtonClick (cellCoordinate: string, testId: string, button: string) =
         let fireEvent: obj = importMember "@testing-library/react"
         let body = Browser.Dom.document.body
+        let arcTable = Fixture.mkTable()
 
-        TestCases.ContextMenuRendering(cellCoordinate, testId) |> ignore
+        TestCases.ContextMenuRendering(arcTable, cellCoordinate, testId) |> ignore
 
         let contextMenuButtons =
             let nodes = body.querySelectorAll("button")
@@ -264,16 +266,51 @@ type TestCases =
                 nodeArray.[i] <- nodes.item (float i)
             nodeArray
 
-        let details =
+        let buttonToPress =
             contextMenuButtons
             |> Seq.cast<Browser.Types.Element>
             |> Seq.tryFind (fun element ->
                 element.textContent.Contains(button))
 
-        fireEvent?click(details) |> ignore
+        fireEvent?click(buttonToPress) |> ignore
         let detailsModal = body.querySelector($"[data-testid='{testId}']")
 
         Expect.isNotNull detailsModal $"The {testId} modal should be rendered"
+
+    static member ContextMenuDeleteButtonClick (cellCoordinate: string, testId: string, buttonName: string) =
+        let fireEvent: obj = importMember "@testing-library/react"
+        let body = Browser.Dom.document.body
+        let arcTable = Fixture.mkTable()
+
+        TestCases.ContextMenuRendering(arcTable, cellCoordinate, testId) |> ignore
+
+        let contextMenuButtons =
+            let nodes = body.querySelectorAll("button")
+            let nodeArray = Array.zeroCreate nodes.length
+            for i in 0 .. nodes.length - 1 do
+                nodeArray.[i] <- nodes.item (float i)
+            nodeArray
+
+        let buttonToPress =
+            contextMenuButtons
+            |> Seq.cast<Browser.Types.Element>
+            |> Seq.tryFind (fun element ->
+                element.textContent.Contains(buttonName))
+
+        let oldColumnCount = arcTable.ColumnCount
+        let oldRowCount = arcTable.RowCount
+
+        fireEvent?click(buttonToPress) |> ignore
+
+        arcTable, oldColumnCount, oldRowCount
+
+    static member ContextMenuDeleteColumnButtonClick (cellCoordinate: string, testId: string, buttonName: string) =
+        let arcTable, oldColumnCount, _ = TestCases.ContextMenuDeleteButtonClick(cellCoordinate, testId, buttonName)
+        Expect.equal arcTable.ColumnCount (oldColumnCount - 1) $"The column count should be {oldColumnCount - 1} but is {arcTable.ColumnCount}"
+
+    static member ContextMenuDeleteRowButtonClick (cellCoordinate: string, testId: string, buttonName: string) =
+        let arcTable, _, oldRowCount = TestCases.ContextMenuDeleteButtonClick(cellCoordinate, testId, buttonName)
+        Expect.equal arcTable.RowCount (oldRowCount - 1) $"The row count should be {oldRowCount - 1} but is {arcTable.RowCount}"
 
 let Main =
 
@@ -322,7 +359,8 @@ let Main =
                     TestCases.AddUnknownPattern(Fixture.Body_Empty)
             testCase $"Test render annotation table"
                 <| fun _ ->
-                    TestCases.AnnotationTableRendering()
+                    let arcTable = Fixture.mkTable()
+                    TestCases.AnnotationTableRendering(arcTable)
             testCase $"Test render cell-1-1"
                 <| fun _ ->
                     TestCases.CellRendering()
@@ -368,5 +406,11 @@ let Main =
             testCase $"Click edit unitized button in context menu"
                 <| fun _ ->
                     TestCases.ContextMenuButtonClick("cell-1-4", "modal_Edit", "Edit")
+            testCase $"Click delete colum button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuDeleteColumnButtonClick("cell-1-1", "context_menu", "Delete Column")
+            testCase $"Click delete row button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuDeleteRowButtonClick("cell-1-1", "context_menu", "Delete Row")
         ]
     ]
