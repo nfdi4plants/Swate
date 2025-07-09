@@ -511,7 +511,8 @@ type ContextMenuModals =
             arcTableIndex: CellCoordinate,
             uiTableIndex: CellCoordinate,
             setModal: AnnotationTable.ModalTypes -> unit,
-            tableRef: IRefValue<TableHandle>
+            tableRef: IRefValue<TableHandle>,
+            ?debug: bool
         ) =
         let rmv =
             fun _ ->
@@ -615,6 +616,12 @@ type ContextMenuModals =
                 ]
             ]
 
+        let debugString =
+            if debug.IsSome && debug.Value then
+                Some "Move_Column"
+            else
+                None
+
         Swate.Components.BaseModal.BaseModal(
             rmv,
             header =
@@ -626,7 +633,8 @@ type ContextMenuModals =
                 ),
             modalActions = modalActivity,
             content = content,
-            footer = footer
+            footer = footer,
+            ?debug = debugString
         )
 
     [<ReactComponent>]

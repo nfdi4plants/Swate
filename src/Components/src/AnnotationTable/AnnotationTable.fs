@@ -189,7 +189,8 @@ type AnnotationTable =
                     arcTableIndex,
                     uiTableIndex,
                     setModal,
-                    tableRef
+                    tableRef,
+                    ?debug = debug
                 )
 
             | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->

@@ -266,6 +266,11 @@ type TestCases =
                 nodeArray.[i] <- nodes.item (float i)
             nodeArray
 
+        contextMenuButtons
+        |> Seq.cast<Browser.Types.Element>
+        |> Seq.iter (fun element ->
+            console.log element.textContent)
+
         let buttonToPress =
             contextMenuButtons
             |> Seq.cast<Browser.Types.Element>
@@ -273,9 +278,9 @@ type TestCases =
                 element.textContent.Contains(button))
 
         fireEvent?click(buttonToPress) |> ignore
-        let detailsModal = body.querySelector($"[data-testid='{testId}']")
+        let targetModal = body.querySelector($"[data-testid='{testId}']")
 
-        Expect.isNotNull detailsModal $"The {testId} modal should be rendered"
+        Expect.isNotNull targetModal $"The {testId} modal should be rendered"
 
     static member ContextMenuDeleteButtonClick (cellCoordinate: string, testId: string, buttonName: string) =
         let fireEvent: obj = importMember "@testing-library/react"
@@ -412,5 +417,8 @@ let Main =
             testCase $"Click delete row button in context menu"
                 <| fun _ ->
                     TestCases.ContextMenuDeleteRowButtonClick("cell-1-1", "context_menu", "Delete Row")
+            testCase $"Click move column button in context menu"
+                <| fun _ ->
+                    TestCases.ContextMenuButtonClick("cell-1-1", "modal_Move_Column", "Move Column")
         ]
     ]
