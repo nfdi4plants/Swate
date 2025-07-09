@@ -15,7 +15,7 @@ open Types.AnnotationTable
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
+    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
         TableCell.BaseCell(
             tcc.Index.y,
             tcc.Index.x,

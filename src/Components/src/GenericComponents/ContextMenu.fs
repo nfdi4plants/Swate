@@ -48,7 +48,7 @@ type ContextMenu =
             childInfo: obj -> ContextMenuItem list,
             ?ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option,
-            ?debug,
+            ?debug: bool,
             ?testId: bool
         ) =
 

@@ -85,7 +85,7 @@ type EditConfig =
                 table.UpdateColumn(columnIndex, column.Header, column.Cells)
                 setArcTable table
 
-        let debubString =
+        let debugString =
             if debug.IsSome && debug.Value then
                 Some "Edit"
             else
@@ -98,5 +98,5 @@ type EditConfig =
                     EditConfig.EditTabs(columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv)
                 ],
             contentClassInfo = "swt:space-y-2 swt:py-2",
-            ?debug = debubString
+            ?debug = debugString
         )

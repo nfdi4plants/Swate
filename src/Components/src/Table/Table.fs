@@ -270,6 +270,7 @@ swt:p-0"""
                         prop.style [
                             style.height (rowVirtualizer.getTotalSize ())
                             style.width (columnVirtualizer.getTotalSize ())
+                            style.position.relative
                         ]
                         prop.children [
                             Html.table [
@@ -289,8 +290,7 @@ swt:p-0"""
                                                         let controller =
                                                             createController {| x = virtualColumn.index; y = 0 |}
                                                         Html.th [
-                                                            if not debug then
-                                                                prop.ref columnVirtualizer.measureElement
+                                                            prop.ref columnVirtualizer.measureElement
                                                             prop.custom ("data-index", virtualColumn.index)
                                                             prop.key $"Column-{virtualColumn.key}"
                                                             prop.className [
@@ -329,13 +329,12 @@ swt:p-0"""
                                                                             |> Seq.last
                                                                         ),
                                                                         className =
-                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 /
-                                                                            swt:bg-base-200 swt:text-transparent",
+                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
                                                                         debug = debug
                                                                     )
                                                                 elif controller.IsActive then
                                                                     renderActiveCell controller
-                                                                else if debug then
+                                                                elif debug then
                                                                     TableCell.BaseCell(
                                                                         controller.Index.y,
                                                                         controller.Index.x,
@@ -344,8 +343,7 @@ swt:p-0"""
                                                                             |> Seq.last
                                                                         ),
                                                                         className =
-                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 /
-                                                                            swt:bg-base-200 swt:text-transparent",
+                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
                                                                         debug = debug
                                                                     )
                                                                 else
@@ -419,7 +417,7 @@ swt:p-0"""
                                                                     prop.children [
                                                                         if controller.IsActive then
                                                                             renderActiveCell controller
-                                                                        else if debug then
+                                                                        elif debug then
                                                                             TableCell.BaseCell(
                                                                                 controller.Index.y,
                                                                                 controller.Index.x,
@@ -428,8 +426,7 @@ swt:p-0"""
                                                                                     |> Seq.last
                                                                                 ),
                                                                                 className =
-                                                                                    "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 /
-                                                                                    swt:bg-base-200 swt:text-transparent",
+                                                                                    "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
                                                                                 debug = debug
                                                                             )
                                                                         else

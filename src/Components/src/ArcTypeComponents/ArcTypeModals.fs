@@ -120,7 +120,7 @@ type CompositeCellModal =
         "swt:overflow-y-auto swt:overflow-x-hidden swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
     static member TermModal
-        (oa: OntologyAnnotation, rmv, ?relevantCompositeHeader: CompositeHeader, ?setOa: OntologyAnnotation -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
+        (oa: OntologyAnnotation, rmv, ?relevantCompositeHeader: CompositeHeader, ?setOa: OntologyAnnotation -> unit, ?setHeader: CompositeHeader -> unit, ?debug: string)
         =
         let initTerm = Term.fromOntologyAnnotation oa
         let tempTerm, setTempTerm = React.useState (initTerm)
