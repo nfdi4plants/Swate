@@ -23,26 +23,57 @@ module private DataAnnotatorHelper =
                 prop.onClick rmvFile
             ]
 
+        let dropdownElement (text: string) setSeperator close =
+            Html.li [
+                Html.a [
+                    prop.onClick (fun _ ->
+                        setSeperator text
+                        close()
+                    )
+                    prop.children [
+                        Html.span [
+                            prop.text text ]
+                    ]
+                ]
+            ]
+
         [<ReactComponent>]
         let UpdateSeparatorButton dispatch =
             let updateSeparator =
                 fun s -> DataAnnotator.UpdateSeperator s |> DataAnnotatorMsg |> dispatch
-
             let input_, setInput = React.useState ("")
+            let isOpen, setOpen = React.useState false
+            let close = fun _ -> setOpen false
 
-            //Daisy.join [
             Html.div [
                 prop.className "swt:join"
                 prop.children [
-                    //Daisy.input [
+                    Components.BaseDropdown.Main(
+                        isOpen,
+                        setOpen,
+                        Html.button [
+                            prop.onClick (fun _ -> setOpen (not isOpen))
+                            prop.role "button"
+                            prop.className "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
+                            prop.children [
+                                Html.i [ prop.className "fa-solid fa-angle-down" ]
+                            ]
+                        ],
+                        [
+                            dropdownElement "\\t" setInput close
+                            dropdownElement "," setInput close
+                            dropdownElement ";" setInput close
+                            dropdownElement "|" setInput close
+                        ],
+                        style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
+                    )
                     Html.input [
                         prop.className "swt:input swt:join-item"
                         prop.placeholder ".. update separator"
-                        prop.defaultValue input_
+                        prop.value input_
                         prop.onChange (fun s -> setInput s)
-                        prop.onKeyDown (key.enter, fun e -> updateSeparator input_)
+                        prop.onKeyDown (key.enter, fun _ -> updateSeparator input_)
                     ]
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:join-item"
                         prop.text "Update"

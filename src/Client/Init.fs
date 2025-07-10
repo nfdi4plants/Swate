@@ -30,6 +30,8 @@ let initialModel = {
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let model, cmd = urlUpdate pageOpt initialModel
 
+    setAutosaveConfiguration model.PersistentStorageState.Autosave
+
     let autosaveConfig = getAutosaveConfiguration ()
 
     let newModel =
