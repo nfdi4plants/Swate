@@ -174,7 +174,9 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
             add widget widgets
 
     Components.BaseNavbar.Main [
-        Html.div [ prop.className "swt:grow-0"; prop.children [ FileName model ] ]
+        Html.div [
+            prop.className "swt:grow-0"
+        ]
         Html.div [
             prop.className "swt:navbar-center swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
             prop.children [

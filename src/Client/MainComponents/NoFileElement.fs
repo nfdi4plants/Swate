@@ -117,7 +117,6 @@ module private Helper =
         ]
 
     let createNewFile (dispatch: Messages.Msg -> unit) =
-        //Daisy.dropdown
         Html.div  [
             prop.className "swt:dropdown"
             prop.children [
