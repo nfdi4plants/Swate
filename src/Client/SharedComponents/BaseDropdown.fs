@@ -13,7 +13,7 @@ type BaseDropdown =
         Html.div [
             prop.ref ref
             prop.className [
-                "swt:dropdown swt:!z-[9999999999999]"
+                "swt:dropdown"
                 if isOpen then
                     "swt:dropdown-open"
                 if style.IsSome then
