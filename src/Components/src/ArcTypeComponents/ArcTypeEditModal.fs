@@ -10,15 +10,7 @@ open Fable.Core
 
 type EditConfig =        
 
-    static member CreateColumnTab () =
-        Html.div [
-        ]
-
-    static member UpdateColumnTab () =
-        Html.div [
-        ]
-
-    static member EditTabs (columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv) =
+    static member EditTabs (columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv, ?debug) =
         Html.div [
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-2"
@@ -60,9 +52,9 @@ type EditConfig =
             Html.div [
                 prop.children [
                     match selectedTab with
-                    | 0 -> EditColumnModal.EditColumnModal(columnIndex, table, setColumn, rmv)
-                    | 1 -> CreateColumnModal.CreateColumnModal(columnIndex, table, setColumn, rmv)
-                    | 2 -> UpdateColumnModal.UpdateColumnModal(columnIndex, table, setColumn, rmv)
+                    | 0 -> EditColumnModal.EditColumnModal(columnIndex, table, setColumn, rmv, ?debug = debug)
+                    | 1 -> CreateColumnModal.CreateColumnModal(columnIndex, table, setColumn, rmv, ?debug = debug)
+                    | 2 -> UpdateColumnModal.UpdateColumnModal(columnIndex, table, setColumn, rmv, ?debug = debug)
                     | _ -> Html.none
                 ]
             ]
@@ -95,7 +87,7 @@ type EditConfig =
             header = Html.div "Edit Column",
             content =
                 React.fragment [
-                    EditConfig.EditTabs(columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv)
+                    EditConfig.EditTabs(columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv, ?debug = debug)
                 ],
             contentClassInfo = "swt:space-y-2 swt:py-2",
             ?debug = debugString

@@ -266,11 +266,6 @@ type TestCases =
                 nodeArray.[i] <- nodes.item (float i)
             nodeArray
 
-        contextMenuButtons
-        |> Seq.cast<Browser.Types.Element>
-        |> Seq.iter (fun element ->
-            console.log element.textContent)
-
         let buttonToPress =
             contextMenuButtons
             |> Seq.cast<Browser.Types.Element>
@@ -281,6 +276,47 @@ type TestCases =
         let targetModal = body.querySelector($"[data-testid='{testId}']")
 
         Expect.isNotNull targetModal $"The {testId} modal should be rendered"
+
+    static member ContextMenuTabClick (cellCoordinate: string, testId: string, button: string, tab: string) =
+        let fireEvent: obj = importMember "@testing-library/react"
+        let body = Browser.Dom.document.body
+        let arcTable = Fixture.mkTable()
+
+        TestCases.ContextMenuRendering(arcTable, cellCoordinate, testId) |> ignore
+
+        let contextMenuButtons =
+            let nodes = body.querySelectorAll("button")
+            let nodeArray = Array.zeroCreate nodes.length
+            for i in 0 .. nodes.length - 1 do
+                nodeArray.[i] <- nodes.item (float i)
+            nodeArray
+
+        let buttonToPress =
+            contextMenuButtons
+            |> Seq.cast<Browser.Types.Element>
+            |> Seq.tryFind (fun element ->
+                element.textContent.Contains(button))
+
+        fireEvent?click(buttonToPress) |> ignore
+        let targetModal = body.querySelector($"[data-testid='{testId}']")
+
+        let tabElements =
+            let tabDivs = targetModal.querySelectorAll("div.swt\\:tab")
+            let tabs = Array.zeroCreate tabDivs.length
+            for i in 0 .. tabDivs.length - 1 do
+                tabs.[i] <- tabDivs.item (float i)
+            tabs
+
+        let tabToPress =
+            tabElements
+            |> Seq.cast<Browser.Types.Element>
+            |> Seq.tryFind (fun element ->
+            element.textContent.Contains(tab))
+
+        fireEvent?click(tabToPress) |> ignore
+        let targetModal = body.querySelector($"[data-testid='{tab}']")
+
+        Expect.isNotNull targetModal $"The tab {tab} should be rendered"
 
     static member ContextMenuDeleteButtonClick (cellCoordinate: string, testId: string, buttonName: string) =
         let fireEvent: obj = importMember "@testing-library/react"
@@ -420,5 +456,14 @@ let Main =
             testCase $"Click move column button in context menu"
                 <| fun _ ->
                     TestCases.ContextMenuButtonClick("cell-1-1", "modal_Move_Column", "Move Column")
+            testCase $"Click edit button in context menu and edit tab"
+                <| fun _ ->
+                    TestCases.ContextMenuTabClick("cell-1-4", "modal_Edit", "Edit", "Edit Column")
+            testCase $"Click edit button in context menu and create tab"
+                <| fun _ ->
+                    TestCases.ContextMenuTabClick("cell-1-4", "modal_Edit", "Edit", "Create Column")
+            testCase $"Click edit button in context menu and update tab"
+                <| fun _ ->
+                    TestCases.ContextMenuTabClick("cell-1-4", "modal_Edit", "Edit", "Update Column")
         ]
     ]
