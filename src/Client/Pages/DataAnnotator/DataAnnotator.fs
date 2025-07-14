@@ -23,11 +23,11 @@ module private DataAnnotatorHelper =
                 prop.onClick rmvFile
             ]
 
-        let dropdownElement (text: string) setSeperator close =
+        let dropdownElement (text: string) (value: string) setSeperator close =
             Html.li [
                 Html.a [
                     prop.onClick (fun _ ->
-                        setSeperator text
+                        setSeperator value
                         close()
                     )
                     prop.children [
@@ -60,10 +60,10 @@ module private DataAnnotatorHelper =
                             ]
                         ],
                         [
-                            dropdownElement "\\t" setInput close
-                            dropdownElement "," setInput close
-                            dropdownElement ";" setInput close
-                            dropdownElement "|" setInput close
+                            dropdownElement "Tab (\\t)" "\\t" setInput close
+                            dropdownElement "," "," setInput close
+                            dropdownElement ";" ";" setInput close
+                            dropdownElement "|" "|" setInput close
                         ],
                         style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
                     )
