@@ -30,20 +30,11 @@ let initialModel = {
 let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let model, cmd = urlUpdate pageOpt initialModel
 
-    setAutosaveConfiguration model.PersistentStorageState.Autosave
-
     let autosaveConfig = getAutosaveConfiguration ()
 
     let newModel =
-        if
-            autosaveConfig.IsSome
-            && autosaveConfig.Value <> model.PersistentStorageState.Autosave
-        then
-            {
-                model with
-                    Model.PersistentStorageState.Autosave = autosaveConfig.Value
-            }
-        else
-            model
+        autosaveConfig
+        |> Option.defaultValue model.PersistentStorageState.Autosave
+        |> fun x -> {model with Model.PersistentStorageState.Autosave = x}
 
     newModel, cmd
