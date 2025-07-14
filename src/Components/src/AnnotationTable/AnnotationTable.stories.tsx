@@ -46,27 +46,6 @@ export const Default: Story = {
   }
 }
 
-export const ContextMenu: Story = {
-  render: renderTable,
-  args: {
-    height: 600,
-    witdth: 1000,
-    debug: true
-  },
-  play: async ({ args, canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    const cell = await canvas.findByTestId('cell-1-1');
-
-    fireEvent.contextMenu(cell);
-
-    await waitFor(() => {
-      const contextMenu = screen.getByTestId('context_menu');
-      expect(contextMenu).toBeVisible();
-    });
-  }
-}
-
 export const ContextMenuBody: Story = {
   render: renderTable,
   args: {
@@ -83,7 +62,7 @@ export const ContextMenuBody: Story = {
     fireEvent.contextMenu(cell);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('body');
+      const contextMenu = screen.getByTestId('context_menu_body');
       expect(contextMenu).toBeVisible();
     });
   }
@@ -105,7 +84,7 @@ export const ContextMenuHeader: Story = {
     await fireEvent.contextMenu(cell);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('header');
+      const contextMenu = screen.getByTestId('context_menu_header');
       expect(contextMenu).toBeVisible();
     });
   }
@@ -127,7 +106,7 @@ export const ContextMenuIndex: Story = {
     await fireEvent.contextMenu(cell);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('index');
+      const contextMenu = screen.getByTestId('context_menu_index');
       expect(contextMenu).toBeVisible();
     });
   }
@@ -147,7 +126,7 @@ export const FreeTextDetails: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
@@ -176,7 +155,7 @@ export const FreeText2Details: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
@@ -205,7 +184,7 @@ export const TermDetails: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
@@ -234,7 +213,7 @@ export const UnitizedDetails: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
@@ -263,7 +242,7 @@ export const EditColumn: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Edit/i });
@@ -292,7 +271,7 @@ export const CreateColumn: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Edit/d });
@@ -334,7 +313,7 @@ export const UpdateColumn: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Edit/d });
@@ -376,7 +355,7 @@ export const DeleteColumn: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Delete Column/d });
@@ -410,7 +389,7 @@ export const DeleteRow: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu');
+    const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Delete Row/d });

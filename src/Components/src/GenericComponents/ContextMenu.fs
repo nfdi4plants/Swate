@@ -48,8 +48,7 @@ type ContextMenu =
             childInfo: obj -> ContextMenuItem list,
             ?ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option,
-            ?debug: bool,
-            ?testId: bool
+            ?debug: bool
         ) =
 
         let (spawnData: obj), setSpawnData = React.useState (null)
@@ -69,7 +68,6 @@ type ContextMenu =
         let listContentRef = React.useRef (ResizeArray())
 
         let debug = defaultArg debug false
-        let testId = defaultArg testId false
 
         let floating =
             FloatingUI.useFloating (
@@ -215,15 +213,13 @@ type ContextMenu =
                             children =
                                 Html.div [
                                     prop.ref floating.refs.setFloating
-                                    if debug && not testId then
-                                        prop.testId "context_menu"
-                                    if testId && debug then
+                                    if debug then
                                         if children.Length <= 1 then
-                                            prop.testId "index"
+                                            prop.testId "context_menu_index"
                                         elif children.Length > 1 && children.Length <= 5 then
-                                            prop.testId "header"
+                                            prop.testId "context_menu_header"
                                         else
-                                            prop.testId "body"
+                                            prop.testId "context_menu_body"
                                     prop.custom ("style", floating.floatingStyles)
                                     for key, v in
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do

@@ -36,7 +36,7 @@ type AnnotationTable =
             ?debug = debug
         )
 
-    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool, ?testId: bool) =
+    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool) =
 
         ContextMenu.ContextMenu(
             (fun data ->
@@ -82,8 +82,7 @@ type AnnotationTable =
                         console.log ("No table cell found")
                         None
                 ),
-            ?debug = debug,
-            ?testId = testId
+            ?debug = debug
         )
 
     static member private ModalController
@@ -207,7 +206,7 @@ type AnnotationTable =
 
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool, ?testId: bool) =
+    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
@@ -277,7 +276,7 @@ type AnnotationTable =
                     AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, debug = debug),
                     Browser.Dom.document.body
                 )
-                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug, ?testId = testId)
+                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug)
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,
