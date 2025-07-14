@@ -12,7 +12,6 @@ let getAutosaveConfiguration () =
         |> Some
     with _ ->
         WebStorage.localStorage.removeItem (AutosaveConfig_Key)
-        printfn "Could not find %s" AutosaveConfig_Key
         None
 
 let setAutosaveConfiguration (autosaveConfig: bool) =
