@@ -7,7 +7,6 @@ open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
 
-
 module private TableHelper =
 
     let (|ActiveTrigger|Default|) (eventCode: string) =
@@ -67,6 +66,7 @@ swt:p-0"""
             renderActiveCell: TableCellController -> ReactElement,
             ref: IRefValue<TableHandle>,
             ?height: int,
+            ?width: int,
             ?onSelect: GridSelect.OnSelect,
             ?onKeydown: (Browser.Types.KeyboardEvent * GridSelect.GridSelectHandle * CellCoordinate option) -> unit,
             ?enableColumnHeaderSelect: bool,
@@ -77,7 +77,7 @@ swt:p-0"""
         let enableColumnHeaderSelect = defaultArg enableColumnHeaderSelect false
         let defaultStyleSelect = defaultArg defaultStyleSelect true
 
-        let scrollContainerRef = React.useElementRef ()
+        let scrollContainerRef = React.useElementRef()
 
         let rowVirtualizer =
             Virtual.useVirtualizer (
@@ -100,19 +100,13 @@ swt:p-0"""
                 count = columnCount,
                 getScrollElement = (fun () -> scrollContainerRef.current),
                 estimateSize = (fun _ -> Constants.Table.DefaultColumnWidth),
-                gap = 0,
                 overscan = 2,
+                gap = 0,
                 scrollPaddingEnd = 1.5 * float Constants.Table.DefaultColumnWidth,
                 horizontal = true,
                 rangeExtractor =
                     (fun range ->
-                        let next =
-                            set [
-                                0
-
-                                yield! Virtual.defaultRangeExtractor range
-                            ]
-
+                        let next = set [ 0; yield! Virtual.defaultRangeExtractor range ]
                         Set.toArray next
                     )
             )
@@ -228,6 +222,7 @@ swt:p-0"""
 
         React.fragment [
             Html.div [
+                prop.key "scroll-container"
                 prop.ref scrollContainerRef
                 prop.onKeyDown (fun e ->
                     TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown
@@ -235,7 +230,9 @@ swt:p-0"""
                 prop.tabIndex 0
                 prop.style [
                     if height.IsSome then
-                        style.height (height.Value)
+                        style.height height.Value
+                    if width.IsSome then
+                        style.width width.Value
                 ]
                 prop.className
                     "swt:overflow-auto swt:h-full swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-100"
@@ -243,6 +240,7 @@ swt:p-0"""
                     prop.testId "virtualized-table"
                 prop.children [
                     Html.div [
+                        prop.key "table-container"
                         prop.style [
                             style.height (rowVirtualizer.getTotalSize ())
                             style.width (columnVirtualizer.getTotalSize ())
@@ -250,6 +248,7 @@ swt:p-0"""
                         ]
                         prop.children [
                             Html.table [
+                                prop.key "table"
                                 prop.className "swt:w-full swt:h-full swt:border-collapse"
                                 prop.children [
                                     Html.thead [
@@ -258,18 +257,16 @@ swt:p-0"""
                                         prop.children [
                                             Html.tr [
                                                 prop.key "header"
-                                                prop.className
-                                                    "swt:sticky swt:top-0 swt:left-0 swt:z-10 swt:bg-base-100 swt:text-left"
+                                                prop.className "swt:sticky swt:top-0 swt:left-0 swt:z-10 swt:bg-base-100 swt:text-left"
                                                 prop.style [ style.height Constants.Table.DefaultRowHeight ]
                                                 prop.children [
                                                     for virtualColumn in columnVirtualizer.getVirtualItems () do
                                                         let controller =
                                                             createController {| x = virtualColumn.index; y = 0 |}
-
                                                         Html.th [
                                                             prop.ref columnVirtualizer.measureElement
                                                             prop.custom ("data-index", virtualColumn.index)
-                                                            prop.key virtualColumn.key
+                                                            prop.key $"Column-{virtualColumn.key}"
                                                             prop.className [
                                                                 if virtualColumn.index <> 0 then
                                                                     "swt:min-w-32"
@@ -306,8 +303,8 @@ swt:p-0"""
                                                                             |> Seq.last
                                                                         ),
                                                                         className =
-                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 /
-                                                                            swt:bg-base-200 swt:text-transparent"
+                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
+                                                                        debug = debug
                                                                     )
                                                                 elif controller.IsActive then
                                                                     renderActiveCell controller
@@ -320,6 +317,7 @@ swt:p-0"""
                                         ]
                                     ]
                                     Html.tbody [
+                                        prop.key "body"
                                         prop.style [ style.marginTop Constants.Table.DefaultRowHeight ]
                                         prop.className "swt:[&>tr>td]:border swt:[&>tr>td]:border-neutral"
                                         prop.children [
@@ -328,11 +326,11 @@ swt:p-0"""
                                                     Html.none // skip header row, is part of thead
                                                 else
                                                     Html.tr [
-                                                        prop.key virtualRow.key
+                                                        prop.key $"virtualRow-{virtualRow.key}"
                                                         prop.style [
+                                                            style.position.absolute
                                                             style.top 0
                                                             style.left 0
-                                                            style.position.absolute
                                                             style.custom (
                                                                 "transform",
                                                                 $"translateY({virtualRow.start}px)"
@@ -350,7 +348,7 @@ swt:p-0"""
                                                                 let controller = createController index
 
                                                                 Html.td [
-                                                                    prop.key virtualColumn.key
+                                                                    prop.key $"Cell-{virtualRow.key}-{virtualColumn.key}"
                                                                     prop.dataRow virtualRow.index
                                                                     prop.dataColumn virtualColumn.index
                                                                     prop.className [
@@ -421,7 +419,7 @@ swt:p-0"""
                         ts.Index.y,
                         ts.Index.x,
                         Html.div [
-                            prop.key $"{ts.Index.x}-{ts.Index.y}"
+                            prop.key $"Cell-{ts.Index.x}-{ts.Index.y}"
                             prop.className "swt:truncate"
                             if ts.Index.x = 0 then
                                 prop.text ts.Index.y

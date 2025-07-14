@@ -113,7 +113,7 @@ type CreateColumnModal =
         ]
 
     [<ReactComponent>]
-    static member CreateColumnModal(columnIndex: int, arcTable:ArcTable, setColumn, rmv: unit -> unit) =
+    static member CreateColumnModal(columnIndex: int, arcTable:ArcTable, setColumn, rmv: unit -> unit, ?debug) =
 
         let column = arcTable.GetColumn(columnIndex)
 
@@ -124,6 +124,8 @@ type CreateColumnModal =
 
         /// This state is only used for update logic
         let regex, setRegex = React.useState ("")
+
+        let debug = defaultArg debug false
 
         let submit =
             fun () ->
@@ -136,6 +138,8 @@ type CreateColumnModal =
 
         let footer =
             Html.div [
+                if debug then
+                    prop.testId "Create Column"
                 prop.className "swt:justify-end swt:flex swt:gap-2"
                 prop.style [ style.marginLeft length.auto ]
                 prop.children [

@@ -282,13 +282,16 @@ type EditColumnModal =
         ]
 
     [<ReactComponent>]
-    static member EditColumnModal(columnIndex: int, table: ArcTable, setColumn, rmv) =
+    static member EditColumnModal(columnIndex: int, table: ArcTable, setColumn, rmv, ?debug) =
 
         let column = table.GetColumn columnIndex
         let state, setState = React.useState (State.init column.Header.AsDiscriminate)
+        let debug = defaultArg debug false
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:h-full swt:gap-4 swt:min-h-[500px]"
+            if debug then
+                prop.testId "Edit Column"
             prop.children [
                 Html.div [
                     prop.className "swt:border-b swt:pb-2 swt:mb-2"

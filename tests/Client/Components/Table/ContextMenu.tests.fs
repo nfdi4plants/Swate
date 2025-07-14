@@ -1,13 +1,21 @@
 module Components.Tests.Table.ContextMenu
 
 open Fable.Mocha
+open Fable.React
+open Fable.React.Props
+open Fable.Core
+open Fable.Core.JsInterop
+open Browser.Types
 open ARCtrl
 open ARCtrl.Spreadsheet
 open Swate.Components
 open AnnotationTableContextMenu
 open Fixture
+open Feliz
+open Types.AnnotationTable
 
 type TestCases =
+
     static member AddColumns () =
         let pasteData = Fixture.Column_Component_InstrumentModel
 
@@ -137,10 +145,9 @@ type TestCases =
             |})
             "Should predict paste fitted cells behavior"
 
-    static member AddUnknown (pasteData:string[][]) =
+    static member AddUnknownPattern (pasteData:string[][]) =
         let currentTable = Fixture.mkTable ()
         let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 4, 4)
-        let cellCoordinates = Fixture.getRangeOfSelectedCells(selectHandle)
 
         let headers =
             let columnIndices = selectHandle.getSelectedCells() |> Array.ofSeq |> Array.distinctBy (fun item -> item.x)
@@ -161,11 +168,6 @@ type TestCases =
                 selectHandle,
                 adaptedData
             )
-
-        let fittedCells =
-            AnnotationTableContextMenuUtil.getFittedCells(
-                adaptedData,
-                headers)
         Expect.equal
             pasteBehavior
             (PasteCases.Unknown {|
@@ -175,6 +177,7 @@ type TestCases =
             "Should predict paste fitted cells behavior"
 
 let Main =
+
     testList "Context Menu" [
         testList "Prediction" [
             testCase "Add columns"
@@ -215,6 +218,6 @@ let Main =
                     TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer)
             testCase $"Add unknown value"
                 <| fun _ ->
-                    TestCases.AddUnknown(Fixture.Body_Empty)
+                    TestCases.AddUnknownPattern(Fixture.Body_Empty)
         ]
     ]

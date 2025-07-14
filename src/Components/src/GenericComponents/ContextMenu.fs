@@ -47,7 +47,8 @@ type ContextMenu =
         (
             childInfo: obj -> ContextMenuItem list,
             ?ref: IRefValue<HTMLElement option>,
-            ?onSpawn: Browser.Types.MouseEvent -> obj option
+            ?onSpawn: Browser.Types.MouseEvent -> obj option,
+            ?debug: bool
         ) =
 
         let (spawnData: obj), setSpawnData = React.useState (null)
@@ -65,6 +66,8 @@ type ContextMenu =
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
         let listContentRef = React.useRef (ResizeArray())
+
+        let debug = defaultArg debug false
 
         let floating =
             FloatingUI.useFloating (
@@ -197,7 +200,6 @@ type ContextMenu =
 
                 timeout.current
                 |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
-
         FloatingUI.FloatingPortal(
             if isOpen then
                 FloatingUI.FloatingOverlay(
@@ -211,6 +213,13 @@ type ContextMenu =
                             children =
                                 Html.div [
                                     prop.ref floating.refs.setFloating
+                                    if debug then
+                                        if children.Length <= 1 then
+                                            prop.testId "context_menu_index"
+                                        elif children.Length > 1 && children.Length <= 5 then
+                                            prop.testId "context_menu_header"
+                                        else
+                                            prop.testId "context_menu_body"
                                     prop.custom ("style", floating.floatingStyles)
                                     for key, v in
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do
