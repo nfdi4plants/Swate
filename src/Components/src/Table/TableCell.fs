@@ -30,7 +30,7 @@ type TableCell =
         ]
 
     [<ReactComponent>]
-    static member BaseActiveTableCell(ts: TableCellController, data: string, setData, ?isStickyHeader: bool) =
+    static member BaseActiveTableCell(ts: TableCellController, data: string, setData, ?isStickyHeader: bool, ?debug: bool) =
         let isStickyHeader = defaultArg isStickyHeader false
         let tempData, setTempData = React.useState (data)
         React.useEffect ((fun _ -> setTempData data), [| box data |])
@@ -59,11 +59,12 @@ type TableCell =
                 prop.onBlur (fun e ->
                     ts.onBlur e
                     setData tempData)
-            ]
+            ],
+            ?debug = debug
         )
 
     static member CompositeCellActiveRender
-        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit)
+        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit, ?debug)
         =
 
         match cell with
@@ -115,7 +116,8 @@ type TableCell =
             TableCell.BaseActiveTableCell(
                 tableCellController,
                 Option.defaultValue "" d.Name,
-                fun t ->
+                (fun t ->
                     d.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
-                    setCell (CompositeCell.Data d)
+                    setCell (CompositeCell.Data d)),
+                ?debug = debug
             )

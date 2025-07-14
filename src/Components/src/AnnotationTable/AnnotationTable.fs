@@ -15,7 +15,7 @@ open Types.AnnotationTable
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
+    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement, ?debug) =
         TableCell.BaseCell(
             tcc.Index.y,
             tcc.Index.x,
@@ -32,7 +32,8 @@ type AnnotationTable =
                 ]
             ],
             props = [ prop.title text; prop.onClick (fun e -> tcc.onClick e) ],
-            className = "swt:w-full swt:h-full"
+            className = "swt:w-full swt:h-full",
+            ?debug = debug
         )
 
     static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool, ?testId: bool) =
@@ -221,11 +222,12 @@ type AnnotationTable =
                             tcc.Index.x,
                             Html.text tcc.Index.y,
                             className =
-                                "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200"
+                                "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200",
+                            debug = debug
                         )
                     | Some(U2.Case2 header) ->
                         let text = header.ToString()
-                        AnnotationTable.InactiveTextRender(text, tcc)
+                        AnnotationTable.InactiveTextRender(text, tcc, debug = debug)
                     | Some(U2.Case1 cell) ->
                         let text = cell.ToString()
 
@@ -245,7 +247,7 @@ type AnnotationTable =
                             else
                                 None
 
-                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)
+                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon, debug = debug)
                 ),
                 withKey =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
@@ -261,7 +263,7 @@ type AnnotationTable =
                                 arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
 
                         let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
-                        TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index)
+                        TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, debug = debug)
                     | _ -> Html.div "Unknown cell type"
                 )
             )

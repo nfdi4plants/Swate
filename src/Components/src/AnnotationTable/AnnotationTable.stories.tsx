@@ -7,7 +7,7 @@ import React from 'react';
 import MockTable from './MockTable.js';
 
 function renderTable(args: any) {
-  const [table, setTable] = React.useState(MockTable);
+  const [table, setTable] = React.useState(MockTable.Copy());
 
   return (
     <div className='swt:h-[600px]'>
@@ -102,7 +102,7 @@ export const ContextMenuHeader: Story = {
 
     const cell = await canvas.findByTestId('cell-0-1');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     await waitFor(() => {
       const contextMenu = screen.getByTestId('header');
@@ -124,7 +124,7 @@ export const ContextMenuIndex: Story = {
 
     const cell = await canvas.findByTestId('cell-0-0');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     await waitFor(() => {
       const contextMenu = screen.getByTestId('index');
@@ -145,7 +145,7 @@ export const FreeTextDetails: Story = {
 
     const cell = await canvas.findByTestId('cell-1-1');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -174,7 +174,7 @@ export const FreeText2Details: Story = {
 
     const cell = await canvas.findByTestId('cell-1-2');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -203,7 +203,7 @@ export const TermDetails: Story = {
 
     const cell = await canvas.findByTestId('cell-1-3');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -232,7 +232,7 @@ export const UnitizedDetails: Story = {
 
     const cell = await canvas.findByTestId('cell-1-5');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -261,7 +261,7 @@ export const EditColumn: Story = {
 
     const cell = await canvas.findByTestId('cell-1-1');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -290,7 +290,7 @@ export const CreateColumn: Story = {
 
     const cell = await canvas.findByTestId('cell-1-1');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -305,13 +305,13 @@ export const CreateColumn: Story = {
       expect(editModal).toBeVisible();
     });
 
-    const editModal = await screen.getByTestId('modal_Edit');
+    const editModal = screen.getByTestId('modal_Edit');
     expect(editModal).toBeVisible();
 
     const createButton = await within(editModal).findByText(/Create Column/i);
     expect(createButton).toBeVisible();
 
-    userEvent.click(createButton);
+    await userEvent.click(createButton);
 
     await waitFor(() => {
       const createTab = screen.getByTestId('Create Column');
@@ -332,7 +332,7 @@ export const UpdateColumn: Story = {
 
     const cell = await canvas.findByTestId('cell-1-1');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -347,13 +347,13 @@ export const UpdateColumn: Story = {
       expect(editModal).toBeVisible();
     });
 
-    const editModal = await screen.getByTestId('modal_Edit');
+    const editModal = screen.getByTestId('modal_Edit');
     expect(editModal).toBeVisible();
 
     const createButton = await within(editModal).findByText(/Update Column/i);
     expect(createButton).toBeVisible();
 
-    userEvent.click(createButton);
+    await userEvent.click(createButton);
 
     await waitFor(() => {
       const createTab = screen.getByTestId('Update Column');
@@ -374,7 +374,7 @@ export const DeleteColumn: Story = {
 
     const cell = await canvas.findByTestId('cell-1-1');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
@@ -408,7 +408,7 @@ export const DeleteRow: Story = {
 
     const cell = await canvas.findByTestId('cell-1-1');
 
-    fireEvent.contextMenu(cell);
+    await fireEvent.contextMenu(cell);
 
     const contextMenu = screen.getByTestId('context_menu');
     expect(contextMenu).toBeVisible();
