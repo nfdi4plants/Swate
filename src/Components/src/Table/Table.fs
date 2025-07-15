@@ -79,6 +79,32 @@ swt:p-0"""
 
         let scrollContainerRef = React.useElementRef()
 
+        React.useLayoutEffect(fun () ->
+            if debug then
+                match scrollContainerRef.current with
+                | None -> ()
+                | Some el ->
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "clientHeight", 
+                        createObj [
+                        "get" ==> (fun () -> 600)
+                        "configurable" ==> true
+                        ])
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "offsetHeight", 
+                        createObj [
+                        "get" ==> (fun () -> 600)
+                        "configurable" ==> true
+                        ])
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "clientWidth", 
+                        createObj [
+                        "get" ==> (fun () -> 1000)
+                        "configurable" ==> true
+                        ])
+                    Browser.Dom.window?Object?defineProperty(scrollContainerRef.current, "offsetWidth", 
+                        createObj [
+                        "get" ==> (fun () -> 1000)
+                        "configurable" ==> true
+                        ]))
+
         let rowVirtualizer =
             Virtual.useVirtualizer (
                 count = rowCount,
