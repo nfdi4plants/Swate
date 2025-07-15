@@ -192,7 +192,7 @@ type ContextMenu =
                     myClearTimeout ())),
             [| box floating.refs |]
         )
-
+        let functionIsCalled = React.useRef(false)
         let close =
             fun () ->
                 setIsOpen false
@@ -214,12 +214,7 @@ type ContextMenu =
                                 Html.div [
                                     prop.ref floating.refs.setFloating
                                     if debug then
-                                        if children.Length <= 1 then
-                                            prop.testId "context_menu_index"
-                                        elif children.Length > 1 && children.Length <= 5 then
-                                            prop.testId "context_menu_header"
-                                        else
-                                            prop.testId "context_menu_body"
+                                        prop.testId "context_menu"
                                     prop.custom ("style", floating.floatingStyles)
                                     for key, v in
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do
@@ -232,13 +227,15 @@ type ContextMenu =
 
                                             let triggerEvent =
                                                 fun (e: Browser.Types.MouseEvent) ->
-                                                    let d = {|
-                                                        buttonEvent = e
-                                                        spawnData = spawnData
-                                                    |}
+                                                    if not functionIsCalled.current then
+                                                        functionIsCalled.current <- true
+                                                        let d = {|
+                                                            buttonEvent = e
+                                                            spawnData = spawnData
+                                                        |}
 
-                                                    child.onClick |> Option.iter (fun f -> f d)
-                                                    close ()
+                                                        child.onClick |> Option.iter (fun f -> f d)
+                                                        close ()
 
                                             let props =
                                                 interactions.getItemProps (

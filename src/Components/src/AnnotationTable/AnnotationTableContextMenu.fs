@@ -429,7 +429,7 @@ type AnnotationTableContextMenu =
                     fun _ ->
                         promise {
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
-                            
+
                             try
                                 let prediction =
                                     AnnotationTableContextMenuUtil.predictPasteBehaviour (

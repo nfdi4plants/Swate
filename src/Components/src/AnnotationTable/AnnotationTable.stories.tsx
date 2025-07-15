@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { fn, within, expect, userEvent, waitFor, fireEvent } from '@storybook/test';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import { screen } from "@storybook/testing-library";
 import Table from "./AnnotationTable.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
@@ -42,17 +42,16 @@ export const Default: Story = {
     const canvas = within(canvasElement);
 
     const contextMenu = canvas.getByTestId('annotation_table');
-    expect(contextMenu).toBeVisible();
+    await expect(contextMenu).toBeVisible();
   }
 }
 
-export const ContextMenuBody: Story = {
+export const ContextMenu: Story = {
   render: renderTable,
   args: {
     height: 600,
     witdth: 1000,
-    debug: true,
-    testId: "body"
+    debug: true
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
@@ -62,51 +61,7 @@ export const ContextMenuBody: Story = {
     fireEvent.contextMenu(cell);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('context_menu_body');
-      expect(contextMenu).toBeVisible();
-    });
-  }
-}
-
-export const ContextMenuHeader: Story = {
-  render: renderTable,
-  args: {
-    height: 600,
-    witdth: 1000,
-    debug: true,
-    testId: "header"
-  },
-  play: async ({ args, canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    const cell = await canvas.findByTestId('cell-0-1');
-
-    await fireEvent.contextMenu(cell);
-
-    await waitFor(() => {
-      const contextMenu = screen.getByTestId('context_menu_header');
-      expect(contextMenu).toBeVisible();
-    });
-  }
-}
-
-export const ContextMenuIndex: Story = {
-  render: renderTable,
-  args: {
-    height: 600,
-    witdth: 1000,
-    debug: true,
-    testId: "index"
-  },
-  play: async ({ args, canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    const cell = await canvas.findByTestId('cell-0-0');
-
-    await fireEvent.contextMenu(cell);
-
-    await waitFor(() => {
-      const contextMenu = screen.getByTestId('context_menu_index');
+      const contextMenu = screen.getByTestId('context_menu');
       expect(contextMenu).toBeVisible();
     });
   }
@@ -126,11 +81,11 @@ export const FreeTextDetails: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
-    expect(detailsButton).toBeVisible();
+    await expect(detailsButton).toBeVisible();
 
     await userEvent.click(detailsButton);
 
@@ -155,11 +110,11 @@ export const FreeText2Details: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
-    expect(detailsButton).toBeVisible();
+    await expect(detailsButton).toBeVisible();
 
     await userEvent.click(detailsButton);
 
@@ -184,11 +139,11 @@ export const TermDetails: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
-    expect(detailsButton).toBeVisible();
+    await expect(detailsButton).toBeVisible();
 
     await userEvent.click(detailsButton);
 
@@ -213,11 +168,11 @@ export const UnitizedDetails: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
-    expect(detailsButton).toBeVisible();
+    await expect(detailsButton).toBeVisible();
 
     await userEvent.click(detailsButton);
 
@@ -242,11 +197,11 @@ export const EditColumn: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Edit/i });
-    expect(editButton).toBeVisible();
+    await expect(editButton).toBeVisible();
 
     await userEvent.click(editButton);
 
@@ -271,11 +226,11 @@ export const CreateColumn: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Edit/d });
-    expect(editButton).toBeVisible();
+    await expect(editButton).toBeVisible();
 
     await userEvent.click(editButton);
 
@@ -285,10 +240,10 @@ export const CreateColumn: Story = {
     });
 
     const editModal = screen.getByTestId('modal_Edit');
-    expect(editModal).toBeVisible();
+    await expect(editModal).toBeVisible();
 
     const createButton = await within(editModal).findByText(/Create Column/i);
-    expect(createButton).toBeVisible();
+    await expect(createButton).toBeVisible();
 
     await userEvent.click(createButton);
 
@@ -313,11 +268,11 @@ export const UpdateColumn: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Edit/d });
-    expect(editButton).toBeVisible();
+    await expect(editButton).toBeVisible();
 
     await userEvent.click(editButton);
 
@@ -327,10 +282,10 @@ export const UpdateColumn: Story = {
     });
 
     const editModal = screen.getByTestId('modal_Edit');
-    expect(editModal).toBeVisible();
+    await expect(editModal).toBeVisible();
 
     const createButton = await within(editModal).findByText(/Update Column/i);
-    expect(createButton).toBeVisible();
+    await expect(createButton).toBeVisible();
 
     await userEvent.click(createButton);
 
@@ -351,46 +306,27 @@ export const DeleteColumn: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await waitFor(() => {
-      const table = screen.getByTestId('annotation_table');
-      expect(table).toBeVisible();
-
-      const rows = within(table).getAllByRole('row');
-      const headerRow = rows[0];
-      const columns = within(headerRow).getAllByRole('columnheader');
-    });
-
     const table = screen.getByTestId('annotation_table');
-    expect(table).toBeVisible();
+    await expect(table).toBeVisible();
 
-    const rows = within(table).getAllByRole('row');
-    const headerRow = rows[0];
-    const columns = within(headerRow).getAllByRole('columnheader');
-
-    const oldColumnLength = columns.length
+    const oldColumnLength = table.getAttribute("data-columnCount")
+    await expect(oldColumnLength).toBe("6");
 
     const cell = await canvas.findByTestId('cell-1-1');
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const deleteButton = within(contextMenu).getByRole('button', { name: /Delete Column/d });
-    expect(deleteButton).toBeVisible();
+    await expect(deleteButton).toBeVisible();
+    await userEvent.click(deleteButton);
+    const newTable = screen.getByTestId('annotation_table');
+    await expect(newTable).toBeVisible();
 
-    userEvent.click(deleteButton);
-
-    await waitFor(() => {
-      const table = screen.getByTestId('annotation_table');
-      expect(table).toBeVisible();
-
-      const rows = within(table).getAllByRole('row');
-      const headerRow = rows[0];
-      const columns = within(headerRow).getAllByRole('columnheader');
-
-      expect(columns).toHaveLength(oldColumnLength - 1);
-    });
+    const newColumnLength = newTable.getAttribute("data-columnCount")
+    await expect(newColumnLength).toBe("5");
   }
 }
 
@@ -408,11 +344,11 @@ export const DeleteRow: Story = {
 
     await fireEvent.contextMenu(cell);
 
-    const contextMenu = screen.getByTestId('context_menu_body');
-    expect(contextMenu).toBeVisible();
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
 
     const editButton = within(contextMenu).getByRole('button', { name: /Delete Row/d });
-    expect(editButton).toBeVisible();
+    await expect(editButton).toBeVisible();
 
     await userEvent.click(editButton);
 

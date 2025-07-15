@@ -103,7 +103,7 @@ type AnnotationTable =
                 elif cc.y = 0 then // headers
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    let setHeader = 
+                    let setHeader =
                         fun (newHeader: CompositeHeader) ->
                             try
                                 arcTable.UpdateHeader(cc.x - 1, newHeader)
@@ -271,6 +271,8 @@ type AnnotationTable =
             prop.ref containerRef
             if debug then
                 prop.testId "annotation_table"
+                prop.custom("data-columnCount", arcTable.ColumnCount)
+                prop.custom("data-rowCount", arcTable.RowCount)
             prop.children [
                 ReactDOM.createPortal ( // Modals
                     AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, debug = debug),
