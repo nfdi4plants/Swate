@@ -56,6 +56,7 @@ module Spreadsheet =
                             (curry GenericError Cmd.none >> DevMsg)
                     else
                         cmd
+
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->

@@ -232,7 +232,7 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
         Html.button [
             prop.onClick (fun _ -> setOpen (not isOpen))
             prop.role "button"
-            prop.className "swt:btn swt:btn-primary swt:join-item swt:flex-nowrap"
+            prop.className "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
             prop.children [
                 Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
                 Html.i [ prop.className "fa-solid fa-angle-down" ]

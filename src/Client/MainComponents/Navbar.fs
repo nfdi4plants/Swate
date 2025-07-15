@@ -12,6 +12,8 @@ open Swate.Components
 open Swate.Components.Shared
 open ARCtrl
 
+open LocalStorage.AutosaveConfig
+
 let private FileName (model: Model) =
     let txt =
         match model.SpreadsheetModel.ArcFile with
@@ -73,23 +75,25 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     ]
 
 let private QuickAccessButtonListEnd (model: Model) dispatch =
+    let autoSaveConfig = getAutosaveConfiguration()
     React.fragment [
-        QuickAccessButton.QuickAccessButton(
-            "Save",
-            Icons.Save(),
-            (fun _ ->
-                match model.PersistentStorageState.Host with
-                | Some(Swatehost.Browser) ->
-                    Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value
-                    |> SpreadsheetMsg
-                    |> dispatch
-                | Some(Swatehost.ARCitect) ->
-                    ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
-                | _ -> ()),
-            isDisabled = model.SpreadsheetModel.ArcFile.IsNone
-        )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Browser ->
+            QuickAccessButton.QuickAccessButton(
+                "Save",
+                Icons.Save(),
+                (fun _ ->
+                    match model.PersistentStorageState.Host with
+                    | Some(Swatehost.Browser) ->
+                        Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value
+                        |> SpreadsheetMsg
+                        |> dispatch
+                    | Some(Swatehost.ARCitect) ->
+                        ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
+                    | _ -> ()),
+                isDisabled = model.SpreadsheetModel.ArcFile.IsNone
+            )
+
             QuickAccessButton.QuickAccessButton(
                 "Reset",
                 Icons.Delete(),
@@ -101,6 +105,24 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                     |> dispatch),
                 color = DaisyUIColors.Error
             )
+
+            NavbarBurger.Main(model, dispatch)
+        | Some Swatehost.ARCitect ->
+            if autoSaveConfig.IsSome && not autoSaveConfig.Value then
+                QuickAccessButton.QuickAccessButton(
+                    "Save",
+                    Icons.Save(),
+                    (fun _ ->
+                        match model.PersistentStorageState.Host with
+                        | Some(Swatehost.Browser) ->
+                            Spreadsheet.ExportXlsx model.SpreadsheetModel.ArcFile.Value
+                            |> SpreadsheetMsg
+                            |> dispatch
+                        | Some(Swatehost.ARCitect) ->
+                            ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
+                        | _ -> ()),
+                    isDisabled = model.SpreadsheetModel.ArcFile.IsNone
+                )
 
             NavbarBurger.Main(model, dispatch)
         | _ -> Html.none
@@ -152,7 +174,9 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
             add widget widgets
 
     Components.BaseNavbar.Main [
-        Html.div [ prop.className "swt:grow-0"; prop.children [ FileName model ] ]
+        Html.div [
+            prop.className "swt:grow-0"
+        ]
         Html.div [
             prop.className "swt:navbar-center swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
             prop.children [
