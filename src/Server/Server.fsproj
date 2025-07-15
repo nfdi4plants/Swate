@@ -19,7 +19,7 @@
     <ProjectReference Include="..\Shared\Swate.Components.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl" Version="2.2.4" />
+    <PackageReference Include="ARCtrl" Version="2.5.1" />
     <PackageReference Include="Saturn" Version="0.16.1" />
     <PackageReference Include="Fable.Remoting.Giraffe" Version="5.19.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
