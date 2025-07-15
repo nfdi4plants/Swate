@@ -370,7 +370,7 @@ export const DeleteColumn: Story = {
       const rows = within(table).getAllByRole('row');
       const headerRow = rows[0];
       const columns = within(headerRow).getAllByRole('columnheader');
-      expect(columns).toHaveLength(6);
+      expect(columns).toHaveLength(5);
     });
   }
 }
