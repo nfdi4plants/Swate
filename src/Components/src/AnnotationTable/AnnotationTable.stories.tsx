@@ -351,6 +351,24 @@ export const DeleteColumn: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await waitFor(() => {
+      const table = screen.getByTestId('annotation_table');
+      expect(table).toBeVisible();
+
+      const rows = within(table).getAllByRole('row');
+      const headerRow = rows[0];
+      const columns = within(headerRow).getAllByRole('columnheader');
+    });
+
+    const table = screen.getByTestId('annotation_table');
+    expect(table).toBeVisible();
+
+    const rows = within(table).getAllByRole('row');
+    const headerRow = rows[0];
+    const columns = within(headerRow).getAllByRole('columnheader');
+
+    const oldColumnLength = columns.length
+
     const cell = await canvas.findByTestId('cell-1-1');
 
     await fireEvent.contextMenu(cell);
@@ -358,10 +376,10 @@ export const DeleteColumn: Story = {
     const contextMenu = screen.getByTestId('context_menu_body');
     expect(contextMenu).toBeVisible();
 
-    const editButton = within(contextMenu).getByRole('button', { name: /Delete Column/d });
-    expect(editButton).toBeVisible();
+    const deleteButton = within(contextMenu).getByRole('button', { name: /Delete Column/d });
+    expect(deleteButton).toBeVisible();
 
-    await userEvent.click(editButton);
+    userEvent.click(deleteButton);
 
     await waitFor(() => {
       const table = screen.getByTestId('annotation_table');
@@ -370,7 +388,8 @@ export const DeleteColumn: Story = {
       const rows = within(table).getAllByRole('row');
       const headerRow = rows[0];
       const columns = within(headerRow).getAllByRole('columnheader');
-      expect(columns).toHaveLength(6);
+
+      expect(columns).toHaveLength(oldColumnLength - 1);
     });
   }
 }
