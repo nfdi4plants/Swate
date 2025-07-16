@@ -256,7 +256,7 @@ type AnnotationTable =
             React.memo (
                 (fun (tcc: TableCellController) ->
                     match tcc with
-                    | cell when tcc.Index.x > 0 && tcc.Index.y > 0 ->
+                    | _ when tcc.Index.x > 0 && tcc.Index.y > 0 ->
                         let setCell =
                             fun (cell: CellCoordinate) (cc: CompositeCell) ->
                                 arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)

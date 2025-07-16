@@ -106,7 +106,8 @@ type TableCell =
                     ),
                 autoFocus = true,
                 portalModals = Browser.Dom.document.body,
-                portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer)
+                portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer),
+                ?debug = debug
             )
         | CompositeCell.FreeText txt ->
             TableCell.BaseActiveTableCell(tableCellController, txt, fun t -> setCell (CompositeCell.FreeText t))

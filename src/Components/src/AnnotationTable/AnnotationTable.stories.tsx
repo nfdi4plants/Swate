@@ -361,3 +361,31 @@ export const DeleteRow: Story = {
     });
   }
 }
+
+export const ActivateTermSearchContainer: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-1-3');
+
+    await userEvent.click(cell);
+    await userEvent.keyboard('T');
+
+    const input = await canvas.findByRole('textbox');
+
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Temperature');
+
+
+    await waitFor(() => {
+      const termsearch = screen.getByTestId('term_dropdown');
+      expect(termsearch).toBeVisible();
+    });
+  }
+}
