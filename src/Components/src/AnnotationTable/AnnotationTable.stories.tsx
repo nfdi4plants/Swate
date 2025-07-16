@@ -382,10 +382,9 @@ export const ActivateTermSearchContainer: Story = {
     await userEvent.clear(input);
     await userEvent.type(input, 'Temperature');
 
-
     await waitFor(() => {
-      const termsearch = screen.getByTestId('term_dropdown');
-      expect(termsearch).toBeVisible();
+      const termDropdown = screen.getByTestId('term_dropdown');
+      expect(termDropdown).toBeVisible();
     });
   }
 }
