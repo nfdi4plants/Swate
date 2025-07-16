@@ -389,3 +389,26 @@ export const ActivateTermSearchContainer: Story = {
     });
   }
 }
+
+export const TermDetailsKeyboard: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-1-3');
+
+    await userEvent.click(cell);
+
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+
+    await waitFor(() => {
+      const modal = screen.getByTestId('modal_Details_Term');
+      expect(modal).toBeVisible();
+    });
+  }
+}
