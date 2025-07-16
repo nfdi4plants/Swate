@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--This is a temporary file used by Fable to restore dependencies.
+If you see this file in your project, you can delete it safely-->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PackageId>Swate.Components</PackageId>
+    <PackageVersion>$(GitTag)</PackageVersion>
+    <Authors>Kevin Frey</Authors>
+    <Description>Swate react components</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>F# fable rdm react fable-library fable-javascript</PackageTags>
+    <PackageProjectUrl>https://github.com/nfdi4plants/Swate</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/Swate</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
+    <Compile Include="Util\Types.fs" />
+    <Compile Include="Util\Virtual.fs" />
+    <Compile Include="Util\FloatingUI.fs" />
+    <Compile Include="Util\Constants.fs" />
+    <Compile Include="Util\Extensions.fs" />
+    <Compile Include="Util\React.useListener.fs" />
+    <Compile Include="Util\Api.fs" />
+    <Compile Include="Util\ARCtrl.Helper.fs" />
+    <Compile Include="GenericComponents\Icons.fs" />
+    <Compile Include="GenericComponents\GenericComponents.fs" />
+    <Compile Include="GenericComponents\ContextMenu.fs" />
+    <Compile Include="GenericComponents\ErrorBaseModal.fs" />
+    <Compile Include="GenericComponents\BaseModal.fs" />
+    <Compile Include="ThemeProvider\ThemeProvider.fs" />
+    <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
+    <Compile Include="TermSearch\TermSearch.fs" />
+    <Compile Include="ArcTypeComponents\CreateColumnModal.fs" />
+    <Compile Include="ArcTypeComponents\UpdateColumnModal.fs" />
+    <Compile Include="ArcTypeComponents\EditColumnModal.fs" />
+    <Compile Include="ArcTypeComponents\ArcTypeEditModal.fs" />
+    <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
+    <Compile Include="ArcTypeComponents\ArcTypeTransformModal.fs" />
+    <Compile Include="Table\KeyboardNavigation.fs" />
+    <Compile Include="Table\TableCell.fs" />
+    <Compile Include="Table\Table.fs" />
+    <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
+    <Compile Include="AnnotationTable\AnnotationTable.fs" />
+    <Compile Include="Style.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ARCtrl.Spreadsheet" Version="2.5.1" />
+    <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
+    <PackageReference Include="Fable.Fetch" Version="2.7.0" />
+    <PackageReference Include="Fable.React.Types" Version="18.4.0" />
+    <PackageReference Include="Fable.Core" Version="4.5.0" />
+    <PackageReference Include="Feliz" Version="2.9.0" />
+    <PackageReference Include="Feliz.DaisyUI" Version="5.2.0" />
+    <PackageReference Include="Fable.Browser.Dom" Version="2.18.0" />
+    <PackageReference Include="ARCtrl.Core" Version="2.5.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Include all files that are compiled with this project -->
+    <!-- Include the project file itself as well -->
+    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NpmDependencies>
+      <NpmPackage Name="@fortawesome/fontawesome-free" Version="gte 6.7.2 lt 7.0.0" ResolutionStrategy="Max" />
+    </NpmDependencies>
+  </PropertyGroup>
+</Project>
