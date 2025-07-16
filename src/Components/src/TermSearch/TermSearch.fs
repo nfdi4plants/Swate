@@ -374,6 +374,7 @@ type TermSearch =
         Html.ul [
             prop.ref termDropdownRef
             if debug then
+                console.log "termDropdownRef"
                 prop.testId "term_dropdown"
             prop.style [ style.scrollbarGutter.stable ]
             prop.className [
