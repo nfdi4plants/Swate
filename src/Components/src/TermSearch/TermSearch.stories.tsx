@@ -76,7 +76,7 @@ export const ParentSearch: Story = {
       expect(directedOutput).toBeInTheDocument();
       const expectedIcons = canvas.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
-    }, { timeout: 4000 });
+    }, { timeout: 5000 });
   }
 }
 

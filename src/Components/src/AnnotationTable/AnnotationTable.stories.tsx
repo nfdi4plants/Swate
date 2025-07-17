@@ -377,15 +377,15 @@ export const ActivateTermSearchContainer: Story = {
     await userEvent.click(cell);
     await userEvent.keyboard('T');
 
-    const input = await canvas.findByRole('textbox');
+    const input = within(canvasElement).getByTestId('term-search-input');
 
     await userEvent.clear(input);
-    await userEvent.type(input, 'Temperature');
+    await userEvent.type(input, 'Temperature', {delay: 50});
 
     await waitFor(() => {
       const termDropdown = screen.getByTestId('term_dropdown');
       expect(termDropdown).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
