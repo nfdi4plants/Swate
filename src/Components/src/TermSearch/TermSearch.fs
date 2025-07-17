@@ -425,6 +425,7 @@ type TermSearch =
             prop.children [
                 Html.button [
                     prop.custom ("data-tip", tooltip)
+                    prop.type'.button
                     prop.onClick onclick
                     prop.className [
                         "swt:btn swt:btn-square swt:btn-xs swt:px-2 swt:!rounded-[var(--radius-field)]"
