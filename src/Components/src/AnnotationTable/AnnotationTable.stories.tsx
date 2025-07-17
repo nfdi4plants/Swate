@@ -90,8 +90,8 @@ export const FreeTextDetails: Story = {
     await userEvent.click(detailsButton);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('modal_Details_FreeText');
-      expect(contextMenu).toBeVisible();
+      const modal = screen.getByTestId('modal_Details_FreeText');
+      expect(modal).toBeVisible();
     });
   }
 }
@@ -119,8 +119,8 @@ export const FreeText2Details: Story = {
     await userEvent.click(detailsButton);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('modal_Details_FreeText');
-      expect(contextMenu).toBeVisible();
+      const modal = screen.getByTestId('modal_Details_FreeText');
+      expect(modal).toBeVisible();
     });
   }
 }
@@ -148,8 +148,8 @@ export const TermDetails: Story = {
     await userEvent.click(detailsButton);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('modal_Details_Term');
-      expect(contextMenu).toBeVisible();
+      const modal = screen.getByTestId('modal_Details_Term');
+      expect(modal).toBeVisible();
     });
   }
 }
@@ -177,8 +177,8 @@ export const UnitizedDetails: Story = {
     await userEvent.click(detailsButton);
 
     await waitFor(() => {
-      const contextMenu = screen.getByTestId('modal_Details_Unitized');
-      expect(contextMenu).toBeVisible();
+      const modal = screen.getByTestId('modal_Details_Unitized');
+      expect(modal).toBeVisible();
     });
   }
 }
@@ -206,8 +206,8 @@ export const EditColumn: Story = {
     await userEvent.click(editButton);
 
     await waitFor(() => {
-      const editModal = screen.getByTestId('modal_Edit');
-      expect(editModal).toBeVisible();
+      const modal = screen.getByTestId('modal_Edit');
+      expect(modal).toBeVisible();
     });
   }
 }
@@ -358,6 +358,110 @@ export const DeleteRow: Story = {
 
       const rows = within(table).getAllByRole('row');
       expect(rows).toHaveLength(17);
+    });
+  }
+}
+
+export const ActivateTermSearchContainer: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-1-3');
+
+    await userEvent.click(cell);
+    await userEvent.keyboard('T');
+
+    const input = await canvas.findByRole('textbox');
+
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Temperature');
+
+    await waitFor(() => {
+      const termDropdown = screen.getByTestId('term_dropdown');
+      expect(termDropdown).toBeVisible();
+    });
+  }
+}
+
+export const TermDetailsKeyboard: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-1-3');
+
+    await userEvent.click(cell);
+
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+
+    await waitFor(() => {
+      const modal = screen.getByTestId('modal_Details_Term');
+      expect(modal).toBeVisible();
+    });
+  }
+}
+
+export const FreeTextDetailsKeyboardActivation: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-1-1');
+
+    await fireEvent.contextMenu(cell);
+
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
+
+    await userEvent.keyboard('d');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      const modal = screen.getByTestId('modal_Details_FreeText');
+      expect(modal).toBeVisible();
+    });
+  }
+}
+
+export const EditColumnKeyboardActivation: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-1-1');
+
+    await fireEvent.contextMenu(cell);
+
+    const contextMenu = screen.getByTestId('context_menu');
+    await expect(contextMenu).toBeVisible();
+
+    await userEvent.keyboard('e');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      const modal = screen.getByTestId('modal_Edit');
+      expect(modal).toBeVisible();
     });
   }
 }
