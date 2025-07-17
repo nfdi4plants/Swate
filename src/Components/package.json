@@ -29,8 +29,7 @@
     "build": "dotnet fable clean -e fs.ts --yes && npm run fable -- --fableLib @fable-org/fable-library-js --noCache -e fs.ts -o src/output && vite build",
     "build:net": "dotnet pack ./src/Swate.Components.fsproj",
     "prebuild:storybook": "npm run fable -- --noCache",
-    "build:storybook": "storybook build",
-    "testMe": "npx vitest run --project=storybook"
+    "build:storybook": "storybook build"
   },
   "repository": {
     "type": "git",
