@@ -63,7 +63,9 @@ type ErrorBaseModal =
                                         prop.text "An error occured!"
                                     ]
                                     Html.div [
-                                        prop.text error
+                                        yield! 
+                                            error.Split('\n')
+                                            |> Array.collect (fun line -> [| Html.text line; Html.br [] |])
                                     ]
                                 ]
 

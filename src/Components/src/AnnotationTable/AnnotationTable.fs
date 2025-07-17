@@ -15,7 +15,7 @@ open Types.AnnotationTable
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement) =
+    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement, ?debug) =
         TableCell.BaseCell(
             tcc.Index.y,
             tcc.Index.x,
@@ -32,14 +32,15 @@ type AnnotationTable =
                 ]
             ],
             props = [ prop.title text; prop.onClick (fun e -> tcc.onClick e) ],
-            className = "swt:w-full swt:h-full"
+            className = "swt:w-full swt:h-full",
+            ?debug = debug
         )
 
-    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal) =
+    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool) =
+
         ContextMenu.ContextMenu(
             (fun data ->
                 let index = data |> unbox<CellCoordinate>
-
                 if index.x = 0 then // index col
                     AnnotationTableContextMenu.IndexColumnContent(
                         index.y,
@@ -52,7 +53,8 @@ type AnnotationTable =
                         index.x,
                         arcTable,
                         setArcTable,
-                        tableRef.current.SelectHandle
+                        tableRef.current.SelectHandle,
+                        setModal
                     )
                 else // standard cell
                     AnnotationTableContextMenu.CompositeCellContent(
@@ -79,12 +81,19 @@ type AnnotationTable =
                     | _ ->
                         console.log ("No table cell found")
                         None
-                )
+                ),
+            ?debug = debug
         )
 
     static member private ModalController
-        (arcTable: ArcTable, setArcTable, modal: AnnotationTable.ModalTypes, setModal, tableRef: IRefValue<TableHandle>)
+        (arcTable: ArcTable, setArcTable, modal: AnnotationTable.ModalTypes, setModal, tableRef: IRefValue<TableHandle>, ?debug: bool)
         =
+
+        let rmv =
+            fun _ ->
+                tableRef.current.focus ()
+                setModal ModalTypes.None
+
         React.fragment [
             match modal with
             | ModalTypes.None -> Html.none
@@ -93,7 +102,27 @@ type AnnotationTable =
                     Html.none
                 elif cc.y = 0 then // headers
                     let header = arcTable.Headers.[cc.x - 1]
-                    Html.none
+
+                    let setHeader =
+                        fun (newHeader: CompositeHeader) ->
+                            try
+                                arcTable.UpdateHeader(cc.x - 1, newHeader)
+                                setArcTable arcTable
+                            with exn ->
+                                let exnMessage =
+                                    if exn.Message.StartsWith("Tried setting header for column with invalid type of cells.") then
+                                        "Your change does not work with Details. Use \"Edit\" instead."
+                                    else
+                                        exn.Message
+                                setModal (ModalTypes.Error exnMessage)
+                                failwith exn.Message
+
+                    CompositeCellModal.CompositeHeaderModal(
+                        header,
+                        setHeader,
+                        rmv
+                    )
+
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
 
@@ -107,12 +136,52 @@ type AnnotationTable =
                     CompositeCellModal.CompositeCellModal(
                         cell,
                         setCell,
-                        (fun _ ->
-                            tableRef.current.focus ()
-                            setModal ModalTypes.None
-                        ),
-                        header
+                        rmv,
+                        header,
+                        ?debug = debug
                     )
+            | ModalTypes.Transform cc ->
+                if cc.x = 0 then // no details modal for index col
+                    Html.none
+                elif cc.y = 0 then // headers
+                    let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+
+                    let setCell =
+                        fun (cell: CompositeCell) ->
+                            arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                            setArcTable arcTable
+
+                    let header = arcTable.Headers.[cc.x - 1]
+
+                    CompositeCellEditModal.CompositeCellTransformModal(
+                        cell,
+                        header,
+                        setCell,
+                        rmv
+                    )
+                else
+                    let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
+
+                    let setCell =
+                        fun (cell: CompositeCell) ->
+                            arcTable.SetCellAt(cc.x - 1, cc.y - 1, cell)
+                            setArcTable arcTable
+
+                    let header = arcTable.Headers.[cc.x - 1]
+
+                    CompositeCellEditModal.CompositeCellTransformModal(
+                        cell,
+                        header,
+                        setCell,
+                        rmv
+                    )
+            | ModalTypes.Edit cc ->
+                if cc.x = 0 then // no details modal for index col
+                    Html.none
+                elif cc.y = 0 then // headers
+                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv, ?debug = debug)
+                else
+                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv, ?debug = debug)
             | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
                 ContextMenuModals.MoveColumnModal(
                     arcTable,
@@ -120,13 +189,16 @@ type AnnotationTable =
                     arcTableIndex,
                     uiTableIndex,
                     setModal,
-                    tableRef
+                    tableRef,
+                    ?debug = debug
                 )
 
             | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->
                 ContextMenuModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
             | ModalTypes.Error(exn) ->
                 ContextMenuModals.ErrorModal(exn, setModal, tableRef)
+            | ModalTypes.UnknownPasteCase(Unknown unknownPasteCase) ->
+                ContextMenuModals.UnknownPasteCase(unknownPasteCase.data, unknownPasteCase.headers, setModal, tableRef)
             | anyElse ->
                 console.warn ("Unknown modal type", anyElse)
                 Html.none
@@ -138,7 +210,7 @@ type AnnotationTable =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
-
+        let debug = defaultArg debug false
         let cellRender =
             React.memo (
                 (fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
@@ -149,11 +221,12 @@ type AnnotationTable =
                             tcc.Index.x,
                             Html.text tcc.Index.y,
                             className =
-                                "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200"
+                                "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200",
+                            debug = debug
                         )
                     | Some(U2.Case2 header) ->
                         let text = header.ToString()
-                        AnnotationTable.InactiveTextRender(text, tcc)
+                        AnnotationTable.InactiveTextRender(text, tcc, debug = debug)
                     | Some(U2.Case1 cell) ->
                         let text = cell.ToString()
 
@@ -173,37 +246,39 @@ type AnnotationTable =
                             else
                                 None
 
-                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon)
+                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon, debug = debug)
                 ),
                 withKey =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
-                        $"{tcc.Index.x}-{tcc.Index.y}"
+                        $"cellRender-{tcc.Index.x}-{tcc.Index.y}"
             )
-
         let renderActiveCell =
             React.memo (
                 (fun (tcc: TableCellController) ->
                     match tcc with
-                    | cell when tcc.Index.x > 0 && tcc.Index.y > 0 ->
+                    | _ when tcc.Index.x > 0 && tcc.Index.y > 0 ->
                         let setCell =
                             fun (cell: CellCoordinate) (cc: CompositeCell) ->
                                 arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
 
                         let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
-                        TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index)
+                        TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, debug = debug)
                     | _ -> Html.div "Unknown cell type"
                 )
-
             )
 
         Html.div [
             prop.ref containerRef
+            if debug then
+                prop.testId "annotation_table"
+                prop.custom("data-columnCount", arcTable.ColumnCount)
+                prop.custom("data-rowCount", arcTable.RowCount)
             prop.children [
                 ReactDOM.createPortal ( // Modals
-                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef),
+                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, debug = debug),
                     Browser.Dom.document.body
                 )
-                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal)
+                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug)
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,
@@ -236,7 +311,8 @@ type AnnotationTable =
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
                         ),
-                    enableColumnHeaderSelect = true
+                    enableColumnHeaderSelect = true,
+                    debug = debug
                 )
             ]
         ]
@@ -254,14 +330,6 @@ type AnnotationTable =
         )
 
         arcTable.AddColumn(
-            CompositeHeader.Output IOType.Sample,
-            [|
-                for i in 0..100 do
-                    CompositeCell.createFreeText $"Sample {i}"
-            |]
-        )
-
-        arcTable.AddColumn(
             CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")),
             [|
                 for i in 0..100 do
@@ -274,6 +342,15 @@ type AnnotationTable =
             [|
                 for i in 0..100 do
                     CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
+            |]
+        )
+
+        arcTable.AddColumn(
+            CompositeHeader.Output IOType.Data,
+            [|
+                for i in 0..100 do
+                    let newData = Data.create(string i, $"Sample {i}", DataFile.RawDataFile, "Some Format", $"Selector Format {i}", ResizeArray[Comment.create("Test", string i)])
+                    CompositeCell.createData(newData)
             |]
         )
 

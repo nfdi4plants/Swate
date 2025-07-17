@@ -1,5 +1,6 @@
 namespace Swate.Components
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
 open ARCtrl
@@ -239,10 +240,25 @@ type AnnotationTableContextMenuUtil =
                     headers
                 )
 
-            PasteCases.PasteColumns {|
-                data = fittedCells
-                coordinates = groupedCellCoordinates
-            |}
+            let isEmpty =
+                Array.isEmpty fittedCells ||
+                fittedCells
+                |> Array.map (fun row ->
+                    Array.isEmpty row ||
+                    Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace (cell.ToTabStr())) row
+                )
+                |> Array.contains true
+
+            if isEmpty then
+                PasteCases.Unknown {|
+                    data = data
+                    headers = headers
+                |}
+            else
+                PasteCases.PasteColumns {|
+                    data = fittedCells
+                    coordinates = groupedCellCoordinates
+                |}
 
     //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
     static member getIndex(startIndex, length) =
@@ -265,6 +281,10 @@ type AnnotationTableContextMenuUtil =
                 if targetCell.isUnitized && unit.isEmpty() then
                     let _, targetUnit = targetCell.AsUnitized
                     let newTarget = CompositeCell.createUnitized(value, targetUnit)
+                    newTarget
+                elif targetCell.isTerm && unit.isEmpty() then
+                    let targetTerm = targetCell.AsTerm
+                    let newTarget = CompositeCell.createUnitized(value, targetTerm)
                     newTarget
                 else
                     currentCell
@@ -301,7 +321,7 @@ type AnnotationTableContextMenuUtil =
         =
 
         match pasteCases with
-        | PasteCases.AddColumns addColumns ->
+        | AddColumns addColumns ->
             setModal (
                 AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
             )
@@ -312,6 +332,10 @@ type AnnotationTableContextMenuUtil =
                 table,
                 selectHandle,
                 setTable
+            )
+        | Unknown unknownPasteCase ->
+            setModal (
+                AnnotationTable.ModalTypes.UnknownPasteCase(PasteCases.Unknown unknownPasteCase)
             )
 
 [<Erase>]
@@ -325,20 +349,42 @@ type AnnotationTableContextMenu =
             setModal: Types.AnnotationTable.ModalTypes -> unit
         ) =
         let cellIndex = {| x = index.x - 1; y = index.y - 1 |}
+        let cell = arcTable.GetCellAt(cellIndex.x, cellIndex.y)
+        let header = arcTable.GetColumn(cellIndex.x).Header
 
+        let transformName =
+            match cell with
+            | CompositeCell.Term _ -> "Transform to Unit"
+            | CompositeCell.Unitized _ -> "Transform to Term"
+            | CompositeCell.Data _ -> "Transform to Text"
+            | CompositeCell.FreeText _ ->
+                if header.IsDataColumn then "Transform to Data"
+                else ""
         [
             ContextMenuItem(
                 Html.div "Details",
                 icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
                 kbdbutton = ATCMC.KbdHint("D"),
-                onClick = fun c -> AnnotationTable.ModalTypes.Details index |> setModal
+                onClick = fun _ -> AnnotationTable.ModalTypes.Details index |> setModal
             )
-            ContextMenuItem(Html.div "Fill Column", icon = ATCMC.Icon "fa-solid fa-pen", kbdbutton = ATCMC.KbdHint("F"))
             ContextMenuItem(
                 Html.div "Edit",
                 icon = ATCMC.Icon "fa-solid fa-pen-to-square",
-                kbdbutton = ATCMC.KbdHint("E")
+                kbdbutton = ATCMC.KbdHint("E"),
+                onClick = fun _ -> AnnotationTable.ModalTypes.Edit index |> setModal
             )
+            ContextMenuItem(
+                Html.div "Fill Column",
+                icon = ATCMC.Icon "fa-solid fa-pen",
+                kbdbutton = ATCMC.KbdHint("F")
+            )
+            if not (String.IsNullOrWhiteSpace(transformName)) then
+                ContextMenuItem(
+                    Html.div transformName,
+                    icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
+                    kbdbutton = ATCMC.KbdHint("T"),
+                    onClick = fun _ -> AnnotationTable.ModalTypes.Transform index |> setModal
+                )
             ContextMenuItem(
                 Html.div "Clear",
                 icon = ATCMC.Icon "fa-solid fa-eraser",
@@ -356,9 +402,7 @@ type AnnotationTableContextMenu =
                 icon = ATCMC.Icon "fa-solid fa-copy",
                 kbdbutton = ATCMC.KbdHint("C"),
                 onClick =
-                    fun c ->
-                        let cc = c.spawnData |> unbox<CellCoordinate>
-
+                    fun _ ->
                         AnnotationTableContextMenuUtil.copy (cellIndex, arcTable, selectHandle)
                         |> Promise.start
 
@@ -382,12 +426,10 @@ type AnnotationTableContextMenu =
                 icon = ATCMC.Icon "fa-solid fa-paste",
                 kbdbutton = ATCMC.KbdHint("V"),
                 onClick =
-                    fun c ->
+                    fun _ ->
                         promise {
-                            //let coordinate = c.spawnData |> unbox<CellCoordinate>
-
                             let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
-                            
+
                             try
                                 let prediction =
                                     AnnotationTableContextMenuUtil.predictPasteBehaviour (
@@ -420,7 +462,6 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-
                         AnnotationTableContextMenuUtil.deleteRow (cc, cellIndex.y, arcTable, selectHandle)
                         |> setArcTable
             )
@@ -431,7 +472,6 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-
                         AnnotationTableContextMenuUtil.deleteColumn (cc, cellIndex.x, arcTable, selectHandle)
                         |> setArcTable
             )
@@ -447,9 +487,23 @@ type AnnotationTableContextMenu =
         ]
 
     static member CompositeHeaderContent
-        (index: int, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle)
+        (columnIndex: int, table: ArcTable, setTable: ArcTable -> unit, selectHandle: SelectHandle, setModal: Types.AnnotationTable.ModalTypes -> unit)
         =
+        let cellCoordinate : CellCoordinate = {| y = 0; x = columnIndex |}
         [
+            ContextMenuItem(
+                Html.div "Details",
+                icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
+                kbdbutton = ATCMC.KbdHint("D"),
+                onClick = fun _ -> AnnotationTable.ModalTypes.Details cellCoordinate |> setModal
+            )
+            ContextMenuItem(
+                Html.div "Edit",
+                icon = ATCMC.Icon "fa-solid fa-pen-to-square",
+                kbdbutton = ATCMC.KbdHint("E"),
+                onClick = fun _ -> AnnotationTable.ModalTypes.Edit cellCoordinate |> setModal
+            )
+            ContextMenuItem(isDivider = true)
             ContextMenuItem(
                 Html.div "Delete Column",
                 icon = ATCMC.Icon "fa-solid fa-delete-left fa-rotate-270",
@@ -458,8 +512,17 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteColumn (cc, index, table, selectHandle)
+                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex, table, selectHandle)
                         |> setTable
+            )
+            ContextMenuItem(
+                Html.div "Move Column",
+                icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
+                kbdbutton = ATCMC.KbdHint("MC"),
+                onClick =
+                    fun c ->
+                        let cc = c.spawnData |> unbox<CellCoordinate>
+                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, cc))
             )
         ]
 

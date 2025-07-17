@@ -617,8 +617,8 @@ module Extensions =
                     success
 
                 match content with
-                | [| value |] when header.IsTermColumn && isNumber value ->
-                    CompositeCell.createUnitizedFromString (value)
+                | arr when arr.Length > 0 && arr.Length < 4 && header.IsTermColumn && isNumber arr.[0] ->
+                    CompositeCell.createUnitizedFromString (arr.[0])
                     |> _.ConvertToValidCell(header)
                 | [| freetext |] when header.IsSingleColumn -> CompositeCell.createFreeText freetext
                 | [| freetext |] -> CompositeCell.createFreeText freetext |> _.ConvertToValidCell(header)

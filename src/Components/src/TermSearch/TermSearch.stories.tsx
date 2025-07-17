@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { fn, within, expect, userEvent, waitFor, fireEvent } from '@storybook/test';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import TermSearch from "./TermSearch.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
 import React from 'react';
@@ -76,7 +76,7 @@ export const ParentSearch: Story = {
       expect(directedOutput).toBeInTheDocument();
       const expectedIcons = canvas.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
-    }, { timeout: 4000 });
+    }, { timeout: 5000 });
   }
 }
 

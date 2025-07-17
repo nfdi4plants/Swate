@@ -1,9 +1,30 @@
 namespace Fixture
 
-open Fable.Mocha
 open ARCtrl
 open ARCtrl.Spreadsheet
+
+open Browser.Types
+
 open Swate.Components
+
+open Fable.Mocha
+open Fable.React
+open Fable.React.Props
+open Fable.Core.JsInterop
+
+open Feliz
+
+open Swate.Components.Shared
+open Swate.Components
+open Fable.Core
+open Fable.Core.JsInterop
+open Feliz
+open Feliz.DaisyUI
+open ARCtrl
+open ARCtrl.Spreadsheet
+
+open Types.AnnotationTableContextMenu
+open Types.AnnotationTable
 
 type Fixture =
 
@@ -27,10 +48,10 @@ type Fixture =
         )
 
         arcTable.AddColumn(
-            CompositeHeader.Output IOType.Sample,
+            CompositeHeader.Output IOType.Data,
             [|
                 for i in 0..100 do
-                    CompositeCell.createFreeText $"Sample {i}"
+                    CompositeCell.createDataFromString(string i, format = "xlsx", selectorFormat = ";")
             |]
         )
 
@@ -51,6 +72,55 @@ type Fixture =
         )
 
         arcTable
+
+    static member hugeRenderingTable () =
+        let arcTable =
+            ARCtrl.ArcTable("TestTableHuge", ResizeArray(), System.Collections.Generic.Dictionary())
+
+        let inputColumn =
+            let cells =
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createFreeText $"Source {i}"
+                |]
+            CompositeColumn.create(CompositeHeader.Input IOType.Source, cells)
+        let outPutColumn =
+            let cells =
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createFreeText $"Sample {i}"
+                |]
+            CompositeColumn.create(CompositeHeader.Output IOType.Sample, cells)
+        let componentColumns =
+            let cells = 
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
+                |]
+            let componentColumn = CompositeColumn.create(CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")), cells)
+            Array.create 50 componentColumn
+        let parameterColumns =
+            let cells = 
+                [|
+                    for i in 0..100 do
+                        CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
+                |]
+            let parameterColumn = CompositeColumn.create(CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")), cells)
+            Array.create 50 parameterColumn
+
+        let compositeColumns =
+            let collection =
+                Array.append componentColumns parameterColumns
+                |> List.ofArray
+                |> (fun list -> list @ [outPutColumn])
+            inputColumn::collection
+            |> Array.ofList
+        arcTable.AddColumns(compositeColumns)
+        arcTable
+
+    static member BaseCell(rowIndex, columnIndex, data) =
+        let content = Html.div (data.ToString())
+        TableCell.BaseCell(rowIndex, columnIndex, content, debug = true)
 
     static member getRangeOfSelectedCells (selectHande: SelectHandle) =
         selectHande.getSelectedCells ()
@@ -99,6 +169,10 @@ type Fixture =
             [| "SCIEX instrument model"; "MS"; "MS:434343" |]
         |]
 
-    static member Body_Unit_Value_Only = [|
+    static member Body_Integer = [|
             [| "4" |]
+        |]
+
+    static member Body_Empty = [|
+            [| "" |]
         |]

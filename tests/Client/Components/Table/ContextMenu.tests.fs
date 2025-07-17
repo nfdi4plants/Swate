@@ -1,13 +1,21 @@
 module Components.Tests.Table.ContextMenu
 
 open Fable.Mocha
+open Fable.React
+open Fable.React.Props
+open Fable.Core
+open Fable.Core.JsInterop
+open Browser.Types
 open ARCtrl
 open ARCtrl.Spreadsheet
 open Swate.Components
 open AnnotationTableContextMenu
 open Fixture
+open Feliz
+open Types.AnnotationTable
 
 type TestCases =
+
     static member AddColumns () =
         let pasteData = Fixture.Column_Component_InstrumentModel
 
@@ -91,30 +99,17 @@ type TestCases =
                 pasteData
             )
 
-        let termIndices, lengthWithoutTerms = CompositeCell.getHeaderParsingInfo (headers)
-
-        if
-            termIndices.Length > 0
-            && pasteData.[0].Length >= termIndices.Length + lengthWithoutTerms then
-            Expect.equal
-                pasteBehavior
-                (PasteCases.PasteColumns {|
-                    data = compositeCells
-                    coordinates = cellCoordinates
-                |})
-                "Should predict paste fitted cells behavior"
-        else
-            Expect.equal
-                pasteBehavior
-                (PasteCases.PasteColumns {|
-                    data = compositeCells
-                    coordinates = cellCoordinates
-                |})
-                "Should predict paste cells behavior"
+        Expect.equal
+            pasteBehavior
+            (PasteCases.PasteColumns {|
+                data = compositeCells
+                coordinates = cellCoordinates
+            |})
+            "Should predict paste fitted cells behavior"
 
     static member AddFittingTerm (startColumn:int, startRow:int, pasteData:string[][]) =
         let currentTable = Fixture.mkTable ()
-        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 4, 4)
+        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 3, 3)
         let cellCoordinates = Fixture.getRangeOfSelectedCells(selectHandle)
 
         let headers =
@@ -142,25 +137,47 @@ type TestCases =
                 adaptedData,
                 headers)
 
-        if selectHandle.getCount () > 1 then
+        Expect.equal
+            pasteBehavior
+            (PasteCases.PasteColumns {|
+                data = fittedCells
+                coordinates = cellCoordinates
+            |})
+            "Should predict paste fitted cells behavior"
 
-            Expect.equal
-                pasteBehavior
-                (PasteCases.PasteColumns {|
-                    data = fittedCells
-                    coordinates = cellCoordinates
-                |})
-                "Should predict paste fitted cells behavior"
-        else
-            Expect.equal
-                pasteBehavior
-                (PasteCases.PasteColumns {|
-                    data = fittedCells
-                    coordinates = cellCoordinates
-                |})
-                "Should predict paste cells behavior"
+    static member AddUnknownPattern (pasteData:string[][]) =
+        let currentTable = Fixture.mkTable ()
+        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 4, 4)
+
+        let headers =
+            let columnIndices = selectHandle.getSelectedCells() |> Array.ofSeq |> Array.distinctBy (fun item -> item.x)
+
+            columnIndices
+            |> Array.map (fun index -> currentTable.GetColumn(index.x - 1).Header)
+
+        let clickedCell: CellCoordinate = {| x = 4; y = 1 |}
+
+        let adaptedData =
+            pasteData
+            |> Array.map (fun item -> item)
+
+        let pasteBehavior =
+            Swate.Components.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                clickedCell,
+                currentTable,
+                selectHandle,
+                adaptedData
+            )
+        Expect.equal
+            pasteBehavior
+            (PasteCases.Unknown {|
+                data = adaptedData
+                headers = headers
+            |})
+            "Should predict paste fitted cells behavior"
 
 let Main =
+
     testList "Context Menu" [
         testList "Prediction" [
             testCase "Add columns"
@@ -195,6 +212,12 @@ let Main =
                     TestCases.AddFittingTerm(0, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
             testCase $"Add unit value"
                 <| fun _ ->
-                    TestCases.AddFittingTerm(0, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term)
+                    TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer)
+            testCase $"Convert term to unit"
+                <| fun _ ->
+                    TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer)
+            testCase $"Add unknown value"
+                <| fun _ ->
+                    TestCases.AddUnknownPattern(Fixture.Body_Empty)
         ]
     ]

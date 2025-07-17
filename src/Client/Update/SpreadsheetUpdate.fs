@@ -61,7 +61,6 @@ module Spreadsheet =
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->
                         let json = assay.ToJsonString()
-
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, json)
                         |> Promise.start
                     | Some(Study(study, _)) ->
@@ -100,7 +99,6 @@ module Spreadsheet =
 
         //let newHistoryController (state, model, cmd) =
         //    updateSessionStorageMsg msg, model
-
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
             | UpdateState nextState -> nextState, model, Cmd.none
@@ -431,14 +429,12 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
-
                 let cmd =
                     Cmd.OfPromise.either
                         Xlsx.toXlsxBytes
                         fswb
                         (fun bytes -> ExportXlsxDownload(name, bytes) |> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
-
                 state, model, cmd
             | ExportXlsxDownload(name, xlsxBytes) ->
                 let _ = UpdateUtil.download (name, xlsxBytes)

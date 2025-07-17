@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { within, expect, userEvent, waitFor, screen } from '@storybook/test';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { within, expect, userEvent, waitFor, screen } from 'storybook/test';
 import BaseModal from "./BaseModal.fs.js";
 import { useState } from 'react';
 import React from 'react';

@@ -360,7 +360,8 @@ type TermSearch =
             state: SearchState,
             loading: Set<string>,
             advancedSearchToggle: (unit -> unit) option,
-            keyboardNavState: KeyboardNavigationController
+            keyboardNavState: KeyboardNavigationController,
+            ?debug: bool
         ) =
 
         let searchIsDone =
@@ -368,8 +369,12 @@ type TermSearch =
             | SearchIsDone _ -> true
             | _ -> false
 
+        let debug = defaultArg debug false
+
         Html.ul [
             prop.ref termDropdownRef
+            if debug then
+                prop.testId "term_dropdown"
             prop.style [ style.scrollbarGutter.stable ]
             prop.className [
                 if not searchIsDone then
@@ -1329,7 +1334,8 @@ type TermSearch =
                                                 searchResults,
                                                 loading,
                                                 advancedSearchToggle,
-                                                keyboardNavState
+                                                keyboardNavState,
+                                                debug = debug
                                             ))),
                                         portalTermSelectArea.portal
                                     )
@@ -1340,7 +1346,8 @@ type TermSearch =
                                         searchResults,
                                         loading,
                                         advancedSearchToggle,
-                                        keyboardNavState
+                                        keyboardNavState,
+                                        debug = debug
                                     )
                             ]
                         ]

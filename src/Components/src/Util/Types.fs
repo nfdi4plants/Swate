@@ -287,8 +287,13 @@ module AnnotationTableContextMenu =
             |}
         | PasteColumns of
             {|
-                data: CompositeCell[][]
+                data: CompositeCell [][]
                 coordinates: CellCoordinate [][]
+            |}
+        | Unknown of
+            {|
+                data: string [][]
+                headers: CompositeHeader []
             |}
 
 module AnnotationTable =
@@ -298,8 +303,11 @@ module AnnotationTable =
     [<RequireQualifiedAccess>]
     type ModalTypes =
         | Details of CellCoordinate
+        | Transform of CellCoordinate
+        | Edit of CellCoordinate
         | PasteCaseUserInput of PasteCases
         /// 👀 Uses CellCoordinate to identify if clicked cell is part of selected range
         | MoveColumn of uiTableIndex: CellCoordinate * arcTableIndex: CellCoordinate
         | Error of string
+        | UnknownPasteCase of PasteCases
         | None

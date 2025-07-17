@@ -16,9 +16,8 @@ type TableCell =
         (rowIndex: int, columnIndex: int, content: ReactElement, ?className: string, ?props, ?debug: bool)
         =
         let debug = defaultArg debug false
-
         Html.div [
-            prop.key $"{rowIndex}-{columnIndex}"
+            prop.key $"BaseCell-{rowIndex}-{columnIndex}"
             if debug then
                 prop.testId $"cell-{rowIndex}-{columnIndex}"
             prop.className [
@@ -31,7 +30,7 @@ type TableCell =
         ]
 
     [<ReactComponent>]
-    static member BaseActiveTableCell(ts: TableCellController, data: string, setData, ?isStickyHeader: bool) =
+    static member BaseActiveTableCell(ts: TableCellController, data: string, setData, ?isStickyHeader: bool, ?debug: bool) =
         let isStickyHeader = defaultArg isStickyHeader false
         let tempData, setTempData = React.useState (data)
         React.useEffect ((fun _ -> setTempData data), [| box data |])
@@ -60,11 +59,12 @@ type TableCell =
                 prop.onBlur (fun e ->
                     ts.onBlur e
                     setData tempData)
-            ]
+            ],
+            ?debug = debug
         )
 
     static member CompositeCellActiveRender
-        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit)
+        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit, ?debug)
         =
 
         match cell with
@@ -106,7 +106,8 @@ type TableCell =
                     ),
                 autoFocus = true,
                 portalModals = Browser.Dom.document.body,
-                portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer)
+                portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer),
+                ?debug = debug
             )
         | CompositeCell.FreeText txt ->
             TableCell.BaseActiveTableCell(tableCellController, txt, fun t -> setCell (CompositeCell.FreeText t))
@@ -116,7 +117,8 @@ type TableCell =
             TableCell.BaseActiveTableCell(
                 tableCellController,
                 Option.defaultValue "" d.Name,
-                fun t ->
+                (fun t ->
                     d.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
-                    setCell (CompositeCell.Data d)
+                    setCell (CompositeCell.Data d)),
+                ?debug = debug
             )

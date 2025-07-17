@@ -1,15 +1,8 @@
-namespace Modals
+namespace Swate.Components
 
-open System
 open ARCtrl
 open Feliz
-open Feliz.DaisyUI
-open Swate.Components
 open Swate.Components.Shared
-open Messages
-open Model
-open Fable.Core
-open Browser.Types
 
 type State = {
     NextHeaderType: CompositeHeaderDiscriminate
@@ -21,7 +14,7 @@ type State = {
         NextIOType = None
     }
 
-type CompositeHeaderModal =
+type EditColumnModal =
 
     static member SelectHeaderTypeOption(headerType: CompositeHeaderDiscriminate) =
         let txt = headerType.ToString()
@@ -42,28 +35,28 @@ type CompositeHeaderModal =
                 Html.optgroup [
                     prop.label "Term Columns"
                     prop.children [
-                        CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Characteristic
-                        CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Component
-                        CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Factor
-                        CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Parameter
+                        EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Characteristic
+                        EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Component
+                        EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Factor
+                        EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Parameter
                     ]
                 ]
                 // -- io columns --
                 Html.optgroup [
                     prop.label "IO Columns"
                     prop.children [
-                        CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Input
-                        CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Output
+                        EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Input
+                        EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Output
                     ]
                 ]
                 // -- single columns --
-                CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Date
-                CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Performer
-                CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolDescription
-                CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolREF
-                CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolType
-                CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolUri
-                CompositeHeaderModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolVersion
+                EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Date
+                EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.Performer
+                EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolDescription
+                EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolREF
+                EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolType
+                EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolUri
+                EditColumnModal.SelectHeaderTypeOption CompositeHeaderDiscriminate.ProtocolVersion
             ]
         ]
 
@@ -82,17 +75,17 @@ type CompositeHeaderModal =
                 }
                 |> setState)
             prop.children [
-                CompositeHeaderModal.SelectIOTypeOption IOType.Source
-                CompositeHeaderModal.SelectIOTypeOption IOType.Sample
-                CompositeHeaderModal.SelectIOTypeOption IOType.Material
-                CompositeHeaderModal.SelectIOTypeOption IOType.Data
+                EditColumnModal.SelectIOTypeOption IOType.Source
+                EditColumnModal.SelectIOTypeOption IOType.Sample
+                EditColumnModal.SelectIOTypeOption IOType.Material
+                EditColumnModal.SelectIOTypeOption IOType.Data
             ]
         ]
 
     static member Preview(column: CompositeColumn) =
         let parsedStrList =
             ARCtrl.Spreadsheet.CompositeColumn.toStringCellColumns column |> List.transpose
-
+        printfn "parsedStrList: %s" (parsedStrList.ToString())
         let headers, body =
             if column.Cells.Length >= 2 then
                 parsedStrList.[0], parsedStrList.[1..]
@@ -102,24 +95,6 @@ type CompositeHeaderModal =
         Html.div [
             prop.className "swt:overflow-x-auto swt:grow"
             prop.children [
-                //Daisy.table [
-                //    table.sm
-                //    prop.children [
-                //        Html.thead [
-                //            Html.tr [
-                //                for header in headers do
-                //                    Html.th [ prop.className "swt:truncate swt:max-w-16"; prop.text header; prop.title header ]
-                //            ]
-                //        ]
-                //        Html.tbody [
-                //            for row in body do
-                //                Html.tr [
-                //                    for cell in row do
-                //                        Html.td [ prop.className "swt:truncate swt:max-w-16"; prop.text cell; prop.title cell ]
-                //                ]
-                //        ]
-                //    ]
-                //]
                 Html.table [
                     prop.className "swt:table swt:table-sm"
                     prop.children [
@@ -172,67 +147,65 @@ type CompositeHeaderModal =
         | CompositeHeaderDiscriminate.Characteristic, _ ->
             CompositeColumn.create (
                 CompositeHeader.Characteristic(header.ToTerm()),
-                CompositeHeaderModal.cellsToTermCells (column)
+                EditColumnModal.cellsToTermCells (column)
             )
         | CompositeHeaderDiscriminate.Parameter, _ ->
             CompositeColumn.create (
                 CompositeHeader.Parameter(header.ToTerm()),
-                CompositeHeaderModal.cellsToTermCells (column)
+                EditColumnModal.cellsToTermCells (column)
             )
         | CompositeHeaderDiscriminate.Component, _ ->
             CompositeColumn.create (
                 CompositeHeader.Component(header.ToTerm()),
-                CompositeHeaderModal.cellsToTermCells (column)
+                EditColumnModal.cellsToTermCells (column)
             )
         | CompositeHeaderDiscriminate.Factor, _ ->
             CompositeColumn.create (
                 CompositeHeader.Factor(header.ToTerm()),
-                CompositeHeaderModal.cellsToTermCells (column)
+                EditColumnModal.cellsToTermCells (column)
             )
         // -- input columns --
         | CompositeHeaderDiscriminate.Input, Some IOType.Data ->
             CompositeColumn.create (
                 CompositeHeader.Input IOType.Data,
-                CompositeHeaderModal.cellsToDataOrFreeText (column)
+                EditColumnModal.cellsToDataOrFreeText (column)
             )
         | CompositeHeaderDiscriminate.Input, Some io ->
-            CompositeColumn.create (CompositeHeader.Input io, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.Input io, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.Input, None ->
-            CompositeColumn.create (CompositeHeader.Input IOType.Sample, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.Input IOType.Sample, EditColumnModal.cellsToFreeText (column))
         // -- output columns --
         | CompositeHeaderDiscriminate.Output, Some IOType.Data ->
             CompositeColumn.create (
                 CompositeHeader.Output IOType.Data,
-                CompositeHeaderModal.cellsToDataOrFreeText (column)
+                EditColumnModal.cellsToDataOrFreeText (column)
             )
         | CompositeHeaderDiscriminate.Output, Some io ->
-            CompositeColumn.create (CompositeHeader.Output io, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.Output io, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.Output, None ->
-            CompositeColumn.create (CompositeHeader.Output IOType.Sample, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.Output IOType.Sample, EditColumnModal.cellsToFreeText (column))
         // -- single columns --
         | CompositeHeaderDiscriminate.ProtocolREF, _ ->
-            CompositeColumn.create (CompositeHeader.ProtocolREF, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.ProtocolREF, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.Date, _ ->
-            CompositeColumn.create (CompositeHeader.Date, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.Date, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.Performer, _ ->
-            CompositeColumn.create (CompositeHeader.Performer, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.Performer, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.ProtocolDescription, _ ->
-            CompositeColumn.create (CompositeHeader.ProtocolDescription, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.ProtocolDescription, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.ProtocolType, _ ->
-            CompositeColumn.create (CompositeHeader.ProtocolType, CompositeHeaderModal.cellsToTermCells (column))
+            CompositeColumn.create (CompositeHeader.ProtocolType, EditColumnModal.cellsToTermCells (column))
         | CompositeHeaderDiscriminate.ProtocolUri, _ ->
-            CompositeColumn.create (CompositeHeader.ProtocolUri, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.ProtocolUri, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.ProtocolVersion, _ ->
-            CompositeColumn.create (CompositeHeader.ProtocolVersion, CompositeHeaderModal.cellsToFreeText (column))
+            CompositeColumn.create (CompositeHeader.ProtocolVersion, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.Comment, _ (*-> failwith "Comment header type is not yet implemented"*)
         | CompositeHeaderDiscriminate.Freetext, _ ->
             CompositeColumn.create (
                 CompositeHeader.FreeText(header.ToString()),
-                CompositeHeaderModal.cellsToFreeText (column)
+                EditColumnModal.cellsToFreeText (column)
             )
     //failwith "Freetext header type is not yet implemented"
-
-    static member header = Html.p "Update Column"
 
     static member modalActivity(state, setState) =
         Html.div [
@@ -240,10 +213,10 @@ type CompositeHeaderModal =
                 Html.div [
                     prop.className "swt:join"
                     prop.children [
-                        CompositeHeaderModal.SelectHeaderType(state, setState)
+                        EditColumnModal.SelectHeaderType(state, setState)
                         match state.NextHeaderType with
                         | CompositeHeaderDiscriminate.Output
-                        | CompositeHeaderDiscriminate.Input -> CompositeHeaderModal.SelectIOType(state, setState)
+                        | CompositeHeaderDiscriminate.Input -> EditColumnModal.SelectIOType(state, setState)
                         | _ -> Html.none
                     ]
                 ]
@@ -261,7 +234,7 @@ type CompositeHeaderModal =
 
     static member content(column0, state) =
         let previewColumn =
-            let cells = Array.takeSafe 10 column0.Cells
+            let cells = Array.takeSafe 15 column0.Cells
             //Replace empty cells with placeholder data to represent meaningfull information in the Preview
             cells
             |> Array.iteri (fun i cell ->
@@ -269,58 +242,74 @@ type CompositeHeaderModal =
 
                 if (Array.filter (fun item -> item = "") content).Length > 0 then
                     match cell with
-                    | cell when cell.isTerm -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
-                    | cell when cell.isUnitized -> cells.[i] <- CompositeHeaderModal.placeHolderUnitCell
-                    | cell when cell.isData -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
-                    | _ -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell)
+                    | cell when cell.isTerm -> cells.[i] <- EditColumnModal.placeHolderTermCell
+                    | cell when cell.isUnitized -> cells.[i] <- EditColumnModal.placeHolderUnitCell
+                    | cell when cell.isData -> cells.[i] <- EditColumnModal.placeHolderTermCell
+                    | _ -> cells.[i] <- EditColumnModal.placeHolderTermCell)
 
-            CompositeHeaderModal.updateColumn ({ column0 with Cells = cells }, state)
+            EditColumnModal.updateColumn ({ column0 with Cells = cells }, state)
 
         React.fragment [
             Html.label [ prop.text "Preview:" ]
             Html.div [
                 prop.style [ style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex ]
-                prop.children [ CompositeHeaderModal.Preview(previewColumn) ]
+                prop.children [ EditColumnModal.Preview(previewColumn) ]
             ]
         ]
 
-    static member footer(columnIndex, column0, state, rmv, dispatch) =
-        let submit (e) =
-            let nxtCol = CompositeHeaderModal.updateColumn (column0, state)
-            Spreadsheet.SetColumn(columnIndex, nxtCol) |> SpreadsheetMsg |> dispatch
-            rmv (e)
+    static member footer(column0, state, setColumn, rmv) =
+        let submit () =
+            let updatedColumn = EditColumnModal.updateColumn (column0, state)
+            setColumn updatedColumn
+            rmv ()
 
         Html.div [
             prop.className "swt:justify-end swt:flex swt:gap-2"
             prop.style [ style.marginLeft length.auto ]
             prop.children [
-                //Daisy.button.button [ prop.onClick rmv; button.outline; prop.text "Cancel" ]
                 Html.button [
                     prop.className "swt:btn swt:btn-outline"
                     prop.text "Cancel"
-                    prop.onClick rmv
+                    prop.onClick (fun _ -> rmv ())
                 ]
-                //Daisy.button.button [ button.primary; prop.text "Submit"; prop.onClick submit ]
                 Html.button [
                     prop.className "swt:btn swt:btn-primary"
+                    prop.style [ style.marginLeft length.auto ]
                     prop.text "Submit"
-                    prop.onClick submit
+                    prop.onClick (fun _ -> submit ())
                 ]
             ]
         ]
 
     [<ReactComponent>]
-    static member Main(columnIndex: int, model: Model, dispatch, ?rmv) =
+    static member EditColumnModal(columnIndex: int, table: ArcTable, setColumn, rmv, ?debug) =
 
-        let rmv = defaultArg rmv (Util.RMV_MODAL dispatch)
-        let column0 = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
-        let state, setState = React.useState (State.init column0.Header.AsDiscriminate)
+        let column = table.GetColumn columnIndex
+        let state, setState = React.useState (State.init column.Header.AsDiscriminate)
+        let debug = defaultArg debug false
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header = Html.p "Update Column",
-            modalClassInfo = "lg:max-w-[600px]",
-            modalActions = CompositeHeaderModal.modalActivity (state, setState),
-            content = CompositeHeaderModal.content (column0, state),
-            footer = CompositeHeaderModal.footer (columnIndex, column0, state, rmv, dispatch)
-        )
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:h-full swt:gap-4 swt:min-h-[500px]"
+            if debug then
+                prop.testId "Edit Column"
+            prop.children [
+                Html.div [
+                    prop.className "swt:border-b swt:pb-2 swt:mb-2"
+                    prop.children [
+                        EditColumnModal.modalActivity (state, setState)
+                    ]
+                ]
+                Html.div [
+                    prop.className "swt:flex-grow swt:overflow-y-auto swt:h-[200px]"
+                    prop.children [
+                        EditColumnModal.content (column, state)
+                    ]
+                ]
+                Html.div [
+                    prop.className "swt:border-t swt:pt-2 swt:mt-2"
+                    prop.children [
+                        EditColumnModal.footer (column, state, setColumn, rmv)
+                    ]
+                ]
+            ]
+        ]

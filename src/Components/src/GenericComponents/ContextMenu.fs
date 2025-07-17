@@ -47,7 +47,8 @@ type ContextMenu =
         (
             childInfo: obj -> ContextMenuItem list,
             ?ref: IRefValue<HTMLElement option>,
-            ?onSpawn: Browser.Types.MouseEvent -> obj option
+            ?onSpawn: Browser.Types.MouseEvent -> obj option,
+            ?debug: bool
         ) =
 
         let (spawnData: obj), setSpawnData = React.useState (null)
@@ -65,6 +66,8 @@ type ContextMenu =
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
         let listContentRef = React.useRef (ResizeArray())
+
+        let debug = defaultArg debug false
 
         let floating =
             FloatingUI.useFloating (
@@ -189,7 +192,7 @@ type ContextMenu =
                     myClearTimeout ())),
             [| box floating.refs |]
         )
-
+        let functionIsCalled = React.useRef(false)
         let close =
             fun () ->
                 setIsOpen false
@@ -197,7 +200,6 @@ type ContextMenu =
 
                 timeout.current
                 |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
-
         FloatingUI.FloatingPortal(
             if isOpen then
                 FloatingUI.FloatingOverlay(
@@ -211,6 +213,8 @@ type ContextMenu =
                             children =
                                 Html.div [
                                     prop.ref floating.refs.setFloating
+                                    if debug then
+                                        prop.testId "context_menu"
                                     prop.custom ("style", floating.floatingStyles)
                                     for key, v in
                                         interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do
@@ -223,13 +227,15 @@ type ContextMenu =
 
                                             let triggerEvent =
                                                 fun (e: Browser.Types.MouseEvent) ->
-                                                    let d = {|
-                                                        buttonEvent = e
-                                                        spawnData = spawnData
-                                                    |}
+                                                    if not functionIsCalled.current then
+                                                        functionIsCalled.current <- true
+                                                        let d = {|
+                                                            buttonEvent = e
+                                                            spawnData = spawnData
+                                                        |}
 
-                                                    child.onClick |> Option.iter (fun f -> f d)
-                                                    close ()
+                                                        child.onClick |> Option.iter (fun f -> f d)
+                                                        close ()
 
                                             let props =
                                                 interactions.getItemProps (
