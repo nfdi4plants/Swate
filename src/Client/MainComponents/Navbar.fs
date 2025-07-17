@@ -124,7 +124,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                     isDisabled = model.SpreadsheetModel.ArcFile.IsNone
                 )
 
-            NavbarBurger.Main(model, dispatch)
+            NavbarBurger.Main(model, dispatch, host = Swatehost.ARCitect)
         | _ -> Html.none
     ]
 

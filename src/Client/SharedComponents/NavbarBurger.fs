@@ -4,6 +4,8 @@ open Feliz
 open Feliz.DaisyUI
 open Swate.Components
 
+open Browser.Dom
+
 type NavbarBurger =
 
     static member private BurgerSwap(isOpen, setIsOpen) =
@@ -57,7 +59,7 @@ type NavbarBurger =
 
 
     [<ReactComponent>]
-    static member Main(model, dispatch) =
+    static member Main(model, dispatch, ?host: Swatehost) =
         let isOpen, setIsOpen = React.useState (false)
 
         let navigateTo =
@@ -68,6 +70,11 @@ type NavbarBurger =
                 }
                 |> Messages.UpdateModel
                 |> dispatch
+
+        let openUrlInBrowser url : IReactProperty =
+            prop.onClick (fun ev ->
+                window.``open``(url, "_blank") |> ignore
+            )
 
         Components.BaseDropdown.Main(
             isOpen,
@@ -89,8 +96,30 @@ type NavbarBurger =
                     Icons.PrivacyPolicy(),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.PrivacyPolicy)
                 )
-                NavbarBurger.DropdownItem("Docs", Icons.Docs(), prop.href Swate.Components.Shared.URLs.SWATE_WIKI)
-                NavbarBurger.DropdownItem("Contact", Icons.Contact(), prop.href Swate.Components.Shared.URLs.CONTACT)
+
+                match host with
+                | Some Swatehost.ARCitect ->
+                    NavbarBurger.DropdownItem(
+                        "Docs",
+                        Icons.Docs(),
+                        openUrlInBrowser Swate.Components.Shared.URLs.SWATE_WIKI
+                    )
+                    NavbarBurger.DropdownItem(
+                        "Contact",
+                        Icons.Contact(),
+                        openUrlInBrowser Swate.Components.Shared.URLs.CONTACT
+                    )
+                | _ ->
+                    NavbarBurger.DropdownItem(
+                        "Docs",
+                        Icons.Docs(),
+                        prop.href Swate.Components.Shared.URLs.SWATE_WIKI
+                    )
+                    NavbarBurger.DropdownItem(
+                        "Contact",
+                        Icons.Contact(),
+                        prop.href Swate.Components.Shared.URLs.CONTACT
+                    )
             ],
             style = Style.init "swt:dropdown-end"
         )
