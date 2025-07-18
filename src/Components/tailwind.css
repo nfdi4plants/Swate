@@ -238,4 +238,33 @@
   .table-bordered td {
     @apply swt:border swt:border-white swt:text-left swt:border-collapse;
   }
+
+  .swt-no-overlap td,
+  .swt-no-overlap th {
+    @apply swt:border swt:border-b swt:border-t swt:border-l swt:border-r;
+  }
+
+  .swt-no-overlap tr td:last-child,
+  .swt-no-overlap tr th:last-child {
+    border-right-width: 1px;
+  }
+
+  .swt-no-overlap tr:last-child td,
+  .swt-no-overlap tr:last-child th {
+    border-bottom-width: 1px;
+  }
+
+  .swt-no-overlap td {
+    border-top-width: 1;
+    border-bottom-width: 0;
+    border-right-width: 0;
+    border-left-width: 1;
+  }
+
+  .swt-no-overlap th {
+    border-top-width: 1;
+    border-bottom-width: 1;
+    border-right-width: 0;
+    border-left-width: 1;
+  }
 }
