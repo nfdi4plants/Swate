@@ -425,6 +425,7 @@ type TermSearch =
             prop.children [
                 Html.button [
                     prop.custom ("data-tip", tooltip)
+                    prop.type'.button
                     prop.onClick onclick
                     prop.className [
                         "swt:btn swt:btn-square swt:btn-xs swt:px-2 swt:!rounded-[var(--radius-field)]"
@@ -1165,7 +1166,7 @@ type TermSearch =
                 prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "not-prose"
+                "not-prose swt:h-full"
                 if fullwidth then
                     "swt:w-full"
             ]

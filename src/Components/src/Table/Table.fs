@@ -249,11 +249,10 @@ swt:p-0"""
                         prop.children [
                             Html.table [
                                 prop.key "table"
-                                prop.className "swt:w-full swt:h-full swt:border-collapse"
+                                prop.className "swt:w-full swt:h-full swt-no-overlap"
                                 prop.children [
                                     Html.thead [
                                         prop.key "table-thead"
-                                        prop.className "swt:[&>tr>th]:border swt:[&>tr>th]:border-neutral"
                                         prop.children [
                                             Html.tr [
                                                 prop.key "header"
@@ -319,7 +318,6 @@ swt:p-0"""
                                     Html.tbody [
                                         prop.key "body"
                                         prop.style [ style.marginTop Constants.Table.DefaultRowHeight ]
-                                        prop.className "swt:[&>tr>td]:border swt:[&>tr>td]:border-neutral"
                                         prop.children [
                                             for virtualRow in rowVirtualizer.getVirtualItems () do
                                                 if virtualRow.index = 0 then
