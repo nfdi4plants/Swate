@@ -111,7 +111,7 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                     // Term search field
                     if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                         //Daisy.input [
-                        Html.div [
+                        Html.input [
                             prop.className "swt:input swt:join-item swt:flex-grow"
                             prop.readOnly false
                             prop.valueOrDefault (model.AddBuildingBlockState.CommentHeader)
@@ -139,7 +139,6 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                         )
 
                     elif state.HeaderCellType.HasIOType() then
-                        //Daisy.input [
                         Html.input [
                             prop.className "swt:input"
                             prop.readOnly true
@@ -179,18 +178,38 @@ let private scrollIntoViewRetry (id: string) =
 
     loop 0
 
+let private addBuildingBlock (model: Model) (state: Model.BuildingBlock.Model) dispatch =
+    let header = Helper.createCompositeHeaderFromState state
+    let body = Helper.tryCreateCompositeCellFromState state
+
+    let bodyCells =
+        if body.IsSome then // create as many body cells as there are rows in the active table
+            let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
+            Array.init rowCount (fun _ -> body.Value.Copy())
+        else
+            Array.empty
+
+    let column = CompositeColumn.create (header, bodyCells)
+
+    let index =
+        Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex
+            model.SpreadsheetModel
+
+    SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
+    let id = $"Header_{index}_Main"
+    scrollIntoViewRetry id
+
 let private AddBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
-
     Html.div [
         prop.className "swt:flex swt:justify-center"
         prop.children [
-            //Daisy.button.button [
             Html.button [
-
                 let header = Helper.createCompositeHeaderFromState state
                 let body = Helper.tryCreateCompositeCellFromState state
                 let isValid = Helper.isValidColumn header
+
+                prop.type'.submit
 
                 prop.className [
                     "swt:btn swt:btn-wide"
@@ -230,11 +249,18 @@ let Main (model: Model) dispatch =
     //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
     //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
     Html.div [
-        prop.className "swt:flex swt:flex-col swt:gap-4"
-        prop.children [
-            SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)
-            if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
-                SearchBuildingBlockBodyElement(model, dispatch)
-            AddBuildingBlockButton model dispatch
+        Html.form [
+            prop.className "swt:flex swt:flex-col swt:gap-4"
+            prop.onSubmit (fun ev ->
+                ev.preventDefault()
+                addBuildingBlock model model.AddBuildingBlockState dispatch
+            )
+            prop.children [
+                SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)
+                if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
+                    SearchBuildingBlockBodyElement(model, dispatch)
+                AddBuildingBlockButton model dispatch
+                Html.input [ prop.type'.submit; prop.style [ style.display.none ] ]
+            ]
         ]
     ]
