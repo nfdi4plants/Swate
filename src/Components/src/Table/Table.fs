@@ -71,9 +71,11 @@ swt:p-0"""
             ?onKeydown: (Browser.Types.KeyboardEvent * GridSelect.GridSelectHandle * CellCoordinate option) -> unit,
             ?enableColumnHeaderSelect: bool,
             ?defaultStyleSelect: bool,
-            ?debug: bool
+            ?debug: bool,
+            ?annotator: bool
         ) =
         let debug = defaultArg debug false
+        let annotator = defaultArg annotator false
         let enableColumnHeaderSelect = defaultArg enableColumnHeaderSelect false
         let defaultStyleSelect = defaultArg defaultStyleSelect true
 
@@ -158,7 +160,7 @@ swt:p-0"""
             [| GridSelect.selectedCells |]
         )
 
-        let createController (index: CellCoordinate) =
+        let createController (index: CellCoordinate) isHeader =
             let isSelected = GridSelect.contains index
 
             let isOrigin =
@@ -171,6 +173,7 @@ swt:p-0"""
                 isActive,
                 isSelected,
                 isOrigin,
+                isHeader,
                 onKeyDown =
                     (fun (e: Browser.Types.KeyboardEvent) ->
                         match e.code with
@@ -261,7 +264,7 @@ swt:p-0"""
                                                 prop.children [
                                                     for virtualColumn in columnVirtualizer.getVirtualItems () do
                                                         let controller =
-                                                            createController {| x = virtualColumn.index; y = 0 |}
+                                                            createController {| x = virtualColumn.index; y = 0 |} true
                                                         Html.th [
                                                             prop.ref columnVirtualizer.measureElement
                                                             prop.custom ("data-index", virtualColumn.index)
@@ -320,7 +323,12 @@ swt:p-0"""
                                         prop.style [ style.marginTop Constants.Table.DefaultRowHeight ]
                                         prop.children [
                                             for virtualRow in rowVirtualizer.getVirtualItems () do
-                                                if virtualRow.index = 0 then
+                                                let rowStart =
+                                                    if annotator then
+                                                        virtualRow.``end``
+                                                    else
+                                                        virtualRow.start
+                                                if virtualRow.index = 0 && not annotator then
                                                     Html.none // skip header row, is part of thead
                                                 else
                                                     Html.tr [
@@ -331,7 +339,7 @@ swt:p-0"""
                                                             style.left 0
                                                             style.custom (
                                                                 "transform",
-                                                                $"translateY({virtualRow.start}px)"
+                                                                $"translateY({rowStart}px)"
                                                             )
                                                             style.height virtualRow.size
                                                         ]
@@ -343,7 +351,7 @@ swt:p-0"""
                                                                     y = virtualRow.index
                                                                 |}
 
-                                                                let controller = createController index
+                                                                let controller = createController index false
 
                                                                 Html.td [
                                                                     prop.key $"Cell-{virtualRow.key}-{virtualColumn.key}"

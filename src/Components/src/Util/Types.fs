@@ -71,16 +71,18 @@ type TableCellController = {
     IsActive: bool
     IsSelected: bool
     IsOrigin: bool
+    IsHeader: bool
     onKeyDown: Browser.Types.KeyboardEvent -> unit
     onBlur: Browser.Types.FocusEvent -> unit
     onClick: Browser.Types.MouseEvent -> unit
 } with
 
-    static member init(index, isActive, isSelected, isOrigin, onKeyDown, onBlur, onClick) = {
+    static member init(index, isActive, isSelected, isOrigin, isHeader, onKeyDown, onBlur, onClick) = {
         Index = index
         IsActive = isActive
         IsSelected = isSelected
         IsOrigin = isOrigin
+        IsHeader = isHeader
         onKeyDown = onKeyDown
         onBlur = onBlur
         onClick = onClick

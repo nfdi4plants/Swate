@@ -67,7 +67,7 @@ type ParsedDataFile = {
             | "\\v" -> "\v"
             | _ -> separator
 
-        let rows = file.DataContent.Split("\n")
+        let rows = file.DataContent.Split("\n", System.StringSplitOptions.RemoveEmptyEntries)
         let splitRows = rows |> Array.map (fun row -> row.Split(sanatizedSeparator))
 
         if splitRows.Length > 1 then
