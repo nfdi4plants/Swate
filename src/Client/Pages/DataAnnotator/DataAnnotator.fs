@@ -309,7 +309,7 @@ module private DataAnnotatorHelper =
         let render =
             React.memo (
                 (fun tcc ->
-                    if tcc.Index.y = 0 && file.HeaderRow.IsSome then
+                    if tcc.Index.y = 0 && file.HeaderRow.IsSome && tcc.IsHeader then
                         // Header Row
                         let content = headerRow.Value.[tcc.Index.x]
                         CellButton content
@@ -317,20 +317,13 @@ module private DataAnnotatorHelper =
                         // Body Row
                         let input = bodyRows.[tcc.Index.y].[tcc.Index.x]
                         CellButton input),
-                withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}")
+                withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}-{ts.IsHeader}")
             )
 
         Html.div [
             prop.className "swt:overflow-hidden swt:flex"
             prop.children [
-                Swate.Components.Table.Table(file.BodyRows.Length, colCount, render, (fun _ -> Html.div []), tableRef)
-            // Components.LazyLoadTable.Main(
-            //     "DataAnnotatorFileView",
-            //     bodyRows,
-            //     CellButton,
-            //     ?headerRow = headerRow,
-            //     rowHeight = rowHeight
-            // )
+                Swate.Components.Table.Table(file.BodyRows.Length, colCount, render, (fun _ -> Html.div []), tableRef, annotator = true)
             ]
         ]
 
@@ -369,13 +362,11 @@ type DataAnnotator =
                         prop.className "swt:ml-auto swt:flex swt:gap-2"
                         prop.style [ style.marginLeft length.auto ]
                         prop.children [
-                            //Daisy.button.button [ prop.onClick rmv; button.outline; prop.text "Cancel" ]
                             Html.button [
                                 prop.className "swt:btn swt:btn-outline"
                                 prop.text "Cancel"
                                 prop.onClick rmv
                             ]
-                            //Daisy.button.button [
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary"
                                 prop.text "Submit"
