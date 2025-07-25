@@ -1166,7 +1166,7 @@ type TermSearch =
                 prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "not-prose swt:h-full"
+                "not-prose swt:h-full swt:centered"
                 if fullwidth then
                     "swt:w-full"
             ]
@@ -1186,21 +1186,23 @@ type TermSearch =
                         match term with
                         | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
                             if System.String.IsNullOrWhiteSpace term.id.Value |> not then
-                                TermSearch.IndicatorItem(
-                                    "",
-                                    sprintf "%s - %s" term.name.Value term.id.Value,
-                                    "swt:tooltip-left",
-                                    "fa-solid fa-square-check",
-                                    (fun _ ->
-                                        setModal (
-                                            if modal.IsSome && modal.Value = Modals.Details then
-                                                None
-                                            else
-                                                Some Modals.Details
-                                        )
-                                    ),
-                                    btnClasses = "swt:btn-primary"
-                                )
+                                let details =
+                                    TermSearch.IndicatorItem(
+                                        "",
+                                        sprintf "%s - %s" term.name.Value term.id.Value,
+                                        "swt:tooltip-left",
+                                        "fa-solid fa-square-check",
+                                        (fun _ ->
+                                            setModal (
+                                                if modal.IsSome && modal.Value = Modals.Details then
+                                                    None
+                                                else
+                                                    Some Modals.Details
+                                            )
+                                        ),
+                                        btnClasses = "swt:btn-primary"
+                                    )
+                                ReactDOM.createPortal (details, Browser.Dom.document.body)
                         | _ when showDetails -> // show only when focused
                             TermSearch.IndicatorItem(
                                 "",

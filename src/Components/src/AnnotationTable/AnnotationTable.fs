@@ -23,7 +23,7 @@ type AnnotationTable =
                 prop.className [
                     if not tcc.IsSelected && tcc.Index.y = 0 then
                         "swt:bg-base-300"
-                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-1 swt:w-full"
+                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full"
                 ]
                 prop.children [
                     if icon.IsSome then
@@ -41,7 +41,7 @@ type AnnotationTable =
         ContextMenu.ContextMenu(
             (fun data ->
                 let index = data |> unbox<CellCoordinate>
-                if index.x = 0 then // index col
+                if index.x = 0 && index.y > 0 then // index col
                     AnnotationTableContextMenu.IndexColumnContent(
                         index.y,
                         arcTable,
@@ -263,6 +263,12 @@ type AnnotationTable =
 
                         let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
                         TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, debug = debug)
+                    | _ when tcc.Index.x > 0 && tcc.Index.y = 0 ->
+                        let setHeader =
+                            fun (index: int) (ch: CompositeHeader) ->
+                                arcTable.UpdateHeader(index - 1, ch)
+                        let header = arcTable.GetColumn(tcc.Index.x - 1).Header
+                        TableCell.CompositeHeaderActiveRender(tcc, header, setHeader (tcc.Index.x), debug = debug)
                     | _ -> Html.div "Unknown cell type"
                 )
             )

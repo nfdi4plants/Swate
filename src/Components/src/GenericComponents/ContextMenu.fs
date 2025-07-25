@@ -212,6 +212,7 @@ type ContextMenu =
                             visuallyHiddenDismiss = true,
                             children =
                                 Html.div [
+                                    functionIsCalled.current <- false
                                     prop.ref floating.refs.setFloating
                                     if debug then
                                         prop.testId "context_menu"
