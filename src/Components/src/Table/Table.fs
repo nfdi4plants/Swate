@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
+open Fable.React
 
 module private TableHelper =
 
@@ -223,6 +224,10 @@ swt:p-0"""
                     )
             )
 
+        React.useEffectOnce(fun () ->
+            Fable.Core.JS.setTimeout (fun () -> ()) 50 |> ignore
+        )
+
         React.fragment [
             Html.div [
                 prop.key "scroll-container"
@@ -290,9 +295,6 @@ swt:p-0"""
                                                                     "transform",
                                                                     $"translateX({virtualColumn.start}px)"
                                                                 )
-                                                                style.width (length.px virtualColumn.size)
-                                                                style.minWidth (length.px virtualColumn.size)
-                                                                style.maxWidth (length.px virtualColumn.size)
                                                             ]
                                                             if controller.IsActive then
                                                                 prop.custom ("data-active", true)

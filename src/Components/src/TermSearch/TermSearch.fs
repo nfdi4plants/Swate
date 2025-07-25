@@ -802,11 +802,6 @@ type TermSearch =
         let (searchResults: SearchState), setSearchResults =
             React.useStateWithUpdater (SearchState.init ())
 
-        let isRefSet, setIsRef = React.useState(false)
-
-        //let targetRef: IRefValue<Browser.Types.HTMLElement option> = React.useRef(None)
-        let indicatorPos, setIndicatorPos = React.useState(None)
-
         /// Set of string ids for each action started. As long as one id is still contained, shows loading spinner
         let (loading: Set<string>), setLoading = React.useStateWithUpdater (Set.empty)
         let inputRef = React.useInputRef ()
@@ -827,18 +822,6 @@ type TermSearch =
                     inputRef.current.Value.value <- inputText
             ),
             [| box term |]
-        )
-
-        React.useEffect (
-            (fun () ->
-                match containerRef.current with
-                | Some el ->
-                    let rect = el.getBoundingClientRect()
-                    setIndicatorPos(Some (rect.top, rect.left, rect.width, rect.height))
-                    setIsRef true
-                | None -> ()
-            ),
-            [||]
         )
 
         /// Close term search result window when opening a modal
@@ -1201,47 +1184,21 @@ type TermSearch =
                         match term with
                         | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
                             if System.String.IsNullOrWhiteSpace term.id.Value |> not then
-                                let details =
-                                    let position =
-                                        match indicatorPos with
-                                        | Some pos ->
-                                            let top, left, width, height = pos
-                                            prop.style
-                                                [
-                                                    style.position.fixedRelativeToWindow
-                                                    style.top (int top - int (height / 2.))
-                                                    style.left (int left + int (width - 8.))
-                                                    style.zIndex 9999
-                                                ]
-                                        | _ ->
-                                            console.log "nope"
-                                            prop.style
-                                                [
-                                                    style.position.fixedRelativeToWindow
-                                                    style.top 2
-                                                    style.left 2
-                                                    style.zIndex 9999
-                                                ]
-                                    TermSearch.IndicatorItem(
-                                        "",
-                                        sprintf "%s - %s" term.name.Value term.id.Value,
-                                        "swt:tooltip-left",
-                                        "fa-solid fa-square-check",
-                                        (fun _ ->
-                                            setModal (
-                                                if modal.IsSome && modal.Value = Modals.Details then
-                                                    None
-                                                else
-                                                    Some Modals.Details
-                                            )
-                                        ),
-                                        btnClasses = "swt:btn-primary",
-                                        props = [ position ]
-                                    )
-                                if isRefSet then
-                                    match indicatorPos with
-                                    | Some _ -> ReactDOM.createPortal (details, Browser.Dom.document.body)
-                                    | _ -> Html.none
+                                TermSearch.IndicatorItem(
+                                    "",
+                                    sprintf "%s - %s" term.name.Value term.id.Value,
+                                    "swt:tooltip-left",
+                                    "fa-solid fa-square-check",
+                                    (fun _ ->
+                                        setModal (
+                                            if modal.IsSome && modal.Value = Modals.Details then
+                                                None
+                                            else
+                                                Some Modals.Details
+                                        )
+                                    ),
+                                    btnClasses = "swt:btn-primary"
+                                )
                         | _ when showDetails -> // show only when focused
                             TermSearch.IndicatorItem(
                                 "",
