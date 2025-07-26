@@ -538,7 +538,7 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteRow (cc, index, table, selectHandle)
+                        AnnotationTableContextMenuUtil.deleteRow (cc, index - 1, table, selectHandle)
                         |> setTable
             )
         ]

@@ -820,8 +820,6 @@ type TermSearch =
             (fun () ->
                 if inputRef.current.IsSome then
                     inputRef.current.Value.value <- inputText
-
-                ()
             ),
             [| box term |]
         )
@@ -1166,7 +1164,7 @@ type TermSearch =
                 prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
                 prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
             prop.className [
-                "not-prose swt:h-full"
+                "not-prose swt:h-full swt:centered"
                 if fullwidth then
                     "swt:w-full"
             ]

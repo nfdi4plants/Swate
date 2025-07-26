@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
+open Fable.React
 
 module private TableHelper =
 
@@ -223,6 +224,14 @@ swt:p-0"""
                     )
             )
 
+        let isMeasured, setIsMeasured = React.useState(false)
+
+        React.useEffectOnce(fun () ->
+            Fable.Core.JS.setTimeout (fun () ->
+                setIsMeasured true)
+                50 |> ignore
+        )
+
         React.fragment [
             Html.div [
                 prop.key "scroll-container"
@@ -266,7 +275,10 @@ swt:p-0"""
                                                         let controller =
                                                             createController {| x = virtualColumn.index; y = 0 |} true
                                                         Html.th [
-                                                            prop.ref columnVirtualizer.measureElement
+
+                                                            if not isMeasured then
+                                                                prop.ref columnVirtualizer.measureElement
+
                                                             prop.custom ("data-index", virtualColumn.index)
                                                             prop.key $"Column-{virtualColumn.key}"
                                                             prop.className [
@@ -274,7 +286,7 @@ swt:p-0"""
                                                                     "swt:min-w-32"
                                                                 else
                                                                     "swt:min-w-min"
-                                                                "swt:h-full swt:resize-x swt:overflow-x-auto"
+                                                                "swt:h-full swt:resize-x swt:overflow-x-hidden"
                                                                 if defaultStyleSelect then
                                                                     Table.TableCellStyle
                                                             ]
@@ -288,6 +300,8 @@ swt:p-0"""
                                                                     "transform",
                                                                     $"translateX({virtualColumn.start}px)"
                                                                 )
+                                                                if isMeasured then
+                                                                    style.width (length.px virtualColumn.size)
                                                             ]
                                                             if controller.IsActive then
                                                                 prop.custom ("data-active", true)
@@ -305,7 +319,7 @@ swt:p-0"""
                                                                             |> Seq.last
                                                                         ),
                                                                         className =
-                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
+                                                                            "swt:px-2 swt:py-2 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
                                                                         debug = debug
                                                                     )
                                                                 elif controller.IsActive then
