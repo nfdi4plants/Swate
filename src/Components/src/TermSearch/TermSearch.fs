@@ -788,11 +788,13 @@ type TermSearch =
             ?fullwidth: bool,
             ?autoFocus: bool,
             ?classNames: TermSearchStyle,
-            ?props: IReactProperty list
+            ?props: IReactProperty list,
+            ?displayIndicators: bool
         ) =
 
         let showDetails = defaultArg showDetails false
         let debug = defaultArg debug false
+        let displayIndicators = defaultArg displayIndicators true
         let fullwidth = defaultArg fullwidth false
         let autoFocus = defaultArg autoFocus false
 
@@ -1181,14 +1183,31 @@ type TermSearch =
                 Html.div [
                     prop.className "swt:indicator swt:w-full swt:h-full"
                     prop.children [
-                        match term with
-                        | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
-                            if System.String.IsNullOrWhiteSpace term.id.Value |> not then
+                        if displayIndicators then
+                            match term with
+                            | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
+                                if System.String.IsNullOrWhiteSpace term.id.Value |> not then
+                                    TermSearch.IndicatorItem(
+                                        "",
+                                        sprintf "%s - %s" term.name.Value term.id.Value,
+                                        "swt:tooltip-left",
+                                        "fa-solid fa-square-check",
+                                        (fun _ ->
+                                            setModal (
+                                                if modal.IsSome && modal.Value = Modals.Details then
+                                                    None
+                                                else
+                                                    Some Modals.Details
+                                            )
+                                        ),
+                                        btnClasses = "swt:btn-primary"
+                                    )
+                            | _ when showDetails -> // show only when focused
                                 TermSearch.IndicatorItem(
                                     "",
-                                    sprintf "%s - %s" term.name.Value term.id.Value,
+                                    "Details",
                                     "swt:tooltip-left",
-                                    "fa-solid fa-square-check",
+                                    "fa-solid fa-circle-info",
                                     (fun _ ->
                                         setModal (
                                             if modal.IsSome && modal.Value = Modals.Details then
@@ -1197,26 +1216,10 @@ type TermSearch =
                                                 Some Modals.Details
                                         )
                                     ),
-                                    btnClasses = "swt:btn-primary"
+                                    btnClasses = "swt:btn-info",
+                                    isActive = focused
                                 )
-                        | _ when showDetails -> // show only when focused
-                            TermSearch.IndicatorItem(
-                                "",
-                                "Details",
-                                "swt:tooltip-left",
-                                "fa-solid fa-circle-info",
-                                (fun _ ->
-                                    setModal (
-                                        if modal.IsSome && modal.Value = Modals.Details then
-                                            None
-                                        else
-                                            Some Modals.Details
-                                    )
-                                ),
-                                btnClasses = "swt:btn-info",
-                                isActive = focused
-                            )
-                        | _ -> Html.none
+                            | _ -> Html.none
 
                         if advancedSearch.IsSome then
                             TermSearch.IndicatorItem(

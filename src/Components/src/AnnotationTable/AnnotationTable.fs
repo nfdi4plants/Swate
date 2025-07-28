@@ -262,13 +262,13 @@ type AnnotationTable =
                                 arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
 
                         let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
-                        TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, debug = debug)
+                        TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, debug = debug, displayIndicators = false)
                     | _ when tcc.Index.x > 0 && tcc.Index.y = 0 ->
                         let setHeader =
                             fun (index: int) (ch: CompositeHeader) ->
                                 arcTable.UpdateHeader(index - 1, ch)
                         let header = arcTable.GetColumn(tcc.Index.x - 1).Header
-                        TableCell.CompositeHeaderActiveRender(tcc, header, setHeader (tcc.Index.x), debug = debug)
+                        TableCell.CompositeHeaderActiveRender(tcc, header, setHeader (tcc.Index.x), debug = debug, displayIndicators = false)
                     | _ -> Html.div "Unknown cell type"
                 )
             )

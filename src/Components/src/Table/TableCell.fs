@@ -94,7 +94,7 @@ type TableCell =
         )
 
     static member CompositeHeaderActiveRender
-        (tableCellController: TableCellController, header: CompositeHeader, setHeader: CompositeHeader -> unit, ?debug)
+        (tableCellController: TableCellController, header: CompositeHeader, setHeader: CompositeHeader -> unit, ?debug, ?displayIndicators)
         =
 
         let handleTerm (oa: OntologyAnnotation) (setHeader: OntologyAnnotation -> unit) =
@@ -135,7 +135,8 @@ type TableCell =
                 autoFocus = true,
                 portalModals = Browser.Dom.document.body,
                 portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer),
-                ?debug = debug
+                ?debug = debug,
+                ?displayIndicators = displayIndicators
             )
 
         let handleTerm header =
@@ -180,7 +181,7 @@ type TableCell =
         | _ -> handleTerm header
 
     static member CompositeCellActiveRender
-        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit, ?debug)
+        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit, ?debug, ?displayIndicators)
         =
 
         match cell with
@@ -223,7 +224,8 @@ type TableCell =
                 autoFocus = true,
                 portalModals = Browser.Dom.document.body,
                 portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer),
-                ?debug = debug
+                ?debug = debug,
+                ?displayIndicators = displayIndicators
             )
         | CompositeCell.FreeText txt ->
             TableCell.BaseActiveTableCell(tableCellController, txt, fun t -> setCell (CompositeCell.FreeText t))
