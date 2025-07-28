@@ -224,14 +224,6 @@ swt:p-0"""
                     )
             )
 
-        let isMeasured, setIsMeasured = React.useState(false)
-
-        React.useEffectOnce(fun () ->
-            Fable.Core.JS.setTimeout (fun () ->
-                setIsMeasured true)
-                50 |> ignore
-        )
-
         React.fragment [
             Html.div [
                 prop.key "scroll-container"
@@ -276,8 +268,7 @@ swt:p-0"""
                                                             createController {| x = virtualColumn.index; y = 0 |} true
                                                         Html.th [
 
-                                                            if not isMeasured then
-                                                                prop.ref columnVirtualizer.measureElement
+                                                            prop.ref columnVirtualizer.measureElement
 
                                                             prop.custom ("data-index", virtualColumn.index)
                                                             prop.key $"Column-{virtualColumn.key}"
@@ -286,7 +277,7 @@ swt:p-0"""
                                                                     "swt:min-w-32"
                                                                 else
                                                                     "swt:min-w-min"
-                                                                "swt:h-full swt:resize-x swt:overflow-x-hidden"
+                                                                "swt:h-full swt:resize-x swt:overflow-hidden"
                                                                 if defaultStyleSelect then
                                                                     Table.TableCellStyle
                                                             ]
@@ -300,8 +291,6 @@ swt:p-0"""
                                                                     "transform",
                                                                     $"translateX({virtualColumn.start}px)"
                                                                 )
-                                                                if isMeasured then
-                                                                    style.width (length.px virtualColumn.size)
                                                             ]
                                                             if controller.IsActive then
                                                                 prop.custom ("data-active", true)
