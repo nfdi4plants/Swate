@@ -305,7 +305,12 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
         Components.Logo.Main()
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
-            Daisy.navbarCenter [ QuickAccessList toggleMetdadataModal model dispatch ]
+            Html.div [
+                prop.className "swt:navbar swt:flex swt:gap-4"
+                prop.children [
+                    QuickAccessList toggleMetdadataModal model dispatch
+                ]
+            ]
 
             Html.div [
                 prop.className "swt:ml-auto"
