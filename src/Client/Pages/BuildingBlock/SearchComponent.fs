@@ -22,7 +22,7 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
 
             prop.className (mkClasses isActive)
-
+            prop.type'.button
             prop.text "Term"
 
             prop.onClick (fun _ ->
@@ -35,7 +35,7 @@ let private termOrUnitizedSwitch (model: Model) dispatch =
             let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
 
             prop.className (mkClasses isActive)
-
+            prop.type'.button
             prop.text "Unit"
 
             prop.onClick (fun _ ->
@@ -60,7 +60,6 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
         prop.ref element
         prop.style [ style.position.relative ]
         prop.children [
-            //Daisy.join [
             Html.div [
                 prop.className "swt:join swt:w-full"
                 prop.children [
@@ -101,16 +100,13 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
         prop.ref element // The ref must be place here, otherwise the portalled term select area will trigger daisy join syntax
         prop.style [ style.position.relative ]
         prop.children [
-            //Daisy.join [
             Html.div [
                 prop.className "swt:join swt:w-full"
                 prop.children [
                     // Choose building block type dropdown element
-                    // Dropdown building block type choice
                     Dropdown.Main(ui, setUi, model, dispatch)
                     // Term search field
                     if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
-                        //Daisy.input [
                         Html.input [
                             prop.className "swt:input swt:join-item swt:flex-grow"
                             prop.readOnly false
@@ -208,8 +204,7 @@ let private AddBuildingBlockButton (model: Model) dispatch =
                 let header = Helper.createCompositeHeaderFromState state
                 let body = Helper.tryCreateCompositeCellFromState state
                 let isValid = Helper.isValidColumn header
-
-                prop.type'.submit
+                prop.type'.button
 
                 prop.className [
                     "swt:btn swt:btn-wide"
