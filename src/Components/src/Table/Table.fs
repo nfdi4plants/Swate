@@ -6,7 +6,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Feliz.DaisyUI
-open Fable.React
 
 module private TableHelper =
 
