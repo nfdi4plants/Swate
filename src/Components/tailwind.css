@@ -254,6 +254,10 @@
     border-bottom-width: 1px;
   }
 
+  .swt-no-overlap tr td:first-child {
+    border-right-width: 1px;
+  }
+
   .swt-no-overlap td {
     border-top-width: 1;
     border-bottom-width: 0;

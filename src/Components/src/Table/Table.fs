@@ -266,7 +266,9 @@ swt:p-0"""
                                                         let controller =
                                                             createController {| x = virtualColumn.index; y = 0 |} true
                                                         Html.th [
+
                                                             prop.ref columnVirtualizer.measureElement
+
                                                             prop.custom ("data-index", virtualColumn.index)
                                                             prop.key $"Column-{virtualColumn.key}"
                                                             prop.className [
@@ -274,7 +276,7 @@ swt:p-0"""
                                                                     "swt:min-w-32"
                                                                 else
                                                                     "swt:min-w-min"
-                                                                "swt:h-full swt:resize-x swt:overflow-x-auto"
+                                                                "swt:h-full swt:resize-x swt:overflow-hidden"
                                                                 if defaultStyleSelect then
                                                                     Table.TableCellStyle
                                                             ]
@@ -305,7 +307,7 @@ swt:p-0"""
                                                                             |> Seq.last
                                                                         ),
                                                                         className =
-                                                                            "swt:px-2 swt:py-1 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
+                                                                            "swt:px-2 swt:py-2 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
                                                                         debug = debug
                                                                     )
                                                                 elif controller.IsActive then

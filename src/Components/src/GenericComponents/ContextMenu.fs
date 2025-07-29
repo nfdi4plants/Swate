@@ -114,6 +114,8 @@ type ContextMenu =
         let interactions =
             FloatingUI.useInteractions [| role; dismiss; listNavigation; typeahead |]
 
+        let functionIsCalled = React.useRef(false)
+
         React.useEffect (
             (fun _ ->
 
@@ -126,6 +128,7 @@ type ContextMenu =
 
                     match onSpawn e with
                     | Some data ->
+                        functionIsCalled.current <- false
                         e.preventDefault ()
                         setSpawnData (data)
                         let children = childInfo data
@@ -192,7 +195,7 @@ type ContextMenu =
                     myClearTimeout ())),
             [| box floating.refs |]
         )
-        let functionIsCalled = React.useRef(false)
+        
         let close =
             fun () ->
                 setIsOpen false
