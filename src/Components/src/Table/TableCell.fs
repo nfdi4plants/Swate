@@ -93,66 +93,66 @@ type TableCell =
             ?debug = debug
         )
 
+    static member TermSearchContent (tableCellController, (oa: OntologyAnnotation), displayIndicators, (setHeader: OntologyAnnotation -> unit), debug) =
+        let term =
+            if oa.isEmpty () then
+                None
+            else
+                Term.fromOntologyAnnotation oa |> Some
+
+        let setTerm =
+            fun (t: Term option) ->
+                let oa =
+                    t
+                    |> Option.map Term.toOntologyAnnotation
+                    |> Option.defaultValue (OntologyAnnotation())
+                setHeader oa
+
+        let termDropdownRenderer =
+            fun (client: Browser.Types.ClientRect) (dropdown: ReactElement) ->
+                Html.div [
+                    prop.className "swt:absolute swt:z-50"
+                    prop.style [
+                        style.left (int (client.left + Browser.Dom.window.scrollX - 2.))
+                        style.top (int (client.bottom + Browser.Dom.window.scrollY + 5.))
+                    ]
+                    prop.children [ dropdown ]
+                ]
+
+        TermSearch.TermSearch(
+            setTerm,
+            term,
+            onBlur = (fun _ -> tableCellController.onBlur !!()),
+            onKeyDown = (fun e -> tableCellController.onKeyDown e),
+            classNames =
+                TermSearchStyle(
+                    !^"swt:rounded-none swt:px-1 swt:py-1 swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content"
+                ),
+            autoFocus = true,
+            portalModals = Browser.Dom.document.body,
+            portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer),
+            ?debug = debug,
+            ?displayIndicators = displayIndicators
+        )
+
     static member CompositeHeaderActiveRender
         (tableCellController: TableCellController, header: CompositeHeader, setHeader: CompositeHeader -> unit, ?debug, ?displayIndicators)
         =
-
-        let handleTerm (oa: OntologyAnnotation) (setHeader: OntologyAnnotation -> unit) =
-            let term =
-                if oa.isEmpty () then
-                    None
-                else
-                    Term.fromOntologyAnnotation oa |> Some
-
-            let setTerm =
-                fun (t: Term option) ->
-                    let oa =
-                        t
-                        |> Option.map Term.toOntologyAnnotation
-                        |> Option.defaultValue (OntologyAnnotation())
-                    setHeader oa
-
-            let termDropdownRenderer =
-                fun (client: Browser.Types.ClientRect) (dropdown: ReactElement) ->
-                    Html.div [
-                        prop.className "swt:absolute swt:z-50"
-                        prop.style [
-                            style.left (int (client.left + Browser.Dom.window.scrollX - 2.))
-                            style.top (int (client.bottom + Browser.Dom.window.scrollY + 5.))
-                        ]
-                        prop.children [ dropdown ]
-                    ]
-
-            TermSearch.TermSearch(
-                setTerm,
-                term,
-                onBlur = (fun _ -> tableCellController.onBlur !!()),
-                onKeyDown = (fun e -> tableCellController.onKeyDown e),
-                classNames =
-                    TermSearchStyle(
-                        !^"swt:rounded-none swt:px-1 swt:py-1 swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content"
-                    ),
-                autoFocus = true,
-                portalModals = Browser.Dom.document.body,
-                portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer),
-                ?debug = debug,
-                ?displayIndicators = displayIndicators
-            )
 
         let handleTerm header =
             match header with
             | CompositeHeader.Component oa ->
                 let setHeader = fun x -> setHeader (CompositeHeader.Component x)
-                handleTerm oa setHeader
+                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)  
             | CompositeHeader.Characteristic oa ->
                 let setHeader = fun x -> setHeader (CompositeHeader.Characteristic x)
-                handleTerm oa setHeader
+                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)  
             | CompositeHeader.Factor oa ->
                 let setHeader = fun x -> setHeader (CompositeHeader.Factor x)
-                handleTerm oa setHeader
+                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)  
             | CompositeHeader.Parameter oa ->
                 let setHeader = fun x -> setHeader (CompositeHeader.Parameter x)
-                handleTerm oa setHeader
+                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)  
             | _ -> failwith $"Unknown type {header}"
 
         match header with
