@@ -363,25 +363,25 @@ type AnnotationTableContextMenu =
         [
             ContextMenuItem(
                 Html.div "Details",
-                icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
+                icon = Icons.MagnifyingClass(),
                 kbdbutton = ATCMC.KbdHint("D"),
                 onClick = fun _ -> AnnotationTable.ModalTypes.Details index |> setModal
             )
             ContextMenuItem(
                 Html.div "Edit",
-                icon = ATCMC.Icon "fa-solid fa-pen-to-square",
+                icon = Icons.PenToSquare(),
                 kbdbutton = ATCMC.KbdHint("E"),
                 onClick = fun _ -> AnnotationTable.ModalTypes.Edit index |> setModal
             )
             ContextMenuItem(
                 Html.div "Fill Column",
-                icon = ATCMC.Icon "fa-solid fa-pen",
+                icon = Icons.Pen(),
                 kbdbutton = ATCMC.KbdHint("F")
             )
             if not (String.IsNullOrWhiteSpace(transformName)) then
                 ContextMenuItem(
                     Html.div transformName,
-                    icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
+                    icon = Icons.ArrorRightLeft(),
                     kbdbutton = ATCMC.KbdHint("T"),
                     onClick = fun _ -> AnnotationTable.ModalTypes.Transform index |> setModal
                 )
@@ -457,7 +457,7 @@ type AnnotationTableContextMenu =
             ContextMenuItem(isDivider = true)
             ContextMenuItem(
                 Html.div "Delete Row",
-                icon = ATCMC.Icon "fa-solid fa-delete-left",
+                icon = Icons.DeleteLeft(),
                 kbdbutton = ATCMC.KbdHint("DelR"),
                 onClick =
                     fun c ->
@@ -467,7 +467,7 @@ type AnnotationTableContextMenu =
             )
             ContextMenuItem(
                 Html.div "Delete Column",
-                icon = ATCMC.Icon "fa-solid fa-delete-left fa-rotate-270",
+                icon = Icons.DeleteDown(),
                 kbdbutton = ATCMC.KbdHint("DelC"),
                 onClick =
                     fun c ->
@@ -477,7 +477,7 @@ type AnnotationTableContextMenu =
             )
             ContextMenuItem(
                 Html.div "Move Column",
-                icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
+                icon = Icons.ArrorRightLeft(),
                 kbdbutton = ATCMC.KbdHint("MC"),
                 onClick =
                     fun c ->
@@ -493,20 +493,20 @@ type AnnotationTableContextMenu =
         [
             ContextMenuItem(
                 Html.div "Details",
-                icon = ATCMC.Icon "fa-solid fa-magnifying-glass",
+                icon = Icons.MagnifyingClass(),
                 kbdbutton = ATCMC.KbdHint("D"),
                 onClick = fun _ -> AnnotationTable.ModalTypes.Details cellCoordinate |> setModal
             )
             ContextMenuItem(
                 Html.div "Edit",
-                icon = ATCMC.Icon "fa-solid fa-pen-to-square",
+                icon = Icons.PenToSquare(),
                 kbdbutton = ATCMC.KbdHint("E"),
                 onClick = fun _ -> AnnotationTable.ModalTypes.Edit cellCoordinate |> setModal
             )
             ContextMenuItem(isDivider = true)
             ContextMenuItem(
                 Html.div "Delete Column",
-                icon = ATCMC.Icon "fa-solid fa-delete-left fa-rotate-270",
+                icon = Icons.DeleteDown(),
                 kbdbutton = ATCMC.KbdHint("DelC"),
                 onClick =
                     fun c ->
@@ -517,7 +517,7 @@ type AnnotationTableContextMenu =
             )
             ContextMenuItem(
                 Html.div "Move Column",
-                icon = ATCMC.Icon "fa-solid fa-arrow-right-arrow-left",
+                icon = Icons.ArrorRightLeft(),
                 kbdbutton = ATCMC.KbdHint("MC"),
                 onClick =
                     fun c ->
@@ -532,7 +532,7 @@ type AnnotationTableContextMenu =
         [
             ContextMenuItem(
                 Html.div "Delete Row",
-                icon = ATCMC.Icon "fa-solid fa-delete-left",
+                icon = Icons.DeleteLeft(),
                 kbdbutton = ATCMC.KbdHint("DelR"),
                 onClick =
                     fun c ->

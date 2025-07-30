@@ -239,8 +239,9 @@ type AnnotationTable =
                         let icon =
                             if System.String.IsNullOrWhiteSpace termAccession |> not then
                                 Html.i [
-                                    prop.className "fa-solid fa-check swt:text-primary"
+                                    prop.className "swt:text-primary"
                                     prop.title termAccession
+                                    prop.children [ Icons.Check() ]
                                 ]
                                 |> Some
                             else
