@@ -6,6 +6,7 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 
 
@@ -36,7 +37,7 @@ let FreeTextInputElement (onSubmit: string -> unit) =
                 prop.onClick (fun e ->
                     e.stopPropagation ()
                     onSubmit inputS)
-                prop.children [ Html.i [ prop.className "fa-solid fa-check" ] ]
+                prop.children [ Icons.Check() ]
             ]
         ]
     ]
@@ -72,7 +73,7 @@ module private DropdownElements =
                     prop.className "swt:flex swt:flex-row swt:justify-between"
                     prop.children [
                         Html.span subpage.toString
-                        Html.i [ prop.className "fa-solid fa-arrow-right" ]
+                        Icons.ArrowRight()
                     ]
                 ]
             ]
@@ -94,7 +95,7 @@ module private DropdownElements =
                 if hasBack then
                     Html.a [
                         prop.className "swt:content-center"
-                        prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ] ]
+                        prop.children [ Icons.ArrowLeft() ]
                     ]
                 annotationsPrinciplesLink
             ]
@@ -236,7 +237,7 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
             prop.className "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
             prop.children [
                 Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
-                Html.i [ prop.className "fa-solid fa-angle-down" ]
+                Icons.AngleDown()
             ]
         ],
         [

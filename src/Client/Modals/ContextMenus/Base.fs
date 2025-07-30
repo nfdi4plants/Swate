@@ -33,21 +33,21 @@ type Base =
             ]
         ]
 
-    static member Item(content: ReactElement, onclick, ?icon: string, ?inactive) =
-        let icon = icon |> Option.map (fun i -> Html.i [ prop.className i ])
+    static member Item(content: ReactElement, onclick, ?icon: ReactElement, ?inactive) =
+        let icon = icon |> Option.map (fun i -> i)
         Base.Item(content, onclick, ?icon = icon, ?inactive = inactive)
 
-    static member Item(content: string, onclick, ?icon: string, ?inactive) =
-        let icon = icon |> Option.map (fun i -> Html.i [ prop.className i ])
+    static member Item(content: string, onclick, ?icon: ReactElement, ?inactive) =
+        let icon = icon |> Option.map (fun i -> i)
         Base.Item(Html.span content, onclick, ?icon = icon, ?inactive = inactive)
 
-    static member Item(content: ReactElement, onclick, ?icons: string[], ?inactive) =
+    static member Item(content: ReactElement, onclick, ?icons: ReactElement[], ?inactive) =
         let icon =
             icons
             |> Option.map (fun icons ->
                 React.fragment [
                     for i in icons do
-                        Html.i [ prop.className i ]
+                        i
                 ])
 
         Base.Item(content, onclick, ?icon = icon, ?inactive = inactive)

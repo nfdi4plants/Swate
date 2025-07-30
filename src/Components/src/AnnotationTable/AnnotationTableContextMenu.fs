@@ -363,7 +363,7 @@ type AnnotationTableContextMenu =
         [
             ContextMenuItem(
                 Html.div "Details",
-                icon = Icons.MagnifyingClass(),
+                icon = Icons.MagnifyingClassPlus(),
                 kbdbutton = ATCMC.KbdHint("D"),
                 onClick = fun _ -> AnnotationTable.ModalTypes.Details index |> setModal
             )
@@ -387,7 +387,7 @@ type AnnotationTableContextMenu =
                 )
             ContextMenuItem(
                 Html.div "Clear",
-                icon = Icons.Erases(),
+                icon = Icons.Eraser(),
                 kbdbutton = ATCMC.KbdHint("Del"),
                 onClick =
                     fun c ->
@@ -493,7 +493,7 @@ type AnnotationTableContextMenu =
         [
             ContextMenuItem(
                 Html.div "Details",
-                icon = Icons.MagnifyingClass(),
+                icon = Icons.MagnifyingClassPlus(),
                 kbdbutton = ATCMC.KbdHint("D"),
                 onClick = fun _ -> AnnotationTable.ModalTypes.Details cellCoordinate |> setModal
             )

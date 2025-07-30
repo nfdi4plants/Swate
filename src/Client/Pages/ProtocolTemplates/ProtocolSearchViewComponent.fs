@@ -1,6 +1,5 @@
 namespace Protocol
 
-open Swate.Components.Shared
 open Model
 open Messages.Protocol
 open Messages
@@ -11,6 +10,9 @@ open Feliz.DaisyUI
 open Modals
 
 open FileImport
+
+open Swate.Components
+open Swate.Components.Shared
 
 /// Fields of Template that can be searched
 [<RequireQualifiedAccess>]
@@ -124,7 +126,7 @@ module ComponentAux =
                                         }
                                         |> setState)
                             ]
-                            Html.i [ prop.className "fa-solid fa-search" ]
+                            Icons.MagnifyingClass()
                         ]
                     ]
                 ]
@@ -255,7 +257,7 @@ module ComponentAux =
                                     }
                                     |> setState)
                             ]
-                            Html.i [ prop.className "fa-solid fa-search" ]
+                            Icons.MagnifyingClass()
                         // Pseudo dropdown
                         ]
                     ]
@@ -478,7 +480,7 @@ module ComponentAux =
                     //td [ Style [TextAlign TextAlignOptions.Center; VerticalAlign "middle"] ] [ str (string template.Used) ]
                     Html.td [
                         prop.key $"{i}_{template.Id}_button"
-                        prop.children [ Html.i [ prop.className "fa-solid fa-chevron-down" ] ]
+                        prop.children [ Icons.ChevronDown() ]
                     ]
                 ]
             ]
@@ -560,7 +562,7 @@ module ComponentAux =
         Daisy.button.button [
             button.sm
             prop.onClick (fun _ -> Messages.Protocol.GetAllProtocolsForceRequest |> ProtocolMsg |> dispatch)
-            prop.children [ Html.i [ prop.className "fa-solid fa-arrows-rotate" ] ]
+            prop.children [ Icons.ArrowsRotate() ]
         ]
 
 module FilterHelper =
@@ -738,7 +740,6 @@ type Search =
             prop.style [ style.maxHeight maxheight ]
             prop.className "swt:shrink swt:overflow-y-auto"
             prop.children [
-                //Daisy.table [
                 Html.table [
                     prop.className "swt:table swt:table-zebra swt:table-pinCols"
                     // prop.className "tableFixHead"
@@ -760,7 +761,7 @@ type Search =
                                     Html.td [
                                         prop.colSpan 4
                                         prop.style [ style.textAlign.center ]
-                                        prop.children [ Html.i [ prop.className "fa-solid fa-spinner fa-spin fa-lg" ] ]
+                                        prop.children [ Icons.SpinningSpinner() ]
                                     ]
                                 ]
                             | false ->

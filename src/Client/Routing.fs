@@ -29,7 +29,7 @@ type SidebarPage =
             Html.i [ prop.title this.AsStringRdbl; prop.children [ icons ] ]
 
         match this with
-        | TermSearch -> createElem <| Icons.MagnifyingClass()
+        | TermSearch -> createElem <| Icons.MagnifyingClassPlus()
         | BuildingBlock -> createElem <| Icons.BuildingBlock()
         | Protocol -> createElem <| Icons.Templates()
         | JsonImport -> createElem <| Icons.FileImport()

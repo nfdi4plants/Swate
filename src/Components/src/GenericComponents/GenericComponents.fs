@@ -90,21 +90,21 @@ type Components =
                     prop.onChange (fun (_: bool) -> ())
                 ]
                 Html.i [
-                    prop.className [
-                        "swt:swap-off fa-solid"
+                    prop.className "swt:swap-off"
+                    prop.children [
                         if collapsedIcon.IsSome then
                             collapsedIcon.Value
                         else
-                            "fa-solid fa-chevron-down"
+                            Icons.ChevronDown()
                     ]
                 ]
                 Html.i [
-                    prop.className [
-                        "swt:swap-on"
+                    prop.className "swt:swap-on"
+                    prop.children [
                         if collapseIcon.IsSome then
                             collapseIcon.Value
                         else
-                            "fa-solid fa-x"
+                            Icons.Close()
                     ]
                 ]
             ]

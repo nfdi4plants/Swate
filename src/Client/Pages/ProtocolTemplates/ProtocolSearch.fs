@@ -7,6 +7,7 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 open Modals
+open Swate.Components
 open Swate.Components.Shared
 
 module private HelperProtocolSearch =
@@ -19,7 +20,7 @@ module private HelperProtocolSearch =
                 |> Messages.ProtocolMsg
                 |> setIsProtocolSearch)
             prop.children [
-                Html.i [ prop.className "fa-solid fa-chevron-left" ]
+                Icons.ChevronLeft()
                 Html.span [ prop.text "Back" ]
             ]
         ]
@@ -42,7 +43,10 @@ type SearchContainer =
                             prop.children [
                                 //Daisy.button.a [
                                 Html.button [
-                                    prop.className "swt:btn swt:btn-sm swt:btn-info fa-solid fa-info"
+                                    prop.className "swt:btn swt:btn-sm swt:btn-info"
+                                    prop.children [
+                                        Icons.Info()
+                                    ]
                                     prop.tabIndex 0
                                 ]
                                 //Daisy.dropdownContent [
@@ -61,7 +65,10 @@ type SearchContainer =
                         ]
                         //Daisy.button.a [
                         Html.button [
-                            prop.className "swt:btn swt:btn-sm swt:btn-success fa-solid fa-cog"
+                            prop.className "swt:btn swt:btn-sm swt:btn-success"
+                            prop.children [
+                                Icons.Cog()
+                            ]
                             prop.onClick (fun _ -> toggleShowFilter ())
                         ]
                     ]

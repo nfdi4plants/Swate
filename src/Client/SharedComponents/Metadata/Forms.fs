@@ -451,7 +451,7 @@ type FormComponents =
                     for listener in Object.keys sortable.listeners do
                         prop.custom (listener, sortable.listeners.get listener)
                     prop.className "swt:cursor-grab swt:flex swt:items-center"
-                    prop.children [ Html.i [ prop.className "fa-solid fa-arrows-up-down fa-lg" ] ]
+                    prop.children [ Icons.ArrowDown() ]
                 ]
                 Html.div [ prop.className "swt:grow"; prop.children listComponent ]
             ]

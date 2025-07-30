@@ -1,7 +1,8 @@
 namespace Components.Forms
 
-open Feliz.DaisyUI
 open Feliz
+open Feliz.DaisyUI
+open Swate.Components
 
 type Generic =
 
@@ -90,7 +91,7 @@ type Generic =
                 Html.div [
                     prop.className "not-prose swt:text-center swt:ml-auto"
                     prop.children [
-                        Html.i [ prop.className "fa-solid fa-edit" ]
+                        Icons.Edit()
                         Html.div [ prop.className "swt:text-sm"; prop.text (count.Value) ]
                     ]
                 ]

@@ -3,6 +3,7 @@ namespace Modals.ContextMenus
 open ARCtrl
 open Feliz
 open Feliz.DaisyUI
+open Swate.Components
 open Swate.Components.Shared
 
 type FooterTabs =
@@ -13,8 +14,8 @@ type FooterTabs =
         let rename = fun _ -> startEdit ()
 
         let children (rmv: unit -> unit) : ReactElement seq = [
-            Modals.ContextMenus.Base.Item(Html.span "Delete", delete >> rmv, "fa-solid fa-trash")
-            Modals.ContextMenus.Base.Item(Html.span "Rename", rename >> rmv, "fa-solid fa-pen-to-square")
+            Modals.ContextMenus.Base.Item(Html.span "Delete", delete >> rmv, Icons.Delete())
+            Modals.ContextMenus.Base.Item(Html.span "Rename", rename >> rmv, Icons.PenToSquare())
         ]
 
         let mouseY = mouseY - 30
@@ -35,8 +36,8 @@ type FooterTabs =
                 |> dispatch
 
         let children (rmv: unit -> unit) : ReactElement seq = [
-            Modals.ContextMenus.Base.Item("Add Table", addTable >> rmv, "fa-solid fa-table")
-            Modals.ContextMenus.Base.Item("Add Datamap", addDataMap >> rmv, "fa-solid fa-map")
+            Modals.ContextMenus.Base.Item("Add Table", addTable >> rmv, Icons.Table())
+            Modals.ContextMenus.Base.Item("Add Datamap", addDataMap >> rmv, Icons.Map())
         ]
 
         let mouseY = mouseY - 30
@@ -47,7 +48,7 @@ type FooterTabs =
             fun _ -> SpreadsheetInterface.UpdateDatamap None |> Messages.InterfaceMsg |> dispatch
 
         let children (rmv: unit -> unit) : ReactElement seq = [
-            Modals.ContextMenus.Base.Item("Delete", delete >> rmv, "fa-solid fa-trash")
+            Modals.ContextMenus.Base.Item("Delete", delete >> rmv, Icons.Delete())
         ]
 
         let mouseY = mouseY - 10

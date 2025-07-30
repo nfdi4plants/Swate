@@ -3,6 +3,7 @@ namespace Modals.ContextMenus
 open ARCtrl
 open Feliz
 open Feliz.DaisyUI
+open Swate.Components
 open Swate.Components.Shared
 
 type DataMapCell =
@@ -22,15 +23,15 @@ type DataMapCell =
             if isHeader then
                 Modals.ContextMenus.Base.Item(Html.span "No Actions available")
             else
-                Modals.ContextMenus.Base.Item(Html.span "Fill Column", fillColumn >> rmv, "fa-solid fa-pen")
-                Modals.ContextMenus.Base.Item(Html.span "Clear", clear >> rmv, "fa-solid fa-eraser")
+                Modals.ContextMenus.Base.Item(Html.span "Fill Column", fillColumn >> rmv, Icons.Pen())
+                Modals.ContextMenus.Base.Item(Html.span "Clear", clear >> rmv, Icons.Eraser())
                 Modals.ContextMenus.Base.Divider()
-                Modals.ContextMenus.Base.Item(Html.span "Copy", copy >> rmv, "fa-solid fa-copy")
-                Modals.ContextMenus.Base.Item(Html.span "Cut", cut >> rmv, "fa-solid fa-scissors")
-                Modals.ContextMenus.Base.Item(Html.span "Paste", paste >> rmv, "fa-solid fa-paste")
-                Modals.ContextMenus.Base.Item(Html.span "Paste All", pasteAll >> rmv, "fa-solid fa-paste")
+                Modals.ContextMenus.Base.Item(Html.span "Copy", copy >> rmv, Icons.Copy())
+                Modals.ContextMenus.Base.Item(Html.span "Cut", cut >> rmv, Icons.Scissor())
+                Modals.ContextMenus.Base.Item(Html.span "Paste", paste >> rmv, Icons.Paste())
+                Modals.ContextMenus.Base.Item(Html.span "Paste All", pasteAll >> rmv, Icons.Paste())
                 Modals.ContextMenus.Base.Divider()
-                Modals.ContextMenus.Base.Item(Html.span "Delete Row", deleteRow >> rmv, "fa-solid fa-delete-left")
+                Modals.ContextMenus.Base.Item(Html.span "Delete Row", deleteRow >> rmv, Icons.DeleteLeft())
         ]
 
         Base.Main(mouseX, mouseY, children, dispatch)
