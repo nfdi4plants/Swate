@@ -212,21 +212,16 @@ type CompositeCollumnModal =
         let isButtonActive = defaultArg isButtonActive true
 
         Html.div [
-            //Daisy.cardActions [
-            //    Daisy.button.button [
-            //        button.primary
-            //        prop.className "fa-solid fa-cog"
-            //        prop.style [ style.marginLeft length.auto ]
-            //        prop.onClick (fun _ -> setModalActivity modalActivity)
-            //    ]
-            //]
             Html.div [
                 prop.className "swt:card-actions"
                 prop.children [
                     Html.button [
-                        prop.className "swt:btn swt:btn-primary fa-solid fa-cog"
+                        prop.className "swt:btn swt:btn-primary"
                         prop.style [ style.marginLeft length.auto ]
                         prop.onClick (fun _ -> setModalActivity modalActivity)
+                        prop.children [
+                            Icons.Cog()
+                        ]
                     ]
                 ]
             ]

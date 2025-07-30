@@ -56,7 +56,7 @@ module private DataAnnotatorHelper =
                             prop.role "button"
                             prop.className "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
                             prop.children [
-                                Html.i [ prop.className "fa-solid fa-angle-down" ]
+                                Icons.AngleDown()
                             ]
                         ],
                         [
@@ -113,21 +113,16 @@ module private DataAnnotatorHelper =
                 | TargetColumn.Input -> "Create Input column, will overwrite!"
                 | TargetColumn.Output -> "Create Output column, will overwrite!"
 
-            //Daisy.tooltip [
             Html.div [
                 //tooltip.bottom
                 prop.className "swt:tooltip swt:tooltip-bottom"
                 //tooltip.text infoText
                 prop.custom ("data-tip", infoText)
                 prop.children [
-                    //Daisy.indicator [
                     Html.div [
                         prop.className "swt:indicator"
                         prop.children [
-                            Html.i [
-                                prop.className "swt:indicator-item fa-solid fa-info-circle fa-lg swt:text-accent"
-                            ]
-                            //Daisy.select [
+                            Icons.InfoCircle([|"swt:indicator-item swt:text-accent"|])
                             Html.select [
                                 prop.className "swt:select swt:join-item swt:min-w-fit"
                                 prop.title infoText
@@ -231,7 +226,7 @@ module private DataAnnotatorHelper =
     let IsAddedIcon =
         Html.div [
             prop.className "swt:absolute swt:top-0 swt:right-0 swt:has-text-success swt:m-0"
-            prop.children [ Html.i [ prop.className "fa-solid fa-square-plus fa-lg" ] ]
+            prop.children [ Icons.SquarePlus() ]
         ]
 
     let CellButton

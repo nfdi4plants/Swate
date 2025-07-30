@@ -387,7 +387,7 @@ type AnnotationTableContextMenu =
                 )
             ContextMenuItem(
                 Html.div "Clear",
-                icon = ATCMC.Icon "fa-solid fa-eraser",
+                icon = Icons.Erases(),
                 kbdbutton = ATCMC.KbdHint("Del"),
                 onClick =
                     fun c ->
@@ -399,7 +399,7 @@ type AnnotationTableContextMenu =
             ContextMenuItem(isDivider = true)
             ContextMenuItem(
                 Html.div "Copy",
-                icon = ATCMC.Icon "fa-solid fa-copy",
+                icon = Icons.Copy(),
                 kbdbutton = ATCMC.KbdHint("C"),
                 onClick =
                     fun _ ->
@@ -409,7 +409,7 @@ type AnnotationTableContextMenu =
             )
             ContextMenuItem(
                 Html.div "Cut",
-                icon = ATCMC.Icon "fa-solid fa-scissors",
+                icon = Icons.Scissor(),
                 kbdbutton = ATCMC.KbdHint("X"),
                 onClick =
                     fun c ->
@@ -423,7 +423,7 @@ type AnnotationTableContextMenu =
             )
             ContextMenuItem(
                 Html.div "Paste",
-                icon = ATCMC.Icon "fa-solid fa-paste",
+                icon = Icons.Paste(),
                 kbdbutton = ATCMC.KbdHint("V"),
                 onClick =
                     fun _ ->

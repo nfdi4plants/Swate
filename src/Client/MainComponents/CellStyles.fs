@@ -4,6 +4,7 @@ open ARCtrl
 open Feliz
 open Feliz.DaisyUI
 open Fable.Core
+open Swate.Components
 
 module private CellStylesHelper =
 
@@ -51,13 +52,13 @@ type CellStyles =
                 setState_extend nextState)
             prop.children [
                 Html.i [
-                    prop.classes [
-                        "fa-sharp"
-                        "fa-solid"
-                        "fa-angles-up"
-                        if isExtended then "fa-rotate-270" else "fa-rotate-90"
-                    ]
                     prop.style [ style.fontSize (length.em 1) ]
+                    prop.children [
+                        if isExtended then
+                            Icons.AnglesBackward()
+                        else
+                            Icons.AnglesForward()
+                    ]
                 ]
             ]
         ]
@@ -84,7 +85,10 @@ type CellStyles =
                 Html.span [ prop.className "swt:grow"; prop.text displayValue ]
                 if hasValidOA then
                     Html.i [
-                        prop.className [ "swt:ml-auto swt:text-primary"; "fa-solid"; "fa-check"; "swt:size-4" ]
+                        prop.className [ "swt:ml-auto swt:text-primary"; "swt:size-4" ]
+                        prop.children [
+                            Icons.Check()
+                        ]
                     ]
             ]
         ]
