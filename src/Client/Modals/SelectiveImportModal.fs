@@ -236,15 +236,17 @@ type SelectiveImportModal =
                         //Daisy.collapseTitle [
                         Html.div [
                             prop.className [
-                                "swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
+                                "swt:flex swt:items-center swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
                             ]
                             prop.children [
-                                Html.span (
-                                    if isActive then
-                                        "Preview Select Columns"
-                                    else
-                                        "Preview Table"
-                                )
+                                Html.span [
+                                    prop.text (
+                                        if isActive then
+                                            "Preview Selected Columns"
+                                        else
+                                            "Preview Table"
+                                    )
+                                ]
                                 Icons.MagnifyingClass()
                             ]
                         ]
