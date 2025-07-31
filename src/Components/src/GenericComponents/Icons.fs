@@ -210,6 +210,9 @@ type Icons =
     static member Table() =
         Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="17" height="20" viewBox="0 0 448 512"><path fill="currentColor" d="M256 160v96h128v-96zm-64 0H64v96h128zM0 320V96c0-35.3 28.7-64 64-64h320c35.3 0 64 28.7 64 64v320c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64zm384 0H256v96h128zm-192 96v-96H64v96z"/></svg>""" ]
 
+    static member TableColumn() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="17" height="20" viewBox="0 0 448 512"><path fill="currentColor" d="M0 96c0-35.3 28.7-64 64-64h320c35.3 0 64 28.7 64 64v320c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64zm64 64v256h128V160zm320 0H256v256h128z"/></svg>""" ]
+
     static member Plus() =
         Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="17" height="20" viewBox="0 0 448 512"><path fill="currentColor" d="M256 64c0-17.7-14.3-32-32-32s-32 14.3-32 32v160H32c-17.7 0-32 14.3-32 32s14.3 32 32 32h160v160c0 17.7 14.3 32 32 32s32-14.3 32-32V288h160c17.7 0 32-14.3 32-32s-14.3-32-32-32H256z"/></svg>""" ]
 
@@ -238,10 +241,34 @@ type Icons =
         Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1664 1664"><path fill="currentColor" d="M1152 704q0-185-131.5-316.5T704 256T387.5 387.5T256 704t131.5 316.5T704 1152t316.5-131.5T1152 704m512 832q0 52-38 90t-90 38q-54 0-90-38l-343-342q-179 124-399 124q-143 0-273.5-55.5t-225-150t-150-225T0 704t55.5-273.5t150-225t225-150T704 0t273.5 55.5t225 150t150 225T1408 704q0 220-124 399l343 343q37 37 37 90"/></svg>""" ]
 
     static member SpinningSpinner() =
-        Html.svg [
-            prop.className "animate-spin h-20 w-20 text-current"
-            prop.xmlns "http://www.w3.org/2000/svg"
-            prop.children [
-                Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1664 1728"><path fill="currentColor" d="M462 1394q0 53-37.5 90.5T334 1522q-52 0-90-38t-38-90q0-53 37.5-90.5T334 1266t90.5 37.5T462 1394m498 206q0 53-37.5 90.5T832 1728t-90.5-37.5T704 1600t37.5-90.5T832 1472t90.5 37.5T960 1600M256 896q0 53-37.5 90.5T128 1024t-90.5-37.5T0 896t37.5-90.5T128 768t90.5 37.5T256 896m1202 498q0 52-38 90t-90 38q-53 0-90.5-37.5T1202 1394t37.5-90.5t90.5-37.5t90.5 37.5t37.5 90.5M494 398q0 66-47 113t-113 47t-113-47t-47-113t47-113t113-47t113 47t47 113m1170 498q0 53-37.5 90.5T1536 1024t-90.5-37.5T1408 896t37.5-90.5T1536 768t90.5 37.5T1664 896m-640-704q0 80-56 136t-136 56t-136-56t-56-136t56-136T832 0t136 56t56 136m530 206q0 93-66 158.5T1330 622q-93 0-158.5-65.5T1106 398q0-92 65.5-158t158.5-66q92 0 158 66t66 158"/></svg>""" ]
+        Svg.svg [
+            Html.i [
+                prop.className "animate-spin h-20 w-20 text-current"
+                prop.xmlns "http://www.w3.org/2000/svg"
+                prop.children [
+                    Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1664 1728"><path fill="currentColor" d="M462 1394q0 53-37.5 90.5T334 1522q-52 0-90-38t-38-90q0-53 37.5-90.5T334 1266t90.5 37.5T462 1394m498 206q0 53-37.5 90.5T832 1728t-90.5-37.5T704 1600t37.5-90.5T832 1472t90.5 37.5T960 1600M256 896q0 53-37.5 90.5T128 1024t-90.5-37.5T0 896t37.5-90.5T128 768t90.5 37.5T256 896m1202 498q0 52-38 90t-90 38q-53 0-90.5-37.5T1202 1394t37.5-90.5t90.5-37.5t90.5 37.5t37.5 90.5M494 398q0 66-47 113t-113 47t-113-47t-47-113t47-113t113-47t113 47t47 113m1170 498q0 53-37.5 90.5T1536 1024t-90.5-37.5T1408 896t37.5-90.5T1536 768t90.5 37.5T1664 896m-640-704q0 80-56 136t-136 56t-136-56t-56-136t56-136T832 0t136 56t56 136m530 206q0 93-66 158.5T1330 622q-93 0-158.5-65.5T1106 398q0-92 65.5-158t158.5-66q92 0 158 66t66 158"/></svg>""" ]
+                ]
             ]
         ]
+
+    static member ExclamationTriangle() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 512 512"><path fill="currentColor" d="M256 0c14.7 0 28.2 8.1 35.2 21l216 400c6.7 12.4 6.4 27.4-.8 39.5S486.1 480 472 480H40c-14.1 0-27.1-7.4-34.4-19.5s-7.5-27.1-.8-39.5l216-400c7-12.9 20.5-21 35.2-21m0 168c-13.3 0-24 10.7-24 24v112c0 13.3 10.7 24 24 24s24-10.7 24-24V192c0-13.3-10.7-24-24-24m26.7 216a26.7 26.7 0 1 0-53.3 0a26.7 26.7 0 1 0 53.3 0"/></svg>""" ]
+
+    static member LightBulb() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="15" height="20" viewBox="0 0 384 512"><path fill="currentColor" d="M292.9 384c7.3-22.3 21.9-42.5 38.4-59.9C364 289.7 384 243.2 384 192C384 86 298 0 192 0S0 86 0 192c0 51.2 20 97.7 52.7 132.1c16.5 17.4 31.2 37.6 38.4 59.9h201.7zm-4.9 48H96v16c0 44.2 35.8 80 80 80h32c44.2 0 80-35.8 80-80zM184 112c-39.8 0-72 32.2-72 72c0 13.3-10.7 24-24 24s-24-10.7-24-24c0-66.3 53.7-120 120-120c13.3 0 24 10.7 24 24s-10.7 24-24 24"/></svg>""" ]
+
+    static member EllipsisVertical() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="5" height="20" viewBox="0 0 128 512"><path fill="currentColor" d="M64 144a56 56 0 1 1 0-112a56 56 0 1 1 0 112m0 224c30.9 0 56 25.1 56 56s-25.1 56-56 56s-56-25.1-56-56s25.1-56 56-56m56-112c0 30.9-25.1 56-56 56S8 286.9 8 256s25.1-56 56-56s56 25.1 56 56"/></svg>""" ]
+
+    static member SquareCheck() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="17" height="20" viewBox="0 0 448 512"><path fill="currentColor" d="M64 32C28.7 32 0 60.7 0 96v320c0 35.3 28.7 64 64 64h320c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64zm244.4 180.7l-80 128c-4.2 6.7-11.4 10.9-19.3 11.3s-15.5-3.2-20.2-9.6l-48-64c-8-10.6-5.8-25.6 4.8-33.6s25.6-5.8 33.6 4.8l27 36l61.4-98.3c7-11.2 21.8-14.7 33.1-7.6s14.7 21.8 7.6 33.1z"/></svg>""" ]
+
+    static member LinkSlash() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="m8 9.06l4.97 4.97a.75.75 0 1 0 1.06-1.06l-11-11a.75.75 0 0 0-1.06 1.06L6.94 8L5.47 9.47a.75.75 0 1 0 1.06 1.06zm3.54-.722L12.601 9.4l.656-.656a4.243 4.243 0 0 0-6-6l-.656.656l1.06 1.06l.657-.656a2.743 2.743 0 0 1 3.879 3.879zM9.47 5.47l-.4.399l1.061 1.06l.4-.399A.75.75 0 1 0 9.47 5.47M3.22 6.78a.75.75 0 0 1 1.06 1.061l-.477.477a2.743 2.743 0 0 0 3.879 3.879l.477-.477a.75.75 0 0 1 1.06 1.06l-.476.477a4.243 4.243 0 0 1-6-6z" clip-rule="evenodd"/></svg>""" ]
+
+    static member DiagramProject() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 512 512"><path fill="currentColor" d="M0 80c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v16h128V80c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v96c0 26.5-21.5 48-48 48h-96c-26.5 0-48-21.5-48-48v-16H192v16c0 7.3-1.7 14.3-4.6 20.5L256 288h80c26.5 0 48 21.5 48 48v96c0 26.5-21.5 48-48 48h-96c-26.5 0-48-21.5-48-48v-96c0-7.3 1.7-14.3 4.6-20.5L128 224H48c-26.5 0-48-21.5-48-48z"/></svg>""" ]
+
+    static member ExternalLinkAlt() =
+        Html.i [ prop.dangerouslySetInnerHTML """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M18 10.82a1 1 0 0 0-1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h7.18a1 1 0 0 0 0-2H5a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-7.18a1 1 0 0 0-1-1m3.92-8.2a1 1 0 0 0-.54-.54A1 1 0 0 0 21 2h-6a1 1 0 0 0 0 2h3.59L8.29 14.29a1 1 0 0 0 0 1.42a1 1 0 0 0 1.42 0L20 5.41V9a1 1 0 0 0 2 0V3a1 1 0 0 0-.08-.38"/></svg>""" ]
+

@@ -11,6 +11,7 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 
+open Swate.Components
 open Swate.Components.ReactHelper
 
 open Browser.Dom
@@ -92,7 +93,7 @@ module Settings =
                     Html.button [
                         prop.className "swt:btn swt:btn-error swt:btn-square"
                         prop.onClick (fun _ -> rmv ())
-                        prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ] ]
+                        prop.children (Icons.Delete())
                     ]
                     if disconnected then
                         Html.div [
@@ -109,9 +110,7 @@ module Settings =
                                         Html.button [
                                             prop.className
                                                 "swt:btn swt:btn-warning swt:btn-active swt:btn-square swt:no-animation"
-                                            prop.children [
-                                                Html.i [ prop.className "fa-solid fa-triangle-exclamation" ]
-                                            ]
+                                            prop.children (Icons.ExclamationTriangle())
                                         ]
                                     ]
                                 ]
@@ -158,7 +157,7 @@ module Settings =
                                     |> PersistentStorageMsg
                                     |> dispatch
                             )
-                            prop.children [ Html.i [ prop.className "fa-solid fa-plus" ]; Html.text "Add" ]
+                            prop.children [ Icons.Plus(); Html.text "Add" ]
                         ]
                         Html.button [
                             prop.className "swt:btn swt:btn-error swt:btn-sm"
@@ -168,14 +167,14 @@ module Settings =
                                 |> PersistentStorageMsg
                                 |> dispatch
                             )
-                            prop.children [ Html.i [ prop.className "fa-solid fa-trash-can" ]; Html.text "Clear" ]
+                            prop.children [ Icons.Delete(); Html.text "Clear" ]
                         ]
                     ]
                 ]
                 if loading then
                     Html.div [
                         prop.className "swt:flex swt:justify-center"
-                        prop.children [ Html.i [ prop.className "fa-solid fa-spinner fa-spin" ] ]
+                        prop.children (Icons.SpinningSpinner())
                     ]
                 elif catalogues.AllCatalogues.Count = 0 then
                     Html.div [

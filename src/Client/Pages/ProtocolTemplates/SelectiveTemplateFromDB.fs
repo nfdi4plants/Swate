@@ -7,6 +7,7 @@ open Messages
 open ARCtrl
 open FileImport
 open OfficeInterop.Core
+open Swate.Components
 
 type SelectiveTemplateFromDB =
 
@@ -156,7 +157,7 @@ type SelectiveTemplateFromDB =
                         prop.children [
                             SelectiveImportModal.RadioPluginsBox(
                                 "Import Type",
-                                "fa-solid fa-cog",
+                                Icons.Cog(),
                                 model.ProtocolState.ImportConfig.ImportType,
                                 "importType" + radioGroup,
                                 [|

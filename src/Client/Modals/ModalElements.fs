@@ -61,7 +61,7 @@ type ModalElements =
             ]
         ]
 
-    static member Box(title: string, icon: string, content: ReactElement, ?className: string list) =
+    static member Box(title: string, icon: ReactElement, content: ReactElement, ?className: string list) =
         Html.div [
             prop.className [
                 "swt:rounded-sm swt:shadow-sm swt:p-2 swt:flex swt:flex-col swt:gap-2 swt:border swt:border-3"
@@ -71,7 +71,7 @@ type ModalElements =
             prop.children [
                 Html.h3 [
                     prop.className "swt:font-semibold swt:gap-2 swt:flex swt:flex-row swt:items-center"
-                    prop.children [ Html.i [ prop.className icon ]; Html.span title ]
+                    prop.children [ icon; Html.span title ]
                 ]
                 content
             ]
