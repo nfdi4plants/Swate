@@ -512,7 +512,7 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex, table, selectHandle)
+                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex - 1, table, selectHandle)
                         |> setTable
             )
             ContextMenuItem(
@@ -522,7 +522,7 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, cc))
+                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, {|x = columnIndex - 1; y = 0|}))
             )
         ]
 
