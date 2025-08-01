@@ -266,9 +266,15 @@ type TermSearch =
                     prop.className [
                         "swt:w-5"
                         if isObsolete then
-                            "fa-solid fa-link-slash swt:text-error"
+                            "swt:text-error"
                         elif isDirectedSearch then
-                            "fa-solid fa-diagram-project swt:text-primary"
+                            "swt:text-primary"
+                    ]
+                    prop.children [
+                        if isObsolete then
+                            Icons.LinkSlash()
+                        elif isDirectedSearch then
+                            Icons.DiagramProject()
                     ]
                 ]
                 Html.span [
@@ -405,7 +411,7 @@ type TermSearch =
             indicatorPosition: string,
             tooltip: string,
             tooltipPosition: string,
-            icon: string,
+            icon: ReactElement,
             onclick,
             ?btnClasses: string,
             ?isActive: bool,
@@ -434,7 +440,7 @@ type TermSearch =
                         if btnClasses.IsSome then
                             btnClasses.Value
                     ]
-                    prop.children [ Html.i [ prop.className icon ] ]
+                    prop.children [ icon ]
                 ]
             ]
         ]
@@ -509,7 +515,7 @@ type TermSearch =
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary swt:btn-xs"
                                 prop.onClick (fun _ -> setShowConfig (not showConfig))
-                                prop.children [ Html.i [ prop.className "fa-solid fa-cog" ] ]
+                                prop.children [ Icons.Cog() ]
                             ]
                         ]
                     ]
@@ -520,7 +526,7 @@ type TermSearch =
                     Html.button [
                         prop.className "swt:btn swt:btn-xs swt:btn-neutral"
                         prop.onClick (fun _ -> setShowConfig (not showConfig))
-                        prop.children [ Html.i [ prop.className "fa-solid fa-arrow-left" ]; Html.span "back" ]
+                        prop.children [ Icons.ArrowLeft(); Html.span "back" ]
                     ]
             ]
 
@@ -1191,7 +1197,7 @@ type TermSearch =
                                         "",
                                         sprintf "%s - %s" term.name.Value term.id.Value,
                                         "swt:tooltip-left",
-                                        "fa-solid fa-square-check",
+                                        Icons.SquareCheck(),
                                         (fun _ ->
                                             setModal (
                                                 if modal.IsSome && modal.Value = Modals.Details then
@@ -1207,7 +1213,7 @@ type TermSearch =
                                     "",
                                     "Details",
                                     "swt:tooltip-left",
-                                    "fa-solid fa-circle-info",
+                                    Icons.InfoCircle([||]),
                                     (fun _ ->
                                         setModal (
                                             if modal.IsSome && modal.Value = Modals.Details then
@@ -1226,7 +1232,7 @@ type TermSearch =
                                 "swt:indicator-bottom",
                                 "Advanced Search",
                                 "swt:tooltip-left",
-                                "fa-solid fa-magnifying-glass-plus",
+                                Icons.MagnifyingClassPlus(),
                                 (fun _ ->
                                     setModal (
                                         if modal.IsSome && modal.Value = Modals.AdvancedSearch then
@@ -1250,13 +1256,16 @@ type TermSearch =
                             prop.children [
                                 Html.i [
                                     prop.className [
-                                        "fa-solid fa-search swt:text-primary swt:pr-2 swt:transition-all swt:w-6 swt:overflow-x-hidden swt:opacity-100"
+                                        "swt:text-primary swt:pr-2 swt:transition-all swt:w-6 swt:overflow-x-hidden swt:opacity-100"
                                         if
                                             focused
                                             || inputRef.current.IsSome
                                                && System.String.IsNullOrEmpty inputRef.current.Value.value |> not
                                         then
                                             "swt:!w-0 swt:!opacity-0"
+                                    ]
+                                    prop.children [
+                                        Icons.MagnifyingClass()
                                     ]
                                 ]
                                 Html.input [

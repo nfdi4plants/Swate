@@ -8,6 +8,7 @@ open Messages
 open Feliz
 open Feliz.DaisyUI
 open Swate
+open Swate.Components
 
 module FilePicker =
 
@@ -60,21 +61,17 @@ type FilePicker =
                 ]
                 match model.PersistentStorageState.Host with
                 | Some Swatehost.ARCitect ->
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:btn-block"
                         prop.text "Pick Files"
                         prop.onClick (fun _ -> Start false |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch)
                     ]
-
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:btn-block"
                         prop.text "Pick Directories"
                         prop.onClick (fun _ -> Start true |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch)
                     ]
                 | _ ->
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:btn-block"
                         prop.text "Pick file names"
@@ -89,15 +86,12 @@ type FilePicker =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:justify-center swt:gap-2"
             prop.children [
-
-                //Daisy.button.button [
                 Html.button [
                     prop.className "swt:btn swt:btn-neutral swt:btn-outline swt:bg-neutral swt:text-white swt:hover:btn-primary"
                     prop.text "Cancel"
                     prop.onClick (fun _ -> Messages.FilePicker.UpdateFileNames [] |> FilePickerMsg |> dispatch)
                 ]
 
-                //Daisy.button.button [
                 Html.button [
                     prop.className "swt:btn swt:btn-primary"
                     prop.text "Insert file names"
@@ -109,28 +103,26 @@ type FilePicker =
         ]
 
     static member private SortButton icon msg =
-        //Daisy.button.a [
         Html.button [
             join.item
             prop.className "swt:btn swt:join-item"
             prop.onClick msg
-            prop.children [ Html.i [ prop.classes [ "fa-lg"; icon ] ] ]
+            prop.children [ icon ]
         ]
 
     static member FileSortElements (model: Model) dispatch =
         Html.div [
-            //Daisy.join [
             Html.div [
                 prop.className "swt:join"
                 prop.children [
-                    FilePicker.SortButton "fa-solid fa-arrow-down-a-z" (fun _ ->
+                    FilePicker.SortButton (Icons.ArrowDownAZ()) (fun _ ->
                         let sortedList =
                             model.FilePickerState.FileNames
                             |> List.sortBy snd
                             |> List.mapi (fun i x -> i + 1, snd x)
 
                         UpdateFileNames sortedList |> FilePickerMsg |> dispatch)
-                    FilePicker.SortButton "fa-solid fa-arrow-down-z-a" (fun _ ->
+                    FilePicker.SortButton (Icons.ArrowDownZA()) (fun _ ->
                         let sortedList =
                             model.FilePickerState.FileNames
                             |> List.sortByDescending snd
@@ -156,7 +148,6 @@ type FilePicker =
         )
 
     static member private MoveUpButton (id, fileName) (model: Model) dispatch =
-        //Daisy.button.a [
         Html.button [
             prop.className "swt:btn swt:btn-xs swt:join-item"
             prop.onClick (fun _ ->
@@ -175,11 +166,10 @@ type FilePicker =
                     |> List.mapi (fun i v -> i + 1, snd v)
 
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch)
-            prop.children [ Html.i [ prop.className "fa-solid fa-arrow-up" ] ]
+            prop.children [ Icons.ArrowUp() ]
         ]
 
     static member private MoveDownButton (id, fileName) (model: Model) dispatch =
-        //Daisy.button.a [
         Html.button [
             prop.className "swt:btn swt:btn-xs swt:join-item"
             prop.onClick (fun _ ->
@@ -198,11 +188,10 @@ type FilePicker =
                     |> List.mapi (fun i v -> i + 1, snd v)
 
                 UpdateFileNames sortedList |> FilePickerMsg |> dispatch)
-            prop.children [ Html.i [ prop.className "fa-solid fa-arrow-down" ] ]
+            prop.children [ Icons.ArrowDown() ]
         ]
 
     static member private MoveButtonList (id, fileName) (model: Model) dispatch =
-        //Daisy.join [
         Html.div [
             prop.className "swt:join"
             prop.children [
@@ -213,7 +202,6 @@ type FilePicker =
 
 
     static member private FileViewTable (model: Model) dispatch =
-        //Daisy.table [
         Html.table [
             prop.className "swt:table swt:table-zebra swt:table-xs"
             prop.children [

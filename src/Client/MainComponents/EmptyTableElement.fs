@@ -35,8 +35,7 @@ type EmptyTableElement =
                                         Html.span "Start from an existing template!"
                                         EmptyTableElement.Button(
                                             React.fragment [
-                                                Html.i [ prop.className "fa-solid fa-circle-plus" ]
-                                                Html.i [ prop.className "fa-solid fa-table" ]
+                                                Icons.Templates()
                                             ],
                                             fun _ -> openTemplateWidget ()
                                         )

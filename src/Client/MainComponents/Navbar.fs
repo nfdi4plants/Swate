@@ -178,7 +178,7 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
             prop.className "swt:grow-0"
         ]
         Html.div [
-            prop.className "swt:navbar-center swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
+            prop.className "swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
             prop.children [
                 QuickAccessButtonListStart model.History dispatch
                 WidgetNavbarList(model, dispatch, addWidget)

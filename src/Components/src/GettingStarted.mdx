@@ -13,7 +13,6 @@
 ```jsx
 
 import '@nfdi4plants/swate-components/style.css' // Import minified tailwind and daisyui style
-import '@fortawesome/fontawesome-free/css/all.css' // Import icons
 import { TermSearch } from '@nfdi4plants/swate-components'
 
 <TermSearch
@@ -42,8 +41,8 @@ paket add Swate.Components
 
 Install npm dependencies
 
-```bash
-npm i @fortawesome/fontawesome-free
+```
+npm i @floating-ui/react@^0 @tanstack/react-virtual@^3 @uidotdev/usehooks@^2
 ```
 
 #### Import the components you want to use:
@@ -53,7 +52,6 @@ npm i @fortawesome/fontawesome-free
 open Fable.Core.JsInterop
 
 Swate.Components.SwateStyle.import
-importSideEffects "@fortawesome/fontawesome-free/css/all.min.css"
 
 Swate.Components.TermSearch.TermSearch(
     (fun term -> Browser.Dom.console.log term),

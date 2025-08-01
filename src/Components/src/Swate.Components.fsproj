@@ -75,7 +75,9 @@
 
   <PropertyGroup>
     <NpmDependencies>
-      <NpmPackage Name="@fortawesome/fontawesome-free" Version="gte 6.7.2 lt 7.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@floating-ui/react" Version="gte 0.27.7 lt 1.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max" />
     </NpmDependencies>
   </PropertyGroup>
 

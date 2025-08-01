@@ -122,7 +122,7 @@ type SelectiveImportModal =
 
         ModalElements.Box(
             sprintf "%s Metadata" name,
-            "fa-solid fa-lightbulb",
+            Icons.LightBulb(),
             React.fragment [
                 //Daisy.fieldset [
                 Html.fieldSet [
@@ -146,7 +146,7 @@ type SelectiveImportModal =
                 Html.div [
                     prop.className "swt:alert swt:alert-warning"
                     prop.children [
-                        Html.i [ prop.className "fa-solid fa-exclamation-triangle" ]
+                        Icons.ExclamationTriangle()
                         Html.text " Importing metadata will overwrite the current file."
                     ]
                 ]
@@ -203,7 +203,7 @@ type SelectiveImportModal =
 
         ModalElements.Box(
             name,
-            "fa-solid fa-table",
+            Icons.Table(),
             React.fragment [
                 Html.div [
                     ModalElements.RadioPlugin(
@@ -236,16 +236,18 @@ type SelectiveImportModal =
                         //Daisy.collapseTitle [
                         Html.div [
                             prop.className [
-                                "swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
+                                "swt:flex swt:items-center swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
                             ]
                             prop.children [
-                                Html.span (
-                                    if isActive then
-                                        "Preview Select Columns"
-                                    else
-                                        "Preview Table"
-                                )
-                                Html.i [ prop.className "fa-solid fa-magnifying-glass" ]
+                                Html.span [
+                                    prop.text (
+                                        if isActive then
+                                            "Preview Selected Columns"
+                                        else
+                                            "Preview Table"
+                                    )
+                                ]
+                                Icons.MagnifyingClass()
                             ]
                         ]
                         //Daisy.collapseContent [
@@ -293,7 +295,7 @@ type SelectiveImportModal =
             React.fragment [
                 SelectiveImportModal.RadioPluginsBox(
                     "Import Type",
-                    "fa-solid fa-cog",
+                    Icons.Cog(),
                     model.ProtocolState.ImportConfig.ImportType,
                     "importType",
                     [|

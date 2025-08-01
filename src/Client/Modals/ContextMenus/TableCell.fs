@@ -3,6 +3,8 @@ namespace Modals.ContextMenus
 open ARCtrl
 open Feliz
 open Feliz.DaisyUI
+
+open Swate.Components
 open Swate.Components.Shared
 
 type TableCell =
@@ -80,18 +82,18 @@ type TableCell =
             fun _ -> Spreadsheet.DeleteColumn(ci) |> Messages.SpreadsheetMsg |> dispatch
 
         let children (rmv: unit -> unit) : ReactElement seq = [
-            Modals.ContextMenus.Base.Item("Edit Column", editColumnModal, "fa-solid fa-table-columns")
+            Modals.ContextMenus.Base.Item("Edit Column", editColumnModal, Icons.TableColumn())
             if (isHeader && header.IsTermColumn) || isUnitOrTermCell then
                 let oa = if isHeader then header.ToTerm() else cell.Value.ToOA()
 
                 if oa.TermAccessionShort <> "" then
-                    Modals.ContextMenus.Base.Item("Details", triggerTermModal oa, "fa-solid fa-magnifying-glass")
+                    Modals.ContextMenus.Base.Item("Details", triggerTermModal oa, Icons.MagnifyingClass())
             if not isHeader then
-                Modals.ContextMenus.Base.Item("Fill Column", fillColumn >> rmv, "fa-solid fa-pen")
+                Modals.ContextMenus.Base.Item("Fill Column", fillColumn >> rmv, Icons.Pen())
 
                 if isUnitOrTermCell then
                     let text = if cell.Value.isTerm then "As Unit Cell" else "As Term Cell"
-                    Modals.ContextMenus.Base.Item(text, transFormCell >> rmv, "fa-solid fa-arrow-right-arrow-left")
+                    Modals.ContextMenus.Base.Item(text, transFormCell >> rmv, Icons.ArrorRightLeft())
                 elif header.IsDataColumn then
                     let text =
                         if cell.Value.isFreeText then
@@ -99,25 +101,25 @@ type TableCell =
                         else
                             "As Free Text Cell"
 
-                    Modals.ContextMenus.Base.Item(text, transFormCell >> rmv, "fa-solid fa-arrow-right-arrow-left")
+                    Modals.ContextMenus.Base.Item(text, transFormCell >> rmv, Icons.ArrorRightLeft())
 
                 if not isUnitOrTermCell then
                     Modals.ContextMenus.Base.Item(
                         "Update Column",
                         triggerUpdateColumnModal,
-                        "fa-solid fa-ellipsis-vertical"
+                        Icons.EllipsisVertical()
                     )
 
-                Modals.ContextMenus.Base.Item("Clear", clear >> rmv, "fa-solid fa-eraser")
+                Modals.ContextMenus.Base.Item("Clear", clear >> rmv, Icons.Eraser())
                 Modals.ContextMenus.Base.Divider()
-                Modals.ContextMenus.Base.Item("Copy", copy >> rmv, "fa-solid fa-copy")
-                Modals.ContextMenus.Base.Item("Cut", cut >> rmv, "fa-solid fa-scissors")
-                Modals.ContextMenus.Base.Item("Paste", paste >> rmv, "fa-solid fa-paste")
-                Modals.ContextMenus.Base.Item("Paste All", pasteAll >> rmv, "fa-solid fa-paste")
+                Modals.ContextMenus.Base.Item("Copy", copy >> rmv, Icons.Copy())
+                Modals.ContextMenus.Base.Item("Cut", cut >> rmv, Icons.Scissor())
+                Modals.ContextMenus.Base.Item("Paste", paste >> rmv, Icons.Paste())
+                Modals.ContextMenus.Base.Item("Paste All", pasteAll >> rmv, Icons.Paste())
                 Modals.ContextMenus.Base.Divider()
-                Modals.ContextMenus.Base.Item("Delete Row", deleteRow >> rmv, "fa-solid fa-delete-left")
-            Modals.ContextMenus.Base.Item("Delete Column", deleteColumn >> rmv, "fa-solid fa-delete-left fa-rotate-270")
-            Modals.ContextMenus.Base.Item("Move Column", triggerMoveColumnModal, "fa-solid fa-arrow-right-arrow-left")
+                Modals.ContextMenus.Base.Item("Delete Row", deleteRow >> rmv, Icons.DeleteLeft())
+            Modals.ContextMenus.Base.Item("Delete Column", deleteColumn >> rmv, Icons.DeleteDown())
+            Modals.ContextMenus.Base.Item("Move Column", triggerMoveColumnModal, Icons.ArrorRightLeft())
         ]
 
         Base.Main(mouseX, mouseY, children, dispatch)

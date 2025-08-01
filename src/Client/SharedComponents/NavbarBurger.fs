@@ -83,7 +83,7 @@ type NavbarBurger =
             [
                 NavbarBurger.DropdownItem(
                     "Settings",
-                    Icons.Settings(),
+                    Icons.Cog(),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.Settings)
                 )
                 NavbarBurger.DropdownItem(

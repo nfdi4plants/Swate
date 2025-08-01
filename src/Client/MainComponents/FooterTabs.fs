@@ -4,6 +4,7 @@ open Feliz
 open Feliz.DaisyUI
 open ARCtrl
 open Model
+open Swate.Components
 
 type private FooterTab = {
     IsEditable: bool
@@ -144,7 +145,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                     prop.defaultValue table.Name
                 ]
             else
-                Html.i [ prop.className "fa-solid fa-table" ]
+                Icons.Table()
                 Html.span [ prop.className "swt:truncate"; prop.text table.Name ]
         ]
     ]
@@ -171,7 +172,7 @@ let MainMetadata (model: Model, dispatch: Messages.Msg -> unit) =
             style.cursor.pointer
         ]
         prop.children [
-            Html.i [ prop.className "fa-solid fa-circle-info" ]
+            Icons.InfoCircle([||])
             Html.text model.SpreadsheetModel.FileType
         ]
     ]
@@ -204,7 +205,7 @@ let MainDataMap (model: Model, dispatch: Messages.Msg -> unit) =
             style.height (length.percent 100)
             style.cursor.pointer
         ]
-        prop.children [ Html.i [ prop.className "fa-solid fa-map" ]; Html.text "Data Map" ]
+        prop.children [ Icons.Map(); Html.text "Data Map" ]
     ]
 
 [<ReactComponent>]
@@ -243,7 +244,7 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
             style.height (length.percent 100)
             style.cursor.pointer
         ]
-        prop.children [ Html.i [ prop.className "fa-solid fa-plus" ] ]
+        prop.children [ Icons.Plus() ]
     ]
 
 let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
@@ -265,8 +266,18 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
                     "swt:drawer swt:drawer-button swt:btn swt:btn-sm swt:px-2 swt:py-2 swt:swap swt:swap-rotate swt:rounded-none swt:h-full"
                 prop.children [
                     Html.input [ prop.type'.checkbox ]
-                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-left"; "swt:swap-off" ] ]
-                    Html.i [ prop.className [ "fa-solid"; "fa-chevron-right"; "swt:swap-on" ] ]
+                    Html.div [
+                        prop.className [ "swt:swap-off" ]
+                        prop.children [
+                            Icons.ChevronLeft()
+                        ]
+                    ]
+                    Html.div [
+                        prop.className [ "swt:swap-on" ]
+                        prop.children [
+                            Icons.ChevronRight()
+                        ]
+                    ]
                 ]
             ]
         ]

@@ -3,6 +3,7 @@ namespace Components.Forms
 open ARCtrl
 open Feliz
 open Feliz.DaisyUI
+open Swate.Components
 
 type Datamap =
 
@@ -13,7 +14,6 @@ type Datamap =
             Html.div [
                 prop.className "swt:flex swt:gap-4 swt:flex-col swt:@lg/main:flex-row"
                 prop.children [
-                    //Daisy.button.button [
                     Html.button [
                         prop.className [
                             "swt:btn swt:btn-success"
@@ -23,9 +23,8 @@ type Datamap =
                         prop.onClick (fun _ ->
                             let newDtm = DataMap.init ()
                             setDatamap (Some newDtm))
-                        prop.children [ Html.i [ prop.className "fa-solid fa-map" ]; Html.span "Add Datamap" ]
+                        prop.children [ Icons.Map(); Html.span "Add Datamap" ]
                     ]
-                    //Daisy.button.button [
                     Html.button [
                         prop.className [
                             "swt:btn swt:btn-error"
@@ -33,7 +32,7 @@ type Datamap =
                                 "swt:btn-disabled"
                         ]
                         prop.onClick (fun _ -> setDatamap None)
-                        prop.children [ Html.i [ prop.className "fa-solid fa-trash" ]; Html.span "Remove Datamap" ]
+                        prop.children [ Icons.Delete() ; Html.span "Remove Datamap" ]
                     ]
                 ]
             ]

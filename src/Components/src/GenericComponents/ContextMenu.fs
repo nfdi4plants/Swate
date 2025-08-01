@@ -326,7 +326,7 @@ type ContextMenu =
                                 text = Html.span $"Item {i}",
                                 ?icon =
                                     (if i = 4 then
-                                         Html.i [ prop.className "fa-solid fa-check" ] |> Some
+                                         Icons.Check() |> Some
                                      else
                                          None),
                                 ?kbdbutton =

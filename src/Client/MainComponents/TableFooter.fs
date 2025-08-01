@@ -4,6 +4,8 @@ open Feliz
 open Feliz.DaisyUI
 open Fable.Core.JsInterop
 
+open Swate.Components
+
 open Messages
 
 [<ReactComponent>]
@@ -39,7 +41,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                             inputRef.current.Value.value <- unbox init_RowsToAdd
                             setState_rows init_RowsToAdd
                             Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch)
-                        prop.children [ Html.i [ prop.className "fa-solid fa-plus" ] ]
+                        prop.children [ Icons.Plus() ]
                     ]
                 ]
             ]

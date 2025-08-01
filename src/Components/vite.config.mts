@@ -31,7 +31,6 @@ export default defineConfig({
                 'tailwindcss',
                 '@fable-org/fable-library-js',
                 "@floating-ui/react",
-                "@fortawesome/fontawesome-free",
                 "@tanstack/react-virtual",
                 "@nfdi4plants/arctrl"
             ],
