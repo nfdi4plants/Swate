@@ -209,6 +209,11 @@ module TemplateFilterAux =
         Payload: obj option
     |}
 
+    let mkFullName (author: ARCtrl.Person) =
+        [ author.FirstName; author.LastName; author.MidInitials ]
+        |> List.choose id
+        |> String.concat " "
+
     let mkFilterTokens (templates: Template[]) =
         let ra = ResizeArray<FilterToken>()
 
@@ -239,10 +244,7 @@ module TemplateFilterAux =
             |> Seq.collect (fun template ->
                 template.Authors
                 |> Seq.collect (fun author ->
-                    let fullname =
-                        [ author.FirstName; author.LastName; author.MidInitials; author.ORCID ]
-                        |> List.choose id
-                        |> String.concat " "
+                    let fullname = mkFullName author
 
                     [
                         {|
@@ -281,40 +283,35 @@ module TemplateFilterAux =
         ra.AddRange(organisations)
         ra
 
-    let filter
-        (tagFilter: ResizeArray<OntologyAnnotation>, communityFilter: Organisation, searchString, templates: Template[])
-        =
-        promise {
-            let filterByTag (template: Template) =
-                if tagFilter.Count = 0 then
-                    true
-                else
-                    tagFilter
-                    |> Seq.exists (fun tag -> template.Tags |> Seq.exists (fun t -> t = tag))
+// let filter
+//     (tagFilter: ResizeArray<OntologyAnnotation>, communityFilter: Organisation, searchString, templates: Template[])
+//     =
+//     promise {
+//         let filterByTag (template: Template) =
+//             if tagFilter.Count = 0 then
+//                 true
+//             else
+//                 tagFilter
+//                 |> Seq.exists (fun tag -> template.Tags |> Seq.exists (fun t -> t = tag))
 
-            let filterByCommunity (template: Template) = template.Organisation = communityFilter
+//         let filterByCommunity (template: Template) = template.Organisation = communityFilter
 
-            let filterBySearchString (template: Template) =
-                if System.String.IsNullOrWhiteSpace searchString then
-                    true
-                else
-                    template.Name.Contains(searchString)
-                    || template.Authors
-                       |> Seq.exists (fun author ->
-                           [ author.FirstName; author.LastName; author.MidInitials; author.ORCID ]
-                           |> List.choose id
-                           |> String.concat " "
-                           |> fun x -> x.Contains searchString
-                       )
+//         let filterBySearchString (template: Template) =
+//             if System.String.IsNullOrWhiteSpace searchString then
+//                 true
+//             else
+//                 template.Name.Contains(searchString)
+//                 || template.Authors
+//                    |> Seq.exists (fun author -> mkFullName author |> fun x -> x.Contains searchString)
 
-            return
-                templates
-                |> Array.filter (fun template ->
-                    filterByTag template
-                    && filterByCommunity template
-                    && filterBySearchString template
-                )
-        }
+//         return
+//             templates
+//             |> Array.filter (fun template ->
+//                 filterByTag template
+//                 && filterByCommunity template
+//                 && filterBySearchString template
+//             )
+//     }
 
 
 [<Erase; Mangle(false)>]
@@ -376,61 +373,69 @@ type TemplateFilter =
         ]
 
     [<ReactComponent(true)>]
-    static member TemplateFilter
-        (templates: Template[], ?filteredTemplatesRenderFn: (Template[] -> ReactElement), ?key: obj)
-        =
+    static member TemplateFilter(templates: Template[], ?key: obj) =
 
         /// This constant is used to display available tags in the combo box
         let filterTokens =
             React.useMemo ((fun () -> TemplateFilterAux.mkFilterTokens templates), [| box templates |])
 
-        let loading, setLoading = React.useState false
+        let inputValue, setInputValue = React.useState ""
 
-        let searchString, setSearchString = React.useState ""
+        let searchFn =
+            fun
+                (props:
+                    {|
+                        item: TemplateFilterAux.FilterToken
+                        search: string
+                    |}) -> props.item.NameText.ToLower().Contains(props.search.ToLower())
 
-        /// these templates are shown to the user
-        let (localTemplates: Template[]), setLocalTemplates = React.useState ([||])
+        let transformFn = fun (item: TemplateFilterAux.FilterToken) -> item.NameText
 
-        let reset = fun () -> setLocalTemplates (Array.ofSeq templates)
-
-        let isDisabled = templates.Length = 0
-
-        Html.div [
-            prop.children [
-                Html.label [
-                    prop.className "swt:input"
-                    prop.children [
-                        Html.input [
-                            prop.type'.search
-                            prop.onChange (fun (ev: string) -> setSearchString ev)
-                            prop.disabled isDisabled
-                            prop.className "swt:grow"
-                            prop.placeholder "Filter templates..."
-                        ]
+        let itemRenderFn =
+            fun
+                (props:
+                    {|
+                        index: int
+                        isActive: bool
+                        item: TemplateFilterAux.FilterToken
+                        props: ResizeArray<IReactProperty>
+                    |}) ->
+                Html.li [
+                    prop.className [
+                        "swt:list-row swt:rounded-none swt:p-1"
+                        if props.isActive then
+                            "swt:bg-base-content swt:text-base-300"
                     ]
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:flex swt:items-center"
+                            prop.children [
+                                match props.item.Type with
+                                | TemplateFilterAux.FilterTokenType.Tag -> Icons.Tag("swt:size-4")
+                                | TemplateFilterAux.FilterTokenType.Repository -> Icons.CloudUpload("swt:size-4")
+                                | TemplateFilterAux.FilterTokenType.Organisation -> Icons.Institution("swt:size-4")
+                                | TemplateFilterAux.FilterTokenType.Author -> Icons.User("swt:size-4")
+                                | TemplateFilterAux.FilterTokenType.ORCID -> Icons.ORCID("swt:size-4")
+                            ]
+                        ]
+                        Html.div props.item.NameText
+                        if props.item.Type = TemplateFilterAux.FilterTokenType.ORCID then
+                            Html.div [
+                                prop.text (TemplateFilterAux.mkFullName (unbox props.item.Payload: ARCtrl.Person))
+                                prop.className "swt:ml-2 swt:text-xs swt:opacity-60"
+                            ]
+                    ]
+                    yield! props.props
                 ]
 
-            // Html.ul [
-            //     prop.className
-            //         "swt:bg-base-100 swt:rounded-box swt:shadow-md swt:max-w-lg swt:max-h-[500px] swt:overflow-y-scroll"
-            //     prop.children [
-
-            //         Html.li [
-            //             prop.className "swt:p-4 swt:pb-2 swt:text-xs swt:opacity-60 swt:tracking-wide"
-            //             prop.text (
-            //                 if loading then
-            //                     "...loading..."
-            //                 else
-            //                     $"{localTemplates.Length} templates found"
-            //             )
-            //         ]
-
-            //         for template in localTemplates do
-            //             TemplateFilter.TemplateItem(template, key = template.Id)
-            //     ]
-            // ]
-            ]
-        ]
+        ComboBox.ComboBox<TemplateFilterAux.FilterToken>(
+            inputValue,
+            setInputValue,
+            Array.ofSeq filterTokens,
+            searchFn,
+            transformFn,
+            itemRenderer = itemRenderFn
+        )
 
     [<ReactComponent>]
     static member Entry() =
@@ -438,3 +443,23 @@ type TemplateFilter =
         let templates, setTemplates = React.useState (TemplateMocks.mkTemplates ())
 
         TemplateFilter.TemplateFilter(templates, key = "template-filter")
+
+// Html.ul [
+//     prop.className
+//         "swt:bg-base-100 swt:rounded-box swt:shadow-md swt:max-w-lg swt:max-h-[500px] swt:overflow-y-scroll"
+//     prop.children [
+
+//         Html.li [
+//             prop.className "swt:p-4 swt:pb-2 swt:text-xs swt:opacity-60 swt:tracking-wide"
+//             prop.text (
+//                 if loading then
+//                     "...loading..."
+//                 else
+//                     $"{localTemplates.Length} templates found"
+//             )
+//         ]
+
+//         for template in localTemplates do
+//             TemplateFilter.TemplateItem(template, key = template.Id)
+//     ]
+// ]

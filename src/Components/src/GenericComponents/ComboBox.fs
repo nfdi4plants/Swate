@@ -13,7 +13,7 @@ type ComboBox =
 
         Html.li [
             prop.className [
-                "swt:list-row swt:rounded-none"
+                "swt:list-row swt:rounded-none swt:p-1"
                 if active then
                     "swt:bg-base-content swt:text-base-300"
             ]
@@ -27,6 +27,8 @@ type ComboBox =
     [<ReactComponent(true)>]
     static member ComboBox<'a>
         (
+            inputValue: string,
+            onInputChange: string -> unit,
             items: 'a[],
             filterFn: {| item: 'a; search: string |} -> bool,
             valueSelectTransformer: 'a -> string,
@@ -51,7 +53,7 @@ type ComboBox =
             ?inputTrailingVisual: ReactElement
         ) : ReactElement =
         let isOpen, setOpen = React.useState (false)
-        let inputValue, setInputValue = React.useState ("")
+
         let activeIndex, setActiveIndex = React.useState (None: int option)
 
         let listRef = React.useRef<ResizeArray<Browser.Types.HTMLElement>> (ResizeArray())
@@ -90,7 +92,7 @@ type ComboBox =
 
         let onChange (e: Browser.Types.InputEvent) =
             let value = e.target?value |> unbox string
-            setInputValue value
+            onInputChange value
 
             if System.String.IsNullOrWhiteSpace value |> not then
                 setOpen true
@@ -129,8 +131,9 @@ type ComboBox =
                             Html.ul [
                                 prop.className [
                                     "swt:list swt:py-2"
-                                    "swt:bg-base-100 swt:shadow-sm swt:rounded-box"
+                                    "swt:bg-base-100 swt:shadow-sm swt:rounded-xs"
                                     "swt:overflow-y-auto swt:max-h-1/2 swt:lg:max-h-1/3 swt:min-w-md swt:max-w-xl"
+                                    "swt:border-2 swt:border-base-content/50"
                                 ]
                                 prop.children props.children
                                 yield! props.props
@@ -186,7 +189,7 @@ type ComboBox =
                                                 && activeIndex.IsSome
                                                 && Array.tryItem activeIndex.Value filteredItems |> Option.isSome
                                             then
-                                                setInputValue (valueSelectTransformer filteredItems.[activeIndex.Value])
+                                                onInputChange (valueSelectTransformer filteredItems.[activeIndex.Value])
                                                 setActiveIndex None
                                                 setOpen false
                                             elif ev.key = "Escape" then
@@ -234,7 +237,7 @@ type ComboBox =
                                                                 ref = fun node -> listRef.current.[index] <- node
                                                                 onClick =
                                                                     fun _ ->
-                                                                        setInputValue (valueSelectTransformer item)
+                                                                        onInputChange (valueSelectTransformer item)
                                                                         setOpen false
                                                                         fluiContext.refs.domReference.current.focus ()
                                                             |}
@@ -372,6 +375,8 @@ type ComboBox =
                 ev.preventDefault ()
         )
 
+        let inputValue, setInputValue = React.useState ("")
+
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-4"
             prop.children [
@@ -382,6 +387,8 @@ type ComboBox =
                 ]
 
                 ComboBox.ComboBox<string>(
+                    inputValue,
+                    onInputChange = setInputValue,
                     items = fruitPool,
                     filterFn = filterFn,
                     valueSelectTransformer = id,
