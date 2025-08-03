@@ -5,6 +5,22 @@ open Browser.Types
 open Feliz
 
 module FloatingUI =
+
+    [<StringEnum(CaseRules.KebabCase)>]
+    type Placement =
+        | Top
+        | TopStart
+        | TopEnd
+        | Right
+        | RightStart
+        | RightEnd
+        | Bottom
+        | BottomStart
+        | BottomEnd
+        | Left
+        | LeftStart
+        | LeftEnd
+
     [<AllowNullLiteral; Global>]
     type VirtualElement [<ParamObjectAttribute; Emit("$0")>] (getBoundingClientRect: unit -> ClientRect) =
         member val getBoundingClientRect = getBoundingClientRect with get, set
@@ -16,7 +32,7 @@ module FloatingUI =
         [<ParamObjectAttribute; Emit("$0")>]
         (
             context: obj,
-            placement: obj,
+            placement: Placement,
             strategy: obj,
             x: int,
             y: int,
@@ -183,9 +199,7 @@ module FloatingUI =
         member val findMatch = findMatch
 
     [<Erase>]
-    type IMiddleware =
-        interface
-        end
+    type IMiddleware = interface end
 
     [<Erase>]
     type Middleware =
@@ -198,8 +212,15 @@ module FloatingUI =
         [<ImportMemberAttribute("@floating-ui/react")>]
         static member shift(?options: obj) : IMiddleware = jsNative
 
+        [<ImportMemberAttribute("@floating-ui/react")>]
+        static member size(?options: obj) : IMiddleware = jsNative
+
 [<Erase>]
 type FloatingUI =
+
+    [<ImportMember("@floating-ui/react")>]
+    static member useId() : string = jsNative
+
     // reference: ReferenceElement, floating: FloatingElement, update: () => void
     [<ImportMember("@floating-ui/react")>]
     static member autoUpdate (reference: obj) (floating: obj) (update: unit -> unit) : unit = jsNative
@@ -207,7 +228,7 @@ type FloatingUI =
     [<ImportMember("@floating-ui/react"); ParamObjectAttribute>]
     static member useFloating
         (
-            ?placement: obj,
+            ?placement: FloatingUI.Placement,
             ?strategy: string,
             ?transform: bool,
             ?middleware: obj[],
