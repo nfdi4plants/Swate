@@ -34,6 +34,7 @@
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\ErrorBaseModal.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
+    <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />

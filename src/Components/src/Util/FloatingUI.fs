@@ -194,7 +194,7 @@ module FloatingUI =
         member val enabled = enabled
         member val resetMs = resetMs
         member val ignoreKeys = ignoreKeys
-        member val selectedIndex = selectedIndex
+        member val selectedIndex: int option = selectedIndex
         member val onTypingChange = onTypingChange
         member val findMatch = findMatch
 
@@ -231,7 +231,7 @@ type FloatingUI =
             ?placement: FloatingUI.Placement,
             ?strategy: string,
             ?transform: bool,
-            ?middleware: obj[],
+            ?middleware: FloatingUI.IMiddleware[],
             ?``open``: bool,
             ?onOpenChange: bool -> unit,
             ?elements: obj,
@@ -247,6 +247,9 @@ type FloatingUI =
     static member useRole(context: obj, ?props: FloatingUI.UseRoleProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
+    static member useClick(context: obj) : obj = jsNative
+
+    [<ImportMember("@floating-ui/react")>]
     static member useListNavigation(context: obj, ?props: FloatingUI.UseListNavigationProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
@@ -254,6 +257,16 @@ type FloatingUI =
 
     [<ImportMember("@floating-ui/react")>]
     static member useInteractions(interactions: obj[]) : FloatingUI.UseInteractionsReturn = jsNative
+
+    [<ImportMember("@floating-ui/react")>]
+    static member useListItem
+        (?label: string)
+        : {|
+              ref: IRefValue<#Browser.Types.HTMLElement option>
+              index: int
+          |}
+        =
+        jsNative
 
     [<ReactComponent("FloatingPortal", "@floating-ui/react")>]
     static member FloatingPortal(children: ReactElement) = React.imported ()
@@ -277,5 +290,14 @@ type FloatingUI =
             ?outsideElementsInert: bool,
             ?getInsideElements: unit -> ReactElement[],
             ?order: string[]
+        ) =
+        React.imported ()
+
+    [<ReactComponent("FloatingList", "@floating-ui/react")>]
+    static member FloatingList
+        (
+            children: ReactElement,
+            elementsRef: IRefValue<Browser.Types.HTMLElement option[]>,
+            labelsRef: IRefValue<string option[]>
         ) =
         React.imported ()

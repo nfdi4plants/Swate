@@ -8,17 +8,17 @@ module TemplateMocks =
 
     let mkStella () =
         ARCtrl.Person(
-            firstName = "Stella",
-            lastName = "Eggels",
-            email = "stella.eggels@example.com",
+            firstName = "Riley",
+            lastName = "Morgan",
+            email = "riley.morgan@samplemail.com",
             orcid = "0000-0002-1825-0097"
         )
 
     let mkDominik () =
         ARCtrl.Person(
-            firstName = "Dominik",
-            lastName = "Brilhaus",
-            email = "dominiks@example.com",
+            firstName = "Jordan",
+            lastName = "Avery",
+            email = "jordan.avery@webmail.org",
             orcid = "0000-0002-1825-0098"
         )
 
@@ -198,7 +198,7 @@ module TemplateFilterAux =
     type FilterTokenType =
         | Tag
         | Repository
-        | Organisation
+        | Name
         | Author
         | ORCID
 
@@ -209,7 +209,144 @@ module TemplateFilterAux =
         Payload: obj option
     |}
 
-    let mkFullName (author: ARCtrl.Person) =
+    module FilterTokenType =
+
+        [<RequireQualifiedAccess>]
+        module FilterTokenPrefixes =
+            [<Literal>]
+            let Tag = "tag"
+
+            [<Literal>]
+            let Repository = "repo"
+
+            [<Literal>]
+            let Author = "author"
+
+            [<Literal>]
+            let ORCID = "orcid"
+
+        let toString (tokenType: FilterTokenType) =
+            match tokenType with
+            | Tag -> FilterTokenPrefixes.Tag
+            | Repository -> FilterTokenPrefixes.Repository
+            | Name -> "name"
+            | Author -> FilterTokenPrefixes.Author
+            | ORCID -> FilterTokenPrefixes.ORCID
+
+        let toPrefix (tokenType: FilterTokenType) =
+            match tokenType with
+            | Tag -> FilterTokenPrefixes.Tag + ":"
+            | Repository -> FilterTokenPrefixes.Repository + ":"
+            | Name -> ""
+            | Author -> FilterTokenPrefixes.Author + ":"
+            | ORCID -> FilterTokenPrefixes.ORCID + ":"
+
+        let fromPrefix (prefix: string) =
+            match prefix.ToLower() with
+            | FilterTokenPrefixes.Tag -> Tag
+            | FilterTokenPrefixes.Repository -> Repository
+            | FilterTokenPrefixes.Author -> Author
+            | FilterTokenPrefixes.ORCID -> ORCID
+            | "" -> Name
+            | _ -> failwithf "Unknown filter token prefix: %s" prefix
+
+        let fromString (str: string) =
+            match str.ToLower() with
+            | "tag" -> Tag
+            | "repo" -> Repository
+            | "name" -> Name
+            | "author" -> Author
+            | "orcid" -> ORCID
+            | _ -> failwithf "Unknown filter token type: %s" str
+
+
+
+    open System.Text.RegularExpressions
+
+    let filterTokenToSearchString (token: FilterToken) =
+        let prefix = FilterTokenType.toPrefix token.Type
+
+        let text =
+            if token.Type = FilterTokenType.Name then
+                token.NameText
+            else
+                token.NameText.Replace(" ", "_")
+
+        $"{prefix}{text}"
+
+    let filterTokensToSearchString (tokens: FilterToken list) =
+        tokens |> List.map filterTokenToSearchString |> String.concat " "
+
+    let searchStringToFilterTokens (searchString: string) : ResizeArray<FilterToken> =
+        let pattern = @"^(?:(?<prefix>tag|orcid|author|repo):)?(?<text>.*)$"
+
+        let substrings =
+            searchString.Split([| " " |], System.StringSplitOptions.RemoveEmptyEntries)
+
+        let regex = Regex(pattern, RegexOptions.IgnoreCase)
+        let ra = ResizeArray<FilterToken>()
+        let raNameStrings = ResizeArray<string>()
+
+        for substring in substrings do
+            let strmatch = regex.Match(substring)
+            let tokentype = FilterTokenType.fromPrefix strmatch.Groups.["prefix"].Value
+            let text = strmatch.Groups.["text"].Value.Trim().Replace("_", " ")
+
+            if tokentype = FilterTokenType.Name then
+                raNameStrings.Add(text)
+            else
+                ra.Add(
+                    {|
+                        Type = tokentype
+                        NameText = text
+                        Id = string tokentype + text
+                        Payload = None
+                    |}
+                )
+
+        raNameStrings
+        |> String.concat " "
+        |> fun nameText ->
+            if not (System.String.IsNullOrWhiteSpace nameText) then
+                ra.Add(
+                    {|
+                        Type = FilterTokenType.Name
+                        NameText = nameText
+                        Id = string FilterTokenType.Name + nameText
+                        Payload = None
+                    |}
+                )
+
+        ra
+
+    let appendFilterTokenToSearchString (searchString: string) (token: FilterToken) =
+        let str = filterTokenToSearchString token
+
+        if searchString.Contains(str) then
+            searchString
+        else if System.String.IsNullOrWhiteSpace searchString then
+            str
+        else
+            $"{searchString} {str}"
+
+    let getOnlyNameFromSearchString (searchString: string) =
+        searchStringToFilterTokens searchString
+        |> Seq.tryFind (fun token -> token.Type = FilterTokenType.Name)
+        |> Option.map (fun token -> token.NameText)
+        |> Option.defaultValue ""
+
+    let replaceNameWithToken (searchString: string) (token: FilterToken) =
+        let tokens =
+            searchStringToFilterTokens searchString
+            |> Seq.filter (fun t -> t.Type <> FilterTokenType.Name)
+            |> List.ofSeq
+
+        if tokens |> List.isEmpty then
+            filterTokenToSearchString token
+        else
+            tokens @ [ token ] |> filterTokensToSearchString
+
+    let mkFullAuthorName (author: ARCtrl.Person) =
         [ author.FirstName; author.LastName; author.MidInitials ]
         |> List.choose id
         |> String.concat " "
@@ -224,7 +361,7 @@ module TemplateFilterAux =
             |> Seq.map (fun tag -> {|
                 Type = FilterTokenType.Tag
                 NameText = tag.NameText
-                Id = tag.NameText
+                Id = string FilterTokenType.Tag + tag.NameText
                 Payload = Some tag
             |})
 
@@ -235,7 +372,7 @@ module TemplateFilterAux =
             |> Seq.map (fun repo -> {|
                 Type = FilterTokenType.Repository
                 NameText = repo.NameText
-                Id = repo.NameText
+                Id = string FilterTokenType.Repository + repo.NameText
                 Payload = Some repo
             |})
 
@@ -244,20 +381,20 @@ module TemplateFilterAux =
             |> Seq.collect (fun template ->
                 template.Authors
                 |> Seq.collect (fun author ->
-                    let fullname = mkFullName author
+                    let fullname = mkFullAuthorName author
 
                     [
                         {|
                             Type = FilterTokenType.Author
                             NameText = fullname
-                            Id = fullname
+                            Id = string FilterTokenType.Author + fullname
                             Payload = Some author
                         |}
                         if author.ORCID.IsSome then
                             {|
                                 Type = FilterTokenType.ORCID
                                 NameText = author.ORCID.Value
-                                Id = author.ORCID.Value
+                                Id = string FilterTokenType.ORCID + author.ORCID.Value
                                 Payload = Some author
                             |}
                     ]
@@ -266,21 +403,22 @@ module TemplateFilterAux =
             |> Seq.distinctBy (fun x -> x.Id)
             |> unbox
 
-        let organisations: seq<FilterToken> =
+        let names: seq<FilterToken> =
             templates
-            |> Seq.map (fun template -> template.Organisation)
+            |> Seq.map (fun template -> template.Name)
             |> Seq.distinct
-            |> Seq.map (fun org -> {|
-                Type = FilterTokenType.Organisation
-                NameText = org.ToString()
-                Id = org.ToString()
-                Payload = Some org
+            |> Seq.map (fun name -> {|
+                Type = FilterTokenType.Name
+                NameText = name
+                Id = name
+                Payload = Some name
             |})
 
         ra.AddRange(tags)
         ra.AddRange(erTags)
         ra.AddRange(authorsRefs)
-        ra.AddRange(organisations)
+        ra.AddRange(names)
+        ra.Sort(fun a b -> String.Compare(a.NameText, b.NameText, StringComparison.OrdinalIgnoreCase))
         ra
 
 // let filter
@@ -317,11 +455,28 @@ module TemplateFilterAux =
 [<Erase; Mangle(false)>]
 type TemplateFilter =
 
-    static member TagBadge(tag: OntologyAnnotation, ?key: obj) =
-        Html.div [ prop.className "swt:badge swt:badge-secondary"; prop.text tag.NameText ]
-
-    static member RepoBadge(repo: OntologyAnnotation, ?key: obj) =
-        Html.div [ prop.className "swt:badge swt:badge-accent"; prop.text repo.NameText ]
+    static member TokenBadge
+        (token: TemplateFilterAux.FilterToken, remove: TemplateFilterAux.FilterToken -> unit, ?key: obj)
+        =
+        Html.div [
+            prop.className "swt:h-(--size) swt:flex swt:items-center"
+            prop.children [
+                Html.div [
+                    prop.key (token.Id)
+                    prop.className [
+                        "swt:badge swt:flex swt:items-center swt:gap-2 swt:bg-base-content/50 swt:text-base-300"
+                    ]
+                    prop.children [
+                        Html.div token.NameText
+                        Html.button [
+                            prop.className "swt:btn swt:btn-ghost swt:btn-circle swt:btn-xs"
+                            prop.onClick (fun _ -> remove (token))
+                            prop.children [ Icons.Close() ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
 
     [<ReactComponent>]
     static member TemplateItem(template: Template, ?key: obj) =
@@ -362,18 +517,18 @@ type TemplateFilter =
                 Html.div [
                     prop.className
                         "swt:flex swt:flex-row swt:flex-wrap swt:gap-2 swt:items-center swt:text-xs swt:opacity-60"
-                    prop.children [
-                        for tag in template.Tags do
-                            TemplateFilter.TagBadge(tag)
-                        for repo in template.EndpointRepositories do
-                            TemplateFilter.RepoBadge(repo)
-                    ]
+                // prop.children [
+                //     for tag in template.Tags do
+                //         TemplateFilter.TagBadge(tag)
+                //     for repo in template.EndpointRepositories do
+                //         TemplateFilter.RepoBadge(repo)
+                // ]
                 ]
             ]
         ]
 
-    [<ReactComponent(true)>]
-    static member TemplateFilter(templates: Template[], ?key: obj) =
+    [<ReactComponent>]
+    static member TemplateSearch(templates: Template[], ?key: obj) =
 
         /// This constant is used to display available tags in the combo box
         let filterTokens =
@@ -381,15 +536,34 @@ type TemplateFilter =
 
         let inputValue, setInputValue = React.useState ""
 
+        let tokens, setTokens =
+            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
+
         let searchFn =
             fun
                 (props:
                     {|
                         item: TemplateFilterAux.FilterToken
                         search: string
-                    |}) -> props.item.NameText.ToLower().Contains(props.search.ToLower())
+                    |}) ->
+                let str = props.search.ToLower()
+                props.item.NameText.ToLower().Contains(str)
 
         let transformFn = fun (item: TemplateFilterAux.FilterToken) -> item.NameText
+
+        let onChangeFn =
+            fun (item: TemplateFilterAux.FilterToken) ->
+
+                setInputValue ("")
+
+                setTokens (fun tokens ->
+                    if tokens.Contains item then
+                        tokens
+                    else
+                        let next = ResizeArray(tokens)
+                        next.Add item
+                        next
+                )
 
         let itemRenderFn =
             fun
@@ -402,9 +576,9 @@ type TemplateFilter =
                     |}) ->
                 Html.li [
                     prop.className [
-                        "swt:list-row swt:rounded-none swt:p-1"
+                        "swt:border-l-4 swt:border-transparent swt:list-row swt:rounded-none swt:p-1"
                         if props.isActive then
-                            "swt:bg-base-content swt:text-base-300"
+                            "swt:!border-primary swt:bg-base-content/10"
                     ]
                     prop.children [
                         Html.div [
@@ -413,7 +587,7 @@ type TemplateFilter =
                                 match props.item.Type with
                                 | TemplateFilterAux.FilterTokenType.Tag -> Icons.Tag("swt:size-4")
                                 | TemplateFilterAux.FilterTokenType.Repository -> Icons.CloudUpload("swt:size-4")
-                                | TemplateFilterAux.FilterTokenType.Organisation -> Icons.Institution("swt:size-4")
+                                | TemplateFilterAux.FilterTokenType.Name -> Icons.Header("swt:size-4")
                                 | TemplateFilterAux.FilterTokenType.Author -> Icons.User("swt:size-4")
                                 | TemplateFilterAux.FilterTokenType.ORCID -> Icons.ORCID("swt:size-4")
                             ]
@@ -421,12 +595,44 @@ type TemplateFilter =
                         Html.div props.item.NameText
                         if props.item.Type = TemplateFilterAux.FilterTokenType.ORCID then
                             Html.div [
-                                prop.text (TemplateFilterAux.mkFullName (unbox props.item.Payload: ARCtrl.Person))
+                                prop.text (TemplateFilterAux.mkFullAuthorName (unbox props.item.Payload: ARCtrl.Person))
                                 prop.className "swt:ml-2 swt:text-xs swt:opacity-60"
                             ]
                     ]
                     yield! props.props
                 ]
+
+        let InputLeadingBadges =
+            tokens
+            |> Seq.map (fun token ->
+                TemplateFilter.TokenBadge(
+                    token,
+                    (fun t ->
+                        setTokens (fun tokens ->
+                            let next = ResizeArray(tokens)
+                            next.Remove t |> ignore
+                            next
+                        )
+                    ),
+                    key = token.Id
+                )
+            )
+            |> React.fragment
+
+        let onKeyDown =
+            fun (ev: Browser.Types.KeyboardEvent) ->
+                if ev.code = kbdEventCode.backspace && inputValue = "" then
+                    // Remove the last token when backspace is pressed and input is empty
+                    setTokens (fun tokens ->
+                        if tokens.Count > 0 then
+                            let next = ResizeArray(tokens)
+                            next.RemoveAt(next.Count - 1) |> ignore
+                            next
+                        else
+                            tokens
+                    )
+                else
+                    ()
 
         ComboBox.ComboBox<TemplateFilterAux.FilterToken>(
             inputValue,
@@ -434,15 +640,85 @@ type TemplateFilter =
             Array.ofSeq filterTokens,
             searchFn,
             transformFn,
-            itemRenderer = itemRenderFn
+            onChange = onChangeFn,
+            itemRenderer = itemRenderFn,
+            inputLeadingVisual = InputLeadingBadges,
+            labelClassName =
+                "swt:has-[:focus]:input-primary swt:flex-wrap swt:h-auto swt:min-h-(--size) swt:flex-row swt:w-fit swt:*:min-h-(--size) swt:*:w-auto swt:gap-y-0 swt:gap-x-1",
+            onKeyDown = onKeyDown
         )
+
+
+    [<ReactComponent>]
+    static member CommunityFilter(templates: Template[], ?key: obj) =
+
+        let communities: SelectItem<ARCtrl.Organisation>[] =
+            React.useMemo (
+                (fun () ->
+                    templates
+                    |> Array.map (fun template -> template.Organisation)
+                    |> Array.distinct
+                    |> Array.sortBy (fun org -> org.IsOfficial() |> not, org.ToString())
+                    |> Array.map (fun org -> {| label = org.ToString(); item = org |})
+                ),
+                [| templates |]
+            )
+
+        let dataplantIndex =
+            communities |> Array.tryFindIndex (fun item -> item.item.IsOfficial())
+
+        let selectedIndices, setSelectedIndices =
+            React.useState (
+                Set [
+                    if dataplantIndex.IsSome then
+                        dataplantIndex.Value
+                ]
+            )
+
+        let TriggerRenderFn =
+            fun _ ->
+                Html.button [
+                    prop.tabIndex -1
+                    prop.className "swt:btn swt:btn-square swt:btn-info swt:pointer-events-none"
+                    prop.children [ Html.div selectedIndices.Count; Icons.Institution(className = "swt:size-4") ]
+                ]
+
+        Select.Select(
+            communities,
+            selectedIndices,
+            setSelectedIndices,
+            triggerRenderFn = TriggerRenderFn,
+            dropdownPlacement = FloatingUI.Placement.BottomEnd,
+            middleware = [| FloatingUI.Middleware.flip (); FloatingUI.Middleware.offset (10) |]
+        )
+
+    [<ReactComponent(true)>]
+    static member TemplateFilter(templates: Template[], ?key: obj) =
+        // This component is used to filter templates by search, community, and tags
+        // It combines TemplateSearch and CommunityFilter components
+
+        let localTemplates, setLocalTemplates = React.useState (templates)
+
+        let reset = fun () -> setLocalTemplates (templates)
+
+        Html.div [
+            prop.className "swt:flex swt:flex-row swt:gap-2"
+            prop.children [
+                TemplateFilter.TemplateSearch(localTemplates, key = "template-filter")
+                TemplateFilter.CommunityFilter(templates, key = "community-filter")
+            ]
+        ]
 
     [<ReactComponent>]
     static member Entry() =
 
         let templates, setTemplates = React.useState (TemplateMocks.mkTemplates ())
 
-        TemplateFilter.TemplateFilter(templates, key = "template-filter")
+        TemplateFilter.TemplateFilter(templates, key = "template-filter-entry")
+
+
+
+
 
 // Html.ul [
 //     prop.className

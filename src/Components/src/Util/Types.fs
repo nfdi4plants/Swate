@@ -4,6 +4,14 @@ module Swate.Components.Types
 open Fable.Core
 open Feliz
 
+type SelectItem<'a> = {| item: 'a; label: string |}
+
+type SelectItemRender<'a> = {|
+    isActive: bool
+    isSelected: bool
+    item: SelectItem<'a>
+|}
+
 type ComboBoxRef = {|
     focus: unit -> unit
     close: unit -> unit

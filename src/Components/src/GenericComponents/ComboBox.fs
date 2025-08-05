@@ -31,7 +31,8 @@ type ComboBox =
             onInputChange: string -> unit,
             items: 'a[],
             filterFn: {| item: 'a; search: string |} -> bool,
-            valueSelectTransformer: 'a -> string,
+            itemToString: 'a -> string,
+            ?onChange: 'a -> unit,
             ?placeholder: string,
             ?itemRenderer:
                 {|
@@ -50,7 +51,9 @@ type ComboBox =
             ?noResultsRenderer: unit -> ReactElement,
             ?comboBoxRef: IRefValue<ComboBoxRef>,
             ?inputLeadingVisual: ReactElement,
-            ?inputTrailingVisual: ReactElement
+            ?inputTrailingVisual: ReactElement,
+            ?labelClassName: string,
+            ?onKeyDown: Browser.Types.KeyboardEvent -> unit
         ) : ReactElement =
         let isOpen, setOpen = React.useState (false)
 
@@ -90,7 +93,13 @@ type ComboBox =
 
         let useInteractions = FloatingUI.useInteractions [| role; dismiss; listNav |]
 
-        let onChange (e: Browser.Types.InputEvent) =
+        let close =
+            fun () ->
+                setOpen false
+                setActiveIndex None
+
+        let onInputChange (e: Browser.Types.InputEvent) =
+
             let value = e.target?value |> unbox string
             onInputChange value
 
@@ -98,8 +107,14 @@ type ComboBox =
                 setOpen true
                 setActiveIndex (Some 0)
             else
-                setOpen false
-                setActiveIndex None
+                close ()
+
+        let onSelect =
+            fun (item: 'a) ->
+
+                onChange |> Option.iter (fun fn -> fn item)
+                close ()
+                fluiContext.refs.domReference.current.focus ()
 
         let filteredItems =
             items
@@ -113,7 +128,7 @@ type ComboBox =
                     | None ->
                         fun props ->
                             ComboBox.ListItem<'a>(
-                                children = Html.text (valueSelectTransformer props.item),
+                                children = Html.text (itemToString props.item),
                                 active = props.isActive,
                                 props = props.props
                             )
@@ -167,18 +182,32 @@ type ComboBox =
             [| box fluiContext.refs.reference |]
         )
 
+        React.useElementListener.onKeyDown (
+            unbox fluiContext.refs.reference,
+            onKeyDown |> Option.defaultValue (fun (ev: Browser.Types.KeyboardEvent) -> ())
+        )
+
+        let inputId = FloatingUI.useId ()
+
         React.fragment [
             Html.label [
+                prop.htmlFor inputId
                 prop.ref (unbox fluiContext.refs.setReference)
-                prop.className "swt:input"
+                prop.className [
+                    "swt:input"
+                    if labelClassName.IsSome then
+                        labelClassName.Value
+                ]
                 prop.children [
                     if inputLeadingVisual.IsSome then
                         inputLeadingVisual.Value
                     Html.input [
+                        prop.id inputId
+                        prop.className "swt:grow swt:shrink swt:min-w-0"
                         for key, v in
                             useInteractions.getReferenceProps (
                                 {|
-                                    onChange = onChange
+                                    onChange = onInputChange
                                     value = inputValue
                                     placeholder = placeholder
                                     ``aria-autocomplete`` = "list"
@@ -189,9 +218,7 @@ type ComboBox =
                                                 && activeIndex.IsSome
                                                 && Array.tryItem activeIndex.Value filteredItems |> Option.isSome
                                             then
-                                                onInputChange (valueSelectTransformer filteredItems.[activeIndex.Value])
-                                                setActiveIndex None
-                                                setOpen false
+                                                onSelect filteredItems.[activeIndex.Value]
                                             elif ev.key = "Escape" then
                                                 setOpen false
                                                 setActiveIndex None
@@ -233,13 +260,9 @@ type ComboBox =
                                                     let props =
                                                         (useInteractions.getItemProps (
                                                             {|
-                                                                key = valueSelectTransformer item
+                                                                key = itemToString item
                                                                 ref = fun node -> listRef.current.[index] <- node
-                                                                onClick =
-                                                                    fun _ ->
-                                                                        onInputChange (valueSelectTransformer item)
-                                                                        setOpen false
-                                                                        fluiContext.refs.domReference.current.focus ()
+                                                                onClick = fun _ -> onSelect item
                                                             |}
                                                          )
                                                          |> Fable.Core.JS.Constructors.Object.entries
@@ -391,7 +414,7 @@ type ComboBox =
                     onInputChange = setInputValue,
                     items = fruitPool,
                     filterFn = filterFn,
-                    valueSelectTransformer = id,
+                    itemToString = id,
                     itemRenderer = itemRendererFn,
                     itemContainerRenderer = itemContainerRendererFn,
                     comboBoxRef = comboBoxRef,
