@@ -32,7 +32,7 @@ type ComboBox =
             items: 'a[],
             filterFn: {| item: 'a; search: string |} -> bool,
             itemToString: 'a -> string,
-            ?onChange: 'a -> unit,
+            ?onChange: int -> 'a -> unit,
             ?placeholder: string,
             ?itemRenderer:
                 {|
@@ -110,9 +110,9 @@ type ComboBox =
                 close ()
 
         let onSelect =
-            fun (item: 'a) ->
+            fun (index: int) (item: 'a) ->
 
-                onChange |> Option.iter (fun fn -> fn item)
+                onChange |> Option.iter (fun fn -> fn index item)
                 close ()
                 fluiContext.refs.domReference.current.focus ()
 
@@ -218,7 +218,7 @@ type ComboBox =
                                                 && activeIndex.IsSome
                                                 && Array.tryItem activeIndex.Value filteredItems |> Option.isSome
                                             then
-                                                onSelect filteredItems.[activeIndex.Value]
+                                                onSelect activeIndex.Value filteredItems.[activeIndex.Value]
                                             elif ev.key = "Escape" then
                                                 setOpen false
                                                 setActiveIndex None
@@ -262,7 +262,7 @@ type ComboBox =
                                                             {|
                                                                 key = itemToString item
                                                                 ref = fun node -> listRef.current.[index] <- node
-                                                                onClick = fun _ -> onSelect item
+                                                                onClick = fun _ -> onSelect index item
                                                             |}
                                                          )
                                                          |> Fable.Core.JS.Constructors.Object.entries

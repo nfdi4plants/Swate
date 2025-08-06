@@ -191,6 +191,15 @@ module TemplateMocks =
 
 module TemplateFilterAux =
 
+    let FilteredTemplateContext =
+        React.createContext<Context<Template[]>> (
+            "TemplateFilterCtx",
+            {
+                data = [||]
+                setData = fun _ -> console.warn "No setData function provided"
+            }
+        )
+
     open System
 
     /// This is a fable StringEnum and can be replaced by any `unbox` string
@@ -258,93 +267,6 @@ module TemplateFilterAux =
             | "author" -> Author
             | "orcid" -> ORCID
             | _ -> failwithf "Unknown filter token type: %s" str
-
-
-
-    open System.Text.RegularExpressions
-
-    let filterTokenToSearchString (token: FilterToken) =
-        let prefix = FilterTokenType.toPrefix token.Type
-
-        let text =
-            if token.Type = FilterTokenType.Name then
-                token.NameText
-            else
-                token.NameText.Replace(" ", "_")
-
-        $"{prefix}{text}"
-
-    let filterTokensToSearchString (tokens: FilterToken list) =
-        tokens |> List.map filterTokenToSearchString |> String.concat " "
-
-    let searchStringToFilterTokens (searchString: string) : ResizeArray<FilterToken> =
-        let pattern = @"^(?:(?<prefix>tag|orcid|author|repo):)?(?<text>.*)$"
-
-        let substrings =
-            searchString.Split([| " " |], System.StringSplitOptions.RemoveEmptyEntries)
-
-        let regex = Regex(pattern, RegexOptions.IgnoreCase)
-        let ra = ResizeArray<FilterToken>()
-        let raNameStrings = ResizeArray<string>()
-
-        for substring in substrings do
-            let strmatch = regex.Match(substring)
-            let tokentype = FilterTokenType.fromPrefix strmatch.Groups.["prefix"].Value
-            let text = strmatch.Groups.["text"].Value.Trim().Replace("_", " ")
-
-            if tokentype = FilterTokenType.Name then
-                raNameStrings.Add(text)
-            else
-                ra.Add(
-                    {|
-                        Type = tokentype
-                        NameText = text
-                        Id = string tokentype + text
-                        Payload = None
-                    |}
-                )
-
-        raNameStrings
-        |> String.concat " "
-        |> fun nameText ->
-            if not (System.String.IsNullOrWhiteSpace nameText) then
-                ra.Add(
-                    {|
-                        Type = FilterTokenType.Name
-                        NameText = nameText
-                        Id = string FilterTokenType.Name + nameText
-                        Payload = None
-                    |}
-                )
-
-        ra
-
-    let appendFilterTokenToSearchString (searchString: string) (token: FilterToken) =
-        let str = filterTokenToSearchString token
-
-        if searchString.Contains(str) then
-            searchString
-        else if System.String.IsNullOrWhiteSpace searchString then
-            str
-        else
-            $"{searchString} {str}"
-
-    let getOnlyNameFromSearchString (searchString: string) =
-        searchStringToFilterTokens searchString
-        |> Seq.tryFind (fun token -> token.Type = FilterTokenType.Name)
-        |> Option.map (fun token -> token.NameText)
-        |> Option.defaultValue ""
-
-    let replaceNameWithToken (searchString: string) (token: FilterToken) =
-        let tokens =
-            searchStringToFilterTokens searchString
-            |> Seq.filter (fun t -> t.Type <> FilterTokenType.Name)
-            |> List.ofSeq
-
-        if tokens |> List.isEmpty then
-            filterTokenToSearchString token
-        else
-            tokens @ [ token ] |> filterTokensToSearchString
 
     let mkFullAuthorName (author: ARCtrl.Person) =
         [ author.FirstName; author.LastName; author.MidInitials ]
@@ -421,36 +343,42 @@ module TemplateFilterAux =
         ra.Sort(fun a b -> String.Compare(a.NameText, b.NameText, StringComparison.OrdinalIgnoreCase))
         ra
 
-// let filter
-//     (tagFilter: ResizeArray<OntologyAnnotation>, communityFilter: Organisation, searchString, templates: Template[])
-//     =
-//     promise {
-//         let filterByTag (template: Template) =
-//             if tagFilter.Count = 0 then
-//                 true
-//             else
-//                 tagFilter
-//                 |> Seq.exists (fun tag -> template.Tags |> Seq.exists (fun t -> t = tag))
+    let filter =
+        fun (templates: Template[]) (selectedOrgs: Organisation[]) (filterTokens: ResizeArray<FilterToken>) ->
+            templates
+            |> Array.filter (fun template ->
+                let orgMatch =
+                    if selectedOrgs.Length = 0 then
+                        false
+                    else
+                        selectedOrgs |> Array.exists (fun org -> template.Organisation = org)
 
-//         let filterByCommunity (template: Template) = template.Organisation = communityFilter
+                let tokenMatch =
+                    if filterTokens.Count = 0 then
+                        true
+                    elif orgMatch = false then
+                        false
+                    else
+                        filterTokens
+                        |> Seq.forall (fun token ->
+                            match token.Type with
+                            | FilterTokenType.Tag ->
+                                template.Tags
+                                |> Seq.exists (fun tag -> tag.NameText.ToLower().Contains(token.NameText.ToLower()))
+                            | FilterTokenType.Repository ->
+                                template.EndpointRepositories
+                                |> Seq.exists (fun repo -> repo.NameText.ToLower().Contains(token.NameText.ToLower()))
+                            | FilterTokenType.Name -> template.Name.ToLower().Contains(token.NameText.ToLower())
+                            | FilterTokenType.Author ->
+                                template.Authors
+                                |> Seq.exists (fun author -> (mkFullAuthorName author) = token.NameText)
+                            | FilterTokenType.ORCID ->
+                                template.Authors
+                                |> Seq.exists (fun author -> author.ORCID = Some token.NameText)
+                        )
 
-//         let filterBySearchString (template: Template) =
-//             if System.String.IsNullOrWhiteSpace searchString then
-//                 true
-//             else
-//                 template.Name.Contains(searchString)
-//                 || template.Authors
-//                    |> Seq.exists (fun author -> mkFullName author |> fun x -> x.Contains searchString)
-
-//         return
-//             templates
-//             |> Array.filter (fun template ->
-//                 filterByTag template
-//                 && filterByCommunity template
-//                 && filterBySearchString template
-//             )
-//     }
-
+                orgMatch && tokenMatch
+            )
 
 [<Erase; Mangle(false)>]
 type TemplateFilter =
@@ -528,16 +456,16 @@ type TemplateFilter =
         ]
 
     [<ReactComponent>]
-    static member TemplateSearch(templates: Template[], ?key: obj) =
-
-        /// This constant is used to display available tags in the combo box
-        let filterTokens =
-            React.useMemo ((fun () -> TemplateFilterAux.mkFilterTokens templates), [| box templates |])
+    static member TemplateSearch
+        (
+            availableTokens: ResizeArray<TemplateFilterAux.FilterToken>,
+            tokens: ResizeArray<TemplateFilterAux.FilterToken>,
+            setTokens:
+                (ResizeArray<TemplateFilterAux.FilterToken> -> ResizeArray<TemplateFilterAux.FilterToken>) -> unit,
+            ?key: obj
+        ) =
 
         let inputValue, setInputValue = React.useState ""
-
-        let tokens, setTokens =
-            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
 
         let searchFn =
             fun
@@ -552,7 +480,7 @@ type TemplateFilter =
         let transformFn = fun (item: TemplateFilterAux.FilterToken) -> item.NameText
 
         let onChangeFn =
-            fun (item: TemplateFilterAux.FilterToken) ->
+            fun (_: int) (item: TemplateFilterAux.FilterToken) ->
 
                 setInputValue ("")
 
@@ -634,45 +562,40 @@ type TemplateFilter =
                 else
                     ()
 
+        let availableTokens =
+            React.useMemo (
+                (fun () ->
+                    availableTokens
+                    |> Array.ofSeq
+                    |> Array.filter (fun token -> tokens.Contains token |> not)
+                ),
+                [| box availableTokens; box tokens |]
+            )
+
         ComboBox.ComboBox<TemplateFilterAux.FilterToken>(
             inputValue,
             setInputValue,
-            Array.ofSeq filterTokens,
+            Array.ofSeq availableTokens,
             searchFn,
             transformFn,
             onChange = onChangeFn,
             itemRenderer = itemRenderFn,
             inputLeadingVisual = InputLeadingBadges,
             labelClassName =
-                "swt:has-[:focus]:input-primary swt:flex-wrap swt:h-auto swt:min-h-(--size) swt:flex-row swt:w-fit swt:*:min-h-(--size) swt:*:w-auto swt:gap-y-0 swt:gap-x-1",
+                "swt:has-[:focus]:input-primary swt:flex-wrap swt:h-fit swt:min-h-(--size) swt:flex-row swt:w-fit swt:*:min-h-(--size) swt:*:w-auto swt:gap-y-0 swt:gap-x-1",
             onKeyDown = onKeyDown
         )
 
 
     [<ReactComponent>]
-    static member CommunityFilter(templates: Template[], ?key: obj) =
+    static member OrganisationFilter
+        (organisations: Organisation[], selectedIndices: Set<int>, setSelectedIndices: Set<int> -> unit, ?key: obj)
+        =
 
         let communities: SelectItem<ARCtrl.Organisation>[] =
             React.useMemo (
-                (fun () ->
-                    templates
-                    |> Array.map (fun template -> template.Organisation)
-                    |> Array.distinct
-                    |> Array.sortBy (fun org -> org.IsOfficial() |> not, org.ToString())
-                    |> Array.map (fun org -> {| label = org.ToString(); item = org |})
-                ),
-                [| templates |]
-            )
-
-        let dataplantIndex =
-            communities |> Array.tryFindIndex (fun item -> item.item.IsOfficial())
-
-        let selectedIndices, setSelectedIndices =
-            React.useState (
-                Set [
-                    if dataplantIndex.IsSome then
-                        dataplantIndex.Value
-                ]
+                (fun () -> organisations |> Array.map (fun org -> {| label = org.ToString(); item = org |})),
+                [| organisations |]
             )
 
         let TriggerRenderFn =
@@ -692,29 +615,117 @@ type TemplateFilter =
             middleware = [| FloatingUI.Middleware.flip (); FloatingUI.Middleware.offset (10) |]
         )
 
+    /// <summary>
+    /// This component is used to filter templates by search, community, and tags.
+    ///
+    /// <param name="templates">The list of templates to filter. This list should not be modified by this component.</param>
+    /// <param name="key">An optional key for the component.</param>
     [<ReactComponent(true)>]
     static member TemplateFilter(templates: Template[], ?key: obj) =
-        // This component is used to filter templates by search, community, and tags
-        // It combines TemplateSearch and CommunityFilter components
 
-        let localTemplates, setLocalTemplates = React.useState (templates)
+        /// This context is used to provide the filtered templates to the rest of the application
+        let filteredTemplatesCtx =
+            React.useContext TemplateFilterAux.FilteredTemplateContext
 
-        let reset = fun () -> setLocalTemplates (templates)
+        /// This constant is used to display available tags in the combo box
+        let availableTokens =
+            React.useMemo ((fun () -> TemplateFilterAux.mkFilterTokens templates), [| box templates |])
+
+        /// This constant is used to display available communities in the community filter
+        let availableCommunities: Organisation[] =
+            React.useMemo (
+                (fun () ->
+                    templates
+                    |> Array.map (fun template -> template.Organisation)
+                    |> Array.distinct
+                    |> Array.sortBy (fun org -> org.IsOfficial() |> not, org.ToString())
+                ),
+                [| templates |]
+            )
+
+        let dataplantIndex =
+            availableCommunities |> Array.tryFindIndex (fun org -> org.IsOfficial())
+
+        let tokens, setTokens =
+            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
+
+        let selectedOrgIndices, setSelectedOrgIndices =
+            React.useState (
+                Set [
+                    if dataplantIndex.IsSome then
+                        dataplantIndex.Value
+                ]
+            )
+
+        let filter =
+            React.useCallback (
+                (fun (templates: Template[]) ->
+                    let orgs =
+                        selectedOrgIndices |> Seq.map (fun i -> availableCommunities.[i]) |> Array.ofSeq
+
+                    TemplateFilterAux.filter templates orgs tokens
+                ),
+                [| box availableCommunities; box selectedOrgIndices; box tokens |]
+            )
+
+        React.useEffect (
+            (fun () ->
+
+                let nextTemplates = filter templates
+
+                filteredTemplatesCtx.setData nextTemplates
+            ),
+            [| box selectedOrgIndices; box tokens |]
+        )
 
         Html.div [
             prop.className "swt:flex swt:flex-row swt:gap-2"
             prop.children [
-                TemplateFilter.TemplateSearch(localTemplates, key = "template-filter")
-                TemplateFilter.CommunityFilter(templates, key = "community-filter")
+                TemplateFilter.TemplateSearch(availableTokens, tokens, setTokens, key = "template-filter")
+                TemplateFilter.OrganisationFilter(
+                    availableCommunities,
+                    selectedOrgIndices,
+                    setSelectedOrgIndices,
+                    key = "community-filter"
+                )
             ]
         ]
 
     [<ReactComponent>]
+    static member TemplateFilterProvider(children: ReactElement) =
+        let filteredTemplates, setFilteredTemplatesFn = React.useState ([||])
+
+        React.contextProvider (
+            TemplateFilterAux.FilteredTemplateContext,
+            {
+                data = filteredTemplates
+                setData = setFilteredTemplatesFn
+            },
+            children
+        )
+
+    [<ReactComponent>]
+    static member FilteredTemplateRenderer(children: Template[] -> ReactElement) =
+        let filteredTemplatesCtx =
+            React.useContext<Context<Template[]>> TemplateFilterAux.FilteredTemplateContext
+
+        let templates = filteredTemplatesCtx.data
+
+        children templates
+
+    [<ReactComponent>]
     static member Entry() =
 
-        let templates, setTemplates = React.useState (TemplateMocks.mkTemplates ())
+        let templates, _ = React.useState (TemplateMocks.mkTemplates)
 
-        TemplateFilter.TemplateFilter(templates, key = "template-filter-entry")
+        TemplateFilter.TemplateFilterProvider(
+            React.fragment [
+                TemplateFilter.TemplateFilter(templates, key = "template-filter-provider")
+                TemplateFilter.FilteredTemplateRenderer(fun templates ->
+                    Html.div [ prop.text (sprintf "%d templates found" templates.Length) ]
+                )
+            ]
+        )
 
 
 
