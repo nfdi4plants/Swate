@@ -1,5 +1,7 @@
 namespace Protocol
 
+open ARCtrl
+
 open Fable.React
 open Fable.React.Props
 open Model
@@ -80,11 +82,12 @@ type SearchContainer =
     static member Main(model: Model, dispatch) =
         let config, setConfig = React.useState (TemplateFilterConfig.init)
         let showTemplatesFilter, setShowTemplatesFilter = React.useState (false)
+        let communities, setCommunities = React.useState [ Organisation.DataPLANT ]
 
         let filteredTemplates =
             React.useMemo (
-                (fun _ -> Protocol.Search.filterTemplates (model.ProtocolState.Templates, config)),
-                [| box model.ProtocolState.Templates; box config |]
+                (fun _ -> Protocol.Search.filterTemplates (model.ProtocolState.Templates, config, communities)),
+                [| box model.ProtocolState.Templates; box config; box communities |]
             )
 
         React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
@@ -101,6 +104,7 @@ type SearchContainer =
                 SearchContainer.HeaderElement((fun _ -> setShowTemplatesFilter (not showTemplatesFilter)), dispatch)
                 if showTemplatesFilter then
                     Protocol.Search.FileSortElement(model, config, setConfig)
+                TemplateFilter.TemplateFilter(model.ProtocolState.Templates, key = "template-filter", setCommunityFilter = setCommunities)
                 if isEmpty && not isLoading then
                     Html.p [
                         prop.className "swt:text-error swt:text-sm"

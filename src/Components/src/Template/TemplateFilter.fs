@@ -621,7 +621,12 @@ type TemplateFilter =
     /// <param name="templates">The list of templates to filter. This list should not be modified by this component.</param>
     /// <param name="key">An optional key for the component.</param>
     [<ReactComponent(true)>]
-    static member TemplateFilter(templates: Template[], ?key: obj) =
+    static member TemplateFilter(templates: Template[], ?key: obj, ?setCommunityFilter) =
+
+        let tokens, setTokens =
+            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
+
+        let selectedOrgIndices, setSelectedOrgIndices = React.useState Set.empty<int>
 
         /// This context is used to provide the filtered templates to the rest of the application
         let filteredTemplatesCtx =
@@ -643,19 +648,31 @@ type TemplateFilter =
                 [| templates |]
             )
 
-        let dataplantIndex =
-            availableCommunities |> Array.tryFindIndex (fun org -> org.IsOfficial())
+        let officialIndices =
+            availableCommunities
+            |> Array.filter (fun org -> org.IsOfficial())
+            |> Array.mapi (fun index _ -> index)
+            |> Set.ofArray
 
-        let tokens, setTokens =
-            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
+        React.useEffect(
+            (fun () ->
+                if setCommunityFilter.IsSome && selectedOrgIndices.IsEmpty && templates.Length > 0 then
+                    if officialIndices.IsEmpty then
+                        setSelectedOrgIndices(Set.empty)
+                    else
+                        setSelectedOrgIndices(officialIndices)
+            ), [| box templates; box availableCommunities |]
+        )
 
-        let selectedOrgIndices, setSelectedOrgIndices =
-            React.useState (
-                Set [
-                    if dataplantIndex.IsSome then
-                        dataplantIndex.Value
-                ]
-            )
+        React.useEffect(
+            (fun () ->
+                if setCommunityFilter.IsSome && not selectedOrgIndices.IsEmpty then
+                    selectedOrgIndices
+                    |> List.ofSeq
+                    |> List.map (fun index ->
+                        availableCommunities.[index])
+                    |> setCommunityFilter.Value
+            ), [| box selectedOrgIndices |])
 
         let filter =
             React.useCallback (
@@ -726,10 +743,6 @@ type TemplateFilter =
                 )
             ]
         )
-
-
-
-
 
 // Html.ul [
 //     prop.className

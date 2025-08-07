@@ -636,12 +636,10 @@ module FilterHelper =
         else
             templates
 
-    let filterTableByCommunityFilter communityfilter (protocol: ARCtrl.Template[]) =
-        match communityfilter with
-        | Protocol.CommunityFilter.All -> protocol
-        | Protocol.CommunityFilter.OnlyCurated -> protocol |> Array.filter (fun x -> x.Organisation.IsOfficial())
-        | Protocol.CommunityFilter.Community name ->
-            protocol |> Array.filter (fun x -> x.Organisation.ToString() = name)
+    let filterTableByCommunityFilter (organisations: List<Organisation>) (protocol: ARCtrl.Template[]) =
+        protocol
+        |> Array.filter (fun template ->
+            List.contains template.Organisation organisations)
 
 open ComponentAux
 
@@ -677,7 +675,7 @@ type Search =
             ]
         ]
 
-    static member filterTemplates(templates: ARCtrl.Template[], config: TemplateFilterConfig) =
+    static member filterTemplates(templates: ARCtrl.Template[], config: TemplateFilterConfig, organisations: List<Organisation>) =
         if templates.Length = 0 then
             [||]
         else
@@ -688,11 +686,11 @@ type Search =
                 config.ProtocolFilterTags
                 config.ProtocolFilterErTags
                 config.TagFilterIsAnd
-            |> FilterHelper.filterTableByCommunityFilter config.CommunityFilter
+            |> FilterHelper.filterTableByCommunityFilter organisations
             |> FilterHelper.sortTableBySearchQuery config.Searchfield config.ProtocolSearchQuery
 
     [<ReactComponent>]
-    static member FileSortElement(model, config, configSetter: TemplateFilterConfig -> unit, ?classes: string) =
+    static member FileSortElement(model, config, setConfig: TemplateFilterConfig -> unit, ?classes: string) =
         React.fragment [
             Html.div [
                 prop.className [
@@ -701,14 +699,14 @@ type Search =
                         classes.Value
                 ]
                 prop.children [
-                    queryField model config configSetter
-                    tagQueryField model config configSetter
-                    communitySelectField model config configSetter
+                    queryField model config setConfig
+                    tagQueryField model config setConfig
+                    communitySelectField model config setConfig
                 ]
             ]
             // Only show the tag list and tag filter (AND or OR) if any tag exists
             if config.ProtocolFilterErTags <> [] || config.ProtocolFilterTags <> [] then
-                Html.div [ TagDisplayField model config configSetter ]
+                Html.div [ TagDisplayField model config setConfig ]
         ]
 
     static member SelectTemplatesButton(model: Model.Model, dispatch) =

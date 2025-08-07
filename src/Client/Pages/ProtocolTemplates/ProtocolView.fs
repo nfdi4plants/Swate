@@ -1,27 +1,8 @@
 namespace Protocol
 
-open System
-
-open Fable
-open Fable.React
-open Fable.React.Props
-//open Fable.Core.JS
-open Fable.Core.JsInterop
-
-//open ISADotNet
-
 open Model
-open Messages
-open Browser.Types
-open SpreadsheetInterface
-open Messages
-open Elmish
 
 open Feliz
-open Feliz.DaisyUI
-open ARCtrl
-
-open FileImport
 
 type Templates =
 
@@ -47,5 +28,4 @@ type Templates =
                 else
                     Modals.SelectiveTemplateFromDB.Main(model, dispatch, false)
             ]
-
         ]

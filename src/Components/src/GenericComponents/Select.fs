@@ -312,10 +312,20 @@ type Select =
                 ]
             )
 
+        let floatingStyle =
+            let entries =
+                JS.Constructors.Object.entries flui.floatingStyles
+                |> Seq.choose (function
+                    | key, value when not (isNull value) -> Some (style.custom (key, value))
+                    | _ -> None
+                )
+                |> Seq.toList
+            entries @ [style.zIndex 999 ]
+
         React.fragment [
             Html.div [
                 prop.className "swt:size-fit swt:cursor-pointer swt:select-none"
-                prop.ref (unbox flui.refs.setReference)
+                prop.ref (fun el -> flui.refs.setReference el)
                 prop.tabIndex 0
                 yield! prop.spread <| interactions.getReferenceProps ()
                 prop.children (TriggerRender {| isOpen = isOpen |})
@@ -331,8 +341,8 @@ type Select =
                                 modal = false,
                                 children =
                                     Html.div [
-                                        prop.ref (unbox flui.refs.setFloating)
-                                        prop.style flui.floatingStyles
+                                        prop.ref flui.refs.setFloating
+                                        prop.style floatingStyle
                                         yield! prop.spread <| interactions.getFloatingProps ()
                                         prop.children [
                                             FloatingUI.FloatingList(
