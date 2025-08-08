@@ -621,16 +621,16 @@ type TemplateFilter =
     /// <param name="templates">The list of templates to filter. This list should not be modified by this component.</param>
     /// <param name="key">An optional key for the component.</param>
     [<ReactComponent(true)>]
-    static member TemplateFilter(templates: Template[], ?key: obj, ?setCommunityFilter) =
-
-        let tokens, setTokens =
-            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
+    static member TemplateFilter(
+        templates: Template[],
+        ?key: obj,
+        ?onFilteredTemplatesChanged: Template [] -> unit) =
 
         let selectedOrgIndices, setSelectedOrgIndices = React.useState Set.empty<int>
+        let tokens, setTokens = React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
 
         /// This context is used to provide the filtered templates to the rest of the application
-        let filteredTemplatesCtx =
-            React.useContext TemplateFilterAux.FilteredTemplateContext
+        let filteredTemplatesCtx = React.useContext TemplateFilterAux.FilteredTemplateContext
 
         /// This constant is used to display available tags in the combo box
         let availableTokens =
@@ -656,23 +656,13 @@ type TemplateFilter =
 
         React.useEffect(
             (fun () ->
-                if setCommunityFilter.IsSome && selectedOrgIndices.IsEmpty && templates.Length > 0 then
+                if selectedOrgIndices.IsEmpty && templates.Length > 0 then
                     if officialIndices.IsEmpty then
                         setSelectedOrgIndices(Set.empty)
                     else
                         setSelectedOrgIndices(officialIndices)
             ), [| box templates; box availableCommunities |]
         )
-
-        React.useEffect(
-            (fun () ->
-                if setCommunityFilter.IsSome && not selectedOrgIndices.IsEmpty then
-                    selectedOrgIndices
-                    |> List.ofSeq
-                    |> List.map (fun index ->
-                        availableCommunities.[index])
-                    |> setCommunityFilter.Value
-            ), [| box selectedOrgIndices |])
 
         let filter =
             React.useCallback (
@@ -687,10 +677,12 @@ type TemplateFilter =
 
         React.useEffect (
             (fun () ->
-
                 let nextTemplates = filter templates
 
                 filteredTemplatesCtx.setData nextTemplates
+
+                if onFilteredTemplatesChanged.IsSome then
+                    onFilteredTemplatesChanged.Value nextTemplates
             ),
             [| box selectedOrgIndices; box tokens |]
         )

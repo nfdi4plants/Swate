@@ -325,7 +325,7 @@ type Select =
         React.fragment [
             Html.div [
                 prop.className "swt:size-fit swt:cursor-pointer swt:select-none"
-                prop.ref (fun el -> flui.refs.setReference el)
+                prop.ref (unbox flui.refs.setReference)
                 prop.tabIndex 0
                 yield! prop.spread <| interactions.getReferenceProps ()
                 prop.children (TriggerRender {| isOpen = isOpen |})
@@ -341,7 +341,7 @@ type Select =
                                 modal = false,
                                 children =
                                     Html.div [
-                                        prop.ref flui.refs.setFloating
+                                        prop.ref (unbox flui.refs.setFloating)
                                         prop.style floatingStyle
                                         yield! prop.spread <| interactions.getFloatingProps ()
                                         prop.children [

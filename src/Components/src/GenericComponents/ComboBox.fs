@@ -148,7 +148,7 @@ type ComboBox =
                                     "swt:list swt:py-2"
                                     "swt:bg-base-100 swt:shadow-sm swt:rounded-xs"
                                     "swt:overflow-y-auto swt:max-h-1/2 swt:lg:max-h-1/3 swt:min-w-md swt:max-w-xl"
-                                    "swt:border-2 swt:border-base-content/50"
+                                    "swt:border-2 swt:border-base-content/50 swt:z-999"
                                 ]
                                 prop.children props.children
                                 yield! props.props
