@@ -33,7 +33,6 @@ type SearchContainer =
 
     [<ReactComponent>]
     static member Main(model: Model, dispatch) =
-        let filteredTemplates, setFilteredTemplates = React.useState model.ProtocolState.Templates
 
         React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
 
@@ -43,21 +42,28 @@ type SearchContainer =
 
         let isLoading = model.ProtocolState.Loading
 
+
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:lg:gap-4 swt:overflow-hidden"
             prop.children [
                 SearchContainer.HeaderElement(dispatch)
-                TemplateFilter.TemplateFilter(
-                    model.ProtocolState.Templates, key = "template-filter", onFilteredTemplatesChanged = setFilteredTemplates)
-
-                if isEmpty && not isLoading then
-                    Html.p [
-                        prop.className "swt:text-error swt:text-sm"
-                        prop.text
-                            "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."
+                TemplateFilter.TemplateFilterProvider(
+                    React.fragment [
+                        TemplateFilter.TemplateFilter(model.ProtocolState.Templates, key = "template-filter-provider")
+                        TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
+                            React.fragment[
+                                if isEmpty && not isLoading then
+                                    Html.p [
+                                        prop.className "swt:text-error swt:text-sm"
+                                        prop.text
+                                            "No templates were found. This can happen if connection to the server was lost. You can try reload this site or contact a developer."
+                                    ]
+                                else
+                                    Search.SelectTemplatesButton(model, dispatch)
+                                    Protocol.Search.Component(filteredTemplates, model, dispatch)
+                            ]
+                        )
                     ]
-                else
-                    Search.SelectTemplatesButton(model, dispatch)
-                    Protocol.Search.Component(filteredTemplates, model, dispatch)
+                )
             ]
         ]
