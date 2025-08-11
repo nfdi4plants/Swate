@@ -28,12 +28,9 @@ module private DataAnnotatorHelper =
                 Html.a [
                     prop.onClick (fun _ ->
                         setSeperator value
-                        close()
+                        close ()
                     )
-                    prop.children [
-                        Html.span [
-                            prop.text text ]
-                    ]
+                    prop.children [ Html.span [ prop.text text ] ]
                 ]
             ]
 
@@ -41,6 +38,7 @@ module private DataAnnotatorHelper =
         let UpdateSeparatorButton dispatch =
             let updateSeparator =
                 fun s -> DataAnnotator.UpdateSeperator s |> DataAnnotatorMsg |> dispatch
+
             let input_, setInput = React.useState ("")
             let isOpen, setOpen = React.useState false
             let close = fun _ -> setOpen false
@@ -54,10 +52,9 @@ module private DataAnnotatorHelper =
                         Html.button [
                             prop.onClick (fun _ -> setOpen (not isOpen))
                             prop.role "button"
-                            prop.className "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
-                            prop.children [
-                                Icons.AngleDown()
-                            ]
+                            prop.className
+                                "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
+                            prop.children [ Icons.AngleDown() ]
                         ],
                         [
                             dropdownElement "Tab (\\t)" "\\t" setInput close
@@ -65,7 +62,8 @@ module private DataAnnotatorHelper =
                             dropdownElement ";" ";" setInput close
                             dropdownElement "|" "|" setInput close
                         ],
-                        style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
+                        style =
+                            Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
                     )
                     Html.input [
                         prop.className "swt:input swt:join-item"
@@ -122,7 +120,7 @@ module private DataAnnotatorHelper =
                     Html.div [
                         prop.className "swt:indicator"
                         prop.children [
-                            Icons.InfoCircle([|"swt:indicator-item swt:text-accent"|])
+                            Icons.InfoCircle([| "swt:indicator-item swt:text-accent" |])
                             Html.select [
                                 prop.className "swt:select swt:join-item swt:min-w-fit"
                                 prop.title infoText
@@ -240,10 +238,12 @@ module private DataAnnotatorHelper =
 
         let isActive =
             dtrgt
-            |> Option.map (function
+            |> Option.map (
+                function
                 | DataTarget.Column _
                 | DataTarget.Row _ -> isDirectlyActive
-                | DataTarget.Cell(ci, ri) -> state.Contains(DataTarget.Column ci) || state.Contains(DataTarget.Row ri))
+                | DataTarget.Cell(ci, ri) -> state.Contains(DataTarget.Column ci) || state.Contains(DataTarget.Row ri)
+            )
             |> Option.defaultValue false
 
         TableCell.BaseCell(
@@ -258,7 +258,8 @@ module private DataAnnotatorHelper =
                              state.Remove dtrgt
                          else
                              state.Add dtrgt
-                         |> setState)
+                         |> setState
+                     )
                      prop.children [
                          if isDirectlyActive then
                              IsAddedIcon
@@ -284,7 +285,8 @@ module private DataAnnotatorHelper =
                         (0, ci, file.HeaderRow.Value.[ci], (DataTarget.Column ci |> Some), state, setState)
                 ]
 
-                data)
+                data
+            )
 
         let bodyRows = [|
             for ri in 0 .. file.BodyRows.Length - 1 do
@@ -311,14 +313,22 @@ module private DataAnnotatorHelper =
                     else
                         // Body Row
                         let input = bodyRows.[tcc.Index.y].[tcc.Index.x]
-                        CellButton input),
+                        CellButton input
+                ),
                 withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}-{ts.IsHeader}")
             )
 
         Html.div [
             prop.className "swt:overflow-hidden swt:flex"
             prop.children [
-                Swate.Components.Table.Table(file.BodyRows.Length, colCount, render, (fun _ -> Html.div []), tableRef, annotator = true)
+                Swate.Components.Table.Table(
+                    file.BodyRows.Length,
+                    colCount,
+                    render,
+                    (fun _ -> Html.div []),
+                    tableRef,
+                    annotator = true
+                )
             ]
         ]
 
@@ -387,9 +397,10 @@ type DataAnnotator =
                                         |}
                                         |> InterfaceMsg
                                         |> dispatch
-                                    | None -> logw "No file selected"
+                                    | None -> console.warn "No file selected"
 
-                                    rmv e)
+                                    rmv e
+                                )
                             ]
                         ]
                     ]

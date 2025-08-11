@@ -13,7 +13,7 @@ let updateDatamap (dataMapOpt: DataMap option) (state: Spreadsheet.Model) : Spre
             s.DataMap <- dataMapOpt
             Some(Study(s, []))
         | _ ->
-            logw "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
+            console.warn "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
             state.ArcFile
 
     match dataMapOpt with
@@ -43,7 +43,7 @@ let updateDataMapDataContextAt (dtx) (index) (state: Spreadsheet.Model) : Spread
             s.DataMap.Value.DataContexts.[index] <- dtx
             Some(Study(s, []))
         | _ ->
-            logw "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
+            console.warn "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
             state.ArcFile
 
     { state with ArcFile = nextArcFile }

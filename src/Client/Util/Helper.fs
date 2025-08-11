@@ -5,13 +5,11 @@ open Fable.Core
 
 open System
 
-let log (a) = Browser.Dom.console.log a
+module console =
+    let log (a) = Browser.Dom.console.log a
+    let warn (a) = Browser.Dom.console.warn a
+    let error (a) = Browser.Dom.console.error a
 
-let logw (a) = Browser.Dom.console.warn a
-
-let logf a b =
-    let txt: string = sprintf a b
-    log txt
 
 open System.Collections.Generic
 
@@ -64,7 +62,8 @@ let debounce<'T> (storage: DebounceStorage) (key: string) (timeout: int) (fn: 'T
         Fable.Core.JS.setTimeout
             (fun () ->
                 storage.Remove(key) |> ignore
-                fn value)
+                fn value
+            )
             timeout
 
     storage.Add(key, timeoutId, fun () -> fn value)
@@ -94,7 +93,8 @@ let debouncel<'T>
                     storage.Remove(key) |> ignore
                     setLoading false
                     fn value
-                | None -> setLoading false)
+                | None -> setLoading false
+            )
             timeout
 
     storage.Add(key, timeoutId, fun () -> fn value)
@@ -133,7 +133,8 @@ let throttleAndDebounce (fn: 'a -> unit, timespan: int) =
                 (fun () ->
                     fn arg
                     id <- None
-                    lastCall <- now)
+                    lastCall <- now
+                )
                 timespan
 
         id <- Some timeoutId

@@ -23,7 +23,7 @@ type Msg =
             targetColumn: DataAnnotator.TargetColumn
         |}
     /// This function will do preprocessing on the tables to join
-    | AddTemplates of ArcTable[] * SelectiveImportConfig
+    | AddTemplates of ArcTable list * SelectiveImportConfig
     | JoinTable of ArcTable * columnIndex: int option * options: TableJoinOptions option
     | UpdateArcFile of ArcFiles
     /// Inserts TermMinimal to selected fields of one column

@@ -120,7 +120,8 @@ module private ResizeEventListener =
 
             Browser.Dom.window.addEventListener ("resize", onResize)
             // Cleanup function to remove event listener when the component unmounts
-            React.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize)))
+            React.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize))
+        )
 
 [<RequireQualifiedAccess>]
 type Widget =
@@ -178,7 +179,9 @@ type Widget =
             |> Option.iter (fun position ->
                 MoveEventListener.ensurePositionInsideWindow element position
                 |> Some
-                |> setPosition)) // Reposition widget inside window
+                |> setPosition
+            )
+        ) // Reposition widget inside window
 
         let resizeElement (content: ReactElement) =
             Html.div [
@@ -198,7 +201,8 @@ type Widget =
                     Browser.Dom.document.addEventListener ("mousemove", onmousemove)
                     let config = createEmpty<AddEventListenerOptions>
                     config.once <- true
-                    Browser.Dom.document.addEventListener ("mouseup", onmouseup, config))
+                    Browser.Dom.document.addEventListener ("mouseup", onmouseup, config)
+                )
                 prop.className
                     "swt:shadow-md swt:border swt:border-base-300 swt:space-y-4 swt:rounded-lg swt:border-r-2 swt:bg-base-100"
                 prop.style [
@@ -240,7 +244,8 @@ type Widget =
                         Browser.Dom.document.addEventListener ("mousemove", onmousemove)
                         let config = createEmpty<AddEventListenerOptions>
                         config.once <- true
-                        Browser.Dom.document.addEventListener ("mouseup", onmouseup, config))
+                        Browser.Dom.document.addEventListener ("mouseup", onmouseup, config)
+                    )
                     prop.className
                         "swt:cursor-move swt:flex swt:justify-end swt:bg-gradient-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
@@ -249,7 +254,8 @@ type Widget =
                             props = [
                                 prop.onClick (fun e ->
                                     e.stopPropagation ()
-                                    rmv e)
+                                    rmv e
+                                )
                             ]
                         )
                     ]
@@ -268,13 +274,12 @@ type Widget =
 
     [<ReactComponent>]
     static member Templates(model: Model, dispatch, rmv: MouseEvent -> unit) =
-        React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
 
         let content =
-            if model.ProtocolState.ShowSearch then
-                Protocol.SearchContainer.Main(model, dispatch)
-            else
-                SelectiveTemplateFromDB.Main(model, dispatch, true)
+            Html.div [
+                prop.className "swt:flex swt:flex-col swt:gap-2"
+                prop.children [ Protocol.Templates.TemplateSelect(model, dispatch) ]
+            ]
 
         let prefix = WidgetLiterals.Templates
         Widget.Base(content, prefix, rmv, prefix)

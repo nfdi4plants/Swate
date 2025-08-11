@@ -260,7 +260,7 @@ type ComboBox =
                                                     let props =
                                                         (useInteractions.getItemProps (
                                                             {|
-                                                                key = itemToString item
+                                                                key = index
                                                                 ref = fun node -> listRef.current.[index] <- node
                                                                 onClick = fun _ -> onSelect index item
                                                             |}

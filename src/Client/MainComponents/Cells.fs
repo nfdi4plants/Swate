@@ -14,7 +14,6 @@ open Modals
 
 module private CellAux =
     let headerTSRSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =
-        log (s, header)
 
         match header.TryOA(), s with
         | Some oa, "" ->
@@ -24,13 +23,7 @@ module private CellAux =
             oa.TermSourceREF <- Some s1
             Some oa
         | None, _ -> None
-        |> fun s ->
-            log s
-            s
         |> Option.map header.UpdateWithOA
-        |> fun s ->
-            log s
-            s
         |> Option.iter (fun nextHeader -> Msg.UpdateHeader(columnIndex, nextHeader) |> SpreadsheetMsg |> dispatch)
 
     let headerTANSetter (columnIndex: int, s: string, header: CompositeHeader, dispatch) =

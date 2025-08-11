@@ -207,13 +207,17 @@ module Interface =
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd =
-                        OfficeInterop.AddTemplates(tables, importType) |> OfficeInteropMsg |> Cmd.ofMsg
+                        OfficeInterop.AddTemplates(Array.ofList tables, importType)
+                        |> OfficeInteropMsg
+                        |> Cmd.ofMsg
 
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
                     let cmd =
-                        Spreadsheet.AddTemplates(tables, importType) |> SpreadsheetMsg |> Cmd.ofMsg
+                        Spreadsheet.AddTemplates(Array.ofList tables, importType)
+                        |> SpreadsheetMsg
+                        |> Cmd.ofMsg
 
                     model, cmd
                 | _ -> failwith "not implemented"
@@ -271,7 +275,8 @@ module Interface =
 
                             let! activeTable =
                                 ExcelJS.Fable.GlobalBindings.Excel.run (fun context ->
-                                    ArcTable.tryGetActiveArcTable (context))
+                                    ArcTable.tryGetActiveArcTable (context)
+                                )
 
                             let activeTableIndex =
                                 match arcfileOpt, activeTable with

@@ -49,7 +49,8 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
                 prop.onClick (fun _ ->
                     let investigation = ArcInvestigation.init ("New Investigation")
                     let arcfile = ArcFiles.Investigation investigation
-                    createMetadata arcfile)
+                    createMetadata arcfile
+                )
             ]
             Html.button [
                 prop.className "swt:btn"
@@ -57,7 +58,8 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
                 prop.onClick (fun _ ->
                     let study = ArcStudy.init ("New Study")
                     let arcfile = ArcFiles.Study(study, [])
-                    createMetadata arcfile)
+                    createMetadata arcfile
+                )
             ]
             Html.button [
                 prop.className "swt:btn"
@@ -65,7 +67,8 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
                 prop.onClick (fun _ ->
                     let assay = ArcAssay.init ("New Assay")
                     let arcfile = ArcFiles.Assay assay
-                    createMetadata arcfile)
+                    createMetadata arcfile
+                )
             ]
             Html.button [
                 prop.className "swt:btn"
@@ -75,7 +78,8 @@ let AddMetaDataButtons refresh (dispatch: Messages.Msg -> unit) =
                     template.Version <- "0.0.0"
                     template.LastUpdated <- System.DateTime.Now
                     let arcfile = ArcFiles.Template template
-                    createMetadata arcfile)
+                    createMetadata arcfile
+                )
             ]
         ]
     ]
@@ -159,7 +163,8 @@ let UpdateMetadataModalContent
 
                                         closeModal ()
                                     else
-                                        logw ("Tried updating metadata sheet without given metadata"))
+                                        console.warn ("Tried updating metadata sheet without given metadata")
+                                )
                             ]
                             //Daisy.button.a [
                             Html.button [
@@ -167,7 +172,8 @@ let UpdateMetadataModalContent
                                 prop.text "Delete Metadata Type"
                                 prop.onClick (fun _ ->
                                     OfficeInterop.DeleteTopLevelMetadata |> OfficeInteropMsg |> dispatch
-                                    closeModal ())
+                                    closeModal ()
+                                )
                             ]
                         ]
                     ]
@@ -239,7 +245,8 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 e.preventDefault ()
                 let e = e :?> Browser.Types.MouseEvent
                 let ctrl = e.metaKey || e.ctrlKey
-                SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch)
+                SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
+            )
         )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
@@ -250,7 +257,8 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     e.preventDefault ()
                     let e = e :?> Browser.Types.MouseEvent
                     let ctrl = not (e.metaKey || e.ctrlKey)
-                    OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch)
+                    OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
+                )
             )
         | _ -> ()
         QuickAccessButton.QuickAccessButton(
@@ -283,7 +291,8 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                         |> Messages.UpdateModal
                         |> dispatch
                 }
-                |> Promise.start)
+                |> Promise.start
+            )
         )
     ]
     |> React.fragment
@@ -307,9 +316,7 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
         | Some Swatehost.Excel ->
             Html.div [
                 prop.className "swt:navbar swt:flex swt:gap-4"
-                prop.children [
-                    QuickAccessList toggleMetdadataModal model dispatch
-                ]
+                prop.children [ QuickAccessList toggleMetdadataModal model dispatch ]
             ]
 
             Html.div [
@@ -326,7 +333,8 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
                             prop.onClick (fun _ ->
                                 Messages.PageState.UpdateShowSidebar(not model.PageState.ShowSideBar)
                                 |> Messages.PageStateMsg
-                                |> dispatch)
+                                |> dispatch
+                            )
                         ]
                     )
                 ]

@@ -89,7 +89,8 @@ module private Helper =
                         let picker = Browser.Dom.document.getElementById (uploadId)
                         // https://stackoverflow.com/questions/3528359/html-input-type-file-file-selection-event/3528376
                         picker?value <- null
-                        ())
+                        ()
+                    )
                 ]
                 //Daisy.button.button [
                 Html.button [
@@ -98,7 +99,8 @@ module private Helper =
                         e.preventDefault ()
                         let getUploadElement = Browser.Dom.document.getElementById uploadId
                         getUploadElement.click ()
-                        ())
+                        ()
+                    )
                     prop.children [ Html.div "Import File" ]
                 ]
             ]
@@ -109,15 +111,13 @@ module private Helper =
             //Daisy.button.a [
             Html.a [
                 prop.className "swt:btn swt:btn-block swt:btn-ghost swt:btn-sm swt:justify-start"
-                prop.onClick (fun e ->
-                    log "inner"
-                    onclick e)
+                prop.onClick (fun e -> onclick e)
                 prop.text txt
             ]
         ]
 
     let createNewFile (dispatch: Messages.Msg -> unit) =
-        Html.div  [
+        Html.div [
             prop.className "swt:dropdown"
             prop.children [
                 Html.div [
@@ -128,7 +128,8 @@ module private Helper =
                 Html.ul [
                     prop.tabIndex 0
                     //Daisy.dropdownContent
-                    prop.className "swt:dropdown-content swt:menu swt:p-2 swt:shadow swt:bg-base-300 swt:rounded-box swt:w-64"
+                    prop.className
+                        "swt:dropdown-content swt:menu swt:p-2 swt:shadow swt:bg-base-300 swt:rounded-box swt:w-64"
                     prop.children [
                         Html.ul [
                             createNewTableItem (
@@ -187,10 +188,12 @@ type NoFileElement =
                     let item = e.dataTransfer.items.[0]
 
                     if item.kind = "file" then
-                        UploadHandler.setActive_DropArea ())
+                        UploadHandler.setActive_DropArea ()
+            )
             prop.onDragLeave (fun e ->
                 //e.preventDefault()
-                UploadHandler.setInActive_DropArea ())
+                UploadHandler.setInActive_DropArea ()
+            )
             prop.onDragOver (fun e -> e.preventDefault ())
             prop.onDrop <| UploadHandler.ondrop args.dispatch
             prop.style [
