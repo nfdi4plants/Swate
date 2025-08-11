@@ -312,12 +312,9 @@ module private DataAnnotatorHelper =
                         // Header Row
                         let content = headerRow.Value.[tcc.Index.x]
                         CellButton content
-                    elif tcc.Index.x < file.HeaderRow.Value.Length then
-                        // Body Row
-                        let input = bodyRows.[tcc.Index.y].[tcc.Index.x]
-                        CellButton input
                     else
-                        Html.div []),
+                        let input = bodyRows.[tcc.Index.y].[tcc.Index.x]]
+                        CellButton input),
                 withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}-{ts.IsHeader}")
             )
 
@@ -381,8 +378,6 @@ type DataAnnotator =
                                                     model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome
                                                 )
                                         |]
-
-                                        console.log selectors
 
                                         let name = dtf.DataFileName
                                         let dt = dtf.DataFileType
