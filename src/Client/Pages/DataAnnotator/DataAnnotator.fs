@@ -314,7 +314,7 @@ module private DataAnnotatorHelper =
                         CellButton content
                     else
                         // Body Row
-                        let input = bodyRows.[tcc.Index.y].[tcc.Index.x]]
+                        let input = bodyRows.[tcc.Index.y].[tcc.Index.x]
                         CellButton input),
                 withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}-{ts.IsHeader}")
             )
