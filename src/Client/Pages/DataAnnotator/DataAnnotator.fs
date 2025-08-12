@@ -1,5 +1,6 @@
 namespace Pages
 
+open System
 open Fable.Core
 open DataAnnotator
 open Model
@@ -44,6 +45,7 @@ module private DataAnnotatorHelper =
             let input_, setInput = React.useState ("")
             let isOpen, setOpen = React.useState false
             let close = fun _ -> setOpen false
+            let hasError = String.IsNullOrEmpty input_
 
             Html.div [
                 prop.className "swt:join"
@@ -72,11 +74,13 @@ module private DataAnnotatorHelper =
                         prop.placeholder ".. update separator"
                         prop.value input_
                         prop.onChange (fun s -> setInput s)
-                        prop.onKeyDown (key.enter, fun _ -> updateSeparator input_)
+                        prop.onKeyDown (key.enter, fun _ ->
+                            if not hasError then updateSeparator input_)
                     ]
                     Html.button [
                         prop.className "swt:btn swt:join-item"
                         prop.text "Update"
+                        prop.disabled hasError
                         prop.onClick (fun _ -> updateSeparator input_)
                     ]
                 ]
