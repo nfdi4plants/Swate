@@ -64,7 +64,8 @@ module private Helper =
                                     |> Messages.UpdateModal
                                     |> dispatch
 
-                                    setState { state with Loading = false })
+                                    setState { state with Loading = false }
+                                )
                                 (fun e -> GenericError(Cmd.none, e) |> DevMsg |> dispatch)
                                 p
                             |> Async.AwaitPromise
@@ -87,9 +88,7 @@ type JsonImport =
             prop.type'.file
             prop.className "swt:file-input swt:file-input-neutral swt:w-full"
             prop.onChange (fun (ev: File list) -> Helper.upload state setState dispatch ev)
-            prop.onClick (fun e ->
-                log e
-                e.target?value <- null)
+            prop.onClick (fun e -> e.target?value <- null)
         ]
 
     [<ReactComponent>]

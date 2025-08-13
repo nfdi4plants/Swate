@@ -94,13 +94,13 @@ module Protocol =
 
     type Msg =
         // UI
-        | UpdateShowSearch of bool
         | UpdateImportConfig of Types.FileImport.SelectiveImportConfig
         | UpdateLoading of bool
         //
         | UpdateTemplates of Template[]
-        | SelectProtocols of Template list
-        | AddProtocol of Template
+        /// trigger import modal for all selected protocols
+        | ImportProtocols
+        | ToggleSelectProtocol of Template
         | RemoveSelectedProtocols
         // // ------ Protocol from Database ------
         | GetAllProtocolsForceRequest

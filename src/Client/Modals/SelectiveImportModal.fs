@@ -70,7 +70,8 @@ type SelectiveImportModal =
                     prop.onChange (fun (_: bool) ->
                         if columns.Length > 0 then
                             let nextImportConfig = importConfig.toggleDeselectColumn (tableIndex, columnIndex)
-                            nextImportConfig |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch)
+                            nextImportConfig |> Protocol.UpdateImportConfig |> ProtocolMsg |> dispatch
+                    )
                 ]
             ]
         ]
@@ -348,7 +349,8 @@ type SelectiveImportModal =
                             |> InterfaceMsg
                             |> dispatch
 
-                            rmv e)
+                            rmv e
+                        )
                     ]
                 ]
             ]
@@ -364,3 +366,67 @@ type SelectiveImportModal =
     static member Main(import: ArcFiles, model, dispatch: Messages.Msg -> unit) =
         let rmv = Util.RMV_MODAL dispatch
         SelectiveImportModal.Main(import, model, dispatch, rmv = rmv)
+
+    static member Templates(model, dispatch: Messages.Msg -> unit) =
+        let rmv = Util.RMV_MODAL dispatch
+
+        let tables = model.ProtocolState.TemplatesSelected |> List.map (fun t -> t.Table)
+
+        let content =
+            React.fragment [
+                SelectiveImportModal.RadioPluginsBox(
+                    "Import Type",
+                    Icons.Cog(),
+                    model.ProtocolState.ImportConfig.ImportType,
+                    "importType",
+                    [|
+                        ARCtrl.TableJoinOptions.Headers, " Column Headers"
+                        ARCtrl.TableJoinOptions.WithUnit, " ..With Units"
+                        ARCtrl.TableJoinOptions.WithValues, " ..With Values"
+                    |],
+                    fun importType ->
+                        {
+                            model.ProtocolState.ImportConfig with
+                                ImportType = importType
+                        }
+                        |> Protocol.UpdateImportConfig
+                        |> ProtocolMsg
+                        |> dispatch
+                )
+                for ti in 0 .. (tables.Length - 1) do
+                    let t = tables.[ti]
+                    SelectiveImportModal.TableImport(ti, t, model, dispatch)
+            ]
+
+        let footer =
+            Html.div [
+                prop.className "swt:justify-end swt:flex swt:gap-2"
+                prop.style [ style.marginLeft length.auto ]
+                prop.children [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-outline"
+                        prop.text "Cancel"
+                        prop.onClick rmv
+                    ]
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary"
+                        prop.style [ style.marginLeft length.auto ]
+                        prop.text "Submit"
+                        prop.onClick (fun e ->
+                            SpreadsheetInterface.AddTemplates(tables, model.ProtocolState.ImportConfig)
+                            |> InterfaceMsg
+                            |> dispatch
+
+                            rmv e
+                        )
+                    ]
+                ]
+            ]
+
+        Swate.Components.BaseModal.BaseModal(
+            rmv,
+            header = Html.p "Import",
+            modalClassInfo = "@container/importModal",
+            content = content,
+            footer = footer
+        )

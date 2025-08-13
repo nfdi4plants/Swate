@@ -18,7 +18,6 @@ module Protocol =
 
         match msg with
         | UpdateLoading next -> { state with Loading = next }, model, Cmd.none
-        | UpdateShowSearch next -> { state with ShowSearch = next }, model, Cmd.none
         | UpdateImportConfig next -> { state with ImportConfig = next }, model, Cmd.none
         // ------ Protocol from Database ------
         | GetAllProtocolsRequest ->
@@ -74,25 +73,31 @@ module Protocol =
         | UpdateTemplates templates ->
             let nextState = { state with Templates = templates }
             nextState, model, Cmd.none
-        | SelectProtocols prots ->
+        | ImportProtocols ->
             let importArr: Types.FileImport.ImportTable list =
-                List.init prots.Length (fun i -> { Index = i; FullImport = false })
+                List.init model.ProtocolState.TemplatesSelected.Length (fun i -> { Index = i; FullImport = false })
 
             let nextState = {
                 state with
-                    TemplatesSelected = prots //
-                    ShowSearch = false // Switch to config view
                     ImportConfig = { // default append all selected templates
                         Types.FileImport.SelectiveImportConfig.init () with
                             ImportTables = importArr
                     }
             }
 
+            let model = {
+                model with
+                    Model.ModalState.ActiveModal =
+                        ModalState.TableModals.TemplateImport
+                        |> ModalState.ModalTypes.TableModal
+                        |> Some
+            }
+
             nextState, model, Cmd.none
-        | AddProtocol prot ->
+        | ToggleSelectProtocol prot ->
             let templates =
                 if List.contains prot model.ProtocolState.TemplatesSelected then
-                    model.ProtocolState.TemplatesSelected
+                    List.except [ prot ] model.ProtocolState.TemplatesSelected
                 else
                     prot :: model.ProtocolState.TemplatesSelected
 

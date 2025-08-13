@@ -27,6 +27,7 @@ type ModalProvider =
         | TableModals.TableCellDetailsAtIndex(ci, ri) ->
             let rmv = Util.RMV_MODAL dispatch
             Modals.CompositeCollumnModal.Main(ci, ri, model, dispatch, rmv)
+        | TableModals.TemplateImport -> Modals.SelectiveImportModal.Templates(model, dispatch)
 
     static member GeneralModal(modal: GeneralModals, model, dispatch) =
         match modal with

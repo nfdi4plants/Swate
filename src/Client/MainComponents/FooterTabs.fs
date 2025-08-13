@@ -54,7 +54,6 @@ let private dragenter_handler (state, setState) =
 ///<summary>Removes dragenter styling.</summary>
 let private dragleave_handler (state, setState) =
     fun (e: Browser.Types.DragEvent) ->
-        log "dragleave"
         e.preventDefault ()
         e.stopPropagation ()
         setState { state with IsDraggedOver = false }
@@ -171,10 +170,7 @@ let MainMetadata (model: Model, dispatch: Messages.Msg -> unit) =
             style.height (length.percent 100)
             style.cursor.pointer
         ]
-        prop.children [
-            Icons.InfoCircle([||])
-            Html.text model.SpreadsheetModel.FileType
-        ]
+        prop.children [ Icons.InfoCircle([||]); Html.text model.SpreadsheetModel.FileType ]
     ]
 
 [<ReactComponent>]
@@ -266,18 +262,8 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
                     "swt:drawer swt:drawer-button swt:btn swt:btn-sm swt:px-2 swt:py-2 swt:swap swt:swap-rotate swt:rounded-none swt:h-full"
                 prop.children [
                     Html.input [ prop.type'.checkbox ]
-                    Html.div [
-                        prop.className [ "swt:swap-off" ]
-                        prop.children [
-                            Icons.ChevronLeft()
-                        ]
-                    ]
-                    Html.div [
-                        prop.className [ "swt:swap-on" ]
-                        prop.children [
-                            Icons.ChevronRight()
-                        ]
-                    ]
+                    Html.div [ prop.className [ "swt:swap-off" ]; prop.children [ Icons.ChevronLeft() ] ]
+                    Html.div [ prop.className [ "swt:swap-on" ]; prop.children [ Icons.ChevronRight() ] ]
                 ]
             ]
         ]

@@ -288,7 +288,6 @@ type Settings =
                     | Swate.Components.Types.Planti -> planti
                     | Swate.Components.Types.Viola -> viola
                     | Swate.Components.Types.Auto -> browser
-                    | _ -> "missing"
 
                 iconRef.current?innerHTML <- icon
                 ()

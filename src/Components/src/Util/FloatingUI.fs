@@ -5,6 +5,22 @@ open Browser.Types
 open Feliz
 
 module FloatingUI =
+
+    [<StringEnum(CaseRules.KebabCase)>]
+    type Placement =
+        | Top
+        | TopStart
+        | TopEnd
+        | Right
+        | RightStart
+        | RightEnd
+        | Bottom
+        | BottomStart
+        | BottomEnd
+        | Left
+        | LeftStart
+        | LeftEnd
+
     [<AllowNullLiteral; Global>]
     type VirtualElement [<ParamObjectAttribute; Emit("$0")>] (getBoundingClientRect: unit -> ClientRect) =
         member val getBoundingClientRect = getBoundingClientRect with get, set
@@ -16,7 +32,7 @@ module FloatingUI =
         [<ParamObjectAttribute; Emit("$0")>]
         (
             context: obj,
-            placement: obj,
+            placement: Placement,
             strategy: obj,
             x: int,
             y: int,
@@ -178,14 +194,12 @@ module FloatingUI =
         member val enabled = enabled
         member val resetMs = resetMs
         member val ignoreKeys = ignoreKeys
-        member val selectedIndex = selectedIndex
+        member val selectedIndex: int option = selectedIndex
         member val onTypingChange = onTypingChange
         member val findMatch = findMatch
 
     [<Erase>]
-    type IMiddleware =
-        interface
-        end
+    type IMiddleware = interface end
 
     [<Erase>]
     type Middleware =
@@ -198,8 +212,15 @@ module FloatingUI =
         [<ImportMemberAttribute("@floating-ui/react")>]
         static member shift(?options: obj) : IMiddleware = jsNative
 
+        [<ImportMemberAttribute("@floating-ui/react")>]
+        static member size(?options: obj) : IMiddleware = jsNative
+
 [<Erase>]
 type FloatingUI =
+
+    [<ImportMember("@floating-ui/react")>]
+    static member useId() : string = jsNative
+
     // reference: ReferenceElement, floating: FloatingElement, update: () => void
     [<ImportMember("@floating-ui/react")>]
     static member autoUpdate (reference: obj) (floating: obj) (update: unit -> unit) : unit = jsNative
@@ -207,10 +228,10 @@ type FloatingUI =
     [<ImportMember("@floating-ui/react"); ParamObjectAttribute>]
     static member useFloating
         (
-            ?placement: obj,
+            ?placement: FloatingUI.Placement,
             ?strategy: string,
             ?transform: bool,
-            ?middleware: obj[],
+            ?middleware: FloatingUI.IMiddleware[],
             ?``open``: bool,
             ?onOpenChange: bool -> unit,
             ?elements: obj,
@@ -226,6 +247,9 @@ type FloatingUI =
     static member useRole(context: obj, ?props: FloatingUI.UseRoleProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
+    static member useClick(context: obj) : obj = jsNative
+
+    [<ImportMember("@floating-ui/react")>]
     static member useListNavigation(context: obj, ?props: FloatingUI.UseListNavigationProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
@@ -233,6 +257,16 @@ type FloatingUI =
 
     [<ImportMember("@floating-ui/react")>]
     static member useInteractions(interactions: obj[]) : FloatingUI.UseInteractionsReturn = jsNative
+
+    [<ImportMember("@floating-ui/react")>]
+    static member useListItem
+        (?label: string)
+        : {|
+              ref: IRefValue<#Browser.Types.HTMLElement option>
+              index: int
+          |}
+        =
+        jsNative
 
     [<ReactComponent("FloatingPortal", "@floating-ui/react")>]
     static member FloatingPortal(children: ReactElement) = React.imported ()
@@ -256,5 +290,14 @@ type FloatingUI =
             ?outsideElementsInert: bool,
             ?getInsideElements: unit -> ReactElement[],
             ?order: string[]
+        ) =
+        React.imported ()
+
+    [<ReactComponent("FloatingList", "@floating-ui/react")>]
+    static member FloatingList
+        (
+            children: ReactElement,
+            elementsRef: IRefValue<Browser.Types.HTMLElement option[]>,
+            labelsRef: IRefValue<string option[]>
         ) =
         React.imported ()

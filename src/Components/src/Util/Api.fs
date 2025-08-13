@@ -85,7 +85,8 @@ module TIBTypesExtensions =
                     t.ontology_name,
                     t.iri,
                     t.is_obsolete |> Option.defaultValue false
-                ))
+                )
+            )
 
 [<AttachMembers>]
 type TIBApi =
@@ -99,7 +100,9 @@ type TIBApi =
             |> Promise.map (fun termApi ->
                 termApi._embedded.terms
                 |> Array.tryFind (fun term -> term.obo_id = oboId)
-                |> Option.map (fun term -> term.iri)))
+                |> Option.map (fun term -> term.iri)
+            )
+        )
 
     // TODO: Maybe we should use allChildrenOf instead of childrenOf?
     // The latter only uses subclassOf/is_a, whereas the other one uses all relationships

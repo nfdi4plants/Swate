@@ -61,7 +61,8 @@ module GetHandler =
                     let selectedBuildingBlock =
                         buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
 
-                    selectedBuildingBlock)
+                    selectedBuildingBlock
+                )
     }
 
     /// <summary>
@@ -97,7 +98,8 @@ module GetHandler =
                     let selectedBuildingBlock =
                         buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
 
-                    selectedBuildingBlock)
+                    selectedBuildingBlock
+                )
     }
 
     /// <summary>
@@ -175,7 +177,8 @@ module GetHandler =
                     let selectedBuildingBlock =
                         buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
 
-                    selectedBuildingBlock)
+                    selectedBuildingBlock
+                )
     }
 
     /// <summary>
@@ -215,7 +218,8 @@ module GetHandler =
                     let selectedBuildingBlock =
                         buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
 
-                    selectedBuildingBlock, selectedRange.rowIndex)
+                    selectedBuildingBlock, selectedRange.rowIndex
+                )
     }
 
     /// <summary>
@@ -294,7 +298,8 @@ module GetHandler =
             if importType then
                 tablesToAdd <- table :: tablesToAdd
             else
-                tablesToJoin <- table :: tablesToJoin)
+                tablesToJoin <- table :: tablesToJoin
+        )
 
         tablesToAdd |> Array.ofList, tablesToJoin |> Array.ofList
 
@@ -362,7 +367,8 @@ module GetHandler =
                             |> Array.ofSeq
                             |> getRange targetIndex selectedIndex
                             |> Seq.map (fun item ->
-                                item |> Option.map string |> Option.defaultValue "" |> (fun s -> s.TrimEnd()))
+                                item |> Option.map string |> Option.defaultValue "" |> (fun s -> s.TrimEnd())
+                            )
 
                         let bodyRows =
                             bodyRowRange.values
@@ -370,9 +376,11 @@ module GetHandler =
                                 items
                                 |> Array.ofSeq
                                 |> getRange targetIndex selectedIndex
-                                |> Seq.map (fun item -> item |> Option.map string |> Option.defaultValue ""))
+                                |> Seq.map (fun item -> item |> Option.map string |> Option.defaultValue "")
+                            )
 
-                        validate headerRow bodyRows)
+                        validate headerRow bodyRows
+                    )
 
             return inMemoryTable
         }
@@ -738,7 +746,8 @@ module UpdateHandler =
                         |> Array.map (fun c -> ResizeArray[c])
                         |> ResizeArray
 
-                    excelTable.columns.items.[pIndex].values <- bodyValues)
+                    excelTable.columns.items.[pIndex].values <- bodyValues
+                )
         }
 
     /// <summary>
@@ -779,7 +788,9 @@ module UpdateHandler =
                             if column.IsSome && not (String.IsNullOrEmpty(column.ToString())) then
                                 Some(column.Value.ToString())
                             else
-                                None))
+                                None
+                        )
+                    )
 
                 return Some(parseToMetadata values)
             else
@@ -964,7 +975,8 @@ module UpdateHandler =
                                 "The active worksheet contains more than one annotationTable. This should not happen. Please report this as a bug to the developers."
                         | _ ->
                             failwith
-                                "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers.")
+                                "The active worksheet contains a negative number of annotation tables. Obviously this cannot happen. Please report this as a bug to the developers."
+                    )
 
             let! prevArcTable = ArcTable.tryGetPrevArcTable context
 
@@ -1033,7 +1045,8 @@ module UpdateHandler =
 
                         // Update annotationTable style
                         excelTable.style <- style
-                        excelTable)
+                        excelTable
+                    )
 
             let _ = table.rows.load (propertyNames = U2.Case2(ResizeArray [| "count" |]))
 
@@ -1101,7 +1114,9 @@ module UpdateHandler =
 
                         headerNames
                         |> Array.iteri (fun i header ->
-                            Table.addColumn i newTable header (int newTableRange.rowCount) "" |> ignore))
+                            Table.addColumn i newTable header (int newTableRange.rowCount) "" |> ignore
+                        )
+                    )
 
             let bodyRange = newTable.getDataBodyRange ()
 
@@ -1123,7 +1138,8 @@ module UpdateHandler =
                         //We delete the annotation table because we cannot overwrite an existing one
                         //As a result we create a new annotation table that has one column
                         //We delete the newly created column of the newly created table
-                        newTable.columns.getItemAt(bodyRange.columnCount - 1.).delete ())
+                        newTable.columns.getItemAt(bodyRange.columnCount - 1.).delete ()
+                    )
 
             let newBodyRange = newTable.getDataBodyRange ()
 
@@ -1287,7 +1303,8 @@ type Main =
                             (rowRangeRowCount |> int)
                             (headerRangeAddr.Replace("Sheet", ""))
                             (headerRangeColCount |> int)
-                            (headerRangeRowCount |> int))
+                            (headerRangeRowCount |> int)
+                    )
 
             return res
         }
@@ -1309,7 +1326,6 @@ type Main =
                 // iterate DESCENDING to avoid index shift
                 for i, _ in Seq.sortByDescending fst selectedBuildingBlock do
                     let column = excelTable.columns.getItemAt (i)
-                    log $"delete column {i}"
                     column.delete ()
 
                 do! context.sync ()
@@ -1469,7 +1485,8 @@ type Main =
 
                 // Interop logging expects list of logs
                 return [ snd newTableLogging ]
-            })
+            }
+        )
 
     /// <summary>
     /// Add the given arc table to the active annotation table at the desired index
@@ -1665,7 +1682,8 @@ type Main =
                             if item.Header.IsTermColumn then
                                 Some(item.Header.ToString())
                             else
-                                None)
+                                None
+                        )
 
                     let columns =
                         items
@@ -1676,7 +1694,9 @@ type Main =
                             |> Array.collect (fun cc ->
                                 cc
                                 |> Array.ofSeq
-                                |> Array.choose (fun r -> if r.IsSome then Some(r.ToString()) else None)))
+                                |> Array.choose (fun r -> if r.IsSome then Some(r.ToString()) else None)
+                            )
+                        )
 
                     let body = excelTable.getDataBodyRange ()
                     let _ = body.load (propertyNames = U2.Case2(ResizeArray [| "values" |]))
@@ -1712,7 +1732,9 @@ type Main =
                                     |> Array.collect (fun pc ->
                                         pc
                                         |> Array.ofSeq
-                                        |> Array.choose (fun pcv -> if pcv.IsSome then Some(pcv.ToString()) else None)))
+                                        |> Array.choose (fun pcv -> if pcv.IsSome then Some(pcv.ToString()) else None)
+                                    )
+                                )
 
                             let mainColumnHasValues =
                                 mainColumn.values
@@ -1721,7 +1743,8 @@ type Main =
                                     c
                                     |> Array.ofSeq
                                     |> Array.choose (fun cc -> if cc.IsSome then Some(cc.ToString()) else None)
-                                    |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv)))
+                                    |> Array.map (fun cv -> cv, String.IsNullOrEmpty(cv))
+                                )
 
                             let mutable names = []
                             let mutable indices = []
@@ -1989,9 +2012,11 @@ type Main =
                                 |> Seq.toArray
                                 |> Array.tryFind (fun table ->
                                     table.name.StartsWith("annotationTable")
-                                    && table.worksheet.position = activeWorksheetPosition)
+                                    && table.worksheet.position = activeWorksheetPosition
+                                )
 
-                            activeTable)
+                            activeTable
+                        )
 
                 if table.IsNone then
                     return [ InteropLogging.NoActiveTableMsg ]
@@ -2089,7 +2114,8 @@ type Main =
                                 | diff when diff < 0 ->
                                     for i = 0 downto diff + 1 do
                                         Table.deleteColumn 0 excelTable
-                                | _ -> ())
+                                | _ -> ()
+                            )
 
                     let newTableRange = excelTable.getRange ()
 
@@ -2107,7 +2133,8 @@ type Main =
                             .sync()
                             .``then`` (fun _ ->
                                 excelTable.delete ()
-                                newTableRange.values <- newExcelTableValues)
+                                newTableRange.values <- newExcelTableValues
+                            )
 
                     let _ =
                         newTableRange.load (
@@ -2129,7 +2156,8 @@ type Main =
                             .``then`` (fun _ ->
                                 let newTable = activeSheet.tables.add (U2.Case1 newTableRange, true)
                                 newTable.name <- name
-                                newTable.style <- style)
+                                newTable.style <- style
+                            )
 
                     let! newTable = tryGetActiveExcelTable context
 
@@ -2165,7 +2193,8 @@ type Main =
             worksheets.items
             |> Seq.iter (fun worksheet ->
                 if isTopLevelMetadataSheet worksheet.name then
-                    worksheet.delete ())
+                    worksheet.delete ()
+            )
 
             return [
                 InteropLogging.Msg.create InteropLogging.Info $"The top level metadata work sheet has been deleted"
@@ -2310,7 +2339,8 @@ type Main =
                                             (if ontologyAnnotation.Name.IsSome then
                                                  ontologyAnnotation.Name.Value
                                              else
-                                                 tableValues.[int rowIndex].[columnIndex]))
+                                                 tableValues.[int rowIndex].[columnIndex])
+                            )
 
                         let bodyValues =
                             tableValues
@@ -2376,21 +2406,23 @@ type Main =
                                     let tmp =
                                         // Iterate over col values (1).
                                         range.values.[rowInd]
-                                        |> Seq.map
-                                            (
-                                            // Ignore prevValue as it will be replaced anyways.
-                                            // Ignore prevValue as it will be replaced anyways.
-                                            fun _ ->
-                                                // This part is a design choice.
-                                                // Should the user select less cells than we have items in the 'fileNameList' then we only fill the selected cells.
-                                                // Should the user select more cells than we have items in the 'fileNameList' then we fill the leftover cells with none.
-                                                let fileName =
-                                                    if fileNameList.Length - 1 < rowInd then
-                                                        None
-                                                    else
-                                                        List.item rowInd fileNameList |> box |> Some
+                                        |> Seq.map (
+                                        // Ignore prevValue as it will be replaced anyways.
+                                        // Ignore prevValue as it will be replaced anyways.
+                                        // Ignore prevValue as it will be replaced anyways.
+                                        // Ignore prevValue as it will be replaced anyways.
+                                        fun _ ->
+                                            // This part is a design choice.
+                                            // Should the user select less cells than we have items in the 'fileNameList' then we only fill the selected cells.
+                                            // Should the user select more cells than we have items in the 'fileNameList' then we fill the leftover cells with none.
+                                            let fileName =
+                                                if fileNameList.Length - 1 < rowInd then
+                                                    None
+                                                else
+                                                    List.item rowInd fileNameList |> box |> Some
 
-                                                fileName)
+                                            fileName
+                                        )
 
                                     ResizeArray(tmp)
                             ]
@@ -2402,4 +2434,5 @@ type Main =
                     //sprintf "%s filled with %s; ExtraCols: %s" range.address v nextColsRange.address
 
                     // return print msg
-                    "Info", sprintf "%A, %A" range.values.Count newVals)
+                    "Info", sprintf "%A, %A" range.values.Count newVals
+                )

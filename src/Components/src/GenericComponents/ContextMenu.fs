@@ -80,7 +80,7 @@ type ContextMenu =
                     |}
                     FloatingUI.Middleware.shift {| padding = 10 |}
                 |],
-                placement = "right-start",
+                placement = FloatingUI.Placement.RightStart,
                 strategy = "fixed",
                 whileElementsMounted = FloatingUI.autoUpdate
             )
@@ -114,7 +114,7 @@ type ContextMenu =
         let interactions =
             FloatingUI.useInteractions [| role; dismiss; listNavigation; typeahead |]
 
-        let functionIsCalled = React.useRef(false)
+        let functionIsCalled = React.useRef (false)
 
         React.useEffect (
             (fun _ ->
@@ -177,7 +177,8 @@ type ContextMenu =
                     ref.current
                     |> Option.iter (fun el ->
                         el.addEventListener ("contextmenu", onContextMenu)
-                        targetRef.current <- Some el)
+                        targetRef.current <- Some el
+                    )
                 | None ->
                     Browser.Dom.document.addEventListener ("contextmenu", onContextMenu)
                     targetRef.current <- Some(Browser.Dom.document :?> HTMLElement)
@@ -192,10 +193,12 @@ type ContextMenu =
                     |> Option.iter (fun el -> el.removeEventListener ("contextmenu", onContextMenu))
 
 
-                    myClearTimeout ())),
+                    myClearTimeout ()
+                )
+            ),
             [| box floating.refs |]
         )
-        
+
         let close =
             fun () ->
                 setIsOpen false
@@ -203,6 +206,7 @@ type ContextMenu =
 
                 timeout.current
                 |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
+
         FloatingUI.FloatingPortal(
             if isOpen then
                 FloatingUI.FloatingOverlay(
@@ -232,6 +236,7 @@ type ContextMenu =
                                                 fun (e: Browser.Types.MouseEvent) ->
                                                     if not functionIsCalled.current then
                                                         functionIsCalled.current <- true
+
                                                         let d = {|
                                                             buttonEvent = e
                                                             spawnData = spawnData
@@ -324,11 +329,7 @@ type ContextMenu =
                         for i in 0..5 do
                             ContextMenuItem(
                                 text = Html.span $"Item {i}",
-                                ?icon =
-                                    (if i = 4 then
-                                         Icons.Check() |> Some
-                                     else
-                                         None),
+                                ?icon = (if i = 4 then Icons.Check() |> Some else None),
                                 ?kbdbutton =
                                     (if i = 3 then
                                          {|
@@ -346,7 +347,8 @@ type ContextMenu =
                                     (fun e ->
                                         e.buttonEvent.stopPropagation ()
                                         let index = e.spawnData |> unbox<CellCoordinate>
-                                        console.log (sprintf "Item clicked: %i" i, index))
+                                        console.log (sprintf "Item clicked: %i" i, index)
+                                    )
                             )
                     ]),
                     ref = containerRef,
@@ -365,7 +367,8 @@ type ContextMenu =
                                 Some indices
                             | _ ->
                                 console.log ("No table cell found")
-                                None)
+                                None
+                        )
                 )
             ]
         ]

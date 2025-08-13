@@ -4,6 +4,19 @@ module Swate.Components.Types
 open Fable.Core
 open Feliz
 
+type SelectItem<'a> = {| item: 'a; label: string |}
+
+type SelectItemRender<'a> = {|
+    isActive: bool
+    isSelected: bool
+    item: SelectItem<'a>
+|}
+
+type ComboBoxRef = {|
+    focus: unit -> unit
+    close: unit -> unit
+|}
+
 type DaisyUIColors =
     | Primary
     | Secondary
@@ -289,13 +302,13 @@ module AnnotationTableContextMenu =
             |}
         | PasteColumns of
             {|
-                data: CompositeCell [][]
-                coordinates: CellCoordinate [][]
+                data: CompositeCell[][]
+                coordinates: CellCoordinate[][]
             |}
         | Unknown of
             {|
-                data: string [][]
-                headers: CompositeHeader []
+                data: string[][]
+                headers: CompositeHeader[]
             |}
 
 module AnnotationTable =

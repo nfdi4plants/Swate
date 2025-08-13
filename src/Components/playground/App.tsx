@@ -2,9 +2,11 @@ import React, { Fragment, useEffect } from 'react';
 import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 import {Entry as Table} from '../src/Table/Table.fs.ts';
 import {Entry as AnnotationTable} from '../src/AnnotationTable/AnnotationTable.fs.ts';
-import TableCom from '../src/AnnotationTable/AnnotationTable.fs.ts';
 import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
 import {TIBApi} from '../src/Util/Api.fs.ts';
+import {Entry as TemplateFilter} from '../src/Template/TemplateFilter.fs.ts';
+import {Entry as ComboBox} from '../src/GenericComponents/ComboBox.fs.ts';
+import {Entry as Select} from '../src/GenericComponents/Select.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -80,10 +82,34 @@ function ContextMenuContainer() {
   </div>
 }
 
+function TemplateFilterContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-3xl'>Template Filter</h2>
+    <TemplateFilter />
+  </div>
+}
+
+function ComboBoxContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-3xl'>Combo Box</h2>
+    <ComboBox />
+  </div>
+}
+
+function SelectContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-3xl'>Select</h2>
+    <Select />
+  </div>
+}
+
 const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
+            <TemplateFilterContainer />
+            <SelectContainer />
+            <ComboBoxContainer />
             <TermSearchContainer />
             <ContextMenuContainer />
             <AnnoTableContainer />
