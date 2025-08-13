@@ -358,7 +358,6 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-
     static member private TermDropdown
         (
             termDropdownRef: IRefValue<option<HTMLElement>>,
@@ -1251,7 +1250,7 @@ type TermSearch =
                                 "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full
                                 swt:focus:!outline-0 swt:focus-within:!outline-0"
                                 if classNames.IsSome && classNames.Value.inputLabel.IsSome then
-                                    TermSearchStyle.resolveStyle classNames.Value.inputLabel.Value
+                                    style.resolveStyle classNames.Value.inputLabel.Value
                             ]
                             prop.children [
                                 Html.i [
@@ -1264,9 +1263,7 @@ type TermSearch =
                                         then
                                             "swt:!w-0 swt:!opacity-0"
                                     ]
-                                    prop.children [
-                                        Icons.MagnifyingClass()
-                                    ]
+                                    prop.children [ Icons.MagnifyingClass() ]
                                 ]
                                 Html.input [
                                     prop.className "swt:grow swt:shrink swt:min-w-[50px] swt:w-full"

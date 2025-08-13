@@ -45,7 +45,7 @@ module FloatingUI =
                     reference: IRefValue<ReferenceElement>
                     floating: IRefValue<HTMLElement option>
                     domReference: IRefValue<HTMLElement>
-                    setReference: obj -> unit
+                    setReference: IRefValue<HTMLElement option>
                     setFloating: IRefValue<HTMLElement option>
                     setPositionReference: ReferenceElement -> unit
                 |},
@@ -215,6 +215,18 @@ module FloatingUI =
         [<ImportMemberAttribute("@floating-ui/react")>]
         static member size(?options: obj) : IMiddleware = jsNative
 
+    [<StringEnum(CaseRules.LowerAll)>]
+    type Status =
+        | Unmounted
+        | Initial
+        | Open
+        | Close
+
+
+    type UseTransitionStatusReturn =
+        abstract member isMounted: bool
+        abstract member status: Status
+
 [<Erase>]
 type FloatingUI =
 
@@ -228,12 +240,12 @@ type FloatingUI =
     [<ImportMember("@floating-ui/react"); ParamObjectAttribute>]
     static member useFloating
         (
+            ?``open``: bool,
+            ?onOpenChange: bool -> unit,
             ?placement: FloatingUI.Placement,
             ?strategy: string,
             ?transform: bool,
             ?middleware: FloatingUI.IMiddleware[],
-            ?``open``: bool,
-            ?onOpenChange: bool -> unit,
             ?elements: obj,
             ?whileElementsMounted: obj -> obj -> (unit -> unit) -> unit,
             ?nodeId: string
@@ -253,7 +265,7 @@ type FloatingUI =
     static member useListNavigation(context: obj, ?props: FloatingUI.UseListNavigationProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
-    static member useTypeahead(conext: obj, ?props: FloatingUI.UseTypeaheadProps) : obj = jsNative
+    static member useTypeahead(context: obj, ?props: FloatingUI.UseTypeaheadProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
     static member useInteractions(interactions: obj[]) : FloatingUI.UseInteractionsReturn = jsNative
@@ -267,6 +279,9 @@ type FloatingUI =
           |}
         =
         jsNative
+
+    [<ImportMember("@floating-ui/react")>]
+    static member useTransitionStatus(context: obj) : FloatingUI.UseTransitionStatusReturn = jsNative
 
     [<ReactComponent("FloatingPortal", "@floating-ui/react")>]
     static member FloatingPortal(children: ReactElement) = React.imported ()
@@ -289,7 +304,8 @@ type FloatingUI =
             ?closeOnFocusOut: bool,
             ?outsideElementsInert: bool,
             ?getInsideElements: unit -> ReactElement[],
-            ?order: string[]
+            ?order: string[],
+            ?key: string
         ) =
         React.imported ()
 
