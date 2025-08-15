@@ -20,6 +20,7 @@ module private Components =
 
     open System
 
+
     let calculateRegex (regex: string) (input: string) =
         try
             let regex = Regex(regex)
@@ -38,7 +39,6 @@ module private Components =
         String.Join("", s0), String.Join("", s1), String.Join("", s2)
 
     let Tab (targetPage: FunctionPage, currentPage, setPage) =
-        //Daisy.tab [
         Html.button [
             prop.className [
                 "swt:tab"
@@ -50,7 +50,6 @@ module private Components =
         ]
 
     let TabNavigation (currentPage, setPage) =
-        //Daisy.tabs [
         Html.div [
             prop.className "swt:tabs swt:tabs-bordered swt:grow"
             prop.children [
@@ -73,12 +72,10 @@ module private Components =
 
     let PreviewTable (column: CompositeColumn, cellValues: string[], regex) =
         React.fragment [
-            //Daisy.label [
             Html.label [ prop.className "swt:label"; prop.text "Preview" ]
             Html.div [
                 prop.className "swt:overflow-x-auto swt:grow"
                 prop.children [
-                    //Daisy.table [
                     Html.table [
                         prop.className "swt:table"
                         prop.children [
@@ -116,11 +113,9 @@ type UpdateColumn =
             |> setPreview
 
         React.fragment [
-            //Daisy.fieldset [
             Html.div [
                 prop.className "swt:fieldset"
                 prop.children [
-                    //Daisy.fieldsetLegend "Base"
                     Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Base" ]
                     //Daisy.input [
                     Html.input [
@@ -134,7 +129,6 @@ type UpdateColumn =
                             updateCells value suffix
                         )
                     ]
-                    //Daisy.label [
                     Html.label [
                         prop.className "swt:label swt:cursor-pointer"
                         prop.children [
@@ -188,13 +182,10 @@ type UpdateColumn =
         Html.div [
             prop.className "swt:flex gap-2"
             prop.children [
-                //Daisy.fieldset [
                 Html.div [
                     prop.className "swt:fieldset"
                     prop.children [
-                        //Daisy.fieldsetLabel "Regex"
                         Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Regex" ]
-                        //Daisy.input [
                         Html.input [
                             prop.autoFocus true
                             prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
@@ -204,9 +195,7 @@ type UpdateColumn =
                                 updateCells replacement v
                             )
                         ]
-                        //Daisy.fieldsetLabel "Replacement"
                         Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Replacement" ]
-                        //Daisy.input [
                         Html.input [
                             prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
                             prop.valueOrDefault replacement
@@ -224,6 +213,9 @@ type UpdateColumn =
 
     [<ReactComponent>]
     static member Main(index: int, column: CompositeColumn, dispatch) =
+
+        let isOpen, setIsOpen = React.useState (true)
+
         let rmv = Util.RMV_MODAL dispatch
 
         let getCellStrings () =
@@ -272,13 +264,11 @@ type UpdateColumn =
                 prop.className "swt:justify-end swt:flex swt:gap-2"
                 prop.style [ style.marginLeft length.auto ]
                 prop.children [
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:btn-outline"
                         prop.text "Cancel"
                         prop.onClick rmv
                     ]
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:btn-primary"
                         prop.style [ style.marginLeft length.auto ]
@@ -291,12 +281,12 @@ type UpdateColumn =
                 ]
             ]
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header = Html.p "Update Column",
-            modalClassInfo = "swt:max-h-screen swt:max-w-4xl swt:flex",
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.p "Update Column",
+            content,
             modalActions = modalActivity,
-            contentClassInfo = "swt:shrink-1 swt:overflow-y-auto",
-            content = content,
-            footer = footer
+            footer = footer,
+            className = "swt:max-h-screen swt:max-w-4xl swt:flex"
         )

@@ -323,7 +323,7 @@ module private DataAnnotatorHelper =
             )
 
         Html.div [
-            prop.className "swt:overflow-hidden swt:flex"
+            prop.className "swt:overflow-hidden swt:flex swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[200px] swt:overflow-hidden"
             prop.children [
                 Swate.Components.Table.Table(
                     file.BodyRows.Length,
@@ -344,7 +344,7 @@ type DataAnnotator =
 
 
     [<ReactComponent>]
-    static member private Modal(model: Model, dispatch, rmvFile, rmv) =
+    static member private Modal(model: Model, dispatch, rmvFile, rmv, isOpen, setIsOpen) =
         let init: unit -> Set<DataTarget> = fun () -> Set.empty
         let state, setState = React.useState (init)
 
@@ -411,13 +411,13 @@ type DataAnnotator =
                 ]
             ]
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header = Html.p "Data Annotator",
-            modalClassInfo = "swt:max-w-none",
+        Swate.Components.BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.p "Data Annotator",
+            content,
+            className = "swt:max-w-none",
             modalActions = modalActivity,
-            content = content,
-            contentClassInfo = "swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[600px] swt:overflow-hidden",
             footer = footer
         )
 
@@ -476,10 +476,7 @@ type DataAnnotator =
                   ParsedFile = Some _
               },
               true ->
-                ReactDOM.createPortal (
-                    DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false),
-                    Browser.Dom.document.body
-                ) // Create a portal to render the modal in the body
+                DataAnnotator.Modal(model, dispatch, rmvFile, (fun _ -> setShowModal false), showModal, setShowModal)
             | _, _ -> Html.none
         ]
 

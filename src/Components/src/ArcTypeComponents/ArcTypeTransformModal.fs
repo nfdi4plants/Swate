@@ -55,9 +55,12 @@ type CompositeCellEditModal =
     static member BaseModalContentClassOverride =
         "swt:overflow-y-auto swt:overflow-x-hidden swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
+    [<ReactComponent>]
     static member TransformTermUnit
         (cell: CompositeCell, header: CompositeHeader, setUnitized: OntologyAnnotation -> unit, rmv)
         =
+
+        let isOpen, setIsOpen = React.useState (true)
 
         let oa = cell.AsTerm
         let term = Term.fromOntologyAnnotation oa
@@ -83,21 +86,23 @@ type CompositeCellEditModal =
                 Html.td ($"{oa.TermAccessionNumber}")
             |]
 
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Term to Unit",
-            content =
-                React.fragment [
-                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Unitized)
-                ],
-            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Term to Unit",
+            React.fragment [
+                TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Unitized)
+            ],
+            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
+            //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
         )
 
+    [<ReactComponent>]
     static member UnitToTerm
         (cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv)
         =
 
+        let isOpen, setIsOpen = React.useState (true)
         let _, oa = cell.AsUnitized
         let term = Term.fromOntologyAnnotation oa
 
@@ -120,20 +125,23 @@ type CompositeCellEditModal =
                 Html.td ($"{oa.TermAccessionNumber}")
             |]
 
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Unit to Term",
-            content =
-                React.fragment [
-                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Term)
-                ],
-            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Unit to Term",
+            React.fragment [
+                TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Term)
+            ],
+            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
+            //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
         )
 
+    [<ReactComponent>]
     static member DataToFreeText
         (cell: CompositeCell, header: CompositeHeader, setText: string -> unit, rmv)
         =
+
+        let isOpen, setIsOpen = React.useState (true)
 
         let data = cell.AsData
         let text = defaultArg data.Name ""
@@ -154,20 +162,23 @@ type CompositeCellEditModal =
                 Html.td ($"{text}")
             |]
 
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Data to Text",
-            content =
-                React.fragment [
-                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Text)
-                ],
-            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Data to Text",
+            React.fragment [
+                TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Text)
+            ],
+            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
+            //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
         )
 
+    [<ReactComponent>]
     static member FreeTextToData
         (cell: CompositeCell, header: CompositeHeader, setData: Data -> unit, rmv)
         =
+
+        let isOpen, setIsOpen = React.useState (true)
 
         let text = cell.AsFreeText
         let data = Data.create(Name = text)
@@ -193,15 +204,15 @@ type CompositeCellEditModal =
                 Html.td ($"{data.SelectorFormat}")
             |]
 
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Text to Data",
-            content =
-                React.fragment [
-                    TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Data)
-                ],
-            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Text to Data",
+            React.fragment [
+                TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Data)
+            ],
+            footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
+            //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
         )
 
     [<ReactComponent>]
