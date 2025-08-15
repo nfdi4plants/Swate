@@ -116,14 +116,13 @@ const App = () => {
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
             <BaseModalContainer />
-            {/* <TermSearchContainer /> */}
-            {/* <TemplateFilterContainer />
+            <TermSearchContainer />
+            <TemplateFilterContainer />
             <SelectContainer />
             <ComboBoxContainer />
             <ContextMenuContainer />
             <AnnoTableContainer />
-            <TableContainer /> */}
-            {/* <Menu></Menu> */}
+            <TableContainer />
         </div>
     );
 };
