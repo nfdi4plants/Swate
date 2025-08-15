@@ -33,6 +33,7 @@ type ComboBox =
             filterFn: {| item: 'a; search: string |} -> bool,
             itemToString: 'a -> string,
             ?onChange: int -> 'a -> unit,
+            ?loading: bool,
             ?placeholder: string,
             ?itemRenderer:
                 {|
@@ -53,7 +54,10 @@ type ComboBox =
             ?inputLeadingVisual: ReactElement,
             ?inputTrailingVisual: ReactElement,
             ?labelClassName: string,
-            ?onKeyDown: Browser.Types.KeyboardEvent -> unit
+            ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
+            ?onFocus: Browser.Types.FocusEvent -> unit,
+            ?onBlur: Browser.Types.FocusEvent -> unit,
+            ?onOpen: bool -> unit
         ) : ReactElement =
         let isOpen, setOpen = React.useState (false)
 
@@ -66,7 +70,11 @@ type ComboBox =
                 placement = FloatingUI.Placement.BottomStart,
                 whileElementsMounted = FloatingUI.autoUpdate,
                 ``open`` = isOpen,
-                onOpenChange = setOpen,
+                onOpenChange =
+                    (fun b ->
+                        onOpen |> Option.iter (fun oo -> oo b)
+                        setOpen b
+                    ),
                 middleware = [|
                     FloatingUI.Middleware.offset (10)
                     FloatingUI.Middleware.flip ({| padding = 10 |})
@@ -157,6 +165,22 @@ type ComboBox =
                 [| box itemContainerRenderer |]
             )
 
+        let LoadingRenderer =
+            React.useMemo (
+                (fun () ->
+                    fun () ->
+                        Html.li [
+                            prop.className
+                                "swt:p-4 swt:tracking-widest swt:flex swt:items-center swt:gap-2 swt:justify-center swt:uppercase"
+                            prop.children [
+                                Html.span "Loading..."
+                                Html.span [ prop.className "swt:loading swt:loading-ring" ]
+                            ]
+                        ]
+                ),
+                [||]
+            )
+
         let NoResultsRenderer =
             React.useMemo (
                 (fun () ->
@@ -182,10 +206,10 @@ type ComboBox =
             [| box fluiContext.refs.reference |]
         )
 
-        React.useElementListener.onKeyDown (
-            unbox fluiContext.refs.reference,
-            onKeyDown |> Option.defaultValue (fun (ev: Browser.Types.KeyboardEvent) -> ())
-        )
+        // React.useElementListener.onKeyDown (
+        //     unbox fluiContext.refs.reference,
+        //     onKeyDown |> Option.defaultValue (fun (ev: Browser.Types.KeyboardEvent) -> ())
+        // )
 
         let inputId = FloatingUI.useId ()
 
@@ -194,7 +218,7 @@ type ComboBox =
                 prop.htmlFor inputId
                 prop.ref (unbox fluiContext.refs.setReference)
                 prop.className [
-                    "swt:input"
+                    "swt:input swt:group"
                     if labelClassName.IsSome then
                         labelClassName.Value
                 ]
@@ -203,6 +227,7 @@ type ComboBox =
                         inputLeadingVisual.Value
                     Html.input [
                         prop.id inputId
+                        prop.autoComplete "off"
                         prop.className "swt:grow swt:shrink swt:min-w-0"
                         for key, v in
                             useInteractions.getReferenceProps (
@@ -211,8 +236,14 @@ type ComboBox =
                                     value = inputValue
                                     placeholder = placeholder
                                     ``aria-autocomplete`` = "list"
+                                    onFocus =
+                                        fun (ev: Browser.Types.FocusEvent) -> onFocus |> Option.iter (fun fn -> fn ev)
+                                    onBlur =
+                                        fun (ev: Browser.Types.FocusEvent) -> onBlur |> Option.iter (fun fn -> fn ev)
                                     onKeyDown =
                                         fun (ev: Browser.Types.KeyboardEvent) ->
+                                            onKeyDown |> Option.iter (fun fn -> fn ev)
+
                                             if
                                                 ev.key = "Enter"
                                                 && activeIndex.IsSome
@@ -251,7 +282,9 @@ type ComboBox =
                                      |> ResizeArray)
                                 children =
                                     React.fragment [
-                                        if filteredItems.Length = 0 then
+                                        if loading.IsSome && loading.Value then
+                                            LoadingRenderer()
+                                        elif filteredItems.Length = 0 then
                                             NoResultsRenderer()
                                         else
                                             yield!

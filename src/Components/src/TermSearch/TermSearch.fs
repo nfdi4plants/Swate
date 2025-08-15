@@ -811,25 +811,16 @@ type TermSearch =
 
         /// Set of string ids for each action started. As long as one id is still contained, shows loading spinner
         let (loading: Set<string>), setLoading = React.useStateWithUpdater (Set.empty)
+        let isLoading = loading.Count > 0
         let inputRef = React.useInputRef ()
-        let containerRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
-        let termDropdownRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
-        let modalContainerRef: IRefValue<option<HTMLElement>> = React.useElementRef ()
-        /// Used to show indicator buttons only when focused
-        let focused, setFocused = React.useState (false)
         let cancelled = React.useRef (false)
 
         let (modal: Modals option), setModal = React.useState None
 
+        let input, setInput = React.useState ("")
         let inputText = term |> Option.bind _.name |> Option.defaultValue ""
 
-        React.useLayoutEffect (
-            (fun () ->
-                if inputRef.current.IsSome then
-                    inputRef.current.Value.value <- inputText
-            ),
-            [| box term |]
-        )
+        React.useLayoutEffect ((fun () -> setInput inputText), [| box term |])
 
         /// Close term search result window when opening a modal
         let setModal =
@@ -841,9 +832,10 @@ type TermSearch =
 
         let onTermSelect =
             fun (term: Term option) ->
-                if inputRef.current.IsSome then
-                    let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
-                    inputRef.current.Value.value <- v
+                // if inputRef.current.IsSome then
+                //     let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
+                //     inputRef.current.Value.value <- v
+                setInput (Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue "")
 
                 setSearchResults (fun _ -> SearchState.init ())
                 onTermSelect term
@@ -1043,79 +1035,79 @@ type TermSearch =
                 React.createDisposable (fun () -> ())
         )
 
-        // Handles click outside events to close dropdown
-        React.useListener.onMouseDown (
-            (fun e ->
-                if focused then
-                    // these are the refs, which must be checked. It boils down to: base ref (containerRef)
-                    // + one ref for everything, which can be portalled outside
-                    let refs = [|
-                        if containerRef.current.IsSome then
-                            containerRef.current.Value
-                        if modalContainerRef.current.IsSome then
-                            modalContainerRef.current.Value
-                        if termDropdownRef.current.IsSome then
-                            termDropdownRef.current.Value
-                    |]
+        // // Handles click outside events to close dropdown
+        // React.useListener.onMouseDown (
+        //     (fun e ->
+        //         if focused then
+        //             // these are the refs, which must be checked. It boils down to: base ref (containerRef)
+        //             // + one ref for everything, which can be portalled outside
+        //             let refs = [|
+        //                 if containerRef.current.IsSome then
+        //                     containerRef.current.Value
+        //                 if modalContainerRef.current.IsSome then
+        //                     modalContainerRef.current.Value
+        //                 if termDropdownRef.current.IsSome then
+        //                     termDropdownRef.current.Value
+        //             |]
 
-                    let refsContain =
-                        refs |> Array.forall (fun el -> not (el.contains (unbox e.target)))
+        //             let refsContain =
+        //                 refs |> Array.forall (fun el -> not (el.contains (unbox e.target)))
 
-                    match refsContain with
-                    | true ->
-                        setFocused false
-                        setSearchResults (fun _ -> SearchState.init ())
+        //             match refsContain with
+        //             | true ->
+        //                 setFocused false
+        //                 setSearchResults (fun _ -> SearchState.init ())
 
-                        if onBlur.IsSome then
-                            onBlur.Value()
+        //                 if onBlur.IsSome then
+        //                     onBlur.Value()
 
-                        cancel ()
-                    | _ -> ()
-            )
-        )
+        //                 cancel ()
+        //             | _ -> ()
+        //     )
+        // )
 
-        // keyboard navigation
-        let keyboardNav =
-            (fun (e: Browser.Types.KeyboardEvent) -> promise {
-                if focused then // only run when focused
-                    match searchResults, e.code with
-                    | _, kbdEventCode.escape -> cancel ()
-                    | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
-                        setKeyboardNavState (
-                            match keyboardNavState.SelectedTermSearchResult with
-                            | Some 0 -> None
-                            | Some i -> Some(System.Math.Max(i - 1, 0))
-                            | _ -> None
-                            |> fun x -> {
-                                keyboardNavState with
-                                    SelectedTermSearchResult = x
-                            }
-                        )
-                    | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
-                        setKeyboardNavState (
-                            match keyboardNavState.SelectedTermSearchResult with
-                            | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
-                            | _ -> Some(0)
-                            |> fun x -> {
-                                keyboardNavState with
-                                    SelectedTermSearchResult = x
-                            }
-                        )
-                    | SearchState.Idle, kbdEventCode.arrowDown when
-                        inputRef.current.IsSome
-                        && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not
-                        -> // down
-                        startSearch inputRef.current.Value.value
-                    | SearchState.SearchDone res, kbdEventCode.enter when
-                        keyboardNavState.SelectedTermSearchResult.IsSome
-                        -> // enter
-                        onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
-                        cancel ()
-                    | _ -> ()
-            })
+        // // keyboard navigation
+        // let keyboardNav =
+        //     (fun (e: Browser.Types.KeyboardEvent) -> promise {
+        //         if focused then // only run when focused
+        //             match searchResults, e.code with
+        //             | _, kbdEventCode.escape -> cancel ()
+        //             | SearchState.SearchDone res, kbdEventCode.arrowUp when res.Count > 0 -> // up
+        //                 setKeyboardNavState (
+        //                     match keyboardNavState.SelectedTermSearchResult with
+        //                     | Some 0 -> None
+        //                     | Some i -> Some(System.Math.Max(i - 1, 0))
+        //                     | _ -> None
+        //                     |> fun x -> {
+        //                         keyboardNavState with
+        //                             SelectedTermSearchResult = x
+        //                     }
+        //                 )
+        //             | SearchState.SearchDone res, kbdEventCode.arrowDown when res.Count > 0 -> // down
+        //                 setKeyboardNavState (
+        //                     match keyboardNavState.SelectedTermSearchResult with
+        //                     | Some i -> Some(System.Math.Min(i + 1, searchResults.Results.Count - 1))
+        //                     | _ -> Some(0)
+        //                     |> fun x -> {
+        //                         keyboardNavState with
+        //                             SelectedTermSearchResult = x
+        //                     }
+        //                 )
+        //             | SearchState.Idle, kbdEventCode.arrowDown when
+        //                 inputRef.current.IsSome
+        //                 && System.String.IsNullOrWhiteSpace inputRef.current.Value.value |> not
+        //                 -> // down
+        //                 startSearch inputRef.current.Value.value
+        //             | SearchState.SearchDone res, kbdEventCode.enter when
+        //                 keyboardNavState.SelectedTermSearchResult.IsSome
+        //                 -> // enter
+        //                 onTermSelect (Some res.[keyboardNavState.SelectedTermSearchResult.Value].Term)
+        //                 cancel ()
+        //             | _ -> ()
+        //     })
 
         /// Could move this outside, but there are so many variable to pass to...
-        let modalContainer =
+        let ModalContainer =
             let configDetails =
                 [
                     "Parent Id", parentId
@@ -1145,7 +1137,6 @@ type TermSearch =
             Html.div [
                 prop.className
                     "swt:z-[9999] swt:left-0 swt:top-0 swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"
-                prop.ref modalContainerRef
                 prop.children [
                     match modal with
                     | Some Modals.Details -> TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
@@ -1165,201 +1156,357 @@ type TermSearch =
                 ]
             ]
 
-        Html.div [
-            if debug then
-                prop.testId "term-search-container"
-                prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
-                prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
-            prop.className [
-                "not-prose swt:h-full swt:centered"
-                if fullwidth then
-                    "swt:w-full"
-            ]
-            if props.IsSome then
-                for prop in props.Value do
-                    prop
-            prop.ref containerRef
-            prop.children [
-                if modal.IsSome then
-                    if portalModals.IsSome then
-                        ReactDOM.createPortal (modalContainer, portalModals.Value)
-                    else
-                        modalContainer
-                Html.div [
-                    prop.className "swt:indicator swt:w-full swt:h-full"
-                    prop.children [
-                        if displayIndicators then
-                            match term with
-                            | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
-                                if System.String.IsNullOrWhiteSpace term.id.Value |> not then
-                                    TermSearch.IndicatorItem(
-                                        "",
-                                        sprintf "%s - %s" term.name.Value term.id.Value,
-                                        "swt:tooltip-left",
-                                        Icons.SquareCheck(),
-                                        (fun _ ->
-                                            setModal (
-                                                if modal.IsSome && modal.Value = Modals.Details then
-                                                    None
-                                                else
-                                                    Some Modals.Details
-                                            )
-                                        ),
-                                        btnClasses = "swt:btn-primary"
-                                    )
-                            | _ when showDetails -> // show only when focused
-                                TermSearch.IndicatorItem(
-                                    "",
-                                    "Details",
-                                    "swt:tooltip-left",
-                                    Icons.InfoCircle([||]),
-                                    (fun _ ->
-                                        setModal (
-                                            if modal.IsSome && modal.Value = Modals.Details then
-                                                None
-                                            else
-                                                Some Modals.Details
-                                        )
-                                    ),
-                                    btnClasses = "swt:btn-info",
-                                    isActive = focused
-                                )
-                            | _ -> Html.none
-
-                        if advancedSearch.IsSome then
-                            TermSearch.IndicatorItem(
-                                "swt:indicator-bottom",
-                                "Advanced Search",
-                                "swt:tooltip-left",
-                                Icons.MagnifyingClassPlus(),
-                                (fun _ ->
-                                    setModal (
-                                        if modal.IsSome && modal.Value = Modals.AdvancedSearch then
-                                            None
-                                        else
-                                            Some Modals.AdvancedSearch
-                                    )
-                                ),
-                                btnClasses = "swt:btn-primary",
-                                isActive = focused,
-                                props = [ prop.testid "advanced-search-indicator" ]
-                            )
-
-                        Html.label [ // main search component
-                            prop.className [
-                                "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full
-                                swt:focus:!outline-0 swt:focus-within:!outline-0"
-                                if classNames.IsSome && classNames.Value.inputLabel.IsSome then
-                                    style.resolveStyle classNames.Value.inputLabel.Value
-                            ]
-                            prop.children [
-                                Html.i [
-                                    prop.className [
-                                        "swt:text-primary swt:pr-2 swt:transition-all swt:w-6 swt:overflow-x-hidden swt:opacity-100"
-                                        if
-                                            focused
-                                            || inputRef.current.IsSome
-                                               && System.String.IsNullOrEmpty inputRef.current.Value.value |> not
-                                        then
-                                            "swt:!w-0 swt:!opacity-0"
-                                    ]
-                                    prop.children [ Icons.MagnifyingClass() ]
-                                ]
-                                Html.input [
-                                    prop.className "swt:grow swt:shrink swt:min-w-[50px] swt:w-full"
-                                    if debug then
-                                        prop.testid "term-search-input"
-                                        prop.custom ("data-debug-focus", $"{autoFocus}-{focused}")
-                                    prop.ref (inputRef)
-                                    prop.defaultValue inputText
-                                    prop.placeholder "..."
-                                    prop.autoFocus autoFocus
-                                    prop.onChange (fun (e: string) ->
-                                        if System.String.IsNullOrEmpty e then
-                                            onTermSelect None
-                                            cancel ()
-                                        else
-                                            onTermSelect (Some <| Term(e))
-                                            startSearch e
-                                    )
-                                    prop.onDoubleClick (fun _ ->
-                                        // if we have parent id and the input is empty, we search all children of the parent
-                                        if
-                                            parentId.IsSome && System.String.IsNullOrEmpty inputRef.current.Value.value
-                                        then
-                                            startAllChildSearch ()
-                                        // if we have input we start search
-                                        elif System.String.IsNullOrEmpty inputRef.current.Value.value |> not then
-                                            startSearch inputRef.current.Value.value
-                                    )
-                                    prop.onKeyDown (fun e ->
-                                        e.stopPropagation ()
-
-                                        promise {
-                                            do! keyboardNav e
-
-                                            if onKeyDown.IsSome then
-                                                onKeyDown.Value e
-                                        }
-                                        |> Promise.start
-                                    )
-                                    prop.onFocus (fun _ ->
-                                        if onFocus.IsSome then
-                                            onFocus.Value()
-
-                                        setFocused true
-                                    )
-                                ]
-                                //Daisy.loading [
-                                Html.div [
-                                    prop.className [
-                                        "swt:loading swt:text-primary swt:loading-sm"
-                                        if loading.IsEmpty then
-                                            "swt:invisible"
-                                    ]
-                                ]
-
-                                let advancedSearchToggle =
-                                    advancedSearch
-                                    |> Option.map (fun _ ->
-                                        fun _ ->
-                                            setModal (
-                                                if modal.IsSome && modal.Value = Modals.AdvancedSearch then
-                                                    None
-                                                else
-                                                    Some Modals.AdvancedSearch
-                                            )
-                                    )
-
-                                match portalTermDropdown with
-                                | Some portalTermSelectArea when containerRef.current.IsSome ->
-                                    ReactDOM.createPortal (
-                                        (portalTermSelectArea.renderer
-                                            (containerRef.current.Value.getBoundingClientRect ())
-                                            (TermSearch.TermDropdown(
-                                                termDropdownRef,
-                                                onTermSelect,
-                                                searchResults,
-                                                loading,
-                                                advancedSearchToggle,
-                                                keyboardNavState,
-                                                debug = debug
-                                            ))),
-                                        portalTermSelectArea.portal
-                                    )
-                                | _ ->
-                                    TermSearch.TermDropdown(
-                                        termDropdownRef,
-                                        onTermSelect,
-                                        searchResults,
-                                        loading,
-                                        advancedSearchToggle,
-                                        keyboardNavState,
-                                        debug = debug
-                                    )
-                            ]
-                        ]
+        let inputLeadingVisual =
+            Html.div [
+                prop.className "swt:swap swt:group-focus-within:swap-active swt:cursor-text"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:swap-on"
+                        prop.children [ Html.kbd [ prop.className [ "swt:kbd swt:kbd-sm" ]; prop.text "F2" ] ]
+                    ]
+                    Html.div [
+                        prop.className "swt:swap-off swt:flex swt:items-center swt:justify-center"
+                        prop.children [ Icons.MagnifyingClass("swt:text-primary") ]
                     ]
                 ]
             ]
+
+        let isFullTerm =
+            term.IsSome
+            && term.Value.name.IsSome
+            && not (System.String.IsNullOrWhiteSpace term.Value.name.Value)
+            && term.Value.id.IsSome
+            && not (System.String.IsNullOrWhiteSpace term.Value.id.Value)
+
+        let inputTrailingVisual =
+            React.fragment [
+                Html.div [
+                    Icons.Check(
+                        [
+                            "swt:text-primary swt:transition-all swt:size-4 swt:overflow-x-hidden swt:opacity-100"
+                            if not isFullTerm then
+                                "swt:!w-0 swt:!opacity-0"
+                        ]
+                        |> String.concat " "
+                    )
+                ]
+            ]
+
+        let itemRendererFn
+            (props:
+                {|
+                    item: TermSearchResult
+                    index: int
+                    isActive: bool
+                    props: ResizeArray<IReactProperty>
+                |})
+            =
+
+            let isObsolete =
+                props.item.Term.isObsolete.IsSome && props.item.Term.isObsolete.Value
+
+            let isDirectedSearch = props.item.IsDirectedSearchResult || true
+
+            Html.li [
+                prop.className [
+                    "swt:list-row swt:rounded-none swt:p-1 swt:cursor-pointer"
+                    if props.isActive then
+                        "swt:bg-primary/10"
+                ]
+                prop.children [
+
+                    Html.div [
+                        if isObsolete then
+                            prop.title "Obsolete"
+                        elif isDirectedSearch then
+                            prop.title "Directed Search"
+                        prop.className [
+                            "swt:w-5 swt:flex swt:items-center swt:justify-center"
+                            if isObsolete then
+                                "swt:text-error"
+                            elif isDirectedSearch then
+                                "swt:text-primary"
+                        ]
+                        prop.children [
+                            if isObsolete then
+                                Icons.LinkSlash()
+                            elif isDirectedSearch then
+                                Icons.DiagramProject()
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "swt:font-bold"
+                        prop.text (props.item.Term.name |> Option.defaultValue "<no-name>")
+                    ]
+                    if props.item.Term.description.IsSome then
+                        Html.div [
+                            prop.className "swt:list-col-wrap swt:text-xs swt:text-muted"
+                            prop.children [ Html.text (props.item.Term.description.Value) ]
+                        ]
+
+                    Html.div [
+                        if props.item.Term.href.IsSome then
+                            Html.a [
+                                prop.onClick (fun e -> e.stopPropagation ())
+                                prop.href props.item.Term.href.Value
+                                prop.target.blank
+                                prop.className "swt:link swt:hover:link-accent"
+                                prop.children [ Html.text (props.item.Term.id |> Option.defaultValue "<no-id>") ]
+                            ]
+                        else
+                            Html.div [
+                                prop.className "swt:text-muted"
+                                prop.children [ Html.text (props.item.Term.id |> Option.defaultValue "<no-id>") ]
+                            ]
+
+                    ]
+                ]
+                yield! props.props
+            ]
+
+        let itemContainerRendererFn
+            (props:
+                {|
+                    props: ResizeArray<IReactProperty>
+                    children: ReactElement
+                |})
+            =
+            Html.ul [
+                prop.className [
+                    "swt:list swt:py-2"
+                    "swt:bg-base-100 swt:shadow-sm swt:rounded-xs"
+                    "swt:overflow-y-auto swt:max-h-1/2 swt:lg:max-h-1/3 swt:min-w-md swt:max-w-xl"
+                    "swt:border-2 swt:border-base-content/50"
+                ]
+                prop.children props.children
+                yield! props.props
+            ]
+
+        let onInputChange =
+            fun (e: string) ->
+                setInput e
+
+                if System.String.IsNullOrEmpty e then
+                    onTermSelect None
+                    cancel ()
+                else
+                    onTermSelect (Some <| Term(e))
+                    startSearch e
+
+        React.fragment [
+            ComboBox.ComboBox<TermSearchResult>(
+                input,
+                onInputChange,
+                items = Array.ofSeq searchResults.Results,
+                filterFn = (fun x -> true),
+                itemToString = (fun x -> x.Term.name |> Option.defaultValue ""),
+                loading = isLoading,
+                inputLeadingVisual = inputLeadingVisual,
+                inputTrailingVisual = inputTrailingVisual,
+                itemContainerRenderer = itemContainerRendererFn,
+                itemRenderer = itemRendererFn,
+                onChange = (fun _ y -> onTermSelect (Some y.Term)),
+                onFocus = (fun (_: Browser.Types.FocusEvent) -> onFocus |> Option.iter (fun fn -> fn ())),
+                onBlur = (fun (_: Browser.Types.FocusEvent) -> onBlur |> Option.iter (fun fn -> fn ())),
+                onOpen = (fun o -> if o then startSearch input else cancel ())
+            )
         ]
+
+// Html.div [
+//     if debug then
+//         prop.testId "term-search-container"
+//         prop.custom ("data-debug-loading", Fable.Core.JS.JSON.stringify loading)
+//         prop.custom ("data-debug-searchresults", Fable.Core.JS.JSON.stringify searchResults)
+//     prop.className [
+//         "not-prose swt:h-full swt:centered"
+//         if fullwidth then
+//             "swt:w-full"
+//     ]
+//     if props.IsSome then
+//         for prop in props.Value do
+//             prop
+//     prop.ref containerRef
+//     prop.children [
+//         if modal.IsSome then
+//             if portalModals.IsSome then
+//                 ReactDOM.createPortal (modalContainer, portalModals.Value)
+//             else
+//                 modalContainer
+//         Html.div [
+//             prop.className "swt:indicator swt:w-full swt:h-full"
+//             prop.children [
+//                 if displayIndicators then
+//                     match term with
+//                     | Some term when term.name.IsSome && term.id.IsSome -> // full term indicator, show always
+//                         if System.String.IsNullOrWhiteSpace term.id.Value |> not then
+//                             TermSearch.IndicatorItem(
+//                                 "",
+//                                 sprintf "%s - %s" term.name.Value term.id.Value,
+//                                 "swt:tooltip-left",
+//                                 Icons.SquareCheck(),
+//                                 (fun _ ->
+//                                     setModal (
+//                                         if modal.IsSome && modal.Value = Modals.Details then
+//                                             None
+//                                         else
+//                                             Some Modals.Details
+//                                     )
+//                                 ),
+//                                 btnClasses = "swt:btn-primary"
+//                             )
+//                     | _ when showDetails -> // show only when focused
+//                         TermSearch.IndicatorItem(
+//                             "",
+//                             "Details",
+//                             "swt:tooltip-left",
+//                             Icons.InfoCircle([||]),
+//                             (fun _ ->
+//                                 setModal (
+//                                     if modal.IsSome && modal.Value = Modals.Details then
+//                                         None
+//                                     else
+//                                         Some Modals.Details
+//                                 )
+//                             ),
+//                             btnClasses = "swt:btn-info",
+//                             isActive = focused
+//                         )
+//                     | _ -> Html.none
+
+//                 if advancedSearch.IsSome then
+//                     TermSearch.IndicatorItem(
+//                         "swt:indicator-bottom",
+//                         "Advanced Search",
+//                         "swt:tooltip-left",
+//                         Icons.MagnifyingClassPlus(),
+//                         (fun _ ->
+//                             setModal (
+//                                 if modal.IsSome && modal.Value = Modals.AdvancedSearch then
+//                                     None
+//                                 else
+//                                     Some Modals.AdvancedSearch
+//                             )
+//                         ),
+//                         btnClasses = "swt:btn-primary",
+//                         isActive = focused,
+//                         props = [ prop.testid "advanced-search-indicator" ]
+//                     )
+
+//                 Html.label [ // main search component
+//                     prop.className [
+//                         "swt:input swt:flex swt:flex-row swt:items-center swt:relative swt:w-full
+//                         swt:focus:!outline-0 swt:focus-within:!outline-0"
+//                         if classNames.IsSome && classNames.Value.inputLabel.IsSome then
+//                             style.resolveStyle classNames.Value.inputLabel.Value
+//                     ]
+//                     prop.children [
+//                         Html.i [
+//                             prop.className [
+//                                 "swt:text-primary swt:pr-2 swt:transition-all swt:w-6 swt:overflow-x-hidden swt:opacity-100"
+//                                 if
+//                                     focused
+//                                     || inputRef.current.IsSome
+//                                        && System.String.IsNullOrEmpty inputRef.current.Value.value |> not
+//                                 then
+//                                     "swt:!w-0 swt:!opacity-0"
+//                             ]
+//                             prop.children [ Icons.MagnifyingClass() ]
+//                         ]
+//                         Html.input [
+//                             prop.className "swt:grow swt:shrink swt:min-w-[50px] swt:w-full"
+//                             if debug then
+//                                 prop.testid "term-search-input"
+//                                 prop.custom ("data-debug-focus", $"{autoFocus}-{focused}")
+//                             prop.ref (inputRef)
+//                             prop.defaultValue inputText
+//                             prop.placeholder "..."
+//                             prop.autoFocus autoFocus
+//                             prop.onChange (fun (e: string) ->
+//                                 if System.String.IsNullOrEmpty e then
+//                                     onTermSelect None
+//                                     cancel ()
+//                                 else
+//                                     onTermSelect (Some <| Term(e))
+//                                     startSearch e
+//                             )
+//                             prop.onDoubleClick (fun _ ->
+//                                 // if we have parent id and the input is empty, we search all children of the parent
+//                                 if
+//                                     parentId.IsSome && System.String.IsNullOrEmpty inputRef.current.Value.value
+//                                 then
+//                                     startAllChildSearch ()
+//                                 // if we have input we start search
+//                                 elif System.String.IsNullOrEmpty inputRef.current.Value.value |> not then
+//                                     startSearch inputRef.current.Value.value
+//                             )
+//                             prop.onKeyDown (fun e ->
+//                                 e.stopPropagation ()
+
+//                                 promise {
+//                                     do! keyboardNav e
+
+//                                     if onKeyDown.IsSome then
+//                                         onKeyDown.Value e
+//                                 }
+//                                 |> Promise.start
+//                             )
+//                             prop.onFocus (fun _ ->
+//                                 if onFocus.IsSome then
+//                                     onFocus.Value()
+
+//                                 setFocused true
+//                             )
+//                         ]
+//                         //Daisy.loading [
+//                         Html.div [
+//                             prop.className [
+//                                 "swt:loading swt:text-primary swt:loading-sm"
+//                                 if loading.IsEmpty then
+//                                     "swt:invisible"
+//                             ]
+//                         ]
+
+//                         let advancedSearchToggle =
+//                             advancedSearch
+//                             |> Option.map (fun _ ->
+//                                 fun _ ->
+//                                     setModal (
+//                                         if modal.IsSome && modal.Value = Modals.AdvancedSearch then
+//                                             None
+//                                         else
+//                                             Some Modals.AdvancedSearch
+//                                     )
+//                             )
+
+//                         match portalTermDropdown with
+//                         | Some portalTermSelectArea when containerRef.current.IsSome ->
+//                             ReactDOM.createPortal (
+//                                 (portalTermSelectArea.renderer
+//                                     (containerRef.current.Value.getBoundingClientRect ())
+//                                     (TermSearch.TermDropdown(
+//                                         termDropdownRef,
+//                                         onTermSelect,
+//                                         searchResults,
+//                                         loading,
+//                                         advancedSearchToggle,
+//                                         keyboardNavState,
+//                                         debug = debug
+//                                     ))),
+//                                 portalTermSelectArea.portal
+//                             )
+//                         | _ ->
+//                             TermSearch.TermDropdown(
+//                                 termDropdownRef,
+//                                 onTermSelect,
+//                                 searchResults,
+//                                 loading,
+//                                 advancedSearchToggle,
+//                                 keyboardNavState,
+//                                 debug = debug
+//                             )
+//                     ]
+//                 ]
+//             ]
+//         ]
+//     ]
+// ]
