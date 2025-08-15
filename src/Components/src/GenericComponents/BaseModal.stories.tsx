@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { within, expect, userEvent, waitFor, screen } from 'storybook/test';
-import BaseModal from "./BaseModal.fs.js";
+import { Modal } from "./BaseModal.fs.js";
 import { useState } from 'react';
 import React from 'react';
 
@@ -16,9 +16,9 @@ const TESTID_SUBMIT_BUTTON = "submit_button_base"
 
 
 const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
-  const [open, setOpen] = useState(false);
-  const rmv=() => setOpen(false) // Close modal when needed
-  const openModal=() => setOpen(true) // Close modal when needed
+  const [isOpen, setIsOpen] = useState(false);
+  const rmv=() => setIsOpen(false) // Close modal when needed
+  const openModal=() => setIsOpen(true) // Close modal when needed
   const submitButton =
     <button
       className={"swt:btn swt:btn-primary"}
@@ -35,17 +35,18 @@ const ButtonWithModal = ({header, modalClassInfo, modalActions, content}) => {
           onClick={openModal}
           >Open Modal</button>
       }
-      {open && (
-        <BaseModal
-          rmv={rmv}
+      {
+        <Modal
+          isOpen={isOpen}
+          setIsOpen={setIsOpen}
           header={header}
-          modalClassInfo={modalClassInfo}
+          className={modalClassInfo}
           modalActions={modalActions}
-          content={content}
+          children={content}
           footer={submitButton}
           debug={"base"}
         />
-      )}
+      }
     </div>
   )
 }
@@ -68,7 +69,7 @@ type Story = StoryObj<typeof meta>;
 const simpleHeader: JSX.Element = <>Simple Header</>;
 const modalActivity: JSX.Element = <>Simple Modal Activity</>;
 const list: JSX.Element[] = Array.from({ length: 500 }, (_, index) => <>Simple Content {index}</>);
-const content =
+const children =
   list.map((item, index) => (
       <div key={index} style={{ padding: "8px", borderBottom: "1px solid #ddd" }}>
           {item}
@@ -81,7 +82,7 @@ export const CompleteModal: Story = {
     header: simpleHeader,
     modalClassInfo: undefined,
     modalActions: modalActivity,
-    content: content
+    content: children
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -119,7 +120,7 @@ export const WideCompleteModal: Story = {
     header: simpleHeader,
     modalClassInfo: modalClassInfo,
     modalActions: modalActivity,
-    content: content
+    content: children
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -157,7 +158,7 @@ export const SmallWindowedCompleteModal: Story = {
     header: simpleHeader,
     modalClassInfo: undefined,
     modalActions: modalActivity,
-    content: content
+    content: children
   },
   parameters: {
     viewport: {

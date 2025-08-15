@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
+import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import TermSearch from "./TermSearch.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
 import React from 'react';
@@ -98,17 +98,17 @@ const DefaultAdvancedSearch: Story = {
     expect(indicator).toBeInTheDocument();
     userEvent.click(indicator);
 
-    const modal = await waitFor(() => canvas.getByTestId("modal_advanced-search-modal"));
+    const modal = await waitFor(() => screen.getByTestId("modal_advanced-search-modal"));
     expect(modal).toBeInTheDocument();
 
-    const input = canvas.getByTestId("advanced-search-term-name-input");
+    const input = within(modal).getByTestId("advanced-search-term-name-input");
     expect(input).toBeInTheDocument();
 
     await userEvent.type(input, "instrument", {delay: 50});
     await fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
 
     await waitFor(() => {
-      const r = canvas.getByText("Instrument Model")
+      const r = screen.getByText("Instrument Model")
       expect(r).toBeInTheDocument()
     });
   }
@@ -224,17 +224,17 @@ export const CustomAdvancedSearch: Story = {
     expect(indicator).toBeInTheDocument();
     await userEvent.click(indicator);
 
-    const modal = await waitFor(() => canvas.getByTestId("modal_advanced-search-modal"));
+    const modal = await waitFor(() => screen.getByTestId("modal_advanced-search-modal"));
     expect(modal).toBeInTheDocument();
 
-    const input = canvas.getByTestId("advanced-search-input");
+    const input = within(modal).getByTestId("advanced-search-input");
     expect(input).toBeInTheDocument();
 
     await userEvent.type(input, "test input", {delay: 50});
     await fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
 
     await waitFor(() => {
-      const r = canvas.getByText("test input")
+      const r = screen.getByText("test input")
       expect(r).toHaveClass("swt:line-through")
       expect(r).toBeInTheDocument()
     });

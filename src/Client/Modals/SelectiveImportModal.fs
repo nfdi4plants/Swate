@@ -275,6 +275,9 @@ type SelectiveImportModal =
 
     [<ReactComponent>]
     static member Main(import: ArcFiles, model, dispatch, rmv) =
+
+        let isOpen, setIsOpen = React.useState (true)
+
         let tables, disArcfile =
             match import with
             | Assay a -> a.Tables, ArcFilesDiscriminate.Assay
@@ -355,11 +358,12 @@ type SelectiveImportModal =
                 ]
             ]
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header = Html.p "Import",
-            modalClassInfo = "@container/importModal",
-            content = content,
+        Swate.Components.BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.p "Import",
+            content,
+            className = "@container/importModal",
             footer = footer
         )
 
@@ -368,6 +372,9 @@ type SelectiveImportModal =
         SelectiveImportModal.Main(import, model, dispatch, rmv = rmv)
 
     static member Templates(model, dispatch: Messages.Msg -> unit) =
+
+        let isOpen, setIsOpen = React.useState (true)
+
         let rmv = Util.RMV_MODAL dispatch
 
         let tables = model.ProtocolState.TemplatesSelected |> List.map (fun t -> t.Table)
@@ -423,10 +430,11 @@ type SelectiveImportModal =
                 ]
             ]
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header = Html.p "Import",
-            modalClassInfo = "@container/importModal",
-            content = content,
+        Swate.Components.BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.p "Import",
+            content,
+            className = "@container/importModal",
             footer = footer
         )

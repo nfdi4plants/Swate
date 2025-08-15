@@ -70,6 +70,7 @@ type EditConfig =
             ?debug: bool
         ) =
 
+        let isOpen, setIsOpen = React.useState (true)
         let selectedTab, setSelectedTab = React.useState(0)
 
         let setColumn =
@@ -82,13 +83,13 @@ type EditConfig =
                 Some "Edit"
             else
                 None
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Edit Column",
-            content =
-                React.fragment [
-                    EditConfig.EditTabs(columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv, ?debug = debug)
-                ],
-            contentClassInfo = "swt:space-y-2 swt:py-2",
+
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Edit Column",
+            React.fragment [
+                EditConfig.EditTabs(columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv, ?debug = debug)
+            ],
             ?debug = debugString
         )
