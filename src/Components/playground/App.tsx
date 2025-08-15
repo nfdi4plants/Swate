@@ -7,6 +7,7 @@ import {TIBApi} from '../src/Util/Api.fs.ts';
 import {Entry as TemplateFilter} from '../src/Template/TemplateFilter.fs.ts';
 import {Entry as ComboBox} from '../src/GenericComponents/ComboBox.fs.ts';
 import {Entry as Select} from '../src/GenericComponents/Select.fs.ts';
+import {Entry as BaseModal} from '../src/GenericComponents/BaseModal.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -103,17 +104,25 @@ function SelectContainer() {
   </div>
 }
 
+function BaseModalContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-3xl'>Base Modal</h2>
+    <BaseModal />
+  </div>
+}
+
 const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
-            <TemplateFilterContainer />
+            <BaseModalContainer />
+            {/* <TermSearchContainer /> */}
+            {/* <TemplateFilterContainer />
             <SelectContainer />
             <ComboBoxContainer />
-            <TermSearchContainer />
             <ContextMenuContainer />
             <AnnoTableContainer />
-            <TableContainer />
+            <TableContainer /> */}
             {/* <Menu></Menu> */}
         </div>
     );

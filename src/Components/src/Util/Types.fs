@@ -240,14 +240,21 @@ module Term =
 
 [<AllowNullLiteral>]
 [<Global>]
-type TermSearchStyle [<ParamObjectAttribute; Emit("$0")>] (?inputLabel: U2<string, ResizeArray<string>>) =
-    member val inputLabel: U2<string, ResizeArray<string>> option = jsNative with get, set
+type TermSearchStyle [<ParamObjectAttribute; Emit("$0")>] (?inputLabel: U2<string, string[]>) =
+    member val inputLabel: U2<string, string[]> option = jsNative with get, set
 
-module TermSearchStyle =
-    let resolveStyle (style: U2<string, ResizeArray<string>>) =
+
+type style =
+    static member resolveStyle(style: U2<string, string[]>) =
         match style with
         | U2.Case1 className -> className
         | U2.Case2 classNames -> classNames |> String.concat " "
+
+    static member resolveStyle(style: U2<string, string[]> option) =
+        match style with
+        | Some(U2.Case1 className) -> className
+        | Some(U2.Case2 classNames) -> classNames |> String.concat " "
+        | None -> null
 
 [<AllowNullLiteral>]
 [<Global>]
