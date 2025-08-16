@@ -43,20 +43,6 @@ type InputField =
             ]
         ]
 
-    static member Show(v: string, label: string, rmv) =
-
-        Html.div [
-            prop.className "swt:flex swt:flex-col swt:gap-2 swt:w-full"
-            prop.children [
-                Html.label [ prop.className "swt:label"; prop.text label ]
-                Html.input [
-                    prop.className "swt:input swt:w-full"
-                    prop.readOnly true
-                    prop.valueOrDefault v
-                ]
-            ]
-        ]
-
     static member TermCombi
         (
             v: Term option,
@@ -89,8 +75,6 @@ type InputField =
 
 type FooterButtons =
     static member Cancel(rmv: unit -> unit) =
-
-        //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
         Html.button [
             prop.className "swt:btn swt:btn-outline"
             prop.text "Cancel"
@@ -98,12 +82,6 @@ type FooterButtons =
         ]
 
     static member Submit(submitOnClick: unit -> unit) =
-        //Daisy.button.button [
-        //    button.primary
-        //    prop.text "Submit"
-        //    prop.className "ml-auto"
-        //    prop.onClick (fun e -> submitOnClick ())
-        //]
         Html.button [
             prop.className "swt:btn swt:btn-primary swt:ml-auto"
             prop.text "Submit"

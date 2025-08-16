@@ -23,7 +23,6 @@ type TermModal =
 
         let isOpen, setIsOpen = React.useState (true)
         let state, setState = React.useState (State.Loading)
-        let rmv = Util.RMV_MODAL dispatch
 
         React.useEffectOnce (fun _ ->
             async {

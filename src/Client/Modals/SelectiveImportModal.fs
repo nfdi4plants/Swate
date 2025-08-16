@@ -60,7 +60,6 @@ type SelectiveImportModal =
         Html.div [
             prop.className "swt:flex swt:justify-center"
             prop.children [
-                //Daisy.checkbox [
                 Html.input [
                     prop.type'.checkbox
                     prop.className "swt:checkbox swt:checkbox-neutral"
@@ -81,7 +80,6 @@ type SelectiveImportModal =
         =
         let columns = table.Columns
 
-        //Daisy.table [
         Html.table [
             prop.className "swt:table"
             prop.children [
@@ -125,15 +123,12 @@ type SelectiveImportModal =
             sprintf "%s Metadata" name,
             Icons.LightBulb(),
             React.fragment [
-                //Daisy.fieldset [
                 Html.fieldSet [
                     prop.className "swt:fieldset"
                     prop.children [
-                        //Daisy.label [
                         Html.label [
                             prop.className "swt:label swt:cursor-pointer"
                             prop.children [
-                                //Daisy.checkbox [
                                 Html.input [
                                     prop.type'.checkbox
                                     prop.className "swt:checkbox"
@@ -229,12 +224,10 @@ type SelectiveImportModal =
                         isDisabled
                     )
                 ]
-                //Daisy.collapse [
                 Html.div [
                     prop.className "swt:collapse"
                     prop.children [
                         Html.input [ prop.type'.checkbox; prop.className "swt:min-h-0 swt:h-5" ]
-                        //Daisy.collapseTitle [
                         Html.div [
                             prop.className [
                                 "swt:flex swt:items-center swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"
@@ -251,7 +244,6 @@ type SelectiveImportModal =
                                 Icons.MagnifyingClass()
                             ]
                         ]
-                        //Daisy.collapseContent [
                         Html.div [
                             prop.className "swt:collapse-content swt:overflow-x-auto"
                             prop.children [
@@ -331,13 +323,11 @@ type SelectiveImportModal =
                 prop.className "swt:justify-end swt:flex swt:gap-2"
                 prop.style [ style.marginLeft length.auto ]
                 prop.children [
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:btn-outline"
                         prop.text "Cancel"
                         prop.onClick rmv
                     ]
-                    //Daisy.button.button [
                     Html.button [
                         prop.className "swt:btn swt:btn-primary"
                         prop.style [ style.marginLeft length.auto ]

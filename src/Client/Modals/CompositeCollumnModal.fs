@@ -467,7 +467,7 @@ type CompositeCollumnModal =
                         selectorFormat,
                         setSelectorFormat
                     ),
-                className = "relative overflow-visible",
+                className = "swt:relative swt:overflow-visible",
                 modalActions =
                     CompositeCollumnModal.modalActivity (
                         potCell,

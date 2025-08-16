@@ -14,7 +14,6 @@ module private DataAnnotatorHelper =
     module DataAnnotatorButtons =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
-            //Daisy.button.button [
             Html.button [
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:btn-disabled"
@@ -94,7 +93,6 @@ module private DataAnnotatorHelper =
                     prop.text "Has Header"
                 ]
 
-            //Daisy.button.button [
             Html.button [
                 if hasHeader then
                     prop.className "swt:btn swt:btn-primary"
@@ -162,7 +160,6 @@ module private DataAnnotatorHelper =
                         prop.className "swt:btn swt:btn-primary swt:join-item swt:btn-disabled"
                         prop.children [
                             if isLoading then
-                                //Daisy.loading []
                                 Html.div [ prop.className "swt:loading" ]
 
                         ]
@@ -175,7 +172,7 @@ module private DataAnnotatorHelper =
             (model: Model)
             (uploadFile: Browser.Types.File -> unit)
             =
-            //Daisy.file [
+
             Html.input [
                 prop.type' "file"
                 prop.className "swt:file-input swt:file-input-primary swt:col-span-2"
@@ -184,7 +181,7 @@ module private DataAnnotatorHelper =
             ]
 
         let OpenModalButton model mkOpen =
-            //Daisy.button.button [
+
             Html.button [
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:btn-primary swt:grow swt:disabled"
@@ -200,7 +197,7 @@ module private DataAnnotatorHelper =
     let ModalMangementContainer (children: ReactElement list) =
         Html.div [ prop.className "swt:flex swt:flex-col swt:gap-4"; prop.children children ]
 
-    let DataFileConfigComponent model rmvFile target setTarget dispatch =
+    let DataFileConfigComponent model target setTarget dispatch =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
@@ -354,7 +351,7 @@ type DataAnnotator =
         let modalActivity =
             Html.div [
                 prop.children [
-                    DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
+                    DataFileConfigComponent model targetCol setTargetCol dispatch
                     FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
                 ]
             ]

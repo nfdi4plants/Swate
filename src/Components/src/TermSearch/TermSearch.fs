@@ -445,7 +445,7 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-    static member private DetailsModal(rvm, term: Term option, config: (string * string) list) =
+    static member private DetailsModal(term: Term option, config: (string * string) list) =
         let isOpen, setIsOpen = React.useState (true)
         let showConfig, setShowConfig = React.useState (false)
 
@@ -1156,7 +1156,7 @@ type TermSearch =
                 prop.ref modalContainerRef
                 prop.children [
                     match modal with
-                    | Some Modals.Details -> TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
+                    | Some Modals.Details -> TermSearch.DetailsModal(term, configDetails)
                     | Some Modals.AdvancedSearch when advancedSearch.IsSome ->
                         let onTermSelect =
                             fun (term: Term option) ->
