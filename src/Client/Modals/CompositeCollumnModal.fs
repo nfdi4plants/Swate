@@ -226,21 +226,6 @@ type CompositeCollumnModal =
                 ]
             ]
 
-            //Daisy.button.button [
-            //    if isButtonActive then button.outline else button.disabled
-            //    button.wide
-            //    prop.style [ style.marginLeft length.auto ]
-            //    match potCell with
-            //    | Some cell when cell.isTerm -> prop.text "As Unit"
-            //    | Some cell when cell.isUnitized -> prop.text "As Term"
-            //    | Some cell when cell.isFreeText -> prop.text "As Data"
-            //    | Some cell when cell.isData -> prop.text "As Free Text"
-            //    | _ -> failwith "Not supported"
-            //    prop.onClick (fun e ->
-            //        setModalActivity modalActivity
-            //        transFormCell ()
-            //        rmv e)
-            //]
             Html.button [
                 prop.className "swt:btn swt:btn-wide"
                 if isButtonActive then
@@ -298,13 +283,6 @@ type CompositeCollumnModal =
         Html.div [
             prop.style [ style.marginLeft length.auto ]
             prop.children [
-                //Daisy.cardActions [
-                //    Daisy.button.button [
-                //        prop.ref cancelButtonRef
-                //        button.outline
-                //        prop.text "Cancel"
-                //        prop.onClick (fun e -> rmv e)
-                //    ]
                 Html.div [
                     prop.className "swt:card-actions"
                     prop.children [
@@ -314,14 +292,6 @@ type CompositeCollumnModal =
                             prop.text "Cancel"
                             prop.onClick (fun e -> rmv e)
                         ]
-                        //Daisy.button.button [
-                        //    prop.ref submitButtonRef
-                        //    button.primary
-                        //    prop.text "Submit"
-                        //    prop.onClick (fun e ->
-                        //        submitOnClick ()
-                        //        rmv e)
-                        //]
                         Html.button [
                             prop.className "swt:btn swt:btn-primary"
                             prop.ref submitButtonRef
@@ -341,6 +311,7 @@ type CompositeCollumnModal =
     static member Main
         (ci: int, ri: int, model: Model.Model, dispatch: Messages.Msg -> unit, (rmv: MouseEvent -> unit))
         =
+        let isOpen, setIsOpen = React.useState (true)
         let index = (ci, ri)
         let potCell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(index)
         let isUnitOrTermCell = Modals.ContextMenus.Util.isUnitOrTermCell potCell
@@ -411,10 +382,12 @@ type CompositeCollumnModal =
 
         match potCell with
         | Some cell when cell.isTerm ->
-            BaseModal.BaseModal(
-                rmv = rmv,
-                header = Term.header,
-                modalClassInfo = "relative overflow-visible",
+            BaseModal.Modal(
+                isOpen,
+                setIsOpen,
+                Term.header,
+                Term.content (model, termState, setTermState),
+                className = "relative overflow-visible",
                 modalActions =
                     CompositeCollumnModal.modalActivity (
                         potCell,
@@ -423,15 +396,15 @@ type CompositeCollumnModal =
                         transFormCell,
                         rmv
                     ),
-                content = Term.content (model, termState, setTermState),
-                contentClassInfo = "",
                 footer = CompositeCollumnModal.footer (updateTermUnit, rmv)
             )
         | Some cell when cell.isUnitized ->
-            BaseModal.BaseModal(
-                rmv = rmv,
-                header = Unit.header,
-                modalClassInfo = "relative overflow-visible",
+            BaseModal.Modal(
+                isOpen,
+                setIsOpen,
+                Unit.header,
+                Term.content (model, termState, setTermState, newValue, setValue),
+                className = "relative overflow-visible",
                 modalActions =
                     CompositeCollumnModal.modalActivity (
                         potCell,
@@ -440,8 +413,6 @@ type CompositeCollumnModal =
                         transFormCell,
                         rmv
                     ),
-                content = Term.content (model, termState, setTermState, newValue, setValue),
-                contentClassInfo = "",
                 footer = CompositeCollumnModal.footer (updateTermUnit, rmv)
             )
         | Some cell when cell.isFreeText ->
@@ -450,10 +421,12 @@ type CompositeCollumnModal =
             let updateFreetext =
                 fun () -> Spreadsheet.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
 
-            BaseModal.BaseModal(
-                rmv = rmv,
-                header = Freetext.header,
-                modalClassInfo = "relative overflow-visible",
+            BaseModal.Modal(
+                isOpen,
+                setIsOpen,
+                Freetext.header,
+                Freetext.content (newValue, setValue),
+                className = "relative overflow-visible",
                 modalActions =
                     CompositeCollumnModal.modalActivity (
                         potCell,
@@ -463,8 +436,6 @@ type CompositeCollumnModal =
                         rmv,
                         cellHeader.IsDataColumn
                     ),
-                content = Freetext.content (newValue, setValue),
-                contentClassInfo = "",
                 footer = CompositeCollumnModal.footer (updateFreetext, rmv)
             )
         | Some cell when cell.isData ->
@@ -482,21 +453,11 @@ type CompositeCollumnModal =
             let updateData =
                 fun () -> Spreadsheet.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
 
-            BaseModal.BaseModal(
-                rmv = rmv,
-                header = Data.header,
-                modalClassInfo = "relative overflow-visible",
-                modalActions =
-                    CompositeCollumnModal.modalActivity (
-                        potCell,
-                        showModalActivity,
-                        setShowModalActivity,
-                        transFormCell,
-                        rmv,
-                        cellHeader.IsDataColumn
-                    ),
-                content =
-                    Data.content (
+            BaseModal.Modal(
+                isOpen,
+                setIsOpen,
+                Data.header,
+                Data.content (
                         newValue,
                         setValue,
                         selector,
@@ -506,7 +467,16 @@ type CompositeCollumnModal =
                         selectorFormat,
                         setSelectorFormat
                     ),
-                contentClassInfo = "",
+                className = "swt:relative swt:overflow-visible",
+                modalActions =
+                    CompositeCollumnModal.modalActivity (
+                        potCell,
+                        showModalActivity,
+                        setShowModalActivity,
+                        transFormCell,
+                        rmv,
+                        cellHeader.IsDataColumn
+                    ),
                 footer = CompositeCollumnModal.footer (updateData, rmv)
             )
         | _ -> Html.div []

@@ -445,7 +445,8 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-    static member private DetailsModal(rvm, term: Term option, config: (string * string) list) =
+    static member private DetailsModal(term: Term option, config: (string * string) list) =
+        let isOpen, setIsOpen = React.useState (true)
         let showConfig, setShowConfig = React.useState (false)
 
         let label (str: string) =
@@ -529,7 +530,12 @@ type TermSearch =
                     ]
             ]
 
-        BaseModal.BaseModal(rvm, header = Html.div "Details", content = content)
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Details",
+            content
+        )
 
     static member private AdvancedSearchDefault
         (advancedSearchState: Swate.Components.Shared.DTOs.AdvancedSearchQuery, setAdvancedSearchState)
@@ -627,6 +633,7 @@ type TermSearch =
     static member private AdvancedSearchModal
         (rmv, advancedSearch0: U2<AdvancedSearch, bool>, onTermSelect, ?debug: bool)
         =
+        let isOpen, setIsOpen = React.useState (true)
         let searchResults, setSearchResults = React.useState (SearchState.init)
         /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
         let (tempPagination: int option), setTempPagination = React.useState (None)
@@ -755,10 +762,11 @@ type TermSearch =
                 ]
             ]
 
-        BaseModal.BaseModal(
-            !!rmv,
-            header = Html.div "Advanced Search",
-            content = content,
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Advanced Search",
+            content,
             ?debug = (Option.map (fun _ -> "advanced-search-modal") debug)
         )
 
@@ -1139,7 +1147,7 @@ type TermSearch =
                     "swt:z-[9999] swt:left-0 swt:top-0 swt:fixed swt:w-screen swt:h-screen swt:pointer-events-none"
                 prop.children [
                     match modal with
-                    | Some Modals.Details -> TermSearch.DetailsModal((fun _ -> setModal None), term, configDetails)
+                    | Some Modals.Details -> TermSearch.DetailsModal(term, configDetails)
                     | Some Modals.AdvancedSearch when advancedSearch.IsSome ->
                         let onTermSelect =
                             fun (term: Term option) ->
