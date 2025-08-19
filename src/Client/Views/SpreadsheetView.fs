@@ -80,7 +80,7 @@ let Main (model: Model, dispatch) =
                                 let openTemplateWidget = fun () -> addWidget Widget._Template
                                 MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
                             | _ ->
-                                MainComponents.SpreadsheetView.ArcTable.Main(model, dispatch)
+                                MainComponents.SpreadsheetView.ArcTable.Main(model)
                                 MainComponents.TableFooter.Main dispatch
                         | Spreadsheet.ActiveView.Metadata ->
                             Html.section [

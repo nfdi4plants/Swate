@@ -280,6 +280,7 @@ type AnnotationTable =
                 prop.testId "annotation_table"
                 prop.custom("data-columnCount", arcTable.ColumnCount)
                 prop.custom("data-rowCount", arcTable.RowCount)
+            prop.className "swt:table-1 swt:overflow-auto swt:flex swt:flex-col swt:h-full"
             prop.children [
                 ReactDOM.createPortal ( // Modals
                     AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, debug = debug),
