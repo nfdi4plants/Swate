@@ -25,7 +25,6 @@ let private addButton (model: Model, dispatch) =
     Html.div [
         prop.className "swt:flex swt:flex-row swt:justify-center"
         prop.children [
-            //Daisy.button.a [
             Html.button [
                 let hasTerm = model.TermSearchState.SelectedTerm.IsSome
 
@@ -47,40 +46,6 @@ let private addButton (model: Model, dispatch) =
             ]
         ]
     ]
-//if model.TermSearchState.SelectedTerm.IsSome then
-//    Bulma.column [
-//        prop.className "pr-0"
-//        Bulma.column.isNarrow
-//        Daisy.button.a [
-//            prop.title "Copy to Clipboard"
-//            button.info
-//            prop.onClick (fun e ->
-//                // trigger icon response
-//                CustomComponents.ResponsiveFA.triggerResponsiveReturnEle "clipboard_termsearch"
-//                //
-//                let t = model.TermSearchState.SelectedTerm.Value
-//                let txt = [t.Name; t.Accession |> Shared.URLs.termAccessionUrlOfAccessionStr; t.Accession.Split(@":").[0] ] |> String.concat System.Environment.NewLine
-//                let textArea = Browser.Dom.document.createElement "textarea"
-//                textArea?value <- txt
-//                textArea?style?top <- "0"
-//                textArea?style?left <- "0"
-//                textArea?style?position <- "fixed"
-
-//                Browser.Dom.document.body.appendChild textArea |> ignore
-
-//                textArea.focus()
-//                // Can't belive this actually worked
-//                textArea?select()
-
-//                let t = Browser.Dom.document.execCommand("copy")
-//                Browser.Dom.document.body.removeChild(textArea) |> ignore
-//                ()
-//            )
-//            CustomComponents.ResponsiveFA.responsiveReturnEle "clipboard_termsearch" "fa-regular fa-clipboard" "fa-solid fa-check"
-//            |> prop.children
-//        ]
-//        |> prop.children
-//    ]
 
 [<ReactComponent>]
 let Main (model: Model, dispatch) =

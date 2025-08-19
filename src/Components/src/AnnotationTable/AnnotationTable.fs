@@ -206,7 +206,7 @@ type AnnotationTable =
 
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?height: int, ?debug: bool) =
+    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?setSelectedCells: Set<int * int> -> unit, ?height: int, ?debug: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
@@ -320,7 +320,8 @@ type AnnotationTable =
                                 arcTable.Copy() |> setArcTable
                         ),
                     enableColumnHeaderSelect = true,
-                    debug = debug
+                    debug = debug,
+                    ?setSelectedCells = setSelectedCells
                 )
             ]
         ]
