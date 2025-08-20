@@ -72,8 +72,7 @@ swt:p-0"""
             ?enableColumnHeaderSelect: bool,
             ?defaultStyleSelect: bool,
             ?debug: bool,
-            ?annotator: bool,
-            ?setSelectedCells: Set<int * int> -> unit
+            ?annotator: bool
         ) =
         let debug = defaultArg debug false
         let annotator = defaultArg annotator false
@@ -135,23 +134,6 @@ swt:p-0"""
                 minCol = 1,
                 onSelect = onSelect
             )
-
-        React.useEffect ((fun _ ->
-            console.log setSelectedCells.IsSome
-            console.log GridSelect.selectedCells.IsSome
-            if GridSelect.selectedCells.IsSome && setSelectedCells.IsSome then
-                let xValues = [| GridSelect.selectedCells.Value.xStart.. GridSelect.selectedCells.Value.xEnd |]
-                let yValues = [| GridSelect.selectedCells.Value.yStart.. GridSelect.selectedCells.Value.yEnd |]
-                let  coordinates =
-                    [| for x in xValues do
-                        for y in yValues do
-                            yield (x - 1, y - 1) |]
-                    |> Set.ofArray
-                console.log (coordinates |> Array.ofSeq)
-                coordinates
-                |> setSelectedCells.Value),
-            [| box GridSelect.selectedCells |]
-        )
 
         React.useImperativeHandle (
             ref,

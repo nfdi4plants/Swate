@@ -192,6 +192,7 @@ type Msg =
     | UpdateDatamap of DataMap option
     | UpdateDataMapDataContextAt of index: int * DataContext
     | AddTable of ArcTable
+    | UpdateTable of ArcTable
     | RemoveTable of index: int
     | RenameTable of index: int * name: string
     | UpdateTableOrder of pre_index: int * new_index: int

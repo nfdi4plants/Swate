@@ -9,20 +9,17 @@ open Swate.Components
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
 
-    let table = model.SpreadsheetModel.ActiveTable
-    let table, setTable = React.useState(table)
-    let selectedCells, setSelectedCells = React.useState(model.SpreadsheetModel.SelectedCells)
+    let setTable = fun (table: ARCtrl.ArcTable) -> Spreadsheet.UpdateTable table |> SpreadsheetMsg |> dispatch
+    let setSelectedCells = fun selectedCells -> Spreadsheet.UpdateSelectedCells selectedCells |> SpreadsheetMsg |> dispatch
 
-    console.log (selectedCells |> Array.ofSeq)
-    console.log (model.SpreadsheetModel.SelectedCells |> Array.ofSeq)
+    let onSelect (index: CellCoordinate) (indices: CellCoordinateRange option) =
+        if indices.IsSome then
+            let xValues = [| indices.Value.xStart..indices.Value.xEnd |]
+            let yValues = [| indices.Value.yStart..indices.Value.yEnd |]
+            [| for x in xValues do
+                for y in yValues do
+                    yield (x - 1, y - 1) |]
+            |> Set.ofArray
+            |> setSelectedCells
 
-    React.useEffect(
-        (fun () ->
-            setTable(model.SpreadsheetModel.ActiveTable)
-            if selectedCells <> model.SpreadsheetModel.SelectedCells then
-                Spreadsheet.UpdateSelectedCells selectedCells |> SpreadsheetMsg |> dispatch
-        ),
-        [| box model; box selectedCells |]
-    )
-
-    AnnotationTable.AnnotationTable(table, setTable, setSelectedCells)
+    AnnotationTable.AnnotationTable(model.SpreadsheetModel.ActiveTable, setTable, onSelect)

@@ -46,6 +46,10 @@ let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model
     state.Tables.AddTable(newTable)
     switchTable (state.Tables.TableCount - 1) state
 
+/// <summary>This is the basic function to update an existing Table from an array of SwateBuildingBlocks</summary>
+let updateTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    state.Tables.UpdateTable(newTable.Name, newTable)
+    switchTable (state.Tables.TableCount - 1) state
 
 /// <summary>This function is used to create multiple tables at once.</summary>
 let addTables (tables: ArcTable[]) (state: Spreadsheet.Model) : Spreadsheet.Model =

@@ -36,7 +36,7 @@ type AnnotationTable =
             ?debug = debug
         )
 
-    static member private ContextMenu(arcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool) =
+    static member private ContextMenu(arcTable: ArcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool) =
 
         ContextMenu.ContextMenu(
             (fun data ->
@@ -206,7 +206,7 @@ type AnnotationTable =
 
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?setSelectedCells: Set<int * int> -> unit, ?height: int, ?debug: bool) =
+    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?onSelect: GridSelect.OnSelect, ?height: int, ?debug: bool) =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
@@ -305,6 +305,7 @@ type AnnotationTable =
                     renderActiveCell = renderActiveCell,
                     ref = tableRef,
                     ?height = height,
+                    ?onSelect = onSelect,
                     onKeydown =
                         (fun (e, selectedCells, activeCell) ->
                             if
@@ -320,8 +321,7 @@ type AnnotationTable =
                                 arcTable.Copy() |> setArcTable
                         ),
                     enableColumnHeaderSelect = true,
-                    debug = debug,
-                    ?setSelectedCells = setSelectedCells
+                    debug = debug
                 )
             ]
         ]

@@ -111,6 +111,10 @@ module Spreadsheet =
             | AddTable table ->
                 let nextState = Controller.Table.addTable table state
                 nextState, model, Cmd.none
+            | UpdateTable table ->
+                let nextTable = table.Copy()
+                let nextState = Controller.Table.updateTable nextTable state
+                nextState, model, Cmd.none
             | CreateAnnotationTable usePrevOutput ->
                 let nextState = Controller.Table.createTable usePrevOutput state
                 nextState, model, Cmd.none
@@ -143,7 +147,6 @@ module Spreadsheet =
                     state with
                         ArcFile = Some updatedArcFile
                 }
-
                 nextState, model, Cmd.none
             | JoinTable(table, index, options, templateName) ->
                 let nextState =
