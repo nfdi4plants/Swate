@@ -15,6 +15,7 @@ open Fable.Core.JsInterop
 
 open ARCtrl
 open ArcTableHelper
+open Swate.Components
 
 module private ModelUtil =
 
@@ -349,10 +350,12 @@ module Interface =
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
-                    if model.SpreadsheetModel.SelectedCells.IsEmpty then
-                        model, Cmd.ofMsg (DevMsg.GenericError(Cmd.none, exn ("No cell(s) selected.")) |> DevMsg)
-                    else
-                        let columnIndex, rowIndex = model.SpreadsheetModel.SelectedCells.MinimumElement
+                    if model.SpreadsheetModel.SelectedCells.IsSome then
+                        let columnIndex, rowIndex =
+                            if model.SpreadsheetModel.SelectedCells.IsSome then
+                                model.SpreadsheetModel.SelectedCells.Value.xStart, model.SpreadsheetModel.SelectedCells.Value.yStart
+                            else
+                                [| |] |> Array.min
                         let mutable rowIndex = rowIndex
 
                         let cells = [|
@@ -360,13 +363,20 @@ module Interface =
                                 match model.SpreadsheetModel.ActiveTable.TryGetCellAt(columnIndex, rowIndex) with
                                 | Some c ->
                                     let cell = c.UpdateMainField name
-                                    (columnIndex, rowIndex), cell
+                                    let coordinate: CellCoordinate =
+                                        {|
+                                            x = columnIndex
+                                            y = rowIndex
+                                        |}
+                                    coordinate, cell
                                     rowIndex <- rowIndex + 1
                                 | None -> ()
                         |]
 
                         let cmd = Spreadsheet.UpdateCells cells |> SpreadsheetMsg |> Cmd.ofMsg
                         model, cmd
+                    else
+                        model, Cmd.ofMsg (DevMsg.GenericError(Cmd.none, exn ("No cell(s) selected.")) |> DevMsg)
                 | _ -> failwith "not implemented"
             | RemoveBuildingBlock ->
                 match host with
@@ -375,11 +385,13 @@ module Interface =
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
-                    if Set.isEmpty model.SpreadsheetModel.SelectedCells then
+                    if model.SpreadsheetModel.SelectedCells.IsNone then
                         failwith "No column selected"
 
-                    let deselectedColumns, _ =
-                        model.SpreadsheetModel.SelectedCells |> Set.toArray |> Array.unzip
+                    let deselectedColumns =
+                        CellCoordinateRange.toArray model.SpreadsheetModel.SelectedCells.Value
+                        |> Array.ofSeq
+                        |> Array.map (fun index -> index.x)
 
                     let distinct = deselectedColumns |> Array.distinct
 

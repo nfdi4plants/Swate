@@ -10,6 +10,7 @@ open Excel
 open GlobalBindings
 
 open Regex
+open Swate.Components
 
 module SidebarControllerAux =
 
@@ -19,9 +20,12 @@ module SidebarControllerAux =
     /// <param name="state"></param>
     let getNextColumnIndex (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
-        if not state.SelectedCells.IsEmpty then
+        if state.SelectedCells.IsSome then
             let indexNextToSelected =
-                state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1
+                CellCoordinateRange.toArray state.SelectedCells.Value
+                |> Array.ofSeq
+                |> Array.head
+                |> (fun coordinate -> coordinate.x + 1)
 
             indexNextToSelected
         else
@@ -29,10 +33,10 @@ module SidebarControllerAux =
 
 module SanityChecks =
     /// Make sure only one column is selected
-    let verifyOnlyOneColumnSelected (selectedCells: (int * int)[]) =
+    let verifyOnlyOneColumnSelected (selectedCells: CellCoordinate []) =
         let isOneColumn =
-            let columnIndex = fst selectedCells.[0] // can just use head of selected cells as all must be same column
-            selectedCells |> Array.forall (fun x -> fst x = columnIndex)
+            let columnIndex = selectedCells.[0].x // can just use head of selected cells as all must be same column
+            selectedCells |> Array.forall (fun coordinate -> coordinate.x = columnIndex)
 
         if not isOneColumn then
             failwith "Can only paste term in one column at a time!"
@@ -163,12 +167,16 @@ let joinTable
     { state with ArcFile = state.ArcFile }
 
 let insertTerm_IntoSelected (term: OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let selected = state.SelectedCells |> Set.toArray
+    let selected =
+        if state.SelectedCells.IsSome then
+            CellCoordinateRange.toArray  state.SelectedCells.Value |> Array.ofSeq
+        else
+            [| |]
     SanityChecks.verifyOnlyOneColumnSelected selected
 
-    for (colIndex, rowIndex) in selected do
-        let c = Generic.getCell (colIndex, rowIndex) state
+    for coordinate in selected do
+        let c = Generic.getCell (coordinate.x, coordinate.y) state
         let newCell = c.UpdateWithOA term
-        Controller.Generic.setCell (colIndex, rowIndex) newCell state
+        Controller.Generic.setCell (coordinate.x, coordinate.y) newCell state
 
     { state with ArcFile = state.ArcFile }

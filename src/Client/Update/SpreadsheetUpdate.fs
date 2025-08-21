@@ -5,6 +5,7 @@ open Elmish
 open Spreadsheet
 open LocalHistory
 open Model
+open Swate.Components
 open Swate.Components.Shared
 open Fable.Remoting.Client
 open FsSpreadsheet.Js
@@ -175,7 +176,7 @@ module Spreadsheet =
                 let cmd = Cmd.none
                 state, model, cmd
             | UpdateCell(index, cell) ->
-                Controller.Generic.setCell index cell state
+                Controller.Generic.setCell (index.x, index.y) cell state
                 let nextState = { state with ArcFile = state.ArcFile }
                 nextState, model, Cmd.none
             | UpdateCells arr ->
@@ -192,7 +193,7 @@ module Spreadsheet =
                 let nextState = {
                     state with
                         ActiveView = nextView
-                        SelectedCells = Set.empty
+                        SelectedCells = None
                 }
 
                 nextState, model, Cmd.none
@@ -256,7 +257,7 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | MoveSelectedCell keypressed ->
                 let cmd =
-                    match state.SelectedCells.IsEmpty with
+                    match state.SelectedCells.IsNone with
                     | true -> Cmd.none
                     | false ->
                         let moveBy =
@@ -274,29 +275,41 @@ module Spreadsheet =
                                 DataMap.ColumnCount - 1, state.DataMapOrDefault.DataContexts.Count - 1
                             | _ -> (state.ActiveTable.ColumnCount - 1), (state.ActiveTable.RowCount - 1) // This does not matter
 
+                        let startCoordinates =
+                            state.SelectedCells.Value.xStart, state.SelectedCells.Value.yStart
+
                         let nextIndex =
                             Controller.Table.selectRelativeCell
-                                state.SelectedCells.MinimumElement
+                                startCoordinates
                                 moveBy
                                 maxColIndex
                                 maxRowIndex
 
-                        let s = Set([ nextIndex ])
+                        let range: CellCoordinateRange =
+                            {|
+                                xStart = fst nextIndex
+                                xEnd = fst nextIndex
+                                yStart = snd nextIndex
+                                yEnd = snd nextIndex
+                            |}
+
                         let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
 
                         match Browser.Dom.document.getElementById cellId with
                         | null -> ()
                         | ele -> ele.focus ()
 
-                        UpdateSelectedCells s |> SpreadsheetMsg |> Cmd.ofMsg
+                        UpdateSelectedCells (Some range) |> SpreadsheetMsg |> Cmd.ofMsg
 
                 state, model, cmd
             | SetActiveCellFromSelected ->
                 let cmd =
-                    if state.SelectedCells.IsEmpty then
-                        Cmd.none
-                    else
-                        let min = state.SelectedCells.MinimumElement
+                    if state.SelectedCells.IsSome then
+                        let min: CellCoordinate =
+                            {|
+                                x = state.SelectedCells.Value.xStart
+                                y = state.SelectedCells.Value.yStart
+                            |}
 
                         let cmd =
                             (Fable.Core.U2.Case2 min, ColumnType.Main)
@@ -305,6 +318,8 @@ module Spreadsheet =
                             |> SpreadsheetMsg
 
                         Cmd.ofMsg cmd
+                    else
+                        Cmd.none
 
                 state, model, cmd
             | UpdateActiveCell next ->
@@ -347,7 +362,7 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | CutSelectedCell ->
                 let nextState =
-                    if state.SelectedCells.IsEmpty then
+                    if state.SelectedCells.IsNone then
                         state
                     else
                         Controller.Clipboard.cutSelectedCell state
@@ -355,7 +370,7 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | CutSelectedCells ->
                 let nextState =
-                    if state.SelectedCells.IsEmpty then
+                    if state.SelectedCells.IsNone then
                         state
                     else
                         Controller.Clipboard.cutSelectedCells state
@@ -401,7 +416,12 @@ module Spreadsheet =
                 let nextState = Controller.Table.clearCells indices state
                 nextState, model, Cmd.none
             | ClearSelected ->
-                let indices = state.SelectedCells |> Set.toArray
+                let indices =
+                    if state.SelectedCells.IsSome then
+                        CellCoordinateRange.toArray state.SelectedCells.Value
+                        |> Array.ofSeq
+                    else
+                        [| |]
                 let nextState = Controller.Table.clearCells indices state
                 nextState, model, Cmd.none
             | FillColumnWithTerm index ->

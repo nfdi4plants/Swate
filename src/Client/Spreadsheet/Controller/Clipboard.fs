@@ -2,6 +2,7 @@ module Spreadsheet.Controller.Clipboard
 
 open Fable.Core
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 
 let copyCell (cell: CompositeCell) : JS.Promise<unit> =
@@ -12,44 +13,57 @@ let copyCells (cells: CompositeCell[]) : JS.Promise<unit> =
     let tab = CompositeCell.ToTabTxt cells
     navigator.clipboard.writeText (tab)
 
-let copyCellByIndex (index: int * int) (state: Spreadsheet.Model) : JS.Promise<unit> =
-    let cell = Generic.getCell index state
+let copyCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<unit> =
+    let cell = Generic.getCell (index.x, index.y) state
     copyCell cell
 
-let copyCellsByIndex (indices: (int * int)[]) (state: Spreadsheet.Model) : JS.Promise<unit> =
+let copyCellsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) : JS.Promise<unit> =
     let cells = [|
         for index in indices do
-            yield Generic.getCell index state
+            yield Generic.getCell (index.x, index.y) state
     |]
 
     copyCells cells
 
 let copySelectedCell (state: Spreadsheet.Model) : JS.Promise<unit> =
     /// Array.head is used until multiple cells are supported, should this ever be intended
-    let index = state.SelectedCells |> Set.toArray |> Array.min
-    copyCellByIndex index state
+    let index =
+        if state.SelectedCells.IsSome then
+            (state.SelectedCells.Value.xStart, state.SelectedCells.Value.yStart)
+        else
+            [||] |> Array.min
+    let coordinate: CellCoordinate =
+        {|
+            x = fst index
+            y = snd index
+        |}
+    copyCellByIndex coordinate state
 
 let copySelectedCells (state: Spreadsheet.Model) : JS.Promise<unit> =
     /// Array.head is used until multiple cells are supported, should this ever be intended
-    let indices = state.SelectedCells |> Set.toArray
+    let indices =
+        if state.SelectedCells.IsSome then
+            CellCoordinateRange.toArray state.SelectedCells.Value |> Array.ofSeq
+        else
+            [| |]
     copyCellsByIndex indices state
 
-let cutCellByIndex (index: int * int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let cell = Generic.getCell index state
+let cutCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let cell = Generic.getCell (index.x, index.y) state
     // Remove selected cell value
     let emptyCell = cell.GetEmptyCell()
-    Generic.setCell index emptyCell state
+    Generic.setCell (index.x, index.y) emptyCell state
     copyCell cell |> Promise.start
     state
 
-let cutCellsByIndices (indices: (int * int)[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let cutCellsByIndices (indices: CellCoordinate []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cells = ResizeArray()
 
     for index in indices do
-        let cell = Generic.getCell index state
+        let cell = Generic.getCell (index.x, index.y) state
         // Remove selected cell value
         let emptyCell = cell.GetEmptyCell()
-        Generic.setCell index emptyCell state
+        Generic.setCell (index.x, index.y) emptyCell state
         cells.Add(cell)
 
     copyCells (Array.ofSeq cells) |> Promise.start
@@ -57,52 +71,80 @@ let cutCellsByIndices (indices: (int * int)[]) (state: Spreadsheet.Model) : Spre
 
 let cutSelectedCell (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.min is used until multiple cells are supported, should this ever be intended
-    let index = state.SelectedCells |> Set.toArray |> Array.min
-    cutCellByIndex index state
+    let index =
+        if state.SelectedCells.IsSome then
+            state.SelectedCells.Value.xStart, state.SelectedCells.Value.yStart
+        else
+            [||] |> Array.min
+    let coordinate: CellCoordinate =
+        {|
+            x = fst index
+            y = snd index
+        |}
+    cutCellByIndex coordinate state
 
 let cutSelectedCells (state: Spreadsheet.Model) : Spreadsheet.Model =
     /// Array.min is used until multiple cells are supported, should this ever be intended
-    let indices = state.SelectedCells |> Set.toArray
+    let indices =
+        if state.SelectedCells.IsSome then
+            CellCoordinateRange.toArray state.SelectedCells.Value
+            |> Array.ofSeq
+        else
+            [| |]
     cutCellsByIndices indices state
 
-let pasteCellByIndex (index: int * int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
+let pasteCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
     let! tab = navigator.clipboard.readText ()
-    let header = Generic.getHeader (fst index) state
+    let header = Generic.getHeader index.x state
     let cell = CompositeCell.fromTabTxt tab header |> Array.head
-    Generic.setCell index cell state
+    Generic.setCell (index.x, index.y) cell state
     return state
 }
 
-let pasteCellsByIndexExtend (index: int * int) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
+let pasteCellsByIndexExtend (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
     let! tab = navigator.clipboard.readText ()
-    let header = Generic.getHeader (fst index) state
+    let header = Generic.getHeader index.x state
     let cells = CompositeCell.fromTabTxt tab header
-    let columnIndex, rowIndex = fst index, snd index
 
     let indexedCells =
         cells
         |> Array.indexed
-        |> Array.map (fun (i, c) -> (columnIndex, rowIndex + i), c)
+        |> Array.map (fun (i, c) ->
+            let coordinate: CellCoordinate =
+                {|
+                    x = index.x
+                    y = index.y + i
+                |}
+            (coordinate, c))
 
     Generic.setCells indexedCells state
     return state
 }
 
 let pasteCellIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
-    if state.SelectedCells.IsEmpty then
-        promise { return state }
+    if state.SelectedCells.IsSome then
+        let coordinate: CellCoordinate =
+            {|
+                x = state.SelectedCells.Value.xStart
+                y = state.SelectedCells.Value.yStart
+            |}
+        pasteCellByIndex coordinate state
     else
-        let minIndex = state.SelectedCells |> Set.toArray |> Array.min
-        pasteCellByIndex minIndex state
+        promise { return state }
 
 let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> =
-    if state.SelectedCells.IsEmpty then
-        promise { return state }
-    else
-        let columnIndex = state.SelectedCells |> Set.toArray |> Array.minBy fst |> fst
+    if state.SelectedCells.IsSome then
+        let columnIndex =
+            if state.SelectedCells.IsSome then
+                state.SelectedCells.Value.xStart
+            else
+                [||] |> Array.min
 
         let selectedSingleColumnCells =
-            state.SelectedCells |> Set.filter (fun index -> fst index = columnIndex)
+            if state.SelectedCells.IsSome then
+               CellCoordinateRange.toArray state.SelectedCells.Value |> Array.ofSeq |> Array.filter (fun index -> index.x = columnIndex)
+            else
+                [| |]
 
         promise {
             let! tab = navigator.clipboard.readText ()
@@ -118,13 +160,15 @@ let pasteCellsIntoSelected (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.M
                 Generic.setCells newCells state
                 return state
             else
-                let rowCount = selectedSingleColumnCells.Count
+                let rowCount = selectedSingleColumnCells.Length
                 let cellsTrimmed = cells |> Array.takeSafe rowCount
 
                 let indicesTrimmed =
-                    (Set.toArray selectedSingleColumnCells).[0 .. cellsTrimmed.Length - 1]
+                    selectedSingleColumnCells.[0 .. cellsTrimmed.Length - 1]
 
                 let indexedCellsTrimmed = Array.zip indicesTrimmed cellsTrimmed
                 Generic.setCells indexedCellsTrimmed state
                 return state
         }
+    else
+        promise { return state }

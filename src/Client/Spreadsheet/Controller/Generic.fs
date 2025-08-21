@@ -2,6 +2,7 @@ module Spreadsheet.Controller.Generic
 
 open Spreadsheet
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 
 let getCell ((ci, ri): int * int) (state: Spreadsheet.Model) : CompositeCell =
@@ -16,12 +17,12 @@ let setCell ((ci, ri): int * int) (cell: CompositeCell) (state: Spreadsheet.Mode
     | IsDataMap -> state.DataMapOrDefault.SetCell(ci, ri, cell)
     | IsMetadata -> failwith "Cannot set cell in metadata view"
 
-let setCells (cells: ((int * int) * CompositeCell)[]) (state: Spreadsheet.Model) : unit =
+let setCells (cells: (CellCoordinate * CompositeCell)[]) (state: Spreadsheet.Model) : unit =
     match state.ActiveView with
     | IsTable -> state.ActiveTable.SetCellsAt cells
     | IsDataMap ->
-        for ((ci, ri), cell) in cells do
-            state.DataMapOrDefault.SetCell(ci, ri, cell)
+        for (cellCoordinate, cell) in cells do
+            state.DataMapOrDefault.SetCell(cellCoordinate.x, cellCoordinate.y, cell)
     | IsMetadata -> failwith "Unable to UpdateCell on Metadata sheet"
 
 let getHeader (index: int) (state: Spreadsheet.Model) : CompositeHeader =

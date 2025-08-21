@@ -6,6 +6,7 @@ open Fable.Core
 open Spreadsheet
 open MainComponents
 open Messages
+open Swate.Components
 open Swate.Components.Shared
 open ARCtrl
 open Components
@@ -55,23 +56,15 @@ open CellAux
 module private EventPresets =
     open Swate.Components.Shared
 
-    let onClickSelect (index: int * int, isIdle: bool, selectedCells: Set<int * int>, model: Model, dispatch) =
+    let onClickSelect (index: int * int, isIdle: bool, selectedCells: CellCoordinateRange option, model: Model, dispatch) =
         fun (e: Browser.Types.MouseEvent) ->
             // don't select cell if active(editable)
             if isIdle then
                 let set =
-                    match e.shiftKey, selectedCells.Count with
-                    | true, 0 -> selectedCells
-                    | true, _ ->
-                        let createSetOfIndex (columnMin: int, columnMax, rowMin: int, rowMax: int) =
-                            [
-                                for c in columnMin..columnMax do
-                                    for r in rowMin..rowMax do
-                                        c, r
-                            ]
-                            |> Set.ofList
-
-                        let source = selectedCells.MinimumElement
+                    match e.shiftKey, selectedCells with
+                    | true, None -> selectedCells
+                    | true, Some cooridatnes ->
+                        let source = cooridatnes.xStart, cooridatnes.yStart
                         let target = index
 
                         let columnMin, columnMax =
@@ -80,22 +73,40 @@ module private EventPresets =
                         let rowMin, rowMax =
                             System.Math.Min(snd source, snd target), System.Math.Max(snd source, snd target)
 
-                        let set = createSetOfIndex (columnMin, columnMax, rowMin, rowMax)
-                        set
-                    | false, _ ->
-                        let next =
-                            if selectedCells = Set([ index ]) then
-                                Set.empty
+                        let cellCoordinates: CellCoordinateRange =
+                            {|
+                                xEnd = columnMax
+                                xStart = columnMin
+                                yEnd = rowMin
+                                yStart = rowMax
+                            |}
+                        Some cellCoordinates
+                    | false, Some cooridatnes ->
+                        let next: CellCoordinateRange option =
+                            let (selectedCoordinates: CellCoordinateRange) =
+                                {|
+                                    xEnd = fst index
+                                    xStart = fst index
+                                    yEnd = snd index
+                                    yStart = snd index
+                                |}
+                            if cooridatnes = selectedCoordinates then
+                                None
                             else
-                                Set([ index ])
+                                Some {|
+                                    xEnd = fst index
+                                    xStart = fst index
+                                    yEnd = snd index
+                                    yStart = snd index
+                                |}
 
                         next
 
                 UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
 
-                if not set.IsEmpty && model.SpreadsheetModel.TableViewIsActive() then
+                if set.IsSome && model.SpreadsheetModel.TableViewIsActive() then
                     let oa =
-                        let columnIndex = set |> Seq.minBy fst |> fst
+                        let columnIndex = set.Value.xStart
                         let column = model.SpreadsheetModel.ActiveTable.GetColumn(columnIndex)
 
                         if column.Header.IsTermColumn then
@@ -217,7 +228,7 @@ type Cell =
                         prop.onClick (fun e ->
                             e.preventDefault ()
                             e.stopPropagation ()
-                            UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                            UpdateSelectedCells None |> SpreadsheetMsg |> dispatch
                         )
 
                         prop.onDoubleClick (fun e ->
@@ -227,7 +238,7 @@ type Cell =
                             if isIdle then
                                 makeActive ()
 
-                            UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                            UpdateSelectedCells None |> SpreadsheetMsg |> dispatch
                         )
                     prop.children [
                         if isActive then
@@ -489,9 +500,9 @@ type Cell =
             ?tooltip: string
         ) =
         let readonly = defaultArg readonly false
-        let columnIndex, rowIndex = index
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
         let state = model.SpreadsheetModel
-        let isSelected = state.SelectedCells.Contains index
+        let isSelected = CellCoordinateRange.contains state.SelectedCells cellCoordinate
         let isIdle = state.CellIsIdle(!^index, columnType)
         let isActive = not isIdle
         let displayValue = defaultArg displayValue cellValue
@@ -502,12 +513,19 @@ type Cell =
             ele.focus ()
 
         let makeActive () =
-            UpdateActiveCell(Some(!^index, columnType)) |> SpreadsheetMsg |> dispatch
+            UpdateActiveCell(Some(!^cellCoordinate, columnType)) |> SpreadsheetMsg |> dispatch
 
         let makeSelected () =
-            UpdateSelectedCells(Set.singleton index) |> SpreadsheetMsg |> dispatch
+            let tempRange: CellCoordinateRange =
+                {|
+                    xEnd = cellCoordinate.x
+                    xStart = cellCoordinate.x
+                    yEnd = cellCoordinate.y
+                    yStart = cellCoordinate.y
+                |}
+            UpdateSelectedCells(Some tempRange) |> SpreadsheetMsg |> dispatch
 
-        let cellId = Controller.Cells.mkCellId columnIndex rowIndex state
+        let cellId = Controller.Cells.mkCellId cellCoordinate.x cellCoordinate.y state
         // let ref = React.useElementRef()
         Html.td [
             if tooltip.IsSome then
@@ -539,7 +557,7 @@ type Cell =
                     if isIdle then
                         makeActive ()
 
-                    UpdateSelectedCells Set.empty |> SpreadsheetMsg |> dispatch
+                    UpdateSelectedCells None |> SpreadsheetMsg |> dispatch
             )
             prop.onKeyDown (fun e ->
                 if e.code = Swate.Components.kbdEventCode.enter then
@@ -576,7 +594,7 @@ type Cell =
 
                         let headerOA =
                             if state.TableViewIsActive() then
-                                state.ActiveTable.Headers.[columnIndex].TryOA()
+                                state.ActiveTable.Headers.[cellCoordinate.x].TryOA()
                                 |> Option.bind (fun x ->
                                     x.TermAccessionShort |> Option.whereNot System.String.IsNullOrWhiteSpace
                                 )
@@ -648,11 +666,11 @@ type Cell =
 
     static member Body(index: (int * int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.GetContentSwate().[0]
-
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
         let setter =
             fun (s: string) ->
                 let nextCell = cell.UpdateMainField s
-                Msg.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
+                Msg.UpdateCell(cellCoordinate, nextCell) |> SpreadsheetMsg |> dispatch
 
         let oasetter =
             if cell.isTerm then
@@ -661,7 +679,7 @@ type Cell =
                     setter =
                         fun (oa: OntologyAnnotation) ->
                             let nextCell = cell.UpdateWithOA oa
-                            CellAux.oasetter (index, nextCell, dispatch)
+                            CellAux.oasetter (cellCoordinate, nextCell, dispatch)
                 |}
                 |> Some
             else
@@ -682,14 +700,14 @@ type Cell =
 
     static member BodyUnit(index: (int * int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().NameText
-
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
         let setter =
             fun (s: string) ->
                 let oa = cell.ToOA()
                 let newName = if s = "" then None else Some s
                 oa.Name <- newName
                 let nextCell = cell.UpdateWithOA oa
-                Msg.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
+                Msg.UpdateCell(cellCoordinate, nextCell) |> SpreadsheetMsg |> dispatch
 
         let oasetter =
             if cell.isUnitized then
@@ -698,7 +716,7 @@ type Cell =
                     setter =
                         fun (oa: OntologyAnnotation) ->
                             let nextCell = cell.UpdateWithOA oa
-                            CellAux.oasetter (index, nextCell, dispatch)
+                            CellAux.oasetter (cellCoordinate, nextCell, dispatch)
                 |}
                 |> Some
             else
@@ -719,6 +737,7 @@ type Cell =
 
     static member BodyTSR(index: (int * int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().TermSourceREF |> Option.defaultValue ""
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
 
         let setter =
             fun (s: string) ->
@@ -726,12 +745,13 @@ type Cell =
                 let newTSR = if s = "" then None else Some s
                 oa.TermSourceREF <- newTSR
                 let nextCell = cell.UpdateWithOA oa
-                Msg.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
+                Msg.UpdateCell(cellCoordinate, nextCell) |> SpreadsheetMsg |> dispatch
 
         Cell.BodyBase(TSR, cellValue, setter, index, model, dispatch)
 
     static member BodyTAN(index: (int * int), cell: CompositeCell, model: Model, dispatch) =
         let cellValue = cell.ToOA().TermAccessionNumber |> Option.defaultValue ""
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
 
         let setter =
             fun (s: string) ->
@@ -739,45 +759,48 @@ type Cell =
                 let newTAN = if s = "" then None else Some s
                 oa.TermAccessionNumber <- newTAN
                 let nextCell = cell.UpdateWithOA oa
-                Msg.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
+                Msg.UpdateCell(cellCoordinate, nextCell) |> SpreadsheetMsg |> dispatch
 
         Cell.BodyBase(TAN, cellValue, setter, index, model, dispatch)
 
     static member BodyDataSelector(index: (int * int), cell: CompositeCell, model: Model, dispatch) =
         let data = cell.AsData
         let cellValue = data.Selector |> Option.defaultValue ""
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
 
         let setter =
             fun (s: string) ->
                 let next = if s = "" then None else Some s
                 data.Selector <- next
                 let nextCell = cell.UpdateWithData data
-                Msg.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
+                Msg.UpdateCell(cellCoordinate, nextCell) |> SpreadsheetMsg |> dispatch
 
         Cell.BodyBase(ColumnType.DataSelector, cellValue, setter, index, model, dispatch)
 
     static member BodyDataFormat(index: (int * int), cell: CompositeCell, model: Model, dispatch) =
         let data = cell.AsData
         let cellValue = data.Format |> Option.defaultValue ""
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
 
         let setter =
             fun (s: string) ->
                 let next = if s = "" then None else Some s
                 data.Format <- next
                 let nextCell = cell.UpdateWithData data
-                Msg.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
+                Msg.UpdateCell(cellCoordinate, nextCell) |> SpreadsheetMsg |> dispatch
 
         Cell.BodyBase(ColumnType.DataFormat, cellValue, setter, index, model, dispatch)
 
     static member BodyDataSelectorFormat(index: (int * int), cell: CompositeCell, model: Model, dispatch) =
         let data = cell.AsData
         let cellValue = data.SelectorFormat |> Option.defaultValue ""
+        let cellCoordinate: CellCoordinate = {| x = fst index; y = snd index |}
 
         let setter =
             fun (s: string) ->
                 let next = if s = "" then None else Some s
                 data.SelectorFormat <- next
                 let nextCell = cell.UpdateWithData data
-                Msg.UpdateCell(index, nextCell) |> SpreadsheetMsg |> dispatch
+                Msg.UpdateCell(cellCoordinate, nextCell) |> SpreadsheetMsg |> dispatch
 
         Cell.BodyBase(ColumnType.DataSelectorFormat, cellValue, setter, index, model, dispatch)

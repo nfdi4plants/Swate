@@ -82,25 +82,25 @@ module ActivePattern =
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
 type Model = {
     ActiveView: ActiveView
-    SelectedCells: Set<int * int>
-    ActiveCell: (U2<int, (int * int)> * ColumnType) option
+    SelectedCells: CellCoordinateRange option
+    ActiveCell: (U2<int, CellCoordinate> * ColumnType) option
     ArcFile: ArcFiles option
 } with
 
     member this.CellIsActive(index: U2<int, int * int>, columnType) =
         match this.ActiveCell, index with
         | Some(U2.Case1(headerIndex), ct), U2.Case1(targetIndex) -> headerIndex = targetIndex && ct = columnType
-        | Some(U2.Case2(ci, ri), ct), U2.Case2 targetIndex -> (ci, ri) = targetIndex && ct = columnType
+        | Some(U2.Case2(coordinate), ct), U2.Case2 targetIndex -> (coordinate.x, coordinate.y) = targetIndex && ct = columnType
         | _ -> false
 
-    member this.CellIsSelected(index: int * int) = this.SelectedCells.Contains((index))
+    member this.CellIsSelected(index: CellCoordinate) = CellCoordinateRange.contains this.SelectedCells index
 
     member this.CellIsIdle(index: U2<int, int * int>, columnType) =
         this.CellIsActive(index, columnType) |> not
 
     static member init() = {
         ActiveView = ActiveView.Metadata
-        SelectedCells = Set.empty
+        SelectedCells = None
         ActiveCell = None
         ArcFile = None
     }
@@ -115,7 +115,7 @@ type Model = {
 
     static member init(arcFile: ArcFiles) = {
         ActiveView = ActiveView.Metadata
-        SelectedCells = Set.empty
+        SelectedCells = None
         ActiveCell = None
         ArcFile = Some arcFile
     }
@@ -180,14 +180,14 @@ type Key =
 type Msg =
     // <--> UI <-->
     | UpdateState of Model
-    | UpdateCell of (int * int) * CompositeCell
-    | UpdateCells of ((int * int) * CompositeCell)[]
+    | UpdateCell of CellCoordinate * CompositeCell
+    | UpdateCells of (CellCoordinate * CompositeCell)[]
     | UpdateHeader of columIndex: int * CompositeHeader
     | UpdateActiveView of ActiveView
-    | UpdateSelectedCells of Set<int * int>
+    | UpdateSelectedCells of CellCoordinateRange option
     | MoveSelectedCell of Key
     | MoveColumn of current: int * next: int
-    | UpdateActiveCell of (U2<int, (int * int)> * ColumnType) option
+    | UpdateActiveCell of (U2<int, CellCoordinate> * ColumnType) option
     | SetActiveCellFromSelected
     | UpdateDatamap of DataMap option
     | UpdateDataMapDataContextAt of index: int * DataContext
@@ -207,16 +207,16 @@ type Msg =
     | CutSelectedCells
     | PasteSelectedCell
     | PasteSelectedCells
-    | CopyCell of index: (int * int)
-    | CopyCells of indices: (int * int)[]
-    | CutCell of index: (int * int)
-    | PasteCell of index: (int * int)
-    | SetCell of columnIndex: int * rowIndex: int * term: Term option
+    | CopyCell of index: CellCoordinate
+    | CopyCells of indices: CellCoordinate []
+    | CutCell of index: CellCoordinate
+    | PasteCell of index: CellCoordinate
+    | SetCell of CellCoordinate * term: Term option
     /// This Msg will paste all cell from clipboard into column starting from index. It will extend the table if necessary.
-    | PasteCellsExtend of index: (int * int)
-    | Clear of index: (int * int)[]
+    | PasteCellsExtend of index: CellCoordinate
+    | Clear of index: CellCoordinate []
     | ClearSelected
-    | FillColumnWithTerm of index: (int * int)
+    | FillColumnWithTerm of index: CellCoordinate
     // /// Update column of index to new column type defined by given SwateCell.emptyXXX
     // | EditColumn of index: int * newType: SwateCell * b_type: BuildingBlockType option
     /// This will reset Spreadsheet.Model to Spreadsheet.Model.init() and clear all webstorage.
