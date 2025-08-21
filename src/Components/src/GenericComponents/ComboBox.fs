@@ -57,7 +57,8 @@ type ComboBox =
             ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
             ?onFocus: Browser.Types.FocusEvent -> unit,
             ?onBlur: Browser.Types.FocusEvent -> unit,
-            ?onOpen: bool -> unit
+            ?onOpen: bool -> unit,
+            ?props: obj
         ) : ReactElement =
         let isOpen, setOpen = React.useState (false)
 
@@ -78,6 +79,7 @@ type ComboBox =
                 middleware = [|
                     FloatingUI.Middleware.offset (10)
                     FloatingUI.Middleware.flip ({| padding = 10 |})
+                    FloatingUI.Middleware.shift ()
                     FloatingUI.Middleware.size ()
                 |]
             )
@@ -202,8 +204,9 @@ type ComboBox =
                     fun () ->
                         setOpen false
                         setActiveIndex None
+                isOpen = fun () -> isOpen
             |}),
-            [| box fluiContext.refs.reference |]
+            [| box fluiContext.refs.reference; box isOpen |]
         )
 
         // React.useElementListener.onKeyDown (
@@ -229,6 +232,8 @@ type ComboBox =
                         prop.id inputId
                         prop.autoComplete "off"
                         prop.className "swt:grow swt:shrink swt:min-w-0"
+                        if props.IsSome then
+                            yield! prop.spread props.Value
                         for key, v in
                             useInteractions.getReferenceProps (
                                 {|

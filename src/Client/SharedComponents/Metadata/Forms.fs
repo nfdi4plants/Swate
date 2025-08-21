@@ -63,9 +63,11 @@ module private API =
                             let s = s0?("employment-summary")
                             let department = s?("department-name") |> Null.defaultValue ""
                             let org = s?organization?name |> Null.defaultValue ""
-                            org, department)
+                            org, department
+                        )
 
-                    summary)
+                    summary
+                )
                 |> createAffiliationString
 
             let person =
@@ -304,7 +306,8 @@ module private Helper =
                                                             prop.text "Add"
                                                             prop.onClick (fun _ ->
                                                                 if not isSelected then
-                                                                    select person)
+                                                                    select person
+                                                            )
                                                         ]
                                                     ]
                                                     Html.td [
@@ -492,7 +495,8 @@ type FormComponents =
                     ResizeArray [
                         for _ in inputs do
                             Guid.NewGuid()
-                    ]),
+                    ]
+                ),
                 [| box inputs.Count |]
             )
 
@@ -552,10 +556,12 @@ type FormComponents =
                                                     item,
                                                     (fun v ->
                                                         inputs.[i] <- v
-                                                        inputs |> setter),
+                                                        inputs |> setter
+                                                    ),
                                                     (fun _ ->
                                                         inputs.RemoveAt i
-                                                        inputs |> setter)
+                                                        inputs |> setter
+                                                    )
                                                 ))
                                             )
                                     ]
@@ -567,7 +573,8 @@ type FormComponents =
                     prop.children [
                         Helper.addButton (fun _ ->
                             inputs.Add(constructor ())
-                            inputs |> setter)
+                            inputs |> setter
+                        )
                     ]
                 ]
             ]
@@ -598,7 +605,8 @@ type FormComponents =
                 if ref.current.IsSome then
                     setLoading false
                     setIsValid true
-                    ref.current.Value.value <- value),
+                    ref.current.Value.value <- value
+            ),
             [| box value |]
         )
 
@@ -701,11 +709,7 @@ type FormComponents =
                         TermSearch.TermSearch(
                             (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
                             (input |> Option.map _.ToTerm()),
-                            ?parentId = (parent |> Option.map _.TermAccessionShort),
-                            ?portalTermDropdown = portalObj,
-                            showDetails = true,
-                            advancedSearch = !^true,
-                            fullwidth = true
+                            ?parentId = (parent |> Option.map _.TermAccessionShort)
                         )
                         if rmv.IsSome then
                             Helper.deleteButton rmv.Value
@@ -728,7 +732,8 @@ type FormComponents =
                     (fun t -> t |> Option.defaultValue (OntologyAnnotation.empty ()) |> setV),
                     ?parent = parent,
                     rmv = rmv
-                )),
+                )
+            ),
             (fun oa1 oa2 -> oa1.Equals oa2),
             ?label = label
         )
@@ -748,7 +753,8 @@ type FormComponents =
                         p,
                         (fun _ ->
                             searchsetter p
-                            resetState ()),
+                            resetState ()
+                        ),
                         resetState
                     )
                 | GenericApiState.Error e -> Helper.errorModal (e, resetState)
@@ -786,7 +792,8 @@ type FormComponents =
                                     API.requestByORCID
                                     orcid
                                     (GenericApiState.Ok >> setState)
-                                    (GenericApiState.Error >> setState))
+                                    (GenericApiState.Error >> setState)
+                            )
                         ]
                     ]
                 ]
@@ -849,7 +856,8 @@ type FormComponents =
                     (fun s ->
                         let s = if s = "" then None else Some s
                         input.ORCID <- s
-                        input |> setter),
+                        input |> setter
+                    ),
                     (fun s -> setter s),
                     "ORCID"
                 )
@@ -867,7 +875,8 @@ type FormComponents =
                 input.Roles,
                 (fun oas ->
                     input.Roles <- oas
-                    input |> setter),
+                    input |> setter
+                ),
                 "Roles",
                 parent = TermCollection.PersonRoleWithinExperiment
             )
@@ -907,7 +916,8 @@ type FormComponents =
                                         GenericApiState.Ok persons |> setExternalPersons
                                     }
                                     |> Promise.catch (fun e -> GenericApiState.Error e |> setExternalPersons)
-                                    |> Promise.start)
+                                    |> Promise.start
+                                )
                             ]
                         ]
                     ]
@@ -923,7 +933,8 @@ type FormComponents =
                             externalPersons,
                             (fun person ->
                                 persons.Add(person)
-                                persons |> setter),
+                                persons |> setter
+                            ),
                             (fun _ -> setExternalPersons GenericApiState.Idle)
                         )
                 ]
@@ -949,7 +960,8 @@ type FormComponents =
         React.useEffect (
             (fun () ->
                 if ref.current.IsSome then
-                    ref.current.Value.value <- input_),
+                    ref.current.Value.value <- input_
+            ),
             [| box input_ |]
         )
 
@@ -967,7 +979,8 @@ type FormComponents =
                     prop.ref ref
                     prop.onChange (fun (e: System.DateTime) ->
                         let dtString = e.ToString("yyyy-MM-ddTHH:mm")
-                        onChange dtString)
+                        onChange dtString
+                    )
                 ]
             ]
         ]
@@ -1021,7 +1034,8 @@ type FormComponents =
                         pub,
                         (fun _ ->
                             searchsetter pub
-                            resetState ()),
+                            resetState ()
+                        ),
                         resetState
                     )
                 | GenericApiState.Error e -> Helper.errorModal (e, resetState)
@@ -1055,7 +1069,8 @@ type FormComponents =
                                     searchAPI
                                     id
                                     (GenericApiState.Ok >> setState)
-                                    (GenericApiState.Error >> setState))
+                                    (GenericApiState.Error >> setState)
+                            )
                         ]
                     ]
                 ]
@@ -1087,14 +1102,16 @@ type FormComponents =
                             comment.Name |> Option.defaultValue "",
                             (fun s ->
                                 comment.Name <- if s = "" then None else Some s
-                                comment |> setter),
+                                comment |> setter
+                            ),
                             placeholder = "comment name"
                         )
                         FormComponents.TextInput(
                             comment.Value |> Option.defaultValue "",
                             (fun s ->
                                 comment.Value <- if s = "" then None else Some s
-                                comment |> setter),
+                                comment |> setter
+                            ),
                             placeholder = "comment"
                         )
                         if rmv.IsSome then
@@ -1125,7 +1142,8 @@ type FormComponents =
                 (fun s ->
                     let s = if s = "" then None else Some s
                     publicationSetter s
-                    input |> setter),
+                    input |> setter
+                ),
                 label
             )
 
@@ -1150,7 +1168,8 @@ type FormComponents =
                     (fun s ->
                         let s = if s = "" then None else Some s
                         input.PubMedID <- s
-                        input |> setter),
+                        input |> setter
+                    ),
                     (fun pub -> setter pub),
                     "PubMed Id"
                 )
@@ -1159,7 +1178,8 @@ type FormComponents =
                     (fun s ->
                         let s = if s = "" then None else Some s
                         input.DOI <- s
-                        input |> setter),
+                        input |> setter
+                    ),
                     (fun pub -> setter pub),
                     "DOI"
                 )
@@ -1169,7 +1189,8 @@ type FormComponents =
                 input.Status,
                 (fun s ->
                     input.Status <- s
-                    input |> setter),
+                    input |> setter
+                ),
                 "Status",
                 parent = TermCollection.PublicationStatus
             )
@@ -1177,7 +1198,8 @@ type FormComponents =
                 input.Comments,
                 (fun c ->
                     input.Comments <- ResizeArray(c)
-                    input |> setter),
+                    input |> setter
+                ),
                 "Comments"
             )
             if rmv.IsSome then
@@ -1208,7 +1230,8 @@ type FormComponents =
                 field |> Option.defaultValue "",
                 (fun s ->
                     s |> Option.whereNot System.String.IsNullOrWhiteSpace |> setFunction
-                    input |> setter),
+                    input |> setter
+                ),
                 label
             )
 
@@ -1235,7 +1258,8 @@ type FormComponents =
                 Option.defaultValue "" input.Description,
                 (fun s ->
                     input.Description <- s |> Option.whereNot System.String.IsNullOrWhiteSpace
-                    input |> setter),
+                    input |> setter
+                ),
                 "Description",
                 isarea = true
             )
@@ -1243,7 +1267,8 @@ type FormComponents =
                 input.Comments,
                 (fun c ->
                     input.Comments <- c
-                    input |> setter),
+                    input |> setter
+                ),
                 "Comments"
             )
             if deletebutton.IsSome then

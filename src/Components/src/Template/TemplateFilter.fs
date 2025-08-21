@@ -192,7 +192,7 @@ module TemplateMocks =
 module TemplateFilterAux =
 
     let FilteredTemplateContext =
-        React.createContext<Context<Template[]>> (
+        React.createContext<StateContext<Template[]>> (
             "TemplateFilterCtx",
             {
                 data = [||]
@@ -642,7 +642,7 @@ type TemplateFilter =
     [<ReactComponent>]
     static member FilteredTemplateRenderer(children: Template[] -> ReactElement) =
         let filteredTemplatesCtx =
-            React.useContext<Context<Template[]>> TemplateFilterAux.FilteredTemplateContext
+            React.useContext<StateContext<Template[]>> TemplateFilterAux.FilteredTemplateContext
 
         let templates = filteredTemplatesCtx.data
 

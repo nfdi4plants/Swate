@@ -51,8 +51,6 @@ type private Term =
                         setTerm,
                         term = term,
                         classNames = Swate.Components.Types.TermSearchStyle(U2.Case1 "swt:border-current swt:join-item"),
-                        advancedSearch = U2.Case2 true,
-                        showDetails = true,
                         disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
                         disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
                         disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
@@ -219,9 +217,7 @@ type CompositeCollumnModal =
                         prop.className "swt:btn swt:btn-primary"
                         prop.style [ style.marginLeft length.auto ]
                         prop.onClick (fun _ -> setModalActivity modalActivity)
-                        prop.children [
-                            Icons.Cog()
-                        ]
+                        prop.children [ Icons.Cog() ]
                     ]
                 ]
             ]
@@ -458,15 +454,15 @@ type CompositeCollumnModal =
                 setIsOpen,
                 Data.header,
                 Data.content (
-                        newValue,
-                        setValue,
-                        selector,
-                        setSelector,
-                        format,
-                        setFormat,
-                        selectorFormat,
-                        setSelectorFormat
-                    ),
+                    newValue,
+                    setValue,
+                    selector,
+                    setSelector,
+                    format,
+                    setFormat,
+                    selectorFormat,
+                    setSelectorFormat
+                ),
                 className = "swt:relative swt:overflow-visible",
                 modalActions =
                     CompositeCollumnModal.modalActivity (

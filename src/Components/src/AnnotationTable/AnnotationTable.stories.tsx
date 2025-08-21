@@ -383,8 +383,8 @@ export const ActivateTermSearchContainer: Story = {
     await userEvent.type(input, 'Temperature', {delay: 50});
 
     await waitFor(() => {
-      const termDropdown = screen.getByTestId('term_dropdown');
-      expect(termDropdown).toBeVisible();
+      const termTemperature = screen.getByText('Temperature');
+      expect(termTemperature).toBeVisible();
     }, { timeout: 5000 });
   }
 }

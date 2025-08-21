@@ -29,6 +29,7 @@
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
+    <Compile Include="Util\ReactContexts.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
@@ -38,6 +39,7 @@
     <Compile Include="GenericComponents\ComboBox.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
+    <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="ArcTypeComponents\CreateColumnModal.fs" />
     <Compile Include="ArcTypeComponents\UpdateColumnModal.fs" />

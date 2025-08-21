@@ -4,6 +4,7 @@ module Swate.Components.Types
 open Fable.Core
 open Feliz
 
+
 type SelectItem<'a> = {| item: 'a; label: string |}
 
 type SelectItemRender<'a> = {|
@@ -15,6 +16,7 @@ type SelectItemRender<'a> = {|
 type ComboBoxRef = {|
     focus: unit -> unit
     close: unit -> unit
+    isOpen: unit -> bool
 |}
 
 type DaisyUIColors =
@@ -26,7 +28,7 @@ type DaisyUIColors =
     | Warning
     | Error
 
-type Context<'T> = { data: 'T; setData: 'T -> unit }
+type StateContext<'T> = { data: 'T; setData: 'T -> unit }
 
 [<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
 type Theme =
@@ -241,7 +243,7 @@ module Term =
 [<AllowNullLiteral>]
 [<Global>]
 type TermSearchStyle [<ParamObjectAttribute; Emit("$0")>] (?inputLabel: U2<string, string[]>) =
-    member val inputLabel: U2<string, string[]> option = jsNative with get, set
+    member val inputLabel: U2<string, string[]> option = inputLabel with get, set
 
 
 type style =
@@ -258,17 +260,11 @@ type style =
 
 [<AllowNullLiteral>]
 [<Global>]
-type AdvancedSearchController [<ParamObjectAttribute; Emit("$0")>] (startSearch: unit -> unit, cancel: unit -> unit) =
-    member val startSearch: unit -> unit = jsNative with get, set
-    member val cancel: unit -> unit = jsNative with get, set
-
-[<AllowNullLiteral>]
-[<Global>]
-type AdvancedSearch
+type AdvancedSearchOptions
     [<ParamObjectAttribute; Emit("$0")>]
-    (search: unit -> JS.Promise<ResizeArray<Term>>, form: AdvancedSearchController -> ReactElement) =
-    member val search: unit -> JS.Promise<ResizeArray<Term>> = jsNative with get, set
-    member val form: AdvancedSearchController -> ReactElement = jsNative with get, set
+    (setResults: (ResizeArray<Term> -> unit), formRef: IRefValue<unit -> JS.Promise<ResizeArray<Term>>>) =
+    member val setResults = setResults with get, set
+    member val formRef = formRef with get, set
 
 [<AllowNullLiteral>]
 [<Global>]
@@ -296,6 +292,34 @@ type ParentSearchCall = (string * string) -> JS.Promise<ResizeArray<Term>>
 /// @typedef {function(string): Promise<Term[]>} AllChildrenSearchCall
 ///
 type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
+
+
+type TermSearchConfigLocalStorageActiveKeysCtx = {
+    disableDefault: bool
+    aktiveKeys: string[] //cannot use Set<_> with local storage
+} with
+
+    static member init(?defaultActive: Set<string>) = {
+        disableDefault = false
+        aktiveKeys = defaultActive |> Option.map Set.toArray |> Option.defaultValue [||]
+    }
+
+type TermSearchConfigCtx = {
+    hasProvider: bool
+    disableDefault: bool
+    termSearchQueries: ResizeArray<string * SearchCall>
+    parentSearchQueries: ResizeArray<string * ParentSearchCall>
+    allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>
+} with
+
+    static member init() = {
+        hasProvider = false
+        disableDefault = false
+        termSearchQueries = ResizeArray()
+        parentSearchQueries = ResizeArray()
+        allChildrenSearchQueries = ResizeArray()
+    }
+
 
 module AnnotationTableContextMenu =
 

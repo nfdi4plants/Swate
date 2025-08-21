@@ -11,7 +11,7 @@ type ThemeProvider =
     [<ReactComponent(true)>]
     static member ThemeProvider
         (
-            reactContext: IContext<Context<Theme>>,
+            reactContext: IContext<StateContext<Theme>>,
             children: ReactElement,
             ?dataAttribute: string,
             ?localStorageKey: string,
@@ -37,7 +37,8 @@ type ThemeProvider =
             (fun () ->
                 match enforceTheme with
                 | Some enforcedTheme when enforcedTheme <> theme -> setTheme enforcedTheme
-                | _ -> ()),
+                | _ -> ()
+            ),
             [| box enforceTheme |]
         )
 

@@ -23,7 +23,6 @@ type TermSearchImplementation =
             setTerm,
             term,
             ?parentId = parentId,
-            advancedSearch = !^true,
             ?onFocus = onFocus,
             ?autoFocus = autoFocus,
             ?classNames = classNames,
@@ -32,9 +31,5 @@ type TermSearchImplementation =
             disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
             termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
             parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch,
-            showDetails = true,
-            portalModals = Browser.Dom.document.body,
-            ?fullwidth = fullwidth,
-            ?portalTermDropdown = portalTermDropdown
+            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
         )

@@ -4,6 +4,10 @@ import TermSearch from "./TermSearch.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
 import React from 'react';
 
+const TERMSEARCH_INPUT_TESTID = 'term-search-input'
+
+const TERMSEARCH_DETAILSMODAL_TESTID = 'modal_termsearch_details_modal'
+
 function renderTermSearch(args: any) {
   const [term, setTerm] = React.useState(undefined as Term | undefined);
 
@@ -40,11 +44,10 @@ export const Default: Story = {
   args: {
     onTermSelect: fn((term) => console.log(term)),
     term: undefined,
-    showDetails: true,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
-    const input = within(canvasElement).getByTestId('term-search-input');
+    const input = within(canvasElement).getByTestId(TERMSEARCH_INPUT_TESTID);
     expect(input).toBeInTheDocument();
     await userEvent.type(input, "instrument model", {delay: 50});
 
@@ -59,29 +62,28 @@ export const ParentSearch: Story = {
     onTermSelect: fn((term) => console.log(term)),
     term: undefined,
     parentId: "MS:1000031",
-    showDetails: true,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByTestId('term-search-input');
+    const input = canvas.getByTestId(TERMSEARCH_INPUT_TESTID);
     expect(input).toBeInTheDocument();
 
-    await userEvent.type(input, "SCIEX", {delay: 50});
+    await userEvent.type(input, "SCIEX instrument", {delay: 50});
 
     await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
 
     await waitFor(() => { // await api call response
-      const directedOutput = canvas.getByText("SCIEX instrument model");
+      const directedOutput = screen.getByText("SCIEX instrument model");
       expect(directedOutput).toBeInTheDocument();
-      const expectedIcons = canvas.getAllByTitle("Directed Search");
+      const expectedIcons = screen.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
     }, { timeout: 5000 });
   }
 }
 
 
-const DefaultAdvancedSearch: Story = {
+export const DefaultAdvancedSearch: Story = {
   render: renderTermSearch,
   parameters: {isolated: true},
   args: {
@@ -94,149 +96,27 @@ const DefaultAdvancedSearch: Story = {
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const indicator = canvas.getByTestId("advanced-search-indicator");
-    expect(indicator).toBeInTheDocument();
-    userEvent.click(indicator);
+    const input = canvas.getByTestId(TERMSEARCH_INPUT_TESTID);
 
-    const modal = await waitFor(() => screen.getByTestId("modal_advanced-search-modal"));
-    expect(modal).toBeInTheDocument();
-
-    const input = within(modal).getByTestId("advanced-search-term-name-input");
     expect(input).toBeInTheDocument();
 
-    await userEvent.type(input, "instrument", {delay: 50});
-    await fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    await userEvent.click(input);
+    await fireEvent.keyDown(input, { key: 'F2', code: 'F2' })
 
-    await waitFor(() => {
-      const r = screen.getByText("Instrument Model")
-      expect(r).toBeInTheDocument()
-    });
-  }
-}
-
-function customAdvancedSearch (setInput: (value: string) => void) {
-  return {
-    search: () =>
-      Promise.resolve([
-        {
-          name: "test input",
-          id: "TST:00001",
-          description: "Test Term",
-          isObsolete: true,
-          data: { test1: "Hello", test2: "World" },
-        },
-      ]),
-    form: (controller: { startSearch: () => void; cancel: () => void }) => (
-      <input
-        className="swt:input swt:w-full"
-        data-testid="advanced-search-input"
-        type="text"
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => (e.code === "Enter" ? controller.startSearch() : null)}
-      />
-    ),
-  }
-};
-
-function renderCustomAdvancedTermSearch(args: any) {
-  const [term, setTerm] = React.useState(undefined as Term | undefined);
-  const [input, setInput] = React.useState("");
-
-  // Create advancedSearch dynamically
-  const advancedSearchInstance = customAdvancedSearch(setInput);
-
-  return (
-    <div className='swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:h-[400px]'>
-      <TermSearch
-        {...args}
-        term={term}
-        onTermSelect={(selectedTerm) => {
-          setTerm(selectedTerm);
-          args.onTermSelect(selectedTerm); // Call mock or external handler
-        }}
-        advancedSearch={advancedSearchInstance}
-      />
-    </div>
-  );
-};
-
-
-/**
- * Advanced search with a custom form
- *
- * ```tsx
- * const advancedSearch = (input: string, setInput: (value: string) => void) => ({
- *   search: () =>
- *     Promise.resolve([
- *       {
- *         name: input,
- *         id: "TST:00001",
- *         description: "Test Term",
- *         isObsolete: true,
- *         data: { test1: "Hello", test2: "World" },
- *       },
- *     ]),
- *   form: (controller: { startSearch: () => void; cancel: () => void }) => (
- *     <input
- *       className="input"
- *       data-testid="advanced-search-input"
- *       type="text"
- *       onChange={(e) => setInput(e.target.value)}
- *       onKeyDown={(e) => (e.code === "Enter" ? controller.startSearch() : null)}
- *     />
- *   ),
- * });
- *
- * function renderAdvancedTermSearch(args: any) {
- *   const [term, setTerm] = React.useState(undefined as Term | undefined);
- *   const [input, setInput] = React.useState("");
- *
- *   // Create advancedSearch dynamically
- *   const advancedSearchInstance = advancedSearch(input, setInput);
- *
- *   return (
- *     <div className='container mx-auto flex flex-col p-2 gap-4 h-[400px]'>
- *       <TermSearch
- *         {...args}
- *         term={term}
- *         onTermSelect={(selectedTerm) => {
- *           setTerm(selectedTerm);
- *           args.onTermSelect(selectedTerm); // Call mock or external handler
- *         }}
- *         advancedSearch={advancedSearchInstance}
- *       />
- *     </div>
- *   );
- * };
- * ```
- **/
-export const CustomAdvancedSearch: Story = {
-  render: renderCustomAdvancedTermSearch,
-  args: {
-    term: undefined,
-    onTermSelect: fn((term) => console.log(term)),
-    showDetails: false,
-    debug: true
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const indicator = canvas.getByTestId("advanced-search-indicator");
-    expect(indicator).toBeInTheDocument();
-    await userEvent.click(indicator);
-
-    const modal = await waitFor(() => screen.getByTestId("modal_advanced-search-modal"));
+    const modal = await waitFor(() => screen.getByTestId(TERMSEARCH_DETAILSMODAL_TESTID));
     expect(modal).toBeInTheDocument();
 
-    const input = within(modal).getByTestId("advanced-search-input");
-    expect(input).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('advanced_search_btn'))
 
-    await userEvent.type(input, "test input", {delay: 50});
-    await fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    const modalInput = within(modal).getByTestId("advanced-search-term-name-input");
+    expect(modalInput).toBeInTheDocument();
+
+    await userEvent.type(modalInput, "instrument model", {delay: 50});
+    await fireEvent.keyDown(modalInput, { key: "Enter", code: "Enter" });
 
     await waitFor(() => {
-      const r = screen.getByText("test input")
-      expect(r).toHaveClass("swt:line-through")
-      expect(r).toBeInTheDocument()
+      const results = screen.getByText(/Results: \d+/);
+      expect(results).toBeInTheDocument();
     });
   }
 }
@@ -247,7 +127,6 @@ export const TIBSearch: Story = {
     term: undefined,
     parentId: "MS:1000031",
     onTermSelect: fn((term) => console.log(term)),
-    debug: true,
     disableDefaultSearch: true,
     disableDefaultParentSearch: true,
     disableDefaultAllChildrenSearch: true,
@@ -266,36 +145,26 @@ export const TIBSearch: Story = {
     const input = canvas.getByTestId('term-search-input');
     expect(input).toBeInTheDocument();
 
-    await userEvent.type(input, "SCIEX", {delay: 50});
+    await userEvent.type(input, "SCIEX instrument", {delay: 50});
 
     await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
 
     await waitFor(() => { // await api call response
-      const directedOutput = canvas.getByText("SCIEX instrument model");
+      const directedOutput = screen.getByText("SCIEX instrument model");
       expect(directedOutput).toBeInTheDocument();
-      const expectedIcons = canvas.getAllByTitle("Directed Search");
+      const expectedIcons = screen.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
     }, { timeout: 3000 });
 
     await userEvent.clear(input);
 
-    await userEvent.dblClick(input);
+    await userEvent.click(input);
+
+    await userEvent.keyboard("{ArrowDown}")
 
     await waitFor(() => { // await api call response
-      const debugContainer = canvas.getByTestId("term-search-container");
-      expect(debugContainer).toBeInTheDocument();
-      const debugValue = debugContainer.getAttribute("data-debug-searchresults")
-
-      try {
-        const parsedData = JSON.parse(debugValue!);
-        expect(Array.isArray(parsedData)).toBe(true); // f# discriminated unions are serialized as arrays
-        const searchResults = parsedData[1]
-        expect(Array.isArray(searchResults)).toBe(true); // element should be result array
-        expect(searchResults.length).toBeGreaterThan(100);
-      } catch (error) {
-        throw new Error(`Failed to parse data-debug-searchresults: ${debugValue}`);
-      }
-
+      const debugValue = input.getAttribute("data-debugresultcount")
+      expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
     }, { timeout: 3000 });
   }
 }

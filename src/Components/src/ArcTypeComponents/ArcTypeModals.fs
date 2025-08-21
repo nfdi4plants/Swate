@@ -63,10 +63,7 @@ type InputField =
                     setter,
                     term = v,
                     classNames = TermSearchStyle(U2.Case1 "swt:border-current"),
-                    advancedSearch = U2.Case2 true,
-                    showDetails = true,
                     autoFocus = autofocus,
-                    portalModals = Browser.Dom.document.body,
                     onKeyDown = (fun (e: KeyboardEvent) -> ArcTypeModalsUtil.inputKeydownHandler e submit rmv),
                     ?parentId = (parentOa |> Option.map (fun oa -> oa.TermAccessionShort))
                 )
@@ -98,8 +95,14 @@ type CompositeCellModal =
         "swt:overflow-y-auto swt:overflow-x-hidden swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
     static member TermModal
-        (oa: OntologyAnnotation, rmv, ?relevantCompositeHeader: CompositeHeader, ?setOa: OntologyAnnotation -> unit, ?setHeader: CompositeHeader -> unit, ?debug: string)
-        =
+        (
+            oa: OntologyAnnotation,
+            rmv,
+            ?relevantCompositeHeader: CompositeHeader,
+            ?setOa: OntologyAnnotation -> unit,
+            ?setHeader: CompositeHeader -> unit,
+            ?debug: string
+        ) =
         let initTerm = Term.fromOntologyAnnotation oa
         let isOpen, setIsOpen = React.useState (true)
         let tempTerm, setTempTerm = React.useState (initTerm)
@@ -113,16 +116,13 @@ type CompositeCellModal =
                     let header =
                         match relevantCompositeHeader.Value with
                         | CompositeHeader.Characteristic _ ->
-                            CompositeHeader.Characteristic (Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Component _ ->
-                            CompositeHeader.Component (Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Factor _ ->
-                            CompositeHeader.Factor (Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Parameter _ ->
-                            CompositeHeader.Parameter (Term.toOntologyAnnotation tempTerm)
+                            CompositeHeader.Characteristic(Term.toOntologyAnnotation tempTerm)
+                        | CompositeHeader.Component _ -> CompositeHeader.Component(Term.toOntologyAnnotation tempTerm)
+                        | CompositeHeader.Factor _ -> CompositeHeader.Factor(Term.toOntologyAnnotation tempTerm)
+                        | CompositeHeader.Parameter _ -> CompositeHeader.Parameter(Term.toOntologyAnnotation tempTerm)
                         | _ -> failwith $"Unknown CompositeHeader type {relevantCompositeHeader.Value.ToString()}"
-                    header
-                    |> setHeader.Value
+
+                    header |> setHeader.Value
                     rmv ()
                 else
                     failwith "At least one set parameter must be set!"
@@ -238,28 +238,32 @@ type CompositeCellModal =
             ?debug = debug
         )
 
-    static member private submit ((setValue:('a -> unit) option), (setHeader: (CompositeHeader -> unit) option), value, headerValue, rmv) =
+    static member private submit
+        ((setValue: ('a -> unit) option), (setHeader: (CompositeHeader -> unit) option), value, headerValue, rmv)
+        =
         try
             if setValue.IsSome then
                 setValue.Value value
                 rmv ()
             elif setHeader.IsSome then
                 let header = headerValue
-                header
-                |> setHeader.Value
+                header |> setHeader.Value
                 rmv ()
             else
                 failwith "At least one set parameter must be given!"
-        with _ -> ()
+        with _ ->
+            ()
 
-    static member FreeTextModal(value: string, rmv, ?setText: string -> unit, ?setHeader: CompositeHeader -> unit, ?debug) =
+    static member FreeTextModal
+        (value: string, rmv, ?setText: string -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
+        =
         let tempValue, setTempValue = React.useState (value)
         let isOpen, setIsOpen = React.useState (true)
 
         let submit =
             fun () ->
                 let headerValue = CompositeHeader.OfHeaderString tempValue
-                CompositeCellModal.submit(setText, setHeader, tempValue, headerValue, rmv)
+                CompositeCellModal.submit (setText, setHeader, tempValue, headerValue, rmv)
 
         BaseModal.Modal(
             isOpen,
@@ -281,8 +285,14 @@ type CompositeCellModal =
         )
 
     static member DataModal
-        (value: ARCtrl.Data, rmv, ?relevantCompositeHeader: CompositeHeader, ?setData: ARCtrl.Data -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
-        =
+        (
+            value: ARCtrl.Data,
+            rmv,
+            ?relevantCompositeHeader: CompositeHeader,
+            ?setData: ARCtrl.Data -> unit,
+            ?setHeader: CompositeHeader -> unit,
+            ?debug
+        ) =
         let tempData, setTempData = React.useState (value)
         let isOpen, setIsOpen = React.useState (true)
 
@@ -291,8 +301,9 @@ type CompositeCellModal =
                 try
                     let filePath = defaultArg tempData.FilePath ""
                     let headerValue = CompositeHeader.OfHeaderString filePath
-                    CompositeCellModal.submit(setData, setHeader, tempData, headerValue, rmv)
-                with _ -> ()
+                    CompositeCellModal.submit (setData, setHeader, tempData, headerValue, rmv)
+                with _ ->
+                    ()
 
         BaseModal.Modal(
             isOpen,
@@ -321,6 +332,7 @@ type CompositeCellModal =
                         rmv,
                         submit
                     )
+
                     InputField.Input(
                         (tempData.SelectorFormat |> Option.defaultValue ""),
                         (fun input ->
@@ -350,19 +362,29 @@ type CompositeCellModal =
         match compositeCell with
         | CompositeCell.Term oa ->
             let setOa = fun oa -> setCell (CompositeCell.Term oa)
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_Term"
                 else
                     None
-            CompositeCellModal.TermModal(oa, rmv, ?relevantCompositeHeader = relevantCompositeHeader, setOa = setOa, ?debug = debug)
+
+            CompositeCellModal.TermModal(
+                oa,
+                rmv,
+                ?relevantCompositeHeader = relevantCompositeHeader,
+                setOa = setOa,
+                ?debug = debug
+            )
         | CompositeCell.Unitized(v, oa) ->
             let setUnitized = fun v oa -> setCell (CompositeCell.Unitized(v, oa))
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_Unitized"
                 else
                     None
+
             CompositeCellModal.UnitizedModal(
                 v,
                 oa,
@@ -373,39 +395,46 @@ type CompositeCellModal =
             )
         | CompositeCell.FreeText text ->
             let setText = fun text -> setCell (CompositeCell.FreeText text)
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_FreeText"
                 else
                     None
+
             CompositeCellModal.FreeTextModal(text, rmv, setText = setText, ?debug = debug)
         | CompositeCell.Data data ->
             let setData = fun data -> setCell (CompositeCell.Data data)
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_Data"
                 else
                     None
-            CompositeCellModal.DataModal(data, rmv, setData = setData, ?relevantCompositeHeader = relevantCompositeHeader, ?debug = debug)
+
+            CompositeCellModal.DataModal(
+                data,
+                rmv,
+                setData = setData,
+                ?relevantCompositeHeader = relevantCompositeHeader,
+                ?debug = debug
+            )
 
     [<ReactComponent>]
-    static member CompositeHeaderModal
-        (
-            header: CompositeHeader,
-            setHeader: CompositeHeader -> unit,
-            rmv: unit -> unit
-        ) =
+    static member CompositeHeaderModal(header: CompositeHeader, setHeader: CompositeHeader -> unit, rmv: unit -> unit) =
         match header with
         | compositeHeader when compositeHeader.IsTermColumn ->
             let setOa = fun oa -> setHeader oa
             let oa = header.ToTerm()
             CompositeCellModal.TermModal(oa, rmv, setHeader = setOa, relevantCompositeHeader = header)
         | compositeHeader when compositeHeader.IsDataColumn ->
-            let data = Data.create(Name = header.ToString())
+            let data = Data.create (Name = header.ToString())
             CompositeCellModal.DataModal(data, rmv, relevantCompositeHeader = header, setHeader = setHeader)
-        | compositeHeader when compositeHeader.isInput
+        | compositeHeader when
+            compositeHeader.isInput
             || compositeHeader.isOutput
-            || compositeHeader.isFreeText ->
+            || compositeHeader.isFreeText
+            ->
             let setText = fun v -> setHeader v
             let text = header.ToString()
             CompositeCellModal.FreeTextModal(text, rmv, setHeader = setText)
@@ -417,7 +446,11 @@ type ContextMenuModals =
         (
             arcTable: ArcTable,
             setArcTable,
-            addColumns: {| data: ResizeArray<CompositeColumn>; columnIndex: int |},
+            addColumns:
+                {|
+                    data: ResizeArray<CompositeColumn>
+                    columnIndex: int
+                |},
             setModal: AnnotationTable.ModalTypes -> unit,
             tableRef: IRefValue<TableHandle>
         ) =
@@ -486,7 +519,7 @@ type ContextMenuModals =
                     FooterButtons.Cancel(rmv)
                     addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
                 ]
-            //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+        //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
         )
 
     [<ReactComponent>]
@@ -625,28 +658,24 @@ type ContextMenuModals =
         )
 
     [<ReactComponent>]
-    static member ErrorModal (
-        exn: string,
-        setModal: AnnotationTable.ModalTypes -> unit,
-        tableRef: IRefValue<TableHandle>
-        ) =
+    static member ErrorModal
+        (exn: string, setModal: AnnotationTable.ModalTypes -> unit, tableRef: IRefValue<TableHandle>)
+        =
 
         let rmv =
             fun _ ->
                 tableRef.current.focus ()
                 setModal AnnotationTable.ModalTypes.None
 
-        ErrorBaseModal.ErrorBaseModal(
-            (fun _ -> rmv ()),
-            exn
-        )
+        ErrorBaseModal.ErrorBaseModal((fun _ -> rmv ()), exn)
 
     [<ReactComponent>]
-    static member UnknownPasteCase (
-        data: string [] [],
-        headers: CompositeHeader [],
-        setModal: AnnotationTable.ModalTypes -> unit,
-        tableRef: IRefValue<TableHandle>
+    static member UnknownPasteCase
+        (
+            data: string[][],
+            headers: CompositeHeader[],
+            setModal: AnnotationTable.ModalTypes -> unit,
+            tableRef: IRefValue<TableHandle>
         ) =
 
         let rmv =
@@ -665,7 +694,4 @@ type ContextMenuModals =
             |]
             |> String.concat System.Environment.NewLine
 
-        ErrorBaseModal.ErrorBaseModal(
-            (fun _ -> rmv ()),
-            msg
-        )
+        ErrorBaseModal.ErrorBaseModal((fun _ -> rmv ()), msg)
