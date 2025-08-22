@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import TermSearch from "./TermSearch.fs.js";
+import * as Provider from "./TermSearchConfigProvider.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
 import React from 'react';
 
@@ -166,5 +167,31 @@ export const TIBSearch: Story = {
       const debugValue = input.getAttribute("data-debugresultcount")
       expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
     }, { timeout: 3000 });
+  }
+}
+
+export const WithSearchConfigProvider: Story = {
+  render: renderTermSearch,
+  args: {
+    onTermSelect: fn((term) => console.log(term)),
+    term: undefined,
+    debug: true,
+    disableDefaultSearch: true,
+    disableDefaultParentSearch: true,
+    disableDefaultAllChildrenSearch: true,
+  },
+  decorators: [
+    (Story) => (
+      <Provider.TIBQueryProvider>
+        <Story />
+      </Provider.TIBQueryProvider>
+    )
+  ],
+  play: async ({ args, canvasElement }) => {
+    const input = within(canvasElement).getByTestId(TERMSEARCH_INPUT_TESTID);
+    expect(input).toBeInTheDocument();
+    await userEvent.type(input, "instrument model", {delay: 50});
+
+    await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
   }
 }

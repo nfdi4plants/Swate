@@ -209,7 +209,7 @@ type Settings =
                 Html.div [ prop.className "not-prose"; prop.children [ settingElement ] ]
                 if description.IsSome then
                     Html.div [
-                        prop.className "swt:text-sm swt:text-gray-500 swt:md:col-span-2 swt:prose"
+                        prop.className "swt:text-sm swt:base-content/80 swt:md:col-span-2 swt:prose"
                         prop.children description.Value
                     ]
             ]
@@ -364,10 +364,8 @@ type Settings =
             "TIB Search",
             Settings.SearchConfig.TIBSearch(model, dispatch),
             React.fragment [
-                Html.p [
-                    prop.text
-                        "Adds support for high performance TIB term search. Choose a catalogue of terms to search through."
-                ]
+                Html.p
+                    "Adds support for high performance TIB term search. Choose a catalogue of terms to search through."
                 Html.p [ prop.text "Selecting multiple catalogues may impact search performance." ]
             ]
         )

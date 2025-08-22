@@ -40,6 +40,7 @@
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
+    <Compile Include="TermSearch\TermSearchConfigSetter.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="ArcTypeComponents\CreateColumnModal.fs" />
     <Compile Include="ArcTypeComponents\UpdateColumnModal.fs" />

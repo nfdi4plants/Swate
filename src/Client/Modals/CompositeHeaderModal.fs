@@ -36,7 +36,8 @@ type CompositeHeaderModal =
                     state with
                         NextHeaderType = CompositeHeaderDiscriminate.fromString e
                 }
-                |> setState)
+                |> setState
+            )
             prop.children [
                 // -- term columns --
                 Html.optgroup [
@@ -80,7 +81,8 @@ type CompositeHeaderModal =
                     state with
                         NextIOType = Some(IOType.ofString e)
                 }
-                |> setState)
+                |> setState
+            )
             prop.children [
                 CompositeHeaderModal.SelectIOTypeOption IOType.Source
                 CompositeHeaderModal.SelectIOTypeOption IOType.Sample
@@ -243,7 +245,7 @@ type CompositeHeaderModal =
 
     static member content(column0, state) =
         let previewColumn =
-            let cells = Array.takeSafe 10 column0.Cells
+            let cells = Array.truncate 10 column0.Cells
             //Replace empty cells with placeholder data to represent meaningfull information in the Preview
             cells
             |> Array.iteri (fun i cell ->
@@ -254,7 +256,8 @@ type CompositeHeaderModal =
                     | cell when cell.isTerm -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
                     | cell when cell.isUnitized -> cells.[i] <- CompositeHeaderModal.placeHolderUnitCell
                     | cell when cell.isData -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
-                    | _ -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell)
+                    | _ -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
+            )
 
             CompositeHeaderModal.updateColumn ({ column0 with Cells = cells }, state)
 

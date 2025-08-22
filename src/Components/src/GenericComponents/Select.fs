@@ -32,12 +32,12 @@ module private SelectHelper =
 [<Erase; Mangle(false)>]
 type Select =
 
-
     static member private InnerBaseOptionRender
         (label: string, isSelected: bool, ?ref: IRefValue<option<Browser.Types.HTMLInputElement>>)
         =
         React.fragment [
             Html.div [
+                prop.custom ("data-selectoption", label)
                 prop.className
                     "swt:text-sm swt:font-normal swt:text-success swt:min-w-4 swt:h-full swt:flex swt:items-center"
                 prop.children [
@@ -98,7 +98,7 @@ type Select =
         ]
 
     [<ReactComponent>]
-    static member SelectAll(setSelectIndices: Set<int> -> unit, key: string) =
+    static member private SelectAll(setSelectIndices: Set<int> -> unit, key: string) =
         let selectContext = React.useContext SelectHelper.SelectContext
         let listItem = FloatingUI.useListItem ()
         let allIndices: Set<int> = Set(List.init selectContext.optionCount id)
@@ -213,10 +213,12 @@ type Select =
             ?dropdownPlacement: FloatingUI.Placement,
             ?middleware: FloatingUI.IMiddleware[]
         ) =
+
+        let mkLabel (indices: int seq) =
+            indices |> Seq.map (fun i -> options.[i].label) |> String.concat ", "
+
         let isOpen, setIsOpen = React.useState (false)
         let activeIndex, setActiveIndex = React.useState (None: int option)
-
-        let selectedLabel, setSelectedLabel = React.useState (None: string option)
 
         let flui =
             FloatingUI.useFloating (
@@ -243,11 +245,6 @@ type Select =
                             selectedIndices.Add index.Value
 
                     setSelectedIndices (nextIndices)
-
-                    let nextLabel =
-                        nextIndices |> Seq.map (fun i -> options.[i].label) |> String.concat ", "
-
-                    setSelectedLabel (if nextLabel.Length > 0 then Some nextLabel else None)
             )
 
         let handleTypeaheadMatch =
@@ -308,19 +305,26 @@ type Select =
                 Html.button [
                     prop.tabIndex -1
                     prop.className [ "swt:btn swt:w-fit swt:pointer-events-none" ]
-                    prop.text (selectedLabel |> Option.defaultValue "Select an option")
+                    prop.text (
+                        if selectedIndices.Count = 0 then
+                            "Select an option"
+                        else
+                            mkLabel selectedIndices
+                    )
                 ]
             )
 
         let floatingStyle =
             let entries =
                 JS.Constructors.Object.entries flui.floatingStyles
-                |> Seq.choose (function
-                    | key, value when not (isNull value) -> Some (style.custom (key, value))
+                |> Seq.choose (
+                    function
+                    | key, value when not (isNull value) -> Some(style.custom (key, value))
                     | _ -> None
                 )
                 |> Seq.toList
-            entries @ [style.zIndex 999 ]
+
+            entries @ [ style.zIndex 999 ]
 
         React.fragment [
             Html.div [
@@ -353,7 +357,7 @@ type Select =
                                                         prop.className [
                                                             "swt:list swt:p-2"
                                                             "swt:bg-base-100 swt:shadow-sm swt:rounded-xs"
-                                                            "swt:overflow-y-auto swt:max-h-1/2 swt:lg:max-h-1/3"
+                                                            "swt:overflow-y-auto swt:max-h-[400px]"
                                                             "swt:border-2 swt:border-base-content/50"
                                                         ]
                                                         prop.children [

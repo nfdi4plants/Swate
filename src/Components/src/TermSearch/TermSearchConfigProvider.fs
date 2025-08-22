@@ -130,8 +130,6 @@ type TermSearchConfigProvider =
             React.useMemo (
                 (fun () ->
 
-                    console.log ("calculate all keys")
-
                     let allKeys =
                         [
                             yield! allTermSearchQueries |> Seq.map fst
@@ -155,8 +153,6 @@ type TermSearchConfigProvider =
         let queries =
             React.useMemo (
                 (fun () ->
-
-                    console.log ("calculate queries")
 
                     let termSearchQueries =
                         allTermSearchQueries

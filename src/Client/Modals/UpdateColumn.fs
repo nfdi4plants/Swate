@@ -82,7 +82,7 @@ module private Components =
                             Html.thead [ Html.tr [ Html.th ""; Html.th "Before"; Html.th "After" ] ]
                             Html.tbody [
                                 let previewCount = 5
-                                let preview = Array.takeSafe previewCount cellValues
+                                let preview = Array.truncate previewCount cellValues
 
                                 for i in 0 .. (preview.Length - 1) do
                                     let cell0 = column.Cells.[i].ToString()

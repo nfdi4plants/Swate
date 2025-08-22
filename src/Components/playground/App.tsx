@@ -9,6 +9,7 @@ import {Entry as ComboBox} from '../src/GenericComponents/ComboBox.fs.ts';
 import {Entry as Select} from '../src/GenericComponents/Select.fs.ts';
 import {Entry as BaseModal} from '../src/GenericComponents/BaseModal.fs.ts';
 import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/TermSearchConfigProvider.fs.ts';
+import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
 
 function TermSearchContainer() {
@@ -59,11 +60,12 @@ function TermSearchContainer() {
           debug={true}
         />
       </div>
-      <div className='swt:flex swt:flex-col'>
+      <div className='swt:flex swt:flex-col swt:border swt:p-2'>
         <label className='swt:text-gray-200'>
           Term Search with Provider
         </label>
         <TermSearchConfigProvider>
+          <TermSearchConfigSetter />
           <TermSearch
             onTermSelect={(term) => setTerm3(term as Term | undefined)}
             term={term3}

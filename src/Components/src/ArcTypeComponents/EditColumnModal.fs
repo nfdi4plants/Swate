@@ -29,7 +29,8 @@ type EditColumnModal =
                     state with
                         NextHeaderType = CompositeHeaderDiscriminate.fromString e
                 }
-                |> setState)
+                |> setState
+            )
             prop.children [
                 // -- term columns --
                 Html.optgroup [
@@ -73,7 +74,8 @@ type EditColumnModal =
                     state with
                         NextIOType = Some(IOType.ofString e)
                 }
-                |> setState)
+                |> setState
+            )
             prop.children [
                 EditColumnModal.SelectIOTypeOption IOType.Source
                 EditColumnModal.SelectIOTypeOption IOType.Sample
@@ -85,7 +87,9 @@ type EditColumnModal =
     static member Preview(column: CompositeColumn) =
         let parsedStrList =
             ARCtrl.Spreadsheet.CompositeColumn.toStringCellColumns column |> List.transpose
+
         printfn "parsedStrList: %s" (parsedStrList.ToString())
+
         let headers, body =
             if column.Cells.Length >= 2 then
                 parsedStrList.[0], parsedStrList.[1..]
@@ -160,26 +164,17 @@ type EditColumnModal =
                 EditColumnModal.cellsToTermCells (column)
             )
         | CompositeHeaderDiscriminate.Factor, _ ->
-            CompositeColumn.create (
-                CompositeHeader.Factor(header.ToTerm()),
-                EditColumnModal.cellsToTermCells (column)
-            )
+            CompositeColumn.create (CompositeHeader.Factor(header.ToTerm()), EditColumnModal.cellsToTermCells (column))
         // -- input columns --
         | CompositeHeaderDiscriminate.Input, Some IOType.Data ->
-            CompositeColumn.create (
-                CompositeHeader.Input IOType.Data,
-                EditColumnModal.cellsToDataOrFreeText (column)
-            )
+            CompositeColumn.create (CompositeHeader.Input IOType.Data, EditColumnModal.cellsToDataOrFreeText (column))
         | CompositeHeaderDiscriminate.Input, Some io ->
             CompositeColumn.create (CompositeHeader.Input io, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.Input, None ->
             CompositeColumn.create (CompositeHeader.Input IOType.Sample, EditColumnModal.cellsToFreeText (column))
         // -- output columns --
         | CompositeHeaderDiscriminate.Output, Some IOType.Data ->
-            CompositeColumn.create (
-                CompositeHeader.Output IOType.Data,
-                EditColumnModal.cellsToDataOrFreeText (column)
-            )
+            CompositeColumn.create (CompositeHeader.Output IOType.Data, EditColumnModal.cellsToDataOrFreeText (column))
         | CompositeHeaderDiscriminate.Output, Some io ->
             CompositeColumn.create (CompositeHeader.Output io, EditColumnModal.cellsToFreeText (column))
         | CompositeHeaderDiscriminate.Output, None ->
@@ -234,7 +229,7 @@ type EditColumnModal =
 
     static member content(column0, state) =
         let previewColumn =
-            let cells = Array.takeSafe 15 column0.Cells
+            let cells = Array.truncate 15 column0.Cells
             //Replace empty cells with placeholder data to represent meaningfull information in the Preview
             cells
             |> Array.iteri (fun i cell ->
@@ -245,7 +240,8 @@ type EditColumnModal =
                     | cell when cell.isTerm -> cells.[i] <- EditColumnModal.placeHolderTermCell
                     | cell when cell.isUnitized -> cells.[i] <- EditColumnModal.placeHolderUnitCell
                     | cell when cell.isData -> cells.[i] <- EditColumnModal.placeHolderTermCell
-                    | _ -> cells.[i] <- EditColumnModal.placeHolderTermCell)
+                    | _ -> cells.[i] <- EditColumnModal.placeHolderTermCell
+            )
 
             EditColumnModal.updateColumn ({ column0 with Cells = cells }, state)
 
@@ -295,21 +291,15 @@ type EditColumnModal =
             prop.children [
                 Html.div [
                     prop.className "swt:border-b swt:pb-2 swt:mb-2"
-                    prop.children [
-                        EditColumnModal.modalActivity (state, setState)
-                    ]
+                    prop.children [ EditColumnModal.modalActivity (state, setState) ]
                 ]
                 Html.div [
                     prop.className "swt:flex-grow swt:overflow-y-auto swt:h-[200px]"
-                    prop.children [
-                        EditColumnModal.content (column, state)
-                    ]
+                    prop.children [ EditColumnModal.content (column, state) ]
                 ]
                 Html.div [
                     prop.className "swt:border-t swt:pt-2 swt:mt-2"
-                    prop.children [
-                        EditColumnModal.footer (column, state, setColumn, rmv)
-                    ]
+                    prop.children [ EditColumnModal.footer (column, state, setColumn, rmv) ]
                 ]
             ]
         ]

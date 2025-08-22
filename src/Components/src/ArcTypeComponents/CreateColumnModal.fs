@@ -50,7 +50,7 @@ module ComponentHelper =
                             Html.thead [ Html.tr [ Html.th ""; Html.th "Before"; Html.th "After" ] ]
                             Html.tbody [
                                 let previewCount = 5
-                                let preview = Array.takeSafe previewCount cellValues
+                                let preview = Array.truncate previewCount cellValues
 
                                 for i in 0 .. (preview.Length - 1) do
                                     let cell0 = column.Cells.[i].ToString()
@@ -76,7 +76,8 @@ type CreateColumnModal =
             |> Array.mapi (fun i c ->
                 match suffix with
                 | true -> baseStr + string (i + 1)
-                | false -> baseStr)
+                | false -> baseStr
+            )
             |> setPreview
 
         React.fragment [
@@ -92,7 +93,8 @@ type CreateColumnModal =
                             let target = ev.target :?> Browser.Types.HTMLInputElement
                             let value = target.value
                             setBaseStr value
-                            updateCells value suffix)
+                            updateCells value suffix
+                        )
                     ]
                     Html.label [
                         prop.className "swt:label swt:cursor-pointer"
@@ -104,7 +106,8 @@ type CreateColumnModal =
                                 prop.isChecked suffix
                                 prop.onChange (fun (b: bool) ->
                                     setSuffix b
-                                    updateCells baseStr b)
+                                    updateCells baseStr b
+                                )
                             ]
                         ]
                     ]
@@ -113,7 +116,7 @@ type CreateColumnModal =
         ]
 
     [<ReactComponent>]
-    static member CreateColumnModal(columnIndex: int, arcTable:ArcTable, setColumn, rmv: unit -> unit, ?debug) =
+    static member CreateColumnModal(columnIndex: int, arcTable: ArcTable, setColumn, rmv: unit -> unit, ?debug) =
 
         let column = arcTable.GetColumn(columnIndex)
 
@@ -146,7 +149,7 @@ type CreateColumnModal =
                     Html.button [
                         prop.className "swt:btn swt:btn-outline"
                         prop.text "Cancel"
-                        prop.onClick (fun _ -> rmv())
+                        prop.onClick (fun _ -> rmv ())
                     ]
                     Html.button [
                         prop.className "swt:btn swt:btn-primary"
@@ -154,7 +157,8 @@ type CreateColumnModal =
                         prop.text "Submit"
                         prop.onClick (fun _ ->
                             submit ()
-                            rmv())
+                            rmv ()
+                        )
                     ]
                 ]
             ]
@@ -164,21 +168,12 @@ type CreateColumnModal =
             prop.children [
                 Html.div [
                     prop.className "swt:border-b swt:pb-2 swt:mb-2"
-                    prop.children [
-                        CreateColumnModal.CreateForm(getCellStrings (), setPreview)
-                    ]
+                    prop.children [ CreateColumnModal.CreateForm(getCellStrings (), setPreview) ]
                 ]
                 Html.div [
                     prop.className "swt:flex-grow swt:overflow-y-auto swt:h-[200px]"
-                    prop.children [
-                        content
-                    ]
+                    prop.children [ content ]
                 ]
-                Html.div [
-                    prop.className "swt:border-t swt:pt-2 swt:mt-2"
-                    prop.children [
-                        footer
-                    ]
-                ]
+                Html.div [ prop.className "swt:border-t swt:pt-2 swt:mt-2"; prop.children [ footer ] ]
             ]
         ]
