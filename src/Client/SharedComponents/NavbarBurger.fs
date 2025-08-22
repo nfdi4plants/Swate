@@ -72,9 +72,7 @@ type NavbarBurger =
                 |> dispatch
 
         let openUrlInBrowser url : IReactProperty =
-            prop.onClick (fun ev ->
-                window.``open``(url, "_blank") |> ignore
-            )
+            prop.onClick (fun ev -> window.``open`` (url, "_blank") |> ignore)
 
         Components.BaseDropdown.Main(
             isOpen,
@@ -83,43 +81,29 @@ type NavbarBurger =
             [
                 NavbarBurger.DropdownItem(
                     "Settings",
-                    Icons.Cog(),
+                    Icons.Cog("swt:size-4"),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.Settings)
                 )
                 NavbarBurger.DropdownItem(
                     "About",
-                    Icons.About(),
+                    Icons.About("swt:size-4"),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.About)
                 )
                 NavbarBurger.DropdownItem(
                     "Privacy Policy",
-                    Icons.PrivacyPolicy(),
+                    Icons.PrivacyPolicy("swt:size-4"),
                     prop.onClick (fun _ -> navigateTo Routing.MainPage.PrivacyPolicy)
                 )
-
-                match host with
-                | Some Swatehost.ARCitect ->
-                    NavbarBurger.DropdownItem(
-                        "Docs",
-                        Icons.Docs(),
-                        openUrlInBrowser Swate.Components.Shared.URLs.SWATE_WIKI
-                    )
-                    NavbarBurger.DropdownItem(
-                        "Contact",
-                        Icons.Contact(),
-                        openUrlInBrowser Swate.Components.Shared.URLs.CONTACT
-                    )
-                | _ ->
-                    NavbarBurger.DropdownItem(
-                        "Docs",
-                        Icons.Docs(),
-                        prop.href Swate.Components.Shared.URLs.SWATE_WIKI
-                    )
-                    NavbarBurger.DropdownItem(
-                        "Contact",
-                        Icons.Contact(),
-                        prop.href Swate.Components.Shared.URLs.CONTACT
-                    )
+                NavbarBurger.DropdownItem(
+                    "Docs",
+                    Icons.Docs("swt:size-4"),
+                    prop.href Swate.Components.Shared.URLs.SWATE_WIKI
+                )
+                NavbarBurger.DropdownItem(
+                    "Contact",
+                    Icons.Contact("swt:size-4"),
+                    prop.href Swate.Components.Shared.URLs.CONTACT
+                )
             ],
             style = Style.init "swt:dropdown-end"
         )
