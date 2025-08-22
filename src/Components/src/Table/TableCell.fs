@@ -137,8 +137,8 @@ type TableCell =
                 ]
 
         TermSearch.TermSearch(
-            setTerm,
             term,
+            setTerm,
             onBlur = (fun _ -> tableCellController.onBlur !!()),
             onKeyDown = (fun e -> tableCellController.onKeyDown e),
             classNames =
@@ -280,8 +280,8 @@ type TableCell =
                     setCell (CompositeCell.Term oa)
 
             TermSearch.TermSearch(
-                setTerm,
                 term,
+                setTerm,
                 onBlur = (fun _ -> tableCellController.onBlur !!()),
                 onKeyDown = (fun e -> tableCellController.onKeyDown e),
                 classNames =

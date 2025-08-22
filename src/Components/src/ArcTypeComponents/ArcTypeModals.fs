@@ -60,8 +60,8 @@ type InputField =
             prop.children [
                 Html.label [ prop.className "swt:label"; prop.text label ]
                 TermSearch.TermSearch(
-                    setter,
                     term = v,
+                    onTermSelect = setter,
                     classNames = TermSearchStyle(U2.Case1 "swt:border-current"),
                     autoFocus = autofocus,
                     onKeyDown = (fun (e: KeyboardEvent) -> ArcTypeModalsUtil.inputKeydownHandler e submit rmv),

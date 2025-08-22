@@ -691,11 +691,6 @@ type FormComponents =
             ?parent: OntologyAnnotation,
             ?rmv: MouseEvent -> unit
         ) =
-        let portal = React.useElementRef ()
-        let renderer = fun _ c -> React.fragment [ c ]
-
-        let portalObj =
-            portal.current |> Option.map (fun p -> PortalTermDropdown(p, renderer))
 
         Html.div [
             prop.className "swt:space-y-2"
@@ -703,12 +698,11 @@ type FormComponents =
                 if label.IsSome then
                     Generic.FieldTitle label.Value
                 Html.div [
-                    prop.ref portal
                     prop.className "swt:w-full swt:flex swt:gap-2 swt:relative"
                     prop.children [
                         TermSearch.TermSearch(
-                            (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
                             (input |> Option.map _.ToTerm()),
+                            (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
                             ?parentId = (parent |> Option.map _.TermAccessionShort)
                         )
                         if rmv.IsSome then

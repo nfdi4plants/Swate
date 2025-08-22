@@ -84,7 +84,8 @@ module Dev =
                     match x with
                     | Error _
                     | Warning _ -> true
-                    | _ -> false)
+                    | _ -> false
+                )
 
             let nextState = {
                 Log = parsedLogs @ currentState.Log
@@ -152,42 +153,6 @@ let handlePersistenStorageMsg
         }
 
         nextState, Cmd.none
-    | PersistentStorage.UpdateSwateDefaultSearch swateDefaultSearch ->
-        let nextState = {
-            currentState with
-                SwateDefaultSearch = swateDefaultSearch
-        }
-
-        LocalStorage.SwateSearchConfig.SwateDefaultSearch.Set swateDefaultSearch
-        nextState, Cmd.none
-    | PersistentStorage.AddTIBSearchCatalogue catalogue ->
-        let nextCata = currentState.TIBSearchCatalogues.Add(catalogue)
-
-        let nextState = {
-            currentState with
-                TIBSearchCatalogues = nextCata
-        }
-
-        LocalStorage.SwateSearchConfig.TIBSearch.Set(Set.toArray nextCata)
-        nextState, Cmd.none
-    | PersistentStorage.RemoveTIBSearchCatalogue catalogue ->
-        let nextCata = currentState.TIBSearchCatalogues.Remove(catalogue)
-
-        let nextState = {
-            currentState with
-                TIBSearchCatalogues = nextCata
-        }
-
-        LocalStorage.SwateSearchConfig.TIBSearch.Set(Set.toArray nextCata)
-        nextState, Cmd.none
-    | PersistentStorage.SetTIBSearchCatalogues catalogues ->
-        let nextState = {
-            currentState with
-                TIBSearchCatalogues = catalogues
-        }
-
-        LocalStorage.SwateSearchConfig.TIBSearch.Set(Set.toArray catalogues)
-        nextState, Cmd.none
     | PersistentStorage.UpdateAutosave autosave ->
         let nextState = {
             currentState with
@@ -209,7 +174,8 @@ module DataAnnotator =
                 dataFile
                 |> Option.map (fun file ->
                     let s = file.ExpectedSeparator
-                    DataAnnotator.ParsedDataFile.fromFileBySeparator s file)
+                    DataAnnotator.ParsedDataFile.fromFileBySeparator s file
+                )
 
             let nextState: DataAnnotator.Model = {
                 state with
@@ -255,7 +221,8 @@ module History =
                             Messages.UpdateModel {
                                 nextModel with
                                     SpreadsheetModel = nextState
-                            })
+                            }
+                        )
                         (curry GenericError Cmd.none >> DevMsg)
 
                 model, cmd

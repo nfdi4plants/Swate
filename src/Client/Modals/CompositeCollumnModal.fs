@@ -48,15 +48,9 @@ type private Term =
                 prop.children [
                     Html.label [ prop.text "Term:" ]
                     TermSearch.TermSearch(
+                        term,
                         setTerm,
-                        term = term,
                         classNames = Swate.Components.Types.TermSearchStyle(U2.Case1 "swt:border-current swt:join-item"),
-                        disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                        termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
-                        parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                        allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch,
                         autoFocus = not value.IsSome
                     )
                 ]

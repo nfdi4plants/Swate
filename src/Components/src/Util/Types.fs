@@ -266,14 +266,6 @@ type AdvancedSearchOptions
     member val setResults = setResults with get, set
     member val formRef = formRef with get, set
 
-[<AllowNullLiteral>]
-[<Global>]
-type PortalTermDropdown
-    [<ParamObjectAttribute; Emit("$0")>]
-    (portal: Browser.Types.HTMLElement, renderer: Browser.Types.ClientRect -> ReactElement -> Fable.React.ReactElement)
-    =
-    member val portal = portal with get, set
-    member val renderer = renderer with get, set
 
 ///
 /// A search function that resolves a list of terms.

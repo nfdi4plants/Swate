@@ -23,15 +23,6 @@ module private ModelUtil =
 
     type Model.Model with
         member this.UpdateFromLocalStorage() =
-            let updateSearch (model: Model.Model) =
-                let swateDefaultSearch = LocalStorage.SwateSearchConfig.SwateDefaultSearch.Get()
-                let tibSearch = LocalStorage.SwateSearchConfig.TIBSearch.Get()
-
-                {
-                    model with
-                        Model.Model.PersistentStorageState.SwateDefaultSearch = swateDefaultSearch
-                        Model.Model.PersistentStorageState.TIBSearchCatalogues = Set.ofArray tibSearch
-                }
 
             match this.PersistentStorageState.Host with
             | Some Swatehost.Browser -> {
@@ -40,7 +31,6 @@ module private ModelUtil =
                     Model.History = this.History.UpdateFromSessionStorage()
               }
             | _ -> this
-            |> updateSearch
 
 open ModelUtil
 

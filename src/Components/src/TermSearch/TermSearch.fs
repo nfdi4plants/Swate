@@ -522,7 +522,7 @@ type TermSearch =
         | _ -> AdvancedSearchForm
 
     [<ReactComponent>]
-    static member ModalDetails(tempTerm: Term option, setTempTerm, term: Term option) =
+    static member private ModalDetails(tempTerm: Term option, setTempTerm, term: Term option) =
         let Label (str: string) =
             Html.label [ prop.className "swt:label"; prop.text str ]
 
@@ -784,8 +784,8 @@ type TermSearch =
     [<ReactComponent(true)>]
     static member TermSearch
         (
-            onTermSelect: Term option -> unit,
             term: Term option,
+            onTermSelect: Term option -> unit,
             ?parentId: string,
             ?termSearchQueries: ResizeArray<string * SearchCall>,
             ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
@@ -1105,7 +1105,7 @@ type TermSearch =
             =
             Html.ul [
                 prop.className [
-                    "swt:list swt:py-2"
+                    "swt:list swt:py-2 swt:z-[99999]"
                     "swt:bg-base-100 swt:shadow-sm swt:rounded-xs"
                     "swt:overflow-y-auto swt:max-h-1/2 swt:lg:max-h-1/3 swt:min-w-md swt:max-w-xl"
                     "swt:border-2 swt:border-base-content/50"

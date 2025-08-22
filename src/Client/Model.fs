@@ -106,16 +106,12 @@ type DevState = {
 type PersistentStorageState = {
     AppVersion: string
     Host: Swatehost option
-    SwateDefaultSearch: bool
-    TIBSearchCatalogues: Set<string>
     Autosave: bool
 } with
 
     static member init() = {
         Host = Some Swatehost.Browser
         AppVersion = ""
-        SwateDefaultSearch = true
-        TIBSearchCatalogues = Set.empty
         Autosave = true
     }
 
@@ -123,42 +119,6 @@ type PersistentStorageState = {
         match this.Host with
         | Some Swatehost.ARCitect -> true
         | _ -> false
-
-    member this.TIBQueries = {|
-        TermSearch =
-            ResizeArray [
-                for c in this.TIBSearchCatalogues do
-                    let n = "TIB_" + c
-
-                    let query: Swate.Components.Types.SearchCall =
-                        fun (q: string) -> Swate.Components.Api.TIBApi.defaultSearch (q, 10, c)
-
-                    yield (n, query)
-            ]
-        ParentSearch =
-            ResizeArray [
-                for c in this.TIBSearchCatalogues do
-                    let n = "TIB_" + c
-
-                    let query: Swate.Components.Types.ParentSearchCall =
-                        fun (parent: string, query: string) ->
-                            Swate.Components.Api.TIBApi.searchChildrenOf (query, parent, 10, c)
-
-                    yield (n, query)
-            ]
-        AllChildrenSearch =
-            ResizeArray [
-                for c in this.TIBSearchCatalogues do
-                    let n = "TIB_" + c
-
-                    let query: Swate.Components.Types.AllChildrenSearchCall =
-                        fun (p: string) -> Swate.Components.Api.TIBApi.searchAllChildrenOf (p, 300, collection = c)
-
-                    yield (n, query)
-            ]
-    |}
-
-    member this.IsDisabledSwateDefaultSearch = not this.SwateDefaultSearch
 
 type PageState = {
     SidebarPage: Routing.SidebarPage
