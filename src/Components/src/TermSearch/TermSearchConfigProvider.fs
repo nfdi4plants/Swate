@@ -70,7 +70,6 @@ type TermSearchConfigProvider =
         React.useEffect (
             (fun _ -> // get all currently supported catalogues
                 promise {
-                    console.log "Fetching TIB collections..."
 
                     let! collections =
                         Api.TIBApi.getCollections ()

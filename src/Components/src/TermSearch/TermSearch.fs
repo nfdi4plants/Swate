@@ -338,14 +338,7 @@ type TermSearch =
                 API.callAdvancedSearch advancedSearchState
                 |> Promise.iter (fun results -> setSearchResults (results))
 
-        React.useImperativeHandle (
-            ref,
-            fun () ->
-                (fun () ->
-                    console.log ("inner")
-                    API.callAdvancedSearch advancedSearchState
-                )
-        )
+        React.useImperativeHandle (ref, fun () -> (fun () -> API.callAdvancedSearch advancedSearchState))
 
         React.fragment [
             Html.div [
@@ -494,7 +487,7 @@ type TermSearch =
                                 prop.disabled disabled
 
                                 prop.onClick (fun _ ->
-                                    tempPagination |> Option.iter ((fun x -> x - 1) >> setPagination)
+                                    tempPagination |> Option.iter ((fun current -> current - 1) >> setPagination)
                                 )
 
                                 prop.text "Go"
@@ -733,10 +726,7 @@ type TermSearch =
 
                     Html.button [
                         prop.className "swt:btn swt:btn-primary"
-                        prop.onClick (fun _ ->
-                            console.log (formRef)
-                            formRef.current () |> Promise.iter setAdvSearchResultsByTerm
-                        )
+                        prop.onClick (fun _ -> formRef.current () |> Promise.iter setAdvSearchResultsByTerm)
                         prop.text "Search"
                     ]
                 | ModalPage.AdvancedSearch ->

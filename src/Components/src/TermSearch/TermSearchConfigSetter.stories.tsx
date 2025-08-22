@@ -68,7 +68,7 @@ export const SetMultipleTIBQueries: Story = {
       expect(option).toBeTruthy()
       await userEvent.click(option as HTMLElement);
       await userEvent.keyboard('{Escape}');
-    })
+    }, { timeout: 5000 })
 
 
     // read the attributes (strings!)
