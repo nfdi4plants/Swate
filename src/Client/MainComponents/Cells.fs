@@ -53,69 +53,6 @@ module private CellAux =
 
 open CellAux
 
-module private EventPresets =
-    open Swate.Components.Shared
-
-    let onClickSelect (index: int * int, isIdle: bool, selectedCells: CellCoordinateRange option, model: Model, dispatch) =
-        fun (e: Browser.Types.MouseEvent) ->
-            // don't select cell if active(editable)
-            if isIdle then
-                let set =
-                    match e.shiftKey, selectedCells with
-                    | true, None -> selectedCells
-                    | true, Some cooridatnes ->
-                        let source = cooridatnes.xStart, cooridatnes.yStart
-                        let target = index
-
-                        let columnMin, columnMax =
-                            System.Math.Min(fst source, fst target), System.Math.Max(fst source, fst target)
-
-                        let rowMin, rowMax =
-                            System.Math.Min(snd source, snd target), System.Math.Max(snd source, snd target)
-
-                        let cellCoordinates: CellCoordinateRange =
-                            {|
-                                xEnd = columnMax
-                                xStart = columnMin
-                                yEnd = rowMin
-                                yStart = rowMax
-                            |}
-                        Some cellCoordinates
-                    | false, Some cooridatnes ->
-                        let next: CellCoordinateRange option =
-                            let (selectedCoordinates: CellCoordinateRange) =
-                                {|
-                                    xEnd = fst index
-                                    xStart = fst index
-                                    yEnd = snd index
-                                    yStart = snd index
-                                |}
-                            if cooridatnes = selectedCoordinates then
-                                None
-                            else
-                                Some {|
-                                    xEnd = fst index
-                                    xStart = fst index
-                                    yEnd = snd index
-                                    yStart = snd index
-                                |}
-
-                        next
-
-                UpdateSelectedCells set |> SpreadsheetMsg |> dispatch
-
-                if set.IsSome && model.SpreadsheetModel.TableViewIsActive() then
-                    let oa =
-                        let columnIndex = set.Value.xStart
-                        let column = model.SpreadsheetModel.ActiveTable.GetColumn(columnIndex)
-
-                        if column.Header.IsTermColumn then
-                            column.Header.ToTerm() |> Some //ToOA
-                        else
-                            None
-
-                    TermSearch.UpdateParentTerm oa |> TermSearchMsg |> dispatch
-
 open Swate.Components.Shared
 open Fable.Core.JsInterop
 
@@ -547,7 +484,7 @@ type Cell =
                     makeSelected ()
 
                 if isIdle then
-                    EventPresets.onClickSelect (index, isIdle, state.SelectedCells, model, dispatch) e
+                    ()
             )
             prop.onDoubleClick (fun e ->
                 e.preventDefault ()
