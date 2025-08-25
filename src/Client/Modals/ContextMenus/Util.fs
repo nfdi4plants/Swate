@@ -1,6 +1,7 @@
 module Modals.ContextMenus.Util
 
 open ARCtrl
+open Swate.Components
 
 let isUnitOrTermCell (cell: CompositeCell option) =
     cell.IsSome && (cell.Value.isTerm || cell.Value.isUnitized)
@@ -38,17 +39,22 @@ let paste isSelectedCell index dispatch =
 
 let deleteRow index (model: Model.Model) dispatch =
     fun _ ->
-        let s = Set.toArray model.SpreadsheetModel.SelectedCells
+        let s =
+            if model.SpreadsheetModel.SelectedCells.IsSome then
+                CellCoordinateRange.toArray model.SpreadsheetModel.SelectedCells.Value
+                |> Array.ofSeq
+            else
+                [| |]
 
         if
             Array.isEmpty s |> not
-            && Array.forall (fun (c, r) -> c = fst index) s
+            && Array.forall (fun c -> c = index) s
             && Array.contains index s
         then
-            let indexArr = s |> Array.map snd |> Array.distinct
+            let indexArr = s |> Array.map (fun coordinate -> coordinate.y) |> Array.distinct
             Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
         else
-            Spreadsheet.DeleteRow(snd index) |> Messages.SpreadsheetMsg |> dispatch
+            Spreadsheet.DeleteRow(index.y) |> Messages.SpreadsheetMsg |> dispatch
 
 let pasteAll index dispatch =
     fun _ -> Spreadsheet.PasteCellsExtend index |> Messages.SpreadsheetMsg |> dispatch

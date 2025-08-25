@@ -9,6 +9,7 @@ open Fable.Core.JsInterop
 
 
 importSideEffects "./tailwind.css"
+importSideEffects "../Components/tailwind.css"
 importSideEffects "./App.css"
 
 module Subscriptions =

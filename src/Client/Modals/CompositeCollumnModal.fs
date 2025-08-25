@@ -341,8 +341,12 @@ type CompositeCollumnModal =
     static member Main
         (ci: int, ri: int, model: Model.Model, dispatch: Messages.Msg -> unit, (rmv: MouseEvent -> unit))
         =
-        let index = (ci, ri)
-        let potCell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(index)
+        let index: CellCoordinate =
+            {|
+                x = ci
+                y = ri
+            |}
+        let potCell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(index.x, index.y)
         let isUnitOrTermCell = Modals.ContextMenus.Util.isUnitOrTermCell potCell
 
         let value, potTerm =

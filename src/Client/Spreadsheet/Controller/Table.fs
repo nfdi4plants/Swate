@@ -4,6 +4,7 @@ open System.Collections.Generic
 open Spreadsheet
 open Types
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 
 module ControllerTableAux =
@@ -37,7 +38,7 @@ let switchTable (nextIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model 
     | _ -> {
         state with
             ActiveCell = None
-            SelectedCells = Set.empty
+            SelectedCells = None
             ActiveView = ActiveView.Table nextIndex
       }
 
@@ -46,6 +47,10 @@ let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model
     state.Tables.AddTable(newTable)
     switchTable (state.Tables.TableCount - 1) state
 
+/// <summary>This is the basic function to update an existing Table from an array of SwateBuildingBlocks</summary>
+let updateTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    state.Tables.UpdateTable(newTable.Name, newTable)
+    switchTable (state.Tables.TableCount - 1) state
 
 /// <summary>This function is used to create multiple tables at once.</summary>
 let addTables (tables: ArcTable[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -120,7 +125,7 @@ let deleteRow (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     {
         state with
             ArcFile = state.ArcFile
-            SelectedCells = Set.empty
+            SelectedCells = None
     }
 
 let deleteRows (indexArr: int[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -129,7 +134,7 @@ let deleteRows (indexArr: int[]) (state: Spreadsheet.Model) : Spreadsheet.Model 
     {
         state with
             ArcFile = state.ArcFile
-            SelectedCells = Set.empty
+            SelectedCells = None
     }
 
 
@@ -139,7 +144,7 @@ let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     {
         state with
             ArcFile = state.ArcFile
-            SelectedCells = Set.empty
+            SelectedCells = None
     }
 
 let setColumn (index: int) (column: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -148,7 +153,7 @@ let setColumn (index: int) (column: CompositeColumn) (state: Spreadsheet.Model) 
     {
         state with
             ArcFile = state.ArcFile
-            SelectedCells = Set.empty
+            SelectedCells = None
     }
 
 let moveColumn (current: int) (next: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -157,16 +162,15 @@ let moveColumn (current: int) (next: int) (state: Spreadsheet.Model) : Spreadshe
     {
         state with
             ArcFile = state.ArcFile
-            SelectedCells = Set.empty
+            SelectedCells = None
     }
 
-let fillColumnWithCell (index: int * int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let cell = Generic.getCell index state
-    let columnIndex = fst index
+let fillColumnWithCell (index: CellCoordinate) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let cell = Generic.getCell (index.x, index.y) state
 
     for ri in 0 .. Generic.getRowCount state - 1 do
         let copy = cell.Copy()
-        Generic.setCell (columnIndex, ri) copy state
+        Generic.setCell (index.x, ri) copy state
 
     { state with ArcFile = state.ArcFile }
 
@@ -175,10 +179,10 @@ let fillColumnWithCell (index: int * int) (state: Spreadsheet.Model) : Spreadshe
 /// </summary>
 /// <param name="indexArr"></param>
 /// <param name="state"></param>
-let clearCells (indexArr: (int * int)[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let clearCells (indexArr: CellCoordinate []) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let newCells = [|
         for index in indexArr do
-            let cell = Generic.getCell index state
+            let cell = Generic.getCell (index.x, index.y) state
             let emptyCell = cell.GetEmptyCell()
             index, emptyCell
     |]

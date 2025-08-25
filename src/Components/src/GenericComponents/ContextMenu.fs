@@ -196,7 +196,7 @@ type ContextMenu =
                     myClearTimeout ()
                 )
             ),
-            [| box floating.refs |]
+            [| box floating.refs; box childInfo |]
         )
 
         let close =

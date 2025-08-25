@@ -16,14 +16,12 @@ let Main (dispatch: Messages.Msg -> unit) =
 
     Html.div [
         prop.id "ExpandTable"
-        prop.className "swt:flex swt:flex-row swt:justify-center swt:grow-0 swt:p-2"
+        prop.className "swt:flex swt:flex-row swt:justify-center swt:grow-0 swt:p-2 swt:shrink-0"
         prop.title "Add Rows"
         prop.children [
-            //Daisy.join [
             Html.div [
                 prop.className "swt:join"
                 prop.children [
-                    //Daisy.input [
                     Html.input [
                         prop.className "swt:input swt:join-item swt:border-current"
                         prop.type'.number
@@ -34,7 +32,6 @@ let Main (dispatch: Messages.Msg -> unit) =
                         prop.defaultValue init_RowsToAdd
                         prop.style [ style.width (100) ]
                     ]
-                    //Daisy.button.a [
                     Html.button [
                         prop.className "swt:btn swt:btn-outline swt:join-item"
                         prop.onClick (fun _ ->

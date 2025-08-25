@@ -10,6 +10,7 @@ open Excel
 open GlobalBindings
 
 open Regex
+open Swate.Components
 
 module SidebarControllerAux =
 
@@ -19,9 +20,12 @@ module SidebarControllerAux =
     /// <param name="state"></param>
     let getNextColumnIndex (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
-        if not state.SelectedCells.IsEmpty then
+        if state.SelectedCells.IsSome then
             let indexNextToSelected =
-                state.SelectedCells |> Set.toArray |> Array.head |> fst |> (+) 1
+                CellCoordinateRange.toArray state.SelectedCells.Value
+                |> Array.ofSeq
+                |> Array.head
+                |> (fun coordinate -> coordinate.x + 1)
 
             indexNextToSelected
         else
@@ -29,10 +33,10 @@ module SidebarControllerAux =
 
 module SanityChecks =
     /// Make sure only one column is selected
-    let verifyOnlyOneColumnSelected (selectedCells: (int * int)[]) =
+    let verifyOnlyOneColumnSelected (selectedCells: CellCoordinate []) =
         let isOneColumn =
-            let columnIndex = fst selectedCells.[0] // can just use head of selected cells as all must be same column
-            selectedCells |> Array.forall (fun x -> fst x = columnIndex)
+            let columnIndex = selectedCells.[0].x // can just use head of selected cells as all must be same column
+            selectedCells |> Array.forall (fun coordinate -> coordinate.x = columnIndex)
 
         if not isOneColumn then
             failwith "Can only paste term in one column at a time!"
@@ -163,57 +167,16 @@ let joinTable
     { state with ArcFile = state.ArcFile }
 
 let insertTerm_IntoSelected (term: OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let selected = state.SelectedCells |> Set.toArray
+    let selected =
+        if state.SelectedCells.IsSome then
+            CellCoordinateRange.toArray  state.SelectedCells.Value |> Array.ofSeq
+        else
+            [| |]
     SanityChecks.verifyOnlyOneColumnSelected selected
 
-    for (colIndex, rowIndex) in selected do
-        let c = Generic.getCell (colIndex, rowIndex) state
+    for coordinate in selected do
+        let c = Generic.getCell (coordinate.x, coordinate.y) state
         let newCell = c.UpdateWithOA term
-        Controller.Generic.setCell (colIndex, rowIndex) newCell state
+        Controller.Generic.setCell (coordinate.x, coordinate.y) newCell state
 
     { state with ArcFile = state.ArcFile }
-
-//let insertCells_IntoSelected (term:CompositeCell []) (state: Spreadsheet.Model) : Spreadsheet.Model =
-//    let table = state.ActiveTable
-//    let selected = state.SelectedCells |> Set.toArray
-//    SanityChecks.verifyOnlyOneColumnSelected selected
-//    /// Make sure either one column header is selected or only body cells are selected
-//    let mutable index = 0
-//    let nextActiveTable = table |> Map.map (fun key cell ->
-//        let isSelected = Array.contains key selected
-//        let next =
-//            let term = Array.tryItem index term
-//            match isSelected, cell with
-//            | false, _ | true, IsHeader _ -> cell
-//            | true, IsTerm t_cell -> if term.IsSome then IsTerm {t_cell with Term = term.Value} else cell
-//            | true, IsUnit u_cell -> if term.IsSome then IsUnit {u_cell with Unit = term.Value} else cell
-//            | true, IsFreetext f_cell -> if term.IsSome then IsFreetext {f_cell with Value = term.Value.Name} else cell
-//        if next <> cell then
-//            index <- index + 1;
-//        next
-//    )
-//    let nextState = { state with ActiveTable = nextActiveTable }
-//    nextState
-
-/////<summary> This function is used to get information for the "Update Ontology Terms" Quick access button</summary>
-//let getUpdateTermColumns (state: Spreadsheet.Model) =
-//    let swate_bbs = SwateBuildingBlock.ofTableMap state.ActiveTable
-//    let bbs = swate_bbs |> Array.map (fun x -> x.toBuildingBlock)
-//    let deprecationMsgs = OfficeInterop.Core.checkForDeprecation bbs
-//    let terms = bbs |> Array.collect OfficeInterop.BuildingBlockFunctions.toTermSearchable
-//    let msg = deprecationMsgs
-//    terms, msg
-
-/////<summary> This function is used to write the results from "Update Ontology Terms" Quick access button</summary>
-//let setUpdateTermColumns (terms: TermSearchable []) (state: Spreadsheet.Model) =
-//    let mutable table = state.ActiveTable
-//    terms
-//    |> Array.iter (fun term ->
-//        for row in term.RowIndices do
-//            let key = term.ColIndex,row
-//            let changeCell newCell = table.Add(key, newCell)
-//            let sc = table.[key]
-//            let newCell = term.toSwateCell(sc)
-//            table <- changeCell newCell
-//    )
-//    {state with ActiveTable = table}

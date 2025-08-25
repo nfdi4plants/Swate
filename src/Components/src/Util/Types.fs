@@ -77,6 +77,13 @@ module CellCoordinateRange =
 
         result
 
+    let contains (range: CellCoordinateRange option) (cellCoordinate: CellCoordinate) : bool =
+        if range.IsSome then
+            let coordinates = toArray range.Value
+            coordinates.Contains(cellCoordinate)
+        else
+            false
+
 // [<AllowNullLiteral>]
 // [<Global>]
 type TableCellController = {

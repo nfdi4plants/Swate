@@ -68,7 +68,6 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     let state, setState = React.useState (FooterTab.init (table.Name))
     let id = $"ReorderMe_{index}_{table.Name}"
 
-    //Daisy.tab [
     Html.div [
         prop.className [
             "swt:tab swt:*:pointer-events-none"
@@ -155,7 +154,6 @@ let MainMetadata (model: Model, dispatch: Messages.Msg -> unit) =
     let nav = Spreadsheet.ActiveView.Metadata
     let order = nav.ViewIndex
 
-    //Daisy.tab [
     Html.div [
         prop.className [
             "swt:tab"
@@ -179,7 +177,6 @@ let MainDataMap (model: Model, dispatch: Messages.Msg -> unit) =
     let nav = Spreadsheet.ActiveView.DataMap
     let order = nav.ViewIndex
 
-    //Daisy.tab [
     Html.div [
         prop.className [
             "swt:tab"
@@ -210,7 +207,6 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
     let order = System.Int32.MaxValue - 1 // MaxValue will be sidebar toggle
     let id = "Add-Spreadsheet-Button"
 
-    //Daisy.tab [
     Html.div [
         prop.className [
             "swt:tab swt:*:pointer-events-none"
@@ -279,7 +275,6 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
                     swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center \
                     swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:flex-nowrap swt:*:flex-nowrap"
                 prop.children [
-                    //Daisy.tab [
                     Html.div [
                         prop.className "swt:tab swt:max-w-min swt:!px-2"
                         prop.style [ style.custom ("order", -2) ]
