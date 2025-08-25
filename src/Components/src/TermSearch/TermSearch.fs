@@ -25,12 +25,6 @@ module private APIExtentions =
 open APIExtentions
 open Browser.Types
 
-type private KeyboardNavigationController = {
-    SelectedTermSearchResult: int option
-} with
-
-    static member init() = { SelectedTermSearchResult = None }
-
 
 [<StringEnum; RequireQualifiedAccess>]
 type ModalPage =
@@ -134,69 +128,6 @@ module private TermSearchHelper =
 open TermSearchHelper
 
 module private API =
-
-    module Mocks =
-
-        // default search, should always be runnable
-        let callSearch =
-            fun (query: string) -> promise {
-                do! Promise.sleep 1500
-                //Init mock data for about 10 items
-                return
-                    ResizeArray [|
-                        Term(
-                            "Term 1",
-                            "1",
-                            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.",
-                            "MS",
-                            isObsolete = false,
-                            href = "www.test.de'/1"
-                        )
-                        Term(
-                            "Term 2",
-                            "2",
-                            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam nec purus nec libero fermentum fermentum.",
-                            "MS",
-                            isObsolete = false,
-                            href = "www.test.de'/2"
-                        )
-                        Term("Term 3", "3", isObsolete = false)
-                        Term(
-                            "Term 4 Is a Very special term with a extremely long name",
-                            "4",
-                            isObsolete = false,
-                            href = "www.test.de'/3"
-                        )
-                        Term("Term 5", "5", isObsolete = false, href = "www.test.de'/4")
-                    |]
-            }
-
-        // search with parent, is run in parallel to default search,
-        // better results, but slower and requires parent
-        let callParentSearch =
-            fun (parent: string) (query: string) -> promise {
-                do! Promise.sleep 2000
-                //Init mock data for about 10 items
-                return ResizeArray [| Term("Term 1", "1", href = "/term/1", isObsolete = false) |]
-            }
-
-        // search all children of parent without actual query. Quite fast
-        // Only triggered onDoubleClick into empty input
-        let callAllChildSearch =
-            fun (parent: string) -> promise {
-                do! Promise.sleep 1500
-                //Init mock data for about 10 items
-                return
-                    ResizeArray [|
-                        for i in 0..100 do
-                            Term(
-                                sprintf "Child %d" i,
-                                i.ToString(),
-                                href = (sprintf "/term/%d" i),
-                                isObsolete = (i % 5 = 0)
-                            )
-                    |]
-            }
 
     let callSearch =
         fun (query: string) ->
@@ -913,8 +844,11 @@ type TermSearch =
                 }
 
         let defaultIsDisabled (local: bool option) =
-            (local.IsSome && local.Value)
-            || (termSearchConfigCtx.hasProvider && termSearchConfigCtx.disableDefault)
+            //If local is set then use its value, else use the value of provider
+            if local.IsSome then
+                local.Value
+            else
+                termSearchConfigCtx.hasProvider && termSearchConfigCtx.disableDefault
 
         /// Collect all given search functions into one combined search
         let termSearchFunc =

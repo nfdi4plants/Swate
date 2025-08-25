@@ -65,6 +65,7 @@ type TermSearchConfigSetter =
 
         React.fragment [
 
+            //Debugging component, storing data for storybook tests
             Html.div [
                 prop.className "swt:hidden"
                 prop.ariaHidden true
