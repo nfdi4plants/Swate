@@ -8,8 +8,12 @@ open Swate.Components.Shared
 
 type DataMapCell =
     static member Main(mouseX, mouseY, ci: int, ri: int, model: Model.Model, dispatch: Messages.Msg -> unit) =
-        let index = ci, ri
-        let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
+        let index: CellCoordinate =
+            {|
+                x = ci
+                y = ri
+            |}
+        let isSelectedCell = CellCoordinateRange.contains model.SpreadsheetModel.SelectedCells index
         let isHeader = Util.isHeader ri
         let fillColumn = Util.fillColumn index dispatch
         let clear = Util.clear isSelectedCell index dispatch

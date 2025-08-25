@@ -8,7 +8,6 @@ open Swate.Components
 type EmptyTableElement =
 
     static member private Button(icons: ReactElement, onclick) =
-        //Daisy.button.button [
         Html.div [
             prop.className "swt:btn swt:btn-primary swt:btn-square swt:place-self-end swt:gap-0"
             prop.onClick (fun _ -> onclick ())
@@ -20,11 +19,9 @@ type EmptyTableElement =
             prop.className "swt:flex swt:justify-center swt:items-center"
             prop.style [ style.height (length.perc 100) ]
             prop.children [
-                //Daisy.card [
                 Html.div [
                     prop.className "swt:card swt:bg-base-300 swt:shadow-xl"
                     prop.children [
-                        //Daisy.cardBody [
                         Html.div [
                             prop.className "swt:card-body"
                             prop.children [

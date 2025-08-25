@@ -10,17 +10,17 @@ open Swate.Components.Shared
 type TableCell =
 
     static member Main(mouseX, mouseY, ci: int, ri: int, model: Model.Model, dispatch: Messages.Msg -> unit) =
-        let index = (ci, ri)
+        let index: CellCoordinate = {| x = ci; y = ri |}
         let cell = model.SpreadsheetModel.ActiveTable.TryGetCellAt(ci, ri)
         let header = model.SpreadsheetModel.ActiveTable.Headers.[ci]
-        let isSelectedCell = model.SpreadsheetModel.SelectedCells.Contains index
+        let isSelectedCell = CellCoordinateRange.contains model.SpreadsheetModel.SelectedCells index
         let isHeader = Util.isHeader ri
         let isUnitOrTermCell = Util.isUnitOrTermCell cell
         let deleteRow = Util.deleteRow index model dispatch
 
         let editColumnModal =
             fun _ ->
-                Model.ModalState.TableModals.EditColumn(fst index)
+                Model.ModalState.TableModals.EditColumn(index.x)
                 |> Model.ModalState.ModalTypes.TableModal
                 |> Some
                 |> Messages.UpdateModal
@@ -28,7 +28,7 @@ type TableCell =
 
         let triggerMoveColumnModal =
             fun _ ->
-                Model.ModalState.TableModals.MoveColumn(fst index)
+                Model.ModalState.TableModals.MoveColumn(index.x)
                 |> Model.ModalState.ModalTypes.TableModal
                 |> Some
                 |> Messages.UpdateModal
@@ -36,7 +36,7 @@ type TableCell =
 
         let triggerUpdateColumnModal =
             fun _ ->
-                let columnIndex = fst index
+                let columnIndex = index.x
                 let column = model.SpreadsheetModel.ActiveTable.GetColumn columnIndex
 
                 Model.ModalState.TableModals.BatchUpdateColumnValues(columnIndex, column)
