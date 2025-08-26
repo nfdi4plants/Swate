@@ -379,11 +379,10 @@ swt:p-0"""
                                                                         style.height virtualRow.size
                                                                         style.top 0
                                                                         style.left 0
-                                                                        if virtualColumn.index > 0 then
-                                                                            style.custom (
-                                                                                "transform",
-                                                                                $"translateX({virtualColumn.start}px)"
-                                                                            )
+                                                                        style.custom (
+                                                                            "transform",
+                                                                            $"translateX({virtualColumn.start}px)"
+                                                                        )
                                                                     ]
                                                                     prop.children [
                                                                         if controller.IsActive then
