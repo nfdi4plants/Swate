@@ -76,7 +76,7 @@ type InputField =
                 TermSearch.TermSearch(
                     setter,
                     term = v,
-                    classNames = TermSearchStyle(U2.Case1 "swt:border-current"),
+                    classNames = TermSearchStyle(U2.Case1 "swt:w-full"),
                     advancedSearch = U2.Case2 true,
                     showDetails = true,
                     autoFocus = autofocus,

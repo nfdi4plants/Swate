@@ -238,7 +238,7 @@ swt:p-0"""
                         style.width width.Value
                 ]
                 prop.className
-                    "swt:overflow-auto swt:h-full swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-100"
+                    "swt:overflow-auto swt:h-full swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-200"
                 if debug then
                     prop.testId "virtualized-table"
                 prop.children [
@@ -379,10 +379,11 @@ swt:p-0"""
                                                                         style.height virtualRow.size
                                                                         style.top 0
                                                                         style.left 0
-                                                                        style.custom (
-                                                                            "transform",
-                                                                            $"translateX({virtualColumn.start}px)"
-                                                                        )
+                                                                        if virtualColumn.index > 0 then
+                                                                            style.custom (
+                                                                                "transform",
+                                                                                $"translateX({virtualColumn.start}px)"
+                                                                            )
                                                                     ]
                                                                     prop.children [
                                                                         if controller.IsActive then
