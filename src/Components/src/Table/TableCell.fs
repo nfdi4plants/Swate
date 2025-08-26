@@ -61,7 +61,7 @@ type TableCell =
         )
 
     [<ReactComponent>]
-    static member BaseActiveTableCell(ts: TableCellController, data: string, setData, ?isStickyHeader: bool, ?debug: bool) =
+    static member BaseActiveTableCell(ts: TableCellController, data: string, setData, ?isStickyHeader: bool, ?originValue: string, ?debug: bool) =
         let isStickyHeader = defaultArg isStickyHeader false
         let tempData, setTempData = React.useState (data)
         React.useEffect ((fun _ -> setTempData data), [| box data |])
@@ -85,6 +85,7 @@ type TableCell =
 
                     match e.code with
                     | kbdEventCode.enter -> setData tempData
+                    | kbdEventCode.escape -> if originValue.IsSome then setData originValue.Value else ()
                     | _ -> ())
                 prop.onBlur (fun e ->
                     ts.onBlur e
@@ -180,6 +181,7 @@ type TableCell =
             TableCell.BaseActiveTableHeader(tableCellController, $"{CompositeHeader.Date}", (fun _ -> setHeader (CompositeHeader.Date)), ?debug = debug)
         | _ -> handleTerm header
 
+    [<ReactComponent>]
     static member CompositeCellActiveRender
         (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit, ?debug, ?displayIndicators)
         =
@@ -191,6 +193,8 @@ type TableCell =
                     None
                 else
                     Term.fromOntologyAnnotation oa |> Some
+
+            let cellContent = Term.fromOntologyAnnotation(cell.AsTerm)
 
             let setTerm =
                 fun (t: Term option) ->
@@ -224,13 +228,14 @@ type TableCell =
                 autoFocus = true,
                 portalModals = Browser.Dom.document.body,
                 portalTermDropdown = PortalTermDropdown(Browser.Dom.document.body, termDropdownRenderer),
+                originTerm = cellContent,
                 ?debug = debug,
                 ?displayIndicators = displayIndicators
             )
         | CompositeCell.FreeText txt ->
-            TableCell.BaseActiveTableCell(tableCellController, txt, fun t -> setCell (CompositeCell.FreeText t))
+            TableCell.BaseActiveTableCell(tableCellController, txt, (fun t -> setCell (CompositeCell.FreeText t)), originValue = cell.ToString(), ?debug = debug)
         | CompositeCell.Unitized(v, oa) ->
-            TableCell.BaseActiveTableCell(tableCellController, v, fun _ -> setCell (CompositeCell.Unitized(v, oa)))
+            TableCell.BaseActiveTableCell(tableCellController, v, (fun _ -> setCell (CompositeCell.Unitized(v, oa))), originValue = cell.ToString(), ?debug = debug)
         | CompositeCell.Data d ->
             TableCell.BaseActiveTableCell(
                 tableCellController,
@@ -238,5 +243,6 @@ type TableCell =
                 (fun t ->
                     d.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
                     setCell (CompositeCell.Data d)),
+                originValue = cell.ToString(),
                 ?debug = debug
             )

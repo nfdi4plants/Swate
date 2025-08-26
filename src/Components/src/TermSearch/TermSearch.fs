@@ -794,7 +794,8 @@ type TermSearch =
             ?autoFocus: bool,
             ?classNames: TermSearchStyle,
             ?props: IReactProperty list,
-            ?displayIndicators: bool
+            ?displayIndicators: bool,
+            ?originTerm: Term
         ) =
 
         let showDetails = defaultArg showDetails false
@@ -1018,6 +1019,7 @@ type TermSearch =
             cancelSearch ()
             cancelParentSearch ()
             cancelAllChildSearch ()
+            onTermSelect(originTerm)
             setKeyboardNavState (KeyboardNavigationController.init ())
 
         let startSearch =
@@ -1310,7 +1312,6 @@ type TermSearch =
                                         setFocused true
                                     )
                                 ]
-                                //Daisy.loading [
                                 Html.div [
                                     prop.className [
                                         "swt:loading swt:text-primary swt:loading-sm"
