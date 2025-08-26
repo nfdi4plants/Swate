@@ -76,6 +76,9 @@ module kbdEventCode =
     [<Literal>]
     let backspace = "Backspace"
 
+    [<Literal>]
+    let f2 = "F2"
+
     let key (key: string) = key.ToUpper() |> sprintf "Key%s"
 
 open Fable.Core
@@ -87,9 +90,10 @@ type console =
     static member inline log e = jsNative
 
     [<Emit("console.warn($0)")>]
-    static member inline warn e =
-        // Fable.Core emits console.warn as a function call, so we use Emit to ensure it is called correctly
-        jsNative
+    static member inline warn e = jsNative
+
+    [<Emit("console.error($0)")>]
+    static member inline error e = jsNative
 
 [<Erase>]
 type Clipboard =

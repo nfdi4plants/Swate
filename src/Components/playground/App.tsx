@@ -8,10 +8,15 @@ import {Entry as TemplateFilter} from '../src/Template/TemplateFilter.fs.ts';
 import {Entry as ComboBox} from '../src/GenericComponents/ComboBox.fs.ts';
 import {Entry as Select} from '../src/GenericComponents/Select.fs.ts';
 import {Entry as BaseModal} from '../src/GenericComponents/BaseModal.fs.ts';
+import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/TermSearchConfigProvider.fs.ts';
+import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
+import { Term } from '../../Shared/Database.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
   const [term2, setTerm2] = React.useState(undefined);
+  const [term3, setTerm3] = React.useState(undefined);
+  const [counter, setCounter] = React.useState(0)
   return <Fragment>
     <h2 className='swt:text-3xl'>TermSearch</h2>
     {/* <TermSearch
@@ -21,7 +26,7 @@ function TermSearchContainer() {
       debug={true}
     /> */}
     <div className='swt:max-w-2xl swt:flex swt:flex-col swt:gap-4'>
-      <div>
+      <div className='swt:flex swt:flex-col'>
         <label className='swt:text-gray-200'>
           TIB Search
         </label>
@@ -32,7 +37,6 @@ function TermSearchContainer() {
           disableDefaultParentSearch
           disableDefaultAllChildrenSearch
           showDetails
-          advancedSearch
           termSearchQueries={[
             ["tib_search", (query) => TIBApi.defaultSearch(query, 10, "DataPLANT")]
           ]}
@@ -44,7 +48,7 @@ function TermSearchContainer() {
           ]}
         />
       </div>
-      <div>
+      <div className='swt:flex swt:flex-col'>
         <label className='swt:text-gray-200'>
           Term Search
         </label>
@@ -54,8 +58,20 @@ function TermSearchContainer() {
           parentId="MS:1000031"
           showDetails
           debug={true}
-          advancedSearch
         />
+      </div>
+      <div className='swt:flex swt:flex-col swt:border swt:p-2'>
+        <label className='swt:text-gray-200'>
+          Term Search with Provider
+        </label>
+        <TermSearchConfigProvider>
+          <TermSearchConfigSetter />
+          <TermSearch
+            onTermSelect={(term) => setTerm3(term as Term | undefined)}
+            term={term3}
+            debug={true}
+          />
+        </TermSearchConfigProvider>
       </div>
     </div>
   </Fragment>
@@ -115,14 +131,14 @@ const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
+            <TermSearchContainer />
             <BaseModalContainer />
-            {/* <TermSearchContainer /> */}
-            {/* <TemplateFilterContainer />
-            <SelectContainer />
             <ComboBoxContainer />
+            <TemplateFilterContainer />
+            <SelectContainer />
             <ContextMenuContainer />
             <AnnoTableContainer />
-            <TableContainer /> */}
+            <TableContainer />
             {/* <Menu></Menu> */}
         </div>
     );

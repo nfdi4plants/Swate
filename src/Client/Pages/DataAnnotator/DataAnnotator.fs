@@ -14,7 +14,6 @@ module private DataAnnotatorHelper =
     module DataAnnotatorButtons =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
-            //Daisy.button.button [
             Html.button [
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:btn-disabled"
@@ -94,7 +93,6 @@ module private DataAnnotatorHelper =
                     prop.text "Has Header"
                 ]
 
-            //Daisy.button.button [
             Html.button [
                 if hasHeader then
                     prop.className "swt:btn swt:btn-primary"
@@ -162,7 +160,6 @@ module private DataAnnotatorHelper =
                         prop.className "swt:btn swt:btn-primary swt:join-item swt:btn-disabled"
                         prop.children [
                             if isLoading then
-                                //Daisy.loading []
                                 Html.div [ prop.className "swt:loading" ]
 
                         ]
@@ -175,7 +172,7 @@ module private DataAnnotatorHelper =
             (model: Model)
             (uploadFile: Browser.Types.File -> unit)
             =
-            //Daisy.file [
+
             Html.input [
                 prop.type' "file"
                 prop.className "swt:file-input swt:file-input-primary swt:col-span-2"
@@ -184,7 +181,7 @@ module private DataAnnotatorHelper =
             ]
 
         let OpenModalButton model mkOpen =
-            //Daisy.button.button [
+
             Html.button [
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:btn-primary swt:grow swt:disabled"
@@ -200,7 +197,7 @@ module private DataAnnotatorHelper =
     let ModalMangementContainer (children: ReactElement list) =
         Html.div [ prop.className "swt:flex swt:flex-col swt:gap-4"; prop.children children ]
 
-    let DataFileConfigComponent model rmvFile target setTarget dispatch =
+    let DataFileConfigComponent model target setTarget dispatch =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
@@ -323,7 +320,7 @@ module private DataAnnotatorHelper =
             )
 
         Html.div [
-            prop.className "swt:overflow-hidden swt:flex"
+            prop.className "swt:overflow-hidden swt:flex swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[200px] swt:overflow-hidden"
             prop.children [
                 Swate.Components.Table.Table(
                     file.BodyRows.Length,
@@ -344,7 +341,7 @@ type DataAnnotator =
 
 
     [<ReactComponent>]
-    static member private Modal(model: Model, dispatch, rmvFile, rmv) =
+    static member private Modal(model: Model, dispatch, rmvFile, rmv, isOpen, setIsOpen) =
         let init: unit -> Set<DataTarget> = fun () -> Set.empty
         let state, setState = React.useState (init)
 
@@ -354,7 +351,7 @@ type DataAnnotator =
         let modalActivity =
             Html.div [
                 prop.children [
-                    DataFileConfigComponent model rmvFile targetCol setTargetCol dispatch
+                    DataFileConfigComponent model targetCol setTargetCol dispatch
                     FileMetadataComponent model.DataAnnotatorModel.DataFile.Value
                 ]
             ]
@@ -411,13 +408,13 @@ type DataAnnotator =
                 ]
             ]
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header = Html.p "Data Annotator",
-            modalClassInfo = "swt:max-w-none",
+        Swate.Components.BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.p "Data Annotator",
+            content,
+            className = "swt:max-w-none",
             modalActions = modalActivity,
-            content = content,
-            contentClassInfo = "swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[600px] swt:overflow-hidden",
             footer = footer
         )
 
@@ -476,10 +473,7 @@ type DataAnnotator =
                   ParsedFile = Some _
               },
               true ->
-                ReactDOM.createPortal (
-                    DataAnnotator.Modal(model, dispatch, rmvFile, fun _ -> setShowModal false),
-                    Browser.Dom.document.body
-                ) // Create a portal to render the modal in the body
+                DataAnnotator.Modal(model, dispatch, rmvFile, (fun _ -> setShowModal false), showModal, setShowModal)
             | _, _ -> Html.none
         ]
 

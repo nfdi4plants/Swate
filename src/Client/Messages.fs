@@ -60,10 +60,6 @@ type DevMsg =
 module PersistentStorage =
     type Msg =
         | UpdateAppVersion of string
-        | UpdateSwateDefaultSearch of bool
-        | AddTIBSearchCatalogue of string
-        | RemoveTIBSearchCatalogue of string
-        | SetTIBSearchCatalogues of Set<string>
         | UpdateAutosave of bool
 
 module PageState =

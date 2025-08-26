@@ -543,8 +543,8 @@ type Cell =
                         //     classes="h-[35px] !rounded-none w-full !border-0"
                         // )
                         Swate.Components.TermSearch.TermSearch(
+                            input,
                             setter,
-                            term = input,
                             ?parentId = headerOA,
                             autoFocus = true,
                             onBlur = onBlur,
@@ -552,13 +552,7 @@ type Cell =
                             classNames =
                                 (Swate.Components.Types.TermSearchStyle(
                                     !^"swt:h-[29px] swt:!rounded-none swt:w-full swt:!border-0"
-                                )),
-                            disableDefaultSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            disableDefaultAllChildrenSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            disableDefaultParentSearch = model.PersistentStorageState.IsDisabledSwateDefaultSearch,
-                            termSearchQueries = model.PersistentStorageState.TIBQueries.TermSearch,
-                            parentSearchQueries = model.PersistentStorageState.TIBQueries.ParentSearch,
-                            allChildrenSearchQueries = model.PersistentStorageState.TIBQueries.AllChildrenSearch
+                                ))
                         )
                     else
                         Cell.CellInputElement(cellValue, false, false, setter, makeIdle, index, dispatch)
