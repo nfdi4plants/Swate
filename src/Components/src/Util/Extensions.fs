@@ -76,6 +76,9 @@ module kbdEventCode =
     [<Literal>]
     let backspace = "Backspace"
 
+    [<Literal>]
+    let f2 = "F2"
+
     let key (key: string) = key.ToUpper() |> sprintf "Key%s"
 
 open Fable.Core

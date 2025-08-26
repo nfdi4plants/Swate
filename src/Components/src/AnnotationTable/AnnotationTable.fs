@@ -308,11 +308,11 @@ type AnnotationTable =
                     ?onSelect = onSelect,
                     onKeydown =
                         (fun (e, selectedCells, activeCell) ->
-                            if
+                            if e.code = kbdEventCode.f2 || (
                                 (e.ctrlKey || e.metaKey)
                                 && e.code = kbdEventCode.enter
                                 && activeCell.IsNone
-                                && selectedCells.count > 0
+                                && selectedCells.count > 0)
                             then
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
                                 setModal (ModalTypes.Details cell)
