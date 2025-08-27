@@ -7,40 +7,73 @@ open Swate.Components
 
 type EmptyTableElement =
 
-    static member private Button(icons: ReactElement, onclick) =
+    static member private Button(icons: ReactElement, text: string, onclick) =
         Html.div [
-            prop.className "swt:btn swt:btn-primary swt:btn-square swt:place-self-end swt:gap-0"
+            prop.className "swt:btn swt:btn-primary swt:btn-square swt:place-self-end swt:gap-0 swt:min-h-[100px] swt:min-w-[100px]"
             prop.onClick (fun _ -> onclick ())
+            prop.text text
             prop.children icons
         ]
 
     static member Main(openBuildingBlockWidget: unit -> unit, openTemplateWidget: unit -> unit) =
         Html.div [
-            prop.className "swt:flex swt:justify-center swt:items-center"
-            prop.style [ style.height (length.perc 100) ]
+            prop.className "swt:flex swt:justify-center swt:h-full swt:items-center"
             prop.children [
                 Html.div [
-                    prop.className "swt:card swt:bg-base-300 swt:shadow-xl"
+                    prop.className "swt:card swt:bg-base-300 swt:shadow-xl swt:min-h-[400px] swt:min-w-[400px]"
                     prop.children [
                         Html.div [
-                            prop.className "swt:card-body"
+                            prop.className "swt:card-body swt:flex-1 swt:flex swt:flex-col swt:justify-center"
                             prop.children [
-                                Html.h3 [ prop.className "swt:font-bold swt:text-xl"; prop.text "New Table!" ]
+                                Html.h3 [
+                                    prop.className "swt:flex swt:justify-center swt:font-bold swt:text-xl swt:mb-6";
+                                    prop.text "New Table!"
+                                ]
                                 Html.div [
-                                    prop.className "swt:grid swt:grid-cols-[auto_auto] swt:gap-4 swt:items-center"
+                                    prop.className "swt:grid swt:grid-cols-2 swt:grid-rows-2 swt:gap-6 swt:h-full swt:place-items-center"
                                     prop.children [
-                                        Html.span "Start from an existing template!"
-                                        EmptyTableElement.Button(
-                                            React.fragment [
-                                                Icons.Templates()
-                                            ],
-                                            fun _ -> openTemplateWidget ()
-                                        )
-                                        Html.span "Or start from scratch!"
-                                        EmptyTableElement.Button(
-                                            Icons.BuildingBlock(),
-                                            fun _ -> openBuildingBlockWidget ()
-                                        )
+                                        Html.div [
+                                            prop.className "swt:flex swt:flex-col swt:items-center swt:gap-2"
+                                            prop.children [
+                                                EmptyTableElement.Button(
+                                                    React.fragment [
+                                                        Icons.Templates()
+                                                    ],
+                                                    "Start from existing template!",
+                                                    fun _ -> openTemplateWidget ()
+                                                )
+                                            ]
+                                        ]
+                                        Html.div [
+                                            prop.className "swt:flex swt:flex-col swt:items-center swt:gap-2"
+                                            prop.children [
+                                                EmptyTableElement.Button(
+                                                    Icons.BuildingBlock(),
+                                                    "Start from scratch!",
+                                                    fun _ -> openBuildingBlockWidget ()
+                                                )
+                                            ]
+                                        ]
+                                        Html.div [
+                                            prop.className "swt:flex swt:flex-col swt:items-center swt:gap-2"
+                                            prop.children [
+                                                EmptyTableElement.Button(
+                                                    Icons.BuildingBlock(),
+                                                    "Copy output from previous table!",
+                                                    fun _ -> openBuildingBlockWidget ()
+                                                )
+                                            ]
+                                        ]
+                                        Html.div [
+                                            prop.className "swt:flex swt:flex-col swt:items-center swt:gap-2"
+                                            prop.children [
+                                                EmptyTableElement.Button(
+                                                    Icons.BuildingBlock(),
+                                                    "Copy output from previous table!",
+                                                    fun _ -> openBuildingBlockWidget ()
+                                                )
+                                            ]
+                                        ]
                                     ]
                                 ]
                             ]
