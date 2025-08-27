@@ -762,7 +762,6 @@ type TermSearch =
 
         let onTermChange =
             fun (term: Term option) ->
-                console.log ("termsearch-onTermSelect triggered")
                 setInput (Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue "")
 
                 setSearchResults (fun _ -> SearchState.init ())

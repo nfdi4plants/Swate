@@ -17,9 +17,9 @@ function renderTermSearch(args: any) {
       <TermSearch
         {...args}
         term={term}
-        onTermSelect={(selectedTerm) => {
+        onTermChange={(selectedTerm) => {
           setTerm(selectedTerm);
-          args.onTermSelect(selectedTerm); // Call mock or external handler
+          args.onTermChange(selectedTerm); // Call mock or external handler
         }}
       />
     </div>
@@ -43,7 +43,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: renderTermSearch,
   args: {
-    onTermSelect: fn((term) => console.log(term)),
+    onTermChange: fn((term) => console.log(term)),
     term: undefined,
     debug: true
   },
@@ -52,7 +52,7 @@ export const Default: Story = {
     expect(input).toBeInTheDocument();
     await userEvent.type(input, "instrument model", {delay: 50});
 
-    await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
+    await waitFor(() => expect(args.onTermChange).toHaveBeenCalled());
   }
 }
 
@@ -60,7 +60,7 @@ export const ParentSearch: Story = {
   render: renderTermSearch,
   parameters: {isolated: true},
   args: {
-    onTermSelect: fn((term) => console.log(term)),
+    onTermChange: fn((term) => console.log(term)),
     term: undefined,
     parentId: "MS:1000031",
     debug: true
@@ -72,7 +72,7 @@ export const ParentSearch: Story = {
 
     await userEvent.type(input, "SCIEX instrument", {delay: 50});
 
-    await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
+    await waitFor(() => expect(args.onTermChange).toHaveBeenCalled());
 
     await waitFor(() => { // await api call response
       const directedOutput = screen.getByText("SCIEX instrument model");
@@ -88,7 +88,7 @@ export const DefaultAdvancedSearch: Story = {
   render: renderTermSearch,
   parameters: {isolated: true},
   args: {
-    onTermSelect: fn((term) => console.log(term)),
+    onTermChange: fn((term) => console.log(term)),
     term: undefined,
     parentId: "MS:1000031",
     showDetails: true,
@@ -127,7 +127,7 @@ export const TIBSearch: Story = {
   args: {
     term: undefined,
     parentId: "MS:1000031",
-    onTermSelect: fn((term) => console.log(term)),
+    onTermChange: fn((term) => console.log(term)),
     disableDefaultSearch: true,
     disableDefaultParentSearch: true,
     disableDefaultAllChildrenSearch: true,
@@ -148,7 +148,7 @@ export const TIBSearch: Story = {
 
     await userEvent.type(input, "SCIEX instrument", {delay: 50});
 
-    await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
+    await waitFor(() => expect(args.onTermChange).toHaveBeenCalled());
 
     await waitFor(() => { // await api call response
       const directedOutput = screen.getByText("SCIEX instrument model");
@@ -173,7 +173,7 @@ export const TIBSearch: Story = {
 export const WithSearchConfigProvider: Story = {
   render: renderTermSearch,
   args: {
-    onTermSelect: fn((term) => console.log(term)),
+    onTermChange: fn((term) => console.log(term)),
     term: undefined,
     debug: true,
     disableDefaultSearch: true,
@@ -192,6 +192,6 @@ export const WithSearchConfigProvider: Story = {
     expect(input).toBeInTheDocument();
     await userEvent.type(input, "instrument model", {delay: 50});
 
-    await waitFor(() => expect(args.onTermSelect).toHaveBeenCalled());
+    await waitFor(() => expect(args.onTermChange).toHaveBeenCalled());
   }
 }

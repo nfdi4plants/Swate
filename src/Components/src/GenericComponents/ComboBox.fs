@@ -121,7 +121,6 @@ type ComboBox =
 
         let onSelect =
             fun (index: int) (item: 'a) ->
-                console.log (index, item)
                 onChange |> Option.iter (fun fn -> fn index item)
                 close ()
                 fluiContext.refs.domReference.current.focus ()

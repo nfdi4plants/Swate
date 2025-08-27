@@ -131,9 +131,12 @@ type TableCell =
 
                 match e.code with
                 | kbdEventCode.enter ->
+                    console.log ("BaseActiveCell - enter key pressed")
+
                     if isSetForced.current || isCancelledRef.current then
                         ()
                     else
+                        console.log ("BaseActiveCell - tempData set")
                         setData tempData
                 | kbdEventCode.escape -> isCancelledRef.current <- true
                 | _ -> ()
@@ -142,7 +145,6 @@ type TableCell =
 
         let onBlur =
             fun e ->
-                console.log ("BaseActiveCell - active cell blur event triggered")
 
                 if not isCancelledRef.current && not isSetForced.current then
                     setData tempData
@@ -153,7 +155,6 @@ type TableCell =
 
         let setDataForce =
             fun (value: 'a) ->
-                console.log ("BaseActiveCell - setDataForce event triggered")
                 isSetForced.current <- true
                 setData value
 
@@ -218,8 +219,6 @@ type TableCell =
 
         let setTerm =
             fun (t: Term option) ->
-                console.log ("OntologyAnnotationActiveCell - set term triggered")
-
                 let oa =
                     t
                     |> Option.map Term.toOntologyAnnotation

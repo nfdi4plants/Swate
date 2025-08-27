@@ -147,7 +147,6 @@ type AnnotationTable =
         | _ when tcc.Index.x > 0 && tcc.Index.y > 0 ->
             let setCell =
                 fun (cell: CellCoordinate) (cc: CompositeCell) ->
-                    console.log (cell, cc)
                     let nextTable = arcTable |> ArcTable.setCellAt (cell.x - 1, cell.y - 1, cc)
                     setTable nextTable
 
