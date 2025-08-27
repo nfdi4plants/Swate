@@ -619,8 +619,7 @@ module Extensions =
 
                 match content with
                 | arr when arr.Length > 0 && arr.Length < 4 && header.IsTermColumn && isNumber arr.[0] ->
-                    CompositeCell.createUnitizedFromString (arr.[0])
-                    |> _.ConvertToValidCell(header)
+                    CompositeCell.createUnitizedFromString (arr.[0]) |> _.ConvertToValidCell(header)
                 | [| freetext |] when header.IsSingleColumn -> CompositeCell.createFreeText freetext
                 | [| freetext |] -> CompositeCell.createFreeText freetext |> _.ConvertToValidCell(header)
                 | [| name; tsr; tan |] when header.IsTermColumn -> CompositeCell.createTermFromString (name, tsr, tan)
@@ -664,6 +663,7 @@ module Extensions =
                         | item when item.IsSingleColumn -> -1, 1
                         | item when item.IsDataColumn -> -1, 4
                         | item when item.IsTermColumn -> i, 0
+                        | anyElse -> failwithf "Error-getHeaderParsingInfo: Encountered unsupported case: %A" anyElse
                     )
                     |> Array.unzip
 

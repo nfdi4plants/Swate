@@ -50,9 +50,9 @@ module private TableHelper =
 type Table =
 
     static member TableCellStyle =
-        """swt:data-[selected=true]:text-secondary-content swt:data-[selected=true]:bg-secondary
+        """swt:border-1 swt:border-base-content/30 swt:data-[selected=true]:text-secondary-content swt:data-[selected=true]:bg-secondary
 swt:data-[is-append-origin=true]:border swt:data-[is-append-origin=true]:border-base-content
-swt:data-[active=true]:border-2 swt:data-[active=true]:border-primary swt:data-[active=true]:!bg-transparent
+swt:data-[active=true]:border-primary
 swt:cursor-pointer
 swt:select-none
 swt:p-0"""
@@ -79,7 +79,7 @@ swt:p-0"""
         let enableColumnHeaderSelect = defaultArg enableColumnHeaderSelect false
         let defaultStyleSelect = defaultArg defaultStyleSelect true
 
-        let scrollContainerRef = React.useElementRef()
+        let scrollContainerRef = React.useElementRef ()
 
         let rowVirtualizer =
             Virtual.useVirtualizer (
@@ -252,19 +252,21 @@ swt:p-0"""
                         prop.children [
                             Html.table [
                                 prop.key "table"
-                                prop.className "swt:w-full swt:h-full swt-no-overlap"
+                                prop.className "swt:w-full swt:h-full"
                                 prop.children [
                                     Html.thead [
                                         prop.key "table-thead"
                                         prop.children [
                                             Html.tr [
                                                 prop.key "header"
-                                                prop.className "swt:sticky swt:top-0 swt:left-0 swt:z-10 swt:bg-base-100 swt:text-left"
+                                                prop.className
+                                                    "swt:sticky swt:top-0 swt:left-0 swt:z-10 swt:bg-base-100 swt:text-left"
                                                 prop.style [ style.height Constants.Table.DefaultRowHeight ]
                                                 prop.children [
                                                     for virtualColumn in columnVirtualizer.getVirtualItems () do
                                                         let controller =
                                                             createController {| x = virtualColumn.index; y = 0 |} true
+
                                                         Html.th [
 
                                                             prop.ref columnVirtualizer.measureElement
@@ -326,10 +328,8 @@ swt:p-0"""
                                         prop.children [
                                             for virtualRow in rowVirtualizer.getVirtualItems () do
                                                 let rowStart =
-                                                    if annotator then
-                                                        virtualRow.``end``
-                                                    else
-                                                        virtualRow.start
+                                                    if annotator then virtualRow.``end`` else virtualRow.start
+
                                                 if virtualRow.index = 0 && not annotator then
                                                     Html.none // skip header row, is part of thead
                                                 else
@@ -339,10 +339,7 @@ swt:p-0"""
                                                             style.position.absolute
                                                             style.top 0
                                                             style.left 0
-                                                            style.custom (
-                                                                "transform",
-                                                                $"translateY({rowStart}px)"
-                                                            )
+                                                            style.custom ("transform", $"translateY({rowStart}px)")
                                                             style.height virtualRow.size
                                                         ]
                                                         prop.className "swt:w-full"
@@ -356,7 +353,8 @@ swt:p-0"""
                                                                 let controller = createController index false
 
                                                                 Html.td [
-                                                                    prop.key $"Cell-{virtualRow.key}-{virtualColumn.key}"
+                                                                    prop.key
+                                                                        $"Cell-{virtualRow.key}-{virtualColumn.key}"
                                                                     prop.dataRow virtualRow.index
                                                                     prop.dataColumn virtualColumn.index
                                                                     prop.className [
@@ -370,11 +368,11 @@ swt:p-0"""
                                                                     if controller.IsOrigin then
                                                                         prop.custom ("data-is-append-origin", true)
                                                                     prop.style [
-                                                                        if virtualColumn.index = 0 then
-                                                                            style.position.sticky
-                                                                            style.zIndex 10
-                                                                        else
-                                                                            style.position.absolute
+                                                                        // if virtualColumn.index = 0 then
+                                                                        //     style.position.sticky
+                                                                        //     style.zIndex 10
+                                                                        // else
+                                                                        style.position.absolute
                                                                         style.width virtualColumn.size
                                                                         style.height virtualRow.size
                                                                         style.top 0
@@ -443,7 +441,7 @@ swt:p-0"""
         let renderActiveCell =
             React.memo (
                 (fun (ts: TableCellController) ->
-                    TableCell.BaseActiveTableCell(
+                    TableCell.StringActiveCell(
                         ts,
                         data.[ts.Index.y].[ts.Index.x],
                         (fun newData ->

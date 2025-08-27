@@ -121,7 +121,7 @@ type ComboBox =
 
         let onSelect =
             fun (index: int) (item: 'a) ->
-
+                console.log (index, item)
                 onChange |> Option.iter (fun fn -> fn index item)
                 close ()
                 fluiContext.refs.domReference.current.focus ()
@@ -129,6 +129,13 @@ type ComboBox =
         let filteredItems =
             items
             |> Array.filter (fun item -> filterFn {| item = item; search = inputValue |})
+
+        let onBlur =
+            fun (e: Browser.Types.FocusEvent) ->
+                if not isOpen then
+                    onBlur |> Option.iter (fun f -> f e)
+                else
+                    ()
 
         let ItemRenderer =
             React.useMemo (
@@ -209,11 +216,6 @@ type ComboBox =
             [| box fluiContext.refs.reference; box isOpen |]
         )
 
-        // React.useElementListener.onKeyDown (
-        //     unbox fluiContext.refs.reference,
-        //     onKeyDown |> Option.defaultValue (fun (ev: Browser.Types.KeyboardEvent) -> ())
-        // )
-
         let inputId = FloatingUI.useId ()
 
         React.fragment [
@@ -234,6 +236,7 @@ type ComboBox =
                         prop.className "swt:grow swt:shrink swt:min-w-0"
                         if props.IsSome then
                             yield! prop.spread props.Value
+                        prop.role.comboBox
                         for key, v in
                             useInteractions.getReferenceProps (
                                 {|
@@ -243,21 +246,23 @@ type ComboBox =
                                     ``aria-autocomplete`` = "list"
                                     onFocus =
                                         fun (ev: Browser.Types.FocusEvent) -> onFocus |> Option.iter (fun fn -> fn ev)
-                                    onBlur =
-                                        fun (ev: Browser.Types.FocusEvent) -> onBlur |> Option.iter (fun fn -> fn ev)
+                                    onBlur = onBlur
                                     onKeyDown =
                                         fun (ev: Browser.Types.KeyboardEvent) ->
-                                            onKeyDown |> Option.iter (fun fn -> fn ev)
-
                                             if
                                                 ev.key = "Enter"
                                                 && activeIndex.IsSome
                                                 && Array.tryItem activeIndex.Value filteredItems |> Option.isSome
                                             then
+                                                ev.stopPropagation ()
                                                 onSelect activeIndex.Value filteredItems.[activeIndex.Value]
                                             elif ev.key = "Escape" then
+                                                ev.stopPropagation ()
                                                 setOpen false
                                                 setActiveIndex None
+
+                                            onKeyDown |> Option.iter (fun fn -> fn ev)
+
                                 |}
                             )
                             |> Fable.Core.JS.Constructors.Object.entries do
@@ -301,6 +306,7 @@ type ComboBox =
                                                                 key = index
                                                                 ref = fun node -> listRef.current.[index] <- node
                                                                 onClick = fun _ -> onSelect index item
+                                                                onMouseDown = fun _ -> onSelect index item
                                                             |}
                                                          )
                                                          |> Fable.Core.JS.Constructors.Object.entries
@@ -458,7 +464,8 @@ type ComboBox =
                     comboBoxRef = comboBoxRef,
                     inputLeadingVisual = Icons.MagnifyingClass(),
                     inputTrailingVisual =
-                        React.fragment [ Html.kbd [ prop.className "swt:kbd"; prop.text "/" ]; Icons.ChevronDown() ]
+                        React.fragment [ Html.kbd [ prop.className "swt:kbd"; prop.text "/" ]; Icons.ChevronDown() ],
+                    onBlur = fun e -> console.log ("ComboBox blurred")
                 )
             ]
         ]

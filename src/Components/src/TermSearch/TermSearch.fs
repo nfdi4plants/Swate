@@ -522,7 +522,8 @@ type TermSearch =
                         ]
                         Html.a [
                             prop.className "swt:btn swt:btn-info swt:join-item"
-                            prop.text "open"
+                            prop.children [ Icons.ExternalLinkAlt(className = "swt:size-4") ]
+                            prop.title "Open external link"
                             prop.disabled (tempTerm.href.IsNone)
                             prop.href (Option.defaultValue "#" tempTerm.href)
                             prop.target.blank
@@ -639,7 +640,12 @@ type TermSearch =
                                 "Advanced Search",
                                 Icons.SearchPlus("swt:size-4")
                             )
-                            PageNavigationBtn(ModalPage.Config, "Show term search settings", Icons.Cog("swt:size-4"))
+                            if config.Length > 0 then
+                                PageNavigationBtn(
+                                    ModalPage.Config,
+                                    "Show term search settings",
+                                    Icons.Cog("swt:size-4")
+                                )
                         ]
                     ]
                 ]
@@ -706,15 +712,16 @@ type TermSearch =
     static member TermSearch
         (
             term: Term option,
-            onTermSelect: Term option -> unit,
+            onTermChange: Term option -> unit,
             ?parentId: string,
             ?termSearchQueries: ResizeArray<string * SearchCall>,
             ?parentSearchQueries: ResizeArray<string * ParentSearchCall>,
             ?allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>,
             ?advancedSearchRenderer: AdvancedSearchOptions -> ReactElement,
-            ?onFocus: unit -> unit,
-            ?onBlur: unit -> unit,
+            ?onFocus: Browser.Types.FocusEvent -> unit,
+            ?onBlur: Browser.Types.FocusEvent -> unit,
             ?onKeyDown: Browser.Types.KeyboardEvent -> unit,
+            ?onTermSelect: Term -> unit,
             ?disableDefaultSearch: bool,
             ?disableDefaultParentSearch: bool,
             ?disableDefaultAllChildrenSearch: bool,
@@ -750,15 +757,25 @@ type TermSearch =
 
                 setModalOpen modalOpen
 
-        let onTermSelect =
+        let onBlur =
+            onBlur |> Option.map (fun x -> if not modalOpen then x else fun _ -> ())
+
+        let onTermChange =
             fun (term: Term option) ->
-                // if inputRef.current.IsSome then
-                //     let v = Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue ""
-                //     inputRef.current.Value.value <- v
+                console.log ("termsearch-onTermSelect triggered")
                 setInput (Option.bind (fun (t: Term) -> t.name) term |> Option.defaultValue "")
 
                 setSearchResults (fun _ -> SearchState.init ())
-                onTermSelect term
+                onTermChange term
+
+        let onTermSelect =
+            fun (term: Term) ->
+                if onTermSelect.IsSome then
+                    setInput (Option.defaultValue "" term.name)
+                    setSearchResults (fun _ -> SearchState.init ())
+                    onTermSelect |> Option.iter (fun fn -> fn term)
+                else
+                    onTermChange (Some term)
 
         let startLoadingBy =
             fun (key: string) ->
@@ -1043,10 +1060,10 @@ type TermSearch =
                 setInput e
 
                 if System.String.IsNullOrEmpty e then
-                    onTermSelect None
+                    onTermChange None
                     cancel ()
                 else
-                    onTermSelect (Some <| Term(e))
+                    onTermChange (Some <| Term(e))
                     startSearch e
 
         let configDetails =
@@ -1117,7 +1134,7 @@ type TermSearch =
                 modalOpen,
                 setModalOpen,
                 term,
-                onTermSelect,
+                onTermChange,
                 configDetails,
                 ?advancedSearch = advancedSearchRenderer
             )
@@ -1134,9 +1151,9 @@ type TermSearch =
                 itemContainerRenderer = itemContainerRendererFn,
                 itemRenderer = itemRendererFn,
                 ?labelClassName = (classNames |> Option.map (fun s -> style.resolveStyle s.inputLabel)),
-                onChange = (fun _ y -> onTermSelect (Some y.Term)),
-                onFocus = (fun (_: Browser.Types.FocusEvent) -> onFocus |> Option.iter (fun fn -> fn ())),
-                onBlur = (fun (_: Browser.Types.FocusEvent) -> onBlur |> Option.iter (fun fn -> fn ())),
+                onChange = (fun _ y -> onTermSelect y.Term),
+                onFocus = (fun (e: Browser.Types.FocusEvent) -> onFocus |> Option.iter (fun fn -> fn e)),
+                onBlur = (fun (e: Browser.Types.FocusEvent) -> onBlur |> Option.iter (fun fn -> fn e)),
                 onOpen = (fun o -> if o then startSearch input else cancel ()),
                 comboBoxRef = comboBoxRef,
                 onKeyDown =
@@ -1158,6 +1175,7 @@ type TermSearch =
                         )
                     ),
                 props = {|
+                    autoFocus = autoFocus
                     ``data-testid`` = "term-search-input"
                     ``data-debugresultcount`` = searchResults.Results.Count
                 |}

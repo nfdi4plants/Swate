@@ -8,13 +8,27 @@ open Feliz
 open Feliz.DaisyUI
 open ARCtrl
 
+type ActiveCellProps<'a> = {|
+    data: 'a
+    setData: 'a -> unit
+    setDataForce: 'a -> unit
+    onBlur: Browser.Types.FocusEvent -> unit
+    onKeyDown: Browser.Types.KeyboardEvent -> unit
+|}
 
 [<Mangle(false); Erase>]
 type TableCell =
 
+    [<ReactComponent>]
     static member BaseCell
-        (rowIndex: int, columnIndex: int, content: ReactElement, ?className: string, ?props, ?debug: bool)
-        =
+        (
+            rowIndex: int,
+            columnIndex: int,
+            content: ReactElement,
+            ?className: string,
+            ?props: IReactProperty list,
+            ?debug: bool
+        ) =
         let debug = defaultArg debug false
 
         Html.div [
@@ -31,85 +45,171 @@ type TableCell =
         ]
 
     [<ReactComponent>]
-    static member BaseActiveTableHeader(ts: TableCellController, data: string, setData, ?debug: bool) =
-        let tempData, setTempData = React.useState (data)
-        React.useEffect ((fun _ -> setTempData data), [| box data |])
-
+    static member StringInactiveCell(ts: TableCellController, text: string, ?debug) =
         TableCell.BaseCell(
             ts.Index.y,
             ts.Index.x,
-            Html.input [
-                prop.autoFocus true
-                prop.className
-                    "swt:rounded-none swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content swt:px-2 swt:py-2 swt:outline-hidden"
+            Html.div [
+                prop.className [
+                    if not ts.IsSelected && ts.Index.y = 0 then
+                        "swt:bg-base-300"
+                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full"
+                ]
+                prop.children [ Html.div [ prop.className "swt:truncate"; prop.text text ] ]
+            ],
+            props = [ prop.title text; prop.onClick (fun e -> ts.onClick e) ],
+            className = "swt:w-full swt:h-full",
+            ?debug = debug
+        )
+
+    [<ReactComponent>]
+    static member InactiveCell(ts: TableCellController, children: ReactElement, ?debug) =
+        TableCell.BaseCell(
+            ts.Index.y,
+            ts.Index.x,
+            Html.div [
+                prop.className [
+                    if not ts.IsSelected && ts.Index.y = 0 then
+                        "swt:bg-base-300"
+                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full"
+                ]
+                prop.children children
+            ],
+            props = [ prop.onClick (fun e -> ts.onClick e) ],
+            className = "swt:w-full swt:h-full",
+            ?debug = debug
+        )
+
+    [<ReactComponent>]
+    static member BaseActiveCell<'a>
+        (
+            ts: TableCellController,
+            data: 'a,
+            setData: 'a -> unit,
+            dataRenderfn: ActiveCellProps<'a> -> ReactElement,
+            ?isStickyHeader: bool,
+            ?debug: bool
+        ) =
+
+        let tempData, setTempData = React.useState (data)
+
+        React.useEffect ((fun _ -> setTempData data), [| box data |])
+
+        let containerRef = React.useElementRef ()
+
+        let isCancelledRef = React.useRef (false)
+        let isSetForced = React.useRef (false)
+
+        let props = [
+
+            if debug.IsSome && debug.Value then
+                prop.testId $"active-cell-{ts.Index.y}-{ts.Index.x}"
+
+            if isStickyHeader.IsSome && isStickyHeader.Value then
                 prop.style [
                     style.position.sticky
                     style.height Constants.Table.DefaultRowHeight
                     style.top Constants.Table.DefaultRowHeight
                 ]
-                prop.defaultValue tempData
-                prop.onChange (fun (e: string) -> setTempData e)
-                prop.onKeyDown (fun e ->
-                    ts.onKeyDown e
 
-                    match e.code with
-                    | kbdEventCode.enter -> setData tempData
-                    | _ -> ()
-                )
-                prop.onBlur (fun e ->
-                    ts.onBlur e
+            prop.ref containerRef
+        ]
+
+        let reset =
+            fun () ->
+                setTempData data
+                isCancelledRef.current <- false
+                isSetForced.current <- false
+
+        let setTempData =
+            fun data ->
+                isSetForced.current <- false
+                setTempData data
+
+        let onKeydown =
+            fun (e: Browser.Types.KeyboardEvent) ->
+
+                match e.code with
+                | kbdEventCode.enter ->
+                    if isSetForced.current || isCancelledRef.current then
+                        ()
+                    else
+                        setData tempData
+                | kbdEventCode.escape -> isCancelledRef.current <- true
+                | _ -> ()
+
+                ts.onKeyDown e
+
+        let onBlur =
+            fun e ->
+                console.log ("BaseActiveCell - active cell blur event triggered")
+
+                if not isCancelledRef.current && not isSetForced.current then
                     setData tempData
-                )
-            ],
-            ?debug = debug
-        )
+                else
+                    reset ()
 
-    [<ReactComponent>]
-    static member BaseActiveTableCell
-        (ts: TableCellController, data: string, setData, ?isStickyHeader: bool, ?debug: bool)
-        =
-        let isStickyHeader = defaultArg isStickyHeader false
-        let tempData, setTempData = React.useState (data)
-        React.useEffect ((fun _ -> setTempData data), [| box data |])
+                ts.onBlur e
+
+        let setDataForce =
+            fun (value: 'a) ->
+                console.log ("BaseActiveCell - setDataForce event triggered")
+                isSetForced.current <- true
+                setData value
+
+        let Renderer =
+            dataRenderfn {|
+                data = tempData
+                setData = setTempData
+                setDataForce = setDataForce
+                onBlur = onBlur
+                onKeyDown = onKeydown
+            |}
 
         TableCell.BaseCell(
             ts.Index.y,
             ts.Index.x,
-            Html.input [
-                prop.autoFocus true
-                prop.className
-                    "swt:rounded-none swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content swt:px-2 swt:py-2 swt:outline-hidden"
-                if isStickyHeader then
-                    prop.style [
-                        style.position.sticky
-                        style.height Constants.Table.DefaultRowHeight
-                        style.top Constants.Table.DefaultRowHeight
-                    ]
-                prop.defaultValue tempData
-                prop.onChange (fun (e: string) -> setTempData e)
-                prop.onKeyDown (fun e ->
-                    ts.onKeyDown e
+            Renderer,
+            ?debug = debug,
+            props = props,
+            className = "swt:w-full swt:h-full"
+        )
 
-                    match e.code with
-                    | kbdEventCode.enter -> setData tempData
-                    | _ -> ()
-                )
-                prop.onBlur (fun e ->
-                    ts.onBlur e
-                    setData tempData
-                )
-            ],
+    [<ReactComponent>]
+    static member StringActiveCell
+        (ts: TableCellController, data: string, setData, ?isStickyHeader: bool, ?debug: bool)
+        =
+
+        TableCell.BaseActiveCell(
+            ts,
+            data,
+            setData,
+            (fun props ->
+                Html.input [
+                    prop.autoFocus true
+                    if debug.IsSome && debug.Value then
+                        prop.testid ($"active-cell-string-input-{ts.Index.y}-{ts.Index.x}")
+                    prop.className "swt:rounded-none swt:w-full swt:h-full swt:input swt:!outline-0 swt:!border-0"
+                    prop.defaultValue props.data
+                    prop.onChange (fun (e: string) -> props.setData e)
+                    prop.onKeyDown props.onKeyDown
+                    prop.onBlur props.onBlur
+                ]
+            ),
+            ?isStickyHeader = isStickyHeader,
             ?debug = debug
         )
 
-    static member TermSearchContent
+    [<ReactComponent>]
+    static member OntologyAnnotationActiveCell
         (
-            tableCellController,
-            (oa: OntologyAnnotation),
-            displayIndicators,
-            (setHeader: OntologyAnnotation -> unit),
-            debug
+            ts: TableCellController,
+            oa: OntologyAnnotation,
+            setOa: OntologyAnnotation -> unit,
+            ?isStickyHeader: bool,
+            ?debug: bool
         ) =
+
         let term =
             if oa.isEmpty () then
                 None
@@ -118,189 +218,31 @@ type TableCell =
 
         let setTerm =
             fun (t: Term option) ->
+                console.log ("OntologyAnnotationActiveCell - set term triggered")
+
                 let oa =
                     t
                     |> Option.map Term.toOntologyAnnotation
                     |> Option.defaultValue (OntologyAnnotation())
 
-                setHeader oa
+                setOa (oa)
 
-        let termDropdownRenderer =
-            fun (client: Browser.Types.ClientRect) (dropdown: ReactElement) ->
-                Html.div [
-                    prop.className "swt:absolute swt:z-50"
-                    prop.style [
-                        style.left (int (client.left + Browser.Dom.window.scrollX - 2.))
-                        style.top (int (client.bottom + Browser.Dom.window.scrollY + 5.))
-                    ]
-                    prop.children [ dropdown ]
-                ]
-
-        TermSearch.TermSearch(
+        TableCell.BaseActiveCell<Term option>(
+            ts,
             term,
             setTerm,
-            onBlur = (fun _ -> tableCellController.onBlur !!()),
-            onKeyDown = (fun e -> tableCellController.onKeyDown e),
-            classNames =
-                TermSearchStyle(
-                    !^"swt:rounded-none swt:px-1 swt:py-1 swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content"
-                ),
-            autoFocus = true
+            (fun (props) ->
+                TermSearch.TermSearch(
+                    props.data,
+                    props.setData,
+                    onBlur = (fun e -> props.onBlur e),
+                    onKeyDown = (fun e -> props.onKeyDown e),
+                    classNames =
+                        TermSearchStyle(!^"swt:rounded-none swt:w-full swt:h-full swt:!outline-0 swt:!border-0"),
+                    onTermSelect = (fun term -> props.setDataForce (Some term)),
+                    autoFocus = true
+                )
+            ),
+            ?isStickyHeader = isStickyHeader,
+            ?debug = debug
         )
-
-    static member CompositeHeaderActiveRender
-        (
-            tableCellController: TableCellController,
-            header: CompositeHeader,
-            setHeader: CompositeHeader -> unit,
-            ?debug,
-            ?displayIndicators
-        ) =
-
-        let handleTerm header =
-            match header with
-            | CompositeHeader.Component oa ->
-                let setHeader = fun x -> setHeader (CompositeHeader.Component x)
-                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)
-            | CompositeHeader.Characteristic oa ->
-                let setHeader = fun x -> setHeader (CompositeHeader.Characteristic x)
-                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)
-            | CompositeHeader.Factor oa ->
-                let setHeader = fun x -> setHeader (CompositeHeader.Factor x)
-                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)
-            | CompositeHeader.Parameter oa ->
-                let setHeader = fun x -> setHeader (CompositeHeader.Parameter x)
-                TableCell.TermSearchContent(tableCellController, oa, displayIndicators, setHeader, debug)
-            | _ -> failwith $"Unknown type {header}"
-
-        match header with
-        | CompositeHeader.Input io ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.Input io}",
-                (fun _ -> setHeader (CompositeHeader.Input io)),
-                ?debug = debug
-            )
-        | CompositeHeader.Output io ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.Output io}",
-                (fun _ -> setHeader (CompositeHeader.Output io)),
-                ?debug = debug
-            )
-        | CompositeHeader.Comment txt ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.Comment txt}",
-                (fun _ -> setHeader (CompositeHeader.Comment txt)),
-                ?debug = debug
-            )
-        | CompositeHeader.FreeText txt ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.FreeText txt}",
-                (fun _ -> setHeader (CompositeHeader.FreeText txt)),
-                ?debug = debug
-            )
-        | CompositeHeader.ProtocolType ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.ProtocolType}",
-                (fun _ -> setHeader (CompositeHeader.ProtocolType)),
-                ?debug = debug
-            )
-        | CompositeHeader.ProtocolDescription ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.ProtocolDescription}",
-                (fun _ -> setHeader (CompositeHeader.ProtocolDescription)),
-                ?debug = debug
-            )
-        | CompositeHeader.ProtocolUri ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.ProtocolUri}",
-                (fun _ -> setHeader (CompositeHeader.ProtocolUri)),
-                ?debug = debug
-            )
-        | CompositeHeader.ProtocolVersion ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.ProtocolVersion}",
-                (fun _ -> setHeader (CompositeHeader.ProtocolVersion)),
-                ?debug = debug
-            )
-        | CompositeHeader.ProtocolREF ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.ProtocolREF}",
-                (fun _ -> setHeader (CompositeHeader.ProtocolREF)),
-                ?debug = debug
-            )
-        | CompositeHeader.Performer ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.Performer}",
-                (fun _ -> setHeader (CompositeHeader.Performer)),
-                ?debug = debug
-            )
-        | CompositeHeader.Date ->
-            TableCell.BaseActiveTableHeader(
-                tableCellController,
-                $"{CompositeHeader.Date}",
-                (fun _ -> setHeader (CompositeHeader.Date)),
-                ?debug = debug
-            )
-        | _ -> handleTerm header
-
-    static member CompositeCellActiveRender
-        (
-            tableCellController: TableCellController,
-            cell: CompositeCell,
-            setCell: CompositeCell -> unit,
-            ?debug,
-            ?displayIndicators
-        ) =
-
-        match cell with
-        | CompositeCell.Term oa ->
-            let term =
-                if oa.isEmpty () then
-                    None
-                else
-                    Term.fromOntologyAnnotation oa |> Some
-
-            let setTerm =
-                fun (t: Term option) ->
-                    let oa =
-                        t
-                        |> Option.map Term.toOntologyAnnotation
-                        |> Option.defaultValue (OntologyAnnotation())
-
-                    setCell (CompositeCell.Term oa)
-
-            TermSearch.TermSearch(
-                term,
-                setTerm,
-                onBlur = (fun _ -> tableCellController.onBlur !!()),
-                onKeyDown = (fun e -> tableCellController.onKeyDown e),
-                classNames =
-                    TermSearchStyle(
-                        !^"swt:rounded-none swt:px-1 swt:py-1 swt:w-full swt:h-full swt:bg-base-100 swt:text-base-content"
-                    ),
-                autoFocus = true
-            )
-        | CompositeCell.FreeText txt ->
-            TableCell.BaseActiveTableCell(tableCellController, txt, fun t -> setCell (CompositeCell.FreeText t))
-        | CompositeCell.Unitized(v, oa) ->
-            TableCell.BaseActiveTableCell(tableCellController, v, fun _ -> setCell (CompositeCell.Unitized(v, oa)))
-        | CompositeCell.Data d ->
-            TableCell.BaseActiveTableCell(
-                tableCellController,
-                Option.defaultValue "" d.Name,
-                (fun t ->
-                    d.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
-                    setCell (CompositeCell.Data d)
-                ),
-                ?debug = debug
-            )

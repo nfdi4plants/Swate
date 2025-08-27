@@ -62,6 +62,7 @@ module Spreadsheet =
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->
                         let json = assay.ToJsonString()
+
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, json)
                         |> Promise.start
                     | Some(Study(study, _)) ->
@@ -148,6 +149,7 @@ module Spreadsheet =
                     state with
                         ArcFile = Some updatedArcFile
                 }
+
                 nextState, model, Cmd.none
             | JoinTable(table, index, options, templateName) ->
                 let nextState =
@@ -279,19 +281,14 @@ module Spreadsheet =
                             state.SelectedCells.Value.xStart, state.SelectedCells.Value.yStart
 
                         let nextIndex =
-                            Controller.Table.selectRelativeCell
-                                startCoordinates
-                                moveBy
-                                maxColIndex
-                                maxRowIndex
+                            Controller.Table.selectRelativeCell startCoordinates moveBy maxColIndex maxRowIndex
 
-                        let range: CellCoordinateRange =
-                            {|
-                                xStart = fst nextIndex
-                                xEnd = fst nextIndex
-                                yStart = snd nextIndex
-                                yEnd = snd nextIndex
-                            |}
+                        let range: CellCoordinateRange = {|
+                            xStart = fst nextIndex
+                            xEnd = fst nextIndex
+                            yStart = snd nextIndex
+                            yEnd = snd nextIndex
+                        |}
 
                         let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
 
@@ -299,17 +296,16 @@ module Spreadsheet =
                         | null -> ()
                         | ele -> ele.focus ()
 
-                        UpdateSelectedCells (Some range) |> SpreadsheetMsg |> Cmd.ofMsg
+                        UpdateSelectedCells(Some range) |> SpreadsheetMsg |> Cmd.ofMsg
 
                 state, model, cmd
             | SetActiveCellFromSelected ->
                 let cmd =
                     if state.SelectedCells.IsSome then
-                        let min: CellCoordinate =
-                            {|
-                                x = state.SelectedCells.Value.xStart
-                                y = state.SelectedCells.Value.yStart
-                            |}
+                        let min: CellCoordinate = {|
+                            x = state.SelectedCells.Value.xStart
+                            y = state.SelectedCells.Value.yStart
+                        |}
 
                         let cmd =
                             (Fable.Core.U2.Case2 min, ColumnType.Main)
@@ -418,10 +414,10 @@ module Spreadsheet =
             | ClearSelected ->
                 let indices =
                     if state.SelectedCells.IsSome then
-                        CellCoordinateRange.toArray state.SelectedCells.Value
-                        |> Array.ofSeq
+                        CellCoordinateRange.toArray state.SelectedCells.Value |> Array.ofSeq
                     else
-                        [| |]
+                        [||]
+
                 let nextState = Controller.Table.clearCells indices state
                 nextState, model, Cmd.none
             | FillColumnWithTerm index ->
@@ -452,15 +448,20 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+
                 let cmd =
                     Cmd.OfPromise.either
                         Xlsx.toXlsxBytes
                         fswb
                         (fun bytes -> ExportXlsxDownload(name, bytes) |> Messages.SpreadsheetMsg)
                         (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
+
                 state, model, cmd
             | ExportXlsxDownload(name, xlsxBytes) ->
                 let _ = UpdateUtil.download (name, xlsxBytes)
+                state, model, Cmd.none
+            | SetCell(x, y) ->
+                failwith "SetCell not implemented in Spreadsheet.Update"
                 state, model, Cmd.none
 
         try

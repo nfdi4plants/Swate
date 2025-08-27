@@ -207,8 +207,8 @@ type ContextMenu =
                 timeout.current
                 |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
 
-        FloatingUI.FloatingPortal(
-            if isOpen then
+        if isOpen then
+            FloatingUI.FloatingPortal(
                 FloatingUI.FloatingOverlay(
                     lockScroll = true,
                     className = "swt:z-[9999]",
@@ -302,9 +302,9 @@ type ContextMenu =
                                 ]
                         )
                 )
-            else
-                Html.none
-        )
+            )
+        else
+            Html.none
 
     [<ReactComponent>]
     static member Example() =

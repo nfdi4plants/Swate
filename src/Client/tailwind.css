@@ -224,9 +224,9 @@
     }
 }
 
-@layer components {
+/* @layer components {
   .swt\:table-bordered th,
   .swt\:table-bordered td {
     @apply swt:!border swt:!border-base-content swt:text-left swt:border-collapse;
   }
-}
+} */
