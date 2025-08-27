@@ -52,10 +52,6 @@ open Fable.Core
 let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
     let element = React.useElementRef ()
 
-    let portalTermDropdown =
-        element.current
-        |> Option.map (fun e -> Swate.Components.Types.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
-
     Html.div [
         prop.ref element
         prop.style [ style.position.relative ]
@@ -73,14 +69,12 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
                     let parent = model.AddBuildingBlockState.TryHeaderOA()
                     let input = model.AddBuildingBlockState.TryBodyOA()
 
-                    Components.TermSearchImplementation.Main(
+                    Swate.Components.TermSearch.TermSearch(
                         (input |> Option.map _.ToTerm()),
                         setter,
-                        model,
-                        classNames = Swate.Components.Types.TermSearchStyle(!^"swt:border-current swt:join-item"),
-                        fullwidth = true,
-                        ?parentId = (parent |> Option.map _.TermAccessionShort),
-                        ?portalTermDropdown = portalTermDropdown
+                        classNames =
+                            Swate.Components.Types.TermSearchStyle(!^"swt:border-current swt:join-item swt:w-full"),
+                        ?parentId = (parent |> Option.map _.TermAccessionShort)
                     )
                 ]
             ]
@@ -91,10 +85,6 @@ let private SearchBuildingBlockBodyElement (model: Model, dispatch) =
 let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, model: Model, dispatch) =
     let state = model.AddBuildingBlockState
     let element = React.useElementRef ()
-
-    let portalTermDropdown =
-        element.current
-        |> Option.map (fun e -> Swate.Components.Types.PortalTermDropdown(e, fun _ c -> React.fragment [ c ]))
 
     Html.div [
         prop.ref element // The ref must be place here, otherwise the portalled term select area will trigger daisy join syntax
@@ -125,13 +115,11 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
                         //selectHeader ui setUi h |> dispatch
                         let input = model.AddBuildingBlockState.TryHeaderOA()
 
-                        Components.TermSearchImplementation.Main(
+                        Swate.Components.TermSearch.TermSearch(
                             (input |> Option.map _.ToTerm()),
                             setter,
-                            model,
-                            classNames = Swate.Components.Types.TermSearchStyle(!^"swt:border-current swt:join-item"),
-                            fullwidth = true,
-                            ?portalTermDropdown = portalTermDropdown
+                            classNames =
+                                Swate.Components.Types.TermSearchStyle(!^"swt:border-current swt:join-item swt:w-full")
                         )
 
                     elif state.HeaderCellType.HasIOType() then
@@ -188,8 +176,7 @@ let private addBuildingBlock (model: Model) (state: Model.BuildingBlock.Model) d
     let column = CompositeColumn.create (header, bodyCells)
 
     let index =
-        Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex
-            model.SpreadsheetModel
+        Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
 
     SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
     let id = $"Header_{index}_Main"
@@ -197,6 +184,7 @@ let private addBuildingBlock (model: Model) (state: Model.BuildingBlock.Model) d
 
 let private AddBuildingBlockButton (model: Model) dispatch =
     let state = model.AddBuildingBlockState
+
     Html.div [
         prop.className "swt:flex swt:justify-center"
         prop.children [
@@ -247,7 +235,7 @@ let Main (model: Model) dispatch =
         Html.form [
             prop.className "swt:flex swt:flex-col swt:gap-4"
             prop.onSubmit (fun ev ->
-                ev.preventDefault()
+                ev.preventDefault ()
                 addBuildingBlock model model.AddBuildingBlockState dispatch
             )
             prop.children [

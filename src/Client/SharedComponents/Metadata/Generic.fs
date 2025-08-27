@@ -32,7 +32,7 @@ type Generic =
                                     Html.h1 [ prop.className "swt:mt-0"; prop.text title.Value ]
                                 if description.IsSome then
                                     Html.p [
-                                        prop.className "swt:text-sm swt:text-gray-500"
+                                        prop.className "swt:text-sm swt:text-base-content/80"
                                         prop.text description.Value
                                     ]
                             ]
@@ -43,7 +43,8 @@ type Generic =
                                 prop.children (
                                     content.Value
                                     |> List.map (fun element ->
-                                        Html.div [ prop.className "swt:py-2"; prop.children [ element ] ])
+                                        Html.div [ prop.className "swt:py-2"; prop.children [ element ] ]
+                                    )
                                 )
                             ]
                     ]

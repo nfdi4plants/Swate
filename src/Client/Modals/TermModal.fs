@@ -21,8 +21,8 @@ type TermModal =
     [<ReactComponent>]
     static member Main(oa: OntologyAnnotation, dispatch) =
 
+        let isOpen, setIsOpen = React.useState (true)
         let state, setState = React.useState (State.Loading)
-        let rmv = Util.RMV_MODAL dispatch
 
         React.useEffectOnce (fun _ ->
             async {
@@ -74,8 +74,10 @@ type TermModal =
                 ]
             ]
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header = Html.p headerElement,
+        Swate.Components.BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.p headerElement,
+            Html.div [],
             modalActions = modalActivity
         )

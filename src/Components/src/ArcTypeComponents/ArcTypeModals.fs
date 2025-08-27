@@ -43,20 +43,6 @@ type InputField =
             ]
         ]
 
-    static member Show(v: string, label: string, rmv) =
-
-        Html.div [
-            prop.className "swt:flex swt:flex-col swt:gap-2 swt:w-full"
-            prop.children [
-                Html.label [ prop.className "swt:label"; prop.text label ]
-                Html.input [
-                    prop.className "swt:input swt:w-full"
-                    prop.readOnly true
-                    prop.valueOrDefault v
-                ]
-            ]
-        ]
-
     static member TermCombi
         (
             v: Term option,
@@ -74,13 +60,10 @@ type InputField =
             prop.children [
                 Html.label [ prop.className "swt:label"; prop.text label ]
                 TermSearch.TermSearch(
-                    setter,
                     term = v,
-                    classNames = TermSearchStyle(U2.Case1 "swt:w-full"),
-                    advancedSearch = U2.Case2 true,
-                    showDetails = true,
+                    onTermSelect = setter,
+                    classNames = TermSearchStyle(U2.Case1 "swt:border-current"),
                     autoFocus = autofocus,
-                    portalModals = Browser.Dom.document.body,
                     onKeyDown = (fun (e: KeyboardEvent) -> ArcTypeModalsUtil.inputKeydownHandler e submit rmv),
                     ?parentId = (parentOa |> Option.map (fun oa -> oa.TermAccessionShort))
                 )
@@ -89,8 +72,6 @@ type InputField =
 
 type FooterButtons =
     static member Cancel(rmv: unit -> unit) =
-
-        //Daisy.button.button [ button.outline; prop.text "Cancel"; prop.onClick (fun e -> rmv ()) ]
         Html.button [
             prop.className "swt:btn swt:btn-outline"
             prop.text "Cancel"
@@ -98,12 +79,6 @@ type FooterButtons =
         ]
 
     static member Submit(submitOnClick: unit -> unit) =
-        //Daisy.button.button [
-        //    button.primary
-        //    prop.text "Submit"
-        //    prop.className "ml-auto"
-        //    prop.onClick (fun e -> submitOnClick ())
-        //]
         Html.button [
             prop.className "swt:btn swt:btn-primary swt:ml-auto"
             prop.text "Submit"
@@ -120,9 +95,16 @@ type CompositeCellModal =
         "swt:overflow-y-auto swt:overflow-x-hidden swt:space-y-2 swt:pl-1 swt:pr-4 swt:py-1"
 
     static member TermModal
-        (oa: OntologyAnnotation, rmv, ?relevantCompositeHeader: CompositeHeader, ?setOa: OntologyAnnotation -> unit, ?setHeader: CompositeHeader -> unit, ?debug: string)
-        =
+        (
+            oa: OntologyAnnotation,
+            rmv,
+            ?relevantCompositeHeader: CompositeHeader,
+            ?setOa: OntologyAnnotation -> unit,
+            ?setHeader: CompositeHeader -> unit,
+            ?debug: string
+        ) =
         let initTerm = Term.fromOntologyAnnotation oa
+        let isOpen, setIsOpen = React.useState (true)
         let tempTerm, setTempTerm = React.useState (initTerm)
 
         let submit =
@@ -134,59 +116,56 @@ type CompositeCellModal =
                     let header =
                         match relevantCompositeHeader.Value with
                         | CompositeHeader.Characteristic _ ->
-                            CompositeHeader.Characteristic (Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Component _ ->
-                            CompositeHeader.Component (Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Factor _ ->
-                            CompositeHeader.Factor (Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Parameter _ ->
-                            CompositeHeader.Parameter (Term.toOntologyAnnotation tempTerm)
+                            CompositeHeader.Characteristic(Term.toOntologyAnnotation tempTerm)
+                        | CompositeHeader.Component _ -> CompositeHeader.Component(Term.toOntologyAnnotation tempTerm)
+                        | CompositeHeader.Factor _ -> CompositeHeader.Factor(Term.toOntologyAnnotation tempTerm)
+                        | CompositeHeader.Parameter _ -> CompositeHeader.Parameter(Term.toOntologyAnnotation tempTerm)
                         | _ -> failwith $"Unknown CompositeHeader type {relevantCompositeHeader.Value.ToString()}"
-                    header
-                    |> setHeader.Value
+
+                    header |> setHeader.Value
                     rmv ()
                 else
                     failwith "At least one set parameter must be set!"
 
         let parentOa = relevantCompositeHeader |> Option.map (fun h -> h.ToTerm())
 
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Term",
-            content =
-                React.fragment [
-                    InputField.TermCombi(
-                        Some tempTerm,
-                        (fun t -> t |> Option.defaultValue (Term()) |> setTempTerm),
-                        "Term Name",
-                        rmv,
-                        submit,
-                        autofocus = debug.IsNone,
-                        ?parentOa = parentOa
-                    )
-                    InputField.Input(
-                        (tempTerm.source |> Option.defaultValue ""),
-                        (fun input ->
-                            tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)
-                        ),
-                        "Source",
-                        rmv,
-                        submit
-                    )
-                    InputField.Input(
-                        (tempTerm.id |> Option.defaultValue ""),
-                        (fun input ->
-                            tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)
-                        ),
-                        "Accession Number",
-                        rmv,
-                        submit
-                    )
-                ],
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Term",
+            React.fragment [
+                InputField.TermCombi(
+                    Some tempTerm,
+                    (fun t -> t |> Option.defaultValue (Term()) |> setTempTerm),
+                    "Term Name",
+                    rmv,
+                    submit,
+                    autofocus = debug.IsNone,
+                    ?parentOa = parentOa
+                )
+                InputField.Input(
+                    (tempTerm.source |> Option.defaultValue ""),
+                    (fun input ->
+                        tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                        setTempTerm (tempTerm)
+                    ),
+                    "Source",
+                    rmv,
+                    submit
+                )
+                InputField.Input(
+                    (tempTerm.id |> Option.defaultValue ""),
+                    (fun input ->
+                        tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                        setTempTerm (tempTerm)
+                    ),
+                    "Accession Number",
+                    rmv,
+                    submit
+                )
+            ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
             ?debug = debug
         )
 
@@ -200,6 +179,7 @@ type CompositeCellModal =
             ?debug
         ) =
         let initTerm = Term.fromOntologyAnnotation oa
+        let isOpen, setIsOpen = React.useState (true)
         let tempValue, setTempValue = React.useState (value)
         let tempTerm, setTempTerm = React.useState (initTerm)
 
@@ -210,146 +190,162 @@ type CompositeCellModal =
                 rmv ()
 
         let parentOa = relevantCompositeHeader |> Option.map (fun h -> h.ToTerm())
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Unitized",
-            content =
-                React.fragment [
-                    InputField.Input(
-                        tempValue,
-                        (fun input -> setTempValue input),
-                        "Value",
-                        rmv,
-                        submit,
-                        autofocus = debug.IsNone
-                    )
-                    InputField.TermCombi(
-                        Some tempTerm,
-                        (fun t -> t |> Option.defaultValue (Term()) |> setTempTerm),
-                        "Term Name",
-                        rmv,
-                        submit,
-                        ?parentOa = parentOa
-                    )
-                    InputField.Input(
-                        (tempTerm.source |> Option.defaultValue ""),
-                        (fun input ->
-                            tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)
-                        ),
-                        "Source",
-                        rmv,
-                        submit
-                    )
-                    InputField.Input(
-                        (tempTerm.id |> Option.defaultValue ""),
-                        (fun input ->
-                            tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                            setTempTerm (tempTerm)
-                        ),
-                        "Accession Number",
-                        rmv,
-                        submit
-                    )
-                ],
+
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Unitized",
+            React.fragment [
+                InputField.Input(
+                    tempValue,
+                    (fun input -> setTempValue input),
+                    "Value",
+                    rmv,
+                    submit,
+                    autofocus = debug.IsNone
+                )
+                InputField.TermCombi(
+                    Some tempTerm,
+                    (fun t -> t |> Option.defaultValue (Term()) |> setTempTerm),
+                    "Term Name",
+                    rmv,
+                    submit,
+                    ?parentOa = parentOa
+                )
+                InputField.Input(
+                    (tempTerm.source |> Option.defaultValue ""),
+                    (fun input ->
+                        tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                        setTempTerm (tempTerm)
+                    ),
+                    "Source",
+                    rmv,
+                    submit
+                )
+                InputField.Input(
+                    (tempTerm.id |> Option.defaultValue ""),
+                    (fun input ->
+                        tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                        setTempTerm (tempTerm)
+                    ),
+                    "Accession Number",
+                    rmv,
+                    submit
+                )
+            ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
             ?debug = debug
         )
 
-    static member private submit ((setValue:('a -> unit) option), (setHeader: (CompositeHeader -> unit) option), value, headerValue, rmv) =
+    static member private submit
+        ((setValue: ('a -> unit) option), (setHeader: (CompositeHeader -> unit) option), value, headerValue, rmv)
+        =
         try
             if setValue.IsSome then
                 setValue.Value value
                 rmv ()
             elif setHeader.IsSome then
                 let header = headerValue
-                header
-                |> setHeader.Value
+                header |> setHeader.Value
                 rmv ()
             else
                 failwith "At least one set parameter must be given!"
-        with _ -> ()
+        with _ ->
+            ()
 
-    static member FreeTextModal(value: string, rmv, ?setText: string -> unit, ?setHeader: CompositeHeader -> unit, ?debug) =
+    static member FreeTextModal
+        (value: string, rmv, ?setText: string -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
+        =
         let tempValue, setTempValue = React.useState (value)
+        let isOpen, setIsOpen = React.useState (true)
 
         let submit =
             fun () ->
                 let headerValue = CompositeHeader.OfHeaderString tempValue
-                CompositeCellModal.submit(setText, setHeader, tempValue, headerValue, rmv)
+                CompositeCellModal.submit (setText, setHeader, tempValue, headerValue, rmv)
 
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Freetext",
-            content =
-                React.fragment [
-                    InputField.Input(
-                        tempValue,
-                        (fun input -> setTempValue input),
-                        "Value",
-                        rmv,
-                        submit,
-                        autofocus = debug.IsNone
-                    )
-                ],
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Freetext",
+            React.fragment [
+                InputField.Input(
+                    tempValue,
+                    (fun input -> setTempValue input),
+                    "Value",
+                    rmv,
+                    submit,
+                    autofocus = debug.IsNone
+                )
+            ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
             ?debug = debug
         )
 
     static member DataModal
-        (value: ARCtrl.Data, rmv, ?relevantCompositeHeader: CompositeHeader, ?setData: ARCtrl.Data -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
-        =
+        (
+            value: ARCtrl.Data,
+            rmv,
+            ?relevantCompositeHeader: CompositeHeader,
+            ?setData: ARCtrl.Data -> unit,
+            ?setHeader: CompositeHeader -> unit,
+            ?debug
+        ) =
         let tempData, setTempData = React.useState (value)
+        let isOpen, setIsOpen = React.useState (true)
 
         let submit =
             fun () ->
                 try
                     let filePath = defaultArg tempData.FilePath ""
                     let headerValue = CompositeHeader.OfHeaderString filePath
-                    CompositeCellModal.submit(setData, setHeader, tempData, headerValue, rmv)
-                with _ -> ()
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Data",
-            content =
-                React.fragment [
+                    CompositeCellModal.submit (setData, setHeader, tempData, headerValue, rmv)
+                with _ ->
+                    ()
+
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Data",
+            React.fragment [
+                InputField.Input(
+                    (tempData.FilePath |> Option.defaultValue ""),
+                    (fun input ->
+                        tempData.FilePath <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                        setTempData tempData
+                    ),
+                    "File Path",
+                    rmv,
+                    submit,
+                    autofocus = debug.IsNone
+                )
+                if setData.IsSome then
                     InputField.Input(
-                        (tempData.FilePath |> Option.defaultValue ""),
+                        (tempData.Selector |> Option.defaultValue ""),
                         (fun input ->
-                            tempData.FilePath <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                            tempData.Selector <- Option.whereNot System.String.IsNullOrWhiteSpace input
                             setTempData tempData
                         ),
-                        "File Path",
+                        "Selector",
                         rmv,
-                        submit,
-                        autofocus = debug.IsNone
+                        submit
                     )
-                    if setData.IsSome then
-                        InputField.Input(
-                            (tempData.Selector |> Option.defaultValue ""),
-                            (fun input ->
-                                tempData.Selector <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                                setTempData tempData
-                            ),
-                            "Selector",
-                            rmv,
-                            submit
-                        )
-                        InputField.Input(
-                            (tempData.SelectorFormat |> Option.defaultValue ""),
-                            (fun input ->
-                                tempData.SelectorFormat <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                                setTempData tempData
-                            ),
-                            "Selector Format",
-                            rmv,
-                            submit
-                        )
-                ],
+
+                    InputField.Input(
+                        (tempData.SelectorFormat |> Option.defaultValue ""),
+                        (fun input ->
+                            tempData.SelectorFormat <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                            setTempData tempData
+                        ),
+                        "Selector Format",
+                        rmv,
+                        submit
+                    )
+            ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
+            //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
             ?debug = debug
         )
 
@@ -366,19 +362,29 @@ type CompositeCellModal =
         match compositeCell with
         | CompositeCell.Term oa ->
             let setOa = fun oa -> setCell (CompositeCell.Term oa)
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_Term"
                 else
                     None
-            CompositeCellModal.TermModal(oa, rmv, ?relevantCompositeHeader = relevantCompositeHeader, setOa = setOa, ?debug = debug)
+
+            CompositeCellModal.TermModal(
+                oa,
+                rmv,
+                ?relevantCompositeHeader = relevantCompositeHeader,
+                setOa = setOa,
+                ?debug = debug
+            )
         | CompositeCell.Unitized(v, oa) ->
             let setUnitized = fun v oa -> setCell (CompositeCell.Unitized(v, oa))
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_Unitized"
                 else
                     None
+
             CompositeCellModal.UnitizedModal(
                 v,
                 oa,
@@ -389,39 +395,46 @@ type CompositeCellModal =
             )
         | CompositeCell.FreeText text ->
             let setText = fun text -> setCell (CompositeCell.FreeText text)
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_FreeText"
                 else
                     None
+
             CompositeCellModal.FreeTextModal(text, rmv, setText = setText, ?debug = debug)
         | CompositeCell.Data data ->
             let setData = fun data -> setCell (CompositeCell.Data data)
+
             let debug =
                 if debug.IsSome && debug.Value then
                     Some "Details_Data"
                 else
                     None
-            CompositeCellModal.DataModal(data, rmv, setData = setData, ?relevantCompositeHeader = relevantCompositeHeader, ?debug = debug)
+
+            CompositeCellModal.DataModal(
+                data,
+                rmv,
+                setData = setData,
+                ?relevantCompositeHeader = relevantCompositeHeader,
+                ?debug = debug
+            )
 
     [<ReactComponent>]
-    static member CompositeHeaderModal
-        (
-            header: CompositeHeader,
-            setHeader: CompositeHeader -> unit,
-            rmv: unit -> unit
-        ) =
+    static member CompositeHeaderModal(header: CompositeHeader, setHeader: CompositeHeader -> unit, rmv: unit -> unit) =
         match header with
         | compositeHeader when compositeHeader.IsTermColumn ->
             let setOa = fun oa -> setHeader oa
             let oa = header.ToTerm()
             CompositeCellModal.TermModal(oa, rmv, setHeader = setOa, relevantCompositeHeader = header)
         | compositeHeader when compositeHeader.IsDataColumn ->
-            let data = Data.create(Name = header.ToString())
+            let data = Data.create (Name = header.ToString())
             CompositeCellModal.DataModal(data, rmv, relevantCompositeHeader = header, setHeader = setHeader)
-        | compositeHeader when compositeHeader.isInput
+        | compositeHeader when
+            compositeHeader.isInput
             || compositeHeader.isOutput
-            || compositeHeader.isFreeText ->
+            || compositeHeader.isFreeText
+            ->
             let setText = fun v -> setHeader v
             let text = header.ToString()
             CompositeCellModal.FreeTextModal(text, rmv, setHeader = setText)
@@ -433,10 +446,16 @@ type ContextMenuModals =
         (
             arcTable: ArcTable,
             setArcTable,
-            addColumns: {| data: ResizeArray<CompositeColumn>; columnIndex: int |},
+            addColumns:
+                {|
+                    data: ResizeArray<CompositeColumn>
+                    columnIndex: int
+                |},
             setModal: AnnotationTable.ModalTypes -> unit,
             tableRef: IRefValue<TableHandle>
         ) =
+        let isOpen, setIsOpen = React.useState (true)
+
         let rmv =
             fun _ ->
                 tableRef.current.focus ()
@@ -460,47 +479,47 @@ type ContextMenuModals =
             |> Array.map (fun compositeColumn -> compositeColumn.Cells)
             |> Array.transpose
 
-        BaseModal.BaseModal(
-            (fun _ -> rmv ()),
-            header = Html.div "Headers have been detected",
-            content =
-                React.fragment [
+        BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.div "Headers have been detected",
+            React.fragment [
+                Html.div [
+                    Html.text "Preview"
                     Html.div [
-                        Html.text "Preview"
-                        Html.div [
-                            prop.className "swt:overflow-x-auto"
-                            prop.children [
-                                Html.table [
-                                    prop.className "swt:table swt:table-xs"
-                                    prop.children [
-                                        Html.thead [
-                                            Html.tr (
-                                                compositeColumns
-                                                |> Array.map (fun compositeColumn ->
-                                                    Html.th (compositeColumn.Header.ToString())
-                                                )
-                                            )
-                                        ]
-                                        Html.tbody (
-                                            rows
+                        prop.className "swt:overflow-x-auto"
+                        prop.children [
+                            Html.table [
+                                prop.className "swt:table swt:table-xs"
+                                prop.children [
+                                    Html.thead [
+                                        Html.tr (
+                                            compositeColumns
                                             |> Array.map (fun compositeColumn ->
-                                                Html.tr (
-                                                    compositeColumn |> Array.map (fun cell -> Html.td (cell.ToString()))
-                                                )
+                                                Html.th (compositeColumn.Header.ToString())
                                             )
                                         )
                                     ]
+                                    Html.tbody (
+                                        rows
+                                        |> Array.map (fun compositeColumn ->
+                                            Html.tr (
+                                                compositeColumn |> Array.map (fun cell -> Html.td (cell.ToString()))
+                                            )
+                                        )
+                                    )
                                 ]
                             ]
                         ]
                     ]
-                ],
+                ]
+            ],
             footer =
                 React.fragment [
                     FooterButtons.Cancel(rmv)
                     addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
-                ],
-            contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
+                ]
+        //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
         )
 
     [<ReactComponent>]
@@ -518,6 +537,8 @@ type ContextMenuModals =
             fun _ ->
                 tableRef.current.focus ()
                 setModal AnnotationTable.ModalTypes.None
+
+        let isOpen, setIsOpen = React.useState (true)
 
         let isInSelected = tableRef.current.SelectHandle.contains (uiTableIndex)
 
@@ -579,7 +600,6 @@ type ContextMenuModals =
                 ]
 
             React.fragment [
-                //Daisy.table [
                 Html.table [
                     prop.className "swt:table"
                     prop.children [
@@ -622,44 +642,40 @@ type ContextMenuModals =
             else
                 None
 
-        Swate.Components.BaseModal.BaseModal(
-            rmv,
-            header =
-                Html.p (
-                    if Subtable.ColumnCount > 1 then
-                        "Move Columns"
-                    else
-                        "Move Column"
-                ),
+        Swate.Components.BaseModal.Modal(
+            isOpen,
+            setIsOpen,
+            Html.p (
+                if Subtable.ColumnCount > 1 then
+                    "Move Columns"
+                else
+                    "Move Column"
+            ),
+            content,
             modalActions = modalActivity,
-            content = content,
             footer = footer,
             ?debug = debugString
         )
 
     [<ReactComponent>]
-    static member ErrorModal (
-        exn: string,
-        setModal: AnnotationTable.ModalTypes -> unit,
-        tableRef: IRefValue<TableHandle>
-        ) =
+    static member ErrorModal
+        (exn: string, setModal: AnnotationTable.ModalTypes -> unit, tableRef: IRefValue<TableHandle>)
+        =
 
         let rmv =
             fun _ ->
                 tableRef.current.focus ()
                 setModal AnnotationTable.ModalTypes.None
 
-        ErrorBaseModal.ErrorBaseModal(
-            (fun _ -> rmv ()),
-            exn
-        )
+        ErrorBaseModal.ErrorBaseModal((fun _ -> rmv ()), exn)
 
     [<ReactComponent>]
-    static member UnknownPasteCase (
-        data: string [] [],
-        headers: CompositeHeader [],
-        setModal: AnnotationTable.ModalTypes -> unit,
-        tableRef: IRefValue<TableHandle>
+    static member UnknownPasteCase
+        (
+            data: string[][],
+            headers: CompositeHeader[],
+            setModal: AnnotationTable.ModalTypes -> unit,
+            tableRef: IRefValue<TableHandle>
         ) =
 
         let rmv =
@@ -678,7 +694,4 @@ type ContextMenuModals =
             |]
             |> String.concat System.Environment.NewLine
 
-        ErrorBaseModal.ErrorBaseModal(
-            (fun _ -> rmv ()),
-            msg
-        )
+        ErrorBaseModal.ErrorBaseModal((fun _ -> rmv ()), msg)
