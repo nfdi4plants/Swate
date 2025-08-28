@@ -46,6 +46,7 @@ function TermSearchContainer() {
           allChildrenSearchQueries={[
             ["tib_search", (parentId) => TIBApi.searchAllChildrenOf(parentId, 500, "DataPLANT")]
           ]}
+          onBlur={() => console.log("TermSearch blurred")}
         />
       </div>
       <div className='swt:flex swt:flex-col'>
@@ -58,6 +59,7 @@ function TermSearchContainer() {
           parentId="MS:1000031"
           showDetails
           debug={true}
+          onBlur={() => console.log("TermSearch blurred")}
         />
       </div>
       <div className='swt:flex swt:flex-col swt:border swt:p-2'>
@@ -131,14 +133,14 @@ const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
-            <TermSearchContainer />
+            <AnnoTableContainer />
+            {/* <TermSearchContainer />
             <BaseModalContainer />
             <ComboBoxContainer />
             <TemplateFilterContainer />
             <SelectContainer />
             <ContextMenuContainer />
-            <AnnoTableContainer />
-            <TableContainer />
+            <TableContainer /> */}
             {/* <Menu></Menu> */}
         </div>
     );

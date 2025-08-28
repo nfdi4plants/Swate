@@ -3,18 +3,23 @@ import { fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/tes
 import { screen } from "@storybook/testing-library";
 import Table from "./AnnotationTable.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
-import React from 'react';
+import React, { act } from 'react';
 import MockTable from './MockTable.js';
 
 function renderTable(args: any) {
-  const [table, setTable] = React.useState(MockTable.Copy());
+  const [table, setTable] = React.useState(() => MockTable.Copy());
+
+  const setTableWithLog = (newTable) => {
+    console.log("Table updated:", newTable);
+    setTable(newTable);
+  }
 
   return (
     <div className='swt:h-[600px]'>
       <Table
         {...args}
         arcTable={table}
-        setArcTable={setTable}
+        setArcTable={setTableWithLog}
       />
     </div>
   );
@@ -67,6 +72,161 @@ export const ContextMenu: Story = {
   }
 }
 
+export const EditCell: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-2-1');
+
+    await userEvent.dblClick(cell);
+
+    const activeCell = await canvas.findByTestId('active-cell-string-input-2-1');
+    expect(activeCell).toBeVisible();
+
+    await userEvent.clear(activeCell);
+    await userEvent.type(activeCell, 'Edited Text', { delay: 50 });
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(async () => {
+      const updatedCell = await canvas.findByText('Edited Text');
+      expect(updatedCell).toBeVisible();
+    });
+
+    const cell2 = await canvas.findByTestId('cell-2-1');
+
+    await userEvent.dblClick(cell2);
+
+    const activeCell2 = await canvas.findByTestId('active-cell-string-input-2-1');
+    await userEvent.clear(activeCell2);
+    await userEvent.type(activeCell2, 'Some totally new text', { delay: 50 });
+
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(async () => {
+      const updatedCell = await canvas.findByText('Edited Text');
+      expect(updatedCell).toBeVisible();
+    });
+
+  }
+}
+
+export const EditTermCellRaw: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-2-3');
+
+    await userEvent.dblClick(cell);
+
+    const activeCell = await canvas.findByTestId('term-search-input');
+    expect(activeCell).toBeVisible();
+
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.type(activeCell, 'leco instrument', { delay: 50 });
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(async () => {
+      const updatedCell = await canvas.findByText('leco instrument');
+      expect(updatedCell).toBeVisible();
+    });
+
+  }
+}
+
+
+export const EditTermCellKbd: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-2-3');
+
+    await userEvent.dblClick(cell);
+
+    const activeCell = await canvas.findByTestId('term-search-input');
+    expect(activeCell).toBeVisible();
+
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.type(activeCell, 'leco', { delay: 50 });
+
+    await waitFor(async () => {
+        const debugValue = activeCell.getAttribute("data-debugresultcount")
+        expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
+    });
+
+    await userEvent.keyboard('[ArrowDown][ArrowDown][Enter]')
+
+    await waitFor(async () => {
+      const updatedCell = await canvas.findByText('LECO instrument model');
+      expect(updatedCell).toBeVisible();
+    });
+  }
+}
+
+export const EditTermCellMouseclick: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-2-3');
+
+    await userEvent.dblClick(cell);
+
+    const activeCell = await canvas.findByTestId('term-search-input');
+    expect(activeCell).toBeVisible();
+
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.type(activeCell, 'leco', { delay: 50 });
+
+    await waitFor(async () => {
+        const debugValue = activeCell.getAttribute("data-debugresultcount")
+        expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
+    });
+
+    const instrumentModelItem = await screen.findByText('MS:1001800');
+    expect(instrumentModelItem).toBeVisible();
+
+    await userEvent.click(instrumentModelItem);
+
+    // await userEvent.keyboard('[ArrowDown][ArrowDown][Enter]')
+
+    // await waitFor(async () => {
+    //   const updatedCell = await canvas.findByText('LECO instrument model');
+    //   expect(updatedCell).toBeVisible();
+    // });
+  }
+}
+
+
 export const FreeTextDetails: Story = {
   render: renderTable,
   args: {
@@ -78,35 +238,6 @@ export const FreeTextDetails: Story = {
     const canvas = within(canvasElement);
 
     const cell = await canvas.findByTestId('cell-1-1');
-
-    await fireEvent.contextMenu(cell);
-
-    const contextMenu = screen.getByTestId('context_menu');
-    await expect(contextMenu).toBeVisible();
-
-    const detailsButton = within(contextMenu).getByRole('button', { name: /Details/d });
-    await expect(detailsButton).toBeVisible();
-
-    await userEvent.click(detailsButton);
-
-    await waitFor(() => {
-      const modal = screen.getByTestId('modal_Details_FreeText');
-      expect(modal).toBeVisible();
-    });
-  }
-}
-
-export const FreeText2Details: Story = {
-  render: renderTable,
-  args: {
-    height: 600,
-    witdth: 1000,
-    debug: true
-  },
-  play: async ({ args, canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    const cell = await canvas.findByTestId('cell-1-2');
 
     await fireEvent.contextMenu(cell);
 
@@ -325,7 +456,7 @@ export const DeleteColumn: Story = {
     const newTable = screen.getByTestId('annotation_table');
     await expect(newTable).toBeVisible();
 
-    const newColumnLength = newTable.getAttribute("data-columnCount")
+    const newColumnLength = newTable.getAttribute("data-columncount")
     await expect(newColumnLength).toBe("5");
   }
 }

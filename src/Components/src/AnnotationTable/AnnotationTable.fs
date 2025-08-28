@@ -15,32 +15,162 @@ open Types.AnnotationTable
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
-    static member private InactiveTextRender(text: string, tcc: TableCellController, ?icon: ReactElement, ?debug) =
-        TableCell.BaseCell(
-            tcc.Index.y,
-            tcc.Index.x,
-            Html.div [
-                prop.className [
-                    if not tcc.IsSelected && tcc.Index.y = 0 then
-                        "swt:bg-base-300"
-                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full"
-                ]
-                prop.children [
-                    if icon.IsSome then
-                        icon.Value
-                    Html.div [ prop.className "swt:truncate"; prop.text text ]
-                ]
-            ],
-            props = [ prop.title text; prop.onClick (fun e -> tcc.onClick e) ],
-            className = "swt:w-full swt:h-full",
-            ?debug = debug
-        )
+    static member private CompositeHeaderActiveRender
+        (tableCellController: TableCellController, header: CompositeHeader, setHeader: CompositeHeader -> unit, ?debug)
+        =
 
-    static member private ContextMenu(arcTable: ArcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool) =
+        match header with
+        | CompositeHeader.Input io ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                io.ToString(),
+                (fun input -> IOType.ofString input |> CompositeHeader.Input |> setHeader),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.Output io ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                io.ToString(),
+                (fun input -> IOType.ofString input |> CompositeHeader.Output |> setHeader),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.Comment txt ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                txt,
+                (fun input -> setHeader (CompositeHeader.Comment input)),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.FreeText txt ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                txt,
+                (fun input -> setHeader (CompositeHeader.FreeText input)),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.Parameter oa ->
+            TableCell.OntologyAnnotationActiveCell(
+                tableCellController,
+                oa,
+                (fun t -> setHeader (CompositeHeader.Parameter t)),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.Characteristic oa ->
+            TableCell.OntologyAnnotationActiveCell(
+                tableCellController,
+                oa,
+                (fun t -> setHeader (CompositeHeader.Characteristic t)),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.Component oa ->
+            TableCell.OntologyAnnotationActiveCell(
+                tableCellController,
+                oa,
+                (fun t -> setHeader (CompositeHeader.Component t)),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.Factor oa ->
+            TableCell.OntologyAnnotationActiveCell(
+                tableCellController,
+                oa,
+                (fun t -> setHeader (CompositeHeader.Factor t)),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+        | CompositeHeader.Performer
+        | CompositeHeader.ProtocolDescription
+        | CompositeHeader.ProtocolREF
+        | CompositeHeader.ProtocolType
+        | CompositeHeader.ProtocolUri
+        | CompositeHeader.ProtocolVersion
+        | CompositeHeader.Date ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                header.ToString(),
+                (fun input ->
+                    let nextHeader = CompositeHeader.OfHeaderString input
+                    setHeader nextHeader
+                ),
+                isStickyHeader = true,
+                ?debug = debug
+            )
+
+    static member CompositeCellActiveRender
+        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit, ?debug)
+        =
+
+        match cell with
+        | CompositeCell.Term oa ->
+            TableCell.OntologyAnnotationActiveCell(
+                tableCellController,
+                oa,
+                (fun t -> setCell (CompositeCell.Term t)),
+                ?debug = debug
+            )
+        | CompositeCell.FreeText txt ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                txt,
+                (fun t -> setCell (CompositeCell.FreeText t)),
+                ?debug = debug
+            )
+        | CompositeCell.Unitized(v, oa) ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                v,
+                (fun _ -> setCell (CompositeCell.Unitized(v, oa))),
+                ?debug = debug
+            )
+        | CompositeCell.Data d ->
+            TableCell.StringActiveCell(
+                tableCellController,
+                Option.defaultValue "" d.Name,
+                (fun t ->
+                    d.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
+                    setCell (CompositeCell.Data d)
+                ),
+                ?debug = debug
+            )
+
+    [<ReactComponentAttribute>]
+    static member private ActiveCellRender
+        (tcc: TableCellController, arcTable: ArcTable, setTable: ArcTable -> unit, ?debug: bool)
+        =
+        match tcc with
+        | _ when tcc.Index.x > 0 && tcc.Index.y > 0 ->
+            let setCell =
+                fun (cell: CellCoordinate) (cc: CompositeCell) ->
+                    let nextTable = arcTable |> ArcTable.setCellAt (cell.x - 1, cell.y - 1, cc)
+                    setTable nextTable
+
+            let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
+            AnnotationTable.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, ?debug = debug)
+        | _ when tcc.Index.x > 0 && tcc.Index.y = 0 ->
+            let setHeader =
+                fun (index: int) (ch: CompositeHeader) ->
+                    let nextTable = arcTable |> ArcTable.updateHeader (index - 1, ch)
+                    setTable nextTable
+
+            let header = arcTable.GetColumn(tcc.Index.x - 1).Header
+            AnnotationTable.CompositeHeaderActiveRender(tcc, header, setHeader (tcc.Index.x), ?debug = debug)
+        | _ -> Html.div "Unknown cell type"
+
+
+    static member private ContextMenu
+        (arcTable: ArcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool)
+        =
 
         ContextMenu.ContextMenu(
             (fun data ->
                 let index = data |> unbox<CellCoordinate>
+
                 if index.x = 0 && index.y > 0 then // index col
                     AnnotationTableContextMenu.IndexColumnContent(
                         index.y,
@@ -86,8 +216,14 @@ type AnnotationTable =
         )
 
     static member private ModalController
-        (arcTable: ArcTable, setArcTable, modal: AnnotationTable.ModalTypes, setModal, tableRef: IRefValue<TableHandle>, ?debug: bool)
-        =
+        (
+            arcTable: ArcTable,
+            setArcTable,
+            modal: AnnotationTable.ModalTypes,
+            setModal,
+            tableRef: IRefValue<TableHandle>,
+            ?debug: bool
+        ) =
 
         let rmv =
             fun _ ->
@@ -110,18 +246,19 @@ type AnnotationTable =
                                 setArcTable arcTable
                             with exn ->
                                 let exnMessage =
-                                    if exn.Message.StartsWith("Tried setting header for column with invalid type of cells.") then
+                                    if
+                                        exn.Message.StartsWith(
+                                            "Tried setting header for column with invalid type of cells."
+                                        )
+                                    then
                                         "Your change does not work with Details. Use \"Edit\" instead."
                                     else
                                         exn.Message
+
                                 setModal (ModalTypes.Error exnMessage)
                                 failwith exn.Message
 
-                    CompositeCellModal.CompositeHeaderModal(
-                        header,
-                        setHeader,
-                        rmv
-                    )
+                    CompositeCellModal.CompositeHeaderModal(header, setHeader, rmv)
 
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
@@ -133,13 +270,7 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    CompositeCellModal.CompositeCellModal(
-                        cell,
-                        setCell,
-                        rmv,
-                        header,
-                        ?debug = debug
-                    )
+                    CompositeCellModal.CompositeCellModal(cell, setCell, rmv, header, ?debug = debug)
             | ModalTypes.Transform cc ->
                 if cc.x = 0 then // no details modal for index col
                     Html.none
@@ -153,12 +284,7 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    CompositeCellEditModal.CompositeCellTransformModal(
-                        cell,
-                        header,
-                        setCell,
-                        rmv
-                    )
+                    CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
 
@@ -169,19 +295,14 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    CompositeCellEditModal.CompositeCellTransformModal(
-                        cell,
-                        header,
-                        setCell,
-                        rmv
-                    )
+                    CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
             | ModalTypes.Edit cc ->
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
-                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv, ?debug = debug)
+                    EditConfig.CompositeCellEditModal(cc.x - 1, arcTable, setArcTable, rmv, ?debug = debug)
                 else
-                    EditConfig.CompositeCellEditModal(cc.x-1, arcTable, setArcTable, rmv, ?debug = debug)
+                    EditConfig.CompositeCellEditModal(cc.x - 1, arcTable, setArcTable, rmv, ?debug = debug)
             | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
                 ContextMenuModals.MoveColumnModal(
                     arcTable,
@@ -195,8 +316,7 @@ type AnnotationTable =
 
             | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->
                 ContextMenuModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
-            | ModalTypes.Error(exn) ->
-                ContextMenuModals.ErrorModal(exn, setModal, tableRef)
+            | ModalTypes.Error(exn) -> ContextMenuModals.ErrorModal(exn, setModal, tableRef)
             | ModalTypes.UnknownPasteCase(Unknown unknownPasteCase) ->
                 ContextMenuModals.UnknownPasteCase(unknownPasteCase.data, unknownPasteCase.headers, setModal, tableRef)
             | anyElse ->
@@ -206,11 +326,14 @@ type AnnotationTable =
 
 
     [<ReactComponent(true)>]
-    static member AnnotationTable(arcTable: ArcTable, setArcTable: ArcTable -> unit, ?onSelect: GridSelect.OnSelect, ?height: int, ?debug: bool) =
+    static member AnnotationTable
+        (arcTable: ArcTable, setArcTable: ArcTable -> unit, ?onSelect: GridSelect.OnSelect, ?height: int, ?debug: bool)
+        =
         let containerRef = React.useElementRef ()
         let tableRef = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
         let debug = defaultArg debug false
+
         let cellRender =
             React.memo (
                 (fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
@@ -221,12 +344,12 @@ type AnnotationTable =
                             tcc.Index.x,
                             Html.text tcc.Index.y,
                             className =
-                                "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200",
+                                "swt:rounded-0 swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200",
                             debug = debug
                         )
                     | Some(U2.Case2 header) ->
                         let text = header.ToString()
-                        AnnotationTable.InactiveTextRender(text, tcc, debug = debug)
+                        TableCell.StringInactiveCell(tcc, text, debug = debug)
                     | Some(U2.Case1 cell) ->
                         let text = cell.ToString()
 
@@ -236,51 +359,42 @@ type AnnotationTable =
                             | unit when unit.isUnitized -> (snd cell.AsUnitized).TermAccessionShort
                             | _ -> ""
 
-                        let icon =
-                            if System.String.IsNullOrWhiteSpace termAccession |> not then
-                                Html.i [
-                                    prop.className "swt:text-primary"
-                                    prop.title termAccession
-                                    prop.children [ Icons.Check() ]
-                                ]
-                                |> Some
-                            else
-                                None
+                        let oa = cell.ToOA()
 
-                        AnnotationTable.InactiveTextRender(text, tcc, ?icon = icon, debug = debug)
+                        TableCell.InactiveCell(
+                            tcc,
+                            Html.div [
+                                prop.className "swt:flex swt:w-full swt:justify-between"
+                                prop.children [
+                                    Html.text text
+                                    if oa.TermAccessionShort |> System.String.IsNullOrWhiteSpace |> not then
+                                        Html.i [
+                                            prop.className "swt:text-primary"
+                                            prop.title termAccession
+                                            prop.children [ Icons.Check() ]
+                                        ]
+                                ]
+                            ],
+                            debug = debug
+                        )
                 ),
                 withKey =
                     fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
-                        $"cellRender-{tcc.Index.x}-{tcc.Index.y}"
+                        $"cellRender-{tcc.Index.x}-{tcc.Index.y}-{compositeCell |> Option.map _.GetHashCode()}"
             )
-        let renderActiveCell =
-            React.memo (
-                (fun (tcc: TableCellController) ->
-                    match tcc with
-                    | _ when tcc.Index.x > 0 && tcc.Index.y > 0 ->
-                        let setCell =
-                            fun (cell: CellCoordinate) (cc: CompositeCell) ->
-                                arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
 
-                        let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
-                        TableCell.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, debug = debug, displayIndicators = false)
-                    | _ when tcc.Index.x > 0 && tcc.Index.y = 0 ->
-                        let setHeader =
-                            fun (index: int) (ch: CompositeHeader) ->
-                                arcTable.UpdateHeader(index - 1, ch)
-                        let header = arcTable.GetColumn(tcc.Index.x - 1).Header
-                        TableCell.CompositeHeaderActiveRender(tcc, header, setHeader (tcc.Index.x), debug = debug, displayIndicators = false)
-                    | _ -> Html.div "Unknown cell type"
-                )
+        let renderActiveCell =
+            (fun (tcc: TableCellController) ->
+                AnnotationTable.ActiveCellRender(tcc, arcTable, setArcTable, debug = debug)
             )
 
         Html.div [
             prop.ref containerRef
             if debug then
                 prop.testId "annotation_table"
-                prop.custom("data-columnCount", arcTable.ColumnCount)
-                prop.custom("data-rowCount", arcTable.RowCount)
-            prop.className "swt:table-1 swt:overflow-auto swt:flex swt:flex-col swt:h-full"
+                prop.custom ("data-columncount", arcTable.ColumnCount)
+                prop.custom ("data-rowcount", arcTable.RowCount)
+            prop.className "swt:overflow-auto swt:flex swt:flex-col swt:h-full"
             prop.children [
                 ReactDOM.createPortal ( // Modals
                     AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, debug = debug),
@@ -350,7 +464,7 @@ type AnnotationTable =
             CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")),
             [|
                 for i in 0..100 do
-                    CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
+                    CompositeCell.createUnitizedFromString (string i, "Degree Celsius", "UO", "UO:000000001")
             |]
         )
 
@@ -358,8 +472,17 @@ type AnnotationTable =
             CompositeHeader.Output IOType.Data,
             [|
                 for i in 0..100 do
-                    let newData = Data.create(string i, $"Sample {i}", DataFile.RawDataFile, "Some Format", $"Selector Format {i}", ResizeArray[Comment.create("Test", string i)])
-                    CompositeCell.createData(newData)
+                    let newData =
+                        Data.create (
+                            string i,
+                            $"Sample {i}",
+                            DataFile.RawDataFile,
+                            "Some Format",
+                            $"Selector Format {i}",
+                            ResizeArray[Comment.create ("Test", string i)]
+                        )
+
+                    CompositeCell.createData (newData)
             |]
         )
 

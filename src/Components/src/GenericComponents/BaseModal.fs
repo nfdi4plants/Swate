@@ -43,8 +43,8 @@ type BaseModal =
         let descId = FloatingUI.useId ()
 
         React.fragment [
-            FloatingUI.FloatingPortal(
-                if isOpen then
+            if isOpen then
+                FloatingUI.FloatingPortal(
                     FloatingUI.FloatingOverlay(
                         lockScroll = true,
                         className = "swt:modal swt:modal-open",
@@ -107,9 +107,9 @@ type BaseModal =
                                 visuallyHiddenDismiss = true
                             )
                     )
-                else
-                    Html.none
-            )
+                )
+            else
+                Html.none
         ]
 
     [<ReactComponentAttribute>]
