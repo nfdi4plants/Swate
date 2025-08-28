@@ -288,6 +288,27 @@ type Templates =
         )
 
     [<ReactComponent>]
+    static member TableSelect(model: Model, dispatch) =
+
+        React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
+
+        Swate.Components.TemplateFilter.TemplateFilterProvider(
+            React.fragment [
+
+                Templates.ImportTemplatesBtn(model, dispatch)
+
+                Swate.Components.TemplateFilter.TemplateFilter(
+                    model.ProtocolState.Templates,
+                    templateSearchClassName = "swt:grow"
+                )
+
+                Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
+                    Templates.DisplayTemplates(filteredTemplates, model, dispatch, ?maxheight = Some(length.px 600))
+                )
+            ]
+        )
+
+    [<ReactComponent>]
     static member Main(model: Model, dispatch) =
         SidebarComponents.SidebarLayout.Container [
             SidebarComponents.SidebarLayout.Header "Templates"

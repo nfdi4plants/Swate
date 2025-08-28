@@ -28,6 +28,9 @@ open FileImport
 
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
+
+    let selectTemplateIsOpen, setSelectTemplateIsOpen = React.useState (false)
+
     let widgets, setWidgets = React.useState ([])
 
     let rmvWidget (widget: Widget) =
@@ -78,7 +81,8 @@ let Main (model: Model, dispatch) =
                             | 0 ->
                                 let openBuildingBlockWidget = fun () -> addWidget Widget._BuildingBlock
                                 let openTemplateWidget = fun () -> addWidget Widget._Template
-                                MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
+                                Widget.PreviousTableSelect(model, selectTemplateIsOpen, setSelectTemplateIsOpen, dispatch)
+                                MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget, setSelectTemplateIsOpen)
                             | _ ->
                                 MainComponents.SpreadsheetView.ArcTable.Main(model, dispatch)
                                 MainComponents.TableFooter.Main dispatch
