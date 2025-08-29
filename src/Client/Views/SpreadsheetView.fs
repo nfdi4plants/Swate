@@ -28,6 +28,9 @@ open FileImport
 
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
+
+    let selectTemplateIsOpen, setSelectTemplateIsOpen = React.useState (false)
+
     let widgets, setWidgets = React.useState ([])
 
     let rmvWidget (widget: Widget) =
@@ -49,9 +52,6 @@ let Main (model: Model, dispatch) =
         | Widget._FilePicker -> Widget.FilePicker(model, dispatch, rmv widget)
         | Widget._DataAnnotator -> Widget.DataAnnotator(model, dispatch, rmv widget)
         |> WidgetOrderContainer bringWidgetToFront
-
-    let addWidget (widget: Widget) =
-        widget :: widgets |> List.rev |> setWidgets
 
     let state = model.SpreadsheetModel
 
@@ -76,9 +76,7 @@ let Main (model: Model, dispatch) =
                         | Spreadsheet.ActiveView.Table _ ->
                             match model.SpreadsheetModel.ActiveTable.ColumnCount with
                             | 0 ->
-                                let openBuildingBlockWidget = fun () -> addWidget Widget._BuildingBlock
-                                let openTemplateWidget = fun () -> addWidget Widget._Template
-                                MainComponents.EmptyTableElement.Main(openBuildingBlockWidget, openTemplateWidget)
+                                MainComponents.EmptyTableElement.Main(model, dispatch)
                             | _ ->
                                 MainComponents.SpreadsheetView.ArcTable.Main(model, dispatch)
                                 MainComponents.TableFooter.Main dispatch

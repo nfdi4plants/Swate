@@ -30,6 +30,36 @@ type Icons =
             ]
         ]
 
+    static member OutputColumn() =
+        Html.span [
+            prop.style [ style.display.flex; style.alignItems.center ]
+            prop.children [
+                Html.i [
+                    prop.dangerouslySetInnerHTML
+                        """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512"><path fill="currentColor" d="M502.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-160-160c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L402.7 224H32c-17.7 0-32 14.3-32 32s14.3 32 32 32h370.7L297.3 393.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l160-160z"/></svg>"""
+                ]
+                Html.i [
+                    prop.dangerouslySetInnerHTML
+                        """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 448 512"><path fill="currentColor" d="M0 96c0-35.3 28.7-64 64-64h320c35.3 0 64 28.7 64 64v320c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64zm64 64v256h128V160zm320 0H256v256h128z"/></svg>"""
+                ]
+            ]
+        ]
+
+    static member BasicTable() =
+        Html.span [
+            prop.style [ style.display.flex; style.alignItems.center ]
+            prop.children [
+                Html.i [
+                    prop.dangerouslySetInnerHTML
+                        """<svg xmlns="http://www.w3.org/2000/svg" width="11" height="14" viewBox="0 0 384 512"><path fill="currentColor" d="M214.6 17.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 117.3V488c0 17.7 14.3 32 32 32s32-14.3 32-32V117.3l105.4 105.4c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"/></svg>"""
+                ]
+                Html.i [
+                    prop.dangerouslySetInnerHTML
+                        """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 448 512"><path fill="currentColor" d="M256 160v96h128v-96zm-64 0H64v96h128zM0 320V96c0-35.3 28.7-64 64-64h320c35.3 0 64 28.7 64 64v320c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64zm384 0H256v96h128zm-192 96v-96H64v96z"/></svg>"""
+                ]
+            ]
+        ]
+
     static member FilePicker() =
         Html.i [
             prop.dangerouslySetInnerHTML

@@ -28,6 +28,9 @@ module WidgetLiterals =
     let FilePicker = "FilerPicker"
 
     [<Literal>]
+    let TableSelect = "TableSelect"
+
+    [<Literal>]
     let DataAnnotator = "DataAnnotator"
 
 [<RequireQualifiedAccess>]
