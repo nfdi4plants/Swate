@@ -4,6 +4,7 @@ open Model
 open Messages
 open Messages.BuildingBlock
 open Swate.Components.Shared
+open SearchComponent
 
 open Elmish
 open ARCtrl
@@ -59,41 +60,13 @@ let update
 open Feliz
 open Feliz.DaisyUI
 
-//let addUnitToExistingBlockElements (model:Model) (dispatch:Messages.Msg -> unit) =
-//    mainFunctionContainer [
-//        Bulma.field.div [
-//            Daisy.button.button [
-//                let isValid = model.AddBuildingBlockState.Unit2TermSearchText <> ""
-//                Bulma.color.isSuccess
-//                if isValid then
-//                    Daisy.button.isActive
-//                else
-//                    button.error
-//                    prop.disabled true
-//                button.block
-//                prop.onClick (fun _ ->
-//                    let unitTerm =
-//                        if model.AddBuildingBlockState.Unit2SelectedTerm.IsSome then Some <| TermMinimal.ofTerm model.AddBuildingBlockState.Unit2SelectedTerm.Value else None
-//                    match model.AddBuildingBlockState.Unit2TermSearchText with
-//                    | "" ->
-//                        curry GenericLog Cmd.none ("Error", "Cannot execute function with empty unit input") |> DevMsg |> dispatch
-//                    | hasUnitTerm when model.AddBuildingBlockState.Unit2SelectedTerm.IsSome ->
-//                        OfficeInterop.UpdateUnitForCells unitTerm.Value |> OfficeInteropMsg |> dispatch
-//                    | freeText ->
-//                        OfficeInterop.UpdateUnitForCells (TermMinimal.create model.AddBuildingBlockState.Unit2TermSearchText "") |> OfficeInteropMsg |> dispatch
-//                )
-//                prop.text "Update unit for cells"
-//            ]
-//        ]
-//    ]
-
 let addBuildingBlockComponent (model: Model) (dispatch: Messages.Msg -> unit) =
     SidebarComponents.SidebarLayout.Container [
         SidebarComponents.SidebarLayout.Header "Building Blocks"
 
         // Input forms, etc related to add building block.
         SidebarComponents.SidebarLayout.Description "Add annotation building blocks (columns) to the annotation table."
-        SidebarComponents.SidebarLayout.LogicContainer [ SearchComponent.Main model dispatch ]
+        SidebarComponents.SidebarLayout.LogicContainer [ SearchComponent.Main(model, dispatch) ]
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
             Html.p "Convert existing Building Block."
