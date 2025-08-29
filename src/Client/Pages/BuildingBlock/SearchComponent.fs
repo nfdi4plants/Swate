@@ -237,7 +237,7 @@ type SearchComponent =
         //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
         Html.div [
             Html.form [
-                prop.className "swt:flex swt:flex-col swt:gap-4"
+                prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-2"
                 prop.onSubmit (fun ev ->
                     ev.preventDefault ()
                     SearchComponent.addBuildingBlock(model, model.AddBuildingBlockState, dispatch)

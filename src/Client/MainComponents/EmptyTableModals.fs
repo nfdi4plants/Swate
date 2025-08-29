@@ -24,7 +24,7 @@ module EmptyTableModals =
 
             let content =
                 Html.div [
-                    prop.className "swt:flex swt:flex-col swt:gap-2"
+                    prop.className "swt:flex swt:flex-col swt:gap-2 swt:p-2"
                     prop.children [ Protocol.Templates.TemplateSelect(model, dispatch, setIsOpen) ]
                 ]
 
