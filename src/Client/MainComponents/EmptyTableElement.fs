@@ -9,15 +9,30 @@ open ARCtrl
 
 type EmptyTableElement =
 
-    static member private TableButton(text: string, onclick) =
+    static member private TableButton(icon: ReactElement, header: string, description: string, onclick) =
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:items-center swt:gap-2"
+            prop.className "swt:flex swt:flex-col swt:gap-2"
             prop.children [
                 Html.div [
-                    prop.className "swt:btn swt:btn-neutral swt:btn-outline swt:place-self-end swt:gap-0 swt:w-full swt:min-h-[100px] swt:min-w-[100px] swt:max-w-[150px] swt:text-secondary"
+                    prop.className "swt:btn swt:btn-neutral swt:btn-outline swt:place-self-end swt:gap-0 swt:w-full swt:min-h-[100px] swt:min-w-[100px] swt:max-w-[230px] swt:text-secondary swt:flex-col swt:items-start swt:gap-2"
                     prop.role "button"
                     prop.onClick (fun _ -> onclick ())
-                    prop.text text
+                    prop.children[
+                        Html.div [
+                            prop.className "swt:flex swt:flex-row swt:gap-2 swt:text-sm swt:font-bold swt:text-left"
+                            prop.children [
+                                Html.div [
+                                    prop.className "swt:p-1 swt:border swt:bg-neutral swt:rounded-xl swt:bg-primary swt:text-primary-content"
+                                    prop.children [ icon ]
+                                ]
+                                Html.text header
+                            ]
+                        ]
+                        Html.div [
+                            prop.className "swt:text-xs swt:text-left"
+                            prop.text description
+                        ]
+                    ]
                 ]
             ]
         ]
@@ -77,19 +92,27 @@ type EmptyTableElement =
                                     prop.className "swt:grid swt:grid-cols-2 swt:grid-rows-2 swt:gap-6 swt:h-full swt:place-items-center"
                                     prop.children [
                                         EmptyTableElement.TableButton(
-                                            "Start from existing template!",
+                                            Icons.Templates(),
+                                            "Start with template!",
+                                            "Select a full template as a starting point.",
                                             fun _ -> setSelectTemplatesIsOpen true
                                         )
                                         EmptyTableElement.TableButton(
+                                            Icons.BuildingBlock(),
                                             "Start from scratch!",
+                                            "Select a building block as a starting point.",
                                             fun _ -> setSelectBuildingBlockIsOpen true
                                         )
                                         EmptyTableElement.TableButton(
-                                            "Copy output from previous table!",
+                                            Icons.OutputColumn(),
+                                            "Utilize output column!",
+                                            "Select an output column of one table as new input column.",
                                             fun _ -> setSelectPreviousTableIsOpen true
                                         )
                                         EmptyTableElement.TableButton(
-                                            "Start with a minimal table!",
+                                            Icons.BasicTable(),
+                                            "Create basic table!",
+                                            "Create a table with columns: Input, Protocol, Output.",
                                             fun _ -> EmptyTableElement.CreateMinimalTable(model, dispatch)
                                         )
                                     ]
