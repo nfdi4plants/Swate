@@ -1,6 +1,6 @@
 namespace SpreadsheetInterface
 
-open Swate.Components.Shared
+open Swate.Components
 open ARCtrl
 open FileImport
 
@@ -8,13 +8,13 @@ open FileImport
 type Msg =
     | Initialize of Swatehost
     | CreateAnnotationTable of tryUsePrevOutput: bool
-    | RemoveBuildingBlock
+    | RemoveBuildingBlock of index: CellCoordinateRange option
     | UpdateDatamap of DataMap option
     | UpdateDataMapDataContextAt of index: int * DataContext
     | AddTable of ArcTable
     | ValidateBuildingBlock
-    | AddAnnotationBlock of CompositeColumn
-    | AddAnnotationBlocks of CompositeColumn[]
+    | AddAnnotationBlock of columnIndex: int option * CompositeColumn
+    | AddAnnotationBlocks of columnIndex: int option * CompositeColumn[]
     | AddDataAnnotation of
         {|
             fragmentSelectors: string[]
@@ -27,8 +27,8 @@ type Msg =
     | JoinTable of ArcTable * columnIndex: int option * options: TableJoinOptions option
     | UpdateArcFile of ArcFiles
     /// Inserts TermMinimal to selected fields of one column
-    | InsertOntologyAnnotation of OntologyAnnotation
-    | InsertFileNames of string list
+    | InsertOntologyAnnotation of range: CellCoordinateRange option * OntologyAnnotation
+    | InsertFileNames of range: CellCoordinateRange option * string list
     | ImportXlsx of byte[]
     | ImportJson of
         {|

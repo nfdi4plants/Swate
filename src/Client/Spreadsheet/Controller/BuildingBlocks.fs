@@ -18,22 +18,16 @@ module SidebarControllerAux =
     /// Uses the first selected columnIndex from `state.SelectedCells` to determine if new column should be inserted or appended.
     /// </summary>
     /// <param name="state"></param>
-    let getNextColumnIndex (state: Spreadsheet.Model) =
+    let getNextColumnIndex (index: int option) (state: Spreadsheet.Model) =
         // if cell is selected get column of selected cell we want to insert AFTER
-        if state.SelectedCells.IsSome then
-            let indexNextToSelected =
-                CellCoordinateRange.toArray state.SelectedCells.Value
-                |> Array.ofSeq
-                |> Array.head
-                |> (fun coordinate -> coordinate.x + 1)
-
-            indexNextToSelected
+        if index.IsSome then
+            System.Math.Min(index.Value + 1, state.ActiveTable.ColumnCount)
         else
             state.ActiveTable.ColumnCount
 
 module SanityChecks =
     /// Make sure only one column is selected
-    let verifyOnlyOneColumnSelected (selectedCells: CellCoordinate []) =
+    let verifyOnlyOneColumnSelected (selectedCells: CellCoordinate[]) =
         let isOneColumn =
             let columnIndex = selectedCells.[0].x // can just use head of selected cells as all must be same column
             selectedCells |> Array.forall (fun coordinate -> coordinate.x = columnIndex)
@@ -44,10 +38,14 @@ module SanityChecks =
 
 open SidebarControllerAux
 
-let addBuildingBlock (newColumn: CompositeColumn) (state: Spreadsheet.Model) : Messages.Msg * Spreadsheet.Model =
+let addBuildingBlock
+    (index: int option)
+    (newColumn: CompositeColumn)
+    (state: Spreadsheet.Model)
+    : Messages.Msg * Spreadsheet.Model =
     let table = state.ActiveTable
     // add one to last column index OR to selected column index to append one to the right.
-    let mutable nextIndex = getNextColumnIndex state
+    let mutable nextIndex = getNextColumnIndex index state
     let mutable newColumn = newColumn
 
     let msg =
@@ -101,10 +99,10 @@ let addBuildingBlock (newColumn: CompositeColumn) (state: Spreadsheet.Model) : M
     msg, { state with ArcFile = state.ArcFile }
 
 
-let addBuildingBlocks (newColumns: CompositeColumn[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let addBuildingBlocks index (newColumns: CompositeColumn[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let table = state.ActiveTable
     let mutable newColumns = newColumns
-    let mutable nextIndex = getNextColumnIndex state
+    let mutable nextIndex = getNextColumnIndex index state
     table.AddColumns(newColumns, nextIndex)
     { state with ArcFile = state.ArcFile }
 
@@ -166,12 +164,8 @@ let joinTable
     table.Join(tableToAdd, ?index = index, ?joinOptions = options, forceReplace = true)
     { state with ArcFile = state.ArcFile }
 
-let insertTerm_IntoSelected (term: OntologyAnnotation) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let selected =
-        if state.SelectedCells.IsSome then
-            CellCoordinateRange.toArray  state.SelectedCells.Value |> Array.ofSeq
-        else
-            [| |]
+let insertTerm (term: OntologyAnnotation) (index: CellCoordinateRange) (state: Spreadsheet.Model) : Spreadsheet.Model =
+    let selected = CellCoordinateRange.toArray index |> Array.ofSeq
     SanityChecks.verifyOnlyOneColumnSelected selected
 
     for coordinate in selected do

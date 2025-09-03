@@ -92,7 +92,8 @@ type BaseModal =
                                             Html.div [
                                                 if debug.IsSome then
                                                     prop.testId ("modal_content_" + debug.Value)
-                                                prop.className "swt:overflow-y-auto swt:overflow-x-hidden"
+                                                prop.className
+                                                    "swt:overflow-y-auto swt:overflow-x-hidden swt:flex swt:flex-col swt:gap-2 swt:p-2"
                                                 prop.children children
                                             ]
                                             if footer.IsSome then

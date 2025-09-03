@@ -9,52 +9,52 @@ let isUnitOrTermCell (cell: CompositeCell option) =
 let isHeader (rowIndex: int) = rowIndex < 0
 
 
-let clear isSelectedCell index dispatch =
-    fun _ ->
-        if isSelectedCell then
-            Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
-        else
-            Spreadsheet.Clear [| index |] |> Messages.SpreadsheetMsg |> dispatch
+// let clear isSelectedCell index dispatch =
+//     fun _ ->
+//         if isSelectedCell then
+//             Spreadsheet.ClearSelected |> Messages.SpreadsheetMsg |> dispatch
+//         else
+//             Spreadsheet.Clear [| index |] |> Messages.SpreadsheetMsg |> dispatch
 
-let fillColumn index dispatch =
-    fun _ -> Spreadsheet.FillColumnWithTerm index |> Messages.SpreadsheetMsg |> dispatch
+// let fillColumn index dispatch =
+//     fun _ -> Spreadsheet.FillColumnWithTerm index |> Messages.SpreadsheetMsg |> dispatch
 
-let copy isSelectedCell index dispatch =
-    fun _ ->
-        if isSelectedCell then
-            Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
-        else
-            Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
+// let copy isSelectedCell index dispatch =
+//     fun _ ->
+//         if isSelectedCell then
+//             Spreadsheet.CopySelectedCells |> Messages.SpreadsheetMsg |> dispatch
+//         else
+//             Spreadsheet.CopyCell index |> Messages.SpreadsheetMsg |> dispatch
 
-let cut index dispatch =
-    fun _ -> Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
+// let cut index dispatch =
+//     fun _ -> Spreadsheet.CutCell index |> Messages.SpreadsheetMsg |> dispatch
 
 
-let paste isSelectedCell index dispatch =
-    fun _ ->
-        if isSelectedCell then
-            Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
-        else
-            Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
+// let paste isSelectedCell index dispatch =
+//     fun _ ->
+//         if isSelectedCell then
+//             Spreadsheet.PasteSelectedCells |> Messages.SpreadsheetMsg |> dispatch
+//         else
+//             Spreadsheet.PasteCell index |> Messages.SpreadsheetMsg |> dispatch
 
-let deleteRow index (model: Model.Model) dispatch =
-    fun _ ->
-        let s =
-            if model.SpreadsheetModel.SelectedCells.IsSome then
-                CellCoordinateRange.toArray model.SpreadsheetModel.SelectedCells.Value
-                |> Array.ofSeq
-            else
-                [| |]
+// let deleteRow index (model: Model.Model) dispatch =
+//     fun _ ->
+//         let s =
+//             if model.SpreadsheetModel.SelectedCells.IsSome then
+//                 CellCoordinateRange.toArray model.SpreadsheetModel.SelectedCells.Value
+//                 |> Array.ofSeq
+//             else
+//                 [| |]
 
-        if
-            Array.isEmpty s |> not
-            && Array.forall (fun c -> c = index) s
-            && Array.contains index s
-        then
-            let indexArr = s |> Array.map (fun coordinate -> coordinate.y) |> Array.distinct
-            Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
-        else
-            Spreadsheet.DeleteRow(index.y) |> Messages.SpreadsheetMsg |> dispatch
+//         if
+//             Array.isEmpty s |> not
+//             && Array.forall (fun c -> c = index) s
+//             && Array.contains index s
+//         then
+//             let indexArr = s |> Array.map (fun coordinate -> coordinate.y) |> Array.distinct
+//             Spreadsheet.DeleteRows indexArr |> Messages.SpreadsheetMsg |> dispatch
+//         else
+//             Spreadsheet.DeleteRow(index.y) |> Messages.SpreadsheetMsg |> dispatch
 
-let pasteAll index dispatch =
-    fun _ -> Spreadsheet.PasteCellsExtend index |> Messages.SpreadsheetMsg |> dispatch
+// let pasteAll index dispatch =
+//     fun _ -> Spreadsheet.PasteCellsExtend index |> Messages.SpreadsheetMsg |> dispatch

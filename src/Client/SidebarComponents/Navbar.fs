@@ -271,7 +271,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
             React.fragment [ Icons.RemoveBuildingBlock() ],
-            (fun _ -> SpreadsheetInterface.RemoveBuildingBlock |> InterfaceMsg |> dispatch)
+            (fun _ -> SpreadsheetInterface.RemoveBuildingBlock None |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.QuickAccessButton(
             "Get Building Block Information",

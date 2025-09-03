@@ -134,35 +134,9 @@ let private SearchBuildingBlockHeaderElement (ui: BuildingBlockUIState, setUi, m
 
     ]
 
-let private scrollIntoViewRetry (id: string) =
-    let rec loop (iteration: int) =
-        let headerelement = Browser.Dom.document.getElementById (id)
+let private addBuildingBlock (selectedColumnIndex: int option) (model: Model) dispatch =
 
-        if isNull headerelement then
-            if iteration < 5 then
-                Fable.Core.JS.setTimeout (fun _ -> loop (iteration + 1)) 100 |> ignore
-            else
-                ()
-        else
-            let rect = headerelement.getBoundingClientRect ()
-
-            if
-                rect.left >= 0
-                && ((rect.right <= Browser.Dom.window.innerWidth)
-                    || (rect.right <= Browser.Dom.document.documentElement.clientWidth))
-            then
-                ()
-            else
-                let config = createEmpty<Browser.Types.ScrollIntoViewOptions>
-                config.behavior <- Browser.Types.ScrollBehavior.Smooth
-                config.block <- Browser.Types.ScrollAlignment.End
-                config.``inline`` <- Browser.Types.ScrollAlignment.End
-                //log headerelement
-                headerelement.scrollIntoView (config)
-
-    loop 0
-
-let private addBuildingBlock (model: Model) (state: Model.BuildingBlock.Model) dispatch =
+    let state = model.AddBuildingBlockState
     let header = Helper.createCompositeHeaderFromState state
     let body = Helper.tryCreateCompositeCellFromState state
 
@@ -176,13 +150,17 @@ let private addBuildingBlock (model: Model) (state: Model.BuildingBlock.Model) d
     let column = CompositeColumn.create (header, bodyCells)
 
     let index =
-        Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex model.SpreadsheetModel
+        Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex
+            selectedColumnIndex
+            model.SpreadsheetModel
 
-    SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
-    let id = $"Header_{index}_Main"
-    scrollIntoViewRetry id
+    console.log (index)
 
-let private AddBuildingBlockButton (model: Model) dispatch =
+    SpreadsheetInterface.AddAnnotationBlock(Some index, column)
+    |> InterfaceMsg
+    |> dispatch
+
+let private AddBuildingBlockButton (model: Model, onClick: unit -> unit) =
     let state = model.AddBuildingBlockState
 
     Html.div [
@@ -202,24 +180,7 @@ let private AddBuildingBlockButton (model: Model) dispatch =
                 if not isValid then
                     prop.disabled true
 
-                prop.onClick (fun _ ->
-                    let bodyCells =
-                        if body.IsSome then // create as many body cells as there are rows in the active table
-                            let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
-                            Array.init rowCount (fun _ -> body.Value.Copy())
-                        else
-                            Array.empty
-
-                    let column = CompositeColumn.create (header, bodyCells)
-
-                    let index =
-                        Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex
-                            model.SpreadsheetModel
-
-                    SpreadsheetInterface.AddAnnotationBlock column |> InterfaceMsg |> dispatch
-                    let id = $"Header_{index}_Main"
-                    scrollIntoViewRetry id
-                )
+                prop.onClick (fun _ -> onClick ())
 
                 prop.text "Add Column"
             ]
@@ -229,20 +190,31 @@ let private AddBuildingBlockButton (model: Model) dispatch =
 [<ReactComponent>]
 let Main (model: Model) dispatch =
     let state_bb, setState_bb = React.useState (BuildingBlockUIState.init)
-    //let state_searchHeader, setState_searchHeader = React.useState(TermSearchUIState.init)
-    //let state_searchBody, setState_searchBody = React.useState(TermSearchUIState.init)
+
+    let ctx =
+        React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
+
+    let xIndex =
+        ctx.data
+        |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
+        |> Option.bind (fun x -> x.SelectedCells)
+        |> Option.map (fun cells -> cells.xEnd)
+        |> Option.map (fun x -> x - 2)
+
+    let callback = fun () -> addBuildingBlock xIndex model dispatch
+
     Html.div [
         Html.form [
             prop.className "swt:flex swt:flex-col swt:gap-4"
             prop.onSubmit (fun ev ->
                 ev.preventDefault ()
-                addBuildingBlock model model.AddBuildingBlockState dispatch
+                callback ()
             )
             prop.children [
                 SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)
                 if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
                     SearchBuildingBlockBodyElement(model, dispatch)
-                AddBuildingBlockButton model dispatch
+                AddBuildingBlockButton(model, callback)
                 Html.input [ prop.type'.submit; prop.style [ style.display.none ] ]
             ]
         ]

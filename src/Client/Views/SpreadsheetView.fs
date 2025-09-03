@@ -153,7 +153,7 @@ let Main (model: Model, dispatch) =
                                 ]
                             ]
                         | Spreadsheet.ActiveView.DataMap ->
-                            MainComponents.SpreadsheetView.DataMap.Main(model, dispatch)
+                            // MainComponents.SpreadsheetView.DataMap.Main(model, dispatch)
                             MainComponents.TableFooter.Main dispatch
                 ]
             ]

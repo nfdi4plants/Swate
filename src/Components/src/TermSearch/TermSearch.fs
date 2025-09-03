@@ -163,7 +163,7 @@ type TermSearch =
 
         let isObsolete = item.Term.isObsolete.IsSome && item.Term.isObsolete.Value
 
-        let isDirectedSearch = item.IsDirectedSearchResult || true
+        let isDirectedSearch = item.IsDirectedSearchResult
 
         Html.li [
             prop.key index
@@ -559,9 +559,6 @@ type TermSearch =
             ]
         ]
 
-
-
-
     [<ReactComponent>]
     static member private Modal
         (
@@ -742,12 +739,15 @@ type TermSearch =
 
         let (modalOpen: bool), setModalOpen = React.useState false
 
-        let input, setInput = React.useState ("")
         let inputText = term |> Option.bind _.name |> Option.defaultValue ""
+        let input, setInput = React.useState (inputText)
 
         let termSearchConfigCtx = React.useContext (Contexts.TermSearch.TermSearchConfigCtx)
 
-        React.useLayoutEffect ((fun () -> setInput inputText), [| box term |])
+        React.useLayoutEffect (
+            (fun () -> term |> Option.bind _.name |> Option.defaultValue "" |> setInput),
+            [| box term |]
+        )
 
         /// Close term search result window when opening a modal
         let setModalOpen =
@@ -1157,6 +1157,7 @@ type TermSearch =
                 comboBoxRef = comboBoxRef,
                 onKeyDown =
                     (fun kbe ->
+
                         match kbe.code with
                         | kbdEventCode.f2 -> setModalOpen true
                         | kbdEventCode.arrowDown when

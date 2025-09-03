@@ -20,7 +20,22 @@ open ARCtrl
 open Fable.Core.JsInterop
 
 /// "Fill selected cells with this term" - button //
-let private addButton (model: Model, dispatch) =
+[<ReactComponent>]
+let private AddButton (model: Model, dispatch) =
+    let ctx =
+        React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
+
+    let selectedCells =
+        ctx.data
+        |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
+        |> Option.bind (fun ctx -> ctx.SelectedCells)
+        |> Option.map (fun x -> {|
+            xStart = x.xStart - 1
+            xEnd = x.xEnd - 1
+            yStart = x.yStart - 1
+            yEnd = x.yEnd - 1
+        |})
+        |> unbox<Swate.Components.Types.CellCoordinateRange option>
 
     Html.div [
         prop.className "swt:flex swt:flex-row swt:justify-center"
@@ -39,7 +54,10 @@ let private addButton (model: Model, dispatch) =
                 prop.onClick (fun _ ->
                     if hasTerm then
                         let oa = model.TermSearchState.SelectedTerm.Value
-                        SpreadsheetInterface.InsertOntologyAnnotation oa |> InterfaceMsg |> dispatch
+
+                        SpreadsheetInterface.InsertOntologyAnnotation(selectedCells, oa)
+                        |> InterfaceMsg
+                        |> dispatch
                 )
 
                 prop.text "Fill selected cells with this term"
@@ -80,6 +98,6 @@ let Main (model: Model, dispatch) =
                 classNames = Swate.Components.Types.TermSearchStyle(!^"swt:input-lg swt:w-full"),
                 ?parentId = (model.TermSearchState.ParentTerm |> Option.map _.TermAccessionShort)
             )
-            addButton (model, dispatch)
+            AddButton(model, dispatch)
         ]
     ]

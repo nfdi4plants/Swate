@@ -45,45 +45,36 @@ type TableCell =
         ]
 
     [<ReactComponent>]
-    static member StringInactiveCell(ts: TableCellController, text: string, ?debug) =
-        TableCell.BaseCell(
-            ts.Index.y,
-            ts.Index.x,
-            Html.div [
-                prop.className [
-                    if not ts.IsSelected && ts.Index.y = 0 then
-                        "swt:bg-base-300"
-                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full"
-                ]
-                prop.children [ Html.div [ prop.className "swt:truncate"; prop.text text ] ]
-            ],
-            props = [ prop.title text; prop.onClick (fun e -> ts.onClick e) ],
-            className = "swt:w-full swt:h-full",
-            ?debug = debug
-        )
+    static member StringInactiveCell(index: CellCoordinate, text: string, ?debug) =
+
+        TableCell.InactiveCell(index, Html.text text, ?debug = debug)
 
     [<ReactComponent>]
-    static member InactiveCell(ts: TableCellController, children: ReactElement, ?debug) =
+    static member InactiveCell(index: CellCoordinate, children: ReactElement, ?debug) =
+        let ctx = React.useContext Contexts.Table.TableStateCtx
+
+        let isSelected = ctx.isSelected index
+
         TableCell.BaseCell(
-            ts.Index.y,
-            ts.Index.x,
+            index.y,
+            index.x,
             Html.div [
                 prop.className [
-                    if not ts.IsSelected && ts.Index.y = 0 then
-                        "swt:bg-base-300"
+                    if not isSelected && index.y = 0 then
+                        "swt:bg-base-300 swt:text-base-content"
                     "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full"
                 ]
                 prop.children children
             ],
-            props = [ prop.onClick (fun e -> ts.onClick e) ],
-            className = "swt:w-full swt:h-full",
+            props = [ prop.onClick (fun e -> ctx.onClick index e) ],
+            className = "swt:w-full swt:h-full swt:truncate",
             ?debug = debug
         )
 
     [<ReactComponent>]
     static member BaseActiveCell<'a>
         (
-            ts: TableCellController,
+            index: CellCoordinate,
             data: 'a,
             setData: 'a -> unit,
             dataRenderfn: ActiveCellProps<'a> -> ReactElement,
@@ -95,7 +86,7 @@ type TableCell =
 
         React.useEffect ((fun _ -> setTempData data), [| box data |])
 
-        let containerRef = React.useElementRef ()
+        let ctx = React.useContext Contexts.Table.TableStateCtx
 
         let isCancelledRef = React.useRef (false)
         let isSetForced = React.useRef (false)
@@ -103,7 +94,7 @@ type TableCell =
         let props = [
 
             if debug.IsSome && debug.Value then
-                prop.testId $"active-cell-{ts.Index.y}-{ts.Index.x}"
+                prop.testId $"active-cell-{index.y}-{index.x}"
 
             if isStickyHeader.IsSome && isStickyHeader.Value then
                 prop.style [
@@ -111,8 +102,6 @@ type TableCell =
                     style.height Constants.Table.DefaultRowHeight
                     style.top Constants.Table.DefaultRowHeight
                 ]
-
-            prop.ref containerRef
         ]
 
         let reset =
@@ -131,17 +120,15 @@ type TableCell =
 
                 match e.code with
                 | kbdEventCode.enter ->
-                    console.log ("BaseActiveCell - enter key pressed")
 
                     if isSetForced.current || isCancelledRef.current then
                         ()
                     else
-                        console.log ("BaseActiveCell - tempData set")
                         setData tempData
                 | kbdEventCode.escape -> isCancelledRef.current <- true
                 | _ -> ()
 
-                ts.onKeyDown e
+                ctx.onKeyDown index e
 
         let onBlur =
             fun e ->
@@ -151,7 +138,7 @@ type TableCell =
                 else
                     reset ()
 
-                ts.onBlur e
+                ctx.onBlur index e
 
         let setDataForce =
             fun (value: 'a) ->
@@ -168,8 +155,8 @@ type TableCell =
             |}
 
         TableCell.BaseCell(
-            ts.Index.y,
-            ts.Index.x,
+            index.y,
+            index.x,
             Renderer,
             ?debug = debug,
             props = props,
@@ -177,19 +164,17 @@ type TableCell =
         )
 
     [<ReactComponent>]
-    static member StringActiveCell
-        (ts: TableCellController, data: string, setData, ?isStickyHeader: bool, ?debug: bool)
-        =
+    static member StringActiveCell(index: CellCoordinate, data: string, setData, ?isStickyHeader: bool, ?debug: bool) =
 
         TableCell.BaseActiveCell(
-            ts,
+            index,
             data,
             setData,
             (fun props ->
                 Html.input [
                     prop.autoFocus true
                     if debug.IsSome && debug.Value then
-                        prop.testid ($"active-cell-string-input-{ts.Index.y}-{ts.Index.x}")
+                        prop.testid ($"active-cell-string-input-{index.y}-{index.x}")
                     prop.className "swt:rounded-none swt:w-full swt:h-full swt:input swt:!outline-0 swt:!border-0"
                     prop.defaultValue props.data
                     prop.onChange (fun (e: string) -> props.setData e)
@@ -204,11 +189,13 @@ type TableCell =
     [<ReactComponent>]
     static member OntologyAnnotationActiveCell
         (
-            ts: TableCellController,
+            index: CellCoordinate,
             oa: OntologyAnnotation,
             setOa: OntologyAnnotation -> unit,
             ?isStickyHeader: bool,
-            ?debug: bool
+            ?debug: bool,
+            ?parentId: string,
+            ?key: string
         ) =
 
         let term =
@@ -226,14 +213,12 @@ type TableCell =
 
                 setOa (oa)
 
-        TableCell.BaseActiveCell<Term option>(
-            ts,
-            term,
-            setTerm,
-            (fun (props) ->
+        let TermSearch =
+            React.memo (fun (props: ActiveCellProps<Term option>) ->
                 TermSearch.TermSearch(
                     props.data,
                     props.setData,
+                    ?parentId = parentId,
                     onBlur = (fun e -> props.onBlur e),
                     onKeyDown = (fun e -> props.onKeyDown e),
                     classNames =
@@ -241,7 +226,25 @@ type TableCell =
                     onTermSelect = (fun term -> props.setDataForce (Some term)),
                     autoFocus = true
                 )
-            ),
+            )
+
+        TableCell.BaseActiveCell<Term option>(
+            index,
+            term,
+            setTerm,
+            TermSearch,
             ?isStickyHeader = isStickyHeader,
             ?debug = debug
         )
+
+// let tempTerm, setTempTerm = React.useState (term)
+// TermSearch.TermSearch(
+//     tempTerm,
+//     (fun input -> ()),
+//     ?parentId = parentId,
+//     onBlur = (fun e -> ts.onBlur e),
+//     onKeyDown = (fun e -> ts.onKeyDown e),
+//     classNames = TermSearchStyle(!^"swt:rounded-none swt:w-full swt:h-full swt:!outline-0 swt:!border-0"),
+//     onTermSelect = (fun term -> setTerm (Some term)),
+//     autoFocus = true
+// )

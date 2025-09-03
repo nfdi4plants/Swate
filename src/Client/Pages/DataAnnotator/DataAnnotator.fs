@@ -71,8 +71,12 @@ module private DataAnnotatorHelper =
                         prop.placeholder ".. update separator"
                         prop.value input_
                         prop.onChange (fun s -> setInput s)
-                        prop.onKeyDown (key.enter, fun _ ->
-                            if not hasError then updateSeparator input_)
+                        prop.onKeyDown (
+                            key.enter,
+                            fun _ ->
+                                if not hasError then
+                                    updateSeparator input_
+                        )
                     ]
                     Html.button [
                         prop.className "swt:btn swt:join-item"
@@ -306,21 +310,21 @@ module private DataAnnotatorHelper =
 
         let render =
             React.memo (
-                (fun tcc ->
-                    if tcc.Index.y = 0 && file.HeaderRow.IsSome && tcc.IsHeader then
+                (fun (index: CellCoordinate) ->
+                    if index.y = 0 && file.HeaderRow.IsSome then
                         // Header Row
-                        let content = headerRow.Value.[tcc.Index.x]
+                        let content = headerRow.Value.[index.x]
                         CellButton content
                     else
                         // Body Row
-                        let input = bodyRows.[tcc.Index.y].[tcc.Index.x]
+                        let input = bodyRows.[index.y].[index.x]
                         CellButton input
                 ),
-                withKey = (fun (ts: TableCellController) -> $"{ts.Index.x}-{ts.Index.y}-{ts.IsHeader}")
+                withKey = (fun (index: CellCoordinate) -> $"{index.x}-{index.y}")
             )
 
         Html.div [
-            prop.className "swt:overflow-hidden swt:flex swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[200px] swt:overflow-hidden"
+            prop.className "swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[200px]"
             prop.children [
                 Swate.Components.Table.Table(
                     file.BodyRows.Length,

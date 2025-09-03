@@ -53,6 +53,7 @@
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
+    <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>

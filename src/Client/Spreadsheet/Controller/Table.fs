@@ -37,8 +37,6 @@ let switchTable (nextIndex: int) (state: Spreadsheet.Model) : Spreadsheet.Model 
     | ActiveView.Table i when i = nextIndex -> state
     | _ -> {
         state with
-            ActiveCell = None
-            SelectedCells = None
             ActiveView = ActiveView.Table nextIndex
       }
 
@@ -50,7 +48,7 @@ let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model
 /// <summary>This is the basic function to update an existing Table from an array of SwateBuildingBlocks</summary>
 let updateTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.Tables.UpdateTable(newTable.Name, newTable)
-    switchTable (state.Tables.TableCount - 1) state
+    state
 
 /// <summary>This function is used to create multiple tables at once.</summary>
 let addTables (tables: ArcTable[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
@@ -122,48 +120,28 @@ let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
 let deleteRow (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveRow index
 
-    {
-        state with
-            ArcFile = state.ArcFile
-            SelectedCells = None
-    }
+    { state with ArcFile = state.ArcFile }
 
 let deleteRows (indexArr: int[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveRows indexArr
 
-    {
-        state with
-            ArcFile = state.ArcFile
-            SelectedCells = None
-    }
+    { state with ArcFile = state.ArcFile }
 
 
 let deleteColumn (index: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.RemoveColumn index
 
-    {
-        state with
-            ArcFile = state.ArcFile
-            SelectedCells = None
-    }
+    { state with ArcFile = state.ArcFile }
 
 let setColumn (index: int) (column: CompositeColumn) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.UpdateColumn(index, column.Header, column.Cells)
 
-    {
-        state with
-            ArcFile = state.ArcFile
-            SelectedCells = None
-    }
+    { state with ArcFile = state.ArcFile }
 
 let moveColumn (current: int) (next: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     state.ActiveTable.MoveColumn(current, next)
 
-    {
-        state with
-            ArcFile = state.ArcFile
-            SelectedCells = None
-    }
+    { state with ArcFile = state.ArcFile }
 
 let fillColumnWithCell (index: CellCoordinate) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = Generic.getCell (index.x, index.y) state
@@ -179,7 +157,7 @@ let fillColumnWithCell (index: CellCoordinate) (state: Spreadsheet.Model) : Spre
 /// </summary>
 /// <param name="indexArr"></param>
 /// <param name="state"></param>
-let clearCells (indexArr: CellCoordinate []) (state: Spreadsheet.Model) : Spreadsheet.Model =
+let clearCells (indexArr: CellCoordinate[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let newCells = [|
         for index in indexArr do
             let cell = Generic.getCell (index.x, index.y) state

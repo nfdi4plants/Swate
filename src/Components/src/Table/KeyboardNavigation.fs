@@ -109,41 +109,80 @@ type GridSelect() =
 
     member val internal LastAppend: CellCoordinate option = None with get, set
 
-    member private this.GetNextIndex(kbd: Kbd, jump: bool, selectedCells: Set<CellCoordinate>, maxRow, maxCol, minRow, minCol) =
+    member private this.GetNextIndex
+        (kbd: Kbd, jump: bool, selectedCells: Set<CellCoordinate>, maxRow, maxCol, minRow, minCol)
+        =
         let current =
             match this.LastAppend, this.Origin with
-            | Some lastAppend, _ ->
-                lastAppend
-            | None, Some origin ->
-                origin
+            | Some lastAppend, _ -> lastAppend
+            | None, Some origin -> origin
             | None, None ->
                 let isIncrease = kbd = ArrowDown || kbd = ArrowRight
-                if isIncrease then selectedCells.MaximumElement else selectedCells.MinimumElement
+
+                if isIncrease then
+                    selectedCells.MaximumElement
+                else
+                    selectedCells.MinimumElement
+
         match jump with
         | true ->
             match kbd with
-            | ArrowDown -> {|current with y = maxRow|}
-            | ArrowUp -> {|current with y = minRow|}
-            | ArrowLeft -> {|current with x = minCol|}
-            | ArrowRight -> {|current with x = maxCol|}
+            | ArrowDown -> {| current with y = maxRow |}
+            | ArrowUp -> {| current with y = minRow |}
+            | ArrowLeft -> {| current with x = minCol |}
+            | ArrowRight -> {| current with x = maxCol |}
         | false ->
             match kbd with
-            | ArrowDown -> {|current with y = min (current.y + 1) maxRow |}
-            | ArrowUp -> {|current with y = max (current.y - 1) minRow |}
-            | ArrowLeft -> {|current with x = max (current.x - 1) minCol |}
-            | ArrowRight -> {|current with x = min (current.x + 1) maxCol |}
+            | ArrowDown -> {|
+                current with
+                    y = min (current.y + 1) maxRow
+              |}
+            | ArrowUp -> {|
+                current with
+                    y = max (current.y - 1) minRow
+              |}
+            | ArrowLeft -> {|
+                current with
+                    x = max (current.x - 1) minCol
+              |}
+            | ArrowRight -> {|
+                current with
+                    x = min (current.x + 1) maxCol
+              |}
 
-    member this.SelectBy(e: Browser.Types.KeyboardEvent, selectedCells: CellCoordinateRange option, setter: CellCoordinateRange option -> unit, maxRow, maxCol, ?minRow, ?minCol, ?onSelect) =
+    member this.SelectBy
+        (
+            e: Browser.Types.KeyboardEvent,
+            selectedCells: CellCoordinateRange option,
+            setter: CellCoordinateRange option -> unit,
+            maxRow,
+            maxCol,
+            ?minRow,
+            ?minCol,
+            ?onSelect
+        ) =
         let kbd = Kbd.tryFromKey e.key
 
         match kbd with
         | Some kbd ->
             e.preventDefault ()
             let jump = e.ctrlKey || e.metaKey
-            this.SelectBy(kbd, jump, e.shiftKey, selectedCells, setter, maxRow, maxCol, ?minRow = minRow, ?minCol = minCol, ?onSelect = onSelect)
+
+            this.SelectBy(
+                kbd,
+                jump,
+                e.shiftKey,
+                selectedCells,
+                setter,
+                maxRow,
+                maxCol,
+                ?minRow = minRow,
+                ?minCol = minCol,
+                ?onSelect = onSelect
+            )
+
             true
-        | None ->
-            false
+        | None -> false
 
     member this.SelectBy
         (
@@ -199,8 +238,7 @@ type GridSelect() =
 
         let newCellRange =
             if not isAppend then
-                Set.singleton (nextIndex)
-                |> SelectedCellRange.fromSet
+                Set.singleton (nextIndex) |> SelectedCellRange.fromSet
             else
                 let selectedCells =
                     selectedCellRange
@@ -254,14 +292,11 @@ module KeyboardNavExtensions =
     open Feliz
 
     type React with
-        static member useGridSelect(
-            rowCount: int,
-            columnCount: int,
-            ?minRow,
-            ?minCol,
-            ?onSelect: OnSelect,
-            ?seed: ResizeArray<CellCoordinate>
-        ) : GridSelectHandle =
+
+        [<Hook>]
+        static member useGridSelect
+            (rowCount: int, columnCount: int, ?minRow, ?minCol, ?onSelect: OnSelect, ?seed: ResizeArray<CellCoordinate>)
+            : GridSelectHandle =
             let minRow = defaultArg minRow 0
             let minCol = defaultArg minCol 0
 
@@ -293,9 +328,7 @@ module KeyboardNavExtensions =
                             minRow,
                             minCol,
                             (fun newIndex newCellRange ->
-                                onSelect |> Option.iter(fun onSelect ->
-                                    onSelect newIndex newCellRange
-                                )
+                                onSelect |> Option.iter (fun onSelect -> onSelect newIndex newCellRange)
                             )
                         )
                     | None -> false
@@ -309,14 +342,13 @@ module KeyboardNavExtensions =
                         selectedCells,
                         setSelectedCells,
                         (fun newIndex newCellRange ->
-                            onSelect |> Option.iter(fun onSelect ->
-                                onSelect newIndex newCellRange
-                            )
+                            onSelect |> Option.iter (fun onSelect -> onSelect newIndex newCellRange)
                         )
                     )
 
             let contains =
                 fun (cell: CellCoordinate) ->
+
                     selectedCells.IsSome
                     && cell.x <= selectedCells.Value.xEnd
                     && cell.x >= selectedCells.Value.xStart

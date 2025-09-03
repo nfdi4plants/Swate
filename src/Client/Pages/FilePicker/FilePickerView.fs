@@ -66,6 +66,7 @@ type FilePicker =
                         prop.text "Pick Files"
                         prop.onClick (fun _ -> Start false |> ARCitect.RequestPaths |> ARCitectMsg |> dispatch)
                     ]
+
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:btn-block"
                         prop.text "Pick Directories"
@@ -77,17 +78,36 @@ type FilePicker =
                         prop.text "Pick file names"
                         prop.onClick (fun _ ->
                             let getUploadElement = Browser.Dom.document.getElementById inputId
-                            getUploadElement.click ())
+                            getUploadElement.click ()
+                        )
                     ]
             ]
         ]
 
+    [<ReactComponentAttribute>]
     static member ActionButtons (model: Model) dispatch =
+
+        let ctx =
+            React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
+
+        let selectedCells =
+            ctx.data
+            |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
+            |> Option.bind (fun ctx -> ctx.SelectedCells)
+            |> Option.map (fun x -> {|
+                xStart = x.xStart - 1
+                xEnd = x.xEnd - 1
+                yStart = x.yStart - 1
+                yEnd = x.yEnd - 1
+            |})
+            |> unbox<Swate.Components.Types.CellCoordinateRange option>
+
         Html.div [
             prop.className "swt:flex swt:flex-row swt:justify-center swt:gap-2"
             prop.children [
                 Html.button [
-                    prop.className "swt:btn swt:btn-neutral swt:btn-outline swt:bg-neutral swt:text-white swt:hover:btn-primary"
+                    prop.className
+                        "swt:btn swt:btn-neutral swt:btn-outline swt:bg-neutral swt:text-white swt:hover:btn-primary"
                     prop.text "Cancel"
                     prop.onClick (fun _ -> Messages.FilePicker.UpdateFileNames [] |> FilePickerMsg |> dispatch)
                 ]
@@ -97,7 +117,11 @@ type FilePicker =
                     prop.text "Insert file names"
                     prop.onClick (fun _ ->
                         let fileNames = model.FilePickerState.FileNames |> List.map snd
-                        SpreadsheetInterface.InsertFileNames fileNames |> InterfaceMsg |> dispatch)
+
+                        SpreadsheetInterface.InsertFileNames(selectedCells, fileNames)
+                        |> InterfaceMsg
+                        |> dispatch
+                    )
                 ]
             ]
         ]
@@ -115,20 +139,26 @@ type FilePicker =
             Html.div [
                 prop.className "swt:join"
                 prop.children [
-                    FilePicker.SortButton (Icons.ArrowDownAZ()) (fun _ ->
-                        let sortedList =
-                            model.FilePickerState.FileNames
-                            |> List.sortBy snd
-                            |> List.mapi (fun i x -> i + 1, snd x)
+                    FilePicker.SortButton
+                        (Icons.ArrowDownAZ())
+                        (fun _ ->
+                            let sortedList =
+                                model.FilePickerState.FileNames
+                                |> List.sortBy snd
+                                |> List.mapi (fun i x -> i + 1, snd x)
 
-                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch)
-                    FilePicker.SortButton (Icons.ArrowDownZA()) (fun _ ->
-                        let sortedList =
-                            model.FilePickerState.FileNames
-                            |> List.sortByDescending snd
-                            |> List.mapi (fun i x -> i + 1, snd x)
+                            UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                        )
+                    FilePicker.SortButton
+                        (Icons.ArrowDownZA())
+                        (fun _ ->
+                            let sortedList =
+                                model.FilePickerState.FileNames
+                                |> List.sortByDescending snd
+                                |> List.mapi (fun i x -> i + 1, snd x)
 
-                        UpdateFileNames sortedList |> FilePickerMsg |> dispatch)
+                            UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+                        )
                 ]
             ]
         ]
@@ -142,7 +172,8 @@ type FilePicker =
                         |> List.except [ id, fileName ]
                         |> List.mapi (fun i (_, name) -> i + 1, name)
 
-                    newList |> UpdateFileNames |> FilePickerMsg |> dispatch)
+                    newList |> UpdateFileNames |> FilePickerMsg |> dispatch
+                )
                 prop.className "swt:btn-xs swt:btn-error wt:btn-outline"
             ]
         )
@@ -161,11 +192,13 @@ type FilePicker =
                             // let sortBy handle all stuff then assign new indices with mapi
                             (float iterInd - 1.5, iterFileName)
                         else
-                            (float iterInd, iterFileName))
+                            (float iterInd, iterFileName)
+                    )
                     |> List.sortBy fst
                     |> List.mapi (fun i v -> i + 1, snd v)
 
-                UpdateFileNames sortedList |> FilePickerMsg |> dispatch)
+                UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+            )
             prop.children [ Icons.ArrowUp() ]
         ]
 
@@ -183,11 +216,13 @@ type FilePicker =
                             // let sortBy handle all stuff then assign new indices with mapi
                             (float iterInd + 1.5, iterFileName)
                         else
-                            (float iterInd, iterFileName))
+                            (float iterInd, iterFileName)
+                    )
                     |> List.sortBy fst
                     |> List.mapi (fun i v -> i + 1, snd v)
 
-                UpdateFileNames sortedList |> FilePickerMsg |> dispatch)
+                UpdateFileNames sortedList |> FilePickerMsg |> dispatch
+            )
             prop.children [ Icons.ArrowDown() ]
         ]
 

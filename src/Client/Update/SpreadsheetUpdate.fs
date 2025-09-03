@@ -40,13 +40,7 @@ module Spreadsheet =
             match msg with
             | UpdateActiveView _
             | Reset
-            | UpdateSelectedCells _
-            | InitFromArcFile _
-            | UpdateActiveCell _
-            | CopySelectedCell
-            | CopyCell _
-            | MoveSelectedCell _
-            | SetActiveCellFromSelected -> state, model, cmd
+            | InitFromArcFile _ -> state, model, cmd
             | _ ->
                 let newCmd =
                     if model.PersistentStorageState.Autosave then
@@ -120,12 +114,12 @@ module Spreadsheet =
             | CreateAnnotationTable usePrevOutput ->
                 let nextState = Controller.Table.createTable usePrevOutput state
                 nextState, model, Cmd.none
-            | AddAnnotationBlock column ->
-                let msg, nextState = Controller.BuildingBlocks.addBuildingBlock column state
+            | AddAnnotationBlock(index, column) ->
+                let msg, nextState = Controller.BuildingBlocks.addBuildingBlock index column state
                 let cmd = Cmd.ofMsg msg
                 nextState, model, cmd
-            | AddAnnotationBlocks columns ->
-                let nextState = Controller.BuildingBlocks.addBuildingBlocks columns state
+            | AddAnnotationBlocks(index, columns) ->
+                let nextState = Controller.BuildingBlocks.addBuildingBlocks index columns state
                 nextState, model, Cmd.none
             | AddDataAnnotation data ->
                 let nextState =
@@ -169,8 +163,8 @@ module Spreadsheet =
             | InitFromArcFile arcFile ->
                 let nextState = Spreadsheet.Model.init (arcFile)
                 nextState, model, Cmd.none
-            | InsertOntologyAnnotation oa ->
-                let nextState = Controller.BuildingBlocks.insertTerm_IntoSelected oa state
+            | InsertOntologyAnnotation(range, oa) ->
+                let nextState = Controller.BuildingBlocks.insertTerm oa range state
                 nextState, model, Cmd.none
             | InsertOntologyAnnotations oas ->
                 failwith "InsertOntologyTerms not implemented in Spreadsheet.Update"
@@ -192,11 +186,7 @@ module Spreadsheet =
 
                 nextState, model, Cmd.none
             | UpdateActiveView nextView ->
-                let nextState = {
-                    state with
-                        ActiveView = nextView
-                        SelectedCells = None
-                }
+                let nextState = { state with ActiveView = nextView }
 
                 nextState, model, Cmd.none
             | RemoveTable removeIndex ->
@@ -250,77 +240,6 @@ module Spreadsheet =
             | MoveColumn(current, next) ->
                 let nextState = Controller.Table.moveColumn current next state
                 nextState, model, Cmd.none
-            | UpdateSelectedCells nextSelectedCells ->
-                let nextState = {
-                    state with
-                        SelectedCells = nextSelectedCells
-                }
-
-                nextState, model, Cmd.none
-            | MoveSelectedCell keypressed ->
-                let cmd =
-                    match state.SelectedCells.IsNone with
-                    | true -> Cmd.none
-                    | false ->
-                        let moveBy =
-                            match keypressed with
-                            | Key.Down -> (0, 1)
-                            | Key.Up -> (0, -1)
-                            | Key.Left -> (-1, 0)
-                            | Key.Right -> (1, 0)
-
-                        let maxColIndex, maxRowIndex =
-                            match state.ActiveView with
-                            | ActiveView.Table _ ->
-                                (state.ActiveTable.ColumnCount - 1), (state.ActiveTable.RowCount - 1)
-                            | ActiveView.DataMap ->
-                                DataMap.ColumnCount - 1, state.DataMapOrDefault.DataContexts.Count - 1
-                            | _ -> (state.ActiveTable.ColumnCount - 1), (state.ActiveTable.RowCount - 1) // This does not matter
-
-                        let startCoordinates =
-                            state.SelectedCells.Value.xStart, state.SelectedCells.Value.yStart
-
-                        let nextIndex =
-                            Controller.Table.selectRelativeCell startCoordinates moveBy maxColIndex maxRowIndex
-
-                        let range: CellCoordinateRange = {|
-                            xStart = fst nextIndex
-                            xEnd = fst nextIndex
-                            yStart = snd nextIndex
-                            yEnd = snd nextIndex
-                        |}
-
-                        let cellId = Controller.Cells.mkCellId (fst nextIndex) (snd nextIndex) state
-
-                        match Browser.Dom.document.getElementById cellId with
-                        | null -> ()
-                        | ele -> ele.focus ()
-
-                        UpdateSelectedCells(Some range) |> SpreadsheetMsg |> Cmd.ofMsg
-
-                state, model, cmd
-            | SetActiveCellFromSelected ->
-                let cmd =
-                    if state.SelectedCells.IsSome then
-                        let min: CellCoordinate = {|
-                            x = state.SelectedCells.Value.xStart
-                            y = state.SelectedCells.Value.yStart
-                        |}
-
-                        let cmd =
-                            (Fable.Core.U2.Case2 min, ColumnType.Main)
-                            |> Some
-                            |> UpdateActiveCell
-                            |> SpreadsheetMsg
-
-                        Cmd.ofMsg cmd
-                    else
-                        Cmd.none
-
-                state, model, cmd
-            | UpdateActiveCell next ->
-                let nextState = { state with ActiveCell = next }
-                nextState, model, Cmd.none
             | CopyCell index ->
                 let cmd =
                     Cmd.OfPromise.attempt
@@ -337,40 +256,8 @@ module Spreadsheet =
                         (curry GenericError Cmd.none >> DevMsg)
 
                 state, model, cmd
-            | CopySelectedCell ->
-                let cmd =
-                    Cmd.OfPromise.attempt
-                        (Controller.Clipboard.copySelectedCell)
-                        state
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
-            | CopySelectedCells ->
-                let cmd =
-                    Cmd.OfPromise.attempt
-                        (Controller.Clipboard.copySelectedCells)
-                        state
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
             | CutCell index ->
                 let nextState = Controller.Clipboard.cutCellByIndex index state
-                nextState, model, Cmd.none
-            | CutSelectedCell ->
-                let nextState =
-                    if state.SelectedCells.IsNone then
-                        state
-                    else
-                        Controller.Clipboard.cutSelectedCell state
-
-                nextState, model, Cmd.none
-            | CutSelectedCells ->
-                let nextState =
-                    if state.SelectedCells.IsNone then
-                        state
-                    else
-                        Controller.Clipboard.cutSelectedCells state
-
                 nextState, model, Cmd.none
             | PasteCell index ->
                 let cmd =
@@ -390,34 +277,7 @@ module Spreadsheet =
                         (curry GenericError Cmd.none >> DevMsg)
 
                 state, model, cmd
-            | PasteSelectedCell ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        (Controller.Clipboard.pasteCellIntoSelected)
-                        state
-                        (UpdateState >> SpreadsheetMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
-            | PasteSelectedCells ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        (Controller.Clipboard.pasteCellsIntoSelected)
-                        state
-                        (UpdateState >> SpreadsheetMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
             | Clear indices ->
-                let nextState = Controller.Table.clearCells indices state
-                nextState, model, Cmd.none
-            | ClearSelected ->
-                let indices =
-                    if state.SelectedCells.IsSome then
-                        CellCoordinateRange.toArray state.SelectedCells.Value |> Array.ofSeq
-                    else
-                        [||]
-
                 let nextState = Controller.Table.clearCells indices state
                 nextState, model, Cmd.none
             | FillColumnWithTerm index ->

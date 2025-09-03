@@ -226,6 +226,39 @@ export const EditTermCellMouseclick: Story = {
   }
 }
 
+export const EditTermHeader: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const inactiveCellId = "cell-0-3"
+
+    const cell = await canvas.findByTestId(inactiveCellId);
+
+    await userEvent.dblClick(cell);
+
+    const activeCell = await canvas.findByTestId('term-search-input');
+    expect(activeCell).toBeVisible();
+
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.clear(activeCell);
+    await userEvent.type(activeCell, 'instrument data banana', { delay: 50 });
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(async () => {
+      const updatedCell = await canvas.findByText('Component [instrument data banana]');
+      expect(updatedCell).toBeVisible();
+    });
+
+  }
+}
 
 export const FreeTextDetails: Story = {
   render: renderTable,

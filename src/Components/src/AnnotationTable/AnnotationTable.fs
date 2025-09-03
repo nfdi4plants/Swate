@@ -15,14 +15,15 @@ open Types.AnnotationTable
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
+    [<ReactComponent>]
     static member private CompositeHeaderActiveRender
-        (tableCellController: TableCellController, header: CompositeHeader, setHeader: CompositeHeader -> unit, ?debug)
+        (index: CellCoordinate, header: CompositeHeader, setHeader: CompositeHeader -> unit, ?debug, ?key: string)
         =
 
         match header with
         | CompositeHeader.Input io ->
             TableCell.StringActiveCell(
-                tableCellController,
+                index,
                 io.ToString(),
                 (fun input -> IOType.ofString input |> CompositeHeader.Input |> setHeader),
                 isStickyHeader = true,
@@ -30,7 +31,7 @@ type AnnotationTable =
             )
         | CompositeHeader.Output io ->
             TableCell.StringActiveCell(
-                tableCellController,
+                index,
                 io.ToString(),
                 (fun input -> IOType.ofString input |> CompositeHeader.Output |> setHeader),
                 isStickyHeader = true,
@@ -38,7 +39,7 @@ type AnnotationTable =
             )
         | CompositeHeader.Comment txt ->
             TableCell.StringActiveCell(
-                tableCellController,
+                index,
                 txt,
                 (fun input -> setHeader (CompositeHeader.Comment input)),
                 isStickyHeader = true,
@@ -46,7 +47,7 @@ type AnnotationTable =
             )
         | CompositeHeader.FreeText txt ->
             TableCell.StringActiveCell(
-                tableCellController,
+                index,
                 txt,
                 (fun input -> setHeader (CompositeHeader.FreeText input)),
                 isStickyHeader = true,
@@ -54,7 +55,7 @@ type AnnotationTable =
             )
         | CompositeHeader.Parameter oa ->
             TableCell.OntologyAnnotationActiveCell(
-                tableCellController,
+                index,
                 oa,
                 (fun t -> setHeader (CompositeHeader.Parameter t)),
                 isStickyHeader = true,
@@ -62,7 +63,7 @@ type AnnotationTable =
             )
         | CompositeHeader.Characteristic oa ->
             TableCell.OntologyAnnotationActiveCell(
-                tableCellController,
+                index,
                 oa,
                 (fun t -> setHeader (CompositeHeader.Characteristic t)),
                 isStickyHeader = true,
@@ -70,7 +71,7 @@ type AnnotationTable =
             )
         | CompositeHeader.Component oa ->
             TableCell.OntologyAnnotationActiveCell(
-                tableCellController,
+                index,
                 oa,
                 (fun t -> setHeader (CompositeHeader.Component t)),
                 isStickyHeader = true,
@@ -78,7 +79,7 @@ type AnnotationTable =
             )
         | CompositeHeader.Factor oa ->
             TableCell.OntologyAnnotationActiveCell(
-                tableCellController,
+                index,
                 oa,
                 (fun t -> setHeader (CompositeHeader.Factor t)),
                 isStickyHeader = true,
@@ -92,7 +93,7 @@ type AnnotationTable =
         | CompositeHeader.ProtocolVersion
         | CompositeHeader.Date ->
             TableCell.StringActiveCell(
-                tableCellController,
+                index,
                 header.ToString(),
                 (fun input ->
                     let nextHeader = CompositeHeader.OfHeaderString input
@@ -102,65 +103,47 @@ type AnnotationTable =
                 ?debug = debug
             )
 
+    [<ReactComponent>]
     static member CompositeCellActiveRender
-        (tableCellController: TableCellController, cell: CompositeCell, setCell: CompositeCell -> unit, ?debug)
-        =
+        (
+            index: CellCoordinate,
+            cell: CompositeCell,
+            setCell: CompositeCell -> unit,
+            ?parentId: string,
+            ?debug,
+            ?key: string
+        ) =
 
         match cell with
         | CompositeCell.Term oa ->
             TableCell.OntologyAnnotationActiveCell(
-                tableCellController,
+                index,
                 oa,
                 (fun t -> setCell (CompositeCell.Term t)),
-                ?debug = debug
+                ?parentId = parentId,
+                ?debug = debug,
+                ?key = key
             )
         | CompositeCell.FreeText txt ->
-            TableCell.StringActiveCell(
-                tableCellController,
-                txt,
-                (fun t -> setCell (CompositeCell.FreeText t)),
-                ?debug = debug
-            )
+            TableCell.StringActiveCell(index, txt, (fun t -> setCell (CompositeCell.FreeText t)), ?debug = debug)
         | CompositeCell.Unitized(v, oa) ->
             TableCell.StringActiveCell(
-                tableCellController,
+                index,
                 v,
-                (fun _ -> setCell (CompositeCell.Unitized(v, oa))),
+                (fun input -> setCell (CompositeCell.Unitized(input, oa))),
                 ?debug = debug
             )
         | CompositeCell.Data d ->
             TableCell.StringActiveCell(
-                tableCellController,
+                index,
                 Option.defaultValue "" d.Name,
                 (fun t ->
-                    d.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
-                    setCell (CompositeCell.Data d)
+                    let nextData = d.Copy()
+                    nextData.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
+                    setCell (CompositeCell.Data nextData)
                 ),
                 ?debug = debug
             )
-
-    [<ReactComponentAttribute>]
-    static member private ActiveCellRender
-        (tcc: TableCellController, arcTable: ArcTable, setTable: ArcTable -> unit, ?debug: bool)
-        =
-        match tcc with
-        | _ when tcc.Index.x > 0 && tcc.Index.y > 0 ->
-            let setCell =
-                fun (cell: CellCoordinate) (cc: CompositeCell) ->
-                    let nextTable = arcTable |> ArcTable.setCellAt (cell.x - 1, cell.y - 1, cc)
-                    setTable nextTable
-
-            let cell = arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1)
-            AnnotationTable.CompositeCellActiveRender(tcc, cell, setCell tcc.Index, ?debug = debug)
-        | _ when tcc.Index.x > 0 && tcc.Index.y = 0 ->
-            let setHeader =
-                fun (index: int) (ch: CompositeHeader) ->
-                    let nextTable = arcTable |> ArcTable.updateHeader (index - 1, ch)
-                    setTable nextTable
-
-            let header = arcTable.GetColumn(tcc.Index.x - 1).Header
-            AnnotationTable.CompositeHeaderActiveRender(tcc, header, setHeader (tcc.Index.x), ?debug = debug)
-        | _ -> Html.div "Unknown cell type"
 
 
     static member private ContextMenu
@@ -206,7 +189,6 @@ type AnnotationTable =
                         let row = int cell?dataset?row
                         let col = int cell?dataset?column
                         let indices: CellCoordinate = {| y = row; x = col |}
-                        console.log (indices)
                         Some indices
                     | _ ->
                         console.log ("No table cell found")
@@ -327,29 +309,61 @@ type AnnotationTable =
 
     [<ReactComponent(true)>]
     static member AnnotationTable
-        (arcTable: ArcTable, setArcTable: ArcTable -> unit, ?onSelect: GridSelect.OnSelect, ?height: int, ?debug: bool)
-        =
+        (
+            arcTable: ArcTable,
+            setArcTable: ArcTable -> unit,
+            ?height: int,
+            ?debug: bool,
+            ?onCellSelect: GridSelect.OnSelect,
+            ?tableRef: IRefValue<TableHandle>,
+            ?key: string
+        ) =
         let containerRef = React.useElementRef ()
-        let tableRef = React.useRef<TableHandle> (null)
+        let tableRefInner = React.useRef<TableHandle> (null)
         let (modal: ModalTypes), setModal = React.useState ModalTypes.None
-        let debug = defaultArg debug false
+        let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
+
+        let hasCtx = isNullOrUndefined ctx |> not
+
+        let tableRef = if tableRef.IsSome then tableRef.Value else tableRefInner
+
+        // TODO: Add table to ctx on effect, and remove on unmount
+        // Does currently not work, as the disposable is not correctly setup in feliz
+        React.useEffectOnce (fun _ ->
+            console.log ("mounted table", arcTable.Name)
+
+            { new System.IDisposable with
+                member _.Dispose() =
+                    console.log ("unmounted table", arcTable.Name)
+            }
+        )
+
+        let onSelect: GridSelect.OnSelect =
+            fun latest range ->
+
+                if hasCtx then
+                    let nextTable: Contexts.AnnotationTable.AnnotationTableContext = { SelectedCells = range }
+                    let nextData = ctx.data.Add(arcTable.Name, nextTable)
+                    ctx.setData nextData
+
+                onCellSelect |> Option.iter (fun f -> f latest range)
 
         let cellRender =
             React.memo (
-                (fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
+                (fun (index: CellCoordinate, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
                     match compositeCell with
                     | None ->
                         TableCell.BaseCell(
-                            tcc.Index.y,
-                            tcc.Index.x,
-                            Html.text tcc.Index.y,
+                            index.y,
+                            index.x,
+                            Html.text index.y,
                             className =
                                 "swt:rounded-0 swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200",
-                            debug = debug
+                            ?debug = debug
                         )
                     | Some(U2.Case2 header) ->
                         let text = header.ToString()
-                        TableCell.StringInactiveCell(tcc, text, debug = debug)
+                        TableCell.StringInactiveCell(index, text, ?debug = debug)
                     | Some(U2.Case1 cell) ->
                         let text = cell.ToString()
 
@@ -362,11 +376,11 @@ type AnnotationTable =
                         let oa = cell.ToOA()
 
                         TableCell.InactiveCell(
-                            tcc,
+                            index,
                             Html.div [
                                 prop.className "swt:flex swt:w-full swt:justify-between"
                                 prop.children [
-                                    Html.text text
+                                    Html.span [ prop.text text; prop.className "swt:truncate" ]
                                     if oa.TermAccessionShort |> System.String.IsNullOrWhiteSpace |> not then
                                         Html.i [
                                             prop.className "swt:text-primary"
@@ -375,58 +389,100 @@ type AnnotationTable =
                                         ]
                                 ]
                             ],
-                            debug = debug
+                            ?debug = debug
                         )
                 ),
                 withKey =
-                    fun (tcc: TableCellController, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
-                        $"cellRender-{tcc.Index.x}-{tcc.Index.y}-{compositeCell |> Option.map _.GetHashCode()}"
+                    fun (index: CellCoordinate, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
+                        $"cellRender-{index.x}-{index.y}-{compositeCell |> Option.map _.GetHashCode()}"
             )
 
-        let renderActiveCell =
-            (fun (tcc: TableCellController) ->
-                AnnotationTable.ActiveCellRender(tcc, arcTable, setArcTable, debug = debug)
+        let activeCellRender =
+            React.memo (
+                (fun (index: CellCoordinate) ->
+                    match index with
+                    | _ when index.x > 0 && index.y > 0 ->
+                        let setCell =
+                            fun (cell: CellCoordinate) (cc: CompositeCell) ->
+                                let nextTable = arcTable |> ArcTable.setCellAt (cell.x - 1, cell.y - 1, cc)
+                                setArcTable nextTable
+
+
+                        let cell = arcTable.GetCellAt(index.x - 1, index.y - 1)
+
+                        let header =
+                            arcTable.Headers[index.x - 1].TryGetTerm()
+                            |> Option.map _.TermAccessionShort
+                            |> Option.bind (Option.whereNot System.String.IsNullOrWhiteSpace)
+
+                        AnnotationTable.CompositeCellActiveRender(
+                            index,
+                            cell,
+                            setCell index,
+                            ?parentId = header,
+                            ?debug = debug,
+                            key = $"cell-{index.x}-{index.y}"
+                        )
+                    | _ when index.x > 0 && index.y = 0 ->
+                        let x = index.x - 1
+
+                        let setHeader =
+                            fun (ch: CompositeHeader) ->
+                                let nextTable = arcTable |> ArcTable.updateHeader (x, ch)
+                                setArcTable nextTable
+
+                        let header = arcTable.Headers[x]
+
+                        AnnotationTable.CompositeHeaderActiveRender(
+                            index,
+                            header,
+                            setHeader,
+                            ?debug = debug,
+                            key = $"header-{x}"
+                        )
+                    | _ -> Html.div "Unknown cell type"
+                )
             )
 
         Html.div [
             prop.ref containerRef
-            if debug then
+            if debug.IsSome && debug.Value then
                 prop.testId "annotation_table"
                 prop.custom ("data-columncount", arcTable.ColumnCount)
                 prop.custom ("data-rowcount", arcTable.RowCount)
             prop.className "swt:overflow-auto swt:flex swt:flex-col swt:h-full"
             prop.children [
                 ReactDOM.createPortal ( // Modals
-                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, debug = debug),
+                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, ?debug = debug),
                     Browser.Dom.document.body
                 )
-                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, debug)
+                AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, ?debug = debug)
                 Table.Table(
                     rowCount = arcTable.RowCount + 1,
                     columnCount = arcTable.ColumnCount + 1,
                     renderCell =
-                        (fun (tcc: TableCellController) ->
+                        (fun (index: CellCoordinate) ->
                             let cell =
-                                if tcc.Index.x = 0 then
+                                if index.x = 0 then
                                     None
-                                elif tcc.Index.y = 0 then
-                                    Some(arcTable.Headers.[tcc.Index.x - 1] |> U2.Case2)
+                                elif index.y = 0 then
+                                    Some(arcTable.Headers.[index.x - 1] |> U2.Case2)
                                 else
-                                    Some(arcTable.GetCellAt(tcc.Index.x - 1, tcc.Index.y - 1) |> U2.Case1)
+                                    Some(arcTable.GetCellAt(index.x - 1, index.y - 1) |> U2.Case1)
 
-                            cellRender (tcc, cell)
+                            cellRender (index, cell)
                         ),
-                    renderActiveCell = renderActiveCell,
+                    renderActiveCell = activeCellRender,
                     ref = tableRef,
                     ?height = height,
-                    ?onSelect = onSelect,
                     onKeydown =
                         (fun (e, selectedCells, activeCell) ->
-                            if e.code = kbdEventCode.f2 || (
-                                (e.ctrlKey || e.metaKey)
-                                && e.code = kbdEventCode.enter
-                                && activeCell.IsNone
-                                && selectedCells.count > 0)
+                            if
+                                e.code = kbdEventCode.f2
+                                || ((e.ctrlKey || e.metaKey)
+                                    && e.code = kbdEventCode.enter
+                                    && activeCell.IsNone
+                                    && selectedCells.count > 0)
                             then
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
                                 setModal (ModalTypes.Details cell)
@@ -435,7 +491,8 @@ type AnnotationTable =
                                 arcTable.Copy() |> setArcTable
                         ),
                     enableColumnHeaderSelect = true,
-                    debug = debug
+                    onSelect = onSelect,
+                    ?debug = debug
                 )
             ]
         ]
@@ -443,6 +500,8 @@ type AnnotationTable =
     static member Entry() =
         let arcTable =
             ARCtrl.ArcTable("TestTable", ResizeArray(), System.Collections.Generic.Dictionary())
+
+        let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
 
         arcTable.AddColumn(
             CompositeHeader.Input IOType.Source,
@@ -453,7 +512,7 @@ type AnnotationTable =
         )
 
         arcTable.AddColumn(
-            CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")),
+            CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:1000031")),
             [|
                 for i in 0..100 do
                     CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
@@ -488,4 +547,14 @@ type AnnotationTable =
 
         let table, setTable = React.useState (arcTable)
 
-        AnnotationTable.AnnotationTable(table, setTable, height = 600)
+        React.fragment [
+            AnnotationTable.AnnotationTable(table, setTable, height = 600)
+            Html.div [
+                prop.textf
+                    "%A"
+                    (ctx.data
+                     |> Map.tryFind table.Name
+                     |> Option.bind _.SelectedCells
+                     |> Option.map (fun x -> sprintf "%i - %i, %i - %i" x.xStart x.xEnd x.yStart x.yEnd))
+            ]
+        ]

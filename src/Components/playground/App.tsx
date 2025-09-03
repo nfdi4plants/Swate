@@ -2,6 +2,7 @@ import React, { Fragment, useEffect } from 'react';
 import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 import {Entry as Table} from '../src/Table/Table.fs.ts';
 import {Entry as AnnotationTable} from '../src/AnnotationTable/AnnotationTable.fs.ts';
+import AnnotationTableCtxProvider from '../src/AnnotationTable/AnnotationTableContextProvider.fs.ts';
 import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
 import {TIBApi} from '../src/Util/Api.fs.ts';
 import {Entry as TemplateFilter} from '../src/Template/TemplateFilter.fs.ts';
@@ -31,7 +32,7 @@ function TermSearchContainer() {
           TIB Search
         </label>
         <TermSearch
-          onTermSelect={(term) => setTerm2(term as Term | undefined)}
+          onTermChange={(term) => setTerm2(term as Term | undefined)}
           term={term2}
           disableDefaultSearch
           disableDefaultParentSearch
@@ -54,7 +55,7 @@ function TermSearchContainer() {
           Term Search
         </label>
         <TermSearch
-          onTermSelect={(term) => setTerm(term as Term | undefined)}
+          onTermChange={(term) => setTerm(term as Term | undefined)}
           term={term}
           parentId="MS:1000031"
           showDetails
@@ -69,7 +70,7 @@ function TermSearchContainer() {
         <TermSearchConfigProvider>
           <TermSearchConfigSetter />
           <TermSearch
-            onTermSelect={(term) => setTerm3(term as Term | undefined)}
+            onTermChange={(term) => setTerm3(term as Term | undefined)}
             term={term3}
             debug={true}
           />
@@ -90,7 +91,9 @@ function TableContainer() {
 function AnnoTableContainer() {
   return <div className='swt:flex swt:flex-col swt:gap-4'>
     <h2 className='swt:text-3xl'>Annotation Table</h2>
-    <AnnotationTable />
+    <AnnotationTableCtxProvider>
+      <AnnotationTable />
+    </AnnotationTableCtxProvider>
   </div>
 }
 
@@ -134,14 +137,13 @@ const App = () => {
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
             <AnnoTableContainer />
-            {/* <TermSearchContainer />
-            <BaseModalContainer />
-            <ComboBoxContainer />
-            <TemplateFilterContainer />
-            <SelectContainer />
-            <ContextMenuContainer />
-            <TableContainer /> */}
-            {/* <Menu></Menu> */}
+            <TermSearchContainer />
+            {/* <BaseModalContainer /> */}
+            {/* <ComboBoxContainer /> */}
+            {/* <TemplateFilterContainer /> */}
+            {/* <SelectContainer /> */}
+            {/* <ContextMenuContainer /> */}
+            {/* <TableContainer /> */}
         </div>
     );
 };

@@ -42,7 +42,6 @@ type ColumnType =
 
     member this.IsRefColumn = not this.IsMainColumn
 
-
 [<RequireQualifiedAccess>]
 type ActiveView =
     | Table of index: int
@@ -82,27 +81,12 @@ module ActivePattern =
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
 type Model = {
     ActiveView: ActiveView
-    SelectedCells: CellCoordinateRange option
-    ActiveCell: (U2<int, CellCoordinate> * ColumnType) option
     ArcFile: ArcFiles option
 } with
 
-    member this.CellIsActive(index: U2<int, int * int>, columnType) =
-        match this.ActiveCell, index with
-        | Some(U2.Case1(headerIndex), ct), U2.Case1(targetIndex) -> headerIndex = targetIndex && ct = columnType
-        | Some(U2.Case2(coordinate), ct), U2.Case2 targetIndex -> (coordinate.x, coordinate.y) = targetIndex && ct = columnType
-        | _ -> false
-
-    member this.CellIsSelected(index: CellCoordinate) = CellCoordinateRange.contains this.SelectedCells index
-
-    member this.CellIsIdle(index: U2<int, int * int>, columnType) =
-        this.CellIsActive(index, columnType) |> not
-
-    static member init() = {
+    static member init(?arcfile) = {
         ActiveView = ActiveView.Metadata
-        SelectedCells = None
-        ActiveCell = None
-        ArcFile = None
+        ArcFile = arcfile
     }
 
     member this.FileType =
@@ -112,13 +96,6 @@ type Model = {
         | Some(Investigation _) -> "Investigation"
         | Some(Template _) -> "Template"
         | None -> "No File"
-
-    static member init(arcFile: ArcFiles) = {
-        ActiveView = ActiveView.Metadata
-        SelectedCells = None
-        ActiveCell = None
-        ArcFile = Some arcFile
-    }
 
     member this.Tables =
         match this.ArcFile with
@@ -166,16 +143,8 @@ type Model = {
 
     member this.TableViewIsActive() =
         match this.ActiveView with
-        | ActiveView.Table i -> true
+        | ActiveView.Table _ -> true
         | _ -> false
-
-[<RequireQualifiedAccess>]
-type Key =
-    | Up
-    | Down
-    | Left
-    | Right
-
 
 type Msg =
     // <--> UI <-->
@@ -184,11 +153,7 @@ type Msg =
     | UpdateCells of (CellCoordinate * CompositeCell)[]
     | UpdateHeader of columIndex: int * CompositeHeader
     | UpdateActiveView of ActiveView
-    | UpdateSelectedCells of CellCoordinateRange option
-    | MoveSelectedCell of Key
     | MoveColumn of current: int * next: int
-    | UpdateActiveCell of (U2<int, CellCoordinate> * ColumnType) option
-    | SetActiveCellFromSelected
     | UpdateDatamap of DataMap option
     | UpdateDataMapDataContextAt of index: int * DataContext
     | AddTable of ArcTable
@@ -201,21 +166,14 @@ type Msg =
     | DeleteRows of int[]
     | DeleteColumn of int
     | SetColumn of index: int * column: CompositeColumn
-    | CopySelectedCell
-    | CopySelectedCells
-    | CutSelectedCell
-    | CutSelectedCells
-    | PasteSelectedCell
-    | PasteSelectedCells
     | CopyCell of index: CellCoordinate
-    | CopyCells of indices: CellCoordinate []
+    | CopyCells of indices: CellCoordinate[]
     | CutCell of index: CellCoordinate
     | PasteCell of index: CellCoordinate
     | SetCell of CellCoordinate * term: Term option
     /// This Msg will paste all cell from clipboard into column starting from index. It will extend the table if necessary.
     | PasteCellsExtend of index: CellCoordinate
-    | Clear of index: CellCoordinate []
-    | ClearSelected
+    | Clear of index: CellCoordinate[]
     | FillColumnWithTerm of index: CellCoordinate
     // /// Update column of index to new column type defined by given SwateCell.emptyXXX
     // | EditColumn of index: int * newType: SwateCell * b_type: BuildingBlockType option
@@ -224,8 +182,8 @@ type Msg =
     | ImportXlsx of byte[]
     // <--> INTEROP <-->
     | CreateAnnotationTable of tryUsePrevOutput: bool
-    | AddAnnotationBlock of CompositeColumn
-    | AddAnnotationBlocks of CompositeColumn[]
+    | AddAnnotationBlock of index: int option * CompositeColumn
+    | AddAnnotationBlocks of index: int option * CompositeColumn[]
     | AddDataAnnotation of
         {|
             fragmentSelectors: string[]
@@ -237,7 +195,7 @@ type Msg =
     | JoinTable of ArcTable * index: int option * options: TableJoinOptions option * string option
     | UpdateArcFile of ArcFiles
     | InitFromArcFile of ArcFiles
-    | InsertOntologyAnnotation of OntologyAnnotation
+    | InsertOntologyAnnotation of CellCoordinateRange * OntologyAnnotation
     | InsertOntologyAnnotations of OntologyAnnotation[]
     /// Starts chain to export active table to isa json
     | ExportJson of ArcFiles * JsonExportFormat

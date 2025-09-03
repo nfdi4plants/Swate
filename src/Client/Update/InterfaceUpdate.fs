@@ -154,7 +154,7 @@ module Interface =
                     let cmd = Spreadsheet.AddTable table |> SpreadsheetMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | AddAnnotationBlock minBuildingBlockInfo ->
+            | AddAnnotationBlock(index, minBuildingBlockInfo) ->
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd =
@@ -166,7 +166,7 @@ module Interface =
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
                     let cmd =
-                        Spreadsheet.AddAnnotationBlock minBuildingBlockInfo
+                        Spreadsheet.AddAnnotationBlock(index, minBuildingBlockInfo)
                         |> SpreadsheetMsg
                         |> Cmd.ofMsg
 
@@ -178,7 +178,7 @@ module Interface =
                     let cmd = OfficeInterop.ValidateBuildingBlock |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
-            | AddAnnotationBlocks compositeColumns ->
+            | AddAnnotationBlocks(index, compositeColumns) ->
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd =
@@ -190,7 +190,9 @@ module Interface =
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
                     let cmd =
-                        Spreadsheet.AddAnnotationBlocks compositeColumns |> SpreadsheetMsg |> Cmd.ofMsg
+                        Spreadsheet.AddAnnotationBlocks(index, compositeColumns)
+                        |> SpreadsheetMsg
+                        |> Cmd.ofMsg
 
                     model, cmd
                 | _ -> failwith "not implemented"
@@ -315,7 +317,7 @@ module Interface =
 
                     model, cmd
                 | _ -> failwith "not implemented"
-            | InsertOntologyAnnotation ontologyAnnotation ->
+            | InsertOntologyAnnotation(range, ontologyAnnotation) ->
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd =
@@ -326,26 +328,31 @@ module Interface =
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
-                    let cmd =
-                        Spreadsheet.InsertOntologyAnnotation ontologyAnnotation
-                        |> SpreadsheetMsg
-                        |> Cmd.ofMsg
+                    match range with
+                    | Some range ->
 
-                    model, cmd
+                        let cmd =
+                            Spreadsheet.InsertOntologyAnnotation(range, ontologyAnnotation)
+                            |> SpreadsheetMsg
+                            |> Cmd.ofMsg
+
+                        model, cmd
+                    | None -> failwith "not implemented"
                 | _ -> failwith "not implemented"
-            | InsertFileNames fileNames ->
+            | InsertFileNames(range, fileNames) ->
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd = OfficeInterop.InsertFileNames fileNames |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
-                    if model.SpreadsheetModel.SelectedCells.IsSome then
+                    if range.IsSome then
                         let columnIndex, rowIndex =
-                            if model.SpreadsheetModel.SelectedCells.IsSome then
-                                model.SpreadsheetModel.SelectedCells.Value.xStart, model.SpreadsheetModel.SelectedCells.Value.yStart
+                            if range.IsSome then
+                                range.Value.xStart, range.Value.yStart
                             else
-                                [| |] |> Array.min
+                                [||] |> Array.min
+
                         let mutable rowIndex = rowIndex
 
                         let cells = [|
@@ -353,11 +360,7 @@ module Interface =
                                 match model.SpreadsheetModel.ActiveTable.TryGetCellAt(columnIndex, rowIndex) with
                                 | Some c ->
                                     let cell = c.UpdateMainField name
-                                    let coordinate: CellCoordinate =
-                                        {|
-                                            x = columnIndex
-                                            y = rowIndex
-                                        |}
+                                    let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
                                     coordinate, cell
                                     rowIndex <- rowIndex + 1
                                 | None -> ()
@@ -368,18 +371,16 @@ module Interface =
                     else
                         model, Cmd.ofMsg (DevMsg.GenericError(Cmd.none, exn ("No cell(s) selected.")) |> DevMsg)
                 | _ -> failwith "not implemented"
-            | RemoveBuildingBlock ->
-                match host with
-                | Some Swatehost.Excel ->
+            | RemoveBuildingBlock index ->
+                match host, index with
+                | Some Swatehost.Excel, _ ->
                     let cmd = OfficeInterop.RemoveBuildingBlock |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
-                | Some Swatehost.Browser
-                | Some Swatehost.ARCitect ->
-                    if model.SpreadsheetModel.SelectedCells.IsNone then
-                        failwith "No column selected"
+                | Some Swatehost.Browser, Some index
+                | Some Swatehost.ARCitect, Some index ->
 
                     let deselectedColumns =
-                        CellCoordinateRange.toArray model.SpreadsheetModel.SelectedCells.Value
+                        CellCoordinateRange.toArray index
                         |> Array.ofSeq
                         |> Array.map (fun index -> index.x)
 
@@ -395,7 +396,7 @@ module Interface =
                             Spreadsheet.DeleteColumn(distinct.[0]) |> SpreadsheetMsg |> Cmd.ofMsg
 
                     model, cmd
-                | _ -> failwith "not implemented"
+                | _, _ -> failwith "not implemented"
             | AddDataAnnotation data ->
                 match host with
                 | Some Swatehost.Excel ->

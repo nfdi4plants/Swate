@@ -86,30 +86,6 @@ module CellCoordinateRange =
         else
             false
 
-// [<AllowNullLiteral>]
-// [<Global>]
-type TableCellController = {
-    Index: CellCoordinate
-    IsActive: bool
-    IsSelected: bool
-    IsOrigin: bool
-    IsHeader: bool
-    onKeyDown: Browser.Types.KeyboardEvent -> unit
-    onBlur: Browser.Types.FocusEvent -> unit
-    onClick: Browser.Types.MouseEvent -> unit
-} with
-
-    static member init(index, isActive, isSelected, isOrigin, isHeader, onKeyDown, onBlur, onClick) = {
-        Index = index
-        IsActive = isActive
-        IsSelected = isSelected
-        IsOrigin = isOrigin
-        IsHeader = isHeader
-        onKeyDown = onKeyDown
-        onBlur = onBlur
-        onClick = onClick
-    }
-
 [<AllowNullLiteral>]
 [<Global>]
 type SelectHandle
