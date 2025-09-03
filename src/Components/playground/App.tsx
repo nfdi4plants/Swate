@@ -12,6 +12,7 @@ import {Entry as BaseModal} from '../src/GenericComponents/BaseModal.fs.ts';
 import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/TermSearchConfigProvider.fs.ts';
 import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
+import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -132,10 +133,18 @@ function BaseModalContainer() {
   </div>
 }
 
+function DataMapTableContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-3xl'>Data Map Table</h2>
+    <DataMapTable />
+  </div>
+}
+
 const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
+            <DataMapTableContainer />
             <AnnoTableContainer />
             <TermSearchContainer />
             {/* <BaseModalContainer /> */}

@@ -10,7 +10,7 @@ open Swate.Components.Shared
 
 open Spreadsheet.Cells
 
-let NameIndex = -1
+// let NameIndex = -1
 
 // let private CreateBodyCells (columnIndex, rowIndex, state: Set<int>, model, dispatch) =
 //     let index = columnIndex, rowIndex
@@ -90,25 +90,33 @@ let NameIndex = -1
 //         (columnIndex, state, setState, model, dispatch)
 // ]
 
-// let Main (model: Model, dispatch: Msg -> unit) =
-//     //let ref = React.useElementRef()
-//     //let state, setState : Set<int> * (Set<int> -> unit) = React.useState(Set.empty)
-//     //Html.div [
-//     //    prop.id "SPREADSHEET_MAIN_VIEW"
-//     //    prop.tabIndex 0
-//     //    prop.className "flex grow overflow-y-hidden"
-//     //    prop.style [style.border(1, borderStyle.solid, "grey")]
-//     //    prop.ref ref
-//     //    prop.onKeyDown(fun e -> Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch e)
-//     //    prop.children [
-//     //        Components.LazyLoadTable.Main("SpreadsheetViewTable", Components.BodyRows state model dispatch, Components.HeaderRow state setState model dispatch, 35, tableClasses=[|"fixed_headers"|])
-//     //    ]
-//     //]
-//     Generic.Main(
-//         (fun s -> BodyRows s model dispatch),
-//         CreateBodyCells,
-//         (fun s ss -> HeaderRow s ss model dispatch),
-//         CreateHeaderCells,
-//         model,
-//         dispatch
-//     )
+open Swate.Components
+
+let Main (model: Model, dispatch: Msg -> unit) =
+    //let state, setState : Set<int> * (Set<int> -> unit) = React.useState(Set.empty)
+    //Html.div [
+    //    prop.id "SPREADSHEET_MAIN_VIEW"
+    //    prop.tabIndex 0
+    //    prop.className "flex grow overflow-y-hidden"
+    //    prop.style [style.border(1, borderStyle.solid, "grey")]
+    //    prop.ref ref
+    //    prop.onKeyDown(fun e -> Spreadsheet.KeyboardShortcuts.onKeydownEvent dispatch e)
+    //    prop.children [
+    //        Components.LazyLoadTable.Main("SpreadsheetViewTable", Components.BodyRows state model dispatch, Components.HeaderRow state setState model dispatch, 35, tableClasses=[|"fixed_headers"|])
+    //    ]
+    //]
+    // Generic.Main(
+    //     (fun s -> BodyRows s model dispatch),
+    //     CreateBodyCells,
+    //     (fun s ss -> HeaderRow s ss model dispatch),
+    //     CreateHeaderCells,
+    //     model,
+    //     dispatch
+    // )
+
+    let datamap = model.SpreadsheetModel.DataMapOrDefault
+
+    let setDatamap =
+        fun (dm: DataMap) -> Spreadsheet.UpdateDatamap(Some dm) |> SpreadsheetMsg |> dispatch
+
+    DataMapTable.DataMapTable(datamap, setDatamap)

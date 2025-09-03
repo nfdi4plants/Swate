@@ -45,12 +45,13 @@ type TableCell =
         ]
 
     [<ReactComponent>]
-    static member StringInactiveCell(index: CellCoordinate, text: string, ?debug) =
+    static member StringInactiveCell(index: CellCoordinate, text: string, ?disableActivation: bool, ?debug) =
 
-        TableCell.InactiveCell(index, Html.text text, ?debug = debug)
+        TableCell.InactiveCell(index, Html.text text, ?disableActivation = disableActivation, ?debug = debug)
 
     [<ReactComponent>]
-    static member InactiveCell(index: CellCoordinate, children: ReactElement, ?debug) =
+    static member InactiveCell(index: CellCoordinate, children: ReactElement, ?disableActivation: bool, ?debug) =
+        let disableActivation = defaultArg disableActivation false
         let ctx = React.useContext Contexts.Table.TableStateCtx
 
         let isSelected = ctx.isSelected index
@@ -66,7 +67,10 @@ type TableCell =
                 ]
                 prop.children children
             ],
-            props = [ prop.onClick (fun e -> ctx.onClick index e) ],
+            props = [
+                if not disableActivation then
+                    prop.onClick (fun e -> ctx.onClick index e)
+            ],
             className = "swt:w-full swt:h-full swt:truncate",
             ?debug = debug
         )

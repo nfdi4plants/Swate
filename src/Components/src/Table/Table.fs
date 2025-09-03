@@ -64,7 +64,7 @@ swt:p-0"""
             columnCount: int,
             renderCell: CellCoordinate -> ReactElement,
             renderActiveCell: CellCoordinate -> ReactElement,
-            ref: IRefValue<TableHandle>,
+            ?ref: IRefValue<TableHandle>,
             ?height: int,
             ?width: int,
             ?onSelect: GridSelect.OnSelect,
@@ -136,7 +136,7 @@ swt:p-0"""
             )
 
         React.useImperativeHandle (
-            ref,
+            !!ref,
             (fun () ->
                 TableHandle(
                     focus = (fun () -> scrollContainerRef.current.Value.focus ()),
@@ -317,8 +317,13 @@ swt:p-0"""
                                                                             index.y,
                                                                             index.x,
                                                                             Html.text (
-                                                                                rowVirtualizer.getVirtualIndexes ()
-                                                                                |> Seq.last
+                                                                                let i =
+                                                                                    rowVirtualizer.getVirtualIndexes ()
+
+                                                                                if i.Length > 0 then
+                                                                                    i |> Seq.last
+                                                                                else
+                                                                                    0
                                                                             ),
                                                                             className =
                                                                                 "swt:px-2 swt:py-2 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",

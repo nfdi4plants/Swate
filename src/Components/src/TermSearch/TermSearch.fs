@@ -921,7 +921,7 @@ type TermSearch =
                             for id, allChildSearch in allChildrenSearchQueries.Value do
                                 createAllChildTermSearch id allChildSearch parentId.Value
 
-                        if allChildrenSearchQueries.IsSome then
+                        if termSearchConfigCtx.hasProvider then
                             for id, allChildSearch in termSearchConfigCtx.allChildrenSearchQueries do
                                 createAllChildTermSearch id allChildSearch parentId.Value
                 ]
@@ -1165,6 +1165,7 @@ type TermSearch =
                             && parentId.IsSome
                             && comboBoxRef.current.isOpen () |> not
                             ->
+                            console.log ("start child search")
                             startAllChildSearch ()
                         | _ -> onKeyDown |> Option.iter (fun fn -> fn kbe)
                     ),
