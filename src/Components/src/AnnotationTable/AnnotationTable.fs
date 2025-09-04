@@ -411,9 +411,9 @@ type AnnotationTable =
                         let cell = arcTable.GetCellAt(index.x - 1, index.y - 1)
 
                         let header =
-                            arcTable.Headers[index.x - 1].TryGetTerm()
-                            |> Option.map _.TermAccessionShort
-                            |> Option.bind (Option.whereNot System.String.IsNullOrWhiteSpace)
+                            arcTable.Headers[index.x - 1].ToTerm()
+                            |> _.TermAccessionShort
+                            |> Option.whereNot System.String.IsNullOrWhiteSpace
 
                         AnnotationTable.CompositeCellActiveRender(
                             index,
