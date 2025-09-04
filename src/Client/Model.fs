@@ -196,8 +196,9 @@ module BuildingBlock =
         }
 
         member this.TryHeaderOA() =
-            match this.HeaderArg with
-            | Some(U2.Case1 oa) -> Some oa
+            match this.HeaderCellType, this.HeaderArg with
+            | CompositeHeaderDiscriminate.ProtocolType, _ -> CompositeHeader.ProtocolType.ToTerm() |> Some
+            | _, Some(U2.Case1 oa) -> Some oa
             | _ -> None
 
         member this.TryHeaderIO() =
