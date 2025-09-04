@@ -277,7 +277,8 @@ type ContextMenu =
                                                     prop.children [
                                                         if child.icon.IsSome then
                                                             Html.div [
-                                                                prop.className "swt:col-start-1 swt:justify-self-start"
+                                                                prop.className
+                                                                    "swt:col-start-1 swt:justify-self-start swt:self-center"
                                                                 prop.children child.icon.Value
                                                             ]
                                                         else

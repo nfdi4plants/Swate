@@ -3,13 +3,66 @@ namespace Swate.Components
 open Feliz
 open Fable.Core
 open ARCtrl
-
+open Fable.Core.JsInterop
 
 [<Erase; Mangle(false)>]
 type DataMapTable =
 
+    static member private ContextMenu
+        (datamap: DataMap, setDatamap: DataMap -> unit, tableRef: IRefValue<TableHandle>, containerRef, ?debug: bool)
+        =
+
+        let deleteRow =
+            fun (index: CellCoordinate) ->
+                let isSelected = tableRef.current.SelectHandle.contains index
+                let newDatamap = datamap.Copy()
+
+                if not isSelected then
+                    newDatamap.DataContexts.RemoveAt(index.y - 1)
+                else
+                    let range = tableRef.current.SelectHandle.getSelectedCellRange().Value
+                    newDatamap.DataContexts.RemoveRange(range.yStart - 1, range.yEnd - range.yStart)
+
+                setDatamap newDatamap
+
+        ContextMenu.ContextMenu(
+            (fun data ->
+                let index = data |> unbox<CellCoordinate>
+
+                [
+                    ContextMenuItem(
+                        text = Html.div "Delete Row",
+                        icon = Icons.DeleteLeft(),
+                        kbdbutton = ATCMC.KbdHint("DelR"),
+                        onClick = (fun x -> deleteRow index)
+                    )
+                ]
+            ),
+            ref = containerRef,
+            onSpawn =
+                (fun e ->
+                    let target = e.target :?> Browser.Types.HTMLElement
+
+                    match target.closest ("[data-row][data-column]"), containerRef.current with
+                    | Some cell, Some container when container.contains (cell) ->
+                        let cell = cell :?> Browser.Types.HTMLElement
+                        let row = int cell?dataset?row
+                        let col = int cell?dataset?column
+                        let indices: CellCoordinate = {| y = row; x = col |}
+                        if col > 0 && row > 0 then Some indices else None // disable context menu on index column
+                    | _ ->
+                        console.log ("No table cell found")
+                        None
+                ),
+            ?debug = debug
+        )
+
     [<ReactComponent(true)>]
-    static member DataMapTable(datamap: DataMap, setDatamap: DataMap -> unit, ?height) =
+    static member DataMapTable(datamap: DataMap, setDatamap: DataMap -> unit, ?height, ?debug: bool) =
+
+        let tableRef = React.useRef<TableHandle> (unbox null)
+        let containerRef = React.useElementRef ()
+
         let renderCell =
             React.memo (
                 (fun (index: CellCoordinate) ->
@@ -50,7 +103,13 @@ type DataMapTable =
                 )
             )
 
-        Table.Table(datamap.RowCount + 1, datamap.ColumnCount, renderCell, renderActiveCell, ?height = height)
+        Html.div [
+            prop.ref containerRef
+            prop.children [
+                DataMapTable.ContextMenu(datamap, setDatamap, tableRef, containerRef, ?debug = debug)
+                Table.Table(datamap.RowCount + 1, datamap.ColumnCount, renderCell, renderActiveCell, ?height = height)
+            ]
+        ]
 
 
     [<ReactComponent>]
