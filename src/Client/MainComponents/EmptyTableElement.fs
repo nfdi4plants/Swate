@@ -91,32 +91,28 @@ type EmptyTableElement =
 
         let modal, setModal = React.useState (None: Modals option)
 
+        let setIsOpen (modal: Modals) =
+            function
+            | true -> setModal (Some modal)
+            | false -> setModal None
+
         React.fragment [
             EmptyTableModals.BuildingBlock(
                 model,
                 isOpen = (modal = Some Modals.BuildingBlock),
-                setIsOpen =
-                    (function
-                    | true -> setModal (Some Modals.BuildingBlock)
-                    | false -> setModal None),
+                setIsOpen = setIsOpen Modals.BuildingBlock,
                 dispatch = dispatch
             )
             EmptyTableModals.Templates(
                 model,
                 isOpen = (modal = Some Modals.Templates),
-                setIsOpen =
-                    (function
-                    | true -> setModal (Some Modals.Templates)
-                    | false -> setModal None),
+                setIsOpen = setIsOpen Modals.Templates,
                 dispatch = dispatch
             )
             EmptyTableModals.PreviousTableSelect(
                 model,
                 isOpen = (modal = Some Modals.PreviousTableSelect),
-                setIsOpen =
-                    (function
-                    | true -> setModal (Some Modals.PreviousTableSelect)
-                    | false -> setModal None),
+                setIsOpen = setIsOpen Modals.PreviousTableSelect,
                 dispatch = dispatch
             )
             Html.div [
