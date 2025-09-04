@@ -11,19 +11,19 @@ type DataMapTable =
     static member private ContextMenu
         (datamap: DataMap, setDatamap: DataMap -> unit, tableRef: IRefValue<TableHandle>, containerRef, ?debug: bool)
         =
-
         let deleteRow =
             fun (index: CellCoordinate) ->
                 let isSelected = tableRef.current.SelectHandle.contains index
-                let newDatamap = datamap.Copy()
+                let start = index.y - 1
 
                 if not isSelected then
-                    newDatamap.DataContexts.RemoveAt(index.y - 1)
+                    datamap.DataContexts.RemoveAt(start)
                 else
                     let range = tableRef.current.SelectHandle.getSelectedCellRange().Value
-                    newDatamap.DataContexts.RemoveRange(range.yStart - 1, range.yEnd - range.yStart)
+                    let count = range.yEnd - range.yStart + 1
+                    datamap.DataContexts.RemoveRange(start, count)
 
-                setDatamap newDatamap
+                setDatamap datamap
 
         ContextMenu.ContextMenu(
             (fun data ->
@@ -104,10 +104,23 @@ type DataMapTable =
             )
 
         Html.div [
+            if debug.IsSome && debug.Value then
+                prop.testId "datamap_table"
+                prop.custom ("data-columncount", datamap.ColumnCount)
+                prop.custom ("data-rowcount", datamap.RowCount)
+            prop.className "swt:overflow-auto swt:flex swt:flex-col swt:h-full"
             prop.ref containerRef
+
             prop.children [
                 DataMapTable.ContextMenu(datamap, setDatamap, tableRef, containerRef, ?debug = debug)
-                Table.Table(datamap.RowCount + 1, datamap.ColumnCount, renderCell, renderActiveCell, ?height = height)
+                Table.Table(
+                    datamap.RowCount + 1,
+                    datamap.ColumnCount,
+                    renderCell,
+                    renderActiveCell,
+                    ref = tableRef,
+                    ?height = height
+                )
             ]
         ]
 
