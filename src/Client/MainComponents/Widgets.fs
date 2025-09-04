@@ -8,6 +8,8 @@ open Swate
 open Modals
 open Types.FileImport
 open Swate.Components
+open ARCtrl
+open BuildingBlock.SearchComponent
 
 module private InitExtensions =
 
@@ -268,9 +270,10 @@ type Widget =
         ]
 
     static member BuildingBlock(model, dispatch, rmv: MouseEvent -> unit) =
-        let content = BuildingBlock.SearchComponent.Main model dispatch
+        let content = SearchComponent.Main(model, dispatch)
         let prefix = WidgetLiterals.BuildingBlock
         Widget.Base(content, prefix, rmv, prefix)
+
 
     [<ReactComponent>]
     static member Templates(model: Model, dispatch, rmv: MouseEvent -> unit) =

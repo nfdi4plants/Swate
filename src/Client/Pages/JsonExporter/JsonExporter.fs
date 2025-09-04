@@ -52,56 +52,51 @@ type FileExporter =
         let state, setState = React.useState JsonExportState.init
 
         Html.div [
-            //Daisy.join [
-            Html.div [
-                prop.className "swt:join"
-                prop.children [
-                    //Daisy.select [
-                    Html.select [
-                        prop.className "swt:select swt:join-item swt:min-w-fit"
-                        prop.onChange (fun (e: Browser.Types.Event) ->
-                            let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
-                            { state with ExportFormat = jef } |> setState)
-                        prop.defaultValue (string state.ExportFormat)
-                        prop.children [
-                            FileExporter.FileFormat(JsonExportFormat.ROCrate, state, setState)
-                            FileExporter.FileFormat(JsonExportFormat.ISA, state, setState)
-                            FileExporter.FileFormat(JsonExportFormat.ARCtrl, state, setState)
-                            FileExporter.FileFormat(JsonExportFormat.ARCtrlCompressed, state, setState)
-                        ]
+            prop.className "swt:join"
+            prop.children [
+                Html.select [
+                    prop.className "swt:select swt:join-item swt:min-w-fit"
+                    prop.onChange (fun (e: Browser.Types.Event) ->
+                        let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
+                        { state with ExportFormat = jef } |> setState)
+                    prop.defaultValue (string state.ExportFormat)
+                    prop.children [
+                        FileExporter.FileFormat(JsonExportFormat.ROCrate, state, setState)
+                        FileExporter.FileFormat(JsonExportFormat.ISA, state, setState)
+                        FileExporter.FileFormat(JsonExportFormat.ARCtrl, state, setState)
+                        FileExporter.FileFormat(JsonExportFormat.ARCtrlCompressed, state, setState)
                     ]
-                    //Daisy.button.button [
-                    Html.button [
-                        prop.className "swt:btn swt:btn-primary swt:btn-block swt:join-item"
-                        prop.text "Download"
-                        prop.onClick (fun _ ->
-                            let host = model.PersistentStorageState.Host
+                ]
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary swt:btn-block swt:join-item"
+                    prop.text "Download"
+                    prop.onClick (fun _ ->
+                        let host = model.PersistentStorageState.Host
 
-                            match host with
-                            | Some Swatehost.Excel ->
-                                promise {
-                                    let! result = OfficeInterop.Core.Main.tryParseToArcFile ()
+                        match host with
+                        | Some Swatehost.Excel ->
+                            promise {
+                                let! result = OfficeInterop.Core.Main.tryParseToArcFile ()
 
-                                    match result with
-                                    | Result.Ok arcFile ->
-                                        SpreadsheetInterface.ExportJson(arcFile, state.ExportFormat)
-                                        |> InterfaceMsg
-                                        |> dispatch
-                                    | Result.Error msgs ->
-                                        OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
-                                }
-                                |> ignore
-                            | Some Swatehost.Browser
-                            | Some Swatehost.ARCitect ->
-                                if model.SpreadsheetModel.ArcFile.IsSome then
-                                    SpreadsheetInterface.ExportJson(
-                                        model.SpreadsheetModel.ArcFile.Value,
-                                        state.ExportFormat
-                                    )
+                                match result with
+                                | Result.Ok arcFile ->
+                                    SpreadsheetInterface.ExportJson(arcFile, state.ExportFormat)
                                     |> InterfaceMsg
                                     |> dispatch
-                            | _ -> failwith "not implemented")
-                    ]
+                                | Result.Error msgs ->
+                                    OfficeInterop.SendErrorsToFront msgs |> OfficeInteropMsg |> dispatch
+                            }
+                            |> ignore
+                        | Some Swatehost.Browser
+                        | Some Swatehost.ARCitect ->
+                            if model.SpreadsheetModel.ArcFile.IsSome then
+                                SpreadsheetInterface.ExportJson(
+                                    model.SpreadsheetModel.ArcFile.Value,
+                                    state.ExportFormat
+                                )
+                                |> InterfaceMsg
+                                |> dispatch
+                        | _ -> failwith "not implemented")
                 ]
             ]
         ]

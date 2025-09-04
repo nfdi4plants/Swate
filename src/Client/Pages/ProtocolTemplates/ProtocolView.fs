@@ -237,7 +237,7 @@ type Templates =
         ]
 
     [<ReactComponent>]
-    static member private ImportTemplatesBtn(model, dispatch) =
+    static member private ImportTemplatesBtn(model, dispatch, ?setIsOpen: bool -> unit) =
         let emptySelected = model.ProtocolState.TemplatesSelected.Length = 0
 
         Html.div [
@@ -250,6 +250,8 @@ type Templates =
                     prop.onClick (fun _ ->
                         if not model.ProtocolState.TemplatesSelected.IsEmpty then
                             Messages.Protocol.ImportProtocols |> Messages.ProtocolMsg |> dispatch
+                        if setIsOpen.IsSome then
+                            setIsOpen.Value false
                     )
                 ]
                 if not emptySelected then
@@ -260,6 +262,8 @@ type Templates =
                             Messages.Protocol.Msg.RemoveSelectedProtocols
                             |> Messages.ProtocolMsg
                             |> dispatch
+                            if setIsOpen.IsSome then
+                                setIsOpen.Value false
                         )
                         prop.children [ Swate.Components.Icons.Delete() ]
                     ]
@@ -267,14 +271,35 @@ type Templates =
         ]
 
     [<ReactComponent>]
-    static member TemplateSelect(model: Model, dispatch) =
+    static member TemplateSelect(model: Model, dispatch, ?setIsOpen: bool -> unit) =
 
         React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
 
         Swate.Components.TemplateFilter.TemplateFilterProvider(
             React.fragment [
 
-                Templates.ImportTemplatesBtn(model, dispatch)
+                Templates.ImportTemplatesBtn(model, dispatch, ?setIsOpen = setIsOpen)
+
+                Swate.Components.TemplateFilter.TemplateFilter(
+                    model.ProtocolState.Templates,
+                    templateSearchClassName = "swt:grow"
+                )
+
+                Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
+                    Templates.DisplayTemplates(filteredTemplates, model, dispatch, ?maxheight = Some(length.px 600))
+                )
+            ]
+        )
+
+    [<ReactComponent>]
+    static member TableSelect(model: Model, dispatch, (?setIsOpen:bool -> unit)) =
+
+        React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
+
+        Swate.Components.TemplateFilter.TemplateFilterProvider(
+            React.fragment [
+
+                Templates.ImportTemplatesBtn(model, dispatch, ?setIsOpen = setIsOpen)
 
                 Swate.Components.TemplateFilter.TemplateFilter(
                     model.ProtocolState.Templates,
