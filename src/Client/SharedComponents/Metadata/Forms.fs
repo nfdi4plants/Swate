@@ -631,7 +631,7 @@ type FormComponents =
                 //Daisy.label [
                 Html.label [
                     prop.className [
-                        "swt:label swt:flex swt:items-center swt:gap-2"
+                        "swt:label swt:flex swt:items-center swt:gap-2 swt:w-full"
                         if isarea.IsSome && isarea.Value then
                             "swt:label swt:textarea"
                         else
@@ -644,7 +644,6 @@ type FormComponents =
                     prop.children [
                         match isarea with
                         | Some true ->
-                            //Daisy.textarea [
                             Html.textarea [
                                 prop.className "swt:textarea swt:grow swt:ghost"
                                 prop.disabled disabled
@@ -703,7 +702,8 @@ type FormComponents =
                         TermSearch.TermSearch(
                             (input |> Option.map _.ToTerm()),
                             (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
-                            ?parentId = (parent |> Option.map _.TermAccessionShort)
+                            ?parentId = (parent |> Option.map _.TermAccessionShort),
+                            classNames = TermSearchStyle(Fable.Core.U2.Case1 "swt:w-full")
                         )
                         if rmv.IsSome then
                             Helper.deleteButton rmv.Value
