@@ -52,7 +52,7 @@ type Table =
     static member TableCellStyle =
         """swt:border-1 swt:border-base-content/30 swt:data-[selected=true]:text-secondary-content swt:data-[selected=true]:bg-secondary
 swt:data-[is-append-origin=true]:border swt:data-[is-append-origin=true]:border-base-content
-swt:data-[active=true]:border-primary
+swt:data-[active=true]:!bg-base-200/50 swt:data-[active=true]:!text-base-content
 swt:cursor-pointer
 swt:select-none
 swt:p-0"""
