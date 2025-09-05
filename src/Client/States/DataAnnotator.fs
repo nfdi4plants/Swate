@@ -47,8 +47,10 @@ type DataFile = {
     }
 
     member this.ExpectedSeparator =
+
         if this.DataFileName.EndsWith(".csv") then ","
         elif this.DataFileName.EndsWith(".tsv") then "\t"
+        elif this.DataFileName.EndsWith(".txt") then "\t"
         else ","
 
 type ParsedDataFile = {
@@ -67,7 +69,9 @@ type ParsedDataFile = {
             | "\\v" -> "\v"
             | _ -> separator
 
-        let rows = file.DataContent.Split("\n", System.StringSplitOptions.RemoveEmptyEntries)
+        let rows =
+            file.DataContent.Split("\n", System.StringSplitOptions.RemoveEmptyEntries)
+
         let splitRows = rows |> Array.map (fun row -> row.Split(sanatizedSeparator))
 
         if splitRows.Length > 1 then

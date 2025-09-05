@@ -282,6 +282,14 @@ type SelectiveImportModal =
                 {
                     model.ProtocolState.ImportConfig with
                         ImportMetadata = b
+                        ImportTables =
+                            if b then
+                                [
+                                    for i in 0 .. (tables.Count - 1) do
+                                        { Index = i; FullImport = true }: FileImport.ImportTable
+                                ]
+                            else
+                                []
                 }
                 |> Protocol.UpdateImportConfig
                 |> ProtocolMsg
