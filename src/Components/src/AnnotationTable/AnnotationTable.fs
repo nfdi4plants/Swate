@@ -147,22 +147,28 @@ type AnnotationTable =
 
 
     static member private ContextMenu
-        (arcTable: ArcTable, setArcTable, tableRef: IRefValue<TableHandle>, containerRef, setModal, ?debug: bool)
-        =
+        (
+            arcTable: ArcTable,
+            setArcTable,
+            tableRef: IRefValue<TableHandle>,
+            containerRef,
+            setModal: ModalTypes option -> unit,
+            ?debug: bool
+        ) =
 
         ContextMenu.ContextMenu(
             (fun data ->
                 let index = data |> unbox<CellCoordinate>
 
                 if index.x = 0 && index.y > 0 then // index col
-                    AnnotationTableContextMenu.IndexColumnContent(
+                    AnnotationTableContextMenu.AnnotationTableContextMenu.IndexColumnContent(
                         index.y,
                         arcTable,
                         setArcTable,
                         tableRef.current.SelectHandle
                     )
                 elif index.y = 0 then // header Row
-                    AnnotationTableContextMenu.CompositeHeaderContent(
+                    AnnotationTableContextMenu.AnnotationTableContextMenu.CompositeHeaderContent(
                         index.x,
                         arcTable,
                         setArcTable,
@@ -170,7 +176,7 @@ type AnnotationTable =
                         setModal
                     )
                 else // standard cell
-                    AnnotationTableContextMenu.CompositeCellContent(
+                    AnnotationTableContextMenu.AnnotationTableContextMenu.CompositeCellContent(
                         {| x = index.x; y = index.y |},
                         arcTable,
                         setArcTable,
@@ -201,7 +207,7 @@ type AnnotationTable =
         (
             arcTable: ArcTable,
             setArcTable,
-            modal: AnnotationTable.ModalTypes,
+            modal: AnnotationTable.ModalTypes option,
             setModal,
             tableRef: IRefValue<TableHandle>,
             ?debug: bool
@@ -210,12 +216,12 @@ type AnnotationTable =
         let rmv =
             fun _ ->
                 tableRef.current.focus ()
-                setModal ModalTypes.None
+                setModal None
 
         React.fragment [
             match modal with
-            | ModalTypes.None -> Html.none
-            | ModalTypes.Details cc ->
+            | None -> Html.none
+            | Some(ModalTypes.Details cc) ->
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
@@ -237,10 +243,10 @@ type AnnotationTable =
                                     else
                                         exn.Message
 
-                                setModal (ModalTypes.Error exnMessage)
+                                setModal (Some(ModalTypes.Error exnMessage))
                                 failwith exn.Message
 
-                    CompositeCellModal.CompositeHeaderModal(header, setHeader, rmv)
+                    AnnotationTableModals.CompositeCellModal.CompositeHeaderModal(header, setHeader, rmv)
 
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
@@ -252,8 +258,14 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    CompositeCellModal.CompositeCellModal(cell, setCell, rmv, header, ?debug = debug)
-            | ModalTypes.Transform cc ->
+                    AnnotationTableModals.CompositeCellModal.CompositeCellModal(
+                        cell,
+                        setCell,
+                        rmv,
+                        header,
+                        ?debug = debug
+                    )
+            | Some(ModalTypes.Transform cc) ->
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
@@ -266,7 +278,7 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
+                    AnnotationTableModals.CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
 
@@ -277,16 +289,28 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
-            | ModalTypes.Edit cc ->
+                    AnnotationTableModals.CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
+            | Some(ModalTypes.Edit cc) ->
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
-                    EditConfig.CompositeCellEditModal(cc.x - 1, arcTable, setArcTable, rmv, ?debug = debug)
+                    AnnotationTableModals.EditConfig.CompositeCellEditModal(
+                        cc.x - 1,
+                        arcTable,
+                        setArcTable,
+                        rmv,
+                        ?debug = debug
+                    )
                 else
-                    EditConfig.CompositeCellEditModal(cc.x - 1, arcTable, setArcTable, rmv, ?debug = debug)
-            | ModalTypes.MoveColumn(uiTableIndex, arcTableIndex) ->
-                ContextMenuModals.MoveColumnModal(
+                    AnnotationTableModals.EditConfig.CompositeCellEditModal(
+                        cc.x - 1,
+                        arcTable,
+                        setArcTable,
+                        rmv,
+                        ?debug = debug
+                    )
+            | Some(ModalTypes.MoveColumn(uiTableIndex, arcTableIndex)) ->
+                AnnotationTableModals.ContextMenuModals.MoveColumnModal(
                     arcTable,
                     setArcTable,
                     arcTableIndex,
@@ -296,11 +320,22 @@ type AnnotationTable =
                     ?debug = debug
                 )
 
-            | ModalTypes.PasteCaseUserInput(AddColumns addColumns) ->
-                ContextMenuModals.PasteFullColumnsModal(arcTable, setArcTable, addColumns, setModal, tableRef)
-            | ModalTypes.Error(exn) -> ContextMenuModals.ErrorModal(exn, setModal, tableRef)
-            | ModalTypes.UnknownPasteCase(Unknown unknownPasteCase) ->
-                ContextMenuModals.UnknownPasteCase(unknownPasteCase.data, unknownPasteCase.headers, setModal, tableRef)
+            | Some(ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)) ->
+                AnnotationTableModals.ContextMenuModals.PasteFullColumnsModal(
+                    arcTable,
+                    setArcTable,
+                    addColumns,
+                    setModal,
+                    tableRef
+                )
+            | Some(ModalTypes.Error(exn)) -> AnnotationTableModals.ContextMenuModals.ErrorModal(exn, setModal, tableRef)
+            | Some(ModalTypes.UnknownPasteCase(PasteCases.Unknown unknownPasteCase)) ->
+                AnnotationTableModals.ContextMenuModals.UnknownPasteCase(
+                    unknownPasteCase.data,
+                    unknownPasteCase.headers,
+                    setModal,
+                    tableRef
+                )
             | anyElse ->
                 console.warn ("Unknown modal type", anyElse)
                 Html.none
@@ -320,7 +355,7 @@ type AnnotationTable =
         ) =
         let containerRef = React.useElementRef ()
         let tableRefInner = React.useRef<TableHandle> (null)
-        let (modal: ModalTypes), setModal = React.useState ModalTypes.None
+        let (modal: ModalTypes option), setModal = React.useState None
         let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
 
         let hasCtx = isNullOrUndefined ctx |> not
@@ -485,7 +520,7 @@ type AnnotationTable =
                                     && selectedCells.count > 0)
                             then
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
-                                setModal (ModalTypes.Details cell)
+                                setModal (Some(ModalTypes.Details cell))
                             elif e.code = kbdEventCode.delete && selectedCells.count > 0 then
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable

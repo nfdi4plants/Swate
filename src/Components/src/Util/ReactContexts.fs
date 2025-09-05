@@ -82,3 +82,15 @@ module AnnotationTable =
                 setData = fun _ -> console.warn "No context provider for AnnotationTableStateCtx found!"
             }
         )
+
+[<Erase; Mangle(false)>]
+module BaseModal =
+    type BaseModalContext = {
+        isOpen: bool
+        setIsOpen: bool -> unit
+        headerId: string
+        descId: string
+    }
+
+    let BaseModalCtx =
+        React.createContext<BaseModalContext option> ("BaseModalCtx", None)

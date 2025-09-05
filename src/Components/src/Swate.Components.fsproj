@@ -42,16 +42,11 @@
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
     <Compile Include="TermSearch\TermSearchConfigSetter.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
-    <Compile Include="ArcTypeComponents\CreateColumnModal.fs" />
-    <Compile Include="ArcTypeComponents\UpdateColumnModal.fs" />
-    <Compile Include="ArcTypeComponents\EditColumnModal.fs" />
-    <Compile Include="ArcTypeComponents\ArcTypeEditModal.fs" />
-    <Compile Include="ArcTypeComponents\ArcTypeModals.fs" />
     <Compile Include="Template\TemplateFilter.fs" />
-    <Compile Include="ArcTypeComponents\ArcTypeTransformModal.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
+    <Compile Include="AnnotationTable\AnnotationTableModals.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
