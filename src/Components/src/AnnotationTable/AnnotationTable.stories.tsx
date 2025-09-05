@@ -176,6 +176,11 @@ export const EditTermCellKbd: Story = {
         expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
     });
 
+    await waitFor(async () => {
+        const termSearchResult = await screen.findByText('MS:1001800');
+        expect(termSearchResult).toBeVisible();
+    });
+
     await userEvent.keyboard('[ArrowDown][ArrowDown][Enter]')
 
     await waitFor(async () => {
