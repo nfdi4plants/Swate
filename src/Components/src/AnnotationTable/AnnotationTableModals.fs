@@ -1705,7 +1705,7 @@ type EditConfig =
                                     if selectedTab = 1 then
                                         "swt:tab-active"
                                 ]
-                                prop.text "Create Column"
+                                prop.text "Generate Rows"
                                 prop.onClick (fun _ -> setSelectedTab 1)
                             ]
                             Html.div [
@@ -1714,7 +1714,7 @@ type EditConfig =
                                     if selectedTab = 2 then
                                         "swt:tab-active"
                                 ]
-                                prop.text "Update Column"
+                                prop.text "Update Rows"
                                 prop.onClick (fun _ -> setSelectedTab 2)
                             ]
                         ]
