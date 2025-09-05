@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { within, expect, userEvent, waitFor, screen } from 'storybook/test';
 import { Modal } from "./BaseModal.fs.js";
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import React from 'react';
 
 interface ButtonProps {
@@ -70,11 +70,15 @@ const simpleHeader: JSX.Element = <>Simple Header</>;
 const modalActivity: JSX.Element = <>Simple Modal Activity</>;
 const list: JSX.Element[] = Array.from({ length: 500 }, (_, index) => <>Simple Content {index}</>);
 const children =
-  list.map((item, index) => (
+  <div>
+
+    {list.map((item, index) => (
       <div key={index} style={{ padding: "8px", borderBottom: "1px solid #ddd" }}>
           {item}
         </div>
-      ));
+      ))
+    }
+  </div>
 const modalClassInfo: string = "swt:max-w-none";
 
 export const CompleteModal: Story = {

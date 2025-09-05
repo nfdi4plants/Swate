@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.AnnotationTableContextMenu
 
 open System
 open Fable.Core
@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Feliz
 
+open Swate.Components
 open Types.AnnotationTableContextMenu
 
 /// AnnotationTableContextMenu Components
@@ -21,6 +22,15 @@ type ATCMC =
         |}
 
 type AnnotationTableContextMenuUtil =
+
+    static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
+        let cell = table.GetCellAt(index.x, index.y)
+        let nextTable = table.Copy()
+
+        for y in 0 .. table.RowCount - 1 do
+            nextTable.SetCellAt(index.x, y, cell.Copy())
+
+        setTable nextTable
 
     static member clear
         (tableIndex: CellCoordinate, cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle)
@@ -331,18 +341,24 @@ type AnnotationTableContextMenuUtil =
             pasteCases: PasteCases,
             coordinate: CellCoordinate,
             table: ArcTable,
-            setModal,
+            setModal: Types.AnnotationTable.ModalTypes option -> unit,
             selectHandle: SelectHandle,
             setTable
         ) =
 
         match pasteCases with
         | AddColumns addColumns ->
-            setModal (AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns))
+            setModal (
+                AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
+                |> Some
+            )
         | PasteColumns pasteColumns ->
             AnnotationTableContextMenuUtil.pasteDefault (pasteColumns, coordinate, table, selectHandle, setTable)
         | Unknown unknownPasteCase ->
-            setModal (AnnotationTable.ModalTypes.UnknownPasteCase(PasteCases.Unknown unknownPasteCase))
+            setModal (
+                AnnotationTable.ModalTypes.UnknownPasteCase(PasteCases.Unknown unknownPasteCase)
+                |> Some
+            )
 
 [<Erase>]
 type AnnotationTableContextMenu =
@@ -352,7 +368,7 @@ type AnnotationTableContextMenu =
             arcTable: ArcTable,
             setArcTable: ArcTable -> unit,
             selectHandle: SelectHandle,
-            setModal: Types.AnnotationTable.ModalTypes -> unit
+            setModal: Types.AnnotationTable.ModalTypes option -> unit
         ) =
         let cellIndex = {| x = index.x - 1; y = index.y - 1 |}
         let cell = arcTable.GetCellAt(cellIndex.x, cellIndex.y)
@@ -370,21 +386,26 @@ type AnnotationTableContextMenu =
                 Html.div "Details",
                 icon = Icons.MagnifyingClassPlus(),
                 kbdbutton = ATCMC.KbdHint("D"),
-                onClick = fun _ -> AnnotationTable.ModalTypes.Details index |> setModal
+                onClick = fun _ -> AnnotationTable.ModalTypes.Details index |> Some |> setModal
             )
             ContextMenuItem(
                 Html.div "Edit",
                 icon = Icons.PenToSquare(),
                 kbdbutton = ATCMC.KbdHint("E"),
-                onClick = fun _ -> AnnotationTable.ModalTypes.Edit index |> setModal
+                onClick = fun _ -> AnnotationTable.ModalTypes.Edit index |> Some |> setModal
             )
-            ContextMenuItem(Html.div "Fill Column", icon = Icons.Pen(), kbdbutton = ATCMC.KbdHint("F"))
+            ContextMenuItem(
+                Html.div "Fill Column",
+                icon = Icons.Pen(),
+                kbdbutton = ATCMC.KbdHint("F"),
+                onClick = fun _ -> AnnotationTableContextMenuUtil.fillColumn (cellIndex, arcTable, setArcTable)
+            )
             if not (String.IsNullOrWhiteSpace(transformName)) then
                 ContextMenuItem(
                     Html.div transformName,
                     icon = Icons.ArrorRightLeft(),
                     kbdbutton = ATCMC.KbdHint("T"),
-                    onClick = fun _ -> AnnotationTable.ModalTypes.Transform index |> setModal
+                    onClick = fun _ -> AnnotationTable.ModalTypes.Transform index |> Some |> setModal
                 )
             ContextMenuItem(
                 Html.div "Clear",
@@ -449,7 +470,7 @@ type AnnotationTableContextMenu =
                                     setArcTable
                                 )
                             with exn ->
-                                setModal (AnnotationTable.ModalTypes.Error(exn.Message))
+                                setModal (AnnotationTable.ModalTypes.Error(exn.Message) |> Some)
                         }
                         |> Promise.start
             )
@@ -483,7 +504,7 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, cellIndex))
+                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, cellIndex) |> Some)
             )
         ]
 
@@ -493,7 +514,7 @@ type AnnotationTableContextMenu =
             table: ArcTable,
             setTable: ArcTable -> unit,
             selectHandle: SelectHandle,
-            setModal: Types.AnnotationTable.ModalTypes -> unit
+            setModal: Types.AnnotationTable.ModalTypes option -> unit
         ) =
         let cellCoordinate: CellCoordinate = {| y = 0; x = columnIndex |}
 
@@ -502,13 +523,13 @@ type AnnotationTableContextMenu =
                 Html.div "Details",
                 icon = Icons.MagnifyingClassPlus(),
                 kbdbutton = ATCMC.KbdHint("D"),
-                onClick = fun _ -> AnnotationTable.ModalTypes.Details cellCoordinate |> setModal
+                onClick = fun _ -> AnnotationTable.ModalTypes.Details cellCoordinate |> Some |> setModal
             )
             ContextMenuItem(
                 Html.div "Edit",
                 icon = Icons.PenToSquare(),
                 kbdbutton = ATCMC.KbdHint("E"),
-                onClick = fun _ -> AnnotationTable.ModalTypes.Edit cellCoordinate |> setModal
+                onClick = fun _ -> AnnotationTable.ModalTypes.Edit cellCoordinate |> Some |> setModal
             )
             ContextMenuItem(isDivider = true)
             ContextMenuItem(
@@ -529,7 +550,11 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, {| x = columnIndex - 1; y = 0 |}))
+
+                        setModal (
+                            AnnotationTable.ModalTypes.MoveColumn(cc, {| x = columnIndex - 1; y = 0 |})
+                            |> Some
+                        )
             )
         ]
 

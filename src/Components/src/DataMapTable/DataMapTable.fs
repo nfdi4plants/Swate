@@ -33,7 +33,7 @@ type DataMapTable =
                     ContextMenuItem(
                         text = Html.div "Delete Row",
                         icon = Icons.DeleteLeft(),
-                        kbdbutton = ATCMC.KbdHint("DelR"),
+                        kbdbutton = AnnotationTableContextMenu.ATCMC.KbdHint("DelR"),
                         onClick = (fun x -> deleteRow index)
                     )
                 ]

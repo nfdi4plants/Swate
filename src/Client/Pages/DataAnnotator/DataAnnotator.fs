@@ -52,7 +52,7 @@ module private DataAnnotatorHelper =
                         setOpen,
                         Html.button [
                             prop.onClick (fun _ -> setOpen (not isOpen))
-                            prop.role "button"
+                            prop.role.button
                             prop.className
                                 "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
                             prop.children [ Icons.AngleDown() ]
@@ -171,15 +171,11 @@ module private DataAnnotatorHelper =
                 ]
             ]
 
-        let UploadButton
-            (ref: IRefValue<#Browser.Types.HTMLElement option>)
-            (model: Model)
-            (uploadFile: Browser.Types.File -> unit)
-            =
+        let UploadButton (ref: IRefValue<#Browser.Types.HTMLElement option>) (uploadFile: Browser.Types.File -> unit) =
 
             Html.input [
-                prop.type' "file"
-                prop.className "swt:file-input swt:file-input-primary swt:col-span-2"
+                prop.type'.file
+                prop.className "swt:file-input swt:file-input-primary swt:col-span-2 swt:w-full"
                 prop.ref ref
                 prop.onChange uploadFile
             ]
@@ -188,7 +184,8 @@ module private DataAnnotatorHelper =
 
             Html.button [
                 if model.DataAnnotatorModel.DataFile.IsNone then
-                    prop.className "swt:btn swt:btn-primary swt:grow swt:disabled"
+                    prop.className "swt:btn swt:grow swt:btn-disabled"
+                    prop.disabled true
                 else
                     prop.className "swt:btn swt:btn-primary swt:grow"
                 prop.text "Open Annotator"
@@ -257,7 +254,7 @@ module private DataAnnotatorHelper =
             (match dtrgt with
              | Some dtrgt ->
                  Html.div [
-                     prop.className "swt:w-full swt:h-full swt:flex swt:items-center swt:px-2 swt:py-1"
+                     prop.className "swt:w-full swt:h-full swt:flex swt:items-center swt:px-2 swt:py-1 swt:truncate"
                      prop.onClick (fun _ ->
                          if isDirectlyActive then
                              state.Remove dtrgt
@@ -280,6 +277,7 @@ module private DataAnnotatorHelper =
                 ]
         )
 
+    [<ReactComponent>]
     let FileViewComponent (file: DataAnnotator.ParsedDataFile, state, setState) =
         let headerRow =
             file.HeaderRow
@@ -304,6 +302,9 @@ module private DataAnnotatorHelper =
                 ]
         |]
 
+        let getDefault (index: CellCoordinate) =
+            (index.y, index.x, "<placeholder>", None, state, setState)
+
         let colCount = bodyRows |> Array.map (fun row -> row.Length) |> Array.max
 
         let tableRef = React.useRef<TableHandle> null
@@ -313,18 +314,27 @@ module private DataAnnotatorHelper =
                 (fun (index: CellCoordinate) ->
                     if index.y = 0 && file.HeaderRow.IsSome then
                         // Header Row
-                        let content = headerRow.Value.[index.x]
+                        let content =
+                            headerRow
+                            |> Option.bind (fun x -> x |> List.tryItem index.x)
+                            |> Option.defaultValue (getDefault index)
+                        // let content = headerRow.Value.[index.x]
                         CellButton content
                     else
                         // Body Row
-                        let input = bodyRows.[index.y].[index.x]
+                        let input =
+                            bodyRows
+                            |> Array.tryItem (index.y - 1)
+                            |> Option.bind (fun row -> row |> List.tryItem index.x)
+                            |> Option.defaultValue (getDefault index)
+                        // let input = bodyRows.[index.y].[index.x]
                         CellButton input
                 ),
                 withKey = (fun (index: CellCoordinate) -> $"{index.x}-{index.y}")
             )
 
         Html.div [
-            prop.className "swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[200px]"
+            prop.className "swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[80%]"
             prop.children [
                 Swate.Components.Table.Table(
                     file.BodyRows.Length,
@@ -462,7 +472,7 @@ type DataAnnotator =
                         requestFileFromARCitect,
                         model.DataAnnotatorModel.Loading
                     )
-                | false -> DataAnnotatorHelper.DataAnnotatorButtons.UploadButton ref model uploadFileOnChange
+                | false -> DataAnnotatorHelper.DataAnnotatorButtons.UploadButton ref uploadFileOnChange
                 Html.div [
                     prop.className "swt:flex swt:flex-row swt:gap-4"
                     prop.children [

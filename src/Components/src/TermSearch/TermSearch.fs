@@ -1165,7 +1165,6 @@ type TermSearch =
                             && parentId.IsSome
                             && comboBoxRef.current.isOpen () |> not
                             ->
-                            console.log ("start child search")
                             startAllChildSearch ()
                         | _ -> onKeyDown |> Option.iter (fun fn -> fn kbe)
                     ),

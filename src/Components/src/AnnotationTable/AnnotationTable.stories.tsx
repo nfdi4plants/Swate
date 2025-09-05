@@ -381,7 +381,7 @@ export const EditColumn: Story = {
   }
 }
 
-export const CreateColumn: Story = {
+export const GenerateRows: Story = {
   render: renderTable,
   args: {
     height: 600,
@@ -411,7 +411,7 @@ export const CreateColumn: Story = {
     const editModal = screen.getByTestId('modal_Edit');
     await expect(editModal).toBeVisible();
 
-    const createButton = await within(editModal).findByText(/Create Column/i);
+    const createButton = await within(editModal).findByText(/Generate Rows/i);
     await expect(createButton).toBeVisible();
 
     await userEvent.click(createButton);
@@ -423,7 +423,7 @@ export const CreateColumn: Story = {
   }
 }
 
-export const UpdateColumn: Story = {
+export const UpdateRows: Story = {
   render: renderTable,
   args: {
     height: 600,
@@ -453,7 +453,7 @@ export const UpdateColumn: Story = {
     const editModal = screen.getByTestId('modal_Edit');
     await expect(editModal).toBeVisible();
 
-    const createButton = await within(editModal).findByText(/Update Column/i);
+    const createButton = await within(editModal).findByText(/Update Rows/i);
     await expect(createButton).toBeVisible();
 
     await userEvent.click(createButton);
