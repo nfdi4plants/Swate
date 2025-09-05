@@ -215,6 +215,7 @@ type AnnotationTable =
 
         let rmv =
             fun _ ->
+                console.log ("Removing modal")
                 tableRef.current.focus ()
                 setModal None
 

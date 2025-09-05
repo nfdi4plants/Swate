@@ -234,7 +234,7 @@ type InputField =
                 TermSearch.TermSearch(
                     v,
                     setter,
-                    classNames = TermSearchStyle(U2.Case1 "swt:border-current"),
+                    classNames = TermSearchStyle(U2.Case1 "swt:border-current swt:w-full"),
                     autoFocus = autofocus,
                     onKeyDown = (fun (e: KeyboardEvent) -> ArcTypeModalsUtil.inputKeydownHandler e submit rmv),
                     ?parentId = (parentOa |> Option.map (fun oa -> oa.TermAccessionShort))
@@ -271,7 +271,6 @@ type CompositeCellModal =
             ?debug: string
         ) =
         let initTerm = Term.fromOntologyAnnotation oa
-        let isOpen, setIsOpen = React.useState (true)
         let tempTerm, setTempTerm = React.useState (initTerm)
 
         let submit =
@@ -297,8 +296,8 @@ type CompositeCellModal =
         let parentOa = relevantCompositeHeader |> Option.map (fun h -> h.ToTerm())
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Term",
             React.fragment [
                 InputField.TermCombi(
@@ -346,7 +345,6 @@ type CompositeCellModal =
             ?debug
         ) =
         let initTerm = Term.fromOntologyAnnotation oa
-        let isOpen, setIsOpen = React.useState (true)
         let tempValue, setTempValue = React.useState (value)
         let tempTerm, setTempTerm = React.useState (initTerm)
 
@@ -359,8 +357,8 @@ type CompositeCellModal =
         let parentOa = relevantCompositeHeader |> Option.map (fun h -> h.ToTerm())
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Unitized",
             React.fragment [
                 InputField.Input(
@@ -425,7 +423,6 @@ type CompositeCellModal =
         (value: string, rmv, ?setText: string -> unit, ?setHeader: CompositeHeader -> unit, ?debug)
         =
         let tempValue, setTempValue = React.useState (value)
-        let isOpen, setIsOpen = React.useState (true)
 
         let submit =
             fun () ->
@@ -433,8 +430,8 @@ type CompositeCellModal =
                 CompositeCellModal.submit (setText, setHeader, tempValue, headerValue, rmv)
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Freetext",
             React.fragment [
                 InputField.Input(
@@ -461,7 +458,6 @@ type CompositeCellModal =
             ?debug
         ) =
         let tempData, setTempData = React.useState (value)
-        let isOpen, setIsOpen = React.useState (true)
 
         let submit =
             fun () ->
@@ -473,8 +469,8 @@ type CompositeCellModal =
                     ()
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Data",
             React.fragment [
                 InputField.Input(
@@ -621,7 +617,6 @@ type ContextMenuModals =
             setModal: AnnotationTable.ModalTypes option -> unit,
             tableRef: IRefValue<TableHandle>
         ) =
-        let isOpen, setIsOpen = React.useState (true)
 
         let rmv =
             fun _ ->
@@ -647,8 +642,8 @@ type ContextMenuModals =
             |> Array.transpose
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Headers have been detected",
             React.fragment [
                 Html.div [
@@ -704,8 +699,6 @@ type ContextMenuModals =
             fun _ ->
                 tableRef.current.focus ()
                 setModal None
-
-        let isOpen, setIsOpen = React.useState (true)
 
         let isInSelected = tableRef.current.SelectHandle.contains (uiTableIndex)
 
@@ -810,8 +803,8 @@ type ContextMenuModals =
                 None
 
         Swate.Components.BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.p (
                 if Subtable.ColumnCount > 1 then
                     "Move Columns"
@@ -906,8 +899,6 @@ type CompositeCellEditModal =
         (cell: CompositeCell, header: CompositeHeader, setUnitized: OntologyAnnotation -> unit, rmv)
         =
 
-        let isOpen, setIsOpen = React.useState (true)
-
         let oa = cell.AsTerm
         let term = Term.fromOntologyAnnotation oa
 
@@ -933,8 +924,8 @@ type CompositeCellEditModal =
         |]
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Term to Unit",
             React.fragment [
                 TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Unitized)
@@ -946,7 +937,6 @@ type CompositeCellEditModal =
     [<ReactComponent>]
     static member UnitToTerm(cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv) =
 
-        let isOpen, setIsOpen = React.useState (true)
         let _, oa = cell.AsUnitized
         let term = Term.fromOntologyAnnotation oa
 
@@ -970,8 +960,8 @@ type CompositeCellEditModal =
         |]
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Unit to Term",
             React.fragment [
                 TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Term)
@@ -982,8 +972,6 @@ type CompositeCellEditModal =
 
     [<ReactComponent>]
     static member DataToFreeText(cell: CompositeCell, header: CompositeHeader, setText: string -> unit, rmv) =
-
-        let isOpen, setIsOpen = React.useState (true)
 
         let data = cell.AsData
         let text = defaultArg data.Name ""
@@ -1002,8 +990,8 @@ type CompositeCellEditModal =
         let tBody = [| Html.td ($"{text}") |]
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Data to Text",
             React.fragment [
                 TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Text)
@@ -1014,8 +1002,6 @@ type CompositeCellEditModal =
 
     [<ReactComponent>]
     static member FreeTextToData(cell: CompositeCell, header: CompositeHeader, setData: Data -> unit, rmv) =
-
-        let isOpen, setIsOpen = React.useState (true)
 
         let text = cell.AsFreeText
         let data = Data.create (Name = text)
@@ -1045,8 +1031,8 @@ type CompositeCellEditModal =
         |]
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Text to Data",
             React.fragment [
                 TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Data)
@@ -1735,7 +1721,6 @@ type EditConfig =
     [<ReactComponent>]
     static member CompositeCellEditModal(columnIndex, table: ArcTable, setArcTable, rmv: unit -> unit, ?debug: bool) =
 
-        let isOpen, setIsOpen = React.useState (true)
         let selectedTab, setSelectedTab = React.useState (0)
 
         let setColumn =
@@ -1746,8 +1731,8 @@ type EditConfig =
         let debugString = if debug.IsSome && debug.Value then Some "Edit" else None
 
         BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv ()),
             Html.div "Edit Column",
             React.fragment [
                 EditConfig.EditTabs(columnIndex, table, selectedTab, setSelectedTab, setColumn, rmv, ?debug = debug)

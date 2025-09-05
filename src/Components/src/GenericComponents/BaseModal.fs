@@ -52,6 +52,7 @@ type BaseModal =
     static member ModalFooter(children: ReactElement) =
         Html.div [ prop.className "swt:card-actions"; prop.children children ]
 
+
     [<ReactComponent>]
     static member BaseModal
         (
@@ -89,7 +90,6 @@ type BaseModal =
             headerId = headerId
             descId = descId
         }
-
 
         React.fragment [
             if isOpen then
@@ -130,6 +130,7 @@ type BaseModal =
                 Html.none
         ]
 
+    [<ReactComponent>]
     static member Modal
         (
             isOpen: bool,
@@ -143,7 +144,7 @@ type BaseModal =
             ?returnFocusRef: IRefValue<option<Browser.Types.HTMLElement>>,
             ?debug: string,
             ?className: string
-        ) =
+        ) : ReactElement =
         BaseModal.BaseModal(
             isOpen = isOpen,
             setIsOpen = setIsOpen,
@@ -166,6 +167,7 @@ type BaseModal =
 
 
     ///<summary>This modal is used to display errors from for example api communication</summary>
+    [<ReactComponent>]
     static member ErrorBaseModal(isOpen: bool, setIsOpen: bool -> unit, error: string, ?debug: string) =
 
         let debug = debug |> Option.map (fun d -> "errormodal_" + d)
