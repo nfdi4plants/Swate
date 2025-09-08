@@ -34,7 +34,7 @@ type TestCases =
         let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 2, 1, 3)
 
         let pasteBehavior =
-            Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+            Swate.Components.AnnotationTableHelper.predictPasteBehaviour (
                 clickedCell,
                 currentTable,
                 selectHandle,
@@ -60,7 +60,7 @@ type TestCases =
         let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 1, 1)
 
         let pasteBehavior =
-            Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+            Swate.Components.AnnotationTableHelper.predictPasteBehaviour (
                 clickedCell,
                 currentTable,
                 selectHandle,
@@ -99,7 +99,7 @@ type TestCases =
         let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
 
         let pasteBehavior =
-            Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+            Swate.Components.AnnotationTableHelper.predictPasteBehaviour (
                 clickedCell,
                 currentTable,
                 selectHandle,
@@ -134,7 +134,7 @@ type TestCases =
             pasteData.[startRow..] |> Array.map (fun item -> item.[startColumn..])
 
         let pasteBehavior =
-            Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+            Swate.Components.AnnotationTableHelper.predictPasteBehaviour (
                 clickedCell,
                 currentTable,
                 selectHandle,
@@ -142,7 +142,7 @@ type TestCases =
             )
 
         let fittedCells =
-            AnnotationTableContextMenuUtil.getFittedCells (adaptedData, headers)
+            Swate.Components.AnnotationTableHelper.getFittedCells (adaptedData, headers)
 
         Expect.equal
             pasteBehavior
@@ -170,7 +170,7 @@ type TestCases =
         let adaptedData = pasteData |> Array.map (fun item -> item)
 
         let pasteBehavior =
-            Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+            Swate.Components.AnnotationTableHelper.predictPasteBehaviour (
                 clickedCell,
                 currentTable,
                 selectHandle,
