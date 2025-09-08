@@ -22,7 +22,7 @@ jobs:
         run: echo "GIT_TAG_LATEST=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> "$GITHUB_ENV"
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
