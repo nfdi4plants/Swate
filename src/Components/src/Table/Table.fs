@@ -31,7 +31,6 @@ module private TableHelper =
         =
         if activeCellIndex.IsNone then
             let nav = selectedCells.selectBy e
-
             if not nav && selectedCells.count > 0 then
                 onKeydown
                 |> Option.iter (fun onKeydown -> onKeydown (e, selectedCells, activeCellIndex))
@@ -43,19 +42,6 @@ module private TableHelper =
                     |> Some
                     |> setActiveCellIndex
                 | Default -> ()
-        else
-            match e.code with
-            | kbdEventCode.enter ->
-                let isSelectedCells =
-                    if selectedCells.count > 1 then
-                        CellCoordinateRange.contains selectedCells.selectedCells activeCellIndex.Value
-                    else
-                        false
-                if not isSelectedCells then
-                    let newActiveCellIndex: CellCoordinate = {|x = activeCellIndex.Value.x; y = activeCellIndex.Value.y + 1|}
-                    setActiveCellIndex (Some newActiveCellIndex)
-            | _ -> ()
-
 
 [<Mangle(false); Erase>]
 type Table =
@@ -184,31 +170,35 @@ swt:p-0"""
                 fun (index: CellCoordinate) (e: Browser.Types.KeyboardEvent) ->
                     match e.code with
                     | kbdEventCode.enter ->
-                        if GridSelect.contains ({| index with y = index.y + 1 |}) then
-                            setActiveCellIndex (Some({| index with y = index.y + 1 |}))
-                        elif
-                            GridSelect.contains (
-                                {|
-                                    x = index.x + 1
-                                    y = GridSelect.selectedCells.Value.yStart
-                                |}
-                            )
-                        then
-                            setActiveCellIndex (
-                                Some {|
-                                    x = index.x + 1
-                                    y = GridSelect.selectedCells.Value.yStart
-                                |}
-                            )
+                        if GridSelect.count > 1 then
+                            if GridSelect.contains ({| index with y = index.y + 1 |}) then
+                                setActiveCellIndex (Some({| index with y = index.y + 1 |}))
+                            elif
+                                GridSelect.contains (
+                                    {|
+                                        x = index.x + 1
+                                        y = GridSelect.selectedCells.Value.yStart
+                                    |}
+                                )
+                            then
+                                setActiveCellIndex (
+                                    Some {|
+                                        x = index.x + 1
+                                        y = GridSelect.selectedCells.Value.yStart
+                                    |}
+                                )
+                            else
+                                let restartIndex: CellCoordinate =
+                                    {|
+                                        x = GridSelect.selectedCells.Value.xStart
+                                        y = GridSelect.selectedCells.Value.yStart
+                                    |}
+                                setActiveCellIndex (Some restartIndex)
                         else
-                            let restartIndex: CellCoordinate =
-                                {|
-                                    x = GridSelect.selectedCells.Value.xStart
-                                    y = GridSelect.selectedCells.Value.yStart
-                                |}
-                            setActiveCellIndex (Some restartIndex)
-                            //scrollContainerRef.current.Value.focus ()
-                            //GridSelect.selectAt (index, false)
+                            let newIndex: CellCoordinate = {|x = index.x; y = index.y + 1|}
+                            setActiveCellIndex None
+                            GridSelect.selectAt (newIndex, false)
+                            scrollContainerRef.current.Value.focus()
                     | kbdEventCode.escape ->
                         setActiveCellIndex (None)
                         scrollContainerRef.current.Value.focus ()
