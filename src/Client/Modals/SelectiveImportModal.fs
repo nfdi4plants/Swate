@@ -405,7 +405,6 @@ type SelectiveImportModal =
                 prop.className "swt:justify-end swt:flex swt:gap-2"
                 prop.style [ style.marginLeft length.auto ]
                 prop.children [
-                    Html.div "Test"
                     Html.button [
                         prop.className "swt:btn swt:btn-outline"
                         prop.text "Cancel"
