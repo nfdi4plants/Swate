@@ -43,7 +43,18 @@ module private TableHelper =
                     |> Some
                     |> setActiveCellIndex
                 | Default -> ()
-
+        else
+            match e.code with
+            | kbdEventCode.enter ->
+                let isSelectedCells =
+                    if selectedCells.count > 1 then
+                        CellCoordinateRange.contains selectedCells.selectedCells activeCellIndex.Value
+                    else
+                        false
+                if not isSelectedCells then
+                    let newActiveCellIndex: CellCoordinate = {|x = activeCellIndex.Value.x; y = activeCellIndex.Value.y + 1|}
+                    setActiveCellIndex (Some newActiveCellIndex)
+            | _ -> ()
 
 
 [<Mangle(false); Erase>]
@@ -190,9 +201,14 @@ swt:p-0"""
                                 |}
                             )
                         else
-                            setActiveCellIndex (None)
-                            scrollContainerRef.current.Value.focus ()
-                            GridSelect.selectAt (index, false)
+                            let restartIndex: CellCoordinate =
+                                {|
+                                    x = GridSelect.selectedCells.Value.xStart
+                                    y = GridSelect.selectedCells.Value.yStart
+                                |}
+                            setActiveCellIndex (Some restartIndex)
+                            //scrollContainerRef.current.Value.focus ()
+                            //GridSelect.selectAt (index, false)
                     | kbdEventCode.escape ->
                         setActiveCellIndex (None)
                         scrollContainerRef.current.Value.focus ()
