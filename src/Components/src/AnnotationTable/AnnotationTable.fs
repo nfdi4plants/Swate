@@ -103,49 +103,6 @@ type AnnotationTable =
                 ?debug = debug
             )
 
-    [<ReactComponent>]
-    static member CompositeCellActiveRender
-        (
-            index: CellCoordinate,
-            cell: CompositeCell,
-            setCell: CompositeCell -> unit,
-            ?parentId: string,
-            ?debug,
-            ?key: string
-        ) =
-
-        match cell with
-        | CompositeCell.Term oa ->
-            TableCell.OntologyAnnotationActiveCell(
-                index,
-                oa,
-                (fun t -> setCell (CompositeCell.Term t)),
-                ?parentId = parentId,
-                ?debug = debug,
-                ?key = key
-            )
-        | CompositeCell.FreeText txt ->
-            TableCell.StringActiveCell(index, txt, (fun t -> setCell (CompositeCell.FreeText t)), ?debug = debug)
-        | CompositeCell.Unitized(v, oa) ->
-            TableCell.StringActiveCell(
-                index,
-                v,
-                (fun input -> setCell (CompositeCell.Unitized(input, oa))),
-                ?debug = debug
-            )
-        | CompositeCell.Data d ->
-            TableCell.StringActiveCell(
-                index,
-                Option.defaultValue "" d.Name,
-                (fun t ->
-                    let nextData = d.Copy()
-                    nextData.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
-                    setCell (CompositeCell.Data nextData)
-                ),
-                ?debug = debug
-            )
-
-
     static member private ContextMenu
         (
             arcTable: ArcTable,
@@ -215,7 +172,6 @@ type AnnotationTable =
 
         let rmv =
             fun _ ->
-                console.log ("Removing modal")
                 tableRef.current.focus ()
                 setModal None
 
@@ -400,33 +356,7 @@ type AnnotationTable =
                     | Some(U2.Case2 header) ->
                         let text = header.ToString()
                         TableCell.StringInactiveCell(index, text, ?debug = debug)
-                    | Some(U2.Case1 cell) ->
-                        let text = cell.ToString()
-
-                        let termAccession =
-                            match cell with
-                            | term when term.isTerm -> cell.AsTerm.TermAccessionShort
-                            | unit when unit.isUnitized -> (snd cell.AsUnitized).TermAccessionShort
-                            | _ -> ""
-
-                        let oa = cell.ToOA()
-
-                        TableCell.InactiveCell(
-                            index,
-                            Html.div [
-                                prop.className "swt:flex swt:w-full swt:justify-between"
-                                prop.children [
-                                    Html.span [ prop.text text; prop.className "swt:truncate" ]
-                                    if oa.TermAccessionShort |> System.String.IsNullOrWhiteSpace |> not then
-                                        Html.i [
-                                            prop.className "swt:text-primary"
-                                            prop.title termAccession
-                                            prop.children [ Icons.Check() ]
-                                        ]
-                                ]
-                            ],
-                            ?debug = debug
-                        )
+                    | Some(U2.Case1 cell) -> TableCell.CompositeCellInactiveCell(index, cell, ?debug = debug)
                 ),
                 withKey =
                     fun (index: CellCoordinate, compositeCell: U2<CompositeCell, CompositeHeader> option) ->
@@ -451,7 +381,7 @@ type AnnotationTable =
                             |> _.TermAccessionShort
                             |> Option.whereNot System.String.IsNullOrWhiteSpace
 
-                        AnnotationTable.CompositeCellActiveRender(
+                        TableCell.CompositeCellActiveCell(
                             index,
                             cell,
                             setCell index,

@@ -187,10 +187,9 @@ module private ArcTypeModalsUtil =
         fun (e: KeyboardEvent) submit cancel ->
             match e.code with
             | kbdEventCode.enter ->
-                if e.ctrlKey || e.metaKey then
-                    e.preventDefault ()
-                    e.stopPropagation ()
-                    submit ()
+                e.preventDefault ()
+                e.stopPropagation ()
+                submit ()
             | kbdEventCode.escape ->
                 e.preventDefault ()
                 e.stopPropagation ()

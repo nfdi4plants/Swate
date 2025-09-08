@@ -6,6 +6,7 @@ open Model
 open Messages
 open Swate.Components.Shared
 
+open Fable.Core.JsInterop
 open ARCtrl
 open FileImport
 open Swate.Components
@@ -268,8 +269,6 @@ type SelectiveImportModal =
     [<ReactComponent>]
     static member Main(import: ArcFiles, model, dispatch, rmv) =
 
-        let isOpen, setIsOpen = React.useState (true)
-
         let tables, disArcfile =
             match import with
             | Assay a -> a.Tables, ArcFilesDiscriminate.Assay
@@ -357,8 +356,8 @@ type SelectiveImportModal =
             ]
 
         Swate.Components.BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv !!()),
             Html.p "Import",
             content,
             className = "@container/importModal",
@@ -370,8 +369,6 @@ type SelectiveImportModal =
         SelectiveImportModal.Main(import, model, dispatch, rmv = rmv)
 
     static member Templates(model, dispatch: Messages.Msg -> unit) =
-
-        let isOpen, setIsOpen = React.useState (true)
 
         let rmv = Util.RMV_MODAL dispatch
 
@@ -429,8 +426,8 @@ type SelectiveImportModal =
             ]
 
         Swate.Components.BaseModal.Modal(
-            isOpen,
-            setIsOpen,
+            true,
+            (fun _ -> rmv !!()),
             Html.p "Import",
             content,
             className = "@container/importModal",

@@ -63,7 +63,7 @@ type TableCell =
                 prop.className [
                     if not isSelected && index.y = 0 then
                         "swt:bg-base-300 swt:text-base-content"
-                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full"
+                    "swt:flex swt:flex-row swt:gap-2 swt:items-center swt:h-full swt:max-w-full swt:px-2 swt:py-2 swt:w-full swt:truncate"
                 ]
                 prop.children children
             ],
@@ -240,6 +240,80 @@ type TableCell =
             ?isStickyHeader = isStickyHeader,
             ?debug = debug
         )
+
+    [<ReactComponent>]
+    static member CompositeCellInactiveCell
+        (index: CellCoordinate, cell: CompositeCell, ?disableActivation: bool, ?debug)
+        =
+        let text = cell.ToString()
+
+        let termAccession =
+            match cell with
+            | term when term.isTerm -> cell.AsTerm.TermAccessionShort
+            | unit when unit.isUnitized -> (snd cell.AsUnitized).TermAccessionShort
+            | _ -> ""
+
+        let oa = cell.ToOA()
+
+        TableCell.InactiveCell(
+            index,
+            Html.div [
+                prop.className "swt:flex swt:w-full swt:justify-between"
+                prop.children [
+                    Html.span [ prop.text text; prop.className "swt:truncate" ]
+                    if oa.TermAccessionShort |> System.String.IsNullOrWhiteSpace |> not then
+                        Html.i [
+                            prop.className "swt:text-primary"
+                            prop.title termAccession
+                            prop.children [ Icons.Check() ]
+                        ]
+                ]
+            ],
+            ?debug = debug,
+            ?disableActivation = disableActivation
+        )
+
+    [<ReactComponent>]
+    static member CompositeCellActiveCell
+        (
+            index: CellCoordinate,
+            cell: CompositeCell,
+            setCell: CompositeCell -> unit,
+            ?parentId: string,
+            ?debug,
+            ?key: string
+        ) =
+
+        match cell with
+        | CompositeCell.Term oa ->
+            TableCell.OntologyAnnotationActiveCell(
+                index,
+                oa,
+                (fun t -> setCell (CompositeCell.Term t)),
+                ?parentId = parentId,
+                ?debug = debug,
+                ?key = key
+            )
+        | CompositeCell.FreeText txt ->
+            TableCell.StringActiveCell(index, txt, (fun t -> setCell (CompositeCell.FreeText t)), ?debug = debug)
+        | CompositeCell.Unitized(v, oa) ->
+            TableCell.StringActiveCell(
+                index,
+                v,
+                (fun input -> setCell (CompositeCell.Unitized(input, oa))),
+                ?debug = debug
+            )
+        | CompositeCell.Data d ->
+            TableCell.StringActiveCell(
+                index,
+                Option.defaultValue "" d.Name,
+                (fun t ->
+                    let nextData = d.Copy()
+                    nextData.Name <- t |> Option.whereNot System.String.IsNullOrWhiteSpace
+                    setCell (CompositeCell.Data nextData)
+                ),
+                ?debug = debug
+            )
 
 // let tempTerm, setTempTerm = React.useState (term)
 // TermSearch.TermSearch(
