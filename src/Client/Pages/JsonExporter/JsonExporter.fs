@@ -68,7 +68,7 @@ type FileExporter =
                     ]
                 ]
                 Html.button [
-                    prop.className "swt:btn swt:btn-primary swt:btn-block swt:join-item"
+                    prop.className "swt:btn swt:btn-primary swt:grow swt:join-item"
                     prop.text "Download"
                     prop.onClick (fun _ ->
                         let host = model.PersistentStorageState.Host

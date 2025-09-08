@@ -156,7 +156,7 @@ module EmptyTableModals =
                             prop.text "Import selected output column"
                             prop.disabled newInputColumn.IsNone
                             prop.onClick (fun _ ->
-                                let newTable = ArcTable.init (selectedTable.Value.Name + "_FollowUp")
+                                let newTable = ArcTable.init (model.SpreadsheetModel.ActiveTable.Name)
                                 newTable.AddColumn(newInputColumn.Value.Header, newInputColumn.Value.Cells)
                                 Spreadsheet.RemoveTable(activeTableIndex) |> Messages.SpreadsheetMsg |> dispatch
 

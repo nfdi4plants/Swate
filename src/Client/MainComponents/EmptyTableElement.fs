@@ -76,7 +76,7 @@ type EmptyTableElement =
                 CompositeColumn.create (header)
 
             let outPutColumn =
-                let header = CompositeHeader.Output IOType.Data
+                let header = CompositeHeader.Output IOType.Sample
                 CompositeColumn.create (header)
 
             [| inputColumn; parameterColumn; outPutColumn |]
