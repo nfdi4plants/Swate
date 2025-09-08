@@ -122,7 +122,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
                         setState { state with IsEditable = false }
 
                 Html.input [
-                    prop.className "swt:input swt:bg-transparent swt:px-2 swt:border-0 swt:focus:ring-0"
+                    prop.className
+                        "swt:input swt:bg-transparent swt:p-0 swt:border-0 swt:focus-within:outline-0 swt:focus::outline-0"
                     prop.autoFocus (true)
                     prop.id (id + "input")
                     prop.onChange (fun e -> setState { state with Name = e })
