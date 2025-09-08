@@ -455,6 +455,10 @@ type AnnotationTable =
                             elif e.code = kbdEventCode.delete && selectedCells.count > 0 then
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
+                            elif ((e.ctrlKey || e.metaKey) && e.code = kbdEventCode.key("v")
+                                    && activeCell.IsNone
+                                    && selectedCells.count > 0) then
+                                AnnotationTableHelper.tryPasteCopiedCells(selectedCells.selectedCellsReducedSet.MinimumElement, arcTable, tableRef.current.SelectHandle, setModal, setArcTable) |> Promise.start
                         ),
                     enableColumnHeaderSelect = true,
                     onSelect = onSelect,

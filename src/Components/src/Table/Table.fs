@@ -9,15 +9,20 @@ open Feliz.DaisyUI
 
 module private TableHelper =
 
-    let (|ActiveTrigger|Default|) (eventCode: string) =
+    let (|ActiveTrigger|Default|) (e: Browser.Types.KeyboardEvent) =
+
+        let isControl = e.ctrlKey || e.metaKey
+
+        let eventCode = e.code
         let lower = eventCode.ToLower()
 
-        if
+        let isTriggerKey =
             (lower.StartsWith("key")
              || lower.StartsWith("digit")
              || lower.StartsWith("numpad"))
             || lower.StartsWith("backspace")
-        then
+
+        if isTriggerKey && not isControl then
             ActiveTrigger
         else
             Default
@@ -35,8 +40,8 @@ module private TableHelper =
             if not nav && selectedCells.count > 0 then
                 onKeydown
                 |> Option.iter (fun onKeydown -> onKeydown (e, selectedCells, activeCellIndex))
-
-                match e.code with
+                
+                match e with
                 | ActiveTrigger ->
                     selectedCells.SelectOrigin
                     |> Option.defaultValue selectedCells.selectedCellsReducedSet.MinimumElement
