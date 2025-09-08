@@ -322,8 +322,6 @@ type AnnotationTable =
         // TODO: Add table to ctx on effect, and remove on unmount
         // Does currently not work, as the disposable is not correctly setup in feliz
         React.useEffectOnce (fun _ ->
-            console.log ("mounted table", arcTable.Name)
-
             { new System.IDisposable with
                 member _.Dispose() =
                     console.log ("unmounted table", arcTable.Name)
