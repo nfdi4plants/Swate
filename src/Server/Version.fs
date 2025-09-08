@@ -4,12 +4,12 @@ open System.Reflection
 
 [<assembly: AssemblyTitleAttribute("Swate")>]
 [<assembly: AssemblyVersionAttribute("1.0.0")>]
-[<assembly: AssemblyMetadataAttribute("Version","v1.0.0-rc.3")>]
-[<assembly: AssemblyMetadataAttribute("ReleaseDate","05.09.2025")>]
+[<assembly: AssemblyMetadataAttribute("Version","v1.0.0-rc.4")>]
+[<assembly: AssemblyMetadataAttribute("ReleaseDate","08.09.2025")>]
 do ()
 
 module internal AssemblyVersionInformation =
     let [<Literal>] AssemblyTitle = "Swate"
     let [<Literal>] AssemblyVersion = "1.0.0"
-    let [<Literal>] AssemblyMetadata_Version = "v1.0.0-rc.3"
-    let [<Literal>] AssemblyMetadata_ReleaseDate = "05.09.2025"
+    let [<Literal>] AssemblyMetadata_Version = "v1.0.0-rc.4"
+    let [<Literal>] AssemblyMetadata_ReleaseDate = "08.09.2025"
