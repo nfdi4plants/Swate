@@ -198,20 +198,21 @@ module Term =
         ARCtrl.OntologyAnnotation(?name = term.name, ?tsr = term.source, ?tan = term.id, ?comments = comments)
 
     let fromOntologyAnnotation (oa: ARCtrl.OntologyAnnotation) =
+
         let description =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Description)
-            |> Option.map (fun c -> Json.parseAs<string> (c.Value.Value))
+            |> Option.map (fun c -> c.Value.Value)
 
         let data =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.Data)
-            |> Option.map (fun c -> Json.parseAs<obj> (c.Value.Value))
+            |> Option.map (fun c -> Fable.Core.JS.JSON.parse c.Value.Value)
 
         let isObsolete =
             oa.Comments
             |> Seq.tryFind (fun c -> c.Name = Some ConvertLiterals.IsObsolete)
-            |> Option.map (fun c -> Json.parseAs<bool> (c.Value.Value))
+            |> Option.bind (fun c -> c.Value |> Option.map System.Boolean.Parse)
 
         Term(
             ?name = oa.Name,
