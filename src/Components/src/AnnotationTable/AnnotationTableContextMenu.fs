@@ -32,10 +32,8 @@ type AnnotationTableContextMenuUtil =
 
         setTable nextTable
 
-    static member clear
-        (tableIndex: CellCoordinate, cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle)
-        : ArcTable =
-        if selectHandle.contains tableIndex then
+    static member clear(cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle) : ArcTable =
+        if selectHandle.contains cellIndex then
             table.ClearSelectedCells(selectHandle)
         else
             table.ClearCell(cellIndex)
@@ -93,10 +91,20 @@ type AnnotationTableContextMenuUtil =
 
                 CompositeCell.ToTableTxt(cells)
             else
-                let cell = table.GetCellAt((cellIndex.x, cellIndex.y))
+                let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
                 cell.ToTabStr()
 
         navigator.clipboard.writeText result
+
+    static member cut(cellIndex: CellCoordinate, table: ArcTable, setTable, selectHandle: SelectHandle) = promise {
+        console.log (cellIndex)
+        do! AnnotationTableContextMenuUtil.copy (cellIndex, table, selectHandle)
+
+        let nextTable =
+            AnnotationTableContextMenuUtil.clear (cellIndex, table, selectHandle)
+
+        nextTable |> setTable
+    }
 
 [<Erase>]
 type AnnotationTableContextMenu =
@@ -150,10 +158,8 @@ type AnnotationTableContextMenu =
                 icon = Icons.Eraser(),
                 kbdbutton = ATCMC.KbdHint("Del"),
                 onClick =
-                    fun c ->
-                        let cc = c.spawnData |> unbox<CellCoordinate>
-
-                        AnnotationTableContextMenuUtil.clear (cc, cellIndex, arcTable, selectHandle)
+                    fun _ ->
+                        AnnotationTableContextMenuUtil.clear (cellIndex, arcTable, selectHandle)
                         |> setArcTable
             )
             ContextMenuItem(isDivider = true)
@@ -172,20 +178,25 @@ type AnnotationTableContextMenu =
                 icon = Icons.Scissor(),
                 kbdbutton = ATCMC.KbdHint("X"),
                 onClick =
-                    fun c ->
-                        let cc = c.spawnData |> unbox<CellCoordinate>
+                    fun _ ->
 
-                        AnnotationTableContextMenuUtil.copy (cellIndex, arcTable, selectHandle)
-                        |> ignore
-
-                        AnnotationTableContextMenuUtil.clear (cc, cellIndex, arcTable, selectHandle)
-                        |> setArcTable
+                        AnnotationTableContextMenuUtil.cut (cellIndex, arcTable, setArcTable, selectHandle)
+                        |> Promise.start
             )
             ContextMenuItem(
                 Html.div "Paste",
                 icon = Icons.Paste(),
                 kbdbutton = ATCMC.KbdHint("V"),
-                onClick = fun _ -> AnnotationTableHelper.tryPasteCopiedCells(cellIndex, arcTable, selectHandle, setModal, setArcTable) |> Promise.start
+                onClick =
+                    fun _ ->
+                        AnnotationTableHelper.tryPasteCopiedCells (
+                            cellIndex,
+                            arcTable,
+                            selectHandle,
+                            setModal,
+                            setArcTable
+                        )
+                        |> Promise.start
             )
             ContextMenuItem(isDivider = true)
             ContextMenuItem(

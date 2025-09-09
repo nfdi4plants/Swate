@@ -1,4 +1,3 @@
-
 namespace Swate.Components
 
 open System
@@ -168,11 +167,11 @@ type AnnotationTableHelper =
             let isEmpty =
                 Array.isEmpty fittedCells
                 || fittedCells
-                    |> Array.map (fun row ->
-                        Array.isEmpty row
-                        || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
-                    )
-                    |> Array.contains true
+                   |> Array.map (fun row ->
+                       Array.isEmpty row
+                       || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
+                   )
+                   |> Array.contains true
 
             if isEmpty then
                 PasteCases.Unknown {| data = data; headers = headers |}
@@ -233,8 +232,7 @@ type AnnotationTableHelper =
                 row
                 |> Array.iteri (fun xi coordinate ->
                     //Restart column index, when the amount of selected columns is bigger than copied columns
-                    let xIndex =
-                        AnnotationTableHelper.getIndex (xi, pasteColumns.data.[0].Length)
+                    let xIndex = AnnotationTableHelper.getIndex (xi, pasteColumns.data.[0].Length)
 
                     let currentCell = pasteColumns.data.[yIndex].[xIndex]
                     let newTarget = getCorrectTarget currentCell table coordinate 1
@@ -244,7 +242,7 @@ type AnnotationTableHelper =
         else
             let currentCell = pasteColumns.data.[0].[0]
             let newTarget = getCorrectTarget currentCell table coordinate 0
-            table.SetCellAt(coordinate.x, coordinate.y, newTarget)
+            table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
 
         table.Copy() |> setTable
 
@@ -272,34 +270,22 @@ type AnnotationTableHelper =
                 |> Some
             )
 
-    static member tryPasteCopiedCells(
-        cellIndex: CellCoordinate,
-        arcTable: ArcTable,
-        selectHandle:SelectHandle,
-        setModal: AnnotationTable.ModalTypes option -> unit,
-        setArcTable: ArcTable -> unit
-    ) =
+    static member tryPasteCopiedCells
+        (
+            cellIndex: CellCoordinate,
+            arcTable: ArcTable,
+            selectHandle: SelectHandle,
+            setModal: AnnotationTable.ModalTypes option -> unit,
+            setArcTable: ArcTable -> unit
+        ) =
         promise {
             let! data = AnnotationTableHelper.getCopiedCells ()
 
             try
                 let prediction =
-                    AnnotationTableHelper.predictPasteBehaviour (
-                        cellIndex,
-                        arcTable,
-                        selectHandle,
-                        data
-                    )
+                    AnnotationTableHelper.predictPasteBehaviour (cellIndex, arcTable, selectHandle, data)
 
-                AnnotationTableHelper.paste (
-                    prediction,
-                    cellIndex,
-                    arcTable,
-                    setModal,
-                    selectHandle,
-                    setArcTable
-                )
+                AnnotationTableHelper.paste (prediction, cellIndex, arcTable, setModal, selectHandle, setArcTable)
             with exn ->
                 setModal (AnnotationTable.ModalTypes.Error(exn.Message) |> Some)
         }
-
