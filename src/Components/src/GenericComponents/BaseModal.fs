@@ -203,7 +203,7 @@ type BaseModal =
                 ],
             footer =
                 Html.button [
-                    prop.className "swt:btn swt:bg-neutral-content swt:btn-outline swt:ml-auto"
+                    prop.className "swt:btn swt:btn-neutral swt:ml-auto"
                     prop.text "Ok"
                     prop.onClick (fun _ -> setIsOpen (false))
                 ],
