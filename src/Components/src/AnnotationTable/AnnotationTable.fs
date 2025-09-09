@@ -12,6 +12,21 @@ open ARCtrl.Spreadsheet
 open Types.AnnotationTableContextMenu
 open Types.AnnotationTable
 
+module AnnotationTableHelper =
+
+    let (|KbdShortcutTrigger|_|)
+        (keyOptions: {| keyCode: string; isCtrl: bool |}[])
+        (e: Browser.Types.KeyboardEvent, selectedCells: GridSelect.GridSelectHandle, activeCell: CellCoordinate option)
+        =
+        match
+            activeCell.IsNone
+            && selectedCells.count > 0
+            && keyOptions
+               |> Array.exists (fun ko -> e.code = ko.keyCode && (if ko.isCtrl then e.ctrlKey || e.metaKey else true))
+        with
+        | true -> Some()
+        | false -> None
+
 [<Mangle(false); Erase>]
 type AnnotationTable =
 
@@ -320,7 +335,7 @@ type AnnotationTable =
         let tableRef = if tableRef.IsSome then tableRef.Value else tableRefInner
 
         // TODO: Add table to ctx on effect, and remove on unmount
-        // Does currently not work, as the disposable is not correctly setup in feliz
+        // Does currently not work, as the disposable is not correctly setup in feliz, will require feliz v3 to fix
         React.useEffectOnce (fun _ ->
             { new System.IDisposable with
                 member _.Dispose() =
@@ -441,22 +456,85 @@ type AnnotationTable =
                     ?height = height,
                     onKeydown =
                         (fun (e, selectedCells, activeCell) ->
-                            if
-                                e.code = kbdEventCode.f2
-                                || ((e.ctrlKey || e.metaKey)
-                                    && e.code = kbdEventCode.enter
-                                    && activeCell.IsNone
-                                    && selectedCells.count > 0)
-                            then
+
+                            let kbd_f2_CtrlEnter = [|
+                                {|
+                                    keyCode = kbdEventCode.f2
+                                    isCtrl = false
+                                |}
+                                {|
+                                    keyCode = kbdEventCode.enter
+                                    isCtrl = true
+                                |}
+                            |]
+
+                            let kbd_delete = [|
+                                {|
+                                    keyCode = kbdEventCode.delete
+                                    isCtrl = false
+                                |}
+                            |]
+
+                            let kbd_CtrlV = [|
+                                {|
+                                    keyCode = kbdEventCode.key ("v")
+                                    isCtrl = true
+                                |}
+                            |]
+
+                            let kbd_CtrlC = [|
+                                {|
+                                    keyCode = kbdEventCode.key ("c")
+                                    isCtrl = true
+                                |}
+                            |]
+
+                            let kbd_CtrlX = [|
+                                {|
+                                    keyCode = kbdEventCode.key ("x")
+                                    isCtrl = true
+                                |}
+                            |]
+
+                            match (e, selectedCells, activeCell) with
+                            | AnnotationTableHelper.KbdShortcutTrigger kbd_f2_CtrlEnter ->
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
                                 setModal (Some(ModalTypes.Details cell))
-                            elif e.code = kbdEventCode.delete && selectedCells.count > 0 then
+                            | AnnotationTableHelper.KbdShortcutTrigger kbd_delete ->
+                                console.log ("Delete selected cells")
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
-                            elif ((e.ctrlKey || e.metaKey) && e.code = kbdEventCode.key("v")
-                                    && activeCell.IsNone
-                                    && selectedCells.count > 0) then
-                                AnnotationTableHelper.tryPasteCopiedCells(selectedCells.selectedCellsReducedSet.MinimumElement, arcTable, tableRef.current.SelectHandle, setModal, setArcTable) |> Promise.start
+                            | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlV ->
+                                console.log ("Pasting cells from clipboard")
+
+                                AnnotationTableHelper.tryPasteCopiedCells (
+                                    selectedCells.selectedCellsReducedSet.MinimumElement,
+                                    arcTable,
+                                    tableRef.current.SelectHandle,
+                                    setModal,
+                                    setArcTable
+                                )
+                                |> Promise.start
+                            | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlC ->
+                                console.log ("Copying cells to clipboard")
+
+                                AnnotationTableContextMenu.AnnotationTableContextMenuUtil.copy (
+                                    selectedCells.selectedCellsReducedSet.MinimumElement,
+                                    arcTable,
+                                    tableRef.current.SelectHandle
+                                )
+                                |> Promise.start
+                            | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlX ->
+                                console.log ("Cutting cells to clipboard")
+
+                                AnnotationTableContextMenu.AnnotationTableContextMenuUtil.cut (
+                                    selectedCells.selectedCellsReducedSet.MinimumElement,
+                                    arcTable,
+                                    setArcTable,
+                                    tableRef.current.SelectHandle
+                                )
+                                |> Promise.start
+                            | _ -> ()
                         ),
                     enableColumnHeaderSelect = true,
                     onSelect = onSelect,

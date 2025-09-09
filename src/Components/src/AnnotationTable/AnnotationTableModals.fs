@@ -592,15 +592,10 @@ type CompositeCellModal =
         | compositeHeader when compositeHeader.IsDataColumn ->
             let data = Data.create (Name = header.ToString())
             CompositeCellModal.DataModal(data, rmv, relevantCompositeHeader = header, setHeader = setHeader)
-        | compositeHeader when
-            compositeHeader.isInput
-            || compositeHeader.isOutput
-            || compositeHeader.isFreeText
-            ->
+        | anyElse ->
             let setText = fun v -> setHeader v
-            let text = header.ToString()
+            let text = anyElse.ToString()
             CompositeCellModal.FreeTextModal(text, rmv, setHeader = setText)
-        | _ -> failwith $"Unknown type of header {header}"
 
 
 type ContextMenuModals =
