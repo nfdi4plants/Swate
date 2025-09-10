@@ -507,7 +507,7 @@ type AnnotationTable =
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlV ->
                                 console.log ("Pasting cells from clipboard")
 
-                                AnnotationTableHelper.tryPasteCopiedCells (
+                                AnnotationTableContextMenu.AnnotationTableContextMenuUtil.tryPasteCopiedCells (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     tableRef.current.SelectHandle,
