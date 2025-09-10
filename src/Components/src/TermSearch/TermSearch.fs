@@ -753,6 +753,7 @@ type TermSearch =
         let setModalOpen =
             fun (modalOpen: bool) ->
                 if modalOpen then
+                    cancelled.current <- true
                     setSearchResults (fun _ -> SearchState.init ())
 
                 setModalOpen modalOpen
