@@ -223,8 +223,11 @@ module TemplateFilterAux =
         |> List.choose id
         |> String.concat " "
 
-    let mkFilterTokens (templates: Template[]) =
+    let mkFilterTokens (templates: Template[]) (organisations: Organisation[]) =
         let ra = ResizeArray<FilterToken>()
+
+        let templates = // shadow templates with only templates filtered for selected orgs
+            templates |> Array.filter (fun t -> Array.contains t.Organisation organisations)
 
         let tempTokens =
             templates
@@ -548,10 +551,6 @@ type TemplateFilter =
             React.useContext TemplateFilterAux.FilteredTemplateContext
 
         /// This constant is used to display available tags in the combo box
-        let availableTokens =
-            React.useMemo ((fun () -> TemplateFilterAux.mkFilterTokens templates), [| box templates |])
-
-        /// This constant is used to display available communities in the community filter
         let availableCommunities: Organisation[] =
             React.useMemo (
                 (fun () ->
@@ -566,9 +565,6 @@ type TemplateFilter =
         let dataplantIndex =
             availableCommunities |> Array.tryFindIndex (fun org -> org.IsOfficial())
 
-        let tokens, setTokens =
-            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
-
         let selectedOrgIndices, setSelectedOrgIndices =
             React.useState (
                 Set [
@@ -577,10 +573,26 @@ type TemplateFilter =
                 ]
             )
 
+        let orgs =
+            selectedOrgIndices |> Seq.map (fun i -> availableCommunities.[i]) |> Array.ofSeq
+
+        let selectedOrgsString =
+            orgs |> Array.map (fun org -> org.ToString()) |> String.concat ", "
+
+        let availableTokens =
+            React.useMemo (
+                (fun () -> TemplateFilterAux.mkFilterTokens templates orgs),
+                [| box templates; box selectedOrgsString |]
+            )
+
+        /// This constant is used to display available communities in the community filter
+
+        let tokens, setTokens =
+            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
+
+
         let filter =
             fun (templates: Template[]) ->
-                let orgs =
-                    selectedOrgIndices |> Seq.map (fun i -> availableCommunities.[i]) |> Array.ofSeq
 
                 TemplateFilterAux.filter templates orgs tokens
 
