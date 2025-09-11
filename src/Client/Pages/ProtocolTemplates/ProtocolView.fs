@@ -155,7 +155,7 @@ type Templates =
 
         Html.div [
             prop.style [ style.maxHeight maxheight ]
-            prop.className "swt:shrink swt:overflow-y-auto"
+            prop.className "swt:shrink swt:overflow-y-auto swt:grow swt:h-fit"
             prop.children [
                 Html.table [
                     prop.className "swt:table swt:table-pin-cols"
@@ -250,6 +250,7 @@ type Templates =
                     prop.onClick (fun _ ->
                         if not model.ProtocolState.TemplatesSelected.IsEmpty then
                             Messages.Protocol.ImportProtocols |> Messages.ProtocolMsg |> dispatch
+
                         if setIsOpen.IsSome then
                             setIsOpen.Value false
                     )
@@ -262,6 +263,7 @@ type Templates =
                             Messages.Protocol.Msg.RemoveSelectedProtocols
                             |> Messages.ProtocolMsg
                             |> dispatch
+
                             if setIsOpen.IsSome then
                                 setIsOpen.Value false
                         )
@@ -292,7 +294,7 @@ type Templates =
         )
 
     [<ReactComponent>]
-    static member TableSelect(model: Model, dispatch, (?setIsOpen:bool -> unit)) =
+    static member TableSelect(model: Model, dispatch, (?setIsOpen: bool -> unit)) =
 
         React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
 

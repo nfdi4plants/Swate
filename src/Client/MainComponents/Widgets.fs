@@ -280,7 +280,7 @@ type Widget =
 
         let content =
             Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-2"
+                prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
                 prop.children [ Protocol.Templates.TemplateSelect(model, dispatch) ]
             ]
 

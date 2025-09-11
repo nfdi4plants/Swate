@@ -59,7 +59,7 @@ module Protocol =
             let nextState, cmd =
                 match templates with
                 | Ok t0 ->
-                    let t = Array.ofSeq t0
+                    let t = Array.ofSeq t0 |> Array.sortBy _.Name
 
                     let nextState = {
                         state with
