@@ -15,6 +15,8 @@ module EmptyTableModals =
 
     type EmptyTableModals =
 
+
+        [<ReactComponent>]
         static member BuildingBlock(model, isOpen, setIsOpen, dispatch) =
             let content = SearchComponent.Main(model, dispatch)
             BaseModal.Modal(isOpen, setIsOpen, Html.text "Select a building block", content)
@@ -22,11 +24,7 @@ module EmptyTableModals =
         [<ReactComponent>]
         static member Templates(model: Model, isOpen, setIsOpen, dispatch) =
 
-            let content =
-                Html.div [
-                    prop.className "swt:flex swt:flex-col swt:gap-2 swt:p-2"
-                    prop.children [ Protocol.Templates.TemplateSelect(model, dispatch, setIsOpen) ]
-                ]
+            let content = Protocol.Templates.TemplateSelect(model, dispatch, setIsOpen)
 
             BaseModal.Modal(isOpen, setIsOpen, Html.text "Select template(s)", content)
 
