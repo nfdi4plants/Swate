@@ -25,7 +25,6 @@ function renderTable(args: any) {
   );
 };
 
-
 const meta = {
   title: "Components/AnnotationTable",
   tags: ["autodocs"],
@@ -147,7 +146,6 @@ export const EditTermCellRaw: Story = {
 
   }
 }
-
 
 export const EditTermCellKbd: Story = {
   render: renderTable,
@@ -632,5 +630,79 @@ export const EditColumnKeyboardActivation: Story = {
       const modal = screen.getByTestId('modal_Edit');
       expect(modal).toBeVisible();
     });
+  }
+}
+
+export const NextRow: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const cell = await canvas.findByTestId('cell-2-1');
+
+    await userEvent.dblClick(cell);
+
+    const activeCell = await canvas.findByTestId('active-cell-string-input-2-1');
+    expect(activeCell).toBeVisible();
+
+    await userEvent.clear(activeCell);
+    await userEvent.type(activeCell, 'Edited Text 1', { delay: 50 });
+    await userEvent.keyboard('{Enter}')
+
+    await userEvent.type(activeCell, '22', { delay: 50 });
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(async () => {
+      const updatedCell = await canvas.findByText('Edited Text 1');
+      expect(updatedCell).toBeVisible();
+    });
+
+    await waitFor(async () => {
+      const updatedCell = await canvas.findByText('Source 22');
+      expect(updatedCell).toBeVisible();
+    });
+  }
+}
+
+export const JumpWithinSelectedCells: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    witdth: 1000,
+    debug: true
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const firstCell = await canvas.findByTestId('cell-1-1');
+    const lastCell = await canvas.findByTestId('cell-2-2');
+
+    await userEvent.dblClick(firstCell);
+
+    await fireEvent.click(lastCell, { shiftKey: true });
+
+    const activeCell1 = await canvas.findByTestId('active-cell-string-input-1-1');
+    expect(activeCell1).toBeVisible();
+    await userEvent.keyboard('{Enter}')
+
+    const activeCell2 = await canvas.findByTestId('active-cell-string-input-2-1');
+    expect(activeCell2).toBeVisible();
+    await userEvent.keyboard('{Enter}')
+
+    const activeCell3 = await canvas.findByTestId('active-cell-string-input-1-2');
+    expect(activeCell3).toBeVisible();
+    await userEvent.keyboard('{Enter}')
+
+    const activeCell4 = await canvas.findByTestId('active-cell-string-input-2-2');
+    expect(activeCell4).toBeVisible();
+    await userEvent.keyboard('{Enter}')
+
+    const activeCell5 = await canvas.findByTestId('active-cell-string-input-1-1');
+    expect(activeCell5).toBeVisible();
   }
 }
