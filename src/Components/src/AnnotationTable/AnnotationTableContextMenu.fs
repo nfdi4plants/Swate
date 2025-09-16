@@ -230,7 +230,7 @@ type AnnotationTableContextMenuUtil =
 
             let areHeaders =
                 headers
-                |> Array.collect (fun header -> row |> Array.map (fun cell -> cell.StartsWith(header)))
+                |> Array.collect (fun header -> row |> Array.map (fun cell -> header.StartsWith(cell)))
 
             Array.contains true areHeaders
 
