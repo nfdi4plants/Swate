@@ -230,12 +230,12 @@ type AnnotationTableContextMenuUtil =
 
             let areHeaders =
                 headers
-                |> Array.collect (fun header -> row |> Array.map (fun cell -> header.StartsWith(cell)))
+                |> Array.collect (fun header -> row |> Array.map (fun cell ->
+                    cell.StartsWith(header + " ") || cell = header))
 
             Array.contains true areHeaders
 
         if checkForHeaders data.[0] then
-
             let body =
                 let rest = data.[1..]
                 if rest.Length > 0 then rest else [||]
@@ -248,10 +248,9 @@ type AnnotationTableContextMenuUtil =
 
             PasteCases.AddColumns {|
                 data = compositeColumns
-                columnIndex = cellIndex.x
+                columnIndex = cellIndex.x - 1
             |}
         else
-
             //Group all cells based on their row
             let groupedCellCoordinates =
                 cellCoordinates

@@ -45,7 +45,7 @@ type TestCases =
             pasteBehavior
             (PasteCases.AddColumns {|
                 data = newCompositeColumns
-                columnIndex = clickedCell.x
+                columnIndex = clickedCell.x - 1
             |})
             "Should predict add columns behavior"
 
