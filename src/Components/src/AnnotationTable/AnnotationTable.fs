@@ -383,8 +383,8 @@ type AnnotationTable =
                     | _ when index.x > 0 && index.y > 0 ->
                         let setCell =
                             fun (cell: CellCoordinate) (cc: CompositeCell) ->
-                                arcTable.SetCellAt(cell.x - 1, cell.y - 1, cc)
-                                setArcTable arcTable
+                                let nextTable = arcTable |> ArcTable.setCellAt (cell.x - 1, cell.y - 1, cc)
+                                setArcTable nextTable
 
 
                         let cell = arcTable.GetCellAt(index.x - 1, index.y - 1)
@@ -407,8 +407,8 @@ type AnnotationTable =
 
                         let setHeader =
                             fun (ch: CompositeHeader) ->
-                                arcTable.UpdateHeader(x, ch)
-                                setArcTable arcTable
+                                let nextTable = arcTable |> ArcTable.updateHeader (x, ch)
+                                setArcTable nextTable
 
                         let header = arcTable.Headers[x]
 
