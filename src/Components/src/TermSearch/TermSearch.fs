@@ -134,24 +134,40 @@ module private API =
             Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
+            |> Promise.catch (fun ex ->
+                console.error $"Error in callSearch {ex.Message}"
+                ResizeArray()
+            )
 
     let callParentSearch =
         fun (parent: string, query: string) ->
             Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10, parentTermId = parent))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
+            |> Promise.catch (fun ex ->
+                console.error $"Error in callParentSearch {ex.Message}"
+                ResizeArray()
+            )
 
     let callAllChildSearch =
         fun (parent: string) ->
             Api.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create (parent, 300))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results.results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
+            |> Promise.catch (fun ex ->
+                console.error $"Error in callAllChildSearch {ex.Message}"
+                ResizeArray()
+            )
 
     let callAdvancedSearch =
         fun dto ->
             Api.SwateApi.searchTermAdvanced dto
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
+            |> Promise.catch (fun ex ->
+                console.error $"Error in callAdvancedSearch {ex.Message}"
+                ResizeArray()
+            )
 
 [<Mangle(false); Erase>]
 type TermSearch =
