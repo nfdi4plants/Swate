@@ -41,11 +41,31 @@ type TestCases =
                 pasteData
             )
 
+        let currentTable = Fixture.mkTable ()
+
+        let cellCoordinates = selectHandle.getSelectedCells() |> Array.ofSeq
+
+        //Group all cells based on their row
+        let groupedCellCoordinates =
+            cellCoordinates
+            |> Array.groupBy (fun item -> item.y)
+            |> Array.map (fun (_, row) -> row)
+
+
+        let headers =
+            let columnIndices = cellCoordinates |> Array.distinctBy (fun item -> item.x)
+            columnIndices
+            |> Array.map (fun index -> currentTable.GetColumn(index.x - 1).Header)
+
+        let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (pasteData, headers)
+
         Expect.equal
             pasteBehavior
             (PasteCases.AddColumns {|
                 data = newCompositeColumns
-                columnIndex = clickedCell.x - 1
+                columnIndex = clickedCell.x
+                pasteData = fittedCells
+                coordinates = groupedCellCoordinates
             |})
             "Should predict add columns behavior"
 
@@ -75,11 +95,6 @@ type TestCases =
                 selectHandle,
                 pasteData
             )
-
-        match pasteBehavior with
-        | PasteCases.PasteColumns x -> printfn $"PasteColumns-coordinates: {x.coordinates}-data-{x.data}"
-        | PasteCases.AddColumns x -> printfn $"AddColumns-columnIndex: {x.columnIndex}-data-{x.data}"
-        | PasteCases.Unknown x -> printfn $"Unknown-headers: {x.headers}-data-{x.data}"
 
         Expect.equal
             pasteBehavior

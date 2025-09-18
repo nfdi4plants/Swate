@@ -3,9 +3,12 @@ namespace Swate.Components.AnnotationTableModals
 open Fable.Core
 open Feliz
 open Browser.Types
-open Swate.Components
+
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
+
+open AnnotationTableContextMenu
 
 // 👀 this file is work in progress
 
@@ -607,7 +610,10 @@ type ContextMenuModals =
                 {|
                     data: ResizeArray<CompositeColumn>
                     columnIndex: int
+                    pasteData: CompositeCell[][]
+                    coordinates: CellCoordinate[][]
                 |},
+            selectHandle: SelectHandle,
             setModal: AnnotationTable.ModalTypes option -> unit,
             tableRef: IRefValue<TableHandle>
         ) =
@@ -622,10 +628,20 @@ type ContextMenuModals =
         let addColumnsBtn compositeColumns columnIndex =
             Html.button [
                 prop.className "swt:btn swt:btn-outline swt:btn-primary"
-                prop.text "Confirm"
+                prop.text "Add new column"
                 prop.onClick (fun _ ->
                     arcTable.AddColumns(compositeColumns, columnIndex, false, false)
                     arcTable.Copy() |> setArcTable
+                    rmv ()
+                )
+            ]
+
+        let pasteColumnsBtn (cells: CompositeCell [][]) (coordinates: CellCoordinate [] []) setTable =
+            Html.button [
+                prop.className "swt:btn swt:btn-outline swt:btn-primary"
+                prop.text "Paste selected cells"
+                prop.onClick (fun _ ->
+                    AnnotationTableContextMenuUtil.pasteDefault ({|coordinates = coordinates; data = cells|}, coordinates.[0].[0], arcTable, selectHandle, setTable)
                     rmv ()
                 )
             ]
@@ -674,6 +690,7 @@ type ContextMenuModals =
                 React.fragment [
                     FooterButtons.Cancel(rmv)
                     addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
+                    pasteColumnsBtn addColumns.pasteData addColumns.coordinates setArcTable
                 ]
         //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
         )

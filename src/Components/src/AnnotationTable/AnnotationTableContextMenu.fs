@@ -31,7 +31,6 @@ type AnnotationTableContextMenuUtil =
         | header when ARCtrl.Helper.Regex.tryParseInputColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseOutputColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseParameterColumnHeader(header).IsSome -> true
-        | header when ARCtrl.Helper.Regex.tryParseReferenceColumnHeader(header).IsSome -> true
         | _ -> false
 
     static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
@@ -227,12 +226,13 @@ type AnnotationTableContextMenuUtil =
         =
 
         //Convert cell coordinates to array
-        let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
+        let cellCoordinates : CellCoordinate [] =
+            selectHandle.getSelectedCells ()
+            |> Array.ofSeq
 
         //Get all required headers for cells
         let headers =
             let columnIndices = cellCoordinates |> Array.distinctBy (fun item -> item.x)
-
             columnIndices
             |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
 
@@ -240,6 +240,23 @@ type AnnotationTableContextMenuUtil =
             row
             |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader(cell))
             |> Array.contains true
+
+        //Group all cells based on their row
+        let groupedCellCoordinates =
+            cellCoordinates
+            |> Array.groupBy (fun item -> item.y)
+            |> Array.map (fun (_, row) -> row)
+
+        let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (data, headers)
+
+        let isEmpty =
+            Array.isEmpty fittedCells
+            || fittedCells
+                |> Array.map (fun row ->
+                    Array.isEmpty row
+                    || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
+                )
+                |> Array.contains true
 
         if checkForHeaders data.[0] then
             let body =
@@ -254,27 +271,11 @@ type AnnotationTableContextMenuUtil =
 
             PasteCases.AddColumns {|
                 data = compositeColumns
-                columnIndex = cellIndex.x - 1
+                columnIndex = cellIndex.x
+                pasteData = fittedCells
+                coordinates = groupedCellCoordinates
             |}
         else
-            //Group all cells based on their row
-            let groupedCellCoordinates =
-                cellCoordinates
-                |> Array.ofSeq
-                |> Array.groupBy (fun item -> item.y)
-                |> Array.map (fun (_, row) -> row)
-
-            let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (data, headers)
-
-            let isEmpty =
-                Array.isEmpty fittedCells
-                || fittedCells
-                   |> Array.map (fun row ->
-                       Array.isEmpty row
-                       || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
-                   )
-                   |> Array.contains true
-
             if isEmpty then
                 PasteCases.Unknown {| data = data; headers = headers |}
             else
@@ -362,7 +363,7 @@ type AnnotationTableContextMenuUtil =
         match pasteCases with
         | AddColumns addColumns ->
             setModal (
-                AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
+                AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns, selectHandle)
                 |> Some
             )
         | PasteColumns pasteColumns ->
