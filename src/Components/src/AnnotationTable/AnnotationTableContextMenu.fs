@@ -23,6 +23,17 @@ type ATCMC =
 
 type AnnotationTableContextMenuUtil =
 
+    static member checkForHeader (value: string) =
+        match value with
+        | header when ARCtrl.Helper.Regex.tryParseCharacteristicColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseComponentColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseFactorColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseInputColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseOutputColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseParameterColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseReferenceColumnHeader(header).IsSome -> true
+        | _ -> false
+
     static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
         let cell = table.GetCellAt(index.x, index.y)
         let nextTable = table.Copy()
@@ -226,14 +237,9 @@ type AnnotationTableContextMenuUtil =
             |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
 
         let checkForHeaders (row: string[]) =
-            let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
-
-            let areHeaders =
-                headers
-                |> Array.collect (fun header -> row |> Array.map (fun cell ->
-                    cell.StartsWith(header + " ") || cell = header))
-
-            Array.contains true areHeaders
+            row
+            |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader(cell))
+            |> Array.contains true
 
         if checkForHeaders data.[0] then
             let body =

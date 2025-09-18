@@ -49,6 +49,46 @@ type TestCases =
             |})
             "Should predict add columns behavior"
 
+    static member NotAddColumns() =
+        let pasteData = Fixture.Body_Component_InstrumentModel_Pseudo_SingleRow
+
+        let compositeCell = CompositeCell.createFreeText (pasteData.[0].[0])
+
+        let newCompositeColumns =
+            let body =
+                let rest = pasteData.[1..]
+                if rest.Length > 0 then rest else [||]
+
+            let columns = Array.append [| pasteData.[0] |] body |> Array.transpose
+            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+            ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList |> ResizeArray
+
+        let currentTable = Fixture.mkTable ()
+        let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
+
+        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 1, 1)
+
+        let pasteBehavior =
+            Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                clickedCell,
+                currentTable,
+                selectHandle,
+                pasteData
+            )
+
+        match pasteBehavior with
+        | PasteCases.PasteColumns x -> printfn $"PasteColumns-coordinates: {x.coordinates}-data-{x.data}"
+        | PasteCases.AddColumns x -> printfn $"AddColumns-columnIndex: {x.columnIndex}-data-{x.data}"
+        | PasteCases.Unknown x -> printfn $"Unknown-headers: {x.headers}-data-{x.data}"
+
+        Expect.equal
+            pasteBehavior
+            (PasteCases.PasteColumns {|
+                data = [| [| compositeCell |] |]
+                coordinates = [| [| clickedCell |] |]
+            |})
+            "Should predict add columns behavior"
+
     static member AddSingleCell() =
         let pasteData = Fixture.Body_Component_InstrumentModel_SingleRow
 
@@ -193,6 +233,7 @@ let Main =
     testList "Context Menu" [
         testList "Prediction" [
             testCase "Add columns" <| fun _ -> TestCases.AddColumns()
+            testCase "Not Add columns" <| fun _ -> TestCases.NotAddColumns()
             testCase "Paste single Cell" <| fun _ -> TestCases.AddSingleCell()
             testCase $"Paste {2} Cell(s) in the same row. Paste {1} Cell(s) in the same column"
             <| fun _ -> TestCases.PasteMultipleCells(2, 1, Fixture.Body_Component_InstrumentModel_SingleRow)
