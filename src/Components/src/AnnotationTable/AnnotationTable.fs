@@ -291,12 +291,12 @@ type AnnotationTable =
                     tableRef,
                     ?debug = debug
                 )
-
-            | Some(ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)) ->
+            | Some(ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns, selectHandle)) ->
                 AnnotationTableModals.ContextMenuModals.PasteFullColumnsModal(
                     arcTable,
                     setArcTable,
                     addColumns,
+                    selectHandle,
                     setModal,
                     tableRef
                 )
@@ -501,14 +501,12 @@ type AnnotationTable =
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
                                 setModal (Some(ModalTypes.Details cell))
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_delete ->
-                                console.log ("Delete selected cells")
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlV ->
-                                console.log ("Pasting cells from clipboard")
-
+                                let cellCoordinate = {|x = selectedCells.selectedCellsReducedSet.MinimumElement.x - 1; y = selectedCells.selectedCellsReducedSet.MinimumElement.y - 1|}
                                 AnnotationTableContextMenu.AnnotationTableContextMenuUtil.tryPasteCopiedCells (
-                                    selectedCells.selectedCellsReducedSet.MinimumElement,
+                                    cellCoordinate,
                                     arcTable,
                                     tableRef.current.SelectHandle,
                                     setModal,
@@ -516,8 +514,6 @@ type AnnotationTable =
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlC ->
-                                console.log ("Copying cells to clipboard")
-
                                 AnnotationTableContextMenu.AnnotationTableContextMenuUtil.copy (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
@@ -525,8 +521,6 @@ type AnnotationTable =
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlX ->
-                                console.log ("Cutting cells to clipboard")
-
                                 AnnotationTableContextMenu.AnnotationTableContextMenuUtil.cut (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,

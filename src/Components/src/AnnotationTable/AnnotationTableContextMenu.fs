@@ -23,6 +23,16 @@ type ATCMC =
 
 type AnnotationTableContextMenuUtil =
 
+    static member checkForHeader (value: string) =
+        match value with
+        | header when ARCtrl.Helper.Regex.tryParseCharacteristicColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseComponentColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseFactorColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseInputColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseOutputColumnHeader(header).IsSome -> true
+        | header when ARCtrl.Helper.Regex.tryParseParameterColumnHeader(header).IsSome -> true
+        | _ -> false
+
     static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
         let cell = table.GetCellAt(index.x, index.y)
         let nextTable = table.Copy()
@@ -216,26 +226,39 @@ type AnnotationTableContextMenuUtil =
         =
 
         //Convert cell coordinates to array
-        let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
+        let cellCoordinates : CellCoordinate [] =
+            selectHandle.getSelectedCells ()
+            |> Array.ofSeq
 
         //Get all required headers for cells
         let headers =
             let columnIndices = cellCoordinates |> Array.distinctBy (fun item -> item.x)
-
             columnIndices
             |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
 
         let checkForHeaders (row: string[]) =
-            let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
+            row
+            |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader(cell))
+            |> Array.contains true
 
-            let areHeaders =
-                headers
-                |> Array.collect (fun header -> row |> Array.map (fun cell -> cell.StartsWith(header)))
+        //Group all cells based on their row
+        let groupedCellCoordinates =
+            cellCoordinates
+            |> Array.groupBy (fun item -> item.y)
+            |> Array.map (fun (_, row) -> row)
 
-            Array.contains true areHeaders
+        let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (data, headers)
+
+        let isEmpty =
+            Array.isEmpty fittedCells
+            || fittedCells
+                |> Array.map (fun row ->
+                    Array.isEmpty row
+                    || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
+                )
+                |> Array.contains true
 
         if checkForHeaders data.[0] then
-
             let body =
                 let rest = data.[1..]
                 if rest.Length > 0 then rest else [||]
@@ -249,27 +272,10 @@ type AnnotationTableContextMenuUtil =
             PasteCases.AddColumns {|
                 data = compositeColumns
                 columnIndex = cellIndex.x
+                pasteData = fittedCells
+                coordinates = groupedCellCoordinates
             |}
         else
-
-            //Group all cells based on their row
-            let groupedCellCoordinates =
-                cellCoordinates
-                |> Array.ofSeq
-                |> Array.groupBy (fun item -> item.y)
-                |> Array.map (fun (_, row) -> row)
-
-            let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (data, headers)
-
-            let isEmpty =
-                Array.isEmpty fittedCells
-                || fittedCells
-                   |> Array.map (fun row ->
-                       Array.isEmpty row
-                       || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
-                   )
-                   |> Array.contains true
-
             if isEmpty then
                 PasteCases.Unknown {| data = data; headers = headers |}
             else
@@ -357,7 +363,7 @@ type AnnotationTableContextMenuUtil =
         match pasteCases with
         | AddColumns addColumns ->
             setModal (
-                AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns)
+                AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns, selectHandle)
                 |> Some
             )
         | PasteColumns pasteColumns ->

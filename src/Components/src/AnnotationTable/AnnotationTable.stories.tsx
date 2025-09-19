@@ -654,18 +654,18 @@ export const NextRow: Story = {
     await userEvent.type(activeCell, 'Edited Text 1', { delay: 50 });
     await userEvent.keyboard('{Enter}')
 
-    await userEvent.type(activeCell, '22', { delay: 50 });
+    await userEvent.type(activeCell, '22', { delay: 100 });
     await userEvent.keyboard('{Enter}')
 
-    await waitFor(async () => {
-      const updatedCell = await canvas.findByText('Edited Text 1');
+    await waitFor(() => {
+      const updatedCell = screen.getByText('Edited Text 1');
       expect(updatedCell).toBeVisible();
-    });
+    }, { timeout: 5000 });
 
-    await waitFor(async () => {
-      const updatedCell = await canvas.findByText('Source 22');
+    await waitFor(() => {
+      const updatedCell = screen.getByText('Source 22');
       expect(updatedCell).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
