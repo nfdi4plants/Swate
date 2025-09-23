@@ -96,9 +96,13 @@ type AnnotationTableContextMenuUtil =
                     cellCoordinates
                     |> Array.map (fun (_, row) ->
                         row
-                        |> Array.map (fun coordinate -> table.GetCellAt(coordinate.x - 1, coordinate.y - 1))
+                        |> Array.map (fun coordinate ->
+                            if coordinate.y - 1 < 0 then
+                                CompositeCell.fromTabStr(table.GetColumn(coordinate.x - 1).Header.ToString(), table.GetColumn(coordinate.x - 1).Header)
+                            else
+                                table.GetCellAt(coordinate.x - 1, coordinate.y - 1))
                     )
-
+                
                 CompositeCell.ToTableTxt(cells)
             else
                 let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
@@ -139,7 +143,7 @@ type AnnotationTableContextMenuUtil =
     static member getFittedCells(data: string[][], headers: CompositeHeader[]) =
 
         let fitColumnsToTarget (row: string[][]) (headers: CompositeHeader[]) =
-
+            printfn $"row: {row}"
             let rec loop index result =
                 if index >= headers.Length then
                     result |> List.rev |> Array.ofList
@@ -183,8 +187,9 @@ type AnnotationTableContextMenuUtil =
             )
 
         let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) =
+            printfn $"strings: {strings}"
             let rec tryFit (cell: string[]) index (headerSizesList: (string * int list) list) =
-                let index = if index >= strings.Length then 0 else index
+                //let index = if index >= strings.Length then 0 else index
 
                 match headerSizesList with
                 | [] -> Some []
@@ -204,7 +209,9 @@ type AnnotationTableContextMenuUtil =
                             | Some restResult -> Some((name, segment) :: restResult)
                             | None -> None
                         else
-                            None
+                            match tryFit cell (index + actualSize) rest with
+                            | Some restResult -> Some((name, [|String.Empty|]) :: restResult)
+                            | None -> None
                     )
                     |> List.tryHead
 
@@ -218,9 +225,9 @@ type AnnotationTableContextMenuUtil =
             fittedRows
             |> Array.choose (fun row -> row)
             |> Array.map (fun row -> row |> List.map (fun (_, cells) -> cells) |> Array.ofList)
-
+        printfn $"result: {result}"
         result |> Array.map (fun row -> fitColumnsToTarget row headers)
-
+        
     static member predictPasteBehaviour
         (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
         =
@@ -331,22 +338,25 @@ type AnnotationTableContextMenuUtil =
             |> Array.iteri (fun yi row ->
                 //Restart row index, when the amount of selected rows is bigger than copied rows
                 let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, pasteColumns.data.Length)
-
                 row
-                |> Array.iteri (fun xi coordinate ->
+                |> Array.iteri (fun xi rowCoordinate ->
                     //Restart column index, when the amount of selected columns is bigger than copied columns
-                    let xIndex =
-                        AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.[0].Length)
+                    //let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.[0].Length)
+                    printfn $"rowCoordinate.x: {rowCoordinate.x}"
+                    printfn $"rowCoordinate.rowCoordinate.y: {rowCoordinate.y}"
 
-                    let currentCell = pasteColumns.data.[yIndex].[xIndex]
-                    let newTarget = getCorrectTarget currentCell table coordinate 1
-                    table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
+                    let currentCell = pasteColumns.data.[yIndex].[xi]
+
+                    printfn $"currentCell: {currentCell.ToString()}"
+
+                    let newTarget = getCorrectTarget currentCell table rowCoordinate 0
+                    table.SetCellAt(rowCoordinate.x - 1, rowCoordinate.y - 1, newTarget)
                 )
             )
         else
             let currentCell = pasteColumns.data.[0].[0]
             let newTarget = getCorrectTarget currentCell table coordinate 0
-            table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
+            table.SetCellAt(coordinate.x, coordinate.y, newTarget)
 
         table.Copy() |> setTable
 

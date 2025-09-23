@@ -641,7 +641,8 @@ type ContextMenuModals =
                 prop.className "swt:btn swt:btn-outline swt:btn-primary"
                 prop.text "Paste selected cells"
                 prop.onClick (fun _ ->
-                    AnnotationTableContextMenuUtil.pasteDefault ({|coordinates = coordinates; data = cells|}, coordinates.[0].[0], arcTable, selectHandle, setTable)
+                    let newCellIndex = {| x = coordinates.[0].[0].x - 1; y = coordinates.[0].[0].y - 1|}
+                    AnnotationTableContextMenuUtil.pasteDefault ({|coordinates = coordinates; data = cells|}, newCellIndex, arcTable, selectHandle, setTable)
                     rmv ()
                 )
             ]
