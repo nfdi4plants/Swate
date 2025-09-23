@@ -307,6 +307,7 @@ module AnnotationTableContextMenu =
                 data: ResizeArray<CompositeColumn>
                 columnIndex: int
                 pasteData: CompositeCell[][]
+                headers: string []
                 coordinates: CellCoordinate[][]
             |}
         | PasteColumns of

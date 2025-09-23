@@ -584,6 +584,38 @@ module Extensions =
             | CompositeHeader.Factor oa -> Some oa
             | _ -> None
 
+        member this.GetContentSwate() =
+            match this with
+            | CompositeHeader.Component oa -> [|this.ToString(); oa.NameText; defaultArg oa.TermSourceREF ""; defaultArg oa.TermAccessionNumber ""|]
+            | CompositeHeader.Characteristic oa -> [|this.ToString(); oa.NameText; defaultArg oa.TermSourceREF ""; defaultArg oa.TermAccessionNumber ""|]
+            | CompositeHeader.Factor oa -> [|this.ToString(); oa.NameText; defaultArg oa.TermSourceREF ""; defaultArg oa.TermAccessionNumber ""|]
+            | CompositeHeader.Parameter oa -> [|this.ToString(); oa.NameText; defaultArg oa.TermSourceREF ""; defaultArg oa.TermAccessionNumber ""|]
+            | CompositeHeader.ProtocolType -> [|this.ToString()|]
+            | CompositeHeader.ProtocolDescription -> [|this.ToString()|]
+            | CompositeHeader.ProtocolUri -> [|this.ToString()|]
+            | CompositeHeader.ProtocolVersion -> [|this.ToString()|]
+            | CompositeHeader.ProtocolREF -> [|this.ToString()|]
+            | CompositeHeader.Performer -> [|this.ToString()|]
+            | CompositeHeader.Date -> [|this.ToString()|]
+            | CompositeHeader.Input io -> [|this.ToString()|]
+            | CompositeHeader.Output io -> [|this.ToString()|]
+            | CompositeHeader.Comment _ -> [|this.ToString()|]
+            | CompositeHeader.FreeText _ -> [|this.ToString()|]
+
+        member this.ToTabStr() =
+            this.GetContentSwate() |> String.concat "\t"
+
+        static member ToTableTxt(headers: CompositeHeader[]) =
+            headers
+            //|> Array.map (fun column -> column.ToTabStr())
+            |> Array.map (fun column -> column.ToString())
+            |> String.concat "\t"
+
+        static member fromTabTxt(str: string) =
+            let content = str.Split('\t') |> Array.map _.Trim()
+            content
+            |> Array.map (fun str -> CompositeHeader.OfHeaderString(str))
+
         member this.AsDiscriminate =
             match this with
             | CompositeHeader.Component _ -> CompositeHeaderDiscriminate.Component
