@@ -64,6 +64,7 @@ type TestCases =
             (PasteCases.AddColumns {|
                 data = newCompositeColumns
                 columnIndex = clickedCell.x
+                headers = [||]
                 pasteData = fittedCells
                 coordinates = groupedCellCoordinates
             |})

@@ -607,9 +607,14 @@ module Extensions =
 
         static member ToTableTxt(headers: CompositeHeader[]) =
             headers
-            //|> Array.map (fun column -> column.ToTabStr())
-            |> Array.map (fun column -> column.ToString())
+            //|> Array.map (fun header -> header.ToTabStr())
+            |> Array.map (fun header -> header.ToString())
             |> String.concat "\t"
+
+        static member ToTableString(columns: CompositeColumn[]) =
+            let testTable = ArcTable.init("Test")
+            testTable.AddColumns(columns)
+            testTable.ToString()
 
         static member fromTabTxt(str: string) =
             let content = str.Split('\t') |> Array.map _.Trim()

@@ -95,25 +95,18 @@ type AnnotationTableContextMenuUtil =
                     cellCoordinates
                     |> Array.map (fun (_, row) ->
                         row
-                        |> Array.map (fun coordinate ->
-                            if coordinate.y - 1 < 0 then
-                                Some (table.GetColumn(coordinate.x - 1).Header), None
-                            else
-                                None, Some (table.GetCellAt(coordinate.x - 1, coordinate.y - 1)))
-                    )
-                    |> Array.map (fun item ->
-                        item
-                        |> Array.unzip
+                        |> Array.partition (fun coordinate -> (coordinate.y - 1) < 0)
+                        |> fun (headerCoordinates, bodyCoordinates) ->
+                            headerCoordinates
+                            |> Array.map (fun coordinate ->
+                                table.GetColumn(coordinate.x - 1).Header),
+                            bodyCoordinates
+                            |> Array.map (fun coordinate ->
+                                table.GetCellAt(coordinate.x - 1, coordinate.y - 1))
                     )
                     |> Array.unzip
 
-                let headers =
-                    headers
-                    |> Array.collect (fun item -> item |> Array.choose (fun item -> item))
-                let cells =
-                    cells |> Array.map (fun item -> item |> Array.choose (fun item -> item))
-
-                let headerString = CompositeHeader.ToTableTxt(headers)
+                let headerString = CompositeHeader.ToTableTxt(headers |> Array.collect id)
                 let bodyString = CompositeCell.ToTableTxt(cells)
                 if String.IsNullOrEmpty headerString then
                     bodyString
@@ -256,7 +249,7 @@ type AnnotationTableContextMenuUtil =
 
         let checkForHeaders (row: string[]) =
             row
-            |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader(cell))
+            |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader(cell) || cellIndex.y < 0)
             |> Array.contains true
 
         let headerData, bodyData =
@@ -530,7 +523,6 @@ type AnnotationTableContextMenu =
                 kbdbutton = ATCMC.KbdHint("X"),
                 onClick =
                     fun _ ->
-
                         AnnotationTableContextMenuUtil.cut (cellIndex, arcTable, setArcTable, selectHandle)
                         |> Promise.start
             )
