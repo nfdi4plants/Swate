@@ -283,8 +283,7 @@ type CompositeCellModal =
                 elif setHeader.IsSome then
                     let header =
                         match relevantCompositeHeader.Value with
-                        | CompositeHeader.Characteristic _ ->
-                            CompositeHeader.Characteristic(Term.toOntologyAnnotation tempTerm)
+                        | CompositeHeader.Characteristic _ -> CompositeHeader.Characteristic(Term.toOntologyAnnotation tempTerm)
                         | CompositeHeader.Component _ -> CompositeHeader.Component(Term.toOntologyAnnotation tempTerm)
                         | CompositeHeader.Factor _ -> CompositeHeader.Factor(Term.toOntologyAnnotation tempTerm)
                         | CompositeHeader.Parameter _ -> CompositeHeader.Parameter(Term.toOntologyAnnotation tempTerm)
@@ -642,10 +641,10 @@ type ContextMenuModals =
                 prop.className "swt:btn swt:btn-outline swt:btn-primary"
                 prop.text "Paste columns"
                 prop.onClick (fun _ ->
-                    let newCellIndex = {| x = coordinates.[0].[0].x - 1; y = coordinates.[0].[0].y - 1|}
-                    if cells.Length > 0 then
-                        AnnotationTableContextMenuUtil.pasteBody ({|coordinates = coordinates; data = cells|}, newCellIndex, arcTable, selectHandle, setTable)
+                    let newCellIndex = {|x = coordinates.[0].[0].x - 1; y = coordinates.[0].[0].y - 1|}
                     AnnotationTableContextMenuUtil.pasteHeaders(addColumns.headers, coordinates, arcTable, setTable, true)
+                    if cells.Length > 0 then
+                        AnnotationTableContextMenuUtil.pasteBody ({|coordinates = coordinates.[1..]; data = cells|}, newCellIndex, arcTable, selectHandle, setTable)
                     rmv ()
                 )
             ]

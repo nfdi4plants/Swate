@@ -1,6 +1,7 @@
 namespace Swate.Components.AnnotationTableContextMenu
 
 open System
+open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
 open ARCtrl
@@ -24,6 +25,17 @@ type ATCMC =
 type AnnotationTableContextMenuUtil =
 
     static member checkForHeader (value: string) =
+
+        let splitCamelCase (input: string) =
+            Regex.Matches(input, @"([A-Z][a-z]+|[A-Z]+(?![a-z]))")
+            |> Seq.cast<Match>
+            |> Seq.map (fun m -> m.Value)
+            |> String.concat " "
+
+        let headerNames =
+            CompositeHeader.Cases
+            |> Array.map (fun (_, item) -> splitCamelCase item)
+
         match value with
         | header when ARCtrl.Helper.Regex.tryParseCharacteristicColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseComponentColumnHeader(header).IsSome -> true
@@ -31,6 +43,7 @@ type AnnotationTableContextMenuUtil =
         | header when ARCtrl.Helper.Regex.tryParseInputColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseOutputColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseParameterColumnHeader(header).IsSome -> true
+        | header when headerNames |> Array.exists (fun case -> header.StartsWith(case)) -> true
         | _ -> false
 
     static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
@@ -91,7 +104,7 @@ type AnnotationTableContextMenuUtil =
                     |> Array.ofSeq
                     |> Array.groupBy (fun item -> item.y)
 
-                let headers, cells =
+                let columns, cells =
                     cellCoordinates
                     |> Array.map (fun (_, row) ->
                         row
@@ -99,24 +112,24 @@ type AnnotationTableContextMenuUtil =
                         |> fun (headerCoordinates, bodyCoordinates) ->
                             headerCoordinates
                             |> Array.map (fun coordinate ->
-                                table.GetColumn(coordinate.x - 1).Header),
+                                table.GetColumn(coordinate.x - 1)),
                             bodyCoordinates
                             |> Array.map (fun coordinate ->
                                 table.GetCellAt(coordinate.x - 1, coordinate.y - 1))
                     )
                     |> Array.unzip
 
-                let headerString = CompositeHeader.ToTableTxt(headers |> Array.collect id)
+                let headerString = CompositeHeader.ToTableTxt(columns |> Array.collect id)
                 let bodyString = CompositeCell.ToTableTxt(cells)
+
                 if String.IsNullOrEmpty headerString then
                     bodyString
                 else
-                    headerString + System.Environment.NewLine + bodyString
+                    headerString + bodyString
             else
                 if cellIndex.y - 1 < 0 then
-                    let header = table.GetColumn(cellIndex.x - 1).Header
-                    //header.ToTabStr()
-                    header.ToString()
+                    let column = table.GetColumn(cellIndex.x - 1)
+                    column.Header.ToTabStr()
                 else
                     let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
                     cell.ToTabStr()
@@ -145,7 +158,6 @@ type AnnotationTableContextMenuUtil =
 
     static member getCopiedCells() = promise {
         let! copiedValue = navigator.clipboard.readText ()
-
         let rows =
             copiedValue.Split([| System.Environment.NewLine |], System.StringSplitOptions.RemoveEmptyEntries)
             |> Array.map (fun item -> item.Split('\t') |> Array.map _.Trim())
@@ -156,7 +168,6 @@ type AnnotationTableContextMenuUtil =
     static member getFittedCells(data: string[][], headers: CompositeHeader[]) =
 
         let fitColumnsToTarget (row: string[][]) (headers: CompositeHeader[]) =
-
             let rec loop index result =
                 if index >= headers.Length then
                     result |> List.rev |> Array.ofList
@@ -164,10 +175,11 @@ type AnnotationTableContextMenuUtil =
                     let header = headers.[index]
 
                     let newIndex =
-                        if index >= row.Length then
-                            AnnotationTableContextMenuUtil.getIndex (index, row.Length)
-                        else
-                            index
+                        //if index >= row.Length then
+                        //    AnnotationTableContextMenuUtil.getIndex (index, row.Length)
+                        //else
+                        //    index
+                        index
 
                     match header with
                     | x when x.IsSingleColumn ->
@@ -189,7 +201,7 @@ type AnnotationTableContextMenuUtil =
 
             loop 0 []
 
-        let getHeadersWithLength (headers: CompositeHeader[]) =
+        let getHeadersExpectedLength (headers: CompositeHeader[]) =
             headers
             |> Array.map (fun header ->
                 match header with
@@ -199,50 +211,145 @@ type AnnotationTableContextMenuUtil =
                 | anyElse -> failwith $"Error-getHeadersWithLength: Encountered unsupported case: {anyElse}"
             )
 
-        let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) =
+        let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) (maxColumns: int) =
 
-            let rec tryFit (cell: string[]) index (headerSizesList: (string * int list) list) =
+            let rec tryFit (cell: string[]) index (remaining: (string * int list) list) (columnsLeft: int) =
                 //let index = if index >= strings.Length then 0 else index
 
-                match headerSizesList with
-                | [] -> Some []
-                | (name, sizes) :: rest ->
+                match remaining, columnsLeft with
+                | _, 0 -> Some []
+                | [], _ -> Some []
+                | (name, sizes) :: rest, _ ->
                     sizes
                     |> List.sortDescending
                     |> List.choose (fun size ->
+                        let maxSize = (cell.Length - index) - (columnsLeft - 1)
+                        let adjustedSize = min size maxSize
+
                         let actualSize =
-                            if index + size <= cell.Length then size
+                            if index + adjustedSize <= cell.Length then adjustedSize
                             elif index < cell.Length then cell.Length - index
                             else 0
 
                         if actualSize > 0 then
-                            let segment = cell.[index .. index + actualSize - 1]
+                            let segment = cell.[index..index + actualSize - 1]
 
-                            match tryFit cell (index + actualSize) rest with
+                            match tryFit cell (index + actualSize) rest (columnsLeft - 1) with
                             | Some restResult -> Some((name, segment) :: restResult)
                             | None -> None
                         else
-                            match tryFit cell (index + actualSize) rest with
-                            //| Some restResult -> Some(restResult)
+                            match tryFit cell (index + actualSize) rest (columnsLeft - 1) with
                             | Some restResult -> Some(restResult)
                             | None -> None
-                            //None
                     )
                     |> List.tryHead
 
-            tryFit strings 0 (Array.toList headersSizes)
+            tryFit strings 0 (Array.toList headersSizes) maxColumns
 
-        let fittingHeaders = getHeadersWithLength headers
+        let fittingHeaders = getHeadersExpectedLength headers
 
-        let fittedRows = data |> Array.map (fun row -> fitHeaders row fittingHeaders)
-
+        let fittedRows = data |> Array.map (fun row -> fitHeaders row fittingHeaders headers.Length)
         let result =
             fittedRows
             |> Array.choose (fun row -> row)
-            |> Array.map (fun row -> row |> List.map (fun (_, cells) -> cells) |> Array.ofList)
-
+            |> Array.map (fun row ->
+                row
+                |> List.map (fun (_, cells) -> cells)
+                |> Array.ofList)
         result |> Array.map (fun row -> fitColumnsToTarget row headers)
-        
+
+    static member getFittedHeaders(data: string[], targetCollumnCount: int) =
+
+        let getIOLength(io: IOType) =
+            match io with
+            | IOType.Data -> [ 1; 2; 3; 4; 5 ]
+            | _ -> [ 1 ]
+
+        let getHeadersExpectedLength (headers: string[]) =
+            headers
+            |> Array.map (fun header ->
+                let potHeader = CompositeHeader.OfHeaderString header
+                match potHeader with
+                | CompositeHeader.Component _ -> CompositeHeader.Component.ToString(), [ 1; 2; 3; 4 ]
+                | CompositeHeader.Characteristic _ -> CompositeHeader.Characteristic.ToString(), [ 1; 2; 3; 4 ]
+                | CompositeHeader.Factor _ -> CompositeHeader.Factor.ToString(), [ 1; 2; 3; 4 ]
+                | CompositeHeader.Parameter _ -> CompositeHeader.Parameter.ToString(), [ 1; 2; 3; 4 ]
+                | CompositeHeader.ProtocolType -> CompositeHeader.ProtocolType.ToString(), [ 1 ]
+                | CompositeHeader.ProtocolDescription -> CompositeHeader.ProtocolDescription.ToString(), [ 1 ]
+                | CompositeHeader.ProtocolUri -> CompositeHeader.ProtocolUri.ToString(), [ 1 ]
+                | CompositeHeader.ProtocolVersion -> CompositeHeader.ProtocolVersion.ToString(), [ 1 ]
+                | CompositeHeader.ProtocolREF -> CompositeHeader.ProtocolREF.ToString(), [ 1 ]
+                | CompositeHeader.Performer -> CompositeHeader.Performer.ToString(), [ 1 ]
+                | CompositeHeader.Date -> CompositeHeader.Date.ToString(), [ 1 ]
+                | CompositeHeader.Input io -> CompositeHeader.Input.ToString(), getIOLength(io)
+                | CompositeHeader.Output io -> CompositeHeader.Output.ToString(), getIOLength(io)
+                | CompositeHeader.Comment _ -> CompositeHeader.Comment.ToString(), [ 1 ]
+                | CompositeHeader.FreeText _ -> CompositeHeader.FreeText.ToString(), [ 1 ]
+            )
+
+        let containsMultipleHeaders (segment: string []) =
+            if segment.Length > 1 then
+                let result =
+                    segment.[1..]
+                    |> Array.map (fun item ->
+                        AnnotationTableContextMenuUtil.checkForHeader(item))
+                    |> Array.contains true
+                result
+            else
+                false
+
+        let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) (maxColumns: int) =
+
+            let rec tryFit (header: string[]) index (remaining: (string * int list) list) (columnsLeft: int) =
+
+                match remaining, columnsLeft with
+                | _, 0 -> Some []
+                | [], _ -> Some []
+                | (name, sizes) :: rest, _ ->
+                    sizes
+                    |> List.sortDescending
+                    |> List.choose (fun size ->
+                        let actualSize =
+                            if index + size <= header.Length then size
+                            elif index < header.Length then header.Length - index
+                            else 0
+
+                        if actualSize > 0 then
+
+                            let segment = header.[index..index + actualSize - 1]
+
+                            match tryFit header (index + actualSize) rest (columnsLeft - 1) with
+                            | Some restResult ->
+                                if containsMultipleHeaders segment then
+                                    None
+                                else
+                                    Some((name, segment) :: restResult)
+                            | None -> None
+                        else
+                            match tryFit header (index + actualSize) rest (columnsLeft - 1) with
+                            | Some restResult -> Some(restResult)
+                            | None -> None
+                    )
+                    |> List.tryHead
+
+            tryFit strings 0 (Array.toList headersSizes) maxColumns
+
+        let expectedHeadersLength = getHeadersExpectedLength data
+
+        let fittedHeaders = fitHeaders data expectedHeadersLength targetCollumnCount
+
+        let result =
+            let row =
+                if fittedHeaders.IsSome then
+                    fittedHeaders.Value
+                else
+                    []
+            row
+            |> List.map (fun (_, cells) -> cells) |> Array.ofList
+
+        result
+        |> Array.map (fun header -> CompositeHeader.fromContentValid(header))
+
     static member predictPasteBehaviour
         (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
         =
@@ -264,10 +371,10 @@ type AnnotationTableContextMenuUtil =
             |> Array.ofSeq
 
         //Get all required headers for cells
-        let headers =
+        let compositeColumns =
             let columnIndices = cellCoordinates |> Array.distinctBy (fun item -> item.x)
             columnIndices
-            |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
+            |> Array.map (fun index -> targetTable.GetColumn(index.x - 1))
 
         //Group all cells based on their row
         let groupedCellCoordinates =
@@ -275,7 +382,7 @@ type AnnotationTableContextMenuUtil =
             |> Array.groupBy (fun item -> item.y)
             |> Array.map (fun (_, row) -> row)
 
-        let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (bodyData, headers)
+        let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (bodyData, compositeColumns |> Array.map (fun column -> column.Header))
 
         let isEmpty =
             Array.isEmpty fittedCells
@@ -287,20 +394,18 @@ type AnnotationTableContextMenuUtil =
                 |> Array.contains true
 
         if headerData.Length > 0 then
-
-            let body = if bodyData.Length > 0 then bodyData else [||]
-            let columns = body.[1..] |> Array.transpose
-
-            let finishedColumns =
-                if columns.Length > 0 then
-                    headerData
-                    |> Array.mapi (fun index header ->
-                        Array.append [|header|] columns.[index])
-                else
-                    [|headerData|]
+            let columnHeaders = AnnotationTableContextMenuUtil.getFittedHeaders(headerData, compositeColumns.Length)
 
             let compositeColumns =
-                ARCtrl.Spreadsheet.ArcTable.composeColumns finishedColumns |> ResizeArray
+                let columns = fittedCells |> Array.transpose
+                if columns.Length > 0 then
+                    columns
+                    |> Array.mapi (fun index column -> CompositeColumn.create(columnHeaders.[index], column))
+                    |> ResizeArray
+                else
+                    columnHeaders
+                    |> Array.map (fun header -> CompositeColumn.create(header))
+                    |> ResizeArray
 
             PasteCases.AddColumns {|
                 data = compositeColumns
@@ -311,7 +416,7 @@ type AnnotationTableContextMenuUtil =
             |}
         else
             if isEmpty then
-                PasteCases.Unknown {| data = bodyData; headers = headers |}
+                PasteCases.Unknown {| data = bodyData; headers = compositeColumns |> Array.map (fun column -> column.Header) |}
             else
                 PasteCases.PasteColumns {|
                     data = fittedCells
@@ -320,7 +425,7 @@ type AnnotationTableContextMenuUtil =
 
     static member pasteHeaders(headers: string[], coordinates: CellCoordinate[][], table: ArcTable, setTable, ?forceConvert) =
 
-        let forceConvert = defaultArg forceConvert false
+        let forceConvert = defaultArg forceConvert true
 
         let columnCoordinates =
             coordinates
@@ -328,9 +433,12 @@ type AnnotationTableContextMenuUtil =
                 coordinate
                 |> Array.where (fun item -> item.y - 1 < 0))
 
-        headers
-        |> Array.iteri (fun index header ->
-            table.UpdateHeader(columnCoordinates.[index].x - 1, CompositeHeader.OfHeaderString(header), forceConvert))
+        let columnHeaders = AnnotationTableContextMenuUtil.getFittedHeaders(headers, columnCoordinates.Length)
+
+        columnCoordinates
+        |> Array.iteri (fun index coordinate ->
+            table.UpdateHeader(coordinate.x - 1, columnHeaders.[index], forceConvert)
+        )
 
         table.Copy() |> setTable
 
@@ -386,7 +494,6 @@ type AnnotationTableContextMenuUtil =
                     //let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.[0].Length)
 
                     let currentCell = pasteColumns.data.[yIndex].[xi]
-
                     let newCoordinate = {| x = rowCoordinate.x - 1; y = rowCoordinate.y - 1 |}
                     let newTarget = getCorrectTarget currentCell table newCoordinate 0
                     table.SetCellAt(rowCoordinate.x - 1, rowCoordinate.y - 1, newTarget)

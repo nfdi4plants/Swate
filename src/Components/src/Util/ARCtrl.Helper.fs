@@ -544,8 +544,7 @@ module Extensions =
 
         static member ParameterEmpty = CompositeHeader.Parameter <| OntologyAnnotation.empty ()
 
-        static member CharacteristicEmpty =
-            CompositeHeader.Characteristic <| OntologyAnnotation.empty ()
+        static member CharacteristicEmpty = CompositeHeader.Characteristic <| OntologyAnnotation.empty ()
 
         static member ComponentEmpty = CompositeHeader.Component <| OntologyAnnotation.empty ()
         static member FactorEmpty = CompositeHeader.Factor <| OntologyAnnotation.empty ()
@@ -602,14 +601,13 @@ module Extensions =
             | CompositeHeader.Comment _ -> [|this.ToString()|]
             | CompositeHeader.FreeText _ -> [|this.ToString()|]
 
+        static member ToTableTxt(headers: CompositeColumn[]) =
+            headers
+            |> Array.map (fun column -> column.Header.ToTabStr())
+            |> String.concat "\t"
+
         member this.ToTabStr() =
             this.GetContentSwate() |> String.concat "\t"
-
-        static member ToTableTxt(headers: CompositeHeader[]) =
-            headers
-            //|> Array.map (fun header -> header.ToTabStr())
-            |> Array.map (fun header -> header.ToString())
-            |> String.concat "\t"
 
         static member ToTableString(columns: CompositeColumn[]) =
             let testTable = ArcTable.init("Test")
@@ -620,6 +618,22 @@ module Extensions =
             let content = str.Split('\t') |> Array.map _.Trim()
             content
             |> Array.map (fun str -> CompositeHeader.OfHeaderString(str))
+
+        static member fromContentValid(content: string[]) =
+            match content with
+            | [| columnType; filePath; selector; format; selectorFormat |] ->
+                CompositeHeader.OfHeaderString(columnType)
+            | [| columnType; name; tsr; tan |] ->
+                let header = CompositeHeader.OfHeaderString(columnType)
+                let ontologyAnnotation = new OntologyAnnotation(name, tsr, tan)
+                header.UpdateWithOA(ontologyAnnotation)
+            | [| columnType |] ->
+                CompositeHeader.OfHeaderString(columnType)
+            | _ -> failwith $"The content {content} cannot be converted. Please create an issue with this."
+
+        static member fromTabStr(str: string, body: CompositeCell[]) =
+            let content = str.Split('\t') |> Array.map _.Trim()
+            CompositeHeader.fromContentValid(content)
 
         member this.AsDiscriminate =
             match this with
@@ -683,6 +697,7 @@ module Extensions =
         /// <param name="content"></param>
         /// <param name="header"></param>
         static member fromContentValid(content: string[], ?header: CompositeHeader) =
+
             if header.IsSome then
                 let header = header.Value
 
@@ -753,7 +768,6 @@ module Extensions =
             let rows =
                 cells
                 |> Array.map (fun row -> row |> Array.map (fun cell -> cell.ToTabStr()) |> String.concat "\t")
-
             rows |> String.concat (System.Environment.NewLine)
 
         static member fromTabTxt (tabTxt: string) (header: CompositeHeader) =
