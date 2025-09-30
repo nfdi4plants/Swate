@@ -260,7 +260,7 @@ type AnnotationTableContextMenuUtil =
                 |> Array.ofList)
         result |> Array.map (fun row -> fitColumnsToTarget row headers)
 
-    static member getFittedHeaders(data: string[], targetCollumnCount: int) =
+    static member getFittedHeaders(data: string[]) =
 
         let getIOLength(io: IOType) =
             match io with
@@ -300,14 +300,13 @@ type AnnotationTableContextMenuUtil =
             else
                 false
 
-        let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) (maxColumns: int) =
+        let fitHeaders (strings: string[]) (headersSizes: (string * int list)[]) =
 
-            let rec tryFit (header: string[]) index (remaining: (string * int list) list) (columnsLeft: int) =
+            let rec tryFit (header: string[]) index (remaining: (string * int list) list) =
 
-                match remaining, columnsLeft with
-                | _, 0 -> Some []
-                | [], _ -> Some []
-                | (name, sizes) :: rest, _ ->
+                match remaining with
+                | [] -> Some []
+                | (name, sizes) :: rest ->
                     sizes
                     |> List.sortDescending
                     |> List.choose (fun size ->
@@ -320,7 +319,7 @@ type AnnotationTableContextMenuUtil =
 
                             let segment = header.[index..index + actualSize - 1]
 
-                            match tryFit header (index + actualSize) rest (columnsLeft - 1) with
+                            match tryFit header (index + actualSize) rest with
                             | Some restResult ->
                                 if containsMultipleHeaders segment then
                                     None
@@ -328,17 +327,17 @@ type AnnotationTableContextMenuUtil =
                                     Some((name, segment) :: restResult)
                             | None -> None
                         else
-                            match tryFit header (index + actualSize) rest (columnsLeft - 1) with
+                            match tryFit header (index + actualSize) rest with
                             | Some restResult -> Some(restResult)
                             | None -> None
                     )
                     |> List.tryHead
 
-            tryFit strings 0 (Array.toList headersSizes) maxColumns
+            tryFit strings 0 (Array.toList headersSizes)
 
         let expectedHeadersLength = getHeadersExpectedLength data
 
-        let fittedHeaders = fitHeaders data expectedHeadersLength targetCollumnCount
+        let fittedHeaders = fitHeaders data expectedHeadersLength
 
         let result =
             let row =
@@ -357,7 +356,6 @@ type AnnotationTableContextMenuUtil =
         =
 
         let checkForHeaders (row: string[]) =
-            printfn $"row: {row.Length}"
             row
             |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader(cell) || cellIndex.y < 0)
             |> Array.contains true
@@ -382,6 +380,8 @@ type AnnotationTableContextMenuUtil =
             columnIndices
             |> Array.map (fun index -> targetTable.GetColumn(index.x - 1))
 
+        printfn $"compositeColumns: {compositeColumns.Length}"
+
         //Group all cells based on their row
         let groupedCellCoordinates =
             cellCoordinates
@@ -398,15 +398,21 @@ type AnnotationTableContextMenuUtil =
                     || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
                 )
                 |> Array.contains true
-
+        
         if headerData.Length > 0 then
-            let columnHeaders = AnnotationTableContextMenuUtil.getFittedHeaders(headerData, compositeColumns.Length)
+
+            let columnHeaders = AnnotationTableContextMenuUtil.getFittedHeaders(headerData)
 
             let compositeColumns =
                 let columns = fittedCells |> Array.transpose
                 if columns.Length > 0 then
                     columns
-                    |> Array.mapi (fun index column -> CompositeColumn.create(columnHeaders.[index], column))
+                    |> Array.mapi (fun index column ->
+                        if index < columnHeaders.Length then
+                            Some (CompositeColumn.create(columnHeaders.[index], column))
+                        else
+                            None)
+                    |> Array.choose id
                     |> ResizeArray
                 else
                     columnHeaders
@@ -432,7 +438,7 @@ type AnnotationTableContextMenuUtil =
                     data = fittedCells
                     coordinates = groupedCellCoordinates
                 |}
-
+    
     static member pasteHeaders(headers: string[], coordinates: CellCoordinate[][], table: ArcTable, setTable, ?forceConvert) =
 
         let forceConvert = defaultArg forceConvert true
@@ -443,7 +449,7 @@ type AnnotationTableContextMenuUtil =
                 coordinate
                 |> Array.where (fun item -> item.y - 1 < 0))
 
-        let columnHeaders = AnnotationTableContextMenuUtil.getFittedHeaders(headers, columnCoordinates.Length)
+        let columnHeaders = AnnotationTableContextMenuUtil.getFittedHeaders(headers)
 
         columnCoordinates
         |> Array.iteri (fun index coordinate ->
@@ -496,16 +502,17 @@ type AnnotationTableContextMenuUtil =
             pasteColumns.coordinates
             |> Array.iteri (fun yi row ->
                 //Restart row index, when the amount of selected rows is bigger than copied rows
-                let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, pasteColumns.data.Length)
+                //let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, pasteColumns.data.Length)
                 row
                 |> Array.iteri (fun xi rowCoordinate ->
                     //Restart column index, when the amount of selected columns is bigger than copied columns
                     //let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.[0].Length)
-
-                    let currentCell = pasteColumns.data.[yIndex].[xi]
-                    let newCoordinate = {| x = rowCoordinate.x - 1; y = rowCoordinate.y - 1 |}
-                    let newTarget = getCorrectTarget currentCell table newCoordinate 0
-                    table.SetCellAt(rowCoordinate.x - 1, rowCoordinate.y - 1, newTarget)
+                    if yi < pasteColumns.data.Length then
+                        if xi < pasteColumns.data.[yi].Length then
+                            let currentCell = pasteColumns.data.[yi].[xi]
+                            let newCoordinate = {| x = rowCoordinate.x - 1; y = rowCoordinate.y - 1 |}
+                            let newTarget = getCorrectTarget currentCell table newCoordinate 0
+                            table.SetCellAt(rowCoordinate.x - 1, rowCoordinate.y - 1, newTarget)
                 )
             )
         else

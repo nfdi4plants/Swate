@@ -147,28 +147,52 @@ type Fixture =
             (fun _ -> CellCoordinateRange.count range)
         )
 
-    static member Column_Component_InstrumentModel = [|
-            [| "Component [instrument model]"; "TSR ()"; "TAN ()" |]
+    static member Component_InstrumentModel_String = [|
+            [| "Characteristic [plant structure development stage]"; "Term Source REF (PO)"; "Term Accession Number (PO:0009012)" |]
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_SingleRow = [|
+    static member Component_InstrumentModel_Term_Column =
+        let header = CompositeHeader.Characteristic (OntologyAnnotation.create("plant structure development stage", "PO", "PO:0009012"))
+        let body = CompositeCell.Term (OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
+        CompositeColumn.create(header, [|body|])
+
+    static member Component_Unit_InstrumentModel_String = [|
+            [| "Characteristic [plant structure development stage]"; "Unit"; "Term Source REF (PO)"; "Term Accession Number (PO:0009012)" |]
+            [| "My mass spec"; "SCIEX instrument model"; "MS"; "MS:424242" |]
+        |]
+
+    static member Component_InstrumentModel_Unit_Column =
+        let header = CompositeHeader.Characteristic (OntologyAnnotation.create("plant structure development stage", "PO", "PO:0009012"))
+        let body = CompositeCell.Unitized ("My mass spec", OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
+        CompositeColumn.create(header, [|body|])
+
+    static member Component_Unit_InstrumentModel_Unit_Term_String = [|
+        [| "Characteristic [plant structure development stage]"; "Unit"; "Term Source REF (PO)"; "Term Accession Number (PO:0009012)"; "Characteristic [plant structure development stage]"; "Term Source REF (PO)"; "Term Accession Number (PO:0009012)" |]
+        [| "My mass spec"; "SCIEX instrument model"; "MS"; "MS:424242"; "SCIEX instrument model"; "MS"; "MS:424242" |]
+    |]
+
+    static member Component_Unit_InstrumentModel_Unit_Term_Columns = [|
+            Fixture.Component_InstrumentModel_Unit_Column; Fixture.Component_InstrumentModel_Term_Column
+        |]
+
+    static member Body_Component_InstrumentModel_SingleRow_String = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_Pseudo_SingleRow = [|
+    static member Body_Component_InstrumentModel_Pseudo_SingleRow_String = [|
             [| "Component_ [instrument model]"; "TSR ()"; "TAN ()" |]
         |]
 
-    static member Body_Component_InstrumentModel_SingleRow_Term = [|
+    static member Body_Component_InstrumentModel_SingleRow_Term_String = [|
             [| "Test"; "Testi"; "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_SingleRow_Unit = [|
+    static member Body_Component_InstrumentModel_SingleRow_Unit_String = [|
             [| "Test"; "Testi"; "My Mass Spec"; "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_TwoRows = [|
+    static member Body_Component_InstrumentModel_TwoRows_String = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
             [| "SCIEX instrument model"; "MS"; "MS:434343" |]
         |]

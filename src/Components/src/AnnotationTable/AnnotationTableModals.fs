@@ -644,7 +644,12 @@ type ContextMenuModals =
                     let newCellIndex = {|x = coordinates.[0].[0].x - 1; y = coordinates.[0].[0].y - 1|}
                     AnnotationTableContextMenuUtil.pasteHeaders(addColumns.headers, coordinates, arcTable, setTable, true)
                     if cells.Length > 0 then
-                        AnnotationTableContextMenuUtil.pasteBody ({|coordinates = coordinates.[1..]; data = cells|}, newCellIndex, arcTable, selectHandle, setTable)
+                        let finalCoordiantes =
+                            if coordinates.[0].[0].y <= 0 then
+                                coordinates.[1..]
+                            else
+                                coordinates
+                        AnnotationTableContextMenuUtil.pasteBody ({|coordinates = finalCoordiantes; data = cells|}, newCellIndex, arcTable, selectHandle, setTable)
                     rmv ()
                 )
             ]

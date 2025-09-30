@@ -1,10 +1,11 @@
 namespace ARCtrl
 
+open System.Text.RegularExpressions
+open System.Collections.Generic
 open Swate.Components
 open Swate.Components.Shared
 open ARCtrl
 open Database
-open System.Collections.Generic
 open Fable.Core.JsInterop
 
 module TermCollection =
@@ -620,12 +621,26 @@ module Extensions =
             |> Array.map (fun str -> CompositeHeader.OfHeaderString(str))
 
         static member fromContentValid(content: string[]) =
+
+            let extractBrackets (input: string) =
+                let m = Regex.Match(input, @"\(([^)]*)\)")
+                let result =
+                    if m.Success then Some m.Groups.[1].Value
+                    else None
+                defaultArg result input
+
             match content with
             | [| columnType; filePath; selector; format; selectorFormat |] ->
                 CompositeHeader.OfHeaderString(columnType)
-            | [| columnType; name; tsr; tan |] ->
+            | [| columnType; unit; tsr; tan |] ->
                 let header = CompositeHeader.OfHeaderString(columnType)
-                let ontologyAnnotation = new OntologyAnnotation(name, tsr, tan)
+                let name = defaultArg (header.ToTerm().Name) " "
+                let ontologyAnnotation = new OntologyAnnotation(name, extractBrackets tsr, extractBrackets tan)
+                header.UpdateWithOA(ontologyAnnotation)
+            | [| columnType; tsr; tan |] ->
+                let header = CompositeHeader.OfHeaderString(columnType)
+                let name = defaultArg (header.ToTerm().Name) " "
+                let ontologyAnnotation = new OntologyAnnotation(name, extractBrackets tsr, extractBrackets tan)
                 header.UpdateWithOA(ontologyAnnotation)
             | [| columnType |] ->
                 CompositeHeader.OfHeaderString(columnType)
@@ -697,7 +712,6 @@ module Extensions =
         /// <param name="content"></param>
         /// <param name="header"></param>
         static member fromContentValid(content: string[], ?header: CompositeHeader) =
-
             if header.IsSome then
                 let header = header.Value
 
