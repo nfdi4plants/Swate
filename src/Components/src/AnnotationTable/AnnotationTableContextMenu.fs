@@ -43,7 +43,9 @@ type AnnotationTableContextMenuUtil =
         | header when ARCtrl.Helper.Regex.tryParseInputColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseOutputColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseParameterColumnHeader(header).IsSome -> true
-        | header when headerNames |> Array.exists (fun case -> header.StartsWith(case)) -> true
+        | header when headerNames |> Array.exists (fun case ->
+            not (System.String.IsNullOrEmpty header) &&
+            case.StartsWith(header)) -> true
         | _ -> false
 
     static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
@@ -355,13 +357,17 @@ type AnnotationTableContextMenuUtil =
         =
 
         let checkForHeaders (row: string[]) =
+            printfn $"row: {row.Length}"
             row
             |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader(cell) || cellIndex.y < 0)
             |> Array.contains true
 
         let headerData, bodyData =
-            if checkForHeaders(data.[0]) then
-                data.[0], data.[1..]
+            if data.Length > 0 then
+                if checkForHeaders(data.[0]) then
+                    data.[0], data.[1..]
+                else
+                    [||], data
             else
                 [||], data
 
@@ -416,7 +422,11 @@ type AnnotationTableContextMenuUtil =
             |}
         else
             if isEmpty then
-                PasteCases.Unknown {| data = bodyData; headers = compositeColumns |> Array.map (fun column -> column.Header) |}
+                PasteCases.PasteColumns {|
+                    data = fittedCells
+                    coordinates = groupedCellCoordinates
+                |}
+                //PasteCases.Unknown {| data = bodyData; headers = compositeColumns |> Array.map (fun column -> column.Header) |}
             else
                 PasteCases.PasteColumns {|
                     data = fittedCells
@@ -437,8 +447,7 @@ type AnnotationTableContextMenuUtil =
 
         columnCoordinates
         |> Array.iteri (fun index coordinate ->
-            table.UpdateHeader(coordinate.x - 1, columnHeaders.[index], forceConvert)
-        )
+            table.UpdateHeader(coordinate.x - 1, columnHeaders.[index], forceConvert))
 
         table.Copy() |> setTable
 
@@ -500,9 +509,12 @@ type AnnotationTableContextMenuUtil =
                 )
             )
         else
-            let currentCell = pasteColumns.data.[0].[0]
-            let newTarget = getCorrectTarget currentCell table coordinate 0
-            table.SetCellAt(coordinate.x, coordinate.y, newTarget)
+            if pasteColumns.data.Length = 0 then
+                table.ClearCell(coordinate)
+            else
+                let currentCell = pasteColumns.data.[0].[0]
+                let newTarget = getCorrectTarget currentCell table coordinate 0
+                table.SetCellAt(coordinate.x, coordinate.y, newTarget)
 
         table.Copy() |> setTable
 
