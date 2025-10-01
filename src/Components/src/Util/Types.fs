@@ -305,11 +305,12 @@ module AnnotationTableContextMenu =
         | AddColumns of
             {|
                 data: ResizeArray<CompositeColumn>
-                columnIndex: int
+                coordinate: CellCoordinate
+                coordinates: CellCoordinate[][]
             |}
-        | PasteColumns of
+        | PasteCells of
             {|
-                data: CompositeCell[][]
+                data: ResizeArray<CompositeColumn>
                 coordinates: CellCoordinate[][]
             |}
         | Unknown of
@@ -327,7 +328,7 @@ module AnnotationTable =
         | Details of CellCoordinate
         | Transform of CellCoordinate
         | Edit of CellCoordinate
-        | PasteCaseUserInput of PasteCases
+        | PasteCaseUserInput of PasteCases * SelectHandle
         /// 👀 Uses CellCoordinate to identify if clicked cell is part of selected range
         | MoveColumn of uiTableIndex: CellCoordinate * arcTableIndex: CellCoordinate
         | Error of string

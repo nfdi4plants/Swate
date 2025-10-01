@@ -46,8 +46,8 @@
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
-    <Compile Include="AnnotationTable\AnnotationTableModals.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
+    <Compile Include="AnnotationTable\AnnotationTableModals.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="DataMapTable\DataMapTable.fs" />

@@ -1,19 +1,13 @@
 namespace Fixture
-
 open ARCtrl
 open ARCtrl.Spreadsheet
-
 open Browser.Types
-
 open Swate.Components
-
 open Fable.Mocha
 open Fable.React
 open Fable.React.Props
 open Fable.Core.JsInterop
-
 open Feliz
-
 open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
@@ -22,12 +16,9 @@ open Feliz
 open Feliz.DaisyUI
 open ARCtrl
 open ARCtrl.Spreadsheet
-
 open Types.AnnotationTableContextMenu
 open Types.AnnotationTable
-
 type Fixture =
-
     /// <summary>
     /// Creates a mock table with some sample data.
     ///
@@ -38,7 +29,6 @@ type Fixture =
     static member mkTable () =
         let arcTable =
             ARCtrl.ArcTable("TestTable", ResizeArray(), System.Collections.Generic.Dictionary())
-
         arcTable.AddColumn(
             CompositeHeader.Input IOType.Source,
             [|
@@ -46,7 +36,6 @@ type Fixture =
                     CompositeCell.createFreeText $"Source {i}"
             |]
         )
-
         arcTable.AddColumn(
             CompositeHeader.Output IOType.Data,
             [|
@@ -54,7 +43,6 @@ type Fixture =
                     CompositeCell.createDataFromString(string i, format = "xlsx", selectorFormat = ";")
             |]
         )
-
         arcTable.AddColumn(
             CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")),
             [|
@@ -62,7 +50,6 @@ type Fixture =
                     CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
             |]
         )
-
         arcTable.AddColumn(
             CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")),
             [|
@@ -70,13 +57,10 @@ type Fixture =
                     CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
             |]
         )
-
         arcTable
-
     static member hugeRenderingTable () =
         let arcTable =
             ARCtrl.ArcTable("TestTableHuge", ResizeArray(), System.Collections.Generic.Dictionary())
-
         let inputColumn =
             let cells =
                 [|
@@ -107,7 +91,6 @@ type Fixture =
                 |]
             let parameterColumn = CompositeColumn.create(CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")), cells)
             Array.create 50 parameterColumn
-
         let compositeColumns =
             let collection =
                 Array.append componentColumns parameterColumns
@@ -117,18 +100,15 @@ type Fixture =
             |> Array.ofList
         arcTable.AddColumns(compositeColumns)
         arcTable
-
     static member BaseCell(rowIndex, columnIndex, data) =
         let content = Html.div (data.ToString())
         TableCell.BaseCell(rowIndex, columnIndex, content, debug = true)
-
     static member getRangeOfSelectedCells (selectHande: SelectHandle) =
         selectHande.getSelectedCells ()
         |> Array.ofSeq
         |> Array.ofSeq
         |> Array.groupBy (fun item -> item.y)
         |> Array.map (fun (_, row) -> row)
-
     ///Start with 1 and not 0!
     static member mkSelectHandle (yStart, yEnd, xStart, xEnd) =
         let range: CellCoordinateRange = {|
@@ -137,7 +117,6 @@ type Fixture =
             xStart = xStart
             xEnd = xEnd
         |}
-
         new SelectHandle(
             (fun _ -> failwith "Not implemented"),
             (fun _ -> failwith "Not implemented"),
@@ -147,32 +126,77 @@ type Fixture =
             (fun _ -> CellCoordinateRange.count range)
         )
 
-    static member Column_Component_InstrumentModel = [|
-            [| "Component [instrument model]"; "TSR ()"; "TAN ()" |]
+    static member Component_Term_InstrumentModel_String = [|
+            [| "Characteristic [plant structure development stage]"; "Term Source REF (PO:0009012)"; "Term Accession Number (PO:0009012)" |]
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_SingleRow = [|
+    static member Component_InstrumentModel_Term_Column =
+        let header = CompositeHeader.Characteristic (OntologyAnnotation.create("plant structure development stage", "PO:0009012", "PO:0009012"))
+        let body = CompositeCell.Term (OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
+        CompositeColumn.create(header, [|body|])
+
+    static member Component_Unit_InstrumentModel_String = [|
+            [| "Characteristic [plant structure development stage]"; "Unit"; "Term Source REF (PO:0009012)"; "Term Accession Number (PO:0009012)" |]
+            [| "My mass spec"; "SCIEX instrument model"; "MS"; "MS:424242" |]
+        |]
+
+    static member Component_InstrumentModel_Unit_Column =
+        let header = CompositeHeader.Characteristic (OntologyAnnotation.create("plant structure development stage", "PO:0009012", "PO:0009012"))
+        let body = CompositeCell.Unitized ("My mass spec", OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
+        CompositeColumn.create(header, [|body|])
+
+    static member Component_Unit_InstrumentModel_Unit_Term_String = [|
+        [| "Characteristic [plant structure development stage]"; "Unit"; "Term Source REF (PO:0009012)"; "Term Accession Number (PO:0009012)"; "Characteristic [plant structure development stage]"; "Term Source REF (PO:0009012)"; "Term Accession Number (PO:0009012)" |]
+        [| "My mass spec"; "SCIEX instrument model"; "MS"; "MS:424242"; "SCIEX instrument model"; "MS"; "MS:424242" |]
+    |]
+
+    static member Component_Unit_InstrumentModel_Unit_Term_Columns = [|
+            Fixture.Component_InstrumentModel_Unit_Column
+            Fixture.Component_InstrumentModel_Term_Column
+        |]
+
+    static member Body_Component_InstrumentModel_SingleRow_Term_String = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_SingleRow_Term = [|
+    static member Body_Component_InstrumentModel_Pseudo_SingleRow_String = [|
+            [| "Component_ [instrument model]"; "TSR ()"; "TAN ()" |]
+        |]
+
+    static member Body_Component_InstrumentModel_Pseudo_SingleRow_Column =
+        let header = CompositeHeader.Component (OntologyAnnotation.create("instrument model", "TSR ()", "TAN ()"))
+        let body = CompositeCell.Term (OntologyAnnotation.create("instrument model", "TSR ()", "TAN ()"))
+        CompositeColumn.create(header, [|body|])
+
+    static member Body_Component_InstrumentModel_SingleRow_Term_Strings = [|
             [| "Test"; "Testi"; "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_SingleRow_Unit = [|
+    static member Body_Component_InstrumentModel_SingleRow_Unit_Strings = [|
             [| "Test"; "Testi"; "My Mass Spec"; "SCIEX instrument model"; "MS"; "MS:424242" |]
         |]
 
-    static member Body_Component_InstrumentModel_TwoRows = [|
+    static member Body_Component_InstrumentModel_TwoRows_Term_Strings = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
             [| "SCIEX instrument model"; "MS"; "MS:434343" |]
         |]
+
+    static member Body_Component_InstrumentModel_TwoRows_Term_Column =
+        let header = CompositeHeader.Characteristic (OntologyAnnotation.create("plant structure development stage", "PO:0009012", "PO:0009012"))
+        let body1 = CompositeCell.Term (OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
+        let body2 = CompositeCell.Term (OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:434343"))
+        CompositeColumn.create(header, [|body1; body2|])
 
     static member Body_Integer = [|
             [| "4" |]
         |]
 
+    static member Body_Integer_Column =
+        let header = CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970"))
+        let body = CompositeCell.FreeText Fixture.Body_Integer.[0].[0]
+        CompositeColumn.create(header, [|body|])
+
     static member Body_Empty = [|
             [| "" |]
-        |]
+|]
