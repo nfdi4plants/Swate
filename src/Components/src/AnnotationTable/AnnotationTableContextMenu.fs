@@ -203,6 +203,8 @@ type AnnotationTableContextMenuUtil =
                         else
                             index
 
+                    printfn $"row.[newIndex]: {row.[newIndex]}"
+
                     match header with
                     | x when x.IsSingleColumn ->
                         let cell = CompositeCell.fromContentValid (row.[newIndex], header)
@@ -288,8 +290,17 @@ type AnnotationTableContextMenuUtil =
         (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
         =
 
+        printfn $"data: {data}"
+        printfn $"data.[0]: {data.[0]}"
+
+        if data.Length > 1 then
+            printfn $"data.[1]: {data.[1]}"
+
         //Convert cell coordinates to array
         let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
+
+        cellCoordinates
+        |> Array.iter (fun coordinate -> printfn $"x: {coordinate.x} y: {coordinate.y}")
 
         //Get all required headers for cells
         let headers =
@@ -323,10 +334,10 @@ type AnnotationTableContextMenuUtil =
                     data.[0], [||]
 
             let columns = Array.append [| headers |] body |> Array.transpose
-            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+            let columnsArrays = columns |> Seq.toArray |> Array.map (Seq.toArray)
 
             let compositeColumns =
-                ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList |> ResizeArray
+                ARCtrl.Spreadsheet.ArcTable.composeColumns columnsArrays |> ResizeArray
 
             PasteCases.AddColumns {|
                 data = compositeColumns

@@ -16,7 +16,7 @@ open Types.AnnotationTable
 
 type TestCases =
 
-    static member AddColumns(pasteData: string[][], selectHandle: SelectHandle, expectedColumns: CompositeColumn[]) =
+    static member AddColumns(selectHandle: SelectHandle, pasteData: string[][], expectedColumns: CompositeColumn[]) =
 
         let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
 
@@ -29,12 +29,6 @@ type TestCases =
             cellCoordinates
             |> Array.groupBy (fun item -> item.y)
             |> Array.map (fun (_, row) -> row)
-
-        let headers =
-            expectedColumns
-            |> Array.map (fun column -> column.Header)
-
-        let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (pasteData.[1..], headers)
 
         let pasteBehavior =
             Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
@@ -52,9 +46,7 @@ type TestCases =
             |})
             "Should predict add column behavior"
 
-    static member AddSingleCell(pasteData: string[][], expectedColumn: CompositeColumn) =
-
-        let compositeCell = CompositeCell.createFreeText (pasteData.[0].[0])
+    static member AddSingleCell(pasteData: string[][], expectedColumn: CompositeColumn[]) =
 
         let currentTable = Fixture.mkTable ()
         let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
@@ -72,31 +64,14 @@ type TestCases =
         Expect.equal
             pasteBehavior
             (PasteCases.PasteCells {|
-                data = [| expectedColumn |] |> ResizeArray
+                data = expectedColumn |> ResizeArray
                 coordinates = [| [| clickedCell |] |]
             |})
             "Should predict paste single cell behavior"
 
-    static member PasteMultipleCells(rowEnd, columEnd, pasteData: string[][], expectedColumn: CompositeColumn) =
+    static member PasteMultipleCells(selectHandle: SelectHandle, pasteData: string[][], expectedColumns: CompositeColumn[]) =
         let currentTable = Fixture.mkTable ()
-        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, columEnd, 1, rowEnd)
         let cellCoordinates = Fixture.getRangeOfSelectedCells (selectHandle)
-
-        let headers =
-            let columnIndices =
-                selectHandle.getSelectedCells ()
-                |> Array.ofSeq
-                |> Array.distinctBy (fun item -> item.x)
-
-            columnIndices
-            |> Array.map (fun index -> currentTable.GetColumn(index.x - 1).Header)
-
-        let compositeCells =
-            pasteData.[0 .. columEnd - 1]
-            |> Array.map (fun row ->
-                row.[0 .. rowEnd - 1]
-                |> Array.mapi (fun i item -> CompositeCell.fromContentValid ([| item |], headers.[i]))
-            )
 
         let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
 
@@ -111,48 +86,29 @@ type TestCases =
         Expect.equal
             pasteBehavior
             (PasteCases.PasteCells {|
-                data = [|expectedColumn|] |> ResizeArray
+                data = expectedColumns |> ResizeArray
                 coordinates = cellCoordinates
             |})
             "Should predict paste fitted cells behavior"
 
-    static member AddFittingTerm(startColumn: int, startRow: int, pasteData: string[][], expectedColumn: CompositeColumn) =
+    static member AddFittingTerm(selectHandle: SelectHandle, pasteData: string[][], expectedColumns: CompositeColumn[]) =
         let currentTable = Fixture.mkTable ()
-        let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 3, 3)
         let cellCoordinates = Fixture.getRangeOfSelectedCells (selectHandle)
 
-        let headers =
-            let columnIndices =
-                selectHandle.getSelectedCells ()
-                |> Array.ofSeq
-                |> Array.distinctBy (fun item -> item.x)
-
-            columnIndices
-            |> Array.map (fun index -> currentTable.GetColumn(index.x - 1).Header)
-
-        let clickedCell: CellCoordinate = {| x = 4; y = 1 |}
-
-        let adaptedData =
-            pasteData.[startRow..] |> Array.map (fun item -> item.[startColumn..])
+        let clickedCell: CellCoordinate = {| x = 3; y = 1 |}
 
         let pasteBehavior =
             Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.predictPasteBehaviour (
                 clickedCell,
                 currentTable,
                 selectHandle,
-                adaptedData
-            )
-
-        let fittedCells =
-            Swate.Components.AnnotationTableContextMenu.AnnotationTableContextMenuUtil.getFittedCells (
-                adaptedData,
-                headers
+                pasteData
             )
 
         Expect.equal
             pasteBehavior
             (PasteCases.PasteCells {|
-                data = [|expectedColumn|] |> ResizeArray
+                data = expectedColumns |> ResizeArray
                 coordinates = cellCoordinates
             |})
             "Should predict paste fitted cells behavior"
@@ -194,30 +150,24 @@ let Main =
 
     testList "Context Menu" [
         testList "Prediction" [
-            testCase "Add term column" <| fun _ -> TestCases.AddColumns(Fixture.Component_Term_InstrumentModel_String, Fixture.mkSelectHandle (1, 1, 3, 3), [| Fixture.Component_InstrumentModel_Term_Column |])
-            testCase "Add unit column" <| fun _ -> TestCases.AddColumns(Fixture.Component_Unit_InstrumentModel_String, Fixture.mkSelectHandle (1, 1, 3, 3), [| Fixture.Component_InstrumentModel_Unit_Column |])
-            testCase "Add unit - term column" <| fun _ -> TestCases.AddColumns(Fixture.Component_Unit_InstrumentModel_Unit_Term_String, Fixture.mkSelectHandle (1, 1, 3, 4), Fixture.Component_Unit_InstrumentModel_Unit_Term_Columns)
-            testCase "Paste single Cell" <| fun _ -> TestCases.AddSingleCell(Fixture.Body_Component_InstrumentModel_Pseudo_SingleRow_String, Fixture.Body_Component_InstrumentModel_Pseudo_SingleRow_Column)
+            testCase "Add term column" <| fun _ -> TestCases.AddColumns(Fixture.mkSelectHandle (1, 1, 3, 3), Fixture.Component_Term_InstrumentModel_String, [| Fixture.Component_InstrumentModel_Term_Column |])
+            testCase "Add unit column" <| fun _ -> TestCases.AddColumns(Fixture.mkSelectHandle (1, 1, 3, 3), Fixture.Component_Unit_InstrumentModel_String, [| Fixture.Component_InstrumentModel_Unit_Column |])
+            testCase "Add unit - term column" <| fun _ -> TestCases.AddColumns(Fixture.mkSelectHandle (1, 1, 3, 4), Fixture.Component_Unit_InstrumentModel_Unit_Term_String, Fixture.Component_Unit_InstrumentModel_Unit_Term_Columns)
+            testCase "Paste single Cell" <| fun _ -> TestCases.AddSingleCell(Fixture.Body_Component_InstrumentModel_Pseudo_SingleRow_String, [| Fixture.Body_Component_InstrumentModel_Pseudo_SingleRow_Column |])
+            testCase $"Paste {1} Cell(s) in the same row. Paste {2} Cell(s) in the same column"
+            <| fun _ -> TestCases.PasteMultipleCells(Fixture.mkSelectHandle (1, 2, 1, 1), Fixture.Body_Component_InstrumentModel_TwoRows_Term_Strings, [| Fixture.Body_Component_InstrumentModel_TwoRows_Term_Column |])
+            testCase $"Paste {1} Cell(s) in the same row. Paste {3} Cell(s) in the same column"
+            <| fun _ -> TestCases.PasteMultipleCells(Fixture.mkSelectHandle (1, 3, 1, 1), Fixture.Body_Component_InstrumentModel_ThreeRows_Term_Strings, [| Fixture.Body_Component_InstrumentModel_ThreeRows_Term_Column |])
             testCase $"Paste {2} Cell(s) in the same row. Paste {1} Cell(s) in the same column"
-            <| fun _ -> TestCases.PasteMultipleCells(2, 1, Fixture.Body_Component_InstrumentModel_SingleRow_Term_String, Fixture.Component_InstrumentModel_Term_Column)
-            testCase $"Paste {2} Cell(s) in the same row. Paste {1} Cell(s) in the same column"
-            <| fun _ -> TestCases.PasteMultipleCells(3, 1, Fixture.Body_Component_InstrumentModel_SingleRow_Term_String, Fixture.Component_InstrumentModel_Term_Column)
-            testCase $"Paste {3} Cell(s) in the same row. Paste {1} Cell(s) in the same column"
-            <| fun _ -> TestCases.PasteMultipleCells(1, 2, Fixture.Body_Component_InstrumentModel_TwoRows_Term_Strings, Fixture.Body_Component_InstrumentModel_TwoRows_Term_Column)
+            <| fun _ -> TestCases.PasteMultipleCells(Fixture.mkSelectHandle (1, 1, 1, 2), Fixture.Body_Component_InstrumentModel_TwoColumns_Term_Strings, Fixture.Body_Component_InstrumentModel_TwoColumns_Term_Columns)
             testCase $"Paste {2} Cell(s) in the same row. Paste {2} Cell(s) in the same column"
-            <| fun _ -> TestCases.PasteMultipleCells(2, 2, Fixture.Body_Component_InstrumentModel_TwoRows_Term_Strings, Fixture.Body_Component_InstrumentModel_TwoRows_Term_Column)
-            testCase $"Paste {3} Cell(s) in the same row. Paste {2} Cell(s) in the same column"
-            <| fun _ -> TestCases.PasteMultipleCells(3, 2, Fixture.Body_Component_InstrumentModel_TwoRows_Term_Strings, Fixture.Body_Component_InstrumentModel_TwoRows_Term_Column)
+            <| fun _ -> TestCases.PasteMultipleCells(Fixture.mkSelectHandle (1, 2, 1, 2), Fixture.Body_Component_InstrumentModel_TwoRowsColumns_Term_Strings, Fixture.Body_Component_InstrumentModel_TwoRowsColumns_Term_Columns)
             testCase $"Add fitting Term"
-            <| fun _ -> TestCases.AddFittingTerm(2, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term_String, Fixture.Component_InstrumentModel_Unit_Column)
-            testCase $"Add fitting Term and 1 freetext"
-            <| fun _ -> TestCases.AddFittingTerm(1, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term_String, Fixture.Component_InstrumentModel_Unit_Column)
-            testCase $"Add fitting Term and 2 freetexts"
-            <| fun _ -> TestCases.AddFittingTerm(0, 0, Fixture.Body_Component_InstrumentModel_SingleRow_Term_String, Fixture.Component_InstrumentModel_Unit_Column)
+            <| fun _ -> TestCases.AddFittingTerm(Fixture.mkSelectHandle (1, 1, 3, 3), Fixture.Body_Component_InstrumentModel_SingleRow_Term_String, [| Fixture.Component_InstrumentModel_Term_Body |])
+            testCase $"Add 1 Freetext and 1 Term"
+            <| fun _ -> TestCases.AddFittingTerm(Fixture.mkSelectHandle (1, 1, 2, 3), Fixture.Body_Component_InstrumentModel_SingleRow_1Freetext_1_Term_Strings, Fixture.Body_Component_InstrumentModel_SingleRow_1Freetext_1_Term_Columns)
             testCase $"Add unit value"
-            <| fun _ -> TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer, Fixture.Body_Integer_Column)
-            testCase $"Convert term to unit"
-            <| fun _ -> TestCases.AddFittingTerm(0, 0, Fixture.Body_Integer, Fixture.Body_Integer_Column)
+            <| fun _ -> TestCases.AddFittingTerm(Fixture.mkSelectHandle (1, 1, 3, 3), Fixture.Body_Integer, [| Fixture.Body_Integer_Column |])
             testCase $"Add unknown value"
             <| fun _ -> TestCases.AddUnknownPattern(Fixture.Body_Empty)
         ]
