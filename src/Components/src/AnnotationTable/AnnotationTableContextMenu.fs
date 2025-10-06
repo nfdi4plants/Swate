@@ -428,7 +428,7 @@ type AnnotationTableContextMenuUtil =
                     table.UpdateHeader(coordinate.x - 1, pasteColumns.data.[0].Header, true)
                 else
                     let currentCell = pasteColumns.data.[0].Cells.[0]
-                    let newTarget = getCorrectTarget currentCell table coordinate 0
+                    let newTarget = getCorrectTarget currentCell table coordinate 1
                     table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
 
         if headerCoordinates.Length > 0 then
@@ -499,9 +499,9 @@ type AnnotationTableContextMenu =
             selectHandle: SelectHandle,
             setModal: Types.AnnotationTable.ModalTypes option -> unit
         ) =
-        let cellIndex = {| x = index.x - 1; y = index.y - 1 |}
-        let cell = arcTable.GetCellAt(cellIndex.x, cellIndex.y)
-        let header = arcTable.GetColumn(cellIndex.x).Header
+        let cellIndex = {| x = index.x; y = index.y |}
+        let cell = arcTable.GetCellAt(cellIndex.x - 1, cellIndex.y - 1)
+        let header = arcTable.GetColumn(cellIndex.x - 1).Header
 
         let containsHeaderRow =
             let range = selectHandle.getSelectedCellRange()
@@ -570,7 +570,6 @@ type AnnotationTableContextMenu =
                     kbdbutton = ATCMC.KbdHint("X"),
                     onClick =
                         fun _ ->
-
                             AnnotationTableContextMenuUtil.cut (cellIndex, arcTable, setArcTable, selectHandle)
                             |> Promise.start
                 )
