@@ -503,6 +503,13 @@ type AnnotationTableContextMenu =
         let cell = arcTable.GetCellAt(cellIndex.x, cellIndex.y)
         let header = arcTable.GetColumn(cellIndex.x).Header
 
+        let containsHeaderRow =
+            let range = selectHandle.getSelectedCellRange()
+            if range.IsSome then
+                range.Value.yStart = 0
+            else
+                false
+
         let transformName =
             match cell with
             | CompositeCell.Term _ -> "Transform to Unit"
@@ -556,16 +563,17 @@ type AnnotationTableContextMenu =
                         |> Promise.start
 
             )
-            ContextMenuItem(
-                Html.div "Cut",
-                icon = Icons.Scissor(),
-                kbdbutton = ATCMC.KbdHint("X"),
-                onClick =
-                    fun _ ->
+            if not containsHeaderRow then
+                ContextMenuItem(
+                    Html.div "Cut",
+                    icon = Icons.Scissor(),
+                    kbdbutton = ATCMC.KbdHint("X"),
+                    onClick =
+                        fun _ ->
 
-                        AnnotationTableContextMenuUtil.cut (cellIndex, arcTable, setArcTable, selectHandle)
-                        |> Promise.start
-            )
+                            AnnotationTableContextMenuUtil.cut (cellIndex, arcTable, setArcTable, selectHandle)
+                            |> Promise.start
+                )
             ContextMenuItem(
                 Html.div "Paste",
                 icon = Icons.Paste(),
@@ -618,8 +626,8 @@ type AnnotationTableContextMenu =
     static member CompositeHeaderContent
         (
             columnIndex: int,
-            table: ArcTable,
-            setTable: ArcTable -> unit,
+            arcTable: ArcTable,
+            setArcTable: ArcTable -> unit,
             selectHandle: SelectHandle,
             setModal: Types.AnnotationTable.ModalTypes option -> unit
         ) =
@@ -640,6 +648,32 @@ type AnnotationTableContextMenu =
             )
             ContextMenuItem(isDivider = true)
             ContextMenuItem(
+                Html.div "Copy",
+                icon = Icons.Copy(),
+                kbdbutton = ATCMC.KbdHint("C"),
+                onClick =
+                    fun _ ->
+                        AnnotationTableContextMenuUtil.copy (cellCoordinate, arcTable, selectHandle)
+                        |> Promise.start
+
+            )
+            ContextMenuItem(
+                Html.div "Paste",
+                icon = Icons.Paste(),
+                kbdbutton = ATCMC.KbdHint("V"),
+                onClick =
+                    fun _ ->
+                        AnnotationTableContextMenuUtil.tryPasteCopiedCells (
+                            cellCoordinate,
+                            arcTable,
+                            selectHandle,
+                            setModal,
+                            setArcTable
+                        )
+                        |> Promise.start
+            )
+            ContextMenuItem(isDivider = true)
+            ContextMenuItem(
                 Html.div "Delete Column",
                 icon = Icons.DeleteDown(),
                 kbdbutton = ATCMC.KbdHint("DelC"),
@@ -647,8 +681,8 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex - 1, table, selectHandle)
-                        |> setTable
+                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex - 1, arcTable, selectHandle)
+                        |> setArcTable
             )
             ContextMenuItem(
                 Html.div "Move Column",
