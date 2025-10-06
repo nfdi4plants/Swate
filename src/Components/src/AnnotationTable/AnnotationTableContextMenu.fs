@@ -323,10 +323,10 @@ type AnnotationTableContextMenuUtil =
                     data.[0], [||]
 
             let columns = Array.append [| headers |] body |> Array.transpose
-            let columnsList = columns |> Seq.toArray |> Array.map (Seq.toArray)
+            let columnsArrays = columns |> Seq.toArray |> Array.map (Seq.toArray)
 
             let compositeColumns =
-                ARCtrl.Spreadsheet.ArcTable.composeColumns columnsList |> ResizeArray
+                ARCtrl.Spreadsheet.ArcTable.composeColumns columnsArrays |> ResizeArray
 
             PasteCases.AddColumns {|
                 data = compositeColumns
