@@ -596,16 +596,21 @@ type TemplateFilter =
 
                 TemplateFilterAux.filter templates orgs tokens
 
+        let hasInilizalized = React.useRef(false)
+
         React.useEffect (
             // ensure that on change of templates index for dataplant official templates is updated.
             // This should ensure that filtered template list will not stay empty on lazy load templates
             (fun () ->
-                let dpIndex =
-                    availableCommunities |> Array.tryFindIndex (fun org -> org.IsOfficial())
+                if not hasInilizalized.current && availableCommunities.Length > 0 then
+                    let dpIndex =
+                        availableCommunities |> Array.tryFindIndex (fun org -> org.IsOfficial())
 
-                if dpIndex.IsSome then
-                    setSelectedOrgIndices (selectedOrgIndices.Add dpIndex.Value)
-
+                    match dpIndex with
+                    | Some idx ->
+                        setSelectedOrgIndices (selectedOrgIndices.Add idx)
+                        hasInilizalized.current <- true;
+                    | None -> ()
             ),
             [| box availableTokens; box availableCommunities |]
         )
