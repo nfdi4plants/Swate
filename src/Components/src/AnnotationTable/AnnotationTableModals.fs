@@ -328,6 +328,16 @@ type CompositeCellModal =
                     rmv,
                     submit
                 )
+                InputField.Input(
+                    (tempTerm.href |> Option.defaultValue ""),
+                    (fun input ->
+                        tempTerm.href <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                        setTempTerm (tempTerm)
+                    ),
+                    "Source Link",
+                    rmv,
+                    submit
+                )
             ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
