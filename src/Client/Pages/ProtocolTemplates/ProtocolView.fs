@@ -323,7 +323,14 @@ type Templates =
                 React.fragment [
                     Html.p [
                         Html.b "Search the database for templates."
-                        Html.text " The building blocks from these templates can be inserted into the Swate table. "
+                        Html.text " Not sure where to begin? Take the "
+                        Html.a [
+                            prop.href "https://nfdi4plants.github.io/nfdi4plants.knowledgebase/resources/metadata-quiz/"
+                            prop.target "_blank"
+                            prop.text "Metadata Quiz"
+                            prop.className "swt:text-blue-600 swt:hover:underline swt:cursor-pointer"
+                        ]
+                        Html.text " to find the swate template best suited to your data."
                     ]
                 ]
             )
