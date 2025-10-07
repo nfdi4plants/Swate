@@ -6,6 +6,7 @@ open ARCtrl
 open Database
 open System.Collections.Generic
 open Fable.Core.JsInterop
+open ARCtrl.Spreadsheet
 
 module TermCollection =
 
@@ -531,6 +532,26 @@ module Extensions =
 
     type Template with
         member this.FileName = this.Name.Replace(" ", "_") + ".xlsx"
+
+    type ArcTable with
+            /// <summary>
+            /// Transforms ArcTable to excel compatible "values", row major
+            /// </summary>
+            member this.ToStringSeqs() =
+
+                // Cancel if there are no columns
+                if this.Columns.Length = 0 then
+                    [||]
+                else
+                    let columns =
+                        this.Columns
+                        |> List.ofArray
+                        |> List.sortBy ArcTable.classifyColumnOrder
+                        |> List.collect CompositeColumn.toStringCellColumns
+                        |> Seq.transpose
+                        |> Seq.map (fun column -> column |> Array.ofSeq)
+                        |> Array.ofSeq
+                    columns
 
     type CompositeHeader with
 

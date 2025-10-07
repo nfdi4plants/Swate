@@ -6,6 +6,7 @@ open Browser.Types
 open Swate.Components
 open ARCtrl
 open Swate.Components.Shared
+open Swate.Components.AnnotationTableContextMenu
 
 // 👀 this file is work in progress
 
@@ -606,8 +607,10 @@ type ContextMenuModals =
             addColumns:
                 {|
                     data: ResizeArray<CompositeColumn>
-                    columnIndex: int
+                    coordinate: CellCoordinate
+                    coordinates: CellCoordinate[][]
                 |},
+            selectHandle: SelectHandle,
             setModal: AnnotationTable.ModalTypes option -> unit,
             tableRef: IRefValue<TableHandle>
         ) =
@@ -617,14 +620,30 @@ type ContextMenuModals =
                 tableRef.current.focus ()
                 setModal None
 
-        let compositeColumns = addColumns.data |> Array.ofSeq
+        let compositeColumns = addColumns.data |> Array.ofSeq 
 
         let addColumnsBtn compositeColumns columnIndex =
             Html.button [
                 prop.className "swt:btn swt:btn-outline swt:btn-primary"
-                prop.text "Confirm"
+                prop.text "Add columns"
                 prop.onClick (fun _ ->
                     arcTable.AddColumns(compositeColumns, columnIndex, false, false)
+                    arcTable.Copy() |> setArcTable
+                    rmv ()
+                )
+            ]
+
+        let pasteColumnsBtn (compositeColumns: ResizeArray<CompositeColumn>) (coordinate: CellCoordinate) (coordinates: CellCoordinate [][]) =
+            Html.button [
+                prop.className "swt:btn swt:btn-outline swt:btn-primary"
+                prop.text "Paste cells"
+                prop.onClick (fun _ ->
+                    let pasteColumns = {|
+                            data = compositeColumns
+                            coordinates = coordinates
+                        |}
+                    AnnotationTableContextMenuUtil.pasteCells(pasteColumns, coordinate, selectHandle, arcTable, setArcTable)
+
                     arcTable.Copy() |> setArcTable
                     rmv ()
                 )
@@ -673,9 +692,9 @@ type ContextMenuModals =
             footer =
                 React.fragment [
                     FooterButtons.Cancel(rmv)
-                    addColumnsBtn compositeColumns (addColumns.columnIndex + 1)
+                    addColumnsBtn compositeColumns addColumns.coordinate.x
+                    pasteColumnsBtn addColumns.data addColumns.coordinate addColumns.coordinates
                 ]
-        //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride
         )
 
     [<ReactComponent>]
@@ -1315,8 +1334,6 @@ type EditColumnModal =
     static member Preview(column: CompositeColumn) =
         let parsedStrList =
             ARCtrl.Spreadsheet.CompositeColumn.toStringCellColumns column |> List.transpose
-
-        printfn "parsedStrList: %s" (parsedStrList.ToString())
 
         let headers, body =
             if column.Cells.Length >= 2 then
