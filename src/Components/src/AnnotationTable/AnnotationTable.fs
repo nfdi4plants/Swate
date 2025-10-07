@@ -1,7 +1,7 @@
 namespace Swate.Components
 
-open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Shared
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -9,8 +9,8 @@ open Feliz.DaisyUI
 open ARCtrl
 open ARCtrl.Spreadsheet
 
-open Types.AnnotationTableContextMenu
 open Types.AnnotationTable
+open Types.AnnotationTableContextMenu
 
 module AnnotationTableHelper =
 
@@ -182,6 +182,8 @@ type AnnotationTable =
             modal: AnnotationTable.ModalTypes option,
             setModal,
             tableRef: IRefValue<TableHandle>,
+            isOpen: bool,
+            setIsOpen: bool -> unit,
             ?debug: bool
         ) =
 
@@ -218,7 +220,10 @@ type AnnotationTable =
                                 setModal (Some(ModalTypes.Error exnMessage))
                                 failwith exn.Message
 
-                    AnnotationTableModals.CompositeCellModal.CompositeHeaderModal(header, setHeader, rmv)
+                    if isOpen = false then
+                        setIsOpen true
+
+                    AnnotationTableModals.CompositeCellModal.CompositeHeaderModal(header, setHeader, rmv, isOpen, setIsOpen)
 
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
@@ -230,10 +235,15 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
+                    if isOpen = false then
+                        setIsOpen true
+
                     AnnotationTableModals.CompositeCellModal.CompositeCellModal(
                         cell,
                         setCell,
                         rmv,
+                        isOpen,
+                        setIsOpen,
                         header,
                         ?debug = debug
                     )
@@ -327,7 +337,17 @@ type AnnotationTable =
         ) =
         let containerRef = React.useElementRef ()
         let tableRefInner = React.useRef<TableHandle> (null)
+        let isOpenTermModal, setIsOpenTermModal = React.useState(false)
         let (modal: ModalTypes option), setModal = React.useState None
+
+        let setIsOpenTermModal isOpen =
+            setModal None
+            setIsOpenTermModal isOpen
+
+        let setModal (modalType: ModalTypes option) =
+            setIsOpenTermModal (modalType.IsSome)
+            setModal modalType
+
         let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
 
         let hasCtx = isNullOrUndefined ctx |> not
@@ -432,7 +452,7 @@ type AnnotationTable =
             prop.className "swt:overflow-auto swt:flex swt:flex-col swt:h-full"
             prop.children [
                 ReactDOM.createPortal ( // Modals
-                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, ?debug = debug),
+                    AnnotationTable.ModalController(arcTable, setArcTable, modal, setModal, tableRef, isOpenTermModal, setIsOpenTermModal, ?debug = debug),
                     Browser.Dom.document.body
                 )
                 AnnotationTable.ContextMenu(arcTable, setArcTable, tableRef, containerRef, setModal, ?debug = debug)
@@ -501,12 +521,9 @@ type AnnotationTable =
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
                                 setModal (Some(ModalTypes.Details cell))
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_delete ->
-                                console.log ("Delete selected cells")
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlV ->
-                                console.log ("Pasting cells from clipboard")
-
                                 AnnotationTableContextMenu.AnnotationTableContextMenuUtil.tryPasteCopiedCells (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
@@ -516,8 +533,6 @@ type AnnotationTable =
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlC ->
-                                console.log ("Copying cells to clipboard")
-
                                 AnnotationTableContextMenu.AnnotationTableContextMenuUtil.copy (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
@@ -525,8 +540,6 @@ type AnnotationTable =
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlX ->
-                                console.log ("Cutting cells to clipboard")
-
                                 AnnotationTableContextMenu.AnnotationTableContextMenuUtil.cut (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,

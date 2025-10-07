@@ -462,7 +462,7 @@ type TermSearch =
         | _ -> AdvancedSearchForm
 
     [<ReactComponent>]
-    static member private ModalDetails(tempTerm: Term option, setTempTerm, term: Term option) =
+    static member private ModalDetails(tempTerm: Term option, setTempTerm, term: Term option, ?tempValue: string, ?setTempValue: string option -> unit, ?value: string) =
         let Label (str: string) =
             Html.label [ prop.className "swt:label"; prop.text str ]
 
@@ -480,18 +480,39 @@ type TermSearch =
         let tempTerm = tempTerm |> Option.defaultValue (Term())
         let term = term |> Option.defaultValue (Term())
 
+        let tempValue = tempValue |> Option.defaultValue ("")
+
         Html.fieldSet [
             prop.className "swt:fieldset swt:p-2"
             prop.children [
-                Label "Name"
-                Input(
-                    tempTerm.name,
-                    term.name,
-                    fun (e: string) ->
-                        let nextTerm = structuredClone (tempTerm)
-                        nextTerm.name <- Option.whereNot System.String.IsNullOrWhiteSpace e
-                        setTempTerm (Some nextTerm)
-                )
+                if value.IsSome && setTempValue.IsSome then
+                    Label "Value"
+                    Input(
+                        Some tempValue,
+                        value,
+                        fun (e: string) ->
+                            let nextValue = structuredClone (e)
+                            setTempValue.Value (Some nextValue)
+                    )
+                    Label "Unit"
+                    Input(
+                        tempTerm.name,
+                        term.name,
+                        fun (e: string) ->
+                            let nextTerm = structuredClone (tempTerm)
+                            nextTerm.name <- Option.whereNot System.String.IsNullOrWhiteSpace e
+                            setTempTerm (Some nextTerm)
+                    )
+                else
+                    Label "Name"
+                    Input(
+                        tempTerm.name,
+                        term.name,
+                        fun (e: string) ->
+                            let nextTerm = structuredClone (tempTerm)
+                            nextTerm.name <- Option.whereNot System.String.IsNullOrWhiteSpace e
+                            setTempTerm (Some nextTerm)
+                    )
                 Label "Id"
                 Input(
                     tempTerm.id,
@@ -576,22 +597,26 @@ type TermSearch =
         ]
 
     [<ReactComponent>]
-    static member private Modal
+    static member Modal
         (
             isOpen,
             setIsOpen,
             term: Term option,
             setTerm: Term option -> unit,
             config: (string * string) list,
-            ?advancedSearch
+            ?advancedSearch,
+            ?setValue: string -> unit,
+            ?value: string
         ) =
         let page, setPage = React.useState (ModalPage.Details)
         let tempTerm, setTempTerm = React.useState (term)
-        let hasChanges = tempTerm <> term
+        let tempValue, setTempValue = React.useState (value)
+        let hasChanges = (tempTerm <> term) || (tempValue <> value)
 
         let advSearchResults, setAdvSearchResults = React.useState (SearchState.init)
 
         React.useEffect ((fun _ -> setTempTerm term), [| box term |])
+        React.useEffect ((fun _ -> setTempValue value), [| box value |])
 
         let formRef = React.useRef (fun () -> promise { return ResizeArray<Term>() })
 
@@ -609,7 +634,7 @@ type TermSearch =
 
         let content =
             match page with
-            | ModalPage.Details -> TermSearch.ModalDetails(tempTerm, setTempTerm, term)
+            | ModalPage.Details -> TermSearch.ModalDetails(tempTerm, setTempTerm, term, ?tempValue = tempValue, ?setTempValue = Some setTempValue, ?value = value)
 
             | ModalPage.Config -> TermSearch.ModalConfig(config)
 
@@ -697,6 +722,8 @@ type TermSearch =
                         prop.onClick (fun _ ->
                             if hasChanges then
                                 setTerm tempTerm
+                                if setValue.IsSome && value.IsSome then
+                                    setValue.Value tempValue.Value
                         )
                     ]
                 | _ -> Html.none
@@ -1126,7 +1153,6 @@ type TermSearch =
                      None)
                 "Provider Custom All Children Search Queries",
                 Option.map (Seq.map fst >> String.concat "; ") allChildrenSearchQueries
-
             ]
             |> List.fold
                 (fun acc (key, value) ->

@@ -3,8 +3,8 @@ namespace Swate.Components.AnnotationTableModals
 open Fable.Core
 open Feliz
 open Browser.Types
-open Swate.Components
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 
 // 👀 this file is work in progress
@@ -527,6 +527,8 @@ type CompositeCellModal =
             compositeCell: CompositeCell,
             setCell: CompositeCell -> unit,
             rmv: unit -> unit,
+            isOpen: bool,
+            setIsOpen: bool -> unit,
             ?relevantCompositeHeader: CompositeHeader,
             ?debug: bool
         ) =
@@ -540,13 +542,24 @@ type CompositeCellModal =
                     Some "Details_Term"
                 else
                     None
+            
+            let term, setTerm = React.useState(Some (Term.fromOntologyAnnotation(oa)))
 
-            CompositeCellModal.TermModal(
-                oa,
-                rmv,
-                ?relevantCompositeHeader = relevantCompositeHeader,
-                setOa = setOa,
-                ?debug = debug
+            let setTerm (term: Term option) =
+                let oa =
+                    if term.IsSome then
+                        OntologyAnnotation.fromTerm(term.Value)
+                    else
+                        oa
+                setOa oa
+                setTerm term
+
+            TermSearch.Modal(
+                isOpen,
+                setIsOpen,
+                term,
+                setTerm,
+                []
             )
         | CompositeCell.Unitized(v, oa) ->
             let setUnitized = fun v oa -> setCell (CompositeCell.Unitized(v, oa))
@@ -556,14 +569,36 @@ type CompositeCellModal =
                     Some "Details_Unitized"
                 else
                     None
+            
+            let term, setTerm = React.useState(Some (Term.fromOntologyAnnotation(oa)))
+            let value, setValue = React.useState(v)
 
-            CompositeCellModal.UnitizedModal(
-                v,
-                oa,
-                setUnitized,
-                rmv,
-                ?relevantCompositeHeader = relevantCompositeHeader,
-                ?debug = debug
+            let setTerm (term: Term option) =
+                let oa =
+                    if term.IsSome then
+                        OntologyAnnotation.fromTerm(term.Value)
+                    else
+                        oa
+                setUnitized value oa
+                setTerm term
+
+            let setValue value =
+                let oa =
+                    if term.IsSome then
+                        OntologyAnnotation.fromTerm(term.Value)
+                    else
+                        oa
+                setValue value
+                setUnitized value oa
+
+            TermSearch.Modal(
+                isOpen,
+                setIsOpen,
+                term,
+                setTerm,
+                [],
+                setValue = setValue,
+                value = value
             )
         | CompositeCell.FreeText text ->
             let setText = fun text -> setCell (CompositeCell.FreeText text)
@@ -593,12 +628,30 @@ type CompositeCellModal =
             )
 
     [<ReactComponent>]
-    static member CompositeHeaderModal(header: CompositeHeader, setHeader: CompositeHeader -> unit, rmv: unit -> unit) =
+    static member CompositeHeaderModal(header: CompositeHeader, setHeader: CompositeHeader -> unit, rmv: unit -> unit, isOpen: bool, setIsOpen: bool -> unit) =
         match header with
         | compositeHeader when compositeHeader.IsTermColumn ->
-            let setOa = fun oa -> setHeader oa
+            let setOa = fun oa ->
+                let newHeader = header.UpdateWithOA oa
+                setHeader newHeader
             let oa = header.ToTerm()
-            CompositeCellModal.TermModal(oa, rmv, setHeader = setOa, relevantCompositeHeader = header)
+            let term, setTerm = React.useState(Some (Term.fromOntologyAnnotation(oa)))
+            let setTerm (term: Term option) =
+                let oa =
+                    if term.IsSome then
+                        OntologyAnnotation.fromTerm(term.Value)
+                    else
+                        oa
+                setOa oa
+                setTerm term
+
+            TermSearch.Modal(
+                isOpen,
+                setIsOpen,
+                term,
+                setTerm,
+                []
+            )
         | compositeHeader when compositeHeader.IsDataColumn ->
             let data = Data.create (Name = header.ToString())
             CompositeCellModal.DataModal(data, rmv, relevantCompositeHeader = header, setHeader = setHeader)
