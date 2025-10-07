@@ -596,16 +596,24 @@ type TemplateFilter =
 
                 TemplateFilterAux.filter templates orgs tokens
 
+        let hasInilizalized = React.useRef(false)
+
+        //DataPLANT shall be set as the first available organization to select templates from.
+        //Problem is, due to lazy loading in the beginning no organizations could be available.
+        //In order to prevent an empty template selection, DataPLANT is set when the organization have been loaded.
+        //In order to avoid resetting DataPLANT, the variable "hasInitialized" checks whether DataPLANT has been set successfully
+        //in the beginning or not and prevent resetting it.
         React.useEffect (
-            // ensure that on change of templates index for dataplant official templates is updated.
-            // This should ensure that filtered template list will not stay empty on lazy load templates
             (fun () ->
-                let dpIndex =
-                    availableCommunities |> Array.tryFindIndex (fun org -> org.IsOfficial())
+                if not hasInilizalized.current && availableCommunities.Length > 0 then
+                    let dpIndex =
+                        availableCommunities |> Array.tryFindIndex (fun org -> org.IsOfficial())
 
-                if dpIndex.IsSome then
-                    setSelectedOrgIndices (selectedOrgIndices.Add dpIndex.Value)
-
+                    match dpIndex with
+                    | Some idx ->
+                        setSelectedOrgIndices (selectedOrgIndices.Add idx)
+                        hasInilizalized.current <- true;
+                    | None -> ()
             ),
             [| box availableTokens; box availableCommunities |]
         )
