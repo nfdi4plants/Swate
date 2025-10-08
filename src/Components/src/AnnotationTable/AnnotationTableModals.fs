@@ -270,66 +270,39 @@ type CompositeCellModal =
             ?setHeader: CompositeHeader -> unit,
             ?debug: string
         ) =
-        let initTerm = Term.fromOntologyAnnotation oa
+
+        let initTerm = Some (Term.fromOntologyAnnotation oa)
         let tempTerm, setTempTerm = React.useState (initTerm)
 
         let submit =
             fun () ->
-                if setOa.IsSome then
-                    tempTerm |> Term.toOntologyAnnotation |> setOa.Value
-                    rmv ()
-                elif setHeader.IsSome then
-                    let header =
-                        match relevantCompositeHeader.Value with
-                        | CompositeHeader.Characteristic _ ->
-                            CompositeHeader.Characteristic(Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Component _ -> CompositeHeader.Component(Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Factor _ -> CompositeHeader.Factor(Term.toOntologyAnnotation tempTerm)
-                        | CompositeHeader.Parameter _ -> CompositeHeader.Parameter(Term.toOntologyAnnotation tempTerm)
-                        | _ -> failwith $"Unknown CompositeHeader type {relevantCompositeHeader.Value.ToString()}"
+                if tempTerm.IsSome then
+                    let tempTerm = tempTerm.Value
+                    if setOa.IsSome then
+                        tempTerm |> Term.toOntologyAnnotation |> setOa.Value
+                        rmv ()
+                    elif setHeader.IsSome then
+                        let header =
+                            match relevantCompositeHeader.Value with
+                            | CompositeHeader.Characteristic _ ->
+                                CompositeHeader.Characteristic(Term.toOntologyAnnotation tempTerm)
+                            | CompositeHeader.Component _ -> CompositeHeader.Component(Term.toOntologyAnnotation tempTerm)
+                            | CompositeHeader.Factor _ -> CompositeHeader.Factor(Term.toOntologyAnnotation tempTerm)
+                            | CompositeHeader.Parameter _ -> CompositeHeader.Parameter(Term.toOntologyAnnotation tempTerm)
+                            | _ -> failwith $"Unknown CompositeHeader type {relevantCompositeHeader.Value.ToString()}"
 
-                    header |> setHeader.Value
-                    rmv ()
-                else
-                    failwith "At least one set parameter must be set!"
+                        header |> setHeader.Value
+                        rmv ()
+                    else
+                        failwith "At least one set parameter must be set!"
 
-        let parentOa = relevantCompositeHeader |> Option.map (fun h -> h.ToTerm())
+        let body = TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm)
 
         BaseModal.Modal(
             true,
             (fun _ -> rmv ()),
             Html.div "Term",
-            React.fragment [
-                InputField.TermCombi(
-                    Some tempTerm,
-                    (fun t -> t |> Option.defaultValue (Term()) |> setTempTerm),
-                    "Term Name",
-                    rmv,
-                    submit,
-                    autofocus = debug.IsNone,
-                    ?parentOa = parentOa
-                )
-                InputField.Input(
-                    (tempTerm.source |> Option.defaultValue ""),
-                    (fun input ->
-                        tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                        setTempTerm (tempTerm)
-                    ),
-                    "Source",
-                    rmv,
-                    submit
-                )
-                InputField.Input(
-                    (tempTerm.id |> Option.defaultValue ""),
-                    (fun input ->
-                        tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                        setTempTerm (tempTerm)
-                    ),
-                    "Accession Number",
-                    rmv,
-                    submit
-                )
-            ],
+            React.fragment [ body ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
             ?debug = debug
@@ -344,60 +317,24 @@ type CompositeCellModal =
             ?relevantCompositeHeader: CompositeHeader,
             ?debug
         ) =
-        let initTerm = Term.fromOntologyAnnotation oa
-        let tempValue, setTempValue = React.useState (value)
+        let initTerm = Some (Term.fromOntologyAnnotation oa)
         let tempTerm, setTempTerm = React.useState (initTerm)
+        let tempValue, setTempValue = React.useState (value)
 
         let submit =
             fun () ->
-                let oa = tempTerm |> Term.toOntologyAnnotation
-                setUnitized tempValue oa
-                rmv ()
+                if tempTerm.IsSome then
+                    let oa = tempTerm.Value |> Term.toOntologyAnnotation
+                    setUnitized tempValue oa
+                    rmv ()
 
-        let parentOa = relevantCompositeHeader |> Option.map (fun h -> h.ToTerm())
+        let body = TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm, tempValue, setTempValue, value)
 
         BaseModal.Modal(
             true,
             (fun _ -> rmv ()),
             Html.div "Unitized",
-            React.fragment [
-                InputField.Input(
-                    tempValue,
-                    (fun input -> setTempValue input),
-                    "Value",
-                    rmv,
-                    submit,
-                    autofocus = debug.IsNone
-                )
-                InputField.TermCombi(
-                    Some tempTerm,
-                    (fun t -> t |> Option.defaultValue (Term()) |> setTempTerm),
-                    "Term Name",
-                    rmv,
-                    submit,
-                    ?parentOa = parentOa
-                )
-                InputField.Input(
-                    (tempTerm.source |> Option.defaultValue ""),
-                    (fun input ->
-                        tempTerm.source <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                        setTempTerm (tempTerm)
-                    ),
-                    "Source",
-                    rmv,
-                    submit
-                )
-                InputField.Input(
-                    (tempTerm.id |> Option.defaultValue ""),
-                    (fun input ->
-                        tempTerm.id <- Option.whereNot System.String.IsNullOrWhiteSpace input
-                        setTempTerm (tempTerm)
-                    ),
-                    "Accession Number",
-                    rmv,
-                    submit
-                )
-            ],
+            React.fragment [ body ],
             footer = React.fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
             //contentClassInfo = CompositeCellModal.BaseModalContentClassOverride,
             ?debug = debug

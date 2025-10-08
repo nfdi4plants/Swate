@@ -462,7 +462,7 @@ type TermSearch =
         | _ -> AdvancedSearchForm
 
     [<ReactComponent>]
-    static member private ModalDetails(tempTerm: Term option, setTempTerm, term: Term option) =
+    static member ModalDetails(tempTerm: Term option, setTempTerm, term: Term option, ?tempValue: string, ?setTempValue: string -> unit, ?value: string) =
         let Label (str: string) =
             Html.label [ prop.className "swt:label"; prop.text str ]
 
@@ -479,19 +479,39 @@ type TermSearch =
 
         let tempTerm = tempTerm |> Option.defaultValue (Term())
         let term = term |> Option.defaultValue (Term())
+        let tempValue = tempValue |> Option.defaultValue ("")
 
         Html.fieldSet [
             prop.className "swt:fieldset swt:p-2"
             prop.children [
-                Label "Name"
-                Input(
-                    tempTerm.name,
-                    term.name,
-                    fun (e: string) ->
-                        let nextTerm = structuredClone (tempTerm)
-                        nextTerm.name <- Option.whereNot System.String.IsNullOrWhiteSpace e
-                        setTempTerm (Some nextTerm)
-                )
+                if value.IsSome && setTempValue.IsSome then
+                    Label "Value"
+                    Input(
+                        Some tempValue,
+                        value,
+                        fun (e: string) ->
+                            let nextValue = structuredClone (e)
+                            setTempValue.Value nextValue
+                    )
+                    Label "Unit"
+                    Input(
+                        tempTerm.name,
+                        term.name,
+                        fun (e: string) ->
+                            let nextTerm = structuredClone (tempTerm)
+                            nextTerm.name <- Option.whereNot System.String.IsNullOrWhiteSpace e
+                            setTempTerm (Some nextTerm)
+                    )
+                else
+                    Label "Name"
+                    Input(
+                        tempTerm.name,
+                        term.name,
+                        fun (e: string) ->
+                            let nextTerm = structuredClone (tempTerm)
+                            nextTerm.name <- Option.whereNot System.String.IsNullOrWhiteSpace e
+                            setTempTerm (Some nextTerm)
+                    )
                 Label "Id"
                 Input(
                     tempTerm.id,
