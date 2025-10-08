@@ -919,6 +919,9 @@ type TermSearch =
                             createTermSearch id termSearch query
                 ]
                 |> Promise.all
+                |> Promise.catch(fun ex ->
+                    console.error $"Error in callParentSearch {ex.Message}" [||]
+                )
                 |> Promise.start
 
         let parentSearch =
@@ -940,9 +943,11 @@ type TermSearch =
                         if termSearchConfigCtx.hasProvider then
                             for id, parentSearch in termSearchConfigCtx.parentSearchQueries do
                                 createParentChildTermSearch id parentSearch (parentId.Value, query)
-                // setLoading(false)
                 ]
                 |> Promise.all
+                |> Promise.catch(fun ex ->
+                    console.error $"Error in callParentSearch {ex.Message}" [||]
+                )
                 |> Promise.start
 
         let allChildSearch =
@@ -963,6 +968,9 @@ type TermSearch =
                                 createAllChildTermSearch id allChildSearch parentId.Value
                 ]
                 |> Promise.all
+                |> Promise.catch(fun ex ->
+                    console.error $"Error in callParentSearch {ex.Message}" [||]
+                )
                 |> Promise.start
 
         let cancelSearch, search =
