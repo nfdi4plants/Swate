@@ -3,6 +3,7 @@ module Swate.Components.Api
 open Swate.Components
 open Swate.Components.Shared
 open Fable.Core
+open Fable.Core.JsInterop
 open Fable.Remoting.Client
 
 let SwateApi: IOntologyAPIv3 =
@@ -98,9 +99,12 @@ type TIBApi =
         |> Promise.bind (fun response ->
             response.json<TIBTypes.TermApi> ()
             |> Promise.map (fun termApi ->
-                termApi._embedded.terms
-                |> Array.tryFind (fun term -> term.obo_id = oboId)
-                |> Option.map (fun term -> term.iri)
+                if not (isNullOrUndefined termApi._embedded) then
+                    termApi._embedded.terms
+                    |> Array.tryFind (fun term -> term.obo_id = oboId)
+                    |> Option.map (fun term -> term.iri)
+                else
+                    None
             )
             |> Promise.catch(fun ex ->
                 console.error $"Error in tryGetIRIFromOboId: {ex.Message}"
