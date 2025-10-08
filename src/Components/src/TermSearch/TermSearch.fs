@@ -134,8 +134,8 @@ module private API =
             Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -144,8 +144,8 @@ module private API =
             Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10, parentTermId = parent))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callParentSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callParentSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -154,8 +154,8 @@ module private API =
             Api.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create (parent, 300))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results.results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callAllChildSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callAllChildSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -164,8 +164,8 @@ module private API =
             Api.SwateApi.searchTermAdvanced dto
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callAdvancedSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callAdvancedSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -853,23 +853,19 @@ type TermSearch =
         let createParentChildTermSearch =
             fun (id: string) (search: ParentSearchCall) ->
                 let id = "PC_" + id
-
                 fun (parentId: string, query: string) -> promise {
                     startLoadingBy id
                     let! termSearchResults = search (parentId, query)
-
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
                             Term = t0
                             IsDirectedSearchResult = true
                         })
-
                     if not cancelled.current then
                         setSearchResults (fun prevResults ->
                             TermSearchResult.addSearchResults prevResults.Results termSearchResults
                             |> SearchState.SearchDone
                         )
-
                     stopLoadingBy id
                 }
 
@@ -919,8 +915,9 @@ type TermSearch =
                             createTermSearch id termSearch query
                 ]
                 |> Promise.all
-                |> Promise.catch(fun ex ->
-                    console.error $"Error in callParentSearch {ex.Message}" [||]
+                |> Promise.catch(fun exn ->
+                    console.error $"Error in termSearchFunc: {exn.Message}"
+                    [||]
                 )
                 |> Promise.start
 
@@ -935,18 +932,17 @@ type TermSearch =
                                 "DEFAULT_PARENTCHILD"
                                 API.callParentSearch
                                 (parentId.Value, query)
-
                         if parentSearchQueries.IsSome then
                             for id, parentSearch in parentSearchQueries.Value do
                                 createParentChildTermSearch id parentSearch (parentId.Value, query)
-
                         if termSearchConfigCtx.hasProvider then
                             for id, parentSearch in termSearchConfigCtx.parentSearchQueries do
                                 createParentChildTermSearch id parentSearch (parentId.Value, query)
                 ]
                 |> Promise.all
-                |> Promise.catch(fun ex ->
-                    console.error $"Error in callParentSearch {ex.Message}" [||]
+                |> Promise.catch(fun exn ->
+                    console.error $"Error in parentSearch: {exn.Message}"
+                    [||]
                 )
                 |> Promise.start
 
@@ -968,8 +964,9 @@ type TermSearch =
                                 createAllChildTermSearch id allChildSearch parentId.Value
                 ]
                 |> Promise.all
-                |> Promise.catch(fun ex ->
-                    console.error $"Error in callParentSearch {ex.Message}" [||]
+                |> Promise.catch(fun exn ->
+                    console.error $"Error in allChildSearch: {exn.Message}"
+                    [||]
                 )
                 |> Promise.start
 

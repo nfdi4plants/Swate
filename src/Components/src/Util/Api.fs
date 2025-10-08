@@ -102,6 +102,10 @@ type TIBApi =
                 |> Array.tryFind (fun term -> term.obo_id = oboId)
                 |> Option.map (fun term -> term.iri)
             )
+            |> Promise.catch(fun ex ->
+                console.error $"Error in tryGetIRIFromOboId: {ex.Message}"
+                None
+            )
         )
 
     // TODO: Maybe we should use allChildrenOf instead of childrenOf?
