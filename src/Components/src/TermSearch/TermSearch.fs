@@ -134,8 +134,8 @@ module private API =
             Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -144,8 +144,8 @@ module private API =
             Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10, parentTermId = parent))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callParentSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callParentSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -154,8 +154,8 @@ module private API =
             Api.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create (parent, 300))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results.results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callAllChildSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callAllChildSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -164,8 +164,8 @@ module private API =
             Api.SwateApi.searchTermAdvanced dto
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
-            |> Promise.catch (fun ex ->
-                console.error $"Error in callAdvancedSearch {ex.Message}"
+            |> Promise.catch (fun exn ->
+                console.error $"Error in callAdvancedSearch: {exn.Message}"
                 ResizeArray()
             )
 
@@ -833,7 +833,13 @@ type TermSearch =
 
                 fun (query: string) -> promise {
                     startLoadingBy id
-                    let! termSearchResults = search query
+                    let! termSearchResults =
+                        search query
+                        |> Promise.catch(fun exn ->
+                          stopLoadingBy id
+                          console.error $"Error in search {exn.Message}"
+                          ResizeArray()
+                        )
 
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
@@ -853,23 +859,25 @@ type TermSearch =
         let createParentChildTermSearch =
             fun (id: string) (search: ParentSearchCall) ->
                 let id = "PC_" + id
-
                 fun (parentId: string, query: string) -> promise {
                     startLoadingBy id
-                    let! termSearchResults = search (parentId, query)
-
+                    let! termSearchResults =
+                        search (parentId, query)
+                        |> Promise.catch(fun exn ->
+                          stopLoadingBy id
+                          console.error $"Error in parent child search {exn.Message}"
+                          ResizeArray()
+                        )
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
                             Term = t0
                             IsDirectedSearchResult = true
                         })
-
                     if not cancelled.current then
                         setSearchResults (fun prevResults ->
                             TermSearchResult.addSearchResults prevResults.Results termSearchResults
                             |> SearchState.SearchDone
                         )
-
                     stopLoadingBy id
                 }
 
@@ -879,7 +887,13 @@ type TermSearch =
 
                 fun (parentId: string) -> promise {
                     startLoadingBy id
-                    let! termSearchResults = search parentId
+                    let! termSearchResults =
+                        search parentId
+                        |> Promise.catch(fun exn ->
+                          stopLoadingBy id
+                          console.error $"Error in all child search {exn.Message}"
+                          ResizeArray()
+                        )
 
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
@@ -919,6 +933,10 @@ type TermSearch =
                             createTermSearch id termSearch query
                 ]
                 |> Promise.all
+                |> Promise.catch(fun exn ->
+                    console.error $"Error in termSearchFunc: {exn.Message}"
+                    [||]
+                )
                 |> Promise.start
 
         let parentSearch =
@@ -932,17 +950,18 @@ type TermSearch =
                                 "DEFAULT_PARENTCHILD"
                                 API.callParentSearch
                                 (parentId.Value, query)
-
                         if parentSearchQueries.IsSome then
                             for id, parentSearch in parentSearchQueries.Value do
                                 createParentChildTermSearch id parentSearch (parentId.Value, query)
-
                         if termSearchConfigCtx.hasProvider then
                             for id, parentSearch in termSearchConfigCtx.parentSearchQueries do
                                 createParentChildTermSearch id parentSearch (parentId.Value, query)
-                // setLoading(false)
                 ]
                 |> Promise.all
+                |> Promise.catch(fun exn ->
+                    console.error $"Error in parentSearch: {exn.Message}"
+                    [||]
+                )
                 |> Promise.start
 
         let allChildSearch =
@@ -963,6 +982,10 @@ type TermSearch =
                                 createAllChildTermSearch id allChildSearch parentId.Value
                 ]
                 |> Promise.all
+                |> Promise.catch(fun exn ->
+                    console.error $"Error in allChildSearch: {exn.Message}"
+                    [||]
+                )
                 |> Promise.start
 
         let cancelSearch, search =
@@ -1050,14 +1073,17 @@ type TermSearch =
         let InputTrailingVisual =
             React.fragment [
                 Html.div [
-                    Icons.Check(
-                        [
-                            "swt:text-primary swt:transition-all swt:size-4 swt:overflow-x-hidden swt:opacity-100"
-                            if not isFullTerm then
-                                "swt:!w-0 swt:!opacity-0"
-                        ]
-                        |> String.concat " "
-                    )
+                    if isLoading then
+                        Html.span [ prop.className "swt:loading swt:loading-spinner swt:loading-sm" ]
+                    else
+                        Icons.Check(
+                            [
+                                "swt:text-primary swt:transition-all swt:size-4 swt:overflow-x-hidden swt:opacity-100"
+                                if not isFullTerm then
+                                    "swt:!w-0 swt:!opacity-0"
+                            ]
+                            |> String.concat " "
+                        )
                 ]
             ]
 
@@ -1180,7 +1206,7 @@ type TermSearch =
                 items = Array.ofSeq searchResults.Results,
                 filterFn = (fun x -> true),
                 itemToString = (fun x -> x.Term.name |> Option.defaultValue ""),
-                loading = isLoading,
+                loading = (isLoading && searchResults.Results.Count = 0),
                 placeholder = placeholder,
                 inputLeadingVisual = InputLeadingVisual,
                 inputTrailingVisual = InputTrailingVisual,

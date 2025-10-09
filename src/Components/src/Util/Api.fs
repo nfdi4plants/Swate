@@ -3,6 +3,7 @@ module Swate.Components.Api
 open Swate.Components
 open Swate.Components.Shared
 open Fable.Core
+open Fable.Core.JsInterop
 open Fable.Remoting.Client
 
 let SwateApi: IOntologyAPIv3 =
@@ -57,7 +58,7 @@ module TIBTypes =
         abstract terms: Term[]
 
     type TermApi =
-        abstract _embedded: TermArray
+        abstract _embedded: TermArray option
 
     type SearchResults =
         abstract numFound: int
@@ -98,9 +99,12 @@ type TIBApi =
         |> Promise.bind (fun response ->
             response.json<TIBTypes.TermApi> ()
             |> Promise.map (fun termApi ->
-                termApi._embedded.terms
-                |> Array.tryFind (fun term -> term.obo_id = oboId)
-                |> Option.map (fun term -> term.iri)
+                if termApi._embedded.IsNone then
+                    None
+                else
+                    termApi._embedded.Value.terms
+                    |> Array.tryFind (fun term -> term.obo_id = oboId)
+                    |> Option.map (fun term -> term.iri)
             )
         )
 
@@ -123,33 +127,34 @@ type TIBApi =
                 let! parentIri = TIBApi.tryGetIRIFromOboId childrenOf.Value
                 childrenOf_ <- parentIri
 
-                if childrenOf.IsSome && childrenOf_.IsNone then // exit condition should we not find the parent IRI
-                    failwith ("Could not find parent IRI for childrenOf: " + childrenOf.Value)
-
-            let queryParams: (string * obj) list = [
-                "q", q
-                if rows.IsSome then
-                    "rows", rows.Value
-                if obsoletes.IsSome then
-                    "obsoletes", obsoletes.Value
-                if queryFields.IsSome then
-                    "queryFields", (queryFields.Value |> String.concat "," |> box)
-                if childrenOf_.IsSome then
-                    "childrenOf", childrenOf_.Value
-                if collection.IsSome then
-                    "schema", "collection"
-                    "classification", collection.Value
-            ]
-
-            let url = appendQueryParams baseUrl queryParams
-
-            return!
-                fetch url [
-                    RequestProperties.Method HttpMethod.GET
-                    requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
+            if childrenOf.IsSome && childrenOf_.IsNone then
+                // exit condition should we not find the parent IRI
+                return ResizeArray()
+            else
+                let queryParams: (string * obj) list = [
+                    "q", q
+                    if rows.IsSome then
+                        "rows", rows.Value
+                    if obsoletes.IsSome then
+                        "obsoletes", obsoletes.Value
+                    if queryFields.IsSome then
+                        "queryFields", (queryFields.Value |> String.concat "," |> box)
+                    if childrenOf_.IsSome then
+                        "childrenOf", childrenOf_.Value
+                    if collection.IsSome then
+                        "schema", "collection"
+                        "classification", collection.Value
                 ]
-                |> Promise.bind (fun response -> response.json<TIBTypes.SearchApi> ())
-                |> Promise.map (fun searchApi -> searchApi.ToMyTerm() |> ResizeArray)
+
+                let url = appendQueryParams baseUrl queryParams
+
+                return!
+                    fetch url [
+                        RequestProperties.Method HttpMethod.GET
+                        requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
+                    ]
+                    |> Promise.bind (fun response -> response.json<TIBTypes.SearchApi> ())
+                    |> Promise.map (fun searchApi -> searchApi.ToMyTerm() |> ResizeArray)
         }
 
     static member defaultSearch(q: string, ?rows: int, ?collection: string) =
