@@ -833,7 +833,13 @@ type TermSearch =
 
                 fun (query: string) -> promise {
                     startLoadingBy id
-                    let! termSearchResults = search query
+                    let! termSearchResults =
+                        search query
+                        |> Promise.catch(fun exn ->
+                          stopLoadingBy id
+                          console.error $"Error in search {exn.Message}"
+                          ResizeArray()
+                        )
 
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
@@ -855,7 +861,13 @@ type TermSearch =
                 let id = "PC_" + id
                 fun (parentId: string, query: string) -> promise {
                     startLoadingBy id
-                    let! termSearchResults = search (parentId, query)
+                    let! termSearchResults =
+                        search (parentId, query)
+                        |> Promise.catch(fun exn ->
+                          stopLoadingBy id
+                          console.error $"Error in parent child search {exn.Message}"
+                          ResizeArray()
+                        )
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
                             Term = t0
@@ -875,7 +887,13 @@ type TermSearch =
 
                 fun (parentId: string) -> promise {
                     startLoadingBy id
-                    let! termSearchResults = search parentId
+                    let! termSearchResults =
+                        search parentId
+                        |> Promise.catch(fun exn ->
+                          stopLoadingBy id
+                          console.error $"Error in all child search {exn.Message}"
+                          ResizeArray()
+                        )
 
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
