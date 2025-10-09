@@ -1073,14 +1073,17 @@ type TermSearch =
         let InputTrailingVisual =
             React.fragment [
                 Html.div [
-                    Icons.Check(
-                        [
-                            "swt:text-primary swt:transition-all swt:size-4 swt:overflow-x-hidden swt:opacity-100"
-                            if not isFullTerm then
-                                "swt:!w-0 swt:!opacity-0"
-                        ]
-                        |> String.concat " "
-                    )
+                    if isLoading then
+                        Html.span [ prop.className "swt:loading swt:loading-spinner swt:loading-sm" ]
+                    else
+                        Icons.Check(
+                            [
+                                "swt:text-primary swt:transition-all swt:size-4 swt:overflow-x-hidden swt:opacity-100"
+                                if not isFullTerm then
+                                    "swt:!w-0 swt:!opacity-0"
+                            ]
+                            |> String.concat " "
+                        )
                 ]
             ]
 
@@ -1203,7 +1206,7 @@ type TermSearch =
                 items = Array.ofSeq searchResults.Results,
                 filterFn = (fun x -> true),
                 itemToString = (fun x -> x.Term.name |> Option.defaultValue ""),
-                loading = isLoading,
+                loading = (isLoading && searchResults.Results.Count = 0),
                 placeholder = placeholder,
                 inputLeadingVisual = InputLeadingVisual,
                 inputTrailingVisual = InputTrailingVisual,
