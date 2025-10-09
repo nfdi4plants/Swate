@@ -25,7 +25,7 @@ module Interop =
         |}
 
     type IARCitectOutAPI = {
-        Init: unit -> JS.Promise<InteropTypes.ARCFile * string>
+        Init: unit -> JS.Promise<(InteropTypes.ARCFile * string) option>
         Save: InteropTypes.ARCFile * string -> JS.Promise<unit>
         /// selectDictionaries:bool -> JS.Promise<wasSuccessful: bool>
         RequestPaths: bool -> JS.Promise<bool>
@@ -52,7 +52,7 @@ let api =
 open Elmish
 
 type Msg =
-    | Init of ApiCall<unit, (Interop.InteropTypes.ARCFile * string)>
+    | Init of ApiCall<unit, (Interop.InteropTypes.ARCFile * string) option>
     | Save of ArcFiles
     /// ApiCall<selectDirectories: bool, wasSuccessful: bool>
     | RequestPaths of ApiCall<bool, bool>

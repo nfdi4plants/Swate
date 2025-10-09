@@ -33,7 +33,7 @@ module ARCitect =
                         (curry GenericError Cmd.none >> DevMsg)
 
                 state, model, cmd
-            | ApiCall.Finished(arcFile, json) ->
+            | ApiCall.Finished(Some(arcFile, json)) ->
                 let resolvedArcFile =
                     match arcFile with
                     | ARCitect.Interop.InteropTypes.ARCFile.Assay ->
@@ -51,6 +51,8 @@ module ARCitect =
 
                 let cmd = Spreadsheet.InitFromArcFile resolvedArcFile |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
+
+            | ApiCall.Finished(None) -> state, model, Cmd.none
 
         | ARCitect.Save arcFile ->
             let arcFileEnum, json =
