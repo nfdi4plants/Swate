@@ -4,8 +4,8 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches:
-      - main
+    # branches:
+      # - main
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 jobs:
