@@ -75,7 +75,7 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Run changelog script
-        run: ./build.cmd changelog
+        run: dotnet run --project ./build/Build.fsproj changelog
 
       - id: read
         run: |
