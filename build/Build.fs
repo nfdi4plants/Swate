@@ -15,7 +15,8 @@ let componentTestsPath = Path.GetFullPath "src/Components"
 
 let dockerComposePath = Path.GetFullPath ".db/docker-compose.yml"
 
-let ChangelogArtifactPath = Path.GetFullPath "artifacts/changelog.json"
+let NEW_RELEASE_VERSION_JSON_PATH =
+    Path.GetFullPath "artifacts/NEW_RELEASE_VERSION.json"
 
 let developmentUrl = "https://localhost:3000"
 
@@ -303,8 +304,8 @@ module Changelog =
             )
 
         Directory.CreateDirectory("artifacts") |> ignore
-        File.WriteAllText(ChangelogArtifactPath, json, Text.Encoding.UTF8)
-        printGreenfn "Wrote %s" ChangelogArtifactPath
+        File.WriteAllText(NEW_RELEASE_VERSION_JSON_PATH, json, Text.Encoding.UTF8)
+        printGreenfn "Wrote %s" NEW_RELEASE_VERSION_JSON_PATH
 
 
 // let mutable prereleaseSuffix = ""

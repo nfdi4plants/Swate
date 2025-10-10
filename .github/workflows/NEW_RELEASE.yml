@@ -77,16 +77,6 @@ jobs:
       - name: Run changelog script
         run: dotnet run --project ./build/Build.fsproj changelog
 
-      - id: read
-        run: |
-          json=$(cat artifacts/changelog.json)
-          version=$(echo "$json" | jq -r .version)
-          changelog=$(echo "$json" | jq -r .changelog)
-
-          echo "new_version=$version" >> $GITHUB_OUTPUT
-          echo "new_changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$changelog" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
   # # --- Job 3: Parallel release jobs ---
   # release-matrix:
