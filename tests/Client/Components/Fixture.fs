@@ -28,13 +28,14 @@ type Fixture =
     /// </summary>
     static member mkTable () =
         let arcTable =
-            ARCtrl.ArcTable("TestTable", ResizeArray(), System.Collections.Generic.Dictionary())
+            ARCtrl.ArcTable("TestTable", ResizeArray())
         arcTable.AddColumn(
             CompositeHeader.Input IOType.Source,
             [|
                 for i in 0..100 do
                     CompositeCell.createFreeText $"Source {i}"
             |]
+            |> ResizeArray
         )
         arcTable.AddColumn(
             CompositeHeader.Output IOType.Data,
@@ -42,6 +43,7 @@ type Fixture =
                 for i in 0..100 do
                     CompositeCell.createDataFromString(string i, format = "xlsx", selectorFormat = ";")
             |]
+            |> ResizeArray
         )
         arcTable.AddColumn(
             CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")),
@@ -49,6 +51,7 @@ type Fixture =
                 for i in 0..100 do
                     CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
             |]
+            |> ResizeArray
         )
         arcTable.AddColumn(
             CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")),
@@ -56,32 +59,33 @@ type Fixture =
                 for i in 0..100 do
                     CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
             |]
+            |> ResizeArray
         )
         arcTable
     static member hugeRenderingTable () =
         let arcTable =
-            ARCtrl.ArcTable("TestTableHuge", ResizeArray(), System.Collections.Generic.Dictionary())
+            ARCtrl.ArcTable("TestTableHuge", ResizeArray())
         let inputColumn =
             let cells =
                 [|
                     for i in 0..100 do
                         CompositeCell.createFreeText $"Source {i}"
                 |]
-            CompositeColumn.create(CompositeHeader.Input IOType.Source, cells)
+            CompositeColumn.create(CompositeHeader.Input IOType.Source, cells |> ResizeArray)
         let outPutColumn =
             let cells =
                 [|
                     for i in 0..100 do
                         CompositeCell.createFreeText $"Sample {i}"
                 |]
-            CompositeColumn.create(CompositeHeader.Output IOType.Sample, cells)
+            CompositeColumn.create(CompositeHeader.Output IOType.Sample, cells |> ResizeArray)
         let componentColumns =
             let cells = 
                 [|
                     for i in 0..100 do
                         CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
                 |]
-            let componentColumn = CompositeColumn.create(CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")), cells)
+            let componentColumn = CompositeColumn.create(CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970")), cells |> ResizeArray)
             Array.create 50 componentColumn
         let parameterColumns =
             let cells = 
@@ -89,7 +93,7 @@ type Fixture =
                     for i in 0..100 do
                         CompositeCell.createUnitizedFromString(string i, "Degree Celsius", "UO", "UO:000000001")
                 |]
-            let parameterColumn = CompositeColumn.create(CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")), cells)
+            let parameterColumn = CompositeColumn.create(CompositeHeader.Parameter(OntologyAnnotation("Temperature", "UO", "UO:123435345")), cells |> ResizeArray)
             Array.create 50 parameterColumn
         let compositeColumns =
             let collection =
@@ -134,12 +138,12 @@ type Fixture =
     static member Component_InstrumentModel_Term_Column =
         let header = CompositeHeader.Characteristic (OntologyAnnotation.create("plant structure development stage", "PO", "PO:0009012"))
         let body = CompositeCell.Term (OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
-        CompositeColumn.create(header, [|body|])
+        CompositeColumn.create(header, [|body|] |> ResizeArray)
 
     static member Component_InstrumentModel_Term_Body =
         let header = CompositeHeader.Component (OntologyAnnotation.create("instrument model", "MS", "MS:2138970"))
         let body = CompositeCell.Term (OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
-        CompositeColumn.create(header, [|body|])
+        CompositeColumn.create(header, [|body|] |> ResizeArray)
 
     static member Component_Unit_InstrumentModel_String = [|
             [| "Characteristic [plant structure development stage]"; "Unit"; "Term Source REF (PO:0009012)"; "Term Accession Number (PO:0009012)" |]
@@ -149,7 +153,7 @@ type Fixture =
     static member Component_InstrumentModel_Unit_Column =
         let header = CompositeHeader.Characteristic (OntologyAnnotation.create("plant structure development stage", "PO", "PO:0009012"))
         let body = CompositeCell.Unitized ("My mass spec", OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
-        CompositeColumn.create(header, [|body|])
+        CompositeColumn.create(header, [|body|] |> ResizeArray)
 
     static member Component_Unit_InstrumentModel_Unit_Term_String = [|
         [| "Characteristic [plant structure development stage]"; "Unit"; "Term Source REF (PO:0009012)"; "Term Accession Number (PO:0009012)"; "Characteristic [plant structure development stage]"; "Term Source REF (PO:0009012)"; "Term Accession Number (PO:0009012)" |]
@@ -172,7 +176,7 @@ type Fixture =
     static member Body_Component_InstrumentModel_Pseudo_SingleRow_Column =
         let header = CompositeHeader.Input IOType.Source
         let body = [| CompositeCell.FreeText "Component_ [instrument model]" |]
-        CompositeColumn.create(header, body)
+        CompositeColumn.create(header, body |> ResizeArray)
 
     static member Body_Component_InstrumentModel_SingleRow_1Freetext_1_Term_Strings = [|
             [| "Test"; "SCIEX instrument model"; "MS"; "MS:424242" |]
@@ -181,10 +185,10 @@ type Fixture =
     static member Body_Component_InstrumentModel_SingleRow_1Freetext_1_Term_Columns =
         let header1 = CompositeHeader.Output IOType.Data
         let body1 = CompositeCell.FreeText "Test"
-        let column1 = CompositeColumn.create(header1, [|body1|])
+        let column1 = CompositeColumn.create(header1, [|body1|] |> ResizeArray)
         let header2 = CompositeHeader.Component (OntologyAnnotation.create("instrument model", "MS", "MS:2138970"))
         let body2 = CompositeCell.Term (OntologyAnnotation.create("SCIEX instrument model", "MS", "MS:424242"))
-        let column2 = CompositeColumn.create(header2, [|body2|])
+        let column2 = CompositeColumn.create(header2, [|body2|] |> ResizeArray)
         [|column1; column2|]
 
     static member Body_Component_InstrumentModel_SingleRow_Unit_Strings = [|
@@ -200,7 +204,7 @@ type Fixture =
         let header = CompositeHeader.Input IOType.Source
         let body1 = CompositeCell.FreeText "SCIEX instrument model"
         let body2 = CompositeCell.FreeText "New SCIEX instrument model"
-        CompositeColumn.create(header, [|body1; body2|])
+        CompositeColumn.create(header, [|body1; body2|] |> ResizeArray)
 
     static member Body_Component_InstrumentModel_ThreeRows_Term_Strings = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242" |]
@@ -213,7 +217,7 @@ type Fixture =
         let body1 = CompositeCell.FreeText "SCIEX instrument model"
         let body2 = CompositeCell.FreeText "New SCIEX instrument model"
         let body3 = CompositeCell.FreeText "Super New SCIEX instrument model"
-        CompositeColumn.create(header, [|body1; body2; body3|])
+        CompositeColumn.create(header, [|body1; body2; body3|] |> ResizeArray)
 
     static member Body_Component_InstrumentModel_TwoColumns_Term_Strings = [|
             [| "SCIEX instrument model"; "MS"; "MS:424242";
@@ -223,10 +227,10 @@ type Fixture =
     static member Body_Component_InstrumentModel_TwoColumns_Term_Columns =
         let header1 = CompositeHeader.Input IOType.Source
         let body1 = CompositeCell.FreeText "SCIEX instrument model"
-        let column1 = CompositeColumn.create(header1, [|body1|])
+        let column1 = CompositeColumn.create(header1, [|body1|] |> ResizeArray)
         let header2 = CompositeHeader.Output IOType.Data
         let body2 = CompositeCell.FreeText "MS"
-        let column2 = CompositeColumn.create(header2, [|body2|])
+        let column2 = CompositeColumn.create(header2, [|body2|] |> ResizeArray)
         [|column1; column2|]
 
     static member Body_Component_InstrumentModel_TwoRowsColumns_Term_Strings = [|
@@ -239,10 +243,10 @@ type Fixture =
     static member Body_Component_InstrumentModel_TwoRowsColumns_Term_Columns =
         let header1 = CompositeHeader.Input IOType.Source
         let body1 = CompositeCell.FreeText "SCIEX instrument model"
-        let column1 = CompositeColumn.create(header1, [|body1; body1|])
+        let column1 = CompositeColumn.create(header1, [|body1; body1|] |> ResizeArray)
         let header2 = CompositeHeader.Output IOType.Data
         let body2 = CompositeCell.FreeText "MS"
-        let column2 = CompositeColumn.create(header2, [|body2; body2|])
+        let column2 = CompositeColumn.create(header2, [|body2; body2|] |> ResizeArray)
         [|column1; column2|]
 
     static member Body_Integer = [|
@@ -252,7 +256,7 @@ type Fixture =
     static member Body_Integer_Column =
         let header = CompositeHeader.Component(OntologyAnnotation("instrument model", "MS", "MS:2138970"))
         let body = CompositeCell.createUnitizedFromString ("4")
-        CompositeColumn.create(header, [|body|])
+        CompositeColumn.create(header, [|body|] |> ResizeArray)
 
     static member Body_Empty = [|
             [| "" |]

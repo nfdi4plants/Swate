@@ -34,6 +34,7 @@ type AnnotationTableContextMenuUtil =
         setTable nextTable
 
     static member clear(cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle) : ArcTable =
+        printfn "clear"
         if selectHandle.contains cellIndex then
             table.ClearSelectedCells(selectHandle)
         else
@@ -128,7 +129,7 @@ type AnnotationTableContextMenuUtil =
                         cells.[1..]
                         |> Array.transpose
                         |> Array.mapi (fun index column ->
-                            CompositeColumn.create(headers.[index], column))
+                            CompositeColumn.create(headers.[index], column |> ResizeArray))
 
                     let tableString =
                         let table = ArcTable.init("placeholder")
@@ -334,7 +335,11 @@ type AnnotationTableContextMenuUtil =
                 coordinates = groupedCellCoordinates
             |}
         else
-            let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (data, headers) |> Array.transpose
+            let fittedCells =
+                AnnotationTableContextMenuUtil.getFittedCells (data, headers) |> Array.transpose
+                |> Array.map (fun column ->
+                    column
+                    |> ResizeArray)
 
             let columns =
                 Array.map2 (fun header cells -> CompositeColumn.create(header, cells)) headers fittedCells
@@ -344,8 +349,8 @@ type AnnotationTableContextMenuUtil =
                 Array.isEmpty fittedCells
                 || fittedCells
                    |> Array.map (fun row ->
-                       Array.isEmpty row
-                       || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
+                       Seq.isEmpty row
+                       || Seq.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
                    )
                    |> Array.contains true
 
@@ -409,7 +414,7 @@ type AnnotationTableContextMenuUtil =
                 coordinates
                 |> Array.iteri (fun yi row ->
                     //Restart row index, when the amount of selected rows is bigger than copied rows
-                    let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, (pasteColumns.data.Item 0).Cells.Length)
+                    let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, (pasteColumns.data.Item 0).Cells.Count)
                     row
                     |> Array.iteri (fun xi coordinate ->
                         let xIndex =

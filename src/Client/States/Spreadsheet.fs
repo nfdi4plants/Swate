@@ -114,6 +114,7 @@ type Model = {
                 [|
                     CompositeCell.FreeText "If you see this table view, pls contact a developer and report it."
                 |]
+                |> ResizeArray
             )
 
             t
