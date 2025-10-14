@@ -8,6 +8,11 @@
     <Compile Include="Server.Tests.fs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="ARCtrl" Version="3.0.0-beta.3" />
+    <PackageReference Include="ARCtrl.Core" Version="3.0.0-beta.3" />
+    <PackageReference Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.3" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Server\Server.fsproj" />
     <ProjectReference Include="..\Shared\Shared.Tests.fsproj" />
   </ItemGroup>
