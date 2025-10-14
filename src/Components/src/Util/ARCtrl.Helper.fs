@@ -496,7 +496,7 @@ module Extensions =
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
 
             SanityChecks.validateColumn
-            <| CompositeColumn.create (this.Headers.[columnIndex], [| cell |])
+            <| CompositeColumn.create (this.Headers.[columnIndex], [| cell |] |> ResizeArray)
 
             Unchecked.setCellAt (columnIndex, rowIndex, cell) this.Values
             Unchecked.fillMissingCells this.Headers this.Values
@@ -506,17 +506,12 @@ module Extensions =
 
             for coordinate, items in columns do
                 SanityChecks.validateColumn
-                <| CompositeColumn.create (this.Headers.[coordinate.x], items |> Array.map snd)
+                <| CompositeColumn.create (this.Headers.[coordinate.x], (items |> Array.map snd) |> ResizeArray)
 
             for index, cell in cells do
                 Unchecked.setCellAt (index.x, index.y, cell) this.Values
 
             Unchecked.fillMissingCells this.Headers this.Values
-
-        member this.MoveColumn(currentIndex: int, nextIndex: int) =
-            let updateHeaders = Helper.arrayMoveColumn currentIndex nextIndex this.Headers
-            let updateBody = Helper.dictMoveColumn currentIndex nextIndex this.Values
-            ()
 
         /// <summary>
         /// Returns a new ArcTable from all columns defined by ``indices``.
@@ -540,12 +535,12 @@ module Extensions =
             member this.ToStringSeqs() =
 
                 // Cancel if there are no columns
-                if this.Columns.Length = 0 then
+                if this.Columns.Count = 0 then
                     [||]
                 else
                     let columns =
                         this.Columns
-                        |> List.ofArray
+                        |> List.ofSeq
                         |> List.sortBy ArcTable.classifyColumnOrder
                         |> List.collect CompositeColumn.toStringCellColumns
                         |> Seq.transpose

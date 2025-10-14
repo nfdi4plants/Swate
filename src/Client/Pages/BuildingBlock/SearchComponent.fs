@@ -22,8 +22,9 @@ module SearchComponentHelper =
             if body.IsSome then // create as many body cells as there are rows in the active table
                 let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
                 Array.init rowCount (fun _ -> body.Value.Copy())
+                |> ResizeArray
             else
-                Array.empty
+                ResizeArray()
 
         let column = CompositeColumn.create (header, bodyCells)
 

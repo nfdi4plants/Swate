@@ -19,12 +19,12 @@ type ArcTable with
     member this.ToStringSeqs() =
 
         // Cancel if there are no columns
-        if this.Columns.Length = 0 then
+        if this.Columns.Count = 0 then
             ResizeArray()
         else
             let columns =
                 this.Columns
-                |> List.ofArray
+                |> List.ofSeq
                 |> List.sortBy ArcTable.classifyColumnOrder
                 |> List.collect CompositeColumn.toStringCellColumns
                 |> Seq.transpose
@@ -49,7 +49,7 @@ type ArcTable with
 
         let arcTable =
             ArcTable.init name
-            |> ArcTable.addColumns (compositeColumns, skipFillMissing = true)
+            |> ArcTable.addColumns (compositeColumns)
 
         arcTable
 

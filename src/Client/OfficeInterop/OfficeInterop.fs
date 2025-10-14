@@ -1032,7 +1032,7 @@ module UpdateHandler =
                             | Some rows -> rows |> Array.map CompositeCell.FreeText
                             | None -> Array.init (int tableRange.rowCount - 1) (fun _ -> CompositeCell.emptyFreeText)
 
-                        inMemoryTable.AddColumn(CompositeHeader.Input IOType.Source, newCells)
+                        inMemoryTable.AddColumn(CompositeHeader.Input IOType.Source, newCells |> ResizeArray)
 
                         let tableStrings = inMemoryTable.ToStringSeqs()
 
@@ -1678,6 +1678,7 @@ type Main =
 
                     let termAndUnitHeaders =
                         columns
+                        |> Array.ofSeq
                         |> Array.choose (fun item ->
                             if item.Header.IsTermColumn then
                                 Some(item.Header.ToString())
@@ -1910,12 +1911,13 @@ type Main =
             match arcTableRes with
             | Ok arcTable ->
                 let values =
-                    if newColumn.Cells.Length < arcTable.RowCount && newColumn.Cells.Length > 0 then
+                    if newColumn.Cells.Count < arcTable.RowCount && newColumn.Cells.Count > 0 then
                         Array.create arcTable.RowCount newColumn.Cells.[0]
+                        |> ResizeArray
                     else
                         newColumn.Cells
 
-                arcTable.AddColumn(newColumn.Header, values, forceReplace = true, skipFillMissing = false)
+                arcTable.AddColumn(newColumn.Header, values, forceReplace = true)
 
                 //Replace old excel table with new one
                 let! _ = Main.createNewAnnotationTable (arcTable)

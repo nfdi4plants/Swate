@@ -86,13 +86,13 @@ type SelectiveImportModal =
             prop.children [
                 Html.thead [
                     Html.tr [
-                        for columnIndex in 0 .. columns.Length - 1 do
+                        for columnIndex in 0 .. columns.Count - 1 do
                             Html.th [
                                 Html.label [
                                     prop.className "swt:flex swt:flex-row swt:gap-2"
                                     prop.children [
                                         SelectiveImportModal.CheckBoxForTableColumnSelection(
-                                            columns,
+                                            columns |> Array.ofSeq,
                                             tableIndex,
                                             columnIndex,
                                             isActive,

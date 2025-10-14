@@ -88,7 +88,7 @@ module EmptyTableModals =
                                             ]
                                         ]
                                         Html.tbody [
-                                            if newInputColumn.Value.Cells.Length > 10 then
+                                            if newInputColumn.Value.Cells.Count > 10 then
                                                 for i in 0..9 do
                                                     let cell = newInputColumn.Value.Cells.[i]
 
