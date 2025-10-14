@@ -219,7 +219,7 @@ type UpdateColumn =
         let rmv = Util.RMV_MODAL dispatch
 
         let getCellStrings () =
-            column.Cells |> Array.map (fun c -> c.ToString())
+            column.Cells |> Array.ofSeq |> Array.map (fun c -> c.ToString())
 
         let preview, setPreview = React.useState (getCellStrings)
 
@@ -244,7 +244,7 @@ type UpdateColumn =
             fun () ->
                 preview
                 |> Array.map (fun x -> CompositeCell.FreeText x)
-                |> fun x -> CompositeColumn.create (column.Header, x)
+                |> fun x -> CompositeColumn.create (column.Header, x |> ResizeArray)
                 |> fun x -> Spreadsheet.SetColumn(index, x)
                 |> SpreadsheetMsg
                 |> dispatch

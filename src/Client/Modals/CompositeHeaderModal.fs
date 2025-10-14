@@ -96,7 +96,7 @@ type CompositeHeaderModal =
             ARCtrl.Spreadsheet.CompositeColumn.toStringCellColumns column |> List.transpose
 
         let headers, body =
-            if column.Cells.Length >= 2 then
+            if column.Cells.Count >= 2 then
                 parsedStrList.[0], parsedStrList.[1..]
             else
                 parsedStrList.[0], []
@@ -133,20 +133,26 @@ type CompositeHeaderModal =
             ]
         ]
 
-    static member cellsToTermCells(column: CompositeColumn) = [|
-        for c in column.Cells do
-            if c.isUnitized || c.isTerm then c else c.ToTermCell()
-    |]
+    static member cellsToTermCells(column: CompositeColumn) =
+        [|
+            for c in column.Cells do
+                if c.isUnitized || c.isTerm then c else c.ToTermCell()
+        |]
+        |> ResizeArray
 
-    static member cellsToFreeText(column) = [|
-        for c in column.Cells do
-            if c.isFreeText then c else c.ToFreeTextCell()
-    |]
+    static member cellsToFreeText(column) =
+        [|
+            for c in column.Cells do
+                if c.isFreeText then c else c.ToFreeTextCell()
+        |]
+        |> ResizeArray
 
-    static member cellsToDataOrFreeText(column) = [|
-        for c in column.Cells do
-            if c.isFreeText || c.isData then c else c.ToDataCell()
-    |]
+    static member cellsToDataOrFreeText(column) =
+        [|
+            for c in column.Cells do
+                if c.isFreeText || c.isData then c else c.ToDataCell()
+        |]
+        |> ResizeArray
 
     static member updateColumn(column: CompositeColumn, state) =
         let header = column.Header
@@ -245,7 +251,7 @@ type CompositeHeaderModal =
 
     static member content(column0, state) =
         let previewColumn =
-            let cells = Array.truncate 10 column0.Cells
+            let cells = Array.truncate 10 (column0.Cells |> Array.ofSeq)
             //Replace empty cells with placeholder data to represent meaningfull information in the Preview
             cells
             |> Array.iteri (fun i cell ->
@@ -259,7 +265,7 @@ type CompositeHeaderModal =
                     | _ -> cells.[i] <- CompositeHeaderModal.placeHolderTermCell
             )
 
-            CompositeHeaderModal.updateColumn ({ column0 with Cells = cells }, state)
+            CompositeHeaderModal.updateColumn ({ column0 with Cells = cells |> ResizeArray }, state)
 
         React.fragment [
             Html.label [ prop.text "Preview:" ]

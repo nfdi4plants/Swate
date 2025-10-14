@@ -657,15 +657,11 @@ export const NextRow: Story = {
     await userEvent.type(activeCell, '22', { delay: 50 });
     await userEvent.keyboard('{Enter}')
 
-    await waitFor(async () => {
-      const updatedCell = await canvas.findByText('Edited Text 1');
-      expect(updatedCell).toBeVisible();
-    });
+    const updatedCell1 = await canvas.findByText('Edited Text 1');
+    expect(updatedCell1).toBeVisible();
 
-    await waitFor(async () => {
-      const updatedCell = await canvas.findByText('Source 22');
-      expect(updatedCell).toBeVisible();
-    });
+    const updatedCell2 = await canvas.findByText('Source 22');
+    expect(updatedCell2).toBeVisible();
   }
 }
 
