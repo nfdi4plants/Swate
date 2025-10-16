@@ -62,7 +62,7 @@ jobs:
       #   run: dotnet run --project ./build/Build.fsproj test
 
   # --- Job 2: Detect new version ---
-  verify-release:
+  verify_release:
     runs-on: ubuntu-latest
     needs: test
     outputs:
@@ -74,12 +74,13 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - name: Run changelog script
+      - id: buildscript
+        name: Run changelog script
         run: dotnet run --project ./build/Build.fsproj changelog
 
   release:
-      needs: verify-release
-      if: ${{ needs.verify-release.outputs.should_skip != 'true' }}
+      needs: verify_release
+      if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
       runs-on: ubuntu-latest
 
       steps:
