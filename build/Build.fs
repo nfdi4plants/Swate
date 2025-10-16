@@ -26,6 +26,15 @@ module ProjectInfo =
     let project = "Swate"
     let projectRepo = $"https://github.com/{gitOwner}/{project}"
 
+module GHActions =
+    let setGitHubOutput (name: string) (value: string) =
+        match Environment.GetEnvironmentVariable("GITHUB_OUTPUT") with
+        | null
+        | "" -> printfn "GITHUB_OUTPUT not set — likely running outside GitHub Actions."
+        | path -> File.AppendAllText(path, $"{name}={value}\n")
+
+    let setShouldSkip () = setGitHubOutput "should_skip" "true"
+
 [<AutoOpenAttribute>]
 module ConsoleUtility =
 
@@ -900,6 +909,7 @@ let main args =
     | "changelog" :: a ->
         let changelog = Changelog.getLatestVersion ()
         Changelog.writeLatestToFile changelog
+        GHActions.setShouldSkip ()
         0
     | "dev" :: a ->
         let changelog = Changelog.getLatestVersion ()
