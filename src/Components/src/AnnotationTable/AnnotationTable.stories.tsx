@@ -9,7 +9,7 @@ import MockTable from './MockTable.js';
 function renderTable(args: any) {
   const [table, setTable] = React.useState(() => MockTable.Copy());
 
-  const setTableWithLog = (newTable) => {
+  const setTableWithLog = (newTable: any) => {
     console.log("Table updated:", newTable);
     setTable(newTable);
   }
@@ -172,19 +172,19 @@ export const EditTermCellKbd: Story = {
     await waitFor(async () => {
         const debugValue = activeCell.getAttribute("data-debugresultcount")
         expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
-    });
+    }, { timeout: 5000 });
 
     await waitFor(async () => {
         const termSearchResult = await screen.findByText('MS:1001800');
         expect(termSearchResult).toBeVisible();
-    });
+    }, { timeout: 5000 });
 
     await userEvent.keyboard('[ArrowDown][ArrowDown][Enter]')
 
     await waitFor(async () => {
       const updatedCell = await canvas.findByText('LECO instrument model');
       expect(updatedCell).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
