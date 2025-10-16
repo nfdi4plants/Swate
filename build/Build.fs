@@ -15,9 +15,6 @@ let componentTestsPath = Path.GetFullPath "src/Components"
 
 let dockerComposePath = Path.GetFullPath ".db/docker-compose.yml"
 
-let NEW_RELEASE_VERSION_JSON_PATH =
-    Path.GetFullPath "artifacts/NEW_RELEASE_VERSION.json"
-
 let developmentUrl = "https://localhost:3000"
 
 module ProjectInfo =
@@ -79,6 +76,15 @@ module RunUtil =
     let run (cmd: string) (args: seq<string>) (workingDir: string) =
         try
             Command.Run(cmd, args = args, workingDirectory = workingDir)
+        with ex ->
+            printRedfn "Error while running command: %s" ex.Message
+            exit 1
+
+    let runReadAsync (cmd: string) (args: seq<string>) (workingDir: string) =
+        try
+            Command.ReadAsync(cmd, args = args, workingDirectory = workingDir)
+            |> Async.AwaitTask
+            |> Async.RunSynchronously
         with ex ->
             printRedfn "Error while running command: %s" ex.Message
             exit 1
@@ -301,21 +307,40 @@ module Changelog =
             printRedfn "Error: %s" (err.ToText())
             exit 1
 
-    let writeLatestToFile (changelog: Version) =
-        let json =
-            JsonSerializer.Serialize(
-                {|
-                    version = changelog.Version.ToString()
-                    changelog = changelog.Body
-                    date = changelog.Date |> Option.map (fun d -> d.ToString("yyyy-MM-dd"))
-                |},
-                JsonSerializerOptions(WriteIndented = true)
-            )
+module GIT =
 
-        Directory.CreateDirectory("artifacts") |> ignore
-        File.WriteAllText(NEW_RELEASE_VERSION_JSON_PATH, json, Text.Encoding.UTF8)
-        printGreenfn "Wrote %s" NEW_RELEASE_VERSION_JSON_PATH
+    /// Get all git tags and strip leading 'v' if present
+    let getTags () =
 
+        let x = runReadAsync "git" [ "tag" ] ""
+        let tags, _ = x.ToTuple()
+
+        tags.Trim().Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map (fun t -> if t.StartsWith("v") then t.Substring 1 else t)
+
+    let createTagAndPush (tag: string) =
+        run
+            "git"
+            [
+                "tag"
+                if tag = "1.0.0-rc.9" then
+                    "-f"
+                tag
+            ]
+            ""
+
+        run
+            "git"
+            [
+                "push"
+                "origin"
+                if tag = "1.0.0-rc.9" then
+                    "-f"
+                tag
+            ]
+            ""
+
+        printGreenfn "Tag %s created and pushed" tag
 
 // let mutable prereleaseSuffix = ""
 // let mutable prereleaseTag: string = ""
@@ -546,54 +571,50 @@ module Changelog =
 //    | anythingElse -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
 //)
 
-// module Release =
+module Release =
 
-//     open System.Diagnostics
+    open System.Diagnostics
 
-//     let GetLatestGitTag () : string =
+// let SetPrereleaseTag () =
+//     printfn "Please enter pre-release package suffix"
+//     let suffix = System.Console.ReadLine()
+//     ProjectInfo.prereleaseSuffix <- suffix
 
-//         executeCommand <| "describe --abbrev=0 --tags".Trim()
+//     ProjectInfo.prereleaseTag <-
+//         (sprintf
+//             "v%i.%i.%i-%s"
+//             ProjectInfo.release.SemVer.Major
+//             ProjectInfo.release.SemVer.Minor
+//             ProjectInfo.release.SemVer.Patch
+//             suffix)
 
-//     let SetPrereleaseTag () =
-//         printfn "Please enter pre-release package suffix"
-//         let suffix = System.Console.ReadLine()
-//         ProjectInfo.prereleaseSuffix <- suffix
+//     ProjectInfo.isPrerelease <- true
 
-//         ProjectInfo.prereleaseTag <-
-//             (sprintf
-//                 "v%i.%i.%i-%s"
-//                 ProjectInfo.release.SemVer.Major
-//                 ProjectInfo.release.SemVer.Minor
-//                 ProjectInfo.release.SemVer.Patch
-//                 suffix)
+// let CreateTag () =
+//     if promptYesNo (sprintf "tagging branch with %s OK?" ProjectInfo.stableVersionTag) then
+//         Git.Branches.tag "" ProjectInfo.stableVersionTag
+//         Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.stableVersionTag
+//     else
+//         failwith "aborted"
 
-//         ProjectInfo.isPrerelease <- true
+// let CreatePrereleaseTag () =
+//     if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag) then
+//         run git [ "tag"; "-f"; ProjectInfo.prereleaseTag ] ""
+//         Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
+//     else
+//         failwith "aborted"
 
-//     let CreateTag () =
-//         if promptYesNo (sprintf "tagging branch with %s OK?" ProjectInfo.stableVersionTag) then
-//             Git.Branches.tag "" ProjectInfo.stableVersionTag
-//             Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.stableVersionTag
-//         else
-//             failwith "aborted"
+// let ForcePushNightly () =
+//     if promptYesNo "Ready to force push release to nightly branch?" then
+//         run git [ "push"; "-f"; "origin"; "HEAD:nightly" ] ""
+//     else
+//         failwith "aborted"
 
-//     let CreatePrereleaseTag () =
-//         if promptYesNo (sprintf "Tagging branch with %s OK?" ProjectInfo.prereleaseTag) then
-//             run git [ "tag"; "-f"; ProjectInfo.prereleaseTag ] ""
-//             Git.Branches.pushTag "" ProjectInfo.projectRepo ProjectInfo.prereleaseTag
-//         else
-//             failwith "aborted"
-
-//     let ForcePushNightly () =
-//         if promptYesNo "Ready to force push release to nightly branch?" then
-//             run git [ "push"; "-f"; "origin"; "HEAD:nightly" ] ""
-//         else
-//             failwith "aborted"
-
-//     let ForcePushLatest () =
-//         if promptYesNo "Ready to force push release to latest branch?" then
-//             run git [ "push"; "-f"; "origin"; "HEAD:latest" ] ""
-//         else
-//             failwith "aborted"
+// let ForcePushLatest () =
+//     if promptYesNo "Ready to force push release to latest branch?" then
+//         run git [ "push"; "-f"; "origin"; "HEAD:latest" ] ""
+//     else
+//         failwith "aborted"
 
 
 // Target.create
@@ -867,10 +888,26 @@ let main args =
         | _ ->
             Tests.Run()
             0
-    // | "release" :: a ->
-    //     Tests.buildSharedTests ()
-    //     Tests.Run()
-    //     0
+    | "release" :: target :: nugetKey :: npmKey :: dockerKey :: _ ->
+        match target with
+        | "nuget" ->
+            printGreenfn ("Release nuget!")
+            0
+        | "npm" ->
+            printGreenfn ("Release npm!")
+            0
+        | "docker" ->
+            printGreenfn ("Release docker!")
+            0
+        | "storybock" ->
+            printGreenfn ("Release storybook!")
+            0
+        | "electron" ->
+            printGreenfn ("Release storybook!")
+            0
+        | _ ->
+            printRedfn ("No valid release target provided!")
+            1
     // // match a with
     // // | "pre" :: a ->
     // //     Release.SetPrereleaseTag()
@@ -906,13 +943,25 @@ let main args =
     // //         ReleaseNoteTasks.createVersionFile (version, false)
     // //         0
     // //     | _ -> runOrDefault args
-    | "changelog" :: a ->
-        let changelog = Changelog.getLatestVersion ()
-        Changelog.writeLatestToFile changelog
-        GHActions.setShouldSkip ()
-        0
+    | "check-release" :: a ->
+        let latestVersion = Changelog.getLatestVersion ()
+        let tags = GIT.getTags () |> Array.toList
+        let nextTag = latestVersion.Version.ToString()
+
+        if tags |> List.contains (nextTag) && nextTag <> "1.0.0-rc.9" then
+            printRedfn
+                "The latest version %O from CHANGELOG.md is already tagged in git. No release needed."
+                latestVersion.Version
+
+            GHActions.setShouldSkip ()
+            1
+        else
+            printGreenfn "The latest version %O from CHANGELOG.md is not yet tagged in git." latestVersion.Version
+            GIT.createTagAndPush (nextTag)
+            0
     | "dev" :: a ->
-        let changelog = Changelog.getLatestVersion ()
+        GIT.getTags () |> printfn "%A"
+
         // run git [ "add"; "." ] ""
         // run git [ "commit"; "-m"; (sprintf "Release v%s" ProjectInfo.prereleaseTag) ] ""
         0
