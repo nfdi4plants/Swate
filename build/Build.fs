@@ -891,15 +891,27 @@ let main args =
     | "release" :: target :: nugetKey :: npmKey :: dockerKey :: _ ->
         match target with
         | "nuget" ->
+            if String.IsNullOrWhiteSpace nugetKey || nugetKey.Contains "$env:NUGET_KEY" then
+                printRedfn "No nuget key provided!"
+                exit 1
+
             printGreenfn ("Release nuget!")
             0
         | "npm" ->
+            if String.IsNullOrWhiteSpace npmKey || npmKey.Contains "$env:NPM_KEY" then
+                printRedfn "No npm key provided!"
+                exit 1
+
             printGreenfn ("Release npm!")
             0
         | "docker" ->
+            if String.IsNullOrWhiteSpace dockerKey || dockerKey.Contains "$env:DOCKER_KEY" then
+                printRedfn "No docker key provided!"
+                exit 1
+
             printGreenfn ("Release docker!")
             0
-        | "storybock" ->
+        | "storybook" ->
             printGreenfn ("Release storybook!")
             0
         | "electron" ->
