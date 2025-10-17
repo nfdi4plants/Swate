@@ -888,25 +888,31 @@ let main args =
         | _ ->
             Tests.Run()
             0
-    | "release" :: target :: nugetKey :: npmKey :: dockerKey :: _ ->
+    | "release" :: target :: "--ci" :: _ ->
         match target with
         | "nuget" ->
-            if String.IsNullOrWhiteSpace nugetKey || nugetKey.Contains "$env:NUGET_KEY" then
-                printRedfn "No nuget key provided!"
+            let key = Environment.GetEnvironmentVariable "NUGET_KEY"
+
+            if String.IsNullOrWhiteSpace key then
+                printRedfn "No nuget key set for environmental variables!"
                 exit 1
 
             printGreenfn ("Release nuget!")
             0
         | "npm" ->
-            if String.IsNullOrWhiteSpace npmKey || npmKey.Contains "$env:NPM_KEY" then
-                printRedfn "No npm key provided!"
+            let key = Environment.GetEnvironmentVariable "NPM_KEY"
+
+            if String.IsNullOrWhiteSpace key then
+                printRedfn "No npm key set for environmental variables!"
                 exit 1
 
             printGreenfn ("Release npm!")
             0
         | "docker" ->
-            if String.IsNullOrWhiteSpace dockerKey || dockerKey.Contains "$env:DOCKER_KEY" then
-                printRedfn "No docker key provided!"
+            let key = Environment.GetEnvironmentVariable "DOCKER_KEY"
+
+            if String.IsNullOrWhiteSpace key then
+                printRedfn "No docker key set for environmental variables!"
                 exit 1
 
             printGreenfn ("Release docker!")

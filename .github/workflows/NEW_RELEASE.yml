@@ -124,4 +124,4 @@ jobs:
           NUGET_KEY: ${{ secrets.NUGET_KEY }}
           NPM_KEY: ${{ secrets.NPM_KEY }}
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
-        run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} "$env:NUGET_KEY" "$env:NPM_KEY" "$env:DOCKER_KEY"
+        run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci
