@@ -1,6 +1,6 @@
 {
   "name": "@nfdi4plants/swate-components",
-  "version": "1.0.0-rc.4",
+  "version": "1.0.0-rc.9",
   "description": "Customizable React components for ontology annotation, based on Swate and the ARC.",
   "main": "./dist/index.cjs.js",
   "module": "./dist/index.es.js",

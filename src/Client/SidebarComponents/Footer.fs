@@ -24,12 +24,10 @@ type Footer =
             prop.children [
                 Html.div [
                     prop.children [
-                        if
-                            model.PersistentStorageState.AppVersion = System.AssemblyVersionInformation.AssemblyMetadata_Version
-                        then
-                            Html.textf "Version %s " System.AssemblyVersionInformation.AssemblyMetadata_Version
+                        if model.PersistentStorageState.AppVersion = Version.AssemblyVersion then
+                            Html.textf "Version %s " Version.AssemblyVersion
                         else
-                            Html.textf "Client %s" System.AssemblyVersionInformation.AssemblyMetadata_Version
+                            Html.textf "Client %s" Version.AssemblyVersion
                             Html.textf " – Server %s " model.PersistentStorageState.AppVersion
                         Html.a [
                             prop.className "swt:link-primary"

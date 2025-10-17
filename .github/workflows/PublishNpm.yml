@@ -1,8 +1,6 @@
 name: Publish NPM Package
 
 on:
-  # push:
-    # branches: ['nightly']
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 jobs:

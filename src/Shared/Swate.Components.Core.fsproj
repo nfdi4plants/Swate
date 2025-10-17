@@ -6,7 +6,7 @@
 
   <PropertyGroup>
     <PackageId>Swate.Components.Core</PackageId>
-    <PackageVersion>$(GitTag)</PackageVersion>
+    <PackageVersion>0.0.0</PackageVersion>
     <Authors>Kevin Frey</Authors>
     <Description>Types for Swate.Components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

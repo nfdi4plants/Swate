@@ -1,4 +1,4 @@
-name: CI + Release
+name: run tests and release
 
 on:
   push:
@@ -88,7 +88,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [nuget, npm, storybook, docker, electron]
+        target: [nuget, npm, docker, electron]
     steps:
       # Checkout the repository
       - name: Checkout code
@@ -124,4 +124,5 @@ jobs:
           NUGET_KEY: ${{ secrets.NUGET_KEY }}
           NPM_KEY: ${{ secrets.NPM_KEY }}
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
-        run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }} --dry-run

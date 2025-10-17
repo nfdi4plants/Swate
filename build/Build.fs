@@ -3,17 +3,23 @@ open System.IO
 
 let DEFINE_SWATE_ENVIRONMENT_FABLE = [ "--define"; "SWATE_ENVIRONMENT" ]
 
-let sharedPath = Path.GetFullPath "src/Shared"
-let serverPath = Path.GetFullPath "src/Server"
-let clientPath = Path.GetFullPath "src/Client"
-let deployPath = Path.GetFullPath "deploy"
+module ProjectPaths =
 
-let sharedTestsPath = Path.GetFullPath "tests/Shared"
-let serverTestsPath = Path.GetFullPath "tests/Server"
-let clientTestsPath = Path.GetFullPath "tests/Client"
-let componentTestsPath = Path.GetFullPath "src/Components"
+    let sharedPath = Path.GetFullPath "src/Shared"
+    let serverPath = Path.GetFullPath "src/Server"
+    let clientPath = Path.GetFullPath "src/Client"
+    let componentsPath = Path.GetFullPath "src/Components"
+    let deployPath = Path.GetFullPath "deploy"
+    let nugetDeployPath = Path.GetFullPath "nupkgs"
+    let nugetSln = Path.GetFullPath "Nuget.sln"
 
-let dockerComposePath = Path.GetFullPath ".db/docker-compose.yml"
+    let sharedTestsPath = Path.GetFullPath "tests/Shared"
+    let serverTestsPath = Path.GetFullPath "tests/Server"
+    let clientTestsPath = Path.GetFullPath "tests/Client"
+    let componentTestsPath = Path.GetFullPath "src/Components"
+
+    let dockerComposePath = Path.GetFullPath ".db/docker-compose.yml"
+    let dockerFilePath = Path.GetFullPath "build/Dockerfile.publish"
 
 let developmentUrl = "https://localhost:3000"
 
@@ -342,6 +348,244 @@ module GIT =
 
         printGreenfn "Tag %s created and pushed" tag
 
+module VersionTasks =
+
+    open Semver
+    open System.Text.RegularExpressions
+
+    // robust function, that looks in string[] for matching line and replaces it if found, returns bool*string []
+    // true if replaced, false if not found
+    let tryReplace (pattern: Regex) (replacement: string) (content: string[]) =
+        let mutable wasReplaced = false
+
+        let nextContent =
+            content
+            |> Array.map (fun line ->
+                if pattern.IsMatch(line) then
+                    wasReplaced <- true
+                    replacement
+                else
+                    line
+            )
+
+        wasReplaced, nextContent
+
+    let updateVersionFiles (version: Changelog.Version) =
+        printGreenfn "Updating version files to %O" version.Version
+        let serverPath = "src/Server/Version.fs"
+        let clientPath = "src/Client/Version.fs"
+
+        let nextReleaseDate =
+            match version.Date with
+            | Some date -> date.ToShortDateString()
+            | None -> DateTime.UtcNow.ToShortDateString()
+
+        let nextVersion = version.Version.ToString()
+
+        // let AssemblyVersion = "0.0.0"
+        let patternAssemblyVersion = @"^let AssemblyVersion = "".*"""
+        // let AssemblyMetadata_ReleaseDate = "09.10.2025"
+        let patternAssemblyMetadata_ReleaseDate =
+            @"^let AssemblyMetadata_ReleaseDate = "".*"""
+
+        let versionRegex = Regex(patternAssemblyVersion)
+        let dateRegex = Regex(patternAssemblyMetadata_ReleaseDate)
+
+        let replace (path: string) =
+            let content = File.ReadAllLines(path)
+
+            let newContent =
+                match
+                    content
+                    |> tryReplace versionRegex (sprintf $"let AssemblyVersion = \"%s{nextVersion}\"")
+                with
+                | (true, newContent) ->
+                    match
+                        newContent
+                        |> tryReplace dateRegex (sprintf $"let AssemblyMetadata_ReleaseDate = \"%s{nextReleaseDate}\"")
+                    with
+                    | (true, finalContent) -> finalContent
+                    | (false, _) -> failwithf "Date line not found in version file: %s" path
+                | (false, _) -> failwithf "Version line not found in version file: %s" path
+
+            File.WriteAllLines(path, newContent)
+
+        replace serverPath
+        printGreenfn "Updated %s" serverPath
+        replace clientPath
+        printGreenfn "Updated %s" clientPath
+
+    let updateFSharpProjectVersions (version: Changelog.Version) =
+        printGreenfn "Updating .fsproj files to version %O" version.Version
+        let componentsProjectPath = "src/Components/src/Swate.Components.fsproj"
+        let sharedProjectPath = "src/Shared/Swate.Components.Core.fsproj"
+
+
+        let nextVersion = version.Version.ToString()
+        let versionRegexPattern = @"<PackageVersion>.*</PackageVersion>"
+
+        let replace (path: string) =
+            let content = File.ReadAllText(path)
+
+            let nextContent =
+                match Regex.Count(content, versionRegexPattern) with
+                | 1 ->
+                    Regex.Replace(
+                        content,
+                        versionRegexPattern,
+                        sprintf "<PackageVersion>%s</PackageVersion>" nextVersion
+                    )
+                | _ -> failwithf "Version line not found in version file: %s" path
+
+            File.WriteAllText(path, nextContent)
+
+        replace componentsProjectPath
+        printGreenfn "Updated %s" componentsProjectPath
+        replace sharedProjectPath
+        printGreenfn "Updated %s" sharedProjectPath
+
+    let updateComponentsPackageJSONVersion (version: Changelog.Version) =
+        run
+            "npm"
+            [
+                "version"
+                version.Version.ToString()
+                "--allow-same-version"
+                "--no-git-tag-version"
+            ]
+            "src/Components"
+
+        printfn "Updated src/Components/package.json to version %O" version.Version
+
+
+module GitHub =
+
+    open FSharp.Data
+    open System.Text.Json
+
+    type ReleaseResponse = {
+        url: string
+        assets_url: string
+        upload_url: string
+        html_url: string
+        id: int
+        tag_name: string
+        name: string
+        body: string
+    }
+
+    type UpdateReleaseRequest = {
+        tag_name: string option
+        name: string option
+        body: string option
+    }
+
+    let mkHeaders token = [
+        "Authorization", sprintf "Bearer %s" token
+        "Accept", "application/vnd.github+json"
+        "X-GitHub-Api-Version", "2022-11-28"
+        "user-agent", "Swate build script"
+    ]
+
+    let toJson (data: (string * obj) list) = JsonSerializer.Serialize(dict data)
+
+    let mkRelease (token: string) (version: Changelog.Version) =
+        let endpoint =
+            $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases"
+
+        Http.RequestString(
+            endpoint,
+            httpMethod = "POST",
+            headers = mkHeaders token,
+            body =
+                TextRequest(
+                    toJson [
+                        "tag_name", version.Version.ToString() :> obj
+                        "name", version.Version.ToString() :> obj
+                        "body", version.Body :> obj
+                        "draft", true :> obj
+                        "generate_release_notes ", true
+                    ]
+                )
+        )
+        |> JsonSerializer.Deserialize<ReleaseResponse>
+
+    let tryGetRelease (token: string) (version: Changelog.Version) =
+        let version = version.Version.ToString()
+
+        let endpoint =
+            $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/tags/{version}"
+
+        let response =
+            Http.Request(endpoint, httpMethod = "GET", headers = mkHeaders token, silentHttpErrors = true)
+
+        match response.StatusCode with
+        | 404 ->
+            printfn "[GitHub] Release %O not found" version
+            None
+        | 200 ->
+            printfn "[GitHub] Found Release %O" version
+
+            let jsonStr =
+                match response.Body with
+                | Text text -> text
+                | _ -> failwith "Unexpected response body"
+
+            let response = JsonSerializer.Deserialize<ReleaseResponse>(jsonStr)
+            Some response
+        | code -> failwithf "Error: unexpected status code %d" code
+
+    let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseResponse -> UpdateReleaseRequest) =
+        let versionStr = version.Version.ToString()
+
+        let id =
+            tryGetRelease token version
+            |> Option.defaultWith (fun () -> failwithf "Release %s not found" versionStr)
+
+        let request = fn id
+
+        let endpoint =
+            $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/{id}"
+
+        Http.Request(
+            endpoint,
+            httpMethod = "PATCH",
+            headers = mkHeaders token,
+            body =
+                TextRequest(
+                    toJson [
+                        if request.tag_name.IsSome then
+                            "tag_name", request.tag_name.Value :> obj
+                        if request.name.IsSome then
+                            "name", request.name.Value :> obj
+                        if request.body.IsSome then
+                            "body", request.body.Value :> obj
+                    ]
+                )
+        )
+
+    let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: string) =
+        let versionStr = version.Version.ToString()
+
+        let release =
+            tryGetRelease token version
+            |> Option.defaultWith (fun () -> failwithf "Release %s not found" versionStr)
+
+        let endpoint =
+            $"https://uploads.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/{release.id}/assets"
+
+        let fileName = Path.GetFileName(filePath)
+
+        let fileBytes = File.ReadAllBytes(filePath)
+
+        Http.Request(
+            endpoint,
+            httpMethod = "POST",
+            headers = mkHeaders token @ [ "Content-Type", "application/octet-stream" ],
+            query = [ "name", fileName; "label", fileName ],
+            body = BinaryUpload fileBytes
+        )
+
 // let mutable prereleaseSuffix = ""
 // let mutable prereleaseTag: string = ""
 // let mutable isPrerelease = false
@@ -571,9 +815,9 @@ module GIT =
 //    | anythingElse -> failwith $"""Could not match your input "{anythingElse}" to a valid input. Please try again."""
 //)
 
-module Release =
+// module Release =
 
-    open System.Diagnostics
+//     open System.Diagnostics
 
 // let SetPrereleaseTag () =
 //     printfn "Please enter pre-release package suffix"
@@ -668,91 +912,101 @@ module Release =
 
 // let InstallClient () = run npm [ "install" ] "."
 
-// type Bundle =
-//     static member Client(?forSwate: bool) =
-//         let forSwate = defaultArg forSwate true
+type Bundle =
 
-//         run
-//             dotnet
-//             [
-//                 "fable"
-//                 "-o"
-//                 "output"
-//                 "-s"
-//                 "-e"
-//                 "fs.js"
-//                 if forSwate then
-//                     yield! DEFINE_SWATE_ENVIRONMENT_FABLE
-//                 "--run"
-//                 "npx"
-//                 "vite"
-//                 "build"
-//             ]
-//             clientPath
+    static member Client(?forSwate: bool) =
+        let forSwate = defaultArg forSwate true
 
-//     static member All() =
-//         [
-//             "server", dotnet [ "publish"; "-c"; "Release"; "-o"; deployPath ] serverPath
-//             "client",
-//             dotnet
-//                 [
-//                     "fable"
-//                     "-o"
-//                     "output"
-//                     "-s"
-//                     "-e"
-//                     "fs.js"
-//                     yield! DEFINE_SWATE_ENVIRONMENT_FABLE
-//                     "--run"
-//                     "npx"
-//                     "vite"
-//                     "build"
-//                 ]
-//                 clientPath
-//         ]
-//         |> runParallel
+        run
+            "dotnet"
+            [
+                "fable"
+                "-o"
+                "output"
+                "-s"
+                "-e"
+                "fs.js"
+                if forSwate then
+                    yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                "--run"
+                "npx"
+                "vite"
+                "build"
+            ]
+            ProjectPaths.clientPath
 
-// type Run =
+    static member All() =
+        [
+            runAsync
+                "server"
+                "dotnet"
+                [ "publish"; "-c"; "Release"; "-o"; ProjectPaths.deployPath ]
+                ProjectPaths.serverPath
+            runAsync
+                "client"
+                "dotnet"
+                [
+                    "fable"
+                    "-o"
+                    "output"
+                    "-s"
+                    "-e"
+                    "fs.js"
+                    yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                    "--run"
+                    "npx"
+                    "vite"
+                    "build"
+                ]
+                ProjectPaths.clientPath
+        ]
+        |> runParallel
 
-//     static member ClientArgs = [
-//         "fable"
-//         "watch"
-//         "-o"
-//         "output"
-//         "-s"
-//         "-e"
-//         "fs.js"
-//         yield! DEFINE_SWATE_ENVIRONMENT_FABLE
-//         "--run"
-//         "npx"
-//         "vite"
-//         "--debug"
-//         "transform"
-//     ]
+type Run =
+
+    static member ClientArgs = [
+        "fable"
+        "watch"
+        "-o"
+        "output"
+        "-s"
+        "-e"
+        "fs.js"
+        yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+        "--run"
+        "npx"
+        "vite"
+        "--debug"
+        "transform"
+    ]
 
 
-//     static member All(db: bool) =
-//         [
-//             "server", dotnet [ "watch"; "run" ] serverPath
-//             "client", dotnet Run.ClientArgs clientPath
-//             if db then
-//                 "database", dockerCompose [ "-f"; dockerComposePath; "up"; "-d" ] __SOURCE_DIRECTORY__
-//         ]
-//         |> runParallel
+    static member All(db: bool) =
+        [
+            runAsync "server" "dotnet" [ "watch"; "run" ] ProjectPaths.serverPath
+            runAsync "client" "dotnet" Run.ClientArgs ProjectPaths.clientPath
+            if db then
+                runAsync
+                    "database"
+                    "docker-compose"
+                    [ "-f"; ProjectPaths.dockerComposePath; "up"; "-d" ]
+                    __SOURCE_DIRECTORY__
+        ]
+        |> runParallel
 
-// //Target.create "officedebug" (fun config ->
-// //    let args = config.Context.Arguments
-// //    run dotnet [ "build" ] sharedPath
-// //    if args |> List.contains "--open" then openBrowser developmentUrl
-// //    [ "server", dotnet "watch run" serverPath
-// //      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" ""
-// //      // start up db + Swobup from docker-compose
-// //      "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
-// //      // sideload webapp in excel
-// //      if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start build/manifest.xml desktop --debug-method web" ""
-// //      ]
-// //    |> runParallel
-// //)
+//Target.create "officedebug" (fun config ->
+//    let args = config.Context.Arguments
+//    run dotnet [ "build" ] sharedPath
+//    if args |> List.contains "--open" then openBrowser developmentUrl
+//    [ "server", dotnet "watch run" serverPath
+//      "client", dotnet "fable watch src/Client -o src/Client/output -e .fs.js -s --run webpack-dev-server" ""
+//      // start up db + Swobup from docker-compose
+//      "database", dockerCompose $"-f {dockerComposePath} up" __SOURCE_DIRECTORY__
+//      // sideload webapp in excel
+//      if args |> List.contains "--excel" then "officedebug", npx "office-addin-debugging start build/manifest.xml desktop --debug-method web" ""
+//      ]
+//    |> runParallel
+//)
 
 // // Target.create "RunDB" (fun _ -> run dockerCompose [ "-f"; dockerComposePath; "up"; "-d" ] __SOURCE_DIRECTORY__)
 
@@ -760,7 +1014,7 @@ module Release =
 module Tests =
 
     let buildSharedTests () =
-        run "dotnet" [ "build" ] sharedTestsPath
+        run "dotnet" [ "build" ] ProjectPaths.sharedTestsPath
 
     /// This disables microsoft data collection for using `office-addin-mock`
     let disableUserData () =
@@ -768,7 +1022,7 @@ module Tests =
 
     let Watch () =
         [
-            runAsync "server" "dotnet" [ "watch"; "run" ] serverTestsPath
+            runAsync "server" "dotnet" [ "watch"; "run" ] ProjectPaths.serverTestsPath
             // This below will start web ui for tests, but cannot execute due to office-addin-mock
             runAsync
                 "client"
@@ -783,11 +1037,11 @@ module Tests =
                     "--run"
                     "npx"
                     "mocha"
-                    $"{clientTestsPath}/output/Client.Tests.js"
+                    $"{ProjectPaths.clientTestsPath}/output/Client.Tests.js"
                     "--watch"
                 ]
-                clientTestsPath
-            runAsync "components" "npm" [ "run"; "test" ] componentTestsPath
+                ProjectPaths.clientTestsPath
+            runAsync "components" "npm" [ "run"; "test" ] ProjectPaths.componentTestsPath
         ]
         |> runParallel
 
@@ -806,17 +1060,17 @@ module Tests =
                     "--run"
                     "npx"
                     "mocha"
-                    $"{clientTestsPath}/output/Client.Tests.js"
+                    $"{ProjectPaths.clientTestsPath}/output/Client.Tests.js"
                     "--watch"
                     "--parallel"
                 ]
-                clientTestsPath
+                ProjectPaths.clientTestsPath
         ]
         |> runParallel
 
     let Run () =
         [
-            runAsyncColored "server" ConsoleColor.Blue "dotnet" [ "run" ] serverTestsPath
+            runAsyncColored "server" ConsoleColor.Blue "dotnet" [ "run" ] ProjectPaths.serverTestsPath
             runAsyncColored
                 "client"
                 ConsoleColor.Magenta
@@ -830,10 +1084,10 @@ module Tests =
                     "--run"
                     "npx"
                     "mocha"
-                    $"{clientTestsPath}/output/Client.Tests.js"
+                    $"{ProjectPaths.clientTestsPath}/output/Client.Tests.js"
                 ]
-                clientTestsPath
-            runAsyncColored "components" ConsoleColor.Yellow "npm" [ "run"; "test:run" ] componentTestsPath
+                ProjectPaths.clientTestsPath
+            runAsyncColored "components" ConsoleColor.Yellow "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
         ]
         |> runParallel
 
@@ -843,37 +1097,198 @@ module Tests =
 
 // Target.create "Ignore" (fun _ -> Trace.trace "Hit ignore")
 
+module Release =
+
+    open SimpleExec
+
+    let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
+
+        VersionTasks.updateComponentsPackageJSONVersion version
+
+        let isPrerelease = version.Version.IsPrerelease
+
+        async {
+            do!
+                Command.RunAsync("npm", [ "run"; "build" ], workingDirectory = ProjectPaths.componentsPath)
+                |> Async.AwaitTask
+
+            do!
+                Command.RunAsync(
+                    "npm",
+                    [
+                        "publish"
+                        "--access"
+                        "public"
+                        if isPrerelease then
+                            "--tag"
+                            "next"
+                        "--otp"
+                        if isDryRun then
+                            "--dry-run"
+                    ],
+                    workingDirectory = ProjectPaths.componentsPath
+                )
+                |> Async.AwaitTask
+        }
+        |> Async.RunSynchronously
+
+    let nuget (key: string) (version: Changelog.Version) (isDryRun: bool) =
+
+        VersionTasks.updateVersionFiles version
+        VersionTasks.updateFSharpProjectVersions version
+
+        let mkCssFile =
+            Command.RunAsync("npm", [ "run"; "prebuild:net" ], workingDirectory = ProjectPaths.componentsPath)
+            |> Async.AwaitTask
+
+        let pack =
+            Command.RunAsync(
+                "dotnet",
+                [
+                    "pack"
+                    ProjectPaths.nugetSln
+                    "--configuration"
+                    "Release"
+                    "--output"
+                    ProjectPaths.nugetDeployPath
+                ]
+            )
+            |> Async.AwaitTask
+
+        let publish =
+            Command.RunAsync(
+                "dotnet",
+                [
+                    "nuget"
+                    "push"
+                    $"{ProjectPaths.nugetDeployPath}/*.nupkg"
+                    "--api-key"
+                    key
+                    "--source"
+                    "https://api.nuget.org/v3/index.json"
+                    if isDryRun then
+                        "--dry-run"
+                ]
+            )
+            |> Async.AwaitTask
+
+        async {
+            do! mkCssFile
+
+            do! pack
+
+            do! publish
+        }
+        |> Async.RunSynchronously
+
+    let docker (username: string) (key: string) (version: Changelog.Version) (isDryRun: bool) =
+        // Placeholder for docker release logic
+
+        let dockerRegistryTarget = "ghcr.io"
+        let imageName = "ghcr.io/nfdi4plants/swate"
+
+        let login =
+            Command.RunAsync("docker", [ "login"; dockerRegistryTarget; "--username"; username; "--password"; key ])
+            |> Async.AwaitTask
+
+        let isPrerelease = version.Version.IsPrerelease
+
+        let imageVersioned = $"{imageName}:{version.Version.ToString()}"
+        let imageLatest = $"{imageName}:latest"
+        let imageNext = $"{imageName}:next"
+
+        let build =
+            Command.RunAsync(
+                "docker",
+                [
+                    "build"
+                    "-f"
+                    ProjectPaths.dockerFilePath
+                    if isPrerelease then
+                        "-t"
+                        imageNext
+                    else
+                        "-t"
+                        imageVersioned
+                        "-t"
+                        imageLatest
+                ]
+            )
+            |> Async.AwaitTask
+
+        let push = async {
+            if isPrerelease then
+                do! Command.RunAsync("docker", [ "push"; imageNext ]) |> Async.AwaitTask
+            else
+                do! Command.RunAsync("docker", [ "push"; imageVersioned ]) |> Async.AwaitTask
+                do! Command.RunAsync("docker", [ "push"; imageLatest ]) |> Async.AwaitTask
+        }
+
+        async {
+            do! login
+            do! build
+
+            if not isDryRun then
+                do! push
+        }
+        |> Async.RunSynchronously
+
+    open System.IO
+    open System.IO.Compression
+
+    /// This currently builds the frontend, zips it to add it as asset to github release
+    let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
+        VersionTasks.updateVersionFiles version
+
+        let sourceDir = Path.Combine(ProjectPaths.deployPath, "public")
+        let targetZip = "./SwateClient.zip"
+
+        async {
+            Bundle.Client(false)
+
+            if File.Exists(targetZip) then
+                File.Delete(targetZip)
+
+            ZipFile.CreateFromDirectory(sourceDir, targetZip, CompressionLevel.Optimal, includeBaseDirectory = false)
+
+            let response = GitHub.uploadReleaseAsset token version targetZip
+
+            ()
+
+        }
+        |> Async.RunSynchronously
+
 [<EntryPoint>]
 let main args =
     let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
 
     match argv with
-    // | "bundle" :: a ->
-    //     InstallClient()
+    | "bundle" :: a ->
+        run "npm" [ "install" ] "."
 
-    //     match a with
-    //     | "client" :: a ->
-    //         match a with
-    //         | "standalone" :: _ ->
-    //             Bundle.Client(false)
-    //             0
-    //         | _ ->
-    //             Bundle.Client(true)
-    //             0
-    //     | _ ->
-    //         Bundle.All()
-    //         0
-    // | "run" :: a ->
-    //     match a with
-    //     | "db" :: a ->
-    //         Run.All(true)
-    //         0
-    //     | "client" :: a ->
-    //         run dotnet Run.ClientArgs clientPath
-    //         0
-    //     | _ ->
-    //         Run.All(false)
-    //         0
+        match a with
+        | "client" :: a ->
+            match a with
+            | "standalone" :: _ ->
+                Bundle.Client(false)
+                0
+            | _ ->
+                Bundle.Client(true)
+                0
+        | _ ->
+            Bundle.All()
+            0
+    | "run" :: a ->
+        match a with
+        | "db" :: a ->
+            Run.All(true)
+            0
+        | "client" :: a ->
+            run "dotnet" Run.ClientArgs ProjectPaths.clientPath
+            0
+        | _ ->
+            Run.All(false)
+            0
     | "test" :: a ->
         Tests.disableUserData ()
         Tests.buildSharedTests ()
@@ -888,7 +1303,18 @@ let main args =
         | _ ->
             Tests.Run()
             0
-    | "release" :: target :: "--ci" :: _ ->
+    | "release" :: target :: otherArgs ->
+        let latestVersion = Changelog.getLatestVersion ()
+        let isDryRun = otherArgs |> List.contains "--dry-run"
+        let isCi = otherArgs |> List.contains "--ci"
+
+        if not isCi then
+            printRedfn "Currently the worklow only supports CI releases!"
+            exit 1
+
+        let ghRelease =
+            GitHub.mkRelease (Environment.GetEnvironmentVariable "GITHUB_TOKEN") latestVersion
+
         match target with
         | "nuget" ->
             let key = Environment.GetEnvironmentVariable "NUGET_KEY"
@@ -896,6 +1322,8 @@ let main args =
             if String.IsNullOrWhiteSpace key then
                 printRedfn "No nuget key set for environmental variables!"
                 exit 1
+
+            Release.nuget key latestVersion isDryRun
 
             printGreenfn ("Release nuget!")
             0
@@ -906,22 +1334,35 @@ let main args =
                 printRedfn "No npm key set for environmental variables!"
                 exit 1
 
-            printGreenfn ("Release npm!")
+            printGreenfn ("Starting NPM release!")
+
+            Release.npm key latestVersion isDryRun
+
+            printGreenfn "Released npm package version %O" latestVersion.Version
             0
         | "docker" ->
             let key = Environment.GetEnvironmentVariable "DOCKER_KEY"
+
+            let user =
+                otherArgs
+                |> List.tryFind (fun x -> x.StartsWith "--user=")
+                |> Option.map (fun x -> x.Substring 7)
+
+            if user.IsNone then
+                printRedfn "No docker user set! Please pass user in the format --user=yourusername"
+                exit 1
 
             if String.IsNullOrWhiteSpace key then
                 printRedfn "No docker key set for environmental variables!"
                 exit 1
 
+            Release.docker user.Value key latestVersion isDryRun
+
             printGreenfn ("Release docker!")
             0
-        | "storybook" ->
-            printGreenfn ("Release storybook!")
-            0
         | "electron" ->
-            printGreenfn ("Release storybook!")
+            printGreenfn ("Release electron!")
+            printfn "This currently also does the github Release"
             0
         | _ ->
             printRedfn ("No valid release target provided!")
@@ -978,7 +1419,6 @@ let main args =
             GIT.createTagAndPush (nextTag)
             0
     | "dev" :: a ->
-        GIT.getTags () |> printfn "%A"
 
         // run git [ "add"; "." ] ""
         // run git [ "commit"; "-m"; (sprintf "Release v%s" ProjectInfo.prereleaseTag) ] ""

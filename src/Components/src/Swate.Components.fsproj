@@ -7,7 +7,7 @@
 
   <PropertyGroup>
     <PackageId>Swate.Components</PackageId>
-    <PackageVersion>$(GitTag)</PackageVersion>
+    <PackageVersion>0.0.0</PackageVersion>
     <Authors>Kevin Frey</Authors>
     <Description>Swate react components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
