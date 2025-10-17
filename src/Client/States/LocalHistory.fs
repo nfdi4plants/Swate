@@ -1,8 +1,8 @@
 module LocalHistory
 
+open System
 open Fable.Core
 open JsInterop
-open System
 
 open Fable.SimpleJson
 open IndexedDB
@@ -127,6 +127,7 @@ module ConversionTypes =
         | Study
         | Assay
         | Template
+        | DataMap of (DataMapParent option)
         | None
 
     type SessionStorage = {
@@ -142,6 +143,15 @@ module ConversionTypes =
                 | Some(ArcFiles.Study(s, al)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
+                | Some(ArcFiles.DataMap (pId, p, d)) ->
+                    match p with
+                    | None
+                    | Some DataMapParent.Assay ->
+                        let parentDataMap = ArcAssay.create(defaultArg pId "default", datamap = d)
+                        JsonArcFiles.DataMap p, ArcAssay.toJsonString 0 parentDataMap
+                    | Some DataMapParent.Study ->
+                        let parentDataMap = ArcStudy.create(defaultArg pId "default", datamap = d)
+                        JsonArcFiles.DataMap p, ArcStudy.toJsonString 0 parentDataMap
                 | None -> JsonArcFiles.None, ""
 
             let compressedJsonString = GeneralHelpers.compressJsonToBase64String jsonString
@@ -169,8 +179,12 @@ module ConversionTypes =
                         ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay -> ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
+                    | JsonArcFiles.DataMap parent ->
+                        let data = ArcAssay.fromJsonString decompressedString
+                        let dataMap = (Some data.Identifier, parent, defaultArg data.DataMap (DataMap.init()))
+                        dataMap
+                        |> ArcFiles.DataMap |> Some
                     | JsonArcFiles.None -> None
-
                 {
                     init with
                         ActiveView = this.ActiveView

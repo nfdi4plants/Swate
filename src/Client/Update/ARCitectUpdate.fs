@@ -33,7 +33,7 @@ module ARCitect =
                         (curry GenericError Cmd.none >> DevMsg)
 
                 state, model, cmd
-            | ApiCall.Finished(Some(arcFile, json)) ->
+            | ApiCall.Finished(Some(arcFile, json, parentId, parent)) ->
                 let resolvedArcFile =
                     match arcFile with
                     | ARCitect.Interop.InteropTypes.ARCFile.Assay ->
@@ -48,6 +48,17 @@ module ARCitect =
                     | ARCitect.Interop.InteropTypes.ARCFile.Template ->
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
+                    | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
+                        let dataMap =
+                            let temp =
+                                match parent with
+                                | None
+                                | Some DataMapParent.Assay ->
+                                    (ArcAssay.fromJsonString json).DataMap
+                                | Some DataMapParent.Study ->
+                                    (ArcStudy.fromJsonString json).DataMap
+                            defaultArg temp (DataMap.init())
+                        ArcFiles.DataMap(parentId, parent, dataMap)
 
                 let cmd = Spreadsheet.InitFromArcFile resolvedArcFile |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
@@ -63,6 +74,17 @@ module ARCitect =
                     ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv
                 | ArcFiles.Template template ->
                     ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template
+                | ArcFiles.DataMap (parentId, parent, datamap) ->
+                    let json =
+                        match parent with
+                        | None
+                        | Some DataMapParent.Assay ->
+                            let parentDataMap = ArcAssay.create(defaultArg parentId "default", datamap = datamap)
+                            ArcAssay.toJsonString 0 parentDataMap
+                        | Some DataMapParent.Study ->
+                            let parentDataMap = ArcStudy.create(defaultArg parentId "default", datamap = datamap)
+                            ArcStudy.toJsonString 0 parentDataMap
+                    ARCitect.Interop.InteropTypes.ARCFile.DataMap, json
 
             let cmd =
                 Cmd.OfPromise.attempt api.Save (arcFileEnum, json) (curry GenericError Cmd.none >> DevMsg)

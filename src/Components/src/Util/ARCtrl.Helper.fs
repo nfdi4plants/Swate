@@ -55,16 +55,31 @@ module ARCtrlHelper =
         | Study
         | Investigation
         | Template
+        | DataMap
+
+    type DataMapParent =
+        | Assay
+        | Study
+
+        static member fromString(str: string) =
+            match str.ToLower() with
+            | "assay" -> Some Assay
+            | "study" -> Some Study
+            | ""
+            | "none" -> None
+            | _ -> failwith $"The type {str.ToLower()} is unknown"
 
     type ArcFiles =
         | Template of Template
         | Investigation of ArcInvestigation
         | Study of ArcStudy * ArcAssay list
         | Assay of ArcAssay
+        | DataMap of ((string option) * (DataMapParent option) * DataMap)
 
         member this.HasTableAt(index: int) =
             match this with
             | Template _ -> index = 0 // Template always has exactly one table
+            | DataMap _ -> false
             | Investigation i -> false
             | Study(s, _) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
@@ -75,6 +90,7 @@ module ARCtrlHelper =
             | Investigation i -> false
             | Study(s, _) -> s.DataMap.IsSome
             | Assay a -> a.DataMap.IsSome
+            | DataMap _ -> true
 
         member this.Tables() : ArcTables =
             match this with
@@ -82,6 +98,7 @@ module ARCtrlHelper =
             | Investigation _ -> ArcTables(ResizeArray [])
             | Study(s, _) -> s
             | Assay a -> a
+            | DataMap _ -> ArcTables(ResizeArray [])
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =

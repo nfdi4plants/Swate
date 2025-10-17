@@ -29,8 +29,6 @@ open FileImport
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
 
-    let selectTemplateIsOpen, setSelectTemplateIsOpen = React.useState (false)
-
     let widgets, setWidgets = React.useState ([])
 
     let rmvWidget (widget: Widget) =
@@ -54,7 +52,7 @@ let Main (model: Model, dispatch) =
         |> WidgetOrderContainer bringWidgetToFront
 
     let state = model.SpreadsheetModel
-
+    
     Html.div [
         prop.id "MainWindow"
         prop.className "swt:@container/main swt:min-w-[400px] swt:flex swt:flex-col swt:h-screen"
@@ -65,13 +63,13 @@ let Main (model: Model, dispatch) =
                 prop.id "TableContainer"
                 prop.className "swt:flex swt:grow swt:flex-col swt:h-full swt:overflow-y-hidden"
                 prop.children [
-                    //
                     match state.ArcFile with
                     | None -> MainComponents.NoFileElement.Main {| dispatch = dispatch |}
                     | Some(ArcFiles.Assay _)
                     | Some(ArcFiles.Study _)
                     | Some(ArcFiles.Investigation _)
-                    | Some(ArcFiles.Template _) ->
+                    | Some(ArcFiles.Template _)
+                    | Some(ArcFiles.DataMap _) ->
                         match model.SpreadsheetModel.ActiveView with
                         | Spreadsheet.ActiveView.Table _ ->
                             match model.SpreadsheetModel.ActiveTable.ColumnCount with
@@ -95,13 +93,11 @@ let Main (model: Model, dispatch) =
                                                     |> SpreadsheetMsg
                                                     |> dispatch
 
-                                                let setAssayDataMap assay dataMap =
-                                                    dataMap
-                                                    |> SpreadsheetInterface.UpdateDatamap
-                                                    |> InterfaceMsg
-                                                    |> dispatch
-
-                                                Components.Metadata.Assay.Main(assay, setAssay, setAssayDataMap, model)
+                                                Components.Metadata.Assay.Main(
+                                                    assay,
+                                                    setAssay,
+                                                    model
+                                                )
                                             | Some(ArcFiles.Study(study, assays)) ->
                                                 let setStudy (study, assays) =
                                                     (study, assays)
@@ -110,17 +106,10 @@ let Main (model: Model, dispatch) =
                                                     |> SpreadsheetMsg
                                                     |> dispatch
 
-                                                let setStudyDataMap study dataMap =
-                                                    dataMap
-                                                    |> SpreadsheetInterface.UpdateDatamap
-                                                    |> InterfaceMsg
-                                                    |> dispatch
-
                                                 Components.Metadata.Study.Main(
                                                     study,
                                                     assays,
                                                     setStudy,
-                                                    setStudyDataMap,
                                                     model
                                                 )
                                             | Some(ArcFiles.Investigation investigation) ->
@@ -144,7 +133,32 @@ let Main (model: Model, dispatch) =
                                                     |> SpreadsheetMsg
                                                     |> dispatch
 
-                                                Components.Metadata.Template.Main(template, setTemplate)
+                                                Components.Metadata.Template.Main(
+                                                    template,
+                                                    setTemplate
+                                                )
+                                            | Some(ArcFiles.DataMap (parentId, parent, datamap)) ->
+
+                                                let setDataMap parentId parent (dataMap: DataMap) =
+                                                    Some dataMap
+                                                    |> Spreadsheet.UpdateDatamap
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                    ArcFiles.DataMap(parentId, parent, dataMap)
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                if not (model.SpreadsheetModel.HasDataMap()) then
+                                                    setDataMap parentId parent datamap
+
+                                                Components.Metadata.DataMap.Main(
+                                                    parentId,
+                                                    parent,
+                                                    datamap,
+                                                    setDataMap
+                                                )
                                             | None -> Html.none
                                         ]
                                     ]

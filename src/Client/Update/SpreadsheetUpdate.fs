@@ -27,7 +27,7 @@ module Spreadsheet =
         /// <param name="model"></param>
         /// <param name="cmd"></param>
         let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
-
+            
             let mutable snapshotJsonString = ""
 
             if model.PersistentStorageState.Autosave then
@@ -51,7 +51,6 @@ module Spreadsheet =
                             (curry GenericError Cmd.none >> DevMsg)
                     else
                         cmd
-
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->
@@ -70,9 +69,21 @@ module Spreadsheet =
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Investigation, json)
                         |> Promise.start
                     | Some(Template template) ->
-                        let json = template.toJsonString ()
+                        let json = template.toJsonString()
 
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
+                        |> Promise.start
+                    | Some(DataMap (parentId, parent, datamap)) ->
+                        let json =
+                            match parent with
+                            | None
+                            | Some DataMapParent.Assay ->
+                                let parentDataMap = ArcAssay.create(defaultArg parentId "default", datamap = datamap)
+                                ArcAssay.toJsonString 0 parentDataMap
+                            | Some DataMapParent.Study ->
+                                let parentDataMap = ArcStudy.create(defaultArg parentId "default", datamap = datamap)
+                                ArcStudy.toJsonString 0 parentDataMap
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.DataMap, json)
                         |> Promise.start
                     | _ -> ()
 
@@ -95,6 +106,7 @@ module Spreadsheet =
 
         //let newHistoryController (state, model, cmd) =
         //    updateSessionStorageMsg msg, model
+
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
             | UpdateState nextState -> nextState, model, Cmd.none
@@ -308,6 +320,13 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+                    | DataMap (_, p, d) ->
+                        let fileName =
+                            if p.IsSome then
+                                n + "_" + p.Value.ToString() + "_" + "datamap"
+                            else
+                                n + "_" + "datamap"
+                        fileName, Spreadsheet.DataMap.toFsWorkbook d
 
                 let cmd =
                     Cmd.OfPromise.either
@@ -325,7 +344,8 @@ module Spreadsheet =
                 state, model, Cmd.none
 
         try
-            innerUpdate state model msg |> Helper.updateHistoryStorageMsg msg
+            innerUpdate state model msg
+            |> Helper.updateHistoryStorageMsg msg
         with e ->
             let cmd = GenericError(Cmd.none, e) |> DevMsg |> Cmd.ofMsg
             state, model, cmd

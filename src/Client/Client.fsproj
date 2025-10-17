@@ -72,7 +72,7 @@
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\Metadata\Generic.fs" />
     <Compile Include="SharedComponents\Metadata\Forms.fs" />
-    <Compile Include="SharedComponents\Metadata\DatamapConfig.fs" />
+    <Compile Include="SharedComponents\Metadata\DataMap.fs" />
     <Compile Include="SharedComponents\Metadata\Assay.fs" />
     <Compile Include="SharedComponents\Metadata\Investigation.fs" />
     <Compile Include="SharedComponents\Metadata\Study.fs" />

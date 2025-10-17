@@ -68,6 +68,8 @@ module Json =
                 Template.fromCompressedJsonString json |> ArcFiles.Template
             | ArcFilesDiscriminate.Template, anyElse ->
                 failwithf "Error. It is not intended to parse Template from %s format." (string anyElse)
+            | ArcFilesDiscriminate.DataMap, _ ->
+                failwithf "Error. It is not intended to parse Datamap this way."
 
         return arcfile
     }

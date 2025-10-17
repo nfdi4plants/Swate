@@ -170,7 +170,6 @@ module private API =
 module private Helper =
 
     let addButton (clickEvent: MouseEvent -> unit) =
-        //Daisy.button.button [
         Html.button [
             prop.className "swt:btn swt:btn-info"
             prop.text "+"
@@ -178,13 +177,6 @@ module private Helper =
         ]
 
     let deleteButton (clickEvent: MouseEvent -> unit) =
-        //Html.div [
-        //    prop.className "swt:grow-0"
-        //    prop.children [
-        //        Daisy.button.button [ button.error; prop.text "Delete"; prop.onClick clickEvent ]
-        //    ]
-        //]
-
         Html.button [
             prop.className "swt:btn swt:btn-error swt:grow-0"
             prop.text "Delete"
@@ -194,16 +186,13 @@ module private Helper =
     let readOnlyFormElement (v: string option, label: string) =
         let v = defaultArg v "-"
 
-        //Daisy.fieldset [
         Html.div [
             prop.className "swt:fieldset"
             prop.children [
-                //Daisy.label label
                 Html.label [
                     prop.className "swt:label"
                     prop.children [ Html.span [ prop.className "swt:label-text"; prop.text label ] ]
                 ]
-                //Daisy.input [ prop.disabled true; prop.readOnly true; prop.valueOrDefault v ]
                 Html.input [
                     prop.className "swt:input"
                     prop.disabled true
@@ -220,13 +209,10 @@ module private Helper =
         ]
 
     let personModal (person: Person, confirm, back) =
-        //Daisy.modal.div [
         Html.div [
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop []
                 Html.div [ prop.className "swt:modal-backdrop" ]
-                //Daisy.modalBox.div [
                 Html.div [
                     prop.className "swt:modal-box"
                     prop.children [
@@ -243,13 +229,11 @@ module private Helper =
                             prop.className "swt:flex swt:justify-end swt:gap-4"
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
-                                //Daisy.button.button [ prop.text "back"; button.outline; prop.onClick back ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-outline"
                                     prop.text "back"
                                     prop.onClick back
                                 ]
-                                //Daisy.button.button [ button.success; prop.text "confirm"; prop.onClick confirm ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-success"
                                     prop.text "confirm"
@@ -263,14 +247,11 @@ module private Helper =
         ]
 
     let PersonsModal (existingPersons: ResizeArray<Person>, externalPersons: Person[], select: Person -> unit, back) =
-        //Daisy.modal.div [
         Html.div [
             //modal.active
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop []
                 Html.div [ prop.className "swt:modal-backdrop" ]
-                //Daisy.modalBox.div [
                 Html.div [
                     prop.className
                         "swt:modal-box swt:max-h-[80%] swt:overflow-y-hidden swt:flex swt:flex-col swt:space-y-2"
@@ -351,7 +332,6 @@ module private Helper =
                             prop.className "swt:flex swt:justify-end swt:gap-4"
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
-                                //Daisy.button.button [ prop.text "back"; button.outline; prop.onClick back ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-outline"
                                     prop.text "back"
@@ -365,14 +345,11 @@ module private Helper =
         ]
 
     let publicationModal (pub: Publication, confirm, back) =
-        //Daisy.modal.div [
         Html.div [
             //modal.active
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop []
                 Html.div [ prop.className "swt:modal-backdrop" ]
-                //Daisy.modalBox.form [
                 Html.form [
                     prop.className "swt:modal-box"
                     prop.children [
@@ -387,9 +364,7 @@ module private Helper =
                             prop.className "swt:is-flex swt:is-justify-content-flex-end"
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
-                                //Daisy.button.button [ prop.text "back"; prop.onClick back ]
                                 Html.button [ prop.className "swt:btn"; prop.text "back"; prop.onClick back ]
-                                //Daisy.button.button [ button.success; prop.text "confirm"; prop.onClick confirm ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-success"
                                     prop.text "confirm"
@@ -403,19 +378,14 @@ module private Helper =
         ]
 
     let errorModal (error: exn, back) =
-        //Daisy.modal.div [
         Html.div [
             //modal.active
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop [ prop.onClick back ]
                 Html.div [ prop.className "swt:modal-backdrop"; prop.onClick back ]
-                //Daisy.modalBox.div [
                 Html.form [
-                    //prop.className "swt:modal-box"
                     prop.className "swt:modal-box swt:bg-transparent swt:p-0 swt:border-0"
                     prop.children [
-                        //Daisy.alert [
                         Html.div [
                             //alert.error
                             prop.className "swt:alert"
@@ -628,7 +598,6 @@ type FormComponents =
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
-                //Daisy.label [
                 Html.label [
                     prop.className [
                         "swt:label swt:flex swt:items-center swt:gap-2 swt:w-full"
@@ -663,10 +632,6 @@ type FormComponents =
                                 prop.ref ref
                                 prop.onChange onChange
                             ]
-                        //Daisy.loading [
-                        //    if not loading then
-                        //        prop.className "swt:invisible"
-                        //]
                         Html.div [
                             if not loading then
                                 prop.className "swt:invisible"
@@ -707,6 +672,59 @@ type FormComponents =
                         )
                         if rmv.IsSome then
                             Helper.deleteButton rmv.Value
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member ParentId
+        (
+            value: string option,
+            setValue: string option -> unit,
+            ?label: string
+        ) =
+
+        Html.div [
+            prop.children [
+                if label.IsSome then
+                    Generic.FieldTitle label.Value
+                Html.div [
+                    prop.className "swt:flex swt:flex-row swt:gap-2 swt:relative"
+                    prop.children [
+                        FormComponents.TextInput(
+                            value |> Option.defaultValue "",
+                            (fun s ->
+                                let value = if s = "" then None else Some s
+                                value |> setValue
+                            )
+                        )
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member SelectDataMapParent
+        (
+            parent: DataMapParent option,
+            setter: DataMapParent option -> unit
+        ) =
+
+        let mkOption (target) =
+            Html.option [ prop.value (string target); prop.text (string target) ]
+
+        Html.div [
+            prop.children [
+                Generic.FieldTitle "Datamap parents"
+                Html.select [
+                    prop.className "swt:select swt:join-item swt:min-w-fit"
+                    prop.defaultValue (if parent.IsSome then string parent else "")
+                    prop.onChange (fun (e: string) -> (DataMapParent.fromString e) |> setter)
+                    prop.children [
+                        mkOption ""
+                        mkOption DataMapParent.Assay
+                        mkOption DataMapParent.Study
                     ]
                 ]
             ]
@@ -756,25 +774,10 @@ type FormComponents =
                 | _ -> Html.none
                 if label.IsSome then
                     Generic.FieldTitle label.Value
-                //Daisy.join [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [
                         FormComponents.TextInput(orcid, doisetter, placeholder = "xxxx-xxxx-xxxx-xxxx", isJoin = true)
-                        //Daisy.button.button [
-                        //    join.item
-                        //    button.info
-                        //    prop.text "Search"
-                        //    prop.onClick (fun _ ->
-                        //        setState GenericApiState.Loading
-                        //        // setState <| API.Request.Error (new Exception("Not implemented"))
-                        //        // setState <| (API.Request.Ok (Person.create(orcid=orcid,firstName="John",lastName="Doe")))
-                        //        API.start
-                        //            API.requestByORCID
-                        //            orcid
-                        //            (GenericApiState.Ok >> setState)
-                        //            (GenericApiState.Error >> setState))
-                        //]
                         Html.button [
                             prop.className "swt:btn swt:btn-info swt:join-item"
                             prop.text "Search"
@@ -966,7 +969,6 @@ type FormComponents =
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
-                //Daisy.input [
                 Html.input [
                     prop.className "swt:input"
                     prop.type'.dateTimeLocal
@@ -1035,24 +1037,10 @@ type FormComponents =
                 | GenericApiState.Error e -> Helper.errorModal (e, resetState)
                 | GenericApiState.Loading -> Modals.Loading.Modal(rmv = resetState)
                 | _ -> Html.none
-                //Daisy.join [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [
                         FormComponents.TextInput(id, doisetter, isJoin = true)
-                        //Daisy.button.button [
-                        //    button.info
-                        //    join.item
-                        //    prop.text "Search"
-                        //    prop.onClick (fun _ ->
-                        //        setState GenericApiState.Loading
-
-                        //        API.start
-                        //            searchAPI
-                        //            id
-                        //            (GenericApiState.Ok >> setState)
-                        //            (GenericApiState.Error >> setState))
-                        //]
                         Html.button [
                             prop.className "swt:btn swt:btn-info swt:join-item"
                             prop.text "Search"
@@ -1087,7 +1075,6 @@ type FormComponents =
         Html.div [
             prop.children [
                 if label.IsSome then
-                    //Daisy.label label.Value
                     Html.label [ prop.className "swt:label"; prop.text label.Value ]
                 Html.div [
                     prop.className "swt:flex swt:flex-row swt:gap-2 swt:relative"
