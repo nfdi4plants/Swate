@@ -21,7 +21,6 @@ type FooterTabs =
         let mouseY = mouseY - 30
         Base.Main(mouseX, mouseY, children, dispatch)
 
-
     static member Plus(mouseX, mouseY, dispatch: Messages.Msg -> unit) =
         let addTable =
             fun _ ->

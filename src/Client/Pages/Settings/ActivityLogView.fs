@@ -9,7 +9,6 @@ type ActivityLog =
 
     static member Main(model: Model) =
         Html.div [
-            //Daisy.table [
             Html.table [
                 prop.className "swt:table swt:table-xs"
                 prop.children [

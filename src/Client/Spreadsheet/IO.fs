@@ -12,6 +12,14 @@ module Xlsx =
             let! fswb = FsSpreadsheet.Js.Xlsx.fromXlsxBytes bytes
             let ws = fswb.GetWorksheets()
 
+            let mutable datamapParent = None
+
+            let hasDatamap =
+                try
+                    let assay = ArcAssay.fromFsWorkbook fswb
+                    datamapParent <- Some (ArcFiles.CreateDataMapParent(assay.Identifier, DataMapParent.Assay))
+                    assay.DataMap.IsSome
+                with _ -> false
             let arcfile =
                 match ws with
                 | _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcAssay.isMetadataSheetName ws.Name) ->
@@ -26,6 +34,9 @@ module Xlsx =
                         || ARCtrl.Spreadsheet.Template.obsoleteMetadataSheetName = ws.Name)
                     ->
                     ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
+                | _ when hasDatamap ->
+                    let datamap = DataMap.fromFsWorkbook fswb
+                    DataMap(datamapParent, datamap)
                 | _ -> failwith "Unable to identify given file. Missing metadata sheet with correct name."
 
             return arcfile
@@ -68,6 +79,8 @@ module Json =
                 Template.fromCompressedJsonString json |> ArcFiles.Template
             | ArcFilesDiscriminate.Template, anyElse ->
                 failwithf "Error. It is not intended to parse Template from %s format." (string anyElse)
+            | ArcFilesDiscriminate.DataMap, _ ->
+                failwithf "Error. It is not intended to parse Datamap this way."
 
         return arcfile
     }

@@ -12,7 +12,6 @@ let Main
         study: ArcStudy,
         assignedAssays: ArcAssay list,
         setArcStudy: (ArcStudy * ArcAssay list) -> unit,
-        setDatamap: ArcStudy -> DataMap option -> unit,
         model: Model.Model
     ) =
     Generic.Section [
@@ -98,5 +97,4 @@ let Main
                 )
             ]
         )
-        Datamap.Main(study.DataMap, fun dataMap -> setDatamap study dataMap)
     ]

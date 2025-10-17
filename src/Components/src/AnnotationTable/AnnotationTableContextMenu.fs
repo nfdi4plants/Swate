@@ -34,7 +34,6 @@ type AnnotationTableContextMenuUtil =
         setTable nextTable
 
     static member clear(cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle) : ArcTable =
-        printfn "clear"
         if selectHandle.contains cellIndex then
             table.ClearSelectedCells(selectHandle)
         else
