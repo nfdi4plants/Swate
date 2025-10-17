@@ -66,7 +66,7 @@ type ActiveView =
         match this with
         | Table i -> arcfile.HasTableAt(i)
         | DataMap -> arcfile.HasDataMap()
-        | Metadata -> true
+        | Metadata -> arcfile.HasMetadata()
 
 [<AutoOpen>]
 module ActivePattern =
@@ -120,25 +120,30 @@ type Model = {
 
             t
 
+    member this.HasMetadata() =
+        match this.ArcFile with
+        | Some(DataMap(_, _)) -> false
+        | _ -> true
+
     member this.HasDataMap() =
         match this.ArcFile with
         | Some(Assay a) -> a.DataMap.IsSome
         | Some(Study(s, _)) -> s.DataMap.IsSome
-        | Some(DataMap(_, _, _)) -> true
+        | Some(DataMap(_, _)) -> true
         | _ -> false
 
     member this.DataMapOrDefault =
         match this.ArcFile with
         | Some(Assay a) when a.DataMap.IsSome -> a.DataMap.Value
         | Some(Study(s, _)) when s.DataMap.IsSome -> s.DataMap.Value
-        | Some(DataMap(_, _, d)) -> d
+        | Some(DataMap(_, d)) -> d
         | _ -> DataMap.init ()
 
     member this.UpdateDataMap(dataMap: DataMap option) =
         match this.ArcFile with
         | Some(Assay a) -> a.DataMap <- dataMap
         | Some(Study(s, _)) -> s.DataMap <- dataMap
-        | Some(DataMap(_, _, d)) ->
+        | Some(DataMap(_, d)) ->
             if dataMap.IsSome then
                 d.DataContexts.Clear()
                 d.DataContexts.AddRange(dataMap.Value.DataContexts)

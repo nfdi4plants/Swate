@@ -137,29 +137,7 @@ let Main (model: Model, dispatch) =
                                                     template,
                                                     setTemplate
                                                 )
-                                            | Some(ArcFiles.DataMap (parentId, parent, datamap)) ->
-
-                                                let setDataMap parentId parent (dataMap: DataMap) =
-                                                    Some dataMap
-                                                    |> Spreadsheet.UpdateDatamap
-                                                    |> SpreadsheetMsg
-                                                    |> dispatch
-
-                                                    ArcFiles.DataMap(parentId, parent, dataMap)
-                                                    |> Spreadsheet.UpdateArcFile
-                                                    |> SpreadsheetMsg
-                                                    |> dispatch
-
-                                                if not (model.SpreadsheetModel.HasDataMap()) then
-                                                    setDataMap parentId parent datamap
-
-                                                Components.Metadata.DataMap.Main(
-                                                    parentId,
-                                                    parent,
-                                                    datamap,
-                                                    setDataMap
-                                                )
-                                            | None -> Html.none
+                                            | _ -> Html.none
                                         ]
                                     ]
                                 ]

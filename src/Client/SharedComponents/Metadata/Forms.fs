@@ -720,9 +720,8 @@ type FormComponents =
                 Html.select [
                     prop.className "swt:select swt:join-item swt:min-w-fit"
                     prop.defaultValue (if parent.IsSome then string parent else "")
-                    prop.onChange (fun (e: string) -> (DataMapParent.fromString e) |> setter)
+                    prop.onChange (fun (e: string) -> Some (DataMapParent.tryFromString e) |> setter)
                     prop.children [
-                        mkOption ""
                         mkOption DataMapParent.Assay
                         mkOption DataMapParent.Study
                     ]

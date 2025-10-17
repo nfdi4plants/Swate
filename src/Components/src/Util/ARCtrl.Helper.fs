@@ -61,12 +61,10 @@ module ARCtrlHelper =
         | Assay
         | Study
 
-        static member fromString(str: string) =
+        static member tryFromString(str: string) =
             match str.ToLower() with
-            | "assay" -> Some Assay
-            | "study" -> Some Study
-            | ""
-            | "none" -> None
+            | "assay" -> Assay
+            | "study" -> Study
             | _ -> failwith $"The type {str.ToLower()} is unknown"
 
     type ArcFiles =
@@ -74,7 +72,10 @@ module ARCtrlHelper =
         | Investigation of ArcInvestigation
         | Study of ArcStudy * ArcAssay list
         | Assay of ArcAssay
-        | DataMap of ((string option) * (DataMapParent option) * DataMap)
+        | DataMap of ({| ParentId: string; Parent: DataMapParent |} option * DataMap)
+
+        static member CreateDataMapParent(parentId: string, parent: DataMapParent) =
+            {| ParentId = parentId; Parent = parent |}
 
         member this.HasTableAt(index: int) =
             match this with
@@ -91,6 +92,14 @@ module ARCtrlHelper =
             | Study(s, _) -> s.DataMap.IsSome
             | Assay a -> a.DataMap.IsSome
             | DataMap _ -> true
+
+        member this.HasMetadata() =
+            match this with
+            | Assay _ 
+            | Template _
+            | Investigation _ -> true
+            | Study(s, _) -> true
+            | DataMap _ -> false
 
         member this.Tables() : ArcTables =
             match this with

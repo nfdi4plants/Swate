@@ -12,11 +12,11 @@ let updateDatamap (dataMapOpt: DataMap option) (state: Spreadsheet.Model) : Spre
         | Some(Study(s, _)) ->
             s.DataMap <- dataMapOpt
             Some(Study(s, []))
-        | Some(DataMap(pId, p, d)) ->
+        | Some(DataMap(p, d)) ->
             if dataMapOpt.IsSome then
-                Some(DataMap(pId, p, dataMapOpt.Value))
+                Some(DataMap(p, dataMapOpt.Value))
             else
-                Some(DataMap(pId, p, d))
+                Some(DataMap(p, d))
         | _ ->
             console.warn "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
             state.ArcFile

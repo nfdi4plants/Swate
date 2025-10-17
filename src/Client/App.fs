@@ -32,8 +32,8 @@ module Subscriptions =
                 return true
             }
         SetARCFile =
-            fun (file, name, parentId, dataMapParent) -> promise {
-                ApiCall.Finished(Some(file, name, parentId, dataMapParent))
+            fun (file, name, dataMapParent) -> promise {
+                ApiCall.Finished(Some(file, name, dataMapParent))
                 |> Model.ARCitect.Init
                 |> Messages.ARCitectMsg
                 |> dispatch

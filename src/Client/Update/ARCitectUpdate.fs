@@ -33,7 +33,7 @@ module ARCitect =
                         (curry GenericError Cmd.none >> DevMsg)
 
                 state, model, cmd
-            | ApiCall.Finished(Some(arcFile, json, parentId, parent)) ->
+            | ApiCall.Finished(Some(arcFile, json, dataMapParent)) ->
                 let resolvedArcFile =
                     match arcFile with
                     | ARCitect.Interop.InteropTypes.ARCFile.Assay ->
@@ -51,14 +51,20 @@ module ARCitect =
                     | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
                         let dataMap =
                             let temp =
-                                match parent with
-                                | None
-                                | Some DataMapParent.Assay ->
+                                match dataMapParent with
+                                | None ->
                                     (ArcAssay.fromJsonString json).DataMap
-                                | Some DataMapParent.Study ->
+                                | Some parent when parent.Parent = DataMapParent.Assay ->
+                                    (ArcAssay.fromJsonString json).DataMap
+                                | Some parent when parent.Parent = DataMapParent.Study ->
                                     (ArcStudy.fromJsonString json).DataMap
                             defaultArg temp (DataMap.init())
-                        ArcFiles.DataMap(parentId, parent, dataMap)
+                        let newDataMapParent =
+                            if dataMapParent.IsSome then
+                                Some (ArcFiles.CreateDataMapParent(dataMapParent.Value.ParentId, dataMapParent.Value.Parent))
+                            else
+                                None
+                        ArcFiles.DataMap(newDataMapParent, dataMap)
 
                 let cmd = Spreadsheet.InitFromArcFile resolvedArcFile |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
@@ -74,15 +80,17 @@ module ARCitect =
                     ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv
                 | ArcFiles.Template template ->
                     ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template
-                | ArcFiles.DataMap (parentId, parent, datamap) ->
+                | ArcFiles.DataMap (datamapParent, datamap) ->
                     let json =
-                        match parent with
-                        | None
-                        | Some DataMapParent.Assay ->
-                            let parentDataMap = ArcAssay.create(defaultArg parentId "default", datamap = datamap)
+                        match datamapParent with
+                        | None ->
+                            let parentDataMap = ArcAssay.create("default", datamap = datamap)
                             ArcAssay.toJsonString 0 parentDataMap
-                        | Some DataMapParent.Study ->
-                            let parentDataMap = ArcStudy.create(defaultArg parentId "default", datamap = datamap)
+                        | Some parent when parent.Parent = DataMapParent.Assay ->
+                            let parentDataMap = ArcAssay.create(parent.ParentId, datamap = datamap)
+                            ArcAssay.toJsonString 0 parentDataMap
+                        | Some parent when parent.Parent = DataMapParent.Study ->
+                            let parentDataMap = ArcStudy.create(parent.ParentId, datamap = datamap)
                             ArcStudy.toJsonString 0 parentDataMap
                     ARCitect.Interop.InteropTypes.ARCFile.DataMap, json
 
