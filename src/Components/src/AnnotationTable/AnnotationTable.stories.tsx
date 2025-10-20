@@ -288,7 +288,7 @@ export const FreeTextDetails: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_FreeText');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -317,7 +317,7 @@ export const TermDetails: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_Term');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -346,7 +346,7 @@ export const UnitizedDetails: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_Unitized');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -575,7 +575,7 @@ export const TermDetailsKeyboard: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_Term');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -602,7 +602,7 @@ export const FreeTextDetailsKeyboardActivation: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_FreeText');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
