@@ -89,7 +89,6 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
             "docker"
             [
                 "build"
-                "-f"
                 if isPrerelease then
                     "-t"
                     imageNext
@@ -98,7 +97,9 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
                     imageVersioned
                     "-t"
                     imageLatest
+                "-f"
                 ProjectPaths.dockerFilePath
+                "."
             ]
             ""
 
