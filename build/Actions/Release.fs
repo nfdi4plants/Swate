@@ -76,17 +76,7 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageName = "ghcr.io/nfdi4plants/swate"
 
     let login =
-        run
-            "docker"
-            [
-                "login"
-                "--username"
-                username
-                "--password-stdin"
-                key
-                dockerRegistryTarget
-            ]
-            ""
+        run "docker" [ "login"; "--username"; username; "--password"; key; dockerRegistryTarget ] ""
 
     let isPrerelease = version.Version.IsPrerelease
 
