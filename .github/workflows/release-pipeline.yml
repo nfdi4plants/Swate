@@ -129,8 +129,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }} --dry-run
 
-      - uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
-        if: ${{ matrix.target }} == 'storybook'
+      # This publishes storybook folder to gh-pages. Only run on matrix.target == 'storybook'
+      - name: Publish Storybook to GitHub Pages
+        uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
+        if: ${{ matrix.target == 'storybook' }}
         with:
           install_command: echo "install skipped"  # default: npm ci
           build_command: echo "build skipped" # default: npm run build-storybook

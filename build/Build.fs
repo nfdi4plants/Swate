@@ -412,11 +412,6 @@ let main args =
 
         let tryGitHubRelease = GitHub.tryGetRelease GithubToken latestVersion
 
-        let ghRelease =
-            match tryGitHubRelease with
-            | None -> GitHub.mkRelease GithubToken latestVersion
-            | Some r -> r
-
         match target with
         | "nuget" ->
             let key = getEnvironementVariableOrFail "NUGET_KEY"
@@ -456,8 +451,8 @@ let main args =
             0
         | "storybook" ->
             printfn "Starting Storybook release!"
-            failwith "not implemented yet"
-            exit 1
+            Release.storybook ()
+            0
         | _ ->
             printRedfn ("No valid release target provided!")
             1

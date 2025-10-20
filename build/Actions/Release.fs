@@ -105,7 +105,17 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageName = "ghcr.io/nfdi4plants/swate"
 
     let login =
-        Command.RunAsync("docker", [ "login"; dockerRegistryTarget; "--username"; username; "--password"; key ])
+        Command.RunAsync(
+            "docker",
+            [
+                "login"
+                dockerRegistryTarget
+                "--username"
+                username
+                "--password-stdin"
+                key
+            ]
+        )
         |> Async.AwaitTask
 
     let isPrerelease = version.Version.IsPrerelease
@@ -174,3 +184,6 @@ let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
 
     }
     |> Async.RunSynchronously
+
+let storybook () =
+    run "npm" [ "run"; "build:storybook" ] ProjectPaths.componentsPath
