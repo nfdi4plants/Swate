@@ -9,46 +9,60 @@ type ReleaseResponse = {
     assets_url: string
     upload_url: string
     html_url: string
+    tarball_url: string
+    zipball_url: string
     id: int
+    node_id: string
+    target_commitish: string
     tag_name: string
     name: string
     body: string
+    draft: bool
+    prerelease: bool
 }
 
 type UpdateReleaseRequest = {
     tag_name: string option
+    target_commitish: string option
     name: string option
     body: string option
+    draft: bool option
+    prerelease: bool option
+    make_latest: string option
 }
 
-let mkHeaders token = [
+let private mkHeaders token = [
     "Authorization", sprintf "Bearer %s" token
     "Accept", "application/vnd.github+json"
     "X-GitHub-Api-Version", "2022-11-28"
     "user-agent", "Swate build script"
 ]
 
-let toJson (data: (string * obj) list) = JsonSerializer.Serialize(dict data)
+let private toJson (data: (string * obj) list) = JsonSerializer.Serialize(dict data)
 
 let mkRelease (token: string) (version: Changelog.Version) =
     let endpoint =
         $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases"
 
-    Http.RequestString(
-        endpoint,
-        httpMethod = "POST",
-        headers = mkHeaders token,
-        body =
-            TextRequest(
-                toJson [
-                    "tag_name", version.Version.ToString() :> obj
-                    "name", version.Version.ToString() :> obj
-                    "body", version.Body :> obj
-                    "draft", true :> obj
-                    "generate_release_notes ", true
-                ]
-            )
-    )
+    let isPrerelease = version.Version.IsPrerelease
+
+    let bodyJson =
+        toJson [
+            "tag_name", version.Version.ToString() :> obj
+            "name", version.Version.ToString() :> obj
+            "body", version.Body :> obj
+            "draft", true :> obj
+            "generate_release_notes", true :> obj
+            if isPrerelease then
+                "prerelease", true :> obj
+        ]
+
+    printfn "%A" bodyJson
+
+    Http.RequestString(endpoint, httpMethod = "POST", headers = mkHeaders token, body = TextRequest(bodyJson))
+    |> fun x ->
+        printfn "json %A" x
+        x
     |> JsonSerializer.Deserialize<ReleaseResponse>
 
 let tryGetRelease (token: string) (version: Changelog.Version) =
@@ -76,11 +90,31 @@ let tryGetRelease (token: string) (version: Changelog.Version) =
         Some response
     | code -> failwithf "Error: unexpected status code %d" code
 
+let getReleases (token: string) (itemsPerPage: int) =
+    let endpoint =
+        $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases"
+
+    Http.RequestString(
+        endpoint,
+        httpMethod = "GET",
+        headers = mkHeaders token,
+        query = [ "per_page", string itemsPerPage ]
+    )
+    |> JsonSerializer.Deserialize<ReleaseResponse[]>
+
+let tryGetLatestRelease (token: string) (version: Changelog.Version) =
+    let releases = getReleases token 3
+
+    releases
+    |> Array.filter (fun r -> r.tag_name = version.Version.ToString())
+    |> Array.sortByDescending (fun r -> r.id)
+    |> Array.tryHead
+
 let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseResponse -> UpdateReleaseRequest) =
     let versionStr = version.Version.ToString()
 
     let id =
-        tryGetRelease token version
+        tryGetLatestRelease token version
         |> Option.defaultWith (fun () -> failwithf "Release %s not found" versionStr)
 
     let request = fn id
@@ -109,7 +143,7 @@ let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: s
     let versionStr = version.Version.ToString()
 
     let release =
-        tryGetRelease token version
+        tryGetLatestRelease token version
         |> Option.defaultWith (fun () -> failwithf "Release %s not found" versionStr)
 
     let endpoint =

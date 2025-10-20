@@ -6,7 +6,10 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
 
 jobs:
   # --- Job 1: Run tests ---
@@ -81,7 +84,7 @@ jobs:
         name: Check for new version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet run --project ./build/Build.fsproj check-release
+        run: dotnet run --project ./build/Build.fsproj prerelease
 
   release:
     needs: verify_release
@@ -138,3 +141,28 @@ jobs:
           build_command: echo "build skipped" # default: npm run build-storybook
           path: src/Components/storybook-static # default: dist/storybook
           checkout: false # default: true
+
+  post-release:
+    needs: [release, verify_release]
+    runs-on: windows-latest
+    if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      - name: Finalize GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet run --project ./build/Build.fsproj postrelease

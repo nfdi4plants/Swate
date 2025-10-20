@@ -491,7 +491,7 @@ let main args =
     // //         ReleaseNoteTasks.createVersionFile (version, false)
     // //         0
     // //     | _ -> runOrDefault args
-    | "check-release" :: _ ->
+    | "prerelease" :: _ ->
 
         let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
 
@@ -511,10 +511,35 @@ let main args =
             Git.createTagAndPush (nextTag)
             GitHub.mkRelease GitHubToken latestVersion |> ignore
             0
+    | "postrelease" :: _ ->
+
+        let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
+        let latestVersion = Changelog.getLatestVersion ()
+        let isPrerelease = latestVersion.Version.IsPrerelease
+
+        GitHub.updateRelease
+            GitHubToken
+            latestVersion
+            (fun _ -> {
+                tag_name = None
+                target_commitish = None
+                name = None
+                body = None
+                draft = Some false
+                prerelease = Some isPrerelease
+                make_latest = Some "true"
+            })
+        |> ignore
+
+        0
     | "dev" :: a ->
 
-        // run git [ "add"; "." ] ""
-        // run git [ "commit"; "-m"; (sprintf "Release v%s" ProjectInfo.prereleaseTag) ] ""
+        // let latestVersion = Changelog.getLatestVersion ()
+        // // GitHub.mkRelease GitHubToken latestVersion |> ignore
+        // // let release = GitHub.mkRelease GitHubToken latestVersion
+        // let tryRelease = GitHub.tryGetLatestRelease GitHubToken latestVersion
+        // printGreenfn "Done!"
+        // printfn "%A" tryRelease
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")

@@ -109,11 +109,11 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
             "docker",
             [
                 "login"
-                dockerRegistryTarget
                 "--username"
                 username
                 "--password-stdin"
                 key
+                dockerRegistryTarget
             ]
         )
         |> Async.AwaitTask
