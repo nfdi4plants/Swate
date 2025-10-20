@@ -35,3 +35,4 @@ output/
 storybook-static/
 nupkgs/
 artifacts/
+./SwateClient.zip

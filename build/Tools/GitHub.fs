@@ -4,6 +4,21 @@ open System.IO
 open FSharp.Data
 open System.Text.Json
 
+type Asset = {
+    url: string
+    browser_download_url: string
+    id: int
+    node_id: string
+    name: string
+    label: string
+    content_type: string
+    size: int
+    download_count: int
+    digest: string
+    created_at: System.DateTime
+    updated_at: System.DateTime
+}
+
 type ReleaseResponse = {
     url: string
     assets_url: string
@@ -19,6 +34,7 @@ type ReleaseResponse = {
     body: string
     draft: bool
     prerelease: bool
+    assets: Asset[]
 }
 
 type UpdateReleaseRequest = {
@@ -139,6 +155,7 @@ let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseRespo
             )
     )
 
+/// Replaces if asset of the same name exists
 let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: string) =
     let versionStr = version.Version.ToString()
 
@@ -146,10 +163,30 @@ let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: s
         tryGetLatestRelease token version
         |> Option.defaultWith (fun () -> failwithf "Release %s not found" versionStr)
 
+    let fileName = Path.GetFileName(filePath)
+
+    let existingAsset = release.assets |> Array.tryFind (fun a -> a.name = fileName)
+
+    match existingAsset with
+    | Some asset ->
+        printGreenfn "[GitHub] Asset %s already exists, updating..." fileName
+
+        let endpoint =
+            $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/assets/{asset.id}"
+
+        Http.Request(
+            endpoint,
+            httpMethod = "DELETE",
+            headers = mkHeaders token @ [ "Content-Type", "application/octet-stream" ],
+            query = [ "name", fileName; "label", fileName ]
+        )
+        |> ignore
+
+        ()
+    | None -> printGreenfn "[GitHub] Uploading asset %s..." fileName
+
     let endpoint =
         $"https://uploads.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/{release.id}/assets"
-
-    let fileName = Path.GetFileName(filePath)
 
     let fileBytes = File.ReadAllBytes(filePath)
 

@@ -529,9 +529,7 @@ let main args =
         |> ignore
 
         0
-    | "dev" :: a ->
-
-        0
+    | "dev" :: a -> 0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")
         1
