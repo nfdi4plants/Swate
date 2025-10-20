@@ -3,8 +3,6 @@ name: Build and Publish Storybook to GitHub Pages
 
 on:
   # Event for the workflow to run on
-  push:
-    branches: ['main']
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 permissions:

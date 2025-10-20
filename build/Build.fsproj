@@ -5,6 +5,17 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="ProjectInfo.fs" />
+    <Compile Include="Util.fs" />
+    <Compile Include="IO\Changelog.fs" />
+    <Compile Include="IO\VersionIO.fs" />
+    <Compile Include="Tools\GHActions.fs" />
+    <Compile Include="Tools\Git.fs" />
+    <Compile Include="Tools\GitHub.fs" />
+    <Compile Include="Actions\Bundle.fs" />
+    <Compile Include="Actions\Run.fs" />
+    <Compile Include="Actions\Test.fs" />
+    <Compile Include="Actions\Release.fs" />
     <Compile Include="Build.fs" />
   </ItemGroup>
   <ItemGroup>

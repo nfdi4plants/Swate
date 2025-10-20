@@ -79,6 +79,8 @@ jobs:
 
       - id: buildscript
         name: Check for new version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project ./build/Build.fsproj check-release
 
   release:
@@ -88,7 +90,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [nuget, npm, docker, electron]
+        target: [nuget, npm, docker, electron, storybook]
     steps:
       # Checkout the repository
       - name: Checkout code
@@ -126,3 +128,11 @@ jobs:
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }} --dry-run
+
+      - uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
+        if: ${{ matrix.target }} == 'storybook'
+        with:
+          install_command: echo "install skipped"  # default: npm ci
+          build_command: echo "build skipped" # default: npm run build-storybook
+          path: src/Components/storybook-static # default: dist/storybook
+          checkout: false # default: true
