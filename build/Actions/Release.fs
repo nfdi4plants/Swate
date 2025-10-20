@@ -10,17 +10,14 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
     let isPrerelease = version.Version.IsPrerelease
 
-    let build =
-        Command.RunAsync("npm", [ "run"; "build" ], workingDirectory = ProjectPaths.componentsPath)
-        |> Async.AwaitTask
+    let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
 
     let setConfig =
-        Command.RunAsync("npm", [ "config"; "set"; $"//registry.npmjs.org/:_authToken={key}" ])
-        |> Async.AwaitTask
+        run "npm" [ "config"; "set"; $"//registry.npmjs.org/:_authToken={key}" ] ProjectPaths.componentsPath
 
     let publish =
-        Command.RunAsync(
-            "npm",
+        run
+            "npm"
             [
                 "publish"
                 "--access"
@@ -30,37 +27,21 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
                     "next"
                 if isDryRun then
                     "--dry-run"
-            ],
-            workingDirectory = ProjectPaths.componentsPath
-        )
-        |> Async.AwaitTask
+            ]
+            ProjectPaths.componentsPath
 
-
-    async {
-        do! build
-
-        do! setConfig
-
-        do! publish
-    }
-    |> Async.RunSynchronously
+    ()
 
 let nuget (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
     VersionIO.updateVersionFiles version
     VersionIO.updateFSharpProjectVersions version
 
-    let installNpmDependencies =
-        Command.RunAsync("npm", [ "ci" ], workingDirectory = ProjectPaths.componentsPath)
-        |> Async.AwaitTask
-
-    let mkCssFile =
-        Command.RunAsync("npm", [ "run"; "prebuild:net" ], workingDirectory = ProjectPaths.componentsPath)
-        |> Async.AwaitTask
+    let mkCssFile = run "npm" [ "run"; "prebuild:net" ] ProjectPaths.componentsPath
 
     let pack =
-        Command.RunAsync(
-            "dotnet",
+        run
+            "dotnet"
             [
                 "pack"
                 ProjectPaths.nugetSln
@@ -69,34 +50,24 @@ let nuget (key: string) (version: Changelog.Version) (isDryRun: bool) =
                 "--output"
                 ProjectPaths.nugetDeployPath
             ]
-        )
-        |> Async.AwaitTask
+            ""
 
     let publish =
-        Command.RunAsync(
-            "dotnet",
-            [
-                "nuget"
-                "push"
-                $"{ProjectPaths.nugetDeployPath}/*.nupkg"
-                "--api-key"
-                key
-                "--source"
-                "https://api.nuget.org/v3/index.json"
-                if isDryRun then
-                    "--dry-run"
-            ]
-        )
-        |> Async.AwaitTask
+        if not isDryRun then
+            run
+                "dotnet"
+                [
+                    "nuget"
+                    "push"
+                    $"{ProjectPaths.nugetDeployPath}/*.nupkg"
+                    "--api-key"
+                    key
+                    "--source"
+                    "https://api.nuget.org/v3/index.json"
+                ]
+                ""
 
-    async {
-        do! mkCssFile
-
-        do! pack
-
-        do! publish
-    }
-    |> Async.RunSynchronously
+    ()
 
 let docker (username: string) (key: string) (version: Changelog.Version) (isDryRun: bool) =
     // Placeholder for docker release logic
@@ -105,8 +76,8 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageName = "ghcr.io/nfdi4plants/swate"
 
     let login =
-        Command.RunAsync(
-            "docker",
+        run
+            "docker"
             [
                 "login"
                 "--username"
@@ -115,8 +86,7 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
                 key
                 dockerRegistryTarget
             ]
-        )
-        |> Async.AwaitTask
+            ""
 
     let isPrerelease = version.Version.IsPrerelease
 
@@ -125,8 +95,8 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageNext = $"{imageName}:next"
 
     let build =
-        Command.RunAsync(
-            "docker",
+        run
+            "docker"
             [
                 "build"
                 "-f"
@@ -140,25 +110,17 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
                     imageLatest
                 ProjectPaths.dockerFilePath
             ]
-        )
-        |> Async.AwaitTask
+            ""
 
-    let push = async {
-        if isPrerelease then
-            do! Command.RunAsync("docker", [ "push"; imageNext ]) |> Async.AwaitTask
-        else
-            do! Command.RunAsync("docker", [ "push"; imageVersioned ]) |> Async.AwaitTask
-            do! Command.RunAsync("docker", [ "push"; imageLatest ]) |> Async.AwaitTask
-    }
-
-    async {
-        do! login
-        do! build
-
+    let push =
         if not isDryRun then
-            do! push
-    }
-    |> Async.RunSynchronously
+            if isPrerelease then
+                run "docker" [ "push"; imageNext ] ""
+            else
+                run "docker" [ "push"; imageVersioned ] ""
+                run "docker" [ "push"; imageLatest ] ""
+
+    ()
 
 open System.IO
 open System.IO.Compression
@@ -170,20 +132,16 @@ let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
     let sourceDir = Path.Combine(ProjectPaths.deployPath, "public")
     let targetZip = "./SwateClient.zip"
 
-    async {
-        Bundle.Client(false)
+    Bundle.Client(false)
 
-        if File.Exists(targetZip) then
-            File.Delete(targetZip)
+    if File.Exists(targetZip) then
+        File.Delete(targetZip)
 
-        ZipFile.CreateFromDirectory(sourceDir, targetZip, CompressionLevel.Optimal, includeBaseDirectory = false)
+    ZipFile.CreateFromDirectory(sourceDir, targetZip, CompressionLevel.Optimal, includeBaseDirectory = false)
 
-        let response = GitHub.uploadReleaseAsset token version targetZip
+    let response = GitHub.uploadReleaseAsset token version targetZip
 
-        ()
-
-    }
-    |> Async.RunSynchronously
+    ()
 
 let storybook () =
     run "npm" [ "run"; "build:storybook" ] ProjectPaths.componentsPath

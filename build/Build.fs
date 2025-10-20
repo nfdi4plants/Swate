@@ -408,10 +408,6 @@ let main args =
             printRedfn "Currently the worklow only supports CI releases!"
             exit 1
 
-        let GithubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
-
-        let tryGitHubRelease = GitHub.tryGetRelease GithubToken latestVersion
-
         match target with
         | "nuget" ->
             let key = getEnvironementVariableOrFail "NUGET_KEY"
@@ -446,6 +442,7 @@ let main args =
             printGreenfn ("Release docker!")
             0
         | "electron" ->
+            let GithubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
             Release.electron latestVersion GithubToken isDryRun
             printGreenfn ("Release electron!")
             0
@@ -534,12 +531,6 @@ let main args =
         0
     | "dev" :: a ->
 
-        // let latestVersion = Changelog.getLatestVersion ()
-        // // GitHub.mkRelease GitHubToken latestVersion |> ignore
-        // // let release = GitHub.mkRelease GitHubToken latestVersion
-        // let tryRelease = GitHub.tryGetLatestRelease GitHubToken latestVersion
-        // printGreenfn "Done!"
-        // printfn "%A" tryRelease
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")
