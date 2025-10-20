@@ -127,7 +127,7 @@ module ConversionTypes =
         | Study
         | Assay
         | Template
-        | DataMap of (DataMapParent option)
+        | DataMap of ({| ParentId: string; Parent: DataMapParent |} option)
         | None
 
     type SessionStorage = {
@@ -144,16 +144,15 @@ module ConversionTypes =
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
                 | Some(ArcFiles.DataMap (p, d)) ->
-                    match p with
-                    | None ->
-                        let parentDataMap = ArcAssay.create("default", datamap = d)
-                        JsonArcFiles.DataMap None, ArcAssay.toJsonString 0 parentDataMap
-                    | Some p when p.Parent = DataMapParent.Assay ->
-                        let parentDataMap = ArcAssay.create(p.ParentId, datamap = d)
-                        JsonArcFiles.DataMap (Some p.Parent), ArcAssay.toJsonString 0 parentDataMap
-                    | Some p when p.Parent = DataMapParent.Study ->
-                        let parentDataMap = ArcStudy.create(p.ParentId, datamap = d)
-                        JsonArcFiles.DataMap (Some p.Parent), ArcStudy.toJsonString 0 parentDataMap
+                    let data = 
+                        DataMap.encoder d
+                        |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                    let parent =
+                        if p.IsSome then
+                            Some {| ParentId = p.Value.ParentId; Parent = p.Value.Parent |}
+                        else
+                            None
+                    JsonArcFiles.DataMap parent, data
                 | None -> JsonArcFiles.None, ""
 
             let compressedJsonString = GeneralHelpers.compressJsonToBase64String jsonString
@@ -181,15 +180,15 @@ module ConversionTypes =
                         ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay -> ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
-                    | JsonArcFiles.DataMap parent ->
-                        let data = ArcAssay.fromJsonString decompressedString
-                        let datamapParent =
-                            if parent.IsSome then
-                                Some (ArcFiles.CreateDataMapParent(data.Identifier, parent.Value))
-                            else None
-                        let dataMap = (datamapParent, defaultArg data.DataMap (DataMap.init()))
-                        dataMap
-                        |> ArcFiles.DataMap |> Some
+                    | JsonArcFiles.DataMap p ->
+                        let parent =
+                            if p.IsSome then
+                                Some (ArcFiles.CreateDataMapParent(p.Value.ParentId, p.Value.Parent))
+                            else
+                                None
+                        let dataMap = Decode.fromJsonString DataMap.decoder decompressedString
+                        ArcFiles.DataMap(parent, dataMap)
+                        |> Some
                     | JsonArcFiles.None -> None
                 {
                     init with
