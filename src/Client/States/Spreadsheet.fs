@@ -65,8 +65,9 @@ type ActiveView =
     member this.ArcFileHasView(arcfile: ArcFiles) =
         match this with
         | Table i -> arcfile.HasTableAt(i)
-        | DataMap -> arcfile.HasDataMap()
+        | DataMap -> arcfile.HasTableAt(-1)
         | Metadata -> arcfile.HasMetadata()
+        | _ -> failwith $"The view {this} is not supported"
 
 [<AutoOpen>]
 module ActivePattern =

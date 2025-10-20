@@ -10,6 +10,7 @@ open Swate.Components.Shared
 open Fable.Remoting.Client
 open FsSpreadsheet.Js
 open ARCtrl
+open Update.UpdateUtil.JsonHelper
 open ARCtrl.Spreadsheet
 open ARCtrl.Json
 
@@ -74,19 +75,14 @@ module Spreadsheet =
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
                         |> Promise.start
                     | Some(DataMap (parent, datamap)) ->
-                        let json =
-                            match parent with
-                            | None ->
-                                let parentDataMap = ArcAssay.create("default", datamap = datamap)
-                                ArcAssay.toJsonString 0 parentDataMap
-                            | Some p when p.Parent = DataMapParent.Assay ->
-                                let parentDataMap = ArcAssay.create(p.ParentId, datamap = datamap)
-                                ArcAssay.toJsonString 0 parentDataMap
-                            | Some p when p.Parent = DataMapParent.Study ->
-                                let parentDataMap = ArcStudy.create(p.ParentId, datamap = datamap)
-                                ArcStudy.toJsonString 0 parentDataMap
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.DataMap, json)
-                        |> Promise.start
+                        if parent.IsSome then
+                            let json =
+                                wholeDatamapEncoder parent.Value.ParentId parent.Value.Parent datamap
+                                |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                            ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.DataMap, json)
+                            |> Promise.start
+                        else
+                            failwith "No datamap parent is available"
                     | _ -> ()
 
                 state, model, newCmd

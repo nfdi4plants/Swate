@@ -1,16 +1,19 @@
 namespace ARCtrl
 
+open System.Collections.Generic
+
 open Swate.Components
 open Swate.Components.Shared
+
 open ARCtrl
-open Database
-open System.Collections.Generic
-open Fable.Core.JsInterop
 open ARCtrl.Spreadsheet
 
-module TermCollection =
+open Database
 
-    open ARCtrl
+open Fable.Core
+open Fable.Core.JsInterop
+
+module TermCollection =
 
     /// <summary>
     /// https://github.com/nfdi4plants/nfdi4plants_ontology/issues/85
@@ -57,6 +60,7 @@ module ARCtrlHelper =
         | Template
         | DataMap
 
+    [<StringEnum>]
     type DataMapParent =
         | Assay
         | Study
@@ -80,18 +84,10 @@ module ARCtrlHelper =
         member this.HasTableAt(index: int) =
             match this with
             | Template _ -> index = 0 // Template always has exactly one table
-            | DataMap _ -> false
+            | DataMap _ -> index = -1
             | Investigation i -> false
             | Study(s, _) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
-
-        member this.HasDataMap() =
-            match this with
-            | Template _ -> false
-            | Investigation i -> false
-            | Study(s, _) -> s.DataMap.IsSome
-            | Assay a -> a.DataMap.IsSome
-            | DataMap _ -> true
 
         member this.HasMetadata() =
             match this with
@@ -130,6 +126,21 @@ module ARCtrlHelper =
             | ARCtrlCompressed -> "ARCtrl Compressed"
             | ISA -> "ISA"
             | ROCrate -> "RO-Crate Metadata"
+
+//module JsonHelper =
+
+//    open ARCtrl.Json
+
+//    open Thoth.Json
+//    open Thoth.Json.Core
+
+//    let datamapEncoder(parent: {| ParentId: string; Parent: DataMapParent|} option) (datamap: DataMap) =
+//        [ 
+//            Encode.tryInclude "Title" Encode.string assay.Title
+//            Encode.tryInclude "Description" Encode.string assay.Description
+//        ]
+//        |> Encode.choose
+//        |> Encode.object
 
 module Table =
 

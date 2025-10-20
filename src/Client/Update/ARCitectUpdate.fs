@@ -5,6 +5,7 @@ open Elmish
 open Messages
 open OfficeInterop
 open OfficeInterop.Core
+
 open Model
 
 module ARCitect =
@@ -49,16 +50,7 @@ module ARCitect =
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
                     | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
-                        let dataMap =
-                            let temp =
-                                match dataMapParent with
-                                | None ->
-                                    (ArcAssay.fromJsonString json).DataMap
-                                | Some parent when parent.Parent = DataMapParent.Assay ->
-                                    (ArcAssay.fromJsonString json).DataMap
-                                | Some parent when parent.Parent = DataMapParent.Study ->
-                                    (ArcStudy.fromJsonString json).DataMap
-                            defaultArg temp (DataMap.init())
+                        let datamapParent, dataMap = Decode.fromJsonString UpdateUtil.JsonHelper.wholeDatamapDecoder json
                         let newDataMapParent =
                             if dataMapParent.IsSome then
                                 Some (ArcFiles.CreateDataMapParent(dataMapParent.Value.ParentId, dataMapParent.Value.Parent))
@@ -82,18 +74,12 @@ module ARCitect =
                     ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template
                 | ArcFiles.DataMap (datamapParent, datamap) ->
                     let json =
-                        match datamapParent with
-                        | None ->
-                            let parentDataMap = ArcAssay.create("default", datamap = datamap)
-                            ArcAssay.toJsonString 0 parentDataMap
-                        | Some parent when parent.Parent = DataMapParent.Assay ->
-                            let parentDataMap = ArcAssay.create(parent.ParentId, datamap = datamap)
-                            ArcAssay.toJsonString 0 parentDataMap
-                        | Some parent when parent.Parent = DataMapParent.Study ->
-                            let parentDataMap = ArcStudy.create(parent.ParentId, datamap = datamap)
-                            ArcStudy.toJsonString 0 parentDataMap
+                        if datamapParent.IsSome then
+                            UpdateUtil.JsonHelper.wholeDatamapEncoder datamapParent.Value.ParentId datamapParent.Value.Parent datamap
+                            |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                        else
+                            failwith "No parent for datamap is available!"
                     ARCitect.Interop.InteropTypes.ARCFile.DataMap, json
-
             let cmd =
                 Cmd.OfPromise.attempt api.Save (arcFileEnum, json) (curry GenericError Cmd.none >> DevMsg)
 

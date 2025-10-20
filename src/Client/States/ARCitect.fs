@@ -45,7 +45,6 @@ module Interop =
         SetARCFile: InteropTypes.ARCFile * string * {| ParentId: string; Parent: DataMapParent |} option-> JS.Promise<bool>
     }
 
-
 let api =
     MessageInterop.MessageInterop.createApi ()
     |> MessageInterop.MessageInterop.buildOutProxy<Interop.IARCitectOutAPI>

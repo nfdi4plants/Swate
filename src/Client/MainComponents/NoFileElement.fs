@@ -172,11 +172,6 @@ module private Helper =
                                     let dataMap = DataMap.init()
                                     let arcFile = ArcFiles.DataMap (None, dataMap)
                                     arcFile |> UpdateArcFile |> InterfaceMsg |> dispatch
-
-                                    Spreadsheet.UpdateActiveView(Spreadsheet.ActiveView.DataMap)
-                                    |> Messages.SpreadsheetMsg
-                                    |> dispatch
-
                             )
                         ]
                     ]
