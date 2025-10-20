@@ -15,20 +15,31 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
     let setConfig =
         run "npm" [ "config"; "set"; $"//registry.npmjs.org/:_authToken={key}" ] ProjectPaths.componentsPath
 
-    let publish =
+    try
         run
             "npm"
-            [
-                "publish"
-                "--access"
-                "public"
-                if isPrerelease then
-                    "--tag"
-                    "next"
-                if isDryRun then
-                    "--dry-run"
-            ]
+            [ "view"; $"{ProjectInfo.componentsPackageName}@{version.Version.ToString()}" ]
             ProjectPaths.componentsPath
+
+        printGreenfn
+            $"Package {ProjectInfo.componentsPackageName} version {version.Version.ToString()} already published to npmjs.org, skipping publish step."
+    with _ ->
+        let publish =
+            run
+                "npm"
+                [
+                    "publish"
+                    "--access"
+                    "public"
+                    if isPrerelease then
+                        "--tag"
+                        "next"
+                    if isDryRun then
+                        "--dry-run"
+                ]
+                ProjectPaths.componentsPath
+
+        ()
 
     ()
 
@@ -62,6 +73,7 @@ let nuget (key: string) (version: Changelog.Version) (isDryRun: bool) =
                     $"{ProjectPaths.nugetDeployPath}/*.nupkg"
                     "--api-key"
                     key
+                    "--skip-duplicate"
                     "--source"
                     "https://api.nuget.org/v3/index.json"
                 ]

@@ -123,11 +123,13 @@ let tryGetLatestRelease (token: string) (version: Changelog.Version) =
 
     releases
     |> Array.filter (fun r -> r.tag_name = version.Version.ToString() || r.name = version.Version.ToString())
-    |> Array.exactlyOne
+    |> Array.tryExactlyOne
 
 let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseResponse -> UpdateReleaseRequest) =
 
-    let response = tryGetLatestRelease token version
+    let response =
+        tryGetLatestRelease token version
+        |> Option.defaultWith (fun () -> failwithf "Release for version %O not found" version.Version)
 
     let request = fn response
 
@@ -154,7 +156,9 @@ let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseRespo
 /// Replaces if asset of the same name exists
 let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: string) =
 
-    let release = tryGetLatestRelease token version
+    let release =
+        tryGetLatestRelease token version
+        |> Option.defaultWith (fun () -> failwithf "Release for version %O not found" version.Version)
 
     let fileName = Path.GetFileName(filePath)
 

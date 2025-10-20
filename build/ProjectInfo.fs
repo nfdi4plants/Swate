@@ -27,3 +27,5 @@ let developmentUrl = "https://localhost:3000"
 let gitOwner = "nfdi4plants"
 let project = "Swate"
 let projectRepo = $"https://github.com/{gitOwner}/{project}"
+
+let componentsPackageName = "@nfdi4plants/swate-components"

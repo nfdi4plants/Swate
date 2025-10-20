@@ -9,6 +9,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  packages: write
 
 jobs:
   # --- Job 1: Run tests ---
@@ -93,8 +94,6 @@ jobs:
       fail-fast: false
       matrix:
         target: [nuget, npm, docker, electron, storybook]
-    permissions:
-      packages: write
     steps:
       # Checkout the repository
       - name: Checkout code

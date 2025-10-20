@@ -118,7 +118,11 @@ let main args =
         else
             printGreenfn "The latest version %O from CHANGELOG.md is not yet tagged in git." latestVersion.Version
             Git.createTagAndPush (nextTag)
-            GitHub.mkRelease GitHubToken latestVersion |> ignore
+
+            match GitHub.tryGetLatestRelease GitHubToken latestVersion with
+            | Some _ -> printGreenfn "Release for version %O already exists on GitHub." latestVersion.Version
+            | None -> GitHub.mkRelease GitHubToken latestVersion |> ignore
+
             0
     | "postrelease" :: _ ->
 
@@ -141,7 +145,11 @@ let main args =
         |> ignore
 
         0
-    | "dev" :: a -> 0
+    | "dev" :: a ->
+        let token = ""
+        let version = Changelog.getLatestVersion ()
+        GitHub.tryGetLatestRelease token version |> printfn "%A"
+        0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")
         1
