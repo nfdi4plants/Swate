@@ -129,14 +129,14 @@ let tryGetLatestRelease (token: string) (version: Changelog.Version) =
 let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseResponse -> UpdateReleaseRequest) =
     let versionStr = version.Version.ToString()
 
-    let id =
+    let response =
         tryGetLatestRelease token version
         |> Option.defaultWith (fun () -> failwithf "Release %s not found" versionStr)
 
-    let request = fn id
+    let request = fn response
 
     let endpoint =
-        $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/{id}"
+        $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/{response.id}"
 
     Http.Request(
         endpoint,
