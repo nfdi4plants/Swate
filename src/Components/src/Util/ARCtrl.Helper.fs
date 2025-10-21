@@ -132,21 +132,6 @@ module ARCtrlHelper =
             | ISA -> "ISA"
             | ROCrate -> "RO-Crate Metadata"
 
-//module JsonHelper =
-
-//    open ARCtrl.Json
-
-//    open Thoth.Json
-//    open Thoth.Json.Core
-
-//    let datamapEncoder(parent: {| ParentId: string; Parent: DataMapParent|} option) (datamap: DataMap) =
-//        [ 
-//            Encode.tryInclude "Title" Encode.string assay.Title
-//            Encode.tryInclude "Description" Encode.string assay.Description
-//        ]
-//        |> Encode.choose
-//        |> Encode.object
-
 module Table =
 
     /// <summary>
