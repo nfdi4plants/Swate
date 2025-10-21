@@ -12,14 +12,6 @@ module Xlsx =
             let! fswb = FsSpreadsheet.Js.Xlsx.fromXlsxBytes bytes
             let ws = fswb.GetWorksheets()
 
-            let mutable datamapParent = None
-
-            let hasDatamap =
-                try
-                    let assay = ArcAssay.fromFsWorkbook fswb
-                    datamapParent <- Some (ArcFiles.CreateDataMapParent(assay.Identifier, DataMapParent.Assay))
-                    assay.DataMap.IsSome
-                with _ -> false
             let arcfile =
                 match ws with
                 | _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcAssay.isMetadataSheetName ws.Name) ->
@@ -34,9 +26,20 @@ module Xlsx =
                         || ARCtrl.Spreadsheet.Template.obsoleteMetadataSheetName = ws.Name)
                     ->
                     ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
-                | _ when hasDatamap ->
+                | _ when ws.Exists(fun ws ->
+                    ws.Name.ToLower().Contains("datamap")) ->
                     let datamap = DataMap.fromFsWorkbook fswb
-                    DataMap(datamapParent, datamap)
+                    DataMap(Some(createDataMapParentInfo"default" DataMapParent.Assay), datamap)
+
+                    //Adapt to FSWorkBook and FromFSWorkbook of ARCtrl to include DatamapParentInfo
+                    //match ws with
+                    //| _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcAssay.isMetadataSheetName ws.Name) ->
+                    //    let assay = ArcAssay.fromFsWorkbook fswb
+                    //    DataMap(Some(createDataMapParentInfo assay.Identifier DataMapParent.Assay), datamap)
+                    //| _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcStudy.isMetadataSheetName ws.Name) ->
+                    //    let (study, _) = ArcStudy.fromFsWorkbook fswb
+                    //    DataMap(Some(createDataMapParentInfo study.Identifier DataMapParent.Study), datamap)
+                    //| _ -> failwith "ws must be from assay or study to contain a datamap!"
                 | _ -> failwith "Unable to identify given file. Missing metadata sheet with correct name."
 
             return arcfile

@@ -35,7 +35,7 @@ module JsonHelper =
                 | "Assay" -> ARCtrl.ARCtrlHelper.DataMapParent.Assay
                 | "Study" -> ARCtrl.ARCtrlHelper.DataMapParent.Study
                 | _ -> failwith $"Could not deserialize the string {temp} into a valid datamap parent."
-            let datamapParent = {| ParentId = parentId; Parent = parent |}
+            let datamapParent = createDataMapParentInfo parentId parent
             let datamap = get.Required.Field "Datamap" DataMap.decoder
             datamapParent, datamap
         )

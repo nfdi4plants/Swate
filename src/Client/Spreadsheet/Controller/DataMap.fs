@@ -18,7 +18,7 @@ let updateDatamap (dataMapOpt: DataMap option) (state: Spreadsheet.Model) : Spre
             else
                 Some(DataMap(p, d))
         | _ ->
-            console.warn "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
+            console.warn "[WARNING] updateDatamap: No Assay, Study or Datamap found in ArcFile"
             state.ArcFile
 
     match dataMapOpt with

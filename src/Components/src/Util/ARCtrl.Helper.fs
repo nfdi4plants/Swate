@@ -71,15 +71,20 @@ module ARCtrlHelper =
             | "study" -> Study
             | _ -> failwith $"The type {str.ToLower()} is unknown"
 
+    type DatamapParentInfo = {|
+        ParentId: string
+        Parent: DataMapParent
+    |}
+
+    let createDataMapParentInfo (parentId: string) (parent: DataMapParent) : DatamapParentInfo =
+        {| ParentId = parentId; Parent = parent |}
+
     type ArcFiles =
         | Template of Template
         | Investigation of ArcInvestigation
         | Study of ArcStudy * ArcAssay list
         | Assay of ArcAssay
-        | DataMap of ({| ParentId: string; Parent: DataMapParent |} option * DataMap)
-
-        static member CreateDataMapParent(parentId: string, parent: DataMapParent) =
-            {| ParentId = parentId; Parent = parent |}
+        | DataMap of (DatamapParentInfo option * DataMap)
 
         member this.HasTableAt(index: int) =
             match this with

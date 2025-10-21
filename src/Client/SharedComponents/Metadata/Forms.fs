@@ -678,58 +678,6 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member ParentId
-        (
-            value: string option,
-            setValue: string option -> unit,
-            ?label: string
-        ) =
-
-        Html.div [
-            prop.children [
-                if label.IsSome then
-                    Generic.FieldTitle label.Value
-                Html.div [
-                    prop.className "swt:flex swt:flex-row swt:gap-2 swt:relative"
-                    prop.children [
-                        FormComponents.TextInput(
-                            value |> Option.defaultValue "",
-                            (fun s ->
-                                let value = if s = "" then None else Some s
-                                value |> setValue
-                            )
-                        )
-                    ]
-                ]
-            ]
-        ]
-
-    [<ReactComponent>]
-    static member SelectDataMapParent
-        (
-            parent: DataMapParent option,
-            setter: DataMapParent option -> unit
-        ) =
-
-        let mkOption (target) =
-            Html.option [ prop.value (string target); prop.text (string target) ]
-
-        Html.div [
-            prop.children [
-                Generic.FieldTitle "Datamap parents"
-                Html.select [
-                    prop.className "swt:select swt:join-item swt:min-w-fit"
-                    prop.defaultValue (if parent.IsSome then string parent else "")
-                    prop.onChange (fun (e: string) -> Some (DataMapParent.tryFromString e) |> setter)
-                    prop.children [
-                        mkOption DataMapParent.Assay
-                        mkOption DataMapParent.Study
-                    ]
-                ]
-            ]
-        ]
-
-    [<ReactComponent>]
     static member OntologyAnnotationsInput
         (oas: ResizeArray<OntologyAnnotation>, setter: ResizeArray<OntologyAnnotation> -> unit, ?label: string, ?parent)
         =

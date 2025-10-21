@@ -140,16 +140,6 @@ type Model = {
         | Some(DataMap(_, d)) -> d
         | _ -> DataMap.init ()
 
-    member this.UpdateDataMap(dataMap: DataMap option) =
-        match this.ArcFile with
-        | Some(Assay a) -> a.DataMap <- dataMap
-        | Some(Study(s, _)) -> s.DataMap <- dataMap
-        | Some(DataMap(_, d)) ->
-            if dataMap.IsSome then
-                d.DataContexts.Clear()
-                d.DataContexts.AddRange(dataMap.Value.DataContexts)
-        | _ -> failwith $"The type {this.ArcFile} is not valid for a datamap"
-
     member this.GetAssay() =
         match this.ArcFile with
         | Some(Assay a) -> a

@@ -51,12 +51,7 @@ module ARCitect =
                         ArcFiles.Template template
                     | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
                         let datamapParent, dataMap = Decode.fromJsonString UpdateUtil.JsonHelper.wholeDatamapDecoder json
-                        let newDataMapParent =
-                            if dataMapParent.IsSome then
-                                Some (ArcFiles.CreateDataMapParent(dataMapParent.Value.ParentId, dataMapParent.Value.Parent))
-                            else
-                                None
-                        ArcFiles.DataMap(newDataMapParent, dataMap)
+                        ArcFiles.DataMap(Some datamapParent, dataMap)
 
                 let cmd = Spreadsheet.InitFromArcFile resolvedArcFile |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
