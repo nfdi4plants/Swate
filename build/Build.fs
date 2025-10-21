@@ -146,9 +146,7 @@ let main args =
 
         0
     | "dev" :: a ->
-        let token = ""
-        let version = Changelog.getLatestVersion ()
-        GitHub.tryGetLatestRelease token version |> printfn "%A"
+        ()
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")

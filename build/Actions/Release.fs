@@ -10,11 +10,6 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
     let isPrerelease = version.Version.IsPrerelease
 
-    let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
-
-    let setConfig =
-        run "npm" [ "config"; "set"; $"//registry.npmjs.org/:_authToken={key}" ] ProjectPaths.componentsPath
-
     try
         run
             "npm"
@@ -24,6 +19,21 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
         printGreenfn
             $"Package {ProjectInfo.componentsPackageName} version {version.Version.ToString()} already published to npmjs.org, skipping publish step."
     with _ ->
+
+        let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
+
+        let setConfig =
+            run "npm" [ "config"; "set"; $"//registry.npmjs.org/:_authToken={key}" ] ProjectPaths.componentsPath
+
+        let cssFilePath = @"src/Components/dist/swate-components.css"
+
+        if not (System.IO.File.Exists(cssFilePath)) then
+            failwithf "CSS file not found at %s" cssFilePath
+
+        let content = System.IO.File.ReadAllText(cssFilePath)
+        let replacedContent = content.Replace("@layer base", "@layer swt-base")
+        System.IO.File.WriteAllText(cssFilePath, replacedContent)
+
         let publish =
             run
                 "npm"

@@ -25,7 +25,6 @@ Swate is a powerful web tool designed for research data management, providing ve
 To get started with Swate, choose your preferred platform:
 
 1. **Web Tool**: Visit [swate-alpha.nfdi4plants.org](https://swate-alpha.nfdi4plants.org)
-2. **VS Code Plugin**: Find installation instructions in the [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/vs-code-extension/)
 3. **Electron App**: Download and install the app from the [GitHub Releases Page](https://github.com/nfdi4plants/ARCitect/releases)
 4. **Excel Add-In**: Find installation instructions in the [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/annotate-in-excel/)
 
@@ -57,17 +56,8 @@ Most information based on ARCitect can be transferred to other Swate platforms.
 
 See all available components in action by visiting our [Storybook](https://nfdi4plants.github.io/Swate/).
 
-### 🌱 Contributing
+### 🌱 Contributing + Development Setup
 
-> [!IMPORTANT]
-> A quote i found years ago by @Thorium.
->
-> > _Imposter syndrome disclaimer_: I want your help. No really, I do.
-> >
-> > There might be a little voice inside that tells you you're not ready; that you need to do one more tutorial, or learn another framework, or write a few more blog posts before you can help me with this project.
-> >
-> > I assure you, that's not the case.
->
-> Any help is welcome, from a typo fix to a new feature. If you are unsure about anything, just ask. We are here to help you help us.
+Any help is welcome, from a typo fix to a new feature. If you are unsure about anything, just ask. We are here to help you help us.
 
 If you want to contribute or just check out Swate on your local machine have a look at the [CONTRIBUTING.md](CONTRIBUTING.md) file.
