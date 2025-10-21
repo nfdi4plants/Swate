@@ -134,18 +134,18 @@ let main args =
             GitHubToken
             latestVersion
             (fun _ -> {
-                tag_name = None
-                target_commitish = None
-                name = None
-                body = None
-                draft = Some false
-                prerelease = Some isPrerelease
-                make_latest = Some "true"
+                GitHub.UpdateReleaseRequest.Empty with
+                    draft = Some false
+                    prerelease = Some isPrerelease
+                    make_latest = Some "true"
             })
         |> ignore
 
         0
     | "dev" :: a ->
+
+        let version = Changelog.getLatestVersion ()
+
         ()
         0
     | _ ->

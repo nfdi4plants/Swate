@@ -45,7 +45,17 @@ type UpdateReleaseRequest = {
     draft: bool option
     prerelease: bool option
     make_latest: string option
-}
+} with
+
+    static member Empty = {
+        tag_name = None
+        target_commitish = None
+        name = None
+        body = None
+        draft = None
+        prerelease = None
+        make_latest = None
+    }
 
 let private mkHeaders token = [
     "Authorization", sprintf "Bearer %s" token
@@ -73,12 +83,8 @@ let mkRelease (token: string) (version: Changelog.Version) =
                 "prerelease", true :> obj
         ]
 
-    printfn "%A" bodyJson
 
     Http.RequestString(endpoint, httpMethod = "POST", headers = mkHeaders token, body = TextRequest(bodyJson))
-    |> fun x ->
-        printfn "json %A" x
-        x
     |> JsonSerializer.Deserialize<ReleaseResponse>
 
 let tryGetRelease (token: string) (version: Changelog.Version) =
@@ -136,22 +142,32 @@ let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseRespo
     let endpoint =
         $"https://api.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/{response.id}"
 
-    Http.Request(
-        endpoint,
-        httpMethod = "PATCH",
-        headers = mkHeaders token,
-        body =
-            TextRequest(
-                toJson [
-                    if request.tag_name.IsSome then
-                        "tag_name", request.tag_name.Value :> obj
-                    if request.name.IsSome then
-                        "name", request.name.Value :> obj
-                    if request.body.IsSome then
-                        "body", request.body.Value :> obj
-                ]
-            )
-    )
+    let jsonList = [
+        if request.tag_name.IsSome then
+            "tag_name", request.tag_name.Value :> obj
+        if request.name.IsSome then
+            "name", request.name.Value :> obj
+        if request.body.IsSome then
+            "body", request.body.Value :> obj
+        if request.draft.IsSome then
+            "draft", request.draft.Value :> obj
+        if request.prerelease.IsSome then
+            "prerelease", request.prerelease.Value :> obj
+        if request.make_latest.IsSome then
+            "make_latest", request.make_latest.Value :> obj
+        if request.target_commitish.IsSome then
+            "target_commitish", request.target_commitish.Value :> obj
+    ]
+
+    match jsonList with
+    | [] ->
+        printRedfn "No fields to update in release"
+        Error "No fields to update"
+    | jsonList ->
+        let json = toJson jsonList
+
+        Http.Request(endpoint, httpMethod = "PATCH", headers = mkHeaders token, body = TextRequest json)
+        |> Ok
 
 /// Replaces if asset of the same name exists
 let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: string) =

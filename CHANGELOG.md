@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Release workflow
 -   RELEASE_NOTES.md to CHANGELOG.md
 
-## 1.0.0+41a16f8 (Released 2024-1-15)
+## 1.0.0+41a16f8 - 2024-01-15
 
 ### Added
 
@@ -83,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#a8a6c93](https://github.com/nfdi4plants/Swate/commit/a8a6c932d5ebc8b9e07b8a92414a4c5500893ba1)] Fix dead links :bug:
 -   [[#d1cf1f5](https://github.com/nfdi4plants/Swate/commit/d1cf1f521dd802b456fbf5dec185af4d1455c44f)] Fix dead installation link :books:
 
-## 0.8.0+6aeb417 (Released 2023-3-10)
+## 0.8.0+6aeb417 - 2023-03-10
 
 ### Added
 
@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#aba0a53](https://github.com/nfdi4plants/Swate/commit/aba0a536cdf97731b225bb894d0917a2e65684d0)] Fix ctrl + click on quick access buttons on mac #273
 -   [[#752a631](https://github.com/nfdi4plants/Swate/commit/752a631a9d4cd0bd4f465f3330ed56213b5dd6dc)] Fix strange search result order (#247)
 
-## 0.7.1+a5a7d62 (Released 2022-12-14)
+## 0.7.1+a5a7d62 - 2022-12-14
 
 ### Added
 
@@ -111,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   [[#bfae9a8](https://github.com/nfdi4plants/Swate/commit/bfae9a87886bfdf18612c46bb1416d35aaf258b8)] Enable CORS
 
-## 0.7.0+d648b9c (Released 2022-12-13)
+## 0.7.0+d648b9c - 2022-12-13
 
 ### Added
 
@@ -126,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#a5ff2cd](https://github.com/nfdi4plants/Swate/commit/a5ff2cd16ea47d6779e4cea38adf636962f9e375)] Fix runtests build target
 -   [[#50b4e98](https://github.com/nfdi4plants/Swate/commit/50b4e9861ded58f59d9dc7f6f7c557db4089679d)] Fix issue with duplicate columns and non term columns :bug:
 
-## 0.6.3+b859e8e (Released 2022-12-1)
+## 0.6.3+b859e8e - 2022-12-01
 
 ### Added
 
@@ -140,7 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   [[#14b2feb](https://github.com/nfdi4plants/Swate/commit/14b2feb8e403a8da16f3dac785c0f081123e7cf4)] Fix whitespace in username install issue :bug:
 
-## 0.6.2+6a4f5b0 (Released 2022-10-19)
+## 0.6.2+6a4f5b0 - 2022-10-19
 
 ### Added
 
@@ -155,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#b09058d](https://github.com/nfdi4plants/Swate/commit/b09058da8aeef94d38d0f47654590e6254f9d2f1)] Remove min length constraint on term search (Issue #226) :bug:
 -   [[#807e643](https://github.com/nfdi4plants/Swate/commit/807e643e59eb2739da1520f5e51d8186482eaa04)] Fix term search field size when parent term name too long (Issue #225) :bug:
 
-## 0.6.1+a1732c7 (Released 2022-9-22)
+## 0.6.1+a1732c7 - 2022-09-22
 
 ### Added
 
@@ -163,7 +163,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#37a09cf](https://github.com/nfdi4plants/Swate/commit/37a09cfcc3ddc93e49023fbdab746d3b6e554877)] Simplify Json-Import :sparkles:
 -   [[#f624141](https://github.com/nfdi4plants/Swate/commit/f624141367ec2573e8f1e39066f2cbeedc51edf0)] Merge branch 'kevinf-patch-0.6' of https://github.com/nfdi4plants/Swate into kevinf-patch-0.6
 
-## 0.6.0+0ba730b (Released 2022-9-7)
+## 0.6.0+0ba730b - 2022-09-07
 
 ### Added
 
@@ -201,7 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#0dd0c91](https://github.com/nfdi4plants/Swate/commit/0dd0c9157e1e3cad213bcb3a68b4393318ff7585)] Fix clipping issue in building block info :bug:
 -   [[#5e45ac8](https://github.com/nfdi4plants/Swate/commit/5e45ac8cbb8a6a031bafeaf49c407b7fd8ee3ba7)] Fix propagation of unit to new building blocks (Issue #183) :bug:.
 
-## 0.5.3+0eaa644 (Released 2021-12-16)
+## 0.5.3+0eaa644 - 2021-12-16
 
 ### Added
 
@@ -213,7 +213,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#0eaa644](https://github.com/nfdi4plants/Swate/commit/0eaa6446e70d858720a1ea3428083cd3b379360a)] Fix accidental value insert from template db.
 -   [[#2039287](https://github.com/nfdi4plants/Swate/commit/20392878a667a6c563a389078629f3526766c4a3)] Fix templates only inserting as characteristic.
 
-## 0.5.2+abcc754 (Released 2021-12-14)
+## 0.5.2+abcc754 - 2021-12-14
 
 ### Added
 
@@ -225,7 +225,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   [[#abcc754](https://github.com/nfdi4plants/Swate/commit/abcc754fddc57b9f9785670569ef352fb5548e56)] **Try** parse number format (fix Issue #180).
 
-## 0.5.1+0c90a83 (Released 2021-12-8)
+## 0.5.1+0c90a83 - 2021-12-08
 
 ### Added
 
@@ -240,7 +240,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#2a09a55](https://github.com/nfdi4plants/Swate/commit/2a09a55120261db8527b1c80e63a50cb0ecfe4e3)] Split template tags by "," instead of ";"
 -   [[#c82dd4f](https://github.com/nfdi4plants/Swate/commit/c82dd4f3ef72a21af8f0896ea0cb103811f2c198)] Fix server port error for production.
 
-## 0.5.0+70632951 (Released 2021-10-22)
+## 0.5.0+70632951 - 2021-10-22
 
 ### Added
 
@@ -286,7 +286,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#6afcd91](https://github.com/nfdi4plants/Swate/commit/6afcd9102bd3e858c46621dda3e6fc804abc6afe)] Fix context update issues in interop functions.
 -   [[#4fb63e9](https://github.com/nfdi4plants/Swate/commit/4fb63e9767da0fe82479c42cbd13b9f0c89b0209)] Fix warning modal when just entering validation subpage :bug:
 
-## 0.4.8+7960150 (Released 2021-9-8)
+## 0.4.8+7960150 - 2021-09-08
 
 ### Added
 
@@ -296,7 +296,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#5b46ded](https://github.com/nfdi4plants/Swate/commit/5b46deda34e38fbd04f0f6f5693aa1a0bd9cfca6)] Update README.md
 -   [[#ef96958](https://github.com/nfdi4plants/Swate/commit/ef96958b4d0929f80273ddc7b90659274bdbcc91)] Update for demo server
 
-## 0.4.7+23edde8 (Released 2021-5-12)
+## 0.4.7+23edde8 - 2021-05-12
 
 ### Added
 
@@ -304,14 +304,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#23edde8](https://github.com/nfdi4plants/Swate/commit/23edde88061148ee37a038a44324f338d3d4ee88)] Add redo search on double click to building block input elements.
 -   [[#b10131b](https://github.com/nfdi4plants/Swate/commit/b10131b5a9957824f8957227ff8b192434adc62e)] Update database, add part_of Term relationships
 
-## 0.4.6+89aa7bc (Released 2021-3-12)
+## 0.4.6+89aa7bc - 2021-03-12
 
 ### Added
 
 -   latest commit #89aa7bc
 -   [[#89aa7bc](https://github.com/nfdi4plants/Swate/commit/89aa7bc8a2e31b8598e0e0b916733f211035fa4c)] Add Spawn API endpoints.
 
-## 0.4.5+b360273 (Released 2021-3-12)
+## 0.4.5+b360273 - 2021-03-12
 
 ### Added
 
@@ -323,14 +323,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#b360273](https://github.com/nfdi4plants/Swate/commit/b36027369f60a612e2660ec3b8bfefb09cbe5664)] Fix bug, removing protocol groups if one column is not an ontology.
 -   [[#402a220](https://github.com/nfdi4plants/Swate/commit/402a220824ee69ebd1cb5e6f4ecd2ba4cf1627f7)] Fix pointer .json generator (Issue #139).
 
-## 0.4.4+4ae3198 (Released 2021-3-11)
+## 0.4.4+4ae3198 - 2021-03-11
 
 ### Added
 
 -   latest commit #4ae3198
 -   [[#4ae3198](https://github.com/nfdi4plants/Swate/commit/4ae31986bc4b1a24ccead037afbde4ced9ed7a44)] Update DB protocol.
 
-## 0.4.3+9b7d7fe (Released 2021-3-9)
+## 0.4.3+9b7d7fe - 2021-03-09
 
 ### Added
 
@@ -340,7 +340,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   [[#9b7d7fe](https://github.com/nfdi4plants/Swate/commit/9b7d7fe5ca562fee346227430c1fc1aebffa3b10)] Remove bugs with protocol update :bug:
 
-## 0.4.2+ae04aa5 (Released 2021-3-9)
+## 0.4.2+ae04aa5 - 2021-03-09
 
 ### Added
 
@@ -350,7 +350,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   [[#ae04aa5](https://github.com/nfdi4plants/Swate/commit/ae04aa51261e614d0c422f03d646e1a76d664501)] Stabilize protocol insert against bugs :bug:
 
-## 0.4.1+d75743c (Released 2021-3-8)
+## 0.4.1+d75743c - 2021-03-08
 
 ### Added
 
@@ -378,7 +378,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#33695f4](https://github.com/nfdi4plants/Swate/commit/33695f429ac6aa76e8638b9d5b375921b3d856bd)] Fix protocol grouping bug.
 -   [[#f4d08e8](https://github.com/nfdi4plants/Swate/commit/f4d08e8f1f41c712ff787ce231e4c085795eef2a)] Fix protocol xml not correctly removed bug.
 
-## 0.4.0+a0e04f3 (Released 2021-3-1)
+## 0.4.0+a0e04f3 - 2021-03-01
 
 ### Added
 
@@ -406,7 +406,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#41e298d](https://github.com/nfdi4plants/Swate/commit/41e298d4369d320331b50c7d08494567daac7004)] Fix updating protocol group header bug if split too often (Issue #120).
 -   [[#01d5cf5](https://github.com/nfdi4plants/Swate/commit/01d5cf5db6152ca16d8fa765c80fd9034d8c9f8e)] Fix protocol group headers not correctly removed bug (Issue #119).
 
-## 0.3.1+cbc655c (Released 2021-2-12)
+## 0.3.1+cbc655c - 2021-02-12
 
 ### Added
 
@@ -416,7 +416,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   [[#cbc655c](https://github.com/nfdi4plants/Swate/commit/cbc655cd6c9692480ac46c894127831aaea5b713)] Fix protocol headers shifted if not placed in row B (Issue #108) :bug:
 
-## 0.3.0+0d31c43 (Released 2021-2-11)
+## 0.3.0+0d31c43 - 2021-02-11
 
 ### Added
 
@@ -445,7 +445,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#1e5eb3d](https://github.com/nfdi4plants/Swate/commit/1e5eb3d6c2b0f2f0527d4843c8bc0addabdb0b04)] Fix reset of unit search input when unchecking (Issue #92).
 -   [[#474cf73](https://github.com/nfdi4plants/Swate/commit/474cf73cb48227d58e88d239e6e9e50e8676c78a)] Fix bug creating wrong TAN with insertTerm.
 
-## 0.2.0+899b535 (Released 2021-1-11)
+## 0.2.0+899b535 - 2021-01-11
 
 ### Added
 
@@ -463,7 +463,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#9c07338](https://github.com/nfdi4plants/Swate/commit/9c07338a624240d1f3119cee243164186c5203b2)] Fix input assistance is not added when first table is created (Issue #82).
 -   [[#889b86c](https://github.com/nfdi4plants/Swate/commit/889b86c466c454e736daf950ac0df4f77dcb6355)] Fix file picker not uploading reoccuring file names (Issue #80).
 
-## 0.1.3+c6ad5b7 (Released 2020-12-7)
+## 0.1.3+c6ad5b7 - 2020-12-07
 
 ### Added
 
@@ -487,7 +487,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#d207770](https://github.com/nfdi4plants/Swate/commit/d207770a880261a2e293c721b90fc69925abc48a)] Fix not shown `No Ontology` option in advanced term search (Issue #64).
 -   [[#1fd3f67](https://github.com/nfdi4plants/Swate/commit/1fd3f6716b2a1f3fc5a1bdbefb7728ef862d4627)] Fix minor bug in release notes creation.
 
-## 0.1.2+af67a92 (Released 2020-11-26)
+## 0.1.2+af67a92 - 2020-11-26
 
 ### Added
 
@@ -505,7 +505,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   [[#fadbea8](https://github.com/nfdi4plants/Swate/commit/fadbea8337eb6ae304085f6f1fbbd4df99d8003f)] Fix disappearing checkboxes (Issue #54).
 -   [[#c402c70](https://github.com/nfdi4plants/Swate/commit/c402c7022bf120ae6b6a25822799aec8d80b2e7b)] Fix api docs not showing examples with DateTime (Issue #55).
 
-## 0.1.1+7c567fd (Released 2020-11-18)
+## 0.1.1+7c567fd - 2020-11-18
 
 ### Added
 
@@ -519,7 +519,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Unit Term Search broke due to a change in naming conventions in the stored procedures. Fixed it!
 
-## 0.1.1-beta (Released 2020-11-5)
+## 0.1.1-beta - 2020-11-05
 
 -   Release of [Minimal POC milestone](https://github.com/nfdi4plants/Swate/milestone/1?closed=1). Rough feature set:
 -   Update advanced term search to use stored procedure introduced in 0.0.2-alpha.
@@ -530,7 +530,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -       * Add-in should not reload after navigating to a new tab for the first time.
 -   Term search input field no longer looses focus after clicking into it.
 
-## 0.0.2-alpha (Released 2020-10-29)
+## 0.0.2-alpha - 2020-10-29
 
 -   First step on the way to the Minimal POC milestone. Rough feature set:
 -   Add fulltext searches for advanced and simple search queries.
@@ -538,7 +538,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   AddBuildingBlock automatically adds 2 additional hidden terms in which "Term Source REF" and "Term Accession Number" are automatically inserted.
 -   For Developers: We added a docker-compose file to generate a local docker mysql database with adminer for an easier developing process. This feature is initialized as part of `dotnet fake build -t OfficeDebug`
 
-## 0.0.1-alpha (Released 2020-7-27)
+## 0.0.1-alpha - 2020-07-27
 
 -   First open alpha release of Swate. Rough feature set:
 -   Create annotation tables from existing data
