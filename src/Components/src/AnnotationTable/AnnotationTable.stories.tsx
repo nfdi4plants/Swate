@@ -167,7 +167,7 @@ export const EditTermCellKbd: Story = {
     await userEvent.clear(activeCell);
     await userEvent.clear(activeCell);
     await userEvent.clear(activeCell);
-    await userEvent.type(activeCell, 'leco', { delay: 50 });
+    await userEvent.type(activeCell, 'leco instrument', { delay: 50 });
 
     await waitFor(async () => {
         const debugValue = activeCell.getAttribute("data-debugresultcount")
@@ -179,7 +179,7 @@ export const EditTermCellKbd: Story = {
         expect(termSearchResult).toBeVisible();
     }, { timeout: 5000 });
 
-    await userEvent.keyboard('[ArrowDown][ArrowDown][Enter]')
+    await userEvent.keyboard('[ArrowDown][Enter]')
 
     await waitFor(async () => {
       const updatedCell = await canvas.findByText('LECO instrument model');
@@ -654,18 +654,38 @@ export const NextRow: Story = {
     await userEvent.type(activeCell, 'Edited Text 1', { delay: 50 });
     await userEvent.keyboard('{Enter}')
 
-    await userEvent.type(activeCell, '22', { delay: 50 });
-    await userEvent.keyboard('{Enter}')
+    const nextCell = await waitFor(() => {
+      return canvasElement.querySelector('[data-row="3"][data-column="1"]');
+    })
+    expect(nextCell).toBeTruthy();
+    expect(nextCell, "unable to find cell at row 3 column 1").toBeInTheDocument();
+    expect(nextCell, "next cell is not `data-selected`").toHaveAttribute('data-selected', 'true');
+
+    if (!nextCell) {
+      throw new Error("Next cell is undefined");
+    }
+
+    await waitFor(() => {
+      const updatedCell = canvas.getByTestId('cell-2-1');
+      expect(updatedCell).toHaveTextContent('Edited Text 1');
+    }, { timeout: 5000 });
+
+    await userEvent.type(nextCell, "22", { delay: 50 }); // This is an unknown issue with userEvent. This seems to miss the first character
 
     await waitFor(async () => {
-      const updatedCell = await canvas.findByText('Edited Text 1');
-      expect(updatedCell).toBeVisible();
-    });
+      const activeCell = await canvas.findByTestId('active-cell-string-input-3-1');
+      expect(activeCell).toBeVisible();
+      await userEvent.keyboard('{Enter}')
+      const updatedCell = canvas.getByTestId('cell-3-1');
+      expect(updatedCell).toHaveTextContent('Source 22');
+    }, { timeout: 5000 });
 
-    await waitFor(async () => {
-      const updatedCell = await canvas.findByText('Source 22');
-      expect(updatedCell).toBeVisible();
-    });
+    const nextNextCell = await waitFor(() => {
+      return canvasElement.querySelector('[data-row="4"][data-column="1"]');
+    })
+    expect(nextNextCell).toBeTruthy();
+    expect(nextNextCell, "unable to find cell at row 3 column 1").toBeInTheDocument();
+    expect(nextNextCell, "next next cell is not `data-selected`").toHaveAttribute('data-selected', 'true');
   }
 }
 
