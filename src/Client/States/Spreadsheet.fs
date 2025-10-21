@@ -123,8 +123,8 @@ type Model = {
 
     member this.HasMetadata() =
         match this.ArcFile with
-        | Some(DataMap(_, _)) -> false
-        | _ -> true
+        | Some(arcFile) -> arcFile.HasMetadata()
+        | None -> false
 
     member this.HasDataMap() =
         match this.ArcFile with
