@@ -136,7 +136,9 @@ module JsonImportHelper =
                 let table = createUpdatedTables (ResizeArray[t.Table]) state deselectedColumns None
                 t.Table <- table.[0]
                 arcFile
-            | Investigation _ as arcFile -> arcFile
+            | Investigation _
+            | Workflow _
+            | DataMap _ as arcFile -> arcFile
 
         arcFile
 
@@ -225,6 +227,8 @@ module JsonImportHelper =
             | Assay a -> a.Tables
             | Study(s, _) -> s.Tables
             | Template t -> ResizeArray([ t.Table ])
+            | DataMap _
+            | Workflow _
             | Investigation _ -> ResizeArray()
 
         updateTables importTables importState activeTableIndex existingOpt
@@ -270,5 +274,6 @@ module JsonExportHelper =
                 nameFromId t.FileName, Template.toCompressedJsonString 0 t
             | Template _, anyElse ->
                 failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
+            | _ -> failwith $"Error, the selected type {arcfile} is not supported to be exported."
 
         name, jsonString
