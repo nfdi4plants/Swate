@@ -16,7 +16,7 @@ open ARCtrl
 open ARCtrl.Json
 
 let serviceApi: IServiceAPIv1 = {
-    getAppVersion = fun () -> async { return System.AssemblyVersionInformation.AssemblyMetadata_Version }
+    getAppVersion = fun () -> async { return Version.AssemblyVersion }
 }
 
 open Microsoft.AspNetCore.Http
@@ -146,21 +146,33 @@ let topLevelRouter = router {
     get "/test/test1" (htmlString "<h1>Hi this is test response 1</h1>")
     get "/test/hello" (getMessage () |> json)
 
-    forward @"" (fun next ctx ->
-        let credentials = getNeo4JCredentials ctx
-        API.IOntologyAPI.V1.createIOntologyApi credentials next ctx)
+    forward
+        @""
+        (fun next ctx ->
+            let credentials = getNeo4JCredentials ctx
+            API.IOntologyAPI.V1.createIOntologyApi credentials next ctx
+        )
 
-    forward @"" (fun next ctx ->
-        let credentials = getNeo4JCredentials ctx
-        API.IOntologyAPI.V2.createIOntologyApi credentials next ctx)
+    forward
+        @""
+        (fun next ctx ->
+            let credentials = getNeo4JCredentials ctx
+            API.IOntologyAPI.V2.createIOntologyApi credentials next ctx
+        )
 
-    forward @"" (fun next ctx ->
-        let credentials = getNeo4JCredentials ctx
-        API.IOntologyAPI.V3.createIOntologyApi credentials next ctx)
+    forward
+        @""
+        (fun next ctx ->
+            let credentials = getNeo4JCredentials ctx
+            API.IOntologyAPI.V3.createIOntologyApi credentials next ctx
+        )
 
-    forward @"" (fun next ctx ->
-        let credentials = getNeo4JCredentials ctx
-        createITemplateApiv1 credentials next ctx)
+    forward
+        @""
+        (fun next ctx ->
+            let credentials = getNeo4JCredentials ctx
+            createITemplateApiv1 credentials next ctx
+        )
 
     //
     forward @"" (fun next ctx -> createIServiceAPIv1 next ctx)
@@ -201,6 +213,7 @@ app.ConfigureAppConfiguration(
     System.Action<Microsoft.Extensions.Hosting.HostBuilderContext, IConfigurationBuilder>(fun ctx config ->
         config.AddUserSecrets("6de80bdf-2a05-4cf7-a1a8-d08581dfa887") |> ignore
         config.AddJsonFile("dev.json", true, true) |> ignore
-        config.AddJsonFile("production.json", true, true) |> ignore)
+        config.AddJsonFile("production.json", true, true) |> ignore
+    )
 )
 |> run

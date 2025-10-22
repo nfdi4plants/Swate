@@ -7,28 +7,11 @@ body:
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report!
-  - type: input
-    id: contact
-    attributes:
-      label: Contact Details
-      description: How can we get in touch if we need more info?
-      placeholder: email, issue, ..
-    validations:
-      required: false
   - type: textarea
     id: what-happened
     attributes:
       label: What happened?
-      description: Give us a step by step what you did.
-      placeholder: Tell us what happened!
-    validations:
-      required: true
-  - type: textarea
-    id: what-expected
-    attributes:
-      label: What did you expect?
-      description: This field might be optional depending on the bug you encountered.
-      placeholder: Tell us what you wanted to see!
+      description: This MUST include a step-by-step description of how to reproduce the bug. If you can add files which triggered the issue. Try to reproduce the issue in a minimal example. You can also open the inspect console (<kbd>Ctrl+Shift+J</kbd> or <kbd>Cmd+Opt+J</kbd>) and copy any error messages you see there.
   - type: dropdown
     id: swate-host
     attributes:
@@ -40,8 +23,6 @@ body:
         - ARCitect
         - Excel
       default: 0
-    validations:
-      required: true
   - type: textarea
     id: swate-host-details
     attributes:
@@ -56,13 +37,3 @@ body:
             * OS [e.g. Windows 11]
         Standalone
             * Browser [e.g. Firefox, Chrome]
-    validations:
-      required: true
-  - type: input
-    id: swate-version
-    attributes:
-      label: Swate version
-      description: You can find it at the bottom of the sidebar.
-      placeholder: 1.0.0-alpha.01
-    validations:
-      required: true

@@ -48,6 +48,8 @@ This needs to be done once per repository download.
 > Should the neo4j database not correctly start up with `./build.cmd run db` delete the container (only container not the volume) and start it again. This can be easily done with the docker ui. Open the `swate_dev` network and click on the thrash bin icon next to the neo4j container.
 >
 > If you know a solution to this issue, please let us know 😞
+>
+> Edit: This issue does not arise if you stop the container before shutting down your computer.
 
 ### Available commands
 
@@ -57,9 +59,8 @@ Usage: ./build.cmd <command>
 run [db]                            Start .net backend server, vite frontend (and database,
                                     swobup with docker if `db`)
 
-release [pre]                       Run .net tests tag current branch and force push to
-                                    release branch (nightly if `pre`), this will trigger
-                                    Github release with docker image
+test                                Run all tests
+
 ```
 
 ## Contribute

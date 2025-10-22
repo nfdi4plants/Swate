@@ -1,0 +1,164 @@
+name: run tests and release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  packages: write
+
+jobs:
+  # --- Job 1: Run tests ---
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      # Install Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Remove root node_modules and lock file (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: rm -rf node_modules package-lock.json
+
+      - name: Remove Components node_modules and lock file (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: rm -rf node_modules package-lock.
+        working-directory: src/Components
+
+      # Install npm dependencies
+      - name: Install root dependencies
+        run: npm i
+
+      # Install component npm dependencies
+      - name: Install components dependencies
+        run: npm i
+        working-directory: src/Components
+
+      # Install playwright dependencies
+      - name: Install Playwright dependencies
+        run: npx playwright install chromium
+        working-directory: src/Components
+
+      - name: Run Tests
+        run: dotnet run --project ./build/Build.fsproj test
+
+  # --- Job 2: Detect new version ---
+  verify_release:
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      should_skip: ${{ steps.buildscript.outputs.should_skip }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - id: buildscript
+        name: Check for new version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet run --project ./build/Build.fsproj prerelease
+
+  release:
+    needs: verify_release
+    if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [nuget, npm, docker, electron, storybook]
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      # Install Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Install npm dependencies
+      - name: Install root dependencies
+        run: npm i
+
+      # Install component npm dependencies
+      - name: Install components dependencies
+        run: npm i
+        working-directory: src/Components
+
+      - name: Run release for ${{ matrix.target }}
+        env:
+          NUGET_KEY: ${{ secrets.NUGET_KEY }}
+          NPM_KEY: ${{ secrets.NPM_KEY }}
+          DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }}
+
+      # This publishes storybook folder to gh-pages. Only run on matrix.target == 'storybook'
+      - name: Publish Storybook to GitHub Pages
+        uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
+        if: ${{ matrix.target == 'storybook' }}
+        with:
+          install_command: echo "install skipped"  # default: npm ci
+          build_command: echo "build skipped" # default: npm run build-storybook
+          path: src/Components/storybook-static # default: dist/storybook
+          checkout: false # default: true
+
+  post_release:
+    needs: [release, verify_release]
+    runs-on: windows-latest
+    if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x.x
+
+      - name: Finalize GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet run --project ./build/Build.fsproj postrelease

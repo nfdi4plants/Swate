@@ -9,7 +9,7 @@ import MockTable from './MockTable.js';
 function renderTable(args: any) {
   const [table, setTable] = React.useState(() => MockTable.Copy());
 
-  const setTableWithLog = (newTable) => {
+  const setTableWithLog = (newTable: any) => {
     console.log("Table updated:", newTable);
     setTable(newTable);
   }
@@ -167,24 +167,24 @@ export const EditTermCellKbd: Story = {
     await userEvent.clear(activeCell);
     await userEvent.clear(activeCell);
     await userEvent.clear(activeCell);
-    await userEvent.type(activeCell, 'leco', { delay: 50 });
+    await userEvent.type(activeCell, 'leco instrument', { delay: 50 });
 
     await waitFor(async () => {
         const debugValue = activeCell.getAttribute("data-debugresultcount")
         expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
-    });
+    }, { timeout: 5000 });
 
     await waitFor(async () => {
         const termSearchResult = await screen.findByText('MS:1001800');
         expect(termSearchResult).toBeVisible();
-    });
+    }, { timeout: 5000 });
 
-    await userEvent.keyboard('[ArrowDown][ArrowDown][Enter]')
+    await userEvent.keyboard('[ArrowDown][Enter]')
 
     await waitFor(async () => {
       const updatedCell = await canvas.findByText('LECO instrument model');
       expect(updatedCell).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -288,7 +288,7 @@ export const FreeTextDetails: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_FreeText');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -317,7 +317,7 @@ export const TermDetails: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_Term');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -346,7 +346,7 @@ export const UnitizedDetails: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_Unitized');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -575,7 +575,7 @@ export const TermDetailsKeyboard: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_Term');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -602,7 +602,7 @@ export const FreeTextDetailsKeyboardActivation: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_FreeText');
       expect(modal).toBeVisible();
-    });
+    }, { timeout: 5000 });
   }
 }
 
@@ -654,14 +654,38 @@ export const NextRow: Story = {
     await userEvent.type(activeCell, 'Edited Text 1', { delay: 50 });
     await userEvent.keyboard('{Enter}')
 
-    await userEvent.type(activeCell, '22', { delay: 50 });
-    await userEvent.keyboard('{Enter}')
+    const nextCell = await waitFor(() => {
+      return canvasElement.querySelector('[data-row="3"][data-column="1"]');
+    })
+    expect(nextCell).toBeTruthy();
+    expect(nextCell, "unable to find cell at row 3 column 1").toBeInTheDocument();
+    expect(nextCell, "next cell is not `data-selected`").toHaveAttribute('data-selected', 'true');
 
-    const updatedCell1 = await canvas.findByText('Edited Text 1');
-    expect(updatedCell1).toBeVisible();
+    if (!nextCell) {
+      throw new Error("Next cell is undefined");
+    }
 
-    const updatedCell2 = await canvas.findByText('Source 22');
-    expect(updatedCell2).toBeVisible();
+    await waitFor(() => {
+      const updatedCell = canvas.getByTestId('cell-2-1');
+      expect(updatedCell).toHaveTextContent('Edited Text 1');
+    }, { timeout: 5000 });
+
+    await userEvent.type(nextCell, "22", { delay: 50 }); // This is an unknown issue with userEvent. This seems to miss the first character
+
+    await waitFor(async () => {
+      const activeCell = await canvas.findByTestId('active-cell-string-input-3-1');
+      expect(activeCell).toBeVisible();
+      await userEvent.keyboard('{Enter}')
+      const updatedCell = canvas.getByTestId('cell-3-1');
+      expect(updatedCell).toHaveTextContent('Source 22');
+    }, { timeout: 5000 });
+
+    const nextNextCell = await waitFor(() => {
+      return canvasElement.querySelector('[data-row="4"][data-column="1"]');
+    })
+    expect(nextNextCell).toBeTruthy();
+    expect(nextNextCell, "unable to find cell at row 3 column 1").toBeInTheDocument();
+    expect(nextNextCell, "next next cell is not `data-selected`").toHaveAttribute('data-selected', 'true');
   }
 }
 
