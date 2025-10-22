@@ -83,7 +83,6 @@ type JsonImport =
     static member private FileUploadButton
         (state: TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)
         =
-        //Daisy.file [
         Html.input [
             prop.type'.file
             prop.className "swt:file-input swt:file-input-neutral swt:w-full"
@@ -113,7 +112,6 @@ type JsonImport =
 
         SidebarComponents.SidebarLayout.LogicContainer [
             Html.div [
-                //Daisy.join [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [
@@ -154,7 +152,6 @@ type JsonImport =
             ]
 
             Html.div [
-                //Daisy.join [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [

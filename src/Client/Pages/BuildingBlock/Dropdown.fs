@@ -17,7 +17,6 @@ let FreeTextInputElement (onSubmit: string -> unit) =
     Html.div [
         prop.className "swt:flex swt:flex-row swt:gap-0 swt:p-0 swt:join"
         prop.children [
-            //Daisy.input [
             Html.input [
                 prop.placeholder "..."
                 prop.className
@@ -31,7 +30,6 @@ let FreeTextInputElement (onSubmit: string -> unit) =
                         onSubmit inputS
                 )
             ]
-            //Daisy.button.button [
             Html.button [
                 prop.className "swt:btn swt:btn-accent swt:btn-sm swt:join-item"
                 prop.onClick (fun e ->
@@ -45,7 +43,6 @@ let FreeTextInputElement (onSubmit: string -> unit) =
 module private DropdownElements =
 
     let divider =
-        //Daisy.divider [
         Html.div [ prop.className "swt:divider swt:mx-2 swt:my-0" ]
 
     let private annotationsPrinciplesLink =
@@ -229,7 +226,6 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
     Components.BaseDropdown.Main(
         isOpen,
         setOpen,
-        //Daisy.button.div [
         Html.button [
             prop.onClick (fun _ -> setOpen (not isOpen))
             prop.role "button"
@@ -251,14 +247,3 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
         ],
         style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
     )
-// Daisy.dropdown [
-//     join.item
-//     if isOpen then dropdown.open'
-//     prop.children [
-
-//         Daisy.dropdownContent [
-//             prop.className "bg-base-300 w-64 menu rounded-box z-[1] p-2"
-//             prop.children
-//         ]
-//     ]
-// ]

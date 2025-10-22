@@ -14,16 +14,13 @@ type Error =
     static member Main(error: exn, dispatch) =
         let closeMsg = Util.RMV_MODAL dispatch
 
-        //Daisy.modal.div [
         Html.div [
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop [ prop.onClick closeMsg ]
                 Html.div [
                     prop.className "swt:modal-backdrop"
                     prop.onClick closeMsg
                 ]
-                //Daisy.modalBox.div [
                 Html.div [
                     prop.className "swt:modal-box swt:!p-0"
                     prop.style [
@@ -32,7 +29,6 @@ type Error =
                         style.overflow.auto
                     ]
                     prop.children [
-                        //Daisy.alert [
                         Html.div [
                             prop.className "swt:alert swt:alert-error swt:size-full"
                             prop.children [

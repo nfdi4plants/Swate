@@ -92,7 +92,6 @@ module private Helper =
                         ()
                     )
                 ]
-                //Daisy.button.button [
                 Html.button [
                     prop.className "swt:btn swt:btn-lg swt:btn-outline"
                     prop.onClick (fun e ->
@@ -108,7 +107,6 @@ module private Helper =
 
     let createNewTableItem (txt: string, onclick: Event -> unit) =
         Html.li [
-            //Daisy.button.a [
             Html.a [
                 prop.className "swt:btn swt:btn-block swt:btn-ghost swt:btn-sm swt:justify-start"
                 prop.onClick (fun e -> onclick e)
@@ -127,7 +125,6 @@ module private Helper =
                 ]
                 Html.ul [
                     prop.tabIndex 0
-                    //Daisy.dropdownContent
                     prop.className
                         "swt:dropdown-content swt:menu swt:p-2 swt:shadow swt:bg-base-300 swt:rounded-box swt:w-64"
                     prop.children [
@@ -153,7 +150,6 @@ module private Helper =
                                     ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
                             Html.div [
-                                //Daisy.divider [
                                 prop.className "swt:divider swt:divider-neutral swt:m-0"
                             ]
                             createNewTableItem (
@@ -166,6 +162,16 @@ module private Helper =
                                     template.Id <- System.Guid.NewGuid()
                                     template.LastUpdated <- System.DateTime.Now
                                     ArcFiles.Template template |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
+                            Html.div [
+                                prop.className "swt:divider swt:divider-neutral swt:m-0"
+                            ]
+                            createNewTableItem (
+                                "Datamap",
+                                fun _ ->
+                                    let dataMap = DataMap.init()
+                                    let arcFile = ArcFiles.DataMap (None, dataMap)
+                                    arcFile |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
                         ]
                     ]

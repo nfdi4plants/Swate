@@ -374,7 +374,7 @@ type DataMapTable =
 
         let datamap, setDatamap =
             React.useState (
-                DataMap(
+                ARCtrl.DataMap(
                     ResizeArray [
                         for i in 0..100 do
                             DataContext(

@@ -1,8 +1,8 @@
 module LocalHistory
 
+open System
 open Fable.Core
 open JsInterop
-open System
 
 open Fable.SimpleJson
 open IndexedDB
@@ -127,6 +127,7 @@ module ConversionTypes =
         | Study
         | Assay
         | Template
+        | DataMap of (DatamapParentInfo option)
         | None
 
     type SessionStorage = {
@@ -139,9 +140,14 @@ module ConversionTypes =
             let jsonArcFile, jsonString =
                 match model.ArcFile with
                 | Some(ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toJsonString 0 i
-                | Some(ArcFiles.Study(s, al)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
+                | Some(ArcFiles.Study(s, _)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
+                | Some(ArcFiles.DataMap (p, d)) ->
+                    let data = 
+                        DataMap.encoder d
+                        |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                    JsonArcFiles.DataMap p, data
                 | None -> JsonArcFiles.None, ""
 
             let compressedJsonString = GeneralHelpers.compressJsonToBase64String jsonString
@@ -169,8 +175,11 @@ module ConversionTypes =
                         ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay -> ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
+                    | JsonArcFiles.DataMap p ->
+                        let dataMap = Decode.fromJsonString DataMap.decoder decompressedString
+                        ArcFiles.DataMap(p, dataMap)
+                        |> Some
                     | JsonArcFiles.None -> None
-
                 {
                     init with
                         ActiveView = this.ActiveView

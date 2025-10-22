@@ -1,16 +1,19 @@
 namespace ARCtrl
 
+open System.Collections.Generic
+
 open Swate.Components
 open Swate.Components.Shared
+
 open ARCtrl
-open Database
-open System.Collections.Generic
-open Fable.Core.JsInterop
 open ARCtrl.Spreadsheet
 
-module TermCollection =
+open Database
 
-    open ARCtrl
+open Fable.Core
+open Fable.Core.JsInterop
+
+module TermCollection =
 
     /// <summary>
     /// https://github.com/nfdi4plants/nfdi4plants_ontology/issues/85
@@ -55,26 +58,49 @@ module ARCtrlHelper =
         | Study
         | Investigation
         | Template
+        | DataMap
+
+    [<StringEnum>]
+    type DataMapParent =
+        | Assay
+        | Study
+
+        static member tryFromString(str: string) =
+            match str.ToLower() with
+            | "assay" -> Assay
+            | "study" -> Study
+            | _ -> failwith $"The type {str.ToLower()} is unknown"
+
+    type DatamapParentInfo = {|
+        ParentId: string
+        Parent: DataMapParent
+    |}
+
+    let createDataMapParentInfo (parentId: string) (parent: DataMapParent) : DatamapParentInfo =
+        {| ParentId = parentId; Parent = parent |}
 
     type ArcFiles =
         | Template of Template
         | Investigation of ArcInvestigation
         | Study of ArcStudy * ArcAssay list
         | Assay of ArcAssay
+        | DataMap of (DatamapParentInfo option * DataMap)
 
         member this.HasTableAt(index: int) =
             match this with
             | Template _ -> index = 0 // Template always has exactly one table
+            | DataMap _ -> index = -1
             | Investigation i -> false
             | Study(s, _) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
 
-        member this.HasDataMap() =
+        member this.HasMetadata() =
             match this with
-            | Template _ -> false
-            | Investigation i -> false
-            | Study(s, _) -> s.DataMap.IsSome
-            | Assay a -> a.DataMap.IsSome
+            | Assay _ 
+            | Template _
+            | Investigation _ -> true
+            | Study(s, _) -> true
+            | DataMap _ -> false
 
         member this.Tables() : ArcTables =
             match this with
@@ -82,6 +108,7 @@ module ARCtrlHelper =
             | Investigation _ -> ArcTables(ResizeArray [])
             | Study(s, _) -> s
             | Assay a -> a
+            | DataMap _ -> ArcTables(ResizeArray [])
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =

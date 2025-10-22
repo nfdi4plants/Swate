@@ -110,9 +110,7 @@ let UpdateMetadataModalContent
                     excelMetadataType with
                         Metadata = Some(ArcFiles.Assay assay)
                 }
-
-            let setAssayDataMap (assay: ArcAssay) (dataMap: DataMap option) = assay.DataMap <- dataMap
-            Assay.Main(assay, setAssay, setAssayDataMap, model)
+            Assay.Main(assay, setAssay, model)
         | {
               Metadata = Some(ArcFiles.Study(study, assays))
           } ->
@@ -121,9 +119,7 @@ let UpdateMetadataModalContent
                     excelMetadataType with
                         Metadata = Some(ArcFiles.Study(study, assays))
                 }
-
-            let setStudyDataMap (study: ArcStudy) (dataMap: DataMap option) = study.DataMap <- dataMap
-            Study.Main(study, assays, setStudy, setStudyDataMap, model)
+            Study.Main(study, assays, setStudy, model)
         | {
               Metadata = Some(ArcFiles.Investigation investigation)
           } ->

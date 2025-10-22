@@ -16,6 +16,7 @@ module Interop =
             | Study
             | Assay
             | Template
+            | DataMap
 
         type ARCitectFile = {|
             mimetype: string
@@ -25,7 +26,7 @@ module Interop =
         |}
 
     type IARCitectOutAPI = {
-        Init: unit -> JS.Promise<(InteropTypes.ARCFile * string) option>
+        Init: unit -> JS.Promise<(InteropTypes.ARCFile * string * DatamapParentInfo option) option>
         Save: InteropTypes.ARCFile * string -> JS.Promise<unit>
         /// selectDictionaries:bool -> JS.Promise<wasSuccessful: bool>
         RequestPaths: bool -> JS.Promise<bool>
@@ -41,9 +42,8 @@ module Interop =
         ResponsePaths: string[] -> JS.Promise<bool>
         ResponseFile: InteropTypes.ARCitectFile -> JS.Promise<bool>
         Refresh: unit -> JS.Promise<bool>
-        SetARCFile: InteropTypes.ARCFile * string -> JS.Promise<bool>
+        SetARCFile: InteropTypes.ARCFile * string * DatamapParentInfo option-> JS.Promise<bool>
     }
-
 
 let api =
     MessageInterop.MessageInterop.createApi ()
@@ -52,7 +52,7 @@ let api =
 open Elmish
 
 type Msg =
-    | Init of ApiCall<unit, (Interop.InteropTypes.ARCFile * string) option>
+    | Init of ApiCall<unit, (Interop.InteropTypes.ARCFile * string * DatamapParentInfo option) option>
     | Save of ArcFiles
     /// ApiCall<selectDirectories: bool, wasSuccessful: bool>
     | RequestPaths of ApiCall<bool, bool>

@@ -10,6 +10,7 @@ open Swate.Components.Shared
 open Fable.Remoting.Client
 open FsSpreadsheet.Js
 open ARCtrl
+open Update.UpdateUtil.JsonHelper
 open ARCtrl.Spreadsheet
 open ARCtrl.Json
 
@@ -51,7 +52,6 @@ module Spreadsheet =
                             (curry GenericError Cmd.none >> DevMsg)
                     else
                         cmd
-
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->
@@ -70,10 +70,19 @@ module Spreadsheet =
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Investigation, json)
                         |> Promise.start
                     | Some(Template template) ->
-                        let json = template.toJsonString ()
+                        let json = template.toJsonString()
 
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
                         |> Promise.start
+                    | Some(DataMap (parent, datamap)) ->
+                        if parent.IsSome then
+                            let json =
+                                wholeDatamapEncoder parent.Value.ParentId parent.Value.Parent datamap
+                                |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                            ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.DataMap, json)
+                            |> Promise.start
+                        else
+                            failwith "No datamap parent is available"
                     | _ -> ()
 
                 state, model, newCmd
@@ -95,6 +104,7 @@ module Spreadsheet =
 
         //let newHistoryController (state, model, cmd) =
         //    updateSessionStorageMsg msg, model
+
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
             | UpdateState nextState -> nextState, model, Cmd.none
@@ -152,12 +162,16 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
                 let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
-
+               
                 let nextState =
-                    if reset then
-                        Spreadsheet.Model.init (arcFile)
-                    else
-                        { state with ArcFile = Some arcFile }
+                    let baseState =
+                        if reset then
+                            Spreadsheet.Model.init (arcFile)
+                        else
+                            { state with ArcFile = Some arcFile }
+                    match arcFile with
+                    | ArcFiles.DataMap _ -> { baseState with ActiveView = ActiveView.DataMap }
+                    | _ -> baseState
 
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
@@ -308,6 +322,13 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+                    | DataMap (p, d) ->
+                        let fileName =
+                            if p.IsSome then
+                                n + "_" + p.Value.ParentId + "_" + p.Value.Parent.ToString() + "_" + "datamap.xlsx"
+                            else
+                                n + "_" + "datamap.xlsx"
+                        fileName, Spreadsheet.DataMap.toFsWorkbook d
 
                 let cmd =
                     Cmd.OfPromise.either
@@ -325,7 +346,8 @@ module Spreadsheet =
                 state, model, Cmd.none
 
         try
-            innerUpdate state model msg |> Helper.updateHistoryStorageMsg msg
+            innerUpdate state model msg
+            |> Helper.updateHistoryStorageMsg msg
         with e ->
             let cmd = GenericError(Cmd.none, e) |> DevMsg |> Cmd.ofMsg
             state, model, cmd

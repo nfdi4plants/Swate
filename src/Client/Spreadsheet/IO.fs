@@ -26,6 +26,20 @@ module Xlsx =
                         || ARCtrl.Spreadsheet.Template.obsoleteMetadataSheetName = ws.Name)
                     ->
                     ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
+                | _ when ws.Exists(fun ws ->
+                    ws.Name.ToLower().Contains("datamap")) ->
+                    let datamap = DataMap.fromFsWorkbook fswb
+                    DataMap(Some(createDataMapParentInfo"default" DataMapParent.Assay), datamap)
+
+                    //Adapt to FSWorkBook and FromFSWorkbook of ARCtrl to include DatamapParentInfo
+                    //match ws with
+                    //| _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcAssay.isMetadataSheetName ws.Name) ->
+                    //    let assay = ArcAssay.fromFsWorkbook fswb
+                    //    DataMap(Some(createDataMapParentInfo assay.Identifier DataMapParent.Assay), datamap)
+                    //| _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcStudy.isMetadataSheetName ws.Name) ->
+                    //    let (study, _) = ArcStudy.fromFsWorkbook fswb
+                    //    DataMap(Some(createDataMapParentInfo study.Identifier DataMapParent.Study), datamap)
+                    //| _ -> failwith "ws must be from assay or study to contain a datamap!"
                 | _ -> failwith "Unable to identify given file. Missing metadata sheet with correct name."
 
             return arcfile
@@ -68,6 +82,8 @@ module Json =
                 Template.fromCompressedJsonString json |> ArcFiles.Template
             | ArcFilesDiscriminate.Template, anyElse ->
                 failwithf "Error. It is not intended to parse Template from %s format." (string anyElse)
+            | ArcFilesDiscriminate.DataMap, _ ->
+                failwithf "Error. It is not intended to parse Datamap this way."
 
         return arcfile
     }

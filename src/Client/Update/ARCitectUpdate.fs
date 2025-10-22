@@ -5,6 +5,7 @@ open Elmish
 open Messages
 open OfficeInterop
 open OfficeInterop.Core
+
 open Model
 
 module ARCitect =
@@ -33,7 +34,7 @@ module ARCitect =
                         (curry GenericError Cmd.none >> DevMsg)
 
                 state, model, cmd
-            | ApiCall.Finished(Some(arcFile, json)) ->
+            | ApiCall.Finished(Some(arcFile, json, dataMapParent)) ->
                 let resolvedArcFile =
                     match arcFile with
                     | ARCitect.Interop.InteropTypes.ARCFile.Assay ->
@@ -48,6 +49,9 @@ module ARCitect =
                     | ARCitect.Interop.InteropTypes.ARCFile.Template ->
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
+                    | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
+                        let datamapParent, dataMap = Decode.fromJsonString UpdateUtil.JsonHelper.wholeDatamapDecoder json
+                        ArcFiles.DataMap(Some datamapParent, dataMap)
 
                 let cmd = Spreadsheet.InitFromArcFile resolvedArcFile |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
@@ -63,7 +67,14 @@ module ARCitect =
                     ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv
                 | ArcFiles.Template template ->
                     ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template
-
+                | ArcFiles.DataMap (datamapParent, datamap) ->
+                    let json =
+                        if datamapParent.IsSome then
+                            UpdateUtil.JsonHelper.wholeDatamapEncoder datamapParent.Value.ParentId datamapParent.Value.Parent datamap
+                            |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                        else
+                            failwith "No parent for datamap is available!"
+                    ARCitect.Interop.InteropTypes.ARCFile.DataMap, json
             let cmd =
                 Cmd.OfPromise.attempt api.Save (arcFileEnum, json) (curry GenericError Cmd.none >> DevMsg)
 
