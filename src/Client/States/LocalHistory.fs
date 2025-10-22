@@ -127,6 +127,7 @@ module ConversionTypes =
         | Study
         | Assay
         | Template
+        | Workflow
         | DataMap of (DatamapParentInfo option)
         | None
 
@@ -143,6 +144,7 @@ module ConversionTypes =
                 | Some(ArcFiles.Study(s, _)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
+                | Some(Workflow w) -> JsonArcFiles.Workflow, "" //We have to implement a toJsonString for workflow, currently autosave and load is not wokring for it
                 | Some(ArcFiles.DataMap (p, d)) ->
                     let data = 
                         DataMap.encoder d
@@ -175,6 +177,7 @@ module ConversionTypes =
                         ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay -> ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
+                    | JsonArcFiles.Workflow -> failwith "No fromJsonString is available for workflow"
                     | JsonArcFiles.DataMap p ->
                         let dataMap = Decode.fromJsonString DataMap.decoder decompressedString
                         ArcFiles.DataMap(p, dataMap)

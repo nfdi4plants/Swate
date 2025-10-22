@@ -69,6 +69,7 @@ let Main (model: Model, dispatch) =
                     | Some(ArcFiles.Study _)
                     | Some(ArcFiles.Investigation _)
                     | Some(ArcFiles.Template _)
+                    | Some(ArcFiles.Workflow _)
                     | Some(ArcFiles.DataMap _) ->
                         match model.SpreadsheetModel.ActiveView with
                         | Spreadsheet.ActiveView.Table _ ->
@@ -136,6 +137,19 @@ let Main (model: Model, dispatch) =
                                                 Components.Metadata.Template.Main(
                                                     template,
                                                     setTemplate
+                                                )
+                                            | Some(ArcFiles.Workflow workflow) ->
+                                                let setWorkflow workflow =
+                                                    workflow
+                                                    |> ArcFiles.Workflow
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Workflow.Main(
+                                                    workflow,
+                                                    setWorkflow,
+                                                    model
                                                 )
                                             | _ -> Html.none
                                         ]

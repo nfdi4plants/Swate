@@ -74,6 +74,13 @@ module Spreadsheet =
 
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
                         |> Promise.start
+                    | Some(Workflow workflow) ->
+                        let json =
+                            workflowEncoder workflow
+                            |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Workflow, json)
+                        |> Promise.start
                     | Some(DataMap (parent, datamap)) ->
                         if parent.IsSome then
                             let json =
@@ -170,6 +177,7 @@ module Spreadsheet =
                         else
                             { state with ArcFile = Some arcFile }
                     match arcFile with
+                    | ArcFiles.Workflow _ -> { baseState with ActiveView = ActiveView.Metadata }
                     | ArcFiles.DataMap _ -> { baseState with ActiveView = ActiveView.DataMap }
                     | _ -> baseState
 
@@ -322,6 +330,7 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+                    | Workflow _ -> failwith "No toFsWorkbook available for workflow"
                     | DataMap (p, d) ->
                         let fileName =
                             if p.IsSome then

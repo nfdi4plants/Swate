@@ -49,6 +49,8 @@ module ARCitect =
                     | ARCitect.Interop.InteropTypes.ARCFile.Template ->
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
+                    | ARCitect.Interop.InteropTypes.ARCFile.Workflow ->
+                        failwith "workflow has no fromJsonString implemented yet"
                     | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
                         let datamapParent, dataMap = Decode.fromJsonString UpdateUtil.JsonHelper.wholeDatamapDecoder json
                         ArcFiles.DataMap(Some datamapParent, dataMap)
@@ -67,6 +69,11 @@ module ARCitect =
                     ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv
                 | ArcFiles.Template template ->
                     ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template
+                | ArcFiles.Workflow workflow ->
+                    let json =
+                        UpdateUtil.JsonHelper.workflowEncoder workflow
+                        |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                    ARCitect.Interop.InteropTypes.ARCFile.Workflow, json
                 | ArcFiles.DataMap (datamapParent, datamap) ->
                     let json =
                         if datamapParent.IsSome then

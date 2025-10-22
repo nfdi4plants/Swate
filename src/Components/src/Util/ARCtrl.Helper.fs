@@ -58,17 +58,19 @@ module ARCtrlHelper =
         | Study
         | Investigation
         | Template
+        | WorkFlow
         | DataMap
 
     [<StringEnum>]
     type DataMapParent =
         | Assay
         | Study
-
+        | Workflow
         static member tryFromString(str: string) =
             match str.ToLower() with
             | "assay" -> Assay
             | "study" -> Study
+            | "workflow" -> Workflow
             | _ -> failwith $"The type {str.ToLower()} is unknown"
 
     type DatamapParentInfo = {|
@@ -84,12 +86,14 @@ module ARCtrlHelper =
         | Investigation of ArcInvestigation
         | Study of ArcStudy * ArcAssay list
         | Assay of ArcAssay
+        | Workflow of ArcWorkflow
         | DataMap of (DatamapParentInfo option * DataMap)
 
         member this.HasTableAt(index: int) =
             match this with
             | Template _ -> index = 0 // Template always has exactly one table
             | DataMap _ -> index = -1
+            | Workflow _ -> index = -2
             | Investigation i -> false
             | Study(s, _) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
@@ -98,8 +102,9 @@ module ARCtrlHelper =
             match this with
             | Assay _ 
             | Template _
+            | Workflow _
             | Investigation _ -> true
-            | Study(s, _) -> true
+            | Study(_, _) -> true
             | DataMap _ -> false
 
         member this.Tables() : ArcTables =
@@ -108,6 +113,7 @@ module ARCtrlHelper =
             | Investigation _ -> ArcTables(ResizeArray [])
             | Study(s, _) -> s
             | Assay a -> a
+            | Workflow _
             | DataMap _ -> ArcTables(ResizeArray [])
 
     [<RequireQualifiedAccess>]

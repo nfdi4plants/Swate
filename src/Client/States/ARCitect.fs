@@ -16,6 +16,7 @@ module Interop =
             | Study
             | Assay
             | Template
+            | Workflow
             | DataMap
 
         type ARCitectFile = {|

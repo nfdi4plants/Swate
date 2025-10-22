@@ -96,6 +96,7 @@ type Model = {
         | Some(Study _) -> "Study"
         | Some(Investigation _) -> "Investigation"
         | Some(Template _) -> "Template"
+        | Some(Workflow _) -> "Workflow"
         | Some(DataMap _) -> "Datamap"
         | None -> "No File"
 
@@ -129,6 +130,7 @@ type Model = {
     member this.HasDataMap() =
         match this.ArcFile with
         | Some(Assay a) -> a.DataMap.IsSome
+        | Some(Workflow w) -> w.DataMap.IsSome
         | Some(Study(s, _)) -> s.DataMap.IsSome
         | Some(DataMap(_, _)) -> true
         | _ -> false
@@ -136,6 +138,7 @@ type Model = {
     member this.DataMapOrDefault =
         match this.ArcFile with
         | Some(Assay a) when a.DataMap.IsSome -> a.DataMap.Value
+        | Some(Workflow w) when w.DataMap.IsSome -> w.DataMap.Value
         | Some(Study(s, _)) when s.DataMap.IsSome -> s.DataMap.Value
         | Some(DataMap(_, d)) -> d
         | _ -> DataMap.init ()

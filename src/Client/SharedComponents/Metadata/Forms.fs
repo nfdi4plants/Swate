@@ -745,6 +745,62 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
+    static member ComponentInput(input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit) =
+        FormComponents.OntologyAnnotationInput(
+            input.ComponentType,
+            (fun oas ->
+                if oas.IsSome then
+                    let temp = input.SetCategory(oas.Value)
+                    temp |> setter
+                else
+                    let temp = input.SetCategory(OntologyAnnotation.empty())
+                    temp |> setter
+            ),
+            ?rmv = rmv
+        )
+
+    [<ReactComponent>]
+    static member ComponentsInput
+        (parameters: ResizeArray<Process.Component>, setter: ResizeArray<Process.Component> -> unit, ?label: string)
+        =
+        FormComponents.InputSequence(
+            parameters,
+            Process.Component.create,
+            setter,
+            (fun (v, setV, rmv) -> FormComponents.ComponentInput(v, setV, rmv)),
+            (fun parameter1 parameter2 -> parameter1.Equals parameter2),
+            ?label = label
+        )
+
+    [<ReactComponent>]
+    static member ParameterInput(input: Process.ProtocolParameter, setter: Process.ProtocolParameter -> unit, ?rmv: MouseEvent -> unit) =
+        FormComponents.OntologyAnnotationInput(
+            input.ParameterName,
+            (fun oas ->
+                if oas.IsSome then
+                    let temp = input.SetCategory(oas.Value)
+                    temp |> setter
+                else
+                    let temp = input.SetCategory(OntologyAnnotation.empty())
+                    temp |> setter
+            ),
+            ?rmv = rmv
+        )
+
+    [<ReactComponent>]
+    static member ParametersInput
+        (parameters: ResizeArray<Process.ProtocolParameter>, setter: ResizeArray<Process.ProtocolParameter> -> unit, ?label: string)
+        =
+        FormComponents.InputSequence(
+            parameters,
+            Process.ProtocolParameter.create,
+            setter,
+            (fun (v, setV, rmv) -> FormComponents.ParameterInput(v, setV, rmv)),
+            (fun parameter1 parameter2 -> parameter1.Equals parameter2),
+            ?label = label
+        )
+
+    [<ReactComponent>]
     static member PersonInput(input: Person, setter: Person -> unit, ?rmv: MouseEvent -> unit) =
         let nameStr =
             let fn = Option.defaultValue "" input.FirstName
@@ -1055,6 +1111,16 @@ type FormComponents =
             Comment,
             setter,
             (fun (v, setV, rmv) -> FormComponents.CommentInput(v, setV, rmv = rmv)),
+            (fun c1 c2 -> c1.Equals c2),
+            ?label = label
+        )
+
+    static member SubWorkflowIdentifiers(identifiers: ResizeArray<string>, ?label) =
+        FormComponents.InputSequence(
+            identifiers,
+            string,
+            (fun _ -> ()),
+            (fun (v, _, _) -> FormComponents.TextInput(v, (fun _ -> ()))),
             (fun c1 c2 -> c1.Equals c2),
             ?label = label
         )
