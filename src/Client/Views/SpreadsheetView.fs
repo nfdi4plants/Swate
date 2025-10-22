@@ -68,8 +68,9 @@ let Main (model: Model, dispatch) =
                     | Some(ArcFiles.Assay _)
                     | Some(ArcFiles.Study _)
                     | Some(ArcFiles.Investigation _)
-                    | Some(ArcFiles.Template _)
+                    | Some(ArcFiles.Run _)
                     | Some(ArcFiles.Workflow _)
+                    | Some(ArcFiles.Template _)
                     | Some(ArcFiles.DataMap _) ->
                         match model.SpreadsheetModel.ActiveView with
                         | Spreadsheet.ActiveView.Table _ ->
@@ -126,17 +127,18 @@ let Main (model: Model, dispatch) =
                                                     setInvesigation,
                                                     model
                                                 )
-                                            | Some(ArcFiles.Template template) ->
-                                                let setTemplate template =
-                                                    template
-                                                    |> ArcFiles.Template
+                                            | Some(ArcFiles.Run run) ->
+                                                let setRun run =
+                                                    run
+                                                    |> ArcFiles.Run
                                                     |> Spreadsheet.UpdateArcFile
                                                     |> SpreadsheetMsg
                                                     |> dispatch
 
-                                                Components.Metadata.Template.Main(
-                                                    template,
-                                                    setTemplate
+                                                Components.Metadata.Run.Main(
+                                                    run,
+                                                    setRun,
+                                                    model
                                                 )
                                             | Some(ArcFiles.Workflow workflow) ->
                                                 let setWorkflow workflow =
@@ -150,6 +152,18 @@ let Main (model: Model, dispatch) =
                                                     workflow,
                                                     setWorkflow,
                                                     model
+                                                )
+                                            | Some(ArcFiles.Template template) ->
+                                                let setTemplate template =
+                                                    template
+                                                    |> ArcFiles.Template
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Template.Main(
+                                                    template,
+                                                    setTemplate
                                                 )
                                             | _ -> Html.none
                                         ]

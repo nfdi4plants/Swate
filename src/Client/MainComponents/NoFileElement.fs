@@ -150,6 +150,13 @@ module private Helper =
                                     ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
                             createNewTableItem (
+                                "Run",
+                                fun _ ->
+                                    let r = ArcRun.init ("New Run")
+                                    let _ = r.InitTable("New Run Table")
+                                    ArcFiles.Run r |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
+                            createNewTableItem (
                                 "Workflow",
                                 fun _ ->
                                     let w = ArcWorkflow.init ("New Workflow")

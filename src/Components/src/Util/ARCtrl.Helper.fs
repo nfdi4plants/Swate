@@ -57,19 +57,22 @@ module ARCtrlHelper =
         | Assay
         | Study
         | Investigation
-        | Template
+        | Run
         | WorkFlow
         | DataMap
+        | Template
 
     [<StringEnum>]
     type DataMapParent =
         | Assay
         | Study
+        | Run
         | Workflow
         static member tryFromString(str: string) =
             match str.ToLower() with
             | "assay" -> Assay
             | "study" -> Study
+            | "run" -> Run
             | "workflow" -> Workflow
             | _ -> failwith $"The type {str.ToLower()} is unknown"
 
@@ -86,6 +89,7 @@ module ARCtrlHelper =
         | Investigation of ArcInvestigation
         | Study of ArcStudy * ArcAssay list
         | Assay of ArcAssay
+        | Run of ArcRun
         | Workflow of ArcWorkflow
         | DataMap of (DatamapParentInfo option * DataMap)
 
@@ -97,11 +101,13 @@ module ARCtrlHelper =
             | Investigation i -> false
             | Study(s, _) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
+            | Run r -> r.TableCount <= index
 
         member this.HasMetadata() =
             match this with
             | Assay _ 
             | Template _
+            | Run _
             | Workflow _
             | Investigation _ -> true
             | Study(_, _) -> true
@@ -113,6 +119,7 @@ module ARCtrlHelper =
             | Investigation _ -> ArcTables(ResizeArray [])
             | Study(s, _) -> s
             | Assay a -> a
+            | Run r -> r
             | Workflow _
             | DataMap _ -> ArcTables(ResizeArray [])
 

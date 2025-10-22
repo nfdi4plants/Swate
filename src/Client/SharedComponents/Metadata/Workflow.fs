@@ -26,10 +26,10 @@ let Main
             content = [
                 FormComponents.TextInput(
                     workflow.Identifier,
-                    (fun _ -> ()),
                     //(fun v ->
                     //    let nextWorkflow = IdentifierSetters.setAssayIdentifier v workflow
                     //    setArcWorkflow nextWorkflow),
+                    (fun _ -> ()), //Have to implement setWorkflowIdentifier in ARCtrl
                     "Identifier",
                     validator = {|
                         fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s)
@@ -68,10 +68,12 @@ let Main
                     "Description",
                     classes = "swt:w-full"
                 )
-                FormComponents.SubWorkflowIdentifiers(
+                FormComponents.CollectionOfStrings(
                     workflow.SubWorkflowIdentifiers,
                     "SubWorkflow Identifiers"
                 )
+                //Adapt so that the names of the fields appear when no Investigation is yet available
+                // -> Without investigation, calling htese paremeters leads to errors
                 if workflow.Investigation.IsSome then
                     FormComponents.TextInput(
                         (if workflow.URI.IsSome then workflow.URI.Value.ToString() else ""),
@@ -85,7 +87,7 @@ let Main
                         "Description",
                         classes = "swt:w-full"
                     )
-                    FormComponents.SubWorkflowIdentifiers(
+                    FormComponents.CollectionOfStrings(
                         workflow.VacantSubWorkflowIdentifiers,
                         "Vacant SubWorkflow Identifiers"
                     )

@@ -18,7 +18,42 @@ module JsonHelper =
     open Thoth.Json
     open Thoth.Json.Core
 
-    //Have to add encoder and ecoder for workflow and several subtypes
+    //Have to add encoder and decoder for run and several subtypes
+    let rec runEncoder (run: ArcRun) =
+        [
+            "Identifier", Encode.string run.Identifier |> Some
+            Encode.tryInclude "Title" Encode.string run.Title
+            Encode.tryInclude "Description" Encode.string run.Description
+            Encode.tryInclude "MeasurementType" OntologyAnnotation.encoder run.MeasurementType
+            Encode.tryInclude "TechnologyType" OntologyAnnotation.encoder run.TechnologyType
+            Encode.tryInclude "TechnologyPlatform" OntologyAnnotation.encoder run.TechnologyPlatform
+            Encode.tryInclude "DataMap" DataMap.encoder run.DataMap
+            Encode.tryIncludeSeq "WorkflowIdentifiers" Encode.string run.WorkflowIdentifiers
+            Encode.tryIncludeSeq "Tables" ArcTable.encoder run.Tables
+            Encode.tryIncludeSeq "Performers" Person.encoder run.Performers
+            Encode.tryIncludeSeq "Comments" Comment.encoder run.Comments
+        ]
+        |> Encode.choose
+        |> Encode.object
+
+    let runDecoder: Decoder<ArcRun> =
+        Decode.object (fun get ->
+            ArcRun.create(
+                get.Required.Field("Identifier") Decode.string,
+                ?title = get.Optional.Field "Title" Decode.string,
+                ?description = get.Optional.Field "Description" Decode.string,
+                ?measurementType = get.Optional.Field "MeasurementType" OntologyAnnotation.decoder,
+                ?technologyType = get.Optional.Field "TechnologyType" OntologyAnnotation.decoder,
+                ?technologyPlatform = get.Optional.Field "TechnologyPlatform" OntologyAnnotation.decoder,
+                ?workflowIdentifiers = get.Optional.Field "WorkflowIdentifiers" (Decode.resizeArray Decode.string),
+                ?tables = get.Optional.Field "Tables" (Decode.resizeArray ArcTable.decoder),
+                ?datamap = get.Optional.Field "DataMap" DataMap.decoder,
+                ?performers = get.Optional.Field "Performers" (Decode.resizeArray Person.decoder),
+                ?comments = get.Optional.Field "Comments" (Decode.resizeArray Comment.decoder)
+            ) 
+        )
+
+    //Have to add encoder and decoder for workflow and several subtypes
     let rec workflowEncoder (workflow: ArcWorkflow) =
         [
             "Identifier", Encode.string workflow.Identifier |> Some
@@ -128,6 +163,10 @@ module JsonImportHelper =
                 let tables = createUpdatedTables a.Tables state deselectedColumns None
                 a.Tables <- tables
                 arcFile
+            | Run r as arcFile ->
+                let tables = createUpdatedTables r.Tables state deselectedColumns None
+                r.Tables <- tables
+                arcFile
             | Study(s, _) as arcFile ->
                 let tables = createUpdatedTables s.Tables state deselectedColumns None
                 s.Tables <- tables
@@ -225,6 +264,7 @@ module JsonImportHelper =
         let importTables =
             match import with
             | Assay a -> a.Tables
+            | Run r -> r.Tables
             | Study(s, _) -> s.Tables
             | Template t -> ResizeArray([ t.Table ])
             | DataMap _
@@ -274,6 +314,6 @@ module JsonExportHelper =
                 nameFromId t.FileName, Template.toCompressedJsonString 0 t
             | Template _, anyElse ->
                 failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
-            | _ -> failwith $"Error, the selected type {arcfile} is not supported to be exported."
+            | _ -> failwith $"Error, the selected type {arcfile} is not supported to be exported." //Have to implement the logic for run when toJsonString has been implemented for it
 
         name, jsonString

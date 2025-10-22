@@ -69,17 +69,21 @@ module Spreadsheet =
 
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Investigation, json)
                         |> Promise.start
-                    | Some(Template template) ->
-                        let json = template.toJsonString()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
+                    | Some(Run run) ->
+                        let json =
+                            runEncoder run
+                            |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, json)
                         |> Promise.start
                     | Some(Workflow workflow) ->
                         let json =
                             workflowEncoder workflow
                             |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
-
                         ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Workflow, json)
+                        |> Promise.start
+                    | Some(Template template) ->
+                        let json = template.toJsonString()
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
                         |> Promise.start
                     | Some(DataMap (parent, datamap)) ->
                         if parent.IsSome then
@@ -330,7 +334,8 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
-                    | Workflow _ -> failwith "No toFsWorkbook available for workflow"
+                    | Run r -> failwith "No toFsWorkbook available for run"
+                    | Workflow w -> failwith "No toFsWorkbook available for workflow"
                     | DataMap (p, d) ->
                         let fileName =
                             if p.IsSome then

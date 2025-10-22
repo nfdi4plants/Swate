@@ -764,7 +764,7 @@ type FormComponents =
                 let temp = Process.Component.create(Value.Ontology oa.Value, ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
                 setter temp
             else
-                let temp = Process.Component.create(Value.Name "")
+                let temp = Process.Component.create(Value.Name "", ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
                 setter temp
             ()
 
@@ -846,42 +846,46 @@ type FormComponents =
 
     [<ReactComponent>]
     static member ComponentInput(input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit) =
-        let componentType =
-            let temp =
-                if input.ComponentType.IsSome then
-                    defaultArg input.ComponentType.Value.Name ""
-                else
-                    ""
-            let x = temp.Trim()
-            if x = "" then "<header>" else $"Type: {x}"
 
-        let componentUnit =
-            let temp =
-                if input.ComponentUnit.IsSome then
-                    defaultArg input.ComponentUnit.Value.Name ""
+        let title =
+            let componentValue =
+                if input.ComponentValue.IsSome then
+                    $"Value: {input.ComponentValue.Value.Text}"
                 else
                     ""
-            let x = temp.Trim()
-            if x = "" then "<unit>" else $"Unit: {x}"
+            let componentType =
+                if input.ComponentType.IsSome then
+                    let temp = defaultArg input.ComponentType.Value.Name ""
+                    componentValue + $" of Type: {temp}"
+                else
+                    componentValue
+            let componentUnit =
+                if input.ComponentUnit.IsSome then
+                    let temp = defaultArg input.ComponentUnit.Value.Name ""
+                    componentType + $" with Unit: {temp}"
+                else
+                    componentType
+            componentUnit
 
         Generic.Collapse [ // title
-            Generic.CollapseTitle(componentType, componentUnit)
+            if not (String.IsNullOrWhiteSpace title) then
+                Html.label [ prop.className "swt:label"; prop.text title ]
         ] [ // content
             FormComponents.ValueInput(
                 input,
                 setter
             )
-
             FormComponents.OntologyAnnotationInput(
                 input.ComponentType,
                 (fun oas ->
+                    let value = defaultArg input.ComponentValue (Value.Name "")
                     if oas.IsSome then
                         let temp =
-                            Process.Component.create(Value.Name "", ?unit = input.ComponentUnit, ?componentType = oas)
+                            Process.Component.create(value, ?unit = input.ComponentUnit, ?componentType = oas)
                         temp |> setter
                     else
                         let temp =
-                            Process.Component.create(Value.Name "", ?unit = input.ComponentUnit)
+                            Process.Component.create(value, ?unit = input.ComponentUnit)
                         temp |> setter
                 ),
                 label = "Type"
@@ -889,13 +893,14 @@ type FormComponents =
             FormComponents.OntologyAnnotationInput(
                 input.ComponentUnit,
                 (fun oas ->
+                    let value = defaultArg input.ComponentValue (Value.Name "")
                     if oas.IsSome then
                         let temp =
-                            Process.Component.create(Value.Name "", ?unit = oas, ?componentType = input.ComponentType)
+                            Process.Component.create(value, ?unit = oas, ?componentType = input.ComponentType)
                         temp |> setter
                     else
                         let temp =
-                            Process.Component.create(Value.Name "", ?componentType = input.ComponentType)
+                            Process.Component.create(value, ?componentType = input.ComponentType)
                         temp |> setter
                 ),
                 label = "Unit"
@@ -1260,15 +1265,17 @@ type FormComponents =
             ?label = label
         )
 
-    static member SubWorkflowIdentifiers(identifiers: ResizeArray<string>, ?label) =
-        FormComponents.InputSequence(
-            identifiers,
-            string,
-            (fun _ -> ()),
-            (fun (v, _, _) -> FormComponents.TextInput(v, (fun _ -> ()))),
-            (fun c1 c2 -> c1.Equals c2),
-            ?label = label
-        )
+    static member CollectionOfStrings(identifiers: ResizeArray<string>, ?label: string) =
+        let content =
+            identifiers
+            |> Array.ofSeq
+            |> Array.map (fun v -> FormComponents.TextInput(v, (fun _ -> ()), disabled = true))
+        Generic.Collapse
+            [
+                if label.IsSome then
+                    Html.label [ prop.className "swt:label"; prop.text label.Value ]
+            ]
+            content
 
     [<ReactComponent>]
     static member PublicationInput(input: Publication, setter: Publication -> unit, ?rmv: MouseEvent -> unit) =
