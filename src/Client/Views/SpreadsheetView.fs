@@ -68,6 +68,8 @@ let Main (model: Model, dispatch) =
                     | Some(ArcFiles.Assay _)
                     | Some(ArcFiles.Study _)
                     | Some(ArcFiles.Investigation _)
+                    | Some(ArcFiles.Run _)
+                    | Some(ArcFiles.Workflow _)
                     | Some(ArcFiles.Template _)
                     | Some(ArcFiles.DataMap _) ->
                         match model.SpreadsheetModel.ActiveView with
@@ -123,6 +125,32 @@ let Main (model: Model, dispatch) =
                                                 Components.Metadata.Investigation.Main(
                                                     investigation,
                                                     setInvesigation,
+                                                    model
+                                                )
+                                            | Some(ArcFiles.Run run) ->
+                                                let setRun run =
+                                                    run
+                                                    |> ArcFiles.Run
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Run.Main(
+                                                    run,
+                                                    setRun,
+                                                    model
+                                                )
+                                            | Some(ArcFiles.Workflow workflow) ->
+                                                let setWorkflow workflow =
+                                                    workflow
+                                                    |> ArcFiles.Workflow
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Workflow.Main(
+                                                    workflow,
+                                                    setWorkflow,
                                                     model
                                                 )
                                             | Some(ArcFiles.Template template) ->

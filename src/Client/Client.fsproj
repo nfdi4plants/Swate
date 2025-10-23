@@ -73,9 +73,11 @@
     <Compile Include="SharedComponents\Metadata\Generic.fs" />
     <Compile Include="SharedComponents\Metadata\Forms.fs" />
     <Compile Include="SharedComponents\Metadata\Assay.fs" />
+    <Compile Include="SharedComponents\Metadata\Run.fs" />
     <Compile Include="SharedComponents\Metadata\Investigation.fs" />
     <Compile Include="SharedComponents\Metadata\Study.fs" />
     <Compile Include="SharedComponents\Metadata\Template.fs" />
+    <Compile Include="SharedComponents\Metadata\Workflow.fs" />
     <Compile Include="SharedComponents\BaseNavbar.fs" />
     <Compile Include="SharedComponents\NavbarBurger.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />

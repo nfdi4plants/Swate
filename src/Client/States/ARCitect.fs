@@ -15,8 +15,10 @@ module Interop =
             | Investigation
             | Study
             | Assay
-            | Template
+            | Run
+            | Workflow
             | DataMap
+            | Template
 
         type ARCitectFile = {|
             mimetype: string

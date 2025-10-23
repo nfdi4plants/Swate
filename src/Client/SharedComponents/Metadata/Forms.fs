@@ -1,6 +1,9 @@
 namespace Components.Forms
 
 open System
+
+open Microsoft.FSharp.Reflection
+
 open Feliz
 open Feliz.DaisyUI
 
@@ -745,6 +748,209 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
+    static member ValueInput(input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit) =
+        let list =
+            FSharpType.GetUnionCases(typeof<Value>)
+            |> Array.map (fun item -> item.Name)
+
+        let valueType, setValueType = React.useState(list.[0])
+
+        let valueSetter value =
+            let newComponent = Process.Component.create(value, ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
+            setter newComponent
+
+        let ontologySetter (oa: OntologyAnnotation option) =
+            if oa.IsSome then
+                let temp = Process.Component.create(Value.Ontology oa.Value, ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
+                setter temp
+            else
+                let temp = Process.Component.create(Value.Name "", ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
+                setter temp
+            ()
+
+        Html.div [
+            prop.className "swt:flex swt:flex-row"
+            prop.children [
+                Html.select [
+                    prop.className "swt:select swt:bg-primary"
+                    prop.value (valueType.ToString())
+                    prop.onChange setValueType
+                    prop.children (
+                        list
+                        |> Array.map (fun txt ->
+                            Html.option [ prop.value txt; prop.text txt ])
+                    )
+                ]
+
+                match valueType with
+                | "Int" ->
+                    let number =
+                        if input.ComponentValue.IsSome && input.ComponentValue.Value.IsAnInt then
+                            input.ComponentValue.Value.AsInt()
+                        else
+                            0
+                    Html.input[
+                        prop.className "swt:input swt:w-full"
+                        prop.type'.number
+                        prop.onChange(fun (value:int) ->
+                            valueSetter (Value.Int value))
+                        prop.value(number)
+                    ]
+                | "Float" ->
+                    let number =
+                        if input.ComponentValue.IsSome && input.ComponentValue.Value.IsAFloat then
+                            input.ComponentValue.Value.AsFloat()
+                        elif input.ComponentValue.Value.IsNumerical then
+                            (float) input.ComponentValue.Value.Text
+                        else
+                            0
+                    Html.input[
+                        prop.className "swt:input swt:w-full"
+                        prop.type'.number
+                        prop.onChange(fun (value:float) ->
+                            valueSetter (Value.Float value))
+                        prop.value(number)
+                        prop.custom("step", "any")
+                        
+                    ]
+                | "Name" ->
+                    let str =
+                        if input.ComponentValue.IsSome && input.ComponentValue.Value.IsAText then
+                            input.ComponentValue.Value.AsName()
+                        else
+                            input.ComponentValue.Value.Text
+                    Html.input[
+                        prop.className "swt:input swt:w-full"
+                        prop.type'.text
+                        prop.onChange(fun (value:string) ->
+                            valueSetter (Value.Name value))
+                        prop.value(str)
+                    ]
+                | "Ontology" ->
+                    let oa =
+                        if input.ComponentValue.IsSome then
+                            if input.ComponentValue.Value.IsAnOntology then
+                                input.ComponentValue.Value.AsOntology()
+                            else
+                                OntologyAnnotation.create(input.ComponentValue.Value.Text)
+                        else
+                            OntologyAnnotation.create("")
+                    TermSearch.TermSearch(
+                        (Some oa |> Option.map _.ToTerm()),
+                        (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> ontologySetter),
+                        classNames = TermSearchStyle(!^"swt:border-current swt:join-item swt:w-full")
+                    )
+                | _ -> failwith $"Unknown type {valueType}!"
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member ComponentInput(input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit) =
+
+        let title =
+            let componentValue =
+                if input.ComponentValue.IsSome then
+                    $"Value: {input.ComponentValue.Value.Text}"
+                else
+                    ""
+            let componentType =
+                if input.ComponentType.IsSome then
+                    let temp = defaultArg input.ComponentType.Value.Name ""
+                    componentValue + $" of Type: {temp}"
+                else
+                    componentValue
+            let componentUnit =
+                if input.ComponentUnit.IsSome then
+                    let temp = defaultArg input.ComponentUnit.Value.Name ""
+                    componentType + $" with Unit: {temp}"
+                else
+                    componentType
+            componentUnit
+
+        Generic.Collapse [ // title
+            if not (String.IsNullOrWhiteSpace title) then
+                Html.label [ prop.className "swt:label"; prop.text title ]
+        ] [ // content
+            FormComponents.ValueInput(
+                input,
+                setter
+            )
+            FormComponents.OntologyAnnotationInput(
+                input.ComponentType,
+                (fun oas ->
+                    let value = defaultArg input.ComponentValue (Value.Name "")
+                    if oas.IsSome then
+                        let temp =
+                            Process.Component.create(value, ?unit = input.ComponentUnit, ?componentType = oas)
+                        temp |> setter
+                    else
+                        let temp =
+                            Process.Component.create(value, ?unit = input.ComponentUnit)
+                        temp |> setter
+                ),
+                label = "Type"
+            )
+            FormComponents.OntologyAnnotationInput(
+                input.ComponentUnit,
+                (fun oas ->
+                    let value = defaultArg input.ComponentValue (Value.Name "")
+                    if oas.IsSome then
+                        let temp =
+                            Process.Component.create(value, ?unit = oas, ?componentType = input.ComponentType)
+                        temp |> setter
+                    else
+                        let temp =
+                            Process.Component.create(value, ?componentType = input.ComponentType)
+                        temp |> setter
+                ),
+                label = "Unit"
+            )
+            if rmv.IsSome then
+                Helper.deleteButton rmv.Value
+        ]
+
+    [<ReactComponent>]
+    static member ComponentsInput
+        (parameters: ResizeArray<Process.Component>, setter: ResizeArray<Process.Component> -> unit, ?label: string)
+        =
+        FormComponents.InputSequence(
+            parameters,
+            Process.Component.create,
+            setter,
+            (fun (v, setV, rmv) -> FormComponents.ComponentInput(v, setV, rmv)),
+            (fun parameter1 parameter2 -> parameter1.Equals parameter2),
+            ?label = label
+        )
+
+    [<ReactComponent>]
+    static member ParameterInput(input: Process.ProtocolParameter, setter: Process.ProtocolParameter -> unit, ?rmv: MouseEvent -> unit) =
+        FormComponents.OntologyAnnotationInput(
+            input.ParameterName,
+            (fun oas ->
+                if oas.IsSome then
+                    let temp = input.SetCategory(oas.Value)
+                    temp |> setter
+                else
+                    let temp = input.SetCategory(OntologyAnnotation.empty())
+                    temp |> setter
+            ),
+            ?rmv = rmv
+        )
+
+    [<ReactComponent>]
+    static member ParametersInput
+        (parameters: ResizeArray<Process.ProtocolParameter>, setter: ResizeArray<Process.ProtocolParameter> -> unit, ?label: string)
+        =
+        FormComponents.InputSequence(
+            parameters,
+            Process.ProtocolParameter.create,
+            setter,
+            (fun (v, setV, rmv) -> FormComponents.ParameterInput(v, setV, rmv)),
+            (fun parameter1 parameter2 -> parameter1.Equals parameter2),
+            ?label = label
+        )
+
+    [<ReactComponent>]
     static member PersonInput(input: Person, setter: Person -> unit, ?rmv: MouseEvent -> unit) =
         let nameStr =
             let fn = Option.defaultValue "" input.FirstName
@@ -1058,6 +1264,18 @@ type FormComponents =
             (fun c1 c2 -> c1.Equals c2),
             ?label = label
         )
+
+    static member CollectionOfStrings(identifiers: ResizeArray<string>, ?label: string) =
+        let content =
+            identifiers
+            |> Array.ofSeq
+            |> Array.map (fun v -> FormComponents.TextInput(v, (fun _ -> ()), disabled = true))
+        Generic.Collapse
+            [
+                if label.IsSome then
+                    Html.label [ prop.className "swt:label"; prop.text label.Value ]
+            ]
+            content
 
     [<ReactComponent>]
     static member PublicationInput(input: Publication, setter: Publication -> unit, ?rmv: MouseEvent -> unit) =

@@ -149,6 +149,26 @@ module private Helper =
                                     let _ = a.InitTable("New Assay Table")
                                     ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
+                            createNewTableItem (
+                                "Run",
+                                fun _ ->
+                                    let r = ArcRun.init ("New Run")
+                                    let _ = r.InitTable("New Run Table")
+                                    ArcFiles.Run r |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
+                            createNewTableItem (
+                                "Workflow",
+                                fun _ ->
+                                    let w = ArcWorkflow.init ("New Workflow")
+                                    ArcFiles.Workflow w |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
+                            createNewTableItem (
+                                "Datamap",
+                                fun _ ->
+                                    let dataMap = DataMap.init()
+                                    let arcFile = ArcFiles.DataMap (None, dataMap)
+                                    arcFile |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
                             Html.div [
                                 prop.className "swt:divider swt:divider-neutral swt:m-0"
                             ]
@@ -162,16 +182,6 @@ module private Helper =
                                     template.Id <- System.Guid.NewGuid()
                                     template.LastUpdated <- System.DateTime.Now
                                     ArcFiles.Template template |> UpdateArcFile |> InterfaceMsg |> dispatch
-                            )
-                            Html.div [
-                                prop.className "swt:divider swt:divider-neutral swt:m-0"
-                            ]
-                            createNewTableItem (
-                                "Datamap",
-                                fun _ ->
-                                    let dataMap = DataMap.init()
-                                    let arcFile = ArcFiles.DataMap (None, dataMap)
-                                    arcFile |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
                         ]
                     ]
