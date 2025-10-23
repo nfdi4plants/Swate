@@ -25,11 +25,11 @@ type ATCMC =
 type AnnotationTableContextMenuUtil =
 
     static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
-        let cell = table.GetCellAt(index.x, index.y)
+        let cell = table.GetCellAt(index.x - 1, index.y - 1)
         let nextTable = table.Copy()
 
         for y in 0 .. table.RowCount - 1 do
-            nextTable.SetCellAt(index.x, y, cell.Copy())
+            nextTable.SetCellAt(index.x - 1, y, cell.Copy())
 
         setTable nextTable
 
@@ -53,7 +53,7 @@ type AnnotationTableContextMenuUtil =
 
             table.RemoveRows(rowCoordinates)
         else
-            table.RemoveRow(rowIndex)
+            table.RemoveRow(rowIndex - 1)
 
         table.Copy()
 
@@ -93,7 +93,7 @@ type AnnotationTableContextMenuUtil =
 
             table.RemoveColumns(columnCoordinates)
         else
-            table.RemoveColumn(colIndex)
+            table.RemoveColumn(colIndex - 1)
 
         table.Copy()
 
