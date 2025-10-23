@@ -103,16 +103,12 @@
     <Compile Include="Pages\JsonImport\JsonImport.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
     <Compile Include="Pages\DataAnnotator\DataAnnotator.fs" />
-    <Compile Include="MainComponents\CellStyles.fs" />
     <Compile Include="MainComponents\EmptyTableModals.fs" />
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
     <Compile Include="MainComponents\NoFileElement.fs" />
-    <Compile Include="MainComponents\ContextMenu.fs" />
-    <Compile Include="MainComponents\Cells.fs" />
     <Compile Include="MainComponents\KeyboardShortcuts.fs" />
     <Compile Include="MainComponents\TableFooter.fs" />
-    <Compile Include="MainComponents\SpreadsheetView\Generic.fs" />
     <Compile Include="MainComponents\SpreadsheetView\ArcTable.fs" />
     <Compile Include="MainComponents\SpreadsheetView\DataMap.fs" />
     <Compile Include="MainComponents\Navbar.fs" />
@@ -132,9 +128,9 @@
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" Version="3.0.0-beta.3" />
-    <PackageReference Include="ARCtrl.Javascript" Version="3.0.0-beta.3" />
-    <PackageReference Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.3" />
+    <PackageReference Include="ARCtrl.Core" Version="3.0.0-beta.5" />
+    <PackageReference Include="ARCtrl.Javascript" Version="3.0.0-beta.5" />
+    <PackageReference Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.5" />
     <PackageReference Include="Fable.Elmish" Version="4.2.0" />
     <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />
     <PackageReference Include="Fable.Elmish.React" Version="4.0.0" />

@@ -29,7 +29,8 @@ let groupToBuildingBlocks (headers: string[]) =
         if isReferenceColumn header then
             ra.[ra.Count - 1].Add(i, header)
         else
-            ra.Add(ResizeArray([ (i, header) ])))
+            ra.Add(ResizeArray([ (i, header) ]))
+    )
 
     ra
 
@@ -77,7 +78,8 @@ let getCompositeColumnInfoByIndex (table: Table) (columnIndex: float) (context: 
                 let selectedBuildingBlock =
                     buildingBlockGroups.Find(fun bb -> bb.Contains selectedHeader)
 
-                selectedBuildingBlock)
+                selectedBuildingBlock
+            )
 }
 
 /// <summary>
@@ -106,10 +108,12 @@ let validate (headers: #seq<string>) (rows: #seq<#seq<string>>) =
                     groupedColumns.[i]
                     |> Array.map (fun gc ->
                         CompositeHeader.Cases
-                        |> Array.exists (fun (_, header) -> gc.[0].StartsWith(header)))
+                        |> Array.exists (fun (_, header) -> gc.[0].StartsWith(header))
+                    )
                     |> Array.contains true
 
-                if hasMainColumn then Some(ex, i) else Some(ex, i - 1))
+                if hasMainColumn then Some(ex, i) else Some(ex, i - 1)
+        )
         |> Array.filter (fun i -> i.IsSome)
 
     let indexedError =
@@ -127,7 +131,8 @@ let validate (headers: #seq<string>) (rows: #seq<#seq<string>>) =
             groupedColumns.[0..bi]
             |> Array.map (fun bb -> bb.Length)
             |> Array.sum
-            |> (fun i -> newHeaders.[i]))
+            |> (fun i -> newHeaders.[i])
+        )
 
     errorIndices
 
@@ -157,7 +162,8 @@ let validateExcelTable (excelTable: Table) (context: RequestContext) = promise {
             bodyRowRange.values
             |> Seq.map (fun items ->
                 items
-                |> Seq.map (fun item -> item |> Option.map string |> Option.defaultValue ""))
+                |> Seq.map (fun item -> item |> Option.map string |> Option.defaultValue "")
+            )
 
         validate headers bodyRows
 
@@ -223,3 +229,12 @@ module ARCtrlExtensions =
                 let metadataWorksheetName = Template.metadataSheetName
                 let seqOfSeqs = Template.toMetadataCollection template
                 metadataWorksheetName, seqOfSeqs
+            | ArcFiles.Workflow workflow ->
+                let metadataWorksheetName = ArcWorkflow.metadataSheetName
+                let seqOfSeqs = ArcWorkflow.toMetadataCollection workflow
+                metadataWorksheetName, seqOfSeqs
+            | ArcFiles.Run run ->
+                let metadataWorksheetName = ArcRun.metadataSheetName
+                let seqOfSeqs = ArcRun.toMetadataCollection run
+                metadataWorksheetName, seqOfSeqs
+            | ArcFiles.DataMap datamap -> failwith "DataMap does not have metadata representation"

@@ -18,79 +18,7 @@ module JsonHelper =
     open Thoth.Json
     open Thoth.Json.Core
 
-    //Have to add encoder and decoder for run and several subtypes
-    let rec runEncoder (run: ArcRun) =
-        [
-            "Identifier", Encode.string run.Identifier |> Some
-            Encode.tryInclude "Title" Encode.string run.Title
-            Encode.tryInclude "Description" Encode.string run.Description
-            Encode.tryInclude "MeasurementType" OntologyAnnotation.encoder run.MeasurementType
-            Encode.tryInclude "TechnologyType" OntologyAnnotation.encoder run.TechnologyType
-            Encode.tryInclude "TechnologyPlatform" OntologyAnnotation.encoder run.TechnologyPlatform
-            Encode.tryInclude "DataMap" DataMap.encoder run.DataMap
-            Encode.tryIncludeSeq "WorkflowIdentifiers" Encode.string run.WorkflowIdentifiers
-            Encode.tryIncludeSeq "Tables" ArcTable.encoder run.Tables
-            Encode.tryIncludeSeq "Performers" Person.encoder run.Performers
-            Encode.tryIncludeSeq "Comments" Comment.encoder run.Comments
-        ]
-        |> Encode.choose
-        |> Encode.object
-
-    let runDecoder: Decoder<ArcRun> =
-        Decode.object (fun get ->
-            ArcRun.create(
-                get.Required.Field("Identifier") Decode.string,
-                ?title = get.Optional.Field "Title" Decode.string,
-                ?description = get.Optional.Field "Description" Decode.string,
-                ?measurementType = get.Optional.Field "MeasurementType" OntologyAnnotation.decoder,
-                ?technologyType = get.Optional.Field "TechnologyType" OntologyAnnotation.decoder,
-                ?technologyPlatform = get.Optional.Field "TechnologyPlatform" OntologyAnnotation.decoder,
-                ?workflowIdentifiers = get.Optional.Field "WorkflowIdentifiers" (Decode.resizeArray Decode.string),
-                ?tables = get.Optional.Field "Tables" (Decode.resizeArray ArcTable.decoder),
-                ?datamap = get.Optional.Field "DataMap" DataMap.decoder,
-                ?performers = get.Optional.Field "Performers" (Decode.resizeArray Person.decoder),
-                ?comments = get.Optional.Field "Comments" (Decode.resizeArray Comment.decoder)
-            ) 
-        )
-
-    //Have to add encoder and decoder for workflow and several subtypes
-    let rec workflowEncoder (workflow: ArcWorkflow) =
-        [
-            "Identifier", Encode.string workflow.Identifier |> Some
-            Encode.tryInclude "WorkflowType" OntologyAnnotation.encoder workflow.WorkflowType
-            Encode.tryInclude "Title" Encode.string workflow.Title
-            Encode.tryInclude "URI" Encode.string workflow.URI
-            Encode.tryInclude "Description" Encode.string workflow.Description
-            Encode.tryInclude "Version" Encode.string workflow.Version
-            Encode.tryInclude "DataMap" DataMap.encoder workflow.DataMap
-            Encode.tryIncludeSeq "SubWorkflowIdentifiers" Encode.string workflow.SubWorkflowIdentifiers
-            Encode.tryIncludeSeq "Parameters" (ProtocolParameter.ISAJson.encoder None) workflow.Parameters
-            Encode.tryIncludeSeq "Components" (Component.ISAJson.encoder None) workflow.Components
-            Encode.tryIncludeSeq "Contacts" Person.encoder workflow.Contacts
-            Encode.tryIncludeSeq "Comments" Comment.encoder workflow.Comments 
-        ]
-        |> Encode.choose
-        |> Encode.object
-
-    let workflowDecoder: Decoder<ArcWorkflow> =
-        Decode.object (fun get ->
-            ArcWorkflow.create(
-                get.Required.Field("Identifier") Decode.string,
-                ?title = get.Optional.Field "Title" Decode.string,
-                ?description = get.Optional.Field "Description" Decode.string,
-                ?workflowType = get.Optional.Field "WorkflowType" OntologyAnnotation.decoder,
-                ?uri = get.Optional.Field "URI" Decode.string,
-                ?version = get.Optional.Field "Version" Decode.string,
-                ?subWorkflowIdentifiers = get.Optional.Field "SubWorkflowIdentifiers" (Decode.resizeArray Decode.string),
-                ?parameters = get.Optional.Field "Parameters" (Decode.resizeArray ProtocolParameter.ISAJson.decoder),
-                ?components = get.Optional.Field "Components" (Decode.resizeArray Component.ISAJson.decoder),
-                ?datamap = get.Optional.Field "DataMap" DataMap.decoder,
-                ?contacts = get.Optional.Field "Contacts" (Decode.resizeArray Person.decoder),
-                ?comments = get.Optional.Field "Comments" (Decode.resizeArray Comment.decoder)
-            )
-        )
-
-    let wholeDatamapEncoder(parentId: string) (parent: ARCtrl.ARCtrlHelper.DataMapParent) (datamap: ARCtrl.DataMap) =
+    let wholeDatamapEncoder (parentId: string) (parent: ARCtrl.ARCtrlHelper.DataMapParent) (datamap: ARCtrl.DataMap) =
         Encode.object [
             "ParentId", Encode.string parentId
             "Parent", Encode.string (parent.ToString())
@@ -98,12 +26,13 @@ module JsonHelper =
         ]
 
     let wholeDatamapDecoder =
-        Decode.object (fun get ->               
-            let parentId = 
-                get.Required.Field "ParentId" Decode.string
-            let parent = 
+        Decode.object (fun get ->
+            let parentId = get.Required.Field "ParentId" Decode.string
+
+            let parent =
                 let temp = get.Required.Field "Parent" Decode.string
-                DataMapParent.tryFromString(temp)
+                DataMapParent.tryFromString (temp)
+
             let datamapParent = createDataMapParentInfo parentId parent
             let datamap = get.Required.Field "Datamap" DataMap.decoder
             datamapParent, datamap
@@ -199,12 +128,7 @@ module JsonImportHelper =
 
         match existingOpt with
         | Some existing ->
-            let existingTables =
-                match existing with
-                | Assay a -> a.Tables
-                | Study(s, _) -> s.Tables
-                | Template t -> ResizeArray([ t.Table ])
-                | Investigation _ -> ResizeArray()
+            let existingTables = existing.Tables()
 
             let appendTables =
                 // only append if the active table exists (this is to handle join call on investigations)
@@ -239,7 +163,8 @@ module JsonImportHelper =
                 |> Seq.map (fun table -> // update tables based on joinOptions
                     let nTable = ArcTable.init (table.Name)
                     nTable.Join(table, joinOptions = importConfig.ImportType)
-                    nTable)
+                    nTable
+                )
                 |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
                 |> Seq.iter (fun table -> existingTables.Add table)
 
@@ -314,6 +239,20 @@ module JsonExportHelper =
                 nameFromId t.FileName, Template.toCompressedJsonString 0 t
             | Template _, anyElse ->
                 failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
-            | _ -> failwith $"Error, the selected type {arcfile} is not supported to be exported." //Have to implement the logic for run when toJsonString has been implemented for it
+
+            | Run r, JsonExportFormat.ARCtrl -> nameFromId r.Identifier, ArcRun.toJsonString 0 r
+            | Run r, JsonExportFormat.ARCtrlCompressed -> nameFromId r.Identifier, ArcRun.toCompressedJsonString 0 r
+            | Run _, anyElse -> failwithf "Error. It is not intended to parse Run to %s format." (string anyElse)
+
+            | Workflow w, JsonExportFormat.ARCtrl -> nameFromId w.Identifier, ArcWorkflow.toJsonString 0 w
+            | Workflow w, JsonExportFormat.ARCtrlCompressed ->
+                nameFromId w.Identifier, ArcWorkflow.toCompressedJsonString 0 w
+            | Workflow _, anyElse ->
+                failwithf "Error. It is not intended to parse Workflow to %s format." (string anyElse)
+
+            | DataMap(_, d), JsonExportFormat.ARCtrl -> n + "_datamap", DataMap.toJsonString 0 d
+            | DataMap(_), anyElse ->
+                failwithf "Error. It is not intended to parse Datamap to %s format." (string anyElse)
+        // | _ -> failwith $"Error, the selected type {arcfile} is not supported to be exported." //Have to implement the logic for run when toJsonString has been implemented for it
 
         name, jsonString

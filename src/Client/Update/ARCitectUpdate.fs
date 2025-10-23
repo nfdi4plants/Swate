@@ -46,16 +46,18 @@ module ARCitect =
                     | ARCitect.Interop.InteropTypes.ARCFile.Investigation ->
                         let inv = ArcInvestigation.fromJsonString json
                         ArcFiles.Investigation inv
-                    | ARCitect.Interop.InteropTypes.ARCFile.Run ->
-                        failwith "Run has no fromJsonString implemented yet"
+                    | ARCitect.Interop.InteropTypes.ARCFile.Run -> failwith "Run has no fromJsonString implemented yet"
                     | ARCitect.Interop.InteropTypes.ARCFile.Workflow ->
                         failwith "Workflow has no fromJsonString implemented yet"
                     | ARCitect.Interop.InteropTypes.ARCFile.Template ->
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
                     | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
-                        let datamapParent, dataMap = Decode.fromJsonString UpdateUtil.JsonHelper.wholeDatamapDecoder json
+                        let datamapParent, dataMap =
+                            Decode.fromJsonString UpdateUtil.JsonHelper.wholeDatamapDecoder json
+
                         ArcFiles.DataMap(Some datamapParent, dataMap)
+
                 let cmd = Spreadsheet.InitFromArcFile resolvedArcFile |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
 
@@ -68,26 +70,24 @@ module ARCitect =
                 | ArcFiles.Study(study, _) -> ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study
                 | ArcFiles.Investigation inv ->
                     ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv
-                | ArcFiles.Run run ->
-                    let json =
-                        UpdateUtil.JsonHelper.runEncoder run
-                        |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
-                    ARCitect.Interop.InteropTypes.ARCFile.Workflow, json
+                | ArcFiles.Run run -> ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run
                 | ArcFiles.Workflow workflow ->
-                    let json =
-                        UpdateUtil.JsonHelper.workflowEncoder workflow
-                        |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
-                    ARCitect.Interop.InteropTypes.ARCFile.Workflow, json
+                    ARCitect.Interop.InteropTypes.ARCFile.Workflow, ArcWorkflow.toJsonString 0 workflow
                 | ArcFiles.Template template ->
                     ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template
-                | ArcFiles.DataMap (datamapParent, datamap) ->
+                | ArcFiles.DataMap(datamapParent, datamap) ->
                     let json =
                         if datamapParent.IsSome then
-                            UpdateUtil.JsonHelper.wholeDatamapEncoder datamapParent.Value.ParentId datamapParent.Value.Parent datamap
+                            UpdateUtil.JsonHelper.wholeDatamapEncoder
+                                datamapParent.Value.ParentId
+                                datamapParent.Value.Parent
+                                datamap
                             |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
                         else
                             failwith "No parent for datamap is available!"
+
                     ARCitect.Interop.InteropTypes.ARCFile.DataMap, json
+
             let cmd =
                 Cmd.OfPromise.attempt api.Save (arcFileEnum, json) (curry GenericError Cmd.none >> DevMsg)
 
@@ -102,6 +102,7 @@ module ARCitect =
                         pojo
                         (Finished >> ARCitect.RequestPaths >> ARCitectMsg)
                         (curry GenericError Cmd.none >> DevMsg)
+
                 state, model, cmd
             | ApiCall.Finished(wasSuccessful: bool) ->
                 let cmd =
@@ -109,6 +110,7 @@ module ARCitect =
                         Cmd.none
                     else
                         GenericError(Cmd.none, exn ("RequestPaths failed")) |> DevMsg |> Cmd.ofMsg
+
                 state, model, cmd
 
         | ARCitect.ResponsePaths paths ->

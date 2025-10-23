@@ -274,7 +274,7 @@ module Interface =
                             let activeTableIndex =
                                 match arcfileOpt, activeTable with
                                 | Some arcfile, Ok activeTable ->
-                                    arcfile.Tables() |> Seq.tryFindIndex (fun table -> table = activeTable)
+                                    arcfile.ArcTables() |> Seq.tryFindIndex (fun table -> table = activeTable)
                                 | _ -> None
 
                             return

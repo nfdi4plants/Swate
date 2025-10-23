@@ -61,10 +61,9 @@ let WatchJs () =
 
 let Run () =
     [
-        runAsyncColored "server" ConsoleColor.Blue "dotnet" [ "run" ] ProjectPaths.serverTestsPath
-        runAsyncColored
+        runAsync "server" "dotnet" [ "run" ] ProjectPaths.serverTestsPath
+        runAsync
             "client"
-            ConsoleColor.Magenta
             "dotnet"
             [
                 "fable"
@@ -78,6 +77,6 @@ let Run () =
                 $"{ProjectPaths.clientTestsPath}/output/Client.Tests.js"
             ]
             ProjectPaths.clientTestsPath
-        runAsyncColored "components" ConsoleColor.Yellow "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
+        runAsync "components" "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
     ]
     |> runParallel

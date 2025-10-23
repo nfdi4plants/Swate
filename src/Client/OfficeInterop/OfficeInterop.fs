@@ -1630,7 +1630,7 @@ type Main =
         <| fun context -> promise {
             let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
             let! updatedWorksheet = updateWorkSheet context worksheetName seqOfSeqs
-            let tables = arcFiles.Tables()
+            let tables = arcFiles.ArcTables()
 
             for table in tables do
                 do! Main.createNewAnnotationTable(table, context).``then`` (fun _ -> ())
@@ -1912,8 +1912,7 @@ type Main =
             | Ok arcTable ->
                 let values =
                     if newColumn.Cells.Count < arcTable.RowCount && newColumn.Cells.Count > 0 then
-                        Array.create arcTable.RowCount newColumn.Cells.[0]
-                        |> ResizeArray
+                        Array.create arcTable.RowCount newColumn.Cells.[0] |> ResizeArray
                     else
                         newColumn.Cells
 
@@ -2409,6 +2408,10 @@ type Main =
                                         // Iterate over col values (1).
                                         range.values.[rowInd]
                                         |> Seq.map (
+                                        // Ignore prevValue as it will be replaced anyways.
+                                        // Ignore prevValue as it will be replaced anyways.
+                                        // Ignore prevValue as it will be replaced anyways.
+                                        // Ignore prevValue as it will be replaced anyways.
                                         // Ignore prevValue as it will be replaced anyways.
                                         // Ignore prevValue as it will be replaced anyways.
                                         // Ignore prevValue as it will be replaced anyways.

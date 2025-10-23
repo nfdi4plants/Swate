@@ -20,12 +20,6 @@ type ModalProvider =
         | TableModals.SelectiveFileImport arcfile -> Modals.SelectiveImportModal.Main(arcfile, model, dispatch)
         | TableModals.BatchUpdateColumnValues(columnIndex, column) ->
             Modals.UpdateColumn.Main(columnIndex, column, dispatch)
-        | TableModals.TableCellContext(mouseX, mouseY, ci, ri) ->
-            // Modals.ContextMenus.TableCell.Main(mouseX, mouseY, ci, ri, model, dispatch)
-            Html.none
-        | TableModals.DataMapCellContext(mouseX, mouseY, ci, ri) ->
-            // Modals.ContextMenus.DataMapCell.Main(mouseX, mouseY, ci, ri, model, dispatch)
-            Html.none
         | TableModals.TableCellDetailsAtIndex(ci, ri) ->
             let rmv = Util.RMV_MODAL dispatch
             Modals.CompositeCollumnModal.Main(ci, ri, model, dispatch, rmv)

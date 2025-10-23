@@ -427,7 +427,7 @@ type FormComponents =
                     for listener in Object.keys sortable.listeners do
                         prop.custom (listener, sortable.listeners.get listener)
                     prop.className "swt:cursor-grab swt:flex swt:items-center"
-                    prop.children [ Icons.ArrowDown() ]
+                    prop.children [ Icons.ArrowUpDown() ]
                 ]
                 Html.div [ prop.className "swt:grow"; prop.children listComponent ]
             ]
@@ -564,6 +564,7 @@ type FormComponents =
             ?isarea: bool,
             ?isJoin,
             ?disabled,
+            ?rmv: MouseEvent -> unit,
             ?classes: string
         ) =
         let disabled = defaultArg disabled false
@@ -601,46 +602,53 @@ type FormComponents =
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
-                Html.label [
-                    prop.className [
-                        "swt:label swt:flex swt:items-center swt:gap-2 swt:w-full"
-                        if isarea.IsSome && isarea.Value then
-                            "swt:label swt:textarea"
-                        else
-                            "swt:input"
-                        if isJoin then
-                            "swt:join-item"
-                        if classes.IsSome then
-                            classes.Value
-                    ]
+                Html.div [
+                    prop.className "swt:w-full swt:join"
                     prop.children [
-                        match isarea with
-                        | Some true ->
-                            Html.textarea [
-                                prop.className "swt:textarea swt:grow swt:ghost"
-                                prop.disabled disabled
-                                prop.readOnly disabled
-                                if placeholder.IsSome then
-                                    prop.placeholder placeholder.Value
-                                prop.ref ref
-                                prop.onChange onChange
+                        Html.label [
+                            prop.className [
+                                "swt:flex swt:items-center swt:gap-2 swt:w-full"
+                                if isarea.IsSome && isarea.Value then
+                                    "swt:textarea"
+                                else
+                                    "swt:input"
+                                if isJoin || rmv.IsSome then
+                                    "swt:join-item"
+                                if classes.IsSome then
+                                    classes.Value
                             ]
-                        | _ ->
-                            Html.input [
-                                prop.disabled disabled
-                                prop.readOnly disabled
-                                prop.className "swt:truncate swt:w-full"
-                                if placeholder.IsSome then
-                                    prop.placeholder placeholder.Value
-                                prop.ref ref
-                                prop.onChange onChange
+                            prop.children [
+                                match isarea with
+                                | Some true ->
+                                    Html.textarea [
+                                        prop.className "swt:textarea swt:grow swt:ghost"
+                                        prop.disabled disabled
+                                        prop.readOnly disabled
+                                        if placeholder.IsSome then
+                                            prop.placeholder placeholder.Value
+                                        prop.ref ref
+                                        prop.onChange onChange
+                                    ]
+                                | _ ->
+                                    Html.input [
+                                        prop.disabled disabled
+                                        prop.readOnly disabled
+                                        prop.className "swt:truncate swt:w-full"
+                                        if placeholder.IsSome then
+                                            prop.placeholder placeholder.Value
+                                        prop.ref ref
+                                        prop.onChange onChange
+                                    ]
+                                Html.div [
+                                    if not loading then
+                                        prop.className "swt:invisible"
+                                    else
+                                        prop.className "swt:loading"
+                                ]
                             ]
-                        Html.div [
-                            if not loading then
-                                prop.className "swt:invisible"
-                            else
-                                prop.className "swt:loading"
                         ]
+                        if rmv.IsSome then
+                            Helper.deleteButton rmv.Value
                     ]
                 ]
                 if not isValid then
@@ -660,7 +668,7 @@ type FormComponents =
         ) =
 
         Html.div [
-            prop.className "swt:space-y-2"
+            prop.className "swt:space-y-2 swt:grow"
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
@@ -748,162 +756,157 @@ type FormComponents =
         ]
 
     [<ReactComponent>]
-    static member ValueInput(input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit) =
+    static member ValueInput
+        (input: ARCtrl.Value option, setter: ARCtrl.Value option -> unit, ?label: string, ?rmv: MouseEvent -> unit)
+        =
         let list =
-            FSharpType.GetUnionCases(typeof<Value>)
-            |> Array.map (fun item -> item.Name)
+            FSharpType.GetUnionCases(typeof<Value>) |> Array.map (fun item -> item.Name)
 
-        let valueType, setValueType = React.useState(list.[0])
+        let NoneOption = "None"
 
-        let valueSetter value =
-            let newComponent = Process.Component.create(value, ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
-            setter newComponent
 
-        let ontologySetter (oa: OntologyAnnotation option) =
-            if oa.IsSome then
-                let temp = Process.Component.create(Value.Ontology oa.Value, ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
-                setter temp
-            else
-                let temp = Process.Component.create(Value.Name "", ?unit = input.ComponentUnit, ?componentType = input.ComponentType)
-                setter temp
-            ()
+        let init =
+            match input with
+            | Some v ->
+                match FSharpValue.GetUnionFields(v, typeof<Value>) with
+                | case, _ -> case.Name
+            | None -> NoneOption
+
+        let valueType, setValueType = React.useState (init)
 
         Html.div [
-            prop.className "swt:flex swt:flex-row"
             prop.children [
-                Html.select [
-                    prop.className "swt:select swt:bg-primary"
-                    prop.value (valueType.ToString())
-                    prop.onChange setValueType
-                    prop.children (
-                        list
-                        |> Array.map (fun txt ->
-                            Html.option [ prop.value txt; prop.text txt ])
-                    )
-                ]
+                if label.IsSome then
+                    Generic.FieldTitle label.Value
+                Html.div [
+                    prop.className "swt:join swt:w-full"
+                    prop.children [
+                        Html.select [
+                            prop.className "swt:select swt:select-primary swt:w-min swt:join-item swt:z-1"
+                            prop.value (valueType)
+                            prop.onChange (fun v ->
+                                setValueType v
+                                setter None
+                            )
+                            prop.children [
+                                Html.option [ prop.value NoneOption; prop.text "None" ]
+                                for item in list do
+                                    Html.option [ prop.value item; prop.text item ]
+                            ]
+                        ]
+                        match valueType with
+                        | "Int"
+                        | "Float" ->
+                            Html.input [
+                                prop.className "swt:input swt:w-full swt:join-item"
+                                prop.type'.number
+                                prop.defaultValue (
+                                    match input with
+                                    | Some(Value.Int i) -> string i
+                                    | Some(Value.Float f) -> string f
+                                    | _ -> ""
+                                )
+                                prop.onChange (fun (value: string) ->
 
-                match valueType with
-                | "Int" ->
-                    let number =
-                        if input.ComponentValue.IsSome && input.ComponentValue.Value.IsAnInt then
-                            input.ComponentValue.Value.AsInt()
-                        else
-                            0
-                    Html.input[
-                        prop.className "swt:input swt:w-full"
-                        prop.type'.number
-                        prop.onChange(fun (value:int) ->
-                            valueSetter (Value.Int value))
-                        prop.value(number)
+                                    if System.String.IsNullOrWhiteSpace value then
+                                        setter None
+                                    else
+                                        match valueType with
+                                        | "Int" ->
+                                            match System.Int32.TryParse value with
+                                            | (true, v) -> (Value.Int v)
+                                            | _ -> (Value.Int 0)
+                                            |> Some
+                                            |> setter
+                                        | "Float" ->
+                                            match System.Double.TryParse value with
+                                            | (true, v) -> (Value.Float v)
+                                            | _ -> (Value.Float 0.0)
+                                            |> Some
+                                            |> setter
+                                        | _ -> setter None
+                                )
+                            ]
+                        | "Name" ->
+                            Html.input [
+                                prop.className "swt:input swt:w-full swt:join-item"
+                                prop.type'.text
+                                prop.defaultValue (
+                                    match input with
+                                    | Some(Value.Name s) -> s
+                                    | _ -> ""
+                                )
+                                prop.onChange (fun (value: string) ->
+                                    if System.String.IsNullOrWhiteSpace value then
+                                        setter None
+                                    else
+                                        Value.Name value |> Some |> setter
+                                )
+                            ]
+                        | "Ontology" ->
+                            let oa =
+                                match input with
+                                | Some(Value.Ontology oa) -> oa
+                                | _ -> OntologyAnnotation.create ("")
+
+                            FormComponents.OntologyAnnotationInput(
+                                Some oa,
+                                (fun oas ->
+                                    if oas.IsSome then
+                                        Value.Ontology oas.Value |> Some |> setter
+                                    else
+                                        setter None
+                                )
+                            )
+                        | "None" ->
+                            Html.div [
+                                prop.className "swt:text-base-content/70 swt:join-item swt:input"
+                                prop.text "Choose value type"
+                                prop.readOnly true
+                                prop.disabled true
+                            ]
+                        | _ ->
+                            Html.div [
+                                prop.className "swt:text-base-content/70 swt:join-item swt:input"
+                                prop.text "(Not implemented)"
+                            ]
                     ]
-                | "Float" ->
-                    let number =
-                        if input.ComponentValue.IsSome && input.ComponentValue.Value.IsAFloat then
-                            input.ComponentValue.Value.AsFloat()
-                        elif input.ComponentValue.Value.IsNumerical then
-                            (float) input.ComponentValue.Value.Text
-                        else
-                            0
-                    Html.input[
-                        prop.className "swt:input swt:w-full"
-                        prop.type'.number
-                        prop.onChange(fun (value:float) ->
-                            valueSetter (Value.Float value))
-                        prop.value(number)
-                        prop.custom("step", "any")
-                        
-                    ]
-                | "Name" ->
-                    let str =
-                        if input.ComponentValue.IsSome && input.ComponentValue.Value.IsAText then
-                            input.ComponentValue.Value.AsName()
-                        else
-                            input.ComponentValue.Value.Text
-                    Html.input[
-                        prop.className "swt:input swt:w-full"
-                        prop.type'.text
-                        prop.onChange(fun (value:string) ->
-                            valueSetter (Value.Name value))
-                        prop.value(str)
-                    ]
-                | "Ontology" ->
-                    let oa =
-                        if input.ComponentValue.IsSome then
-                            if input.ComponentValue.Value.IsAnOntology then
-                                input.ComponentValue.Value.AsOntology()
-                            else
-                                OntologyAnnotation.create(input.ComponentValue.Value.Text)
-                        else
-                            OntologyAnnotation.create("")
-                    TermSearch.TermSearch(
-                        (Some oa |> Option.map _.ToTerm()),
-                        (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> ontologySetter),
-                        classNames = TermSearchStyle(!^"swt:border-current swt:join-item swt:w-full")
-                    )
-                | _ -> failwith $"Unknown type {valueType}!"
+                ]
             ]
         ]
 
     [<ReactComponent>]
-    static member ComponentInput(input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit) =
+    static member ComponentInput
+        (input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit)
+        =
 
         let title =
-            let componentValue =
-                if input.ComponentValue.IsSome then
-                    $"Value: {input.ComponentValue.Value.Text}"
-                else
-                    ""
-            let componentType =
-                if input.ComponentType.IsSome then
-                    let temp = defaultArg input.ComponentType.Value.Name ""
-                    componentValue + $" of Type: {temp}"
-                else
-                    componentValue
-            let componentUnit =
-                if input.ComponentUnit.IsSome then
-                    let temp = defaultArg input.ComponentUnit.Value.Name ""
-                    componentType + $" with Unit: {temp}"
-                else
-                    componentType
-            componentUnit
+            match input.ComponentValue with
+            | Some v -> v.Text
+            | None -> "<value>"
+
+        let subtitle =
+            let e = input.ComponentType |> Option.map _.NameText |> Option.defaultValue "<type>"
+            let u = input.ComponentUnit |> Option.map _.NameText |> Option.defaultValue "<unit>"
+            $"{e} [{u}]"
 
         Generic.Collapse [ // title
-            if not (String.IsNullOrWhiteSpace title) then
-                Html.label [ prop.className "swt:label"; prop.text title ]
+            Generic.CollapseTitle(title, subtitle)
         ] [ // content
             FormComponents.ValueInput(
-                input,
-                setter
+                input.ComponentValue,
+                (fun v -> { input with ComponentValue = v } |> setter),
+                label = "Component Value"
             )
             FormComponents.OntologyAnnotationInput(
                 input.ComponentType,
-                (fun oas ->
-                    let value = defaultArg input.ComponentValue (Value.Name "")
-                    if oas.IsSome then
-                        let temp =
-                            Process.Component.create(value, ?unit = input.ComponentUnit, ?componentType = oas)
-                        temp |> setter
-                    else
-                        let temp =
-                            Process.Component.create(value, ?unit = input.ComponentUnit)
-                        temp |> setter
-                ),
-                label = "Type"
+                (fun oas -> { input with ComponentType = oas } |> setter),
+                label = "Component Type"
             )
             FormComponents.OntologyAnnotationInput(
                 input.ComponentUnit,
-                (fun oas ->
-                    let value = defaultArg input.ComponentValue (Value.Name "")
-                    if oas.IsSome then
-                        let temp =
-                            Process.Component.create(value, ?unit = oas, ?componentType = input.ComponentType)
-                        temp |> setter
-                    else
-                        let temp =
-                            Process.Component.create(value, ?componentType = input.ComponentType)
-                        temp |> setter
-                ),
-                label = "Unit"
+                (fun oas -> { input with ComponentUnit = oas } |> setter),
+                label = "Component Unit"
             )
             if rmv.IsSome then
                 Helper.deleteButton rmv.Value
@@ -923,7 +926,9 @@ type FormComponents =
         )
 
     [<ReactComponent>]
-    static member ParameterInput(input: Process.ProtocolParameter, setter: Process.ProtocolParameter -> unit, ?rmv: MouseEvent -> unit) =
+    static member ParameterInput
+        (input: Process.ProtocolParameter, setter: Process.ProtocolParameter -> unit, ?rmv: MouseEvent -> unit)
+        =
         FormComponents.OntologyAnnotationInput(
             input.ParameterName,
             (fun oas ->
@@ -931,7 +936,7 @@ type FormComponents =
                     let temp = input.SetCategory(oas.Value)
                     temp |> setter
                 else
-                    let temp = input.SetCategory(OntologyAnnotation.empty())
+                    let temp = input.SetCategory(OntologyAnnotation.empty ())
                     temp |> setter
             ),
             ?rmv = rmv
@@ -939,8 +944,11 @@ type FormComponents =
 
     [<ReactComponent>]
     static member ParametersInput
-        (parameters: ResizeArray<Process.ProtocolParameter>, setter: ResizeArray<Process.ProtocolParameter> -> unit, ?label: string)
-        =
+        (
+            parameters: ResizeArray<Process.ProtocolParameter>,
+            setter: ResizeArray<Process.ProtocolParameter> -> unit,
+            ?label: string
+        ) =
         FormComponents.InputSequence(
             parameters,
             Process.ProtocolParameter.create,
@@ -1265,17 +1273,15 @@ type FormComponents =
             ?label = label
         )
 
-    static member CollectionOfStrings(identifiers: ResizeArray<string>, ?label: string) =
-        let content =
-            identifiers
-            |> Array.ofSeq
-            |> Array.map (fun v -> FormComponents.TextInput(v, (fun _ -> ()), disabled = true))
-        Generic.Collapse
-            [
-                if label.IsSome then
-                    Html.label [ prop.className "swt:label"; prop.text label.Value ]
-            ]
-            content
+    static member CollectionOfStrings(identifiers: ResizeArray<string>, setIdentifiers, ?label: string) =
+        FormComponents.InputSequence(
+            identifiers,
+            (fun () -> ""),
+            setIdentifiers,
+            (fun (v, setV, rmv) -> FormComponents.TextInput(v, setV, rmv = rmv)),
+            (fun c1 c2 -> c1.Equals c2),
+            ?label = label
+        )
 
     [<ReactComponent>]
     static member PublicationInput(input: Publication, setter: Publication -> unit, ?rmv: MouseEvent -> unit) =

@@ -275,6 +275,9 @@ type SelectiveImportModal =
             | Study(s, _) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([ t.Table ]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
+            | Workflow _ -> ResizeArray(), ArcFilesDiscriminate.Workflow
+            | Run r -> r.Tables, ArcFilesDiscriminate.Run
+            | DataMap _ -> ResizeArray(), ArcFilesDiscriminate.DataMap
 
         let setMetadataImport =
             fun b ->

@@ -52,44 +52,42 @@ module Spreadsheet =
                             (curry GenericError Cmd.none >> DevMsg)
                     else
                         cmd
+
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->
-                        let json = assay.ToJsonString()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, json)
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, ArcAssay.toJsonString 0 assay)
                         |> Promise.start
                     | Some(Study(study, _)) ->
-                        let json = study.ToJsonString()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, json)
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study)
                         |> Promise.start
                     | Some(Investigation inv) ->
-                        let json = inv.ToJsonString()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Investigation, json)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Investigation,
+                            ArcInvestigation.toJsonString 0 inv
+                        )
                         |> Promise.start
                     | Some(Run run) ->
-                        let json =
-                            runEncoder run
-                            |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, json)
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run)
                         |> Promise.start
                     | Some(Workflow workflow) ->
-                        let json =
-                            workflowEncoder workflow
-                            |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Workflow, json)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Workflow,
+                            ArcWorkflow.toJsonString 0 workflow
+                        )
                         |> Promise.start
                     | Some(Template template) ->
-                        let json = template.toJsonString()
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Template,
+                            Template.toJsonString 0 template
+                        )
                         |> Promise.start
-                    | Some(DataMap (parent, datamap)) ->
+                    | Some(DataMap(parent, datamap)) ->
                         if parent.IsSome then
                             let json =
                                 wholeDatamapEncoder parent.Value.ParentId parent.Value.Parent datamap
                                 |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+
                             ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.DataMap, json)
                             |> Promise.start
                         else
@@ -173,16 +171,23 @@ module Spreadsheet =
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
                 let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
-               
+
                 let nextState =
                     let baseState =
                         if reset then
                             Spreadsheet.Model.init (arcFile)
                         else
                             { state with ArcFile = Some arcFile }
+
                     match arcFile with
-                    | ArcFiles.Workflow _ -> { baseState with ActiveView = ActiveView.Metadata }
-                    | ArcFiles.DataMap _ -> { baseState with ActiveView = ActiveView.DataMap }
+                    | ArcFiles.Workflow _ -> {
+                        baseState with
+                            ActiveView = ActiveView.Metadata
+                      }
+                    | ArcFiles.DataMap _ -> {
+                        baseState with
+                            ActiveView = ActiveView.DataMap
+                      }
                     | _ -> baseState
 
                 nextState, model, Cmd.none
@@ -334,15 +339,9 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
-                    | Run r -> failwith "No toFsWorkbook available for run"
-                    | Workflow w -> failwith "No toFsWorkbook available for workflow"
-                    | DataMap (p, d) ->
-                        let fileName =
-                            if p.IsSome then
-                                n + "_" + p.Value.ParentId + "_" + p.Value.Parent.ToString() + "_" + "datamap.xlsx"
-                            else
-                                n + "_" + "datamap.xlsx"
-                        fileName, Spreadsheet.DataMap.toFsWorkbook d
+                    | Run r -> n + "_" + ArcRun.FileName, ArcRun.toFsWorkbook r
+                    | Workflow w -> n + "_" + ArcWorkflow.FileName, ArcWorkflow.toFsWorkbook w
+                    | DataMap(_, d) -> n + "_" + "datamap.xlsx", Spreadsheet.DataMap.toFsWorkbook d
 
                 let cmd =
                     Cmd.OfPromise.either
@@ -360,8 +359,7 @@ module Spreadsheet =
                 state, model, Cmd.none
 
         try
-            innerUpdate state model msg
-            |> Helper.updateHistoryStorageMsg msg
+            innerUpdate state model msg |> Helper.updateHistoryStorageMsg msg
         with e ->
             let cmd = GenericError(Cmd.none, e) |> DevMsg |> Cmd.ofMsg
             state, model, cmd

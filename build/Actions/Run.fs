@@ -20,7 +20,7 @@ let ClientArgs = [
 ]
 
 
-let All(db: bool) =
+let All (db: bool) =
     [
         runAsync "server" "dotnet" [ "watch"; "run" ] ProjectPaths.serverPath
         runAsync "client" "dotnet" ClientArgs ProjectPaths.clientPath

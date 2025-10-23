@@ -31,7 +31,7 @@ module EmptyTableModals =
         [<ReactComponent>]
         static member PreviousTableSelect(model: Model, isOpen, setIsOpen, dispatch) =
 
-            let tables = model.SpreadsheetModel.ArcFile.Value.Tables().Tables |> Array.ofSeq
+            let tables = model.SpreadsheetModel.ArcFile.Value.ArcTables().Tables |> Array.ofSeq
 
             let activeTableIndex =
                 let activeTableName = model.SpreadsheetModel.ActiveTable.Name

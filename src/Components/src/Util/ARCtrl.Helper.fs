@@ -58,9 +58,25 @@ module ARCtrlHelper =
         | Study
         | Investigation
         | Run
-        | WorkFlow
+        | Workflow
         | DataMap
         | Template
+
+        static member tryFromString(str: string) =
+            match str.ToLower() with
+            | "assay" -> Some Assay
+            | "study" -> Some Study
+            | "investigation" -> Some Investigation
+            | "run" -> Some Run
+            | "workflow" -> Some Workflow
+            | "datamap" -> Some DataMap
+            | "template" -> Some Template
+            | _ -> None
+
+        static member fromString(str: string) =
+            match ArcFilesDiscriminate.tryFromString str with
+            | Some r -> r
+            | None -> failwithf "Unknown ArcFilesDiscriminate: %s" str
 
     [<StringEnum>]
     type DataMapParent =
@@ -68,6 +84,7 @@ module ARCtrlHelper =
         | Study
         | Run
         | Workflow
+
         static member tryFromString(str: string) =
             match str.ToLower() with
             | "assay" -> Assay
@@ -81,8 +98,10 @@ module ARCtrlHelper =
         Parent: DataMapParent
     |}
 
-    let createDataMapParentInfo (parentId: string) (parent: DataMapParent) : DatamapParentInfo =
-        {| ParentId = parentId; Parent = parent |}
+    let createDataMapParentInfo (parentId: string) (parent: DataMapParent) : DatamapParentInfo = {|
+        ParentId = parentId
+        Parent = parent
+    |}
 
     type ArcFiles =
         | Template of Template
@@ -91,6 +110,7 @@ module ARCtrlHelper =
         | Assay of ArcAssay
         | Run of ArcRun
         | Workflow of ArcWorkflow
+        /// DatamapParentInfo is only required for ARCitect integration purposes.
         | DataMap of (DatamapParentInfo option * DataMap)
 
         member this.HasTableAt(index: int) =
@@ -98,14 +118,14 @@ module ARCtrlHelper =
             | Template _ -> index = 0 // Template always has exactly one table
             | DataMap _ -> index = -1
             | Workflow _ -> index = -2
-            | Investigation i -> false
+            | Investigation _ -> false
             | Study(s, _) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
             | Run r -> r.TableCount <= index
 
         member this.HasMetadata() =
             match this with
-            | Assay _ 
+            | Assay _
             | Template _
             | Run _
             | Workflow _
@@ -113,15 +133,35 @@ module ARCtrlHelper =
             | Study(_, _) -> true
             | DataMap _ -> false
 
-        member this.Tables() : ArcTables =
+        member this.ArcTables() : ArcTables =
             match this with
             | Template t -> ResizeArray([ t.Table ]) |> ArcTables
-            | Investigation _ -> ArcTables(ResizeArray [])
             | Study(s, _) -> s
             | Assay a -> a
             | Run r -> r
+            | Investigation _
             | Workflow _
             | DataMap _ -> ArcTables(ResizeArray [])
+
+        member this.Tables() : ResizeArray<ArcTable> =
+            match this with
+            | Template t -> ResizeArray([ t.Table ])
+            | Study(s, _) -> s.Tables
+            | Assay a -> a.Tables
+            | Run r -> r.Tables
+            | Investigation _
+            | Workflow _
+            | DataMap _ -> ResizeArray()
+
+        member this.RelatedArcFilesDiscriminate: ArcFilesDiscriminate =
+            match this with
+            | Template _ -> ArcFilesDiscriminate.Template
+            | Investigation _ -> ArcFilesDiscriminate.Investigation
+            | Study _ -> ArcFilesDiscriminate.Study
+            | Assay _ -> ArcFilesDiscriminate.Assay
+            | Run _ -> ArcFilesDiscriminate.Run
+            | Workflow _ -> ArcFilesDiscriminate.Workflow
+            | DataMap _ -> ArcFilesDiscriminate.DataMap
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =
@@ -133,9 +173,11 @@ module ARCtrlHelper =
         static member fromString(str: string) =
             match str.ToLower() with
             | "arctrl" -> ARCtrl
-            | "arctrl compressed" -> ARCtrlCompressed
+            | "arctrl compressed"
+            | "arctrlcompressed" -> ARCtrlCompressed
             | "isa" -> ISA
-            | "ro-crate metadata" -> ROCrate
+            | "ro-crate metadata"
+            | "rocrate" -> ROCrate
             | _ -> failwithf "Unknown JSON export format: %s" str
 
         member this.AsStringRdbl =
@@ -569,24 +611,25 @@ module Extensions =
         member this.FileName = this.Name.Replace(" ", "_") + ".xlsx"
 
     type ArcTable with
-            /// <summary>
-            /// Transforms ArcTable to excel compatible "values", row major
-            /// </summary>
-            member this.ToStringSeqs() =
+        /// <summary>
+        /// Transforms ArcTable to excel compatible "values", row major
+        /// </summary>
+        member this.ToStringSeqs() =
 
-                // Cancel if there are no columns
-                if this.Columns.Count = 0 then
-                    [||]
-                else
-                    let columns =
-                        this.Columns
-                        |> List.ofSeq
-                        |> List.sortBy ArcTable.classifyColumnOrder
-                        |> List.collect CompositeColumn.toStringCellColumns
-                        |> Seq.transpose
-                        |> Seq.map (fun column -> column |> Array.ofSeq)
-                        |> Array.ofSeq
-                    columns
+            // Cancel if there are no columns
+            if this.Columns.Count = 0 then
+                [||]
+            else
+                let columns =
+                    this.Columns
+                    |> List.ofSeq
+                    |> List.sortBy ArcTable.classifyColumnOrder
+                    |> List.collect CompositeColumn.toStringCellColumns
+                    |> Seq.transpose
+                    |> Seq.map (fun column -> column |> Array.ofSeq)
+                    |> Array.ofSeq
+
+                columns
 
     type CompositeHeader with
 
