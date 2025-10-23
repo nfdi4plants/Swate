@@ -37,6 +37,9 @@ type SidebarView =
                 | {
                       SidebarPage = Routing.SidebarPage.JsonImport
                   } -> Pages.JsonImport.Main(model, dispatch)
+                | {
+                      SidebarPage = Routing.SidebarPage.DataAnnotator
+                  } -> Pages.DataAnnotator.Main(model, dispatch)
             ]
         ]
 

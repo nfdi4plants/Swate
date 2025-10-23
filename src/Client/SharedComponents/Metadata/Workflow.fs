@@ -9,13 +9,14 @@ open Components
 open Components.Forms
 
 [<ReactComponent>]
-let Main
-    (workflow: ArcWorkflow, setArcWorkflow: ArcWorkflow -> unit, model: Model.Model)
-    =
-    let versionPattern = @"^v[a-zA-Z0-9._\- ]+$"
+let Main (workflow: ArcWorkflow, setArcWorkflow: ArcWorkflow -> unit, model: Model.Model) =
+    /// default SemVer Regex: https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+    /// CHANGED: Added optional 'v' at start to allow versions like 'v1.0.0'
+    let versionPattern =
+        @"^(v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
 
     // Function to check if a string contains only valid characters
-    let tryCheckValidCharacters (identifier: string) =
+    let checkVersionStr (identifier: string) =
         match identifier with
         | Regex versionPattern _ -> true
         | _ -> false
@@ -26,31 +27,46 @@ let Main
             content = [
                 FormComponents.TextInput(
                     workflow.Identifier,
-                    //(fun v ->
-                    //    let nextWorkflow = IdentifierSetters.setAssayIdentifier v workflow
-                    //    setArcWorkflow nextWorkflow),
-                    (fun _ -> ()), //Have to implement setWorkflowIdentifier in ARCtrl
+                    (fun v ->
+                        let nextWorkflow = IdentifierSetters.setWorkflowIdentifier v workflow
+                        setArcWorkflow nextWorkflow
+                    ),
                     "Identifier",
                     validator = {|
                         fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s)
                         msg = "Invalid Identifier"
                     |},
-                    disabled = true,
+                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host,
                     classes = "swt:w-full"
                 )
                 FormComponents.TextInput(
                     defaultArg workflow.Title "",
-                    (fun v -> workflow.Title <- Some v
+                    (fun v ->
+                        workflow.Title <- Option.whereNot System.String.IsNullOrWhiteSpace v
+                        setArcWorkflow workflow
                     ),
                     "Title",
                     classes = "swt:w-full"
                 )
                 FormComponents.TextInput(
-                    defaultArg workflow.Version "v",
-                    (fun _ -> ()),
+                    defaultArg workflow.Description "",
+                    (fun v ->
+                        workflow.Description <- Option.whereNot System.String.IsNullOrWhiteSpace v
+                        setArcWorkflow workflow
+                    ),
+                    "Description",
+                    classes = "swt:w-full",
+                    isarea = true
+                )
+                FormComponents.TextInput(
+                    defaultArg workflow.Version "",
+                    (fun v ->
+                        workflow.Version <- Option.whereNot System.String.IsNullOrWhiteSpace v
+                        setArcWorkflow workflow
+                    ),
                     "Version",
                     validator = {|
-                        fn = (fun s -> tryCheckValidCharacters s)
+                        fn = (fun s -> checkVersionStr s)
                         msg = "Invalid Version"
                     |},
                     classes = "swt:w-full"
@@ -59,57 +75,49 @@ let Main
                     workflow.WorkflowType,
                     (fun oa ->
                         workflow.WorkflowType <- oa
-                        setArcWorkflow <| workflow),
+                        setArcWorkflow <| workflow
+                    ),
                     "Workflow Type"
                 )
                 FormComponents.TextInput(
-                    defaultArg workflow.Description "",
-                    (fun _ -> ()),
-                    "Description",
+                    defaultArg workflow.URI "",
+                    (fun v ->
+                        workflow.URI <- Option.whereNot System.String.IsNullOrWhiteSpace v
+                        setArcWorkflow workflow
+                    ),
+                    "URI",
                     classes = "swt:w-full"
                 )
-                FormComponents.CollectionOfStrings(
-                    workflow.SubWorkflowIdentifiers,
-                    "SubWorkflow Identifiers"
-                )
-                //Adapt so that the names of the fields appear when no Investigation is yet available
-                // -> Without investigation, calling htese paremeters leads to errors
-                if workflow.Investigation.IsSome then
-                    FormComponents.TextInput(
-                        (if workflow.URI.IsSome then workflow.URI.Value.ToString() else ""),
-                        (fun _ -> ()),
-                        "Description",
-                        classes = "swt:w-full"
-                    )
-                    FormComponents.TextInput(
-                        workflow.SubWorkflowCount.ToString(),
-                        (fun _ -> ()),
-                        "Description",
-                        classes = "swt:w-full"
-                    )
-                    FormComponents.CollectionOfStrings(
-                        workflow.VacantSubWorkflowIdentifiers,
-                        "Vacant SubWorkflow Identifiers"
-                    )
+                // FormComponents.CollectionOfStrings(
+                //     workflow.SubWorkflowIdentifiers,
+                //     (fun identifiers ->
+                //         workflow.SubWorkflowIdentifiers <- identifiers
+                //         setArcWorkflow workflow
+                //     ),
+                //     "SubWorkflow Identifiers"
+                // )
                 FormComponents.ParametersInput(
                     workflow.Parameters,
                     (fun parameter ->
                         workflow.Parameters <- parameter
-                        setArcWorkflow workflow),
+                        setArcWorkflow workflow
+                    ),
                     "Parameters"
                 )
                 FormComponents.ComponentsInput(
                     workflow.Components,
                     (fun workflowComponent ->
                         workflow.Components <- workflowComponent
-                        setArcWorkflow workflow),
+                        setArcWorkflow workflow
+                    ),
                     "Components"
                 )
                 FormComponents.PersonsInput(
                     workflow.Contacts,
                     (fun persons ->
                         workflow.Contacts <- persons
-                        setArcWorkflow workflow),
+                        setArcWorkflow workflow
+                    ),
                     model.PersistentStorageState.IsARCitect,
                     "Contacts"
                 )
@@ -117,7 +125,8 @@ let Main
                     workflow.Comments,
                     (fun comments ->
                         workflow.Comments <- ResizeArray comments
-                        setArcWorkflow workflow),
+                        setArcWorkflow workflow
+                    ),
                     "Comments"
                 )
             ]

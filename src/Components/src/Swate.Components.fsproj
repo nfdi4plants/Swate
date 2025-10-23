@@ -55,8 +55,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" Version="3.0.0-beta.3" />
-    <PackageReference Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.3" />
+    <PackageReference Include="ARCtrl.Core" Version="3.0.0-beta.5" />
+    <PackageReference Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.5" />
     <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
     <PackageReference Include="Fable.Fetch" Version="2.7.0" />
     <PackageReference Include="Fable.React.Types" Version="18.4.0" />

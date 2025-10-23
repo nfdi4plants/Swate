@@ -77,15 +77,15 @@ type Generic =
     static member CollapseTitle(title: string, subtitle: string, ?count: string) =
         React.fragment [
             Html.div [
-                Html.h5 title
+                Html.h5 [ prop.className "swt:text-md swt:font-semibold"; prop.text title ]
                 Html.div [
-                    prop.className "not-prose swt:text-sm"
+                    prop.className "not-prose swt:text-xs swt:text-base-content/70"
                     prop.children [ Html.span [ prop.text subtitle ] ]
                 ]
             ]
             if count.IsSome then
                 Html.div [
-                    prop.className "not-prose swt:text-center swt:ml-auto"
+                    prop.className "not-prose swt:flex swt:flex-col swt:ml-auto swt:items-center swt:justify-center"
                     prop.children [
                         Icons.Edit()
                         Html.div [ prop.className "swt:text-sm"; prop.text (count.Value) ]

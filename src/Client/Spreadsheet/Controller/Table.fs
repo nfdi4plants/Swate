@@ -49,8 +49,9 @@ let addTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model
 let updateTable (newTable: ArcTable) (state: Spreadsheet.Model) : Spreadsheet.Model =
 
     match state.ArcFile with
-    | Some (ArcFiles.Template t) -> t.Table <- newTable
+    | Some(ArcFiles.Template t) -> t.Table <- newTable
     | _ -> state.Tables.UpdateTable(newTable.Name, newTable)
+
     state
 
 /// <summary>This function is used to create multiple tables at once.</summary>
@@ -61,7 +62,7 @@ let addTables (tables: ArcTable[]) (state: Spreadsheet.Model) : Spreadsheet.Mode
 
 /// <summary>Adds the most basic empty Swate table with auto generated name.</summary>
 let createTable (usePrevOutput: bool) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let tables = state.ArcFile.Value.Tables()
+    let tables = state.ArcFile.Value.ArcTables()
     let newName = createNewTableName 0 tables.TableNames
     let newTable = ArcTable.init (newName)
 

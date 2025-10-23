@@ -291,7 +291,6 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
                         MainPlus(model, dispatch)
                 ]
             ]
-            if model.SpreadsheetModel.TableViewIsActive() then
-                ToggleSidebar(model, dispatch)
+            ToggleSidebar(model, dispatch)
         ]
     ]

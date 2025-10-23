@@ -145,16 +145,10 @@ module ConversionTypes =
                 | Some(ArcFiles.Study(s, _)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
-                | Some(ArcFiles.Run r) -> 
-                    Browser.Dom.console.warn "We have to implement a toJsonString for run, currently autosave and load is not working for it"
-                    JsonArcFiles.Template, "" 
-                | Some(Workflow w) -> 
-                    Browser.Dom.console.warn "We have to implement a toJsonString for workflow, currently autosave and load is not working for it"
-                    JsonArcFiles.Workflow, "" 
-                | Some(ArcFiles.DataMap (p, d)) ->
-                    let data = 
-                        DataMap.encoder d
-                        |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                | Some(ArcFiles.Run r) -> JsonArcFiles.Run, ArcRun.toJsonString 0 r
+                | Some(Workflow w) -> JsonArcFiles.Workflow, ArcWorkflow.toJsonString 0 w
+                | Some(ArcFiles.DataMap(p, d)) ->
+                    let data = DataMap.encoder d |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
                     JsonArcFiles.DataMap p, data
                 | None -> JsonArcFiles.None, ""
 
@@ -182,14 +176,15 @@ module ConversionTypes =
                         let s = ArcStudy.fromJsonString decompressedString
                         ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay -> ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
-                    | JsonArcFiles.Run -> failwith "No fromJsonString is available for run"
-                    | JsonArcFiles.Workflow -> failwith "No fromJsonString is available for workflow"
+                    | JsonArcFiles.Run -> ArcRun.fromJsonString decompressedString |> ArcFiles.Run |> Some
+                    | JsonArcFiles.Workflow ->
+                        ArcWorkflow.fromJsonString decompressedString |> ArcFiles.Workflow |> Some
                     | JsonArcFiles.DataMap p ->
                         let dataMap = Decode.fromJsonString DataMap.decoder decompressedString
-                        ArcFiles.DataMap(p, dataMap)
-                        |> Some
+                        ArcFiles.DataMap(p, dataMap) |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
                     | JsonArcFiles.None -> None
+
                 {
                     init with
                         ActiveView = this.ActiveView
@@ -538,7 +533,8 @@ type Model = {
                 toRemoveList
                 |> List.iter (fun guid ->
                     let rmvKey = Keys.create_swate_session_history_table_key (guid)
-                    Browser.WebStorage.sessionStorage.removeItem (rmvKey))
+                    Browser.WebStorage.sessionStorage.removeItem (rmvKey)
+                )
 
             {
                 this with

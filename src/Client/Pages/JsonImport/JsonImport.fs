@@ -53,7 +53,10 @@ module private Helper =
 
                     async {
                         setState { state with Loading = true }
-                        let p = Spreadsheet.IO.Json.readFromJson state.FileType state.JsonFormat r
+
+                        let p = promise {
+                            return Spreadsheet.IO.Json.readFromJsonMap.[(state.FileType, state.JsonFormat)] r
+                        }
 
                         do!
                             Promise.either
@@ -93,101 +96,40 @@ type JsonImport =
     [<ReactComponent>]
     static member JsonUploadComponent(model: Model, dispatch) =
         let state, setState = React.useState (TemplateFromFileState.init)
-        let setJsonFormat = fun x -> setState { state with JsonFormat = x }
-        let setFileType = fun x -> setState { state with FileType = x }
 
-        let fileTypeDisabled (ft: ArcFilesDiscriminate) =
-            match state.JsonFormat, ft with
-            // isa and rocrate do not support template
-            | JsonExportFormat.ROCrate, ArcFilesDiscriminate.Template
-            | JsonExportFormat.ISA, ArcFilesDiscriminate.Template -> true
-            | _ -> false
+        let keysToString (arcfile: ArcFilesDiscriminate, jsontype: JsonExportFormat) = sprintf "%A@%A" arcfile jsontype
 
-        let jsonFormatDisabled (jf: JsonExportFormat) =
-            match state.FileType, jf with
-            // template does not support isa and rocrate
-            | ArcFilesDiscriminate.Template, JsonExportFormat.ROCrate
-            | ArcFilesDiscriminate.Template, JsonExportFormat.ISA -> true
-            | _ -> false
+        let tryKeysFromString (s: string) =
+            let parts = s.Split '@'
 
-        SidebarComponents.SidebarLayout.LogicContainer [
-            Html.div [
-                Html.div [
-                    prop.className "swt:join swt:w-full"
-                    prop.children [
-                        JsonExportFormat.ROCrate
-                        |> fun jef ->
-                            ModalElements.SelectorButton<JsonExportFormat>(
-                                jef,
-                                state.JsonFormat,
-                                setJsonFormat,
-                                jsonFormatDisabled jef
-                            )
-                        JsonExportFormat.ISA
-                        |> fun jef ->
-                            ModalElements.SelectorButton<JsonExportFormat>(
-                                jef,
-                                state.JsonFormat,
-                                setJsonFormat,
-                                jsonFormatDisabled jef
-                            )
-                        JsonExportFormat.ARCtrl
-                        |> fun jef ->
-                            ModalElements.SelectorButton<JsonExportFormat>(
-                                jef,
-                                state.JsonFormat,
-                                setJsonFormat,
-                                jsonFormatDisabled jef
-                            )
-                        JsonExportFormat.ARCtrlCompressed
-                        |> fun jef ->
-                            ModalElements.SelectorButton<JsonExportFormat>(
-                                jef,
-                                state.JsonFormat,
-                                setJsonFormat,
-                                jsonFormatDisabled jef
-                            )
-                    ]
-                ]
-            ]
+            if parts.Length = 2 then
+                let arcFile = parts.[0] |> ArcFilesDiscriminate.fromString
+                let jsontype = parts.[1] |> JsonExportFormat.fromString
 
-            Html.div [
-                Html.div [
-                    prop.className "swt:join swt:w-full"
-                    prop.children [
-                        ArcFilesDiscriminate.Assay
-                        |> fun ft ->
-                            ModalElements.SelectorButton<ArcFilesDiscriminate>(
-                                ft,
-                                state.FileType,
-                                setFileType,
-                                fileTypeDisabled ft
-                            )
-                        ArcFilesDiscriminate.Study
-                        |> fun ft ->
-                            ModalElements.SelectorButton<ArcFilesDiscriminate>(
-                                ft,
-                                state.FileType,
-                                setFileType,
-                                fileTypeDisabled ft
-                            )
-                        ArcFilesDiscriminate.Investigation
-                        |> fun ft ->
-                            ModalElements.SelectorButton<ArcFilesDiscriminate>(
-                                ft,
-                                state.FileType,
-                                setFileType,
-                                fileTypeDisabled ft
-                            )
-                        ArcFilesDiscriminate.Template
-                        |> fun ft ->
-                            ModalElements.SelectorButton<ArcFilesDiscriminate>(
-                                ft,
-                                state.FileType,
-                                setFileType,
-                                fileTypeDisabled ft
-                            )
-                    ]
+                Some(arcFile, jsontype)
+            else
+                None
+
+        React.fragment [
+            Html.select [
+                prop.className "swt:select swt:w-full"
+                prop.value (sprintf "%A@%A" state.FileType state.JsonFormat)
+                prop.onChange (fun (ev: string) ->
+                    match tryKeysFromString ev with
+                    | Some(arcfile, jsontype) ->
+                        setState {
+                            state with
+                                FileType = arcfile
+                                JsonFormat = jsontype
+                        }
+                    | None -> ()
+                )
+                prop.children [
+                    for (arcfile, jsontype) in Spreadsheet.IO.Json.readFromJsonMap.Keys |> Seq.sortBy fst do
+                        Html.option [
+                            prop.value (sprintf "%A@%A" arcfile jsontype)
+                            prop.text (sprintf "%A - %A" arcfile jsontype)
+                        ]
                 ]
             ]
 
@@ -207,5 +149,5 @@ type JsonImport =
                 ]
             )
 
-            JsonImport.JsonUploadComponent(model, dispatch)
+            SidebarComponents.SidebarLayout.LogicContainer [ JsonImport.JsonUploadComponent(model, dispatch) ]
         ]

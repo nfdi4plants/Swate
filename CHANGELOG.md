@@ -16,6 +16,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+-   Full support for isa.run.xlsx files
+-   Full support for isa.workflow.xlsx files
+-   Full support for separate datamap.xlsx files
+
+### Changed
+
+-   JSON import uses a more direct Select component to choose file type and json format.
+-   JSON export now checks compatibility of selected file type and json format before displaying options.
+-   Assay metadata sheet now has fields for: "Title" and "Description".
+
+### Deprecated
+
+-   Remove in file support for DataMaps
+
+### Removed
+
+-   Restriction of Sidebar to table views.
+
 ## 1.0.0-rc.9 - 2025-10-10
 
 ### Added
@@ -526,8 +546,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
--       * Responsive design should now render immediatly upon window size change
--       * Add-in should not reload after navigating to a new tab for the first time.
+-         * Responsive design should now render immediatly upon window size change
+-         * Add-in should not reload after navigating to a new tab for the first time.
 -   Term search input field no longer looses focus after clicking into it.
 
 ## 0.0.2-alpha - 2020-10-29

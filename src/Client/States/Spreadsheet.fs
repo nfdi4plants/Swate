@@ -62,12 +62,12 @@ type ActiveView =
         | Table i -> Some i
         | _ -> None
 
+    /// This function is used to verify if the current arcfile supports the active view type.
     member this.ArcFileHasView(arcfile: ArcFiles) =
         match this with
         | Table i -> arcfile.HasTableAt(i)
         | DataMap -> arcfile.HasTableAt(-1)
         | Metadata -> arcfile.HasMetadata()
-        | _ -> failwith $"The view {this} is not supported"
 
 [<AutoOpen>]
 module ActivePattern =
@@ -103,7 +103,7 @@ type Model = {
 
     member this.Tables =
         match this.ArcFile with
-        | Some(arcfile) -> arcfile.Tables()
+        | Some(arcfile) -> arcfile.ArcTables()
         | None -> ResizeArray() |> ArcTables
 
     member this.ActiveTable =
@@ -154,7 +154,8 @@ type Model = {
     member this.CanHaveTables() =
         match this.ArcFile with
         | Some(ArcFiles.Assay _)
-        | Some(ArcFiles.Study _) -> true
+        | Some(ArcFiles.Study _)
+        | Some(ArcFiles.Run _) -> true
         | _ -> false
 
     member this.TableViewIsActive() =

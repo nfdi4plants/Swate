@@ -157,12 +157,11 @@ let joinTable
 
         let newTable =
             let body =
-                state.ActiveTable.Columns
-                |> Seq.map (fun column -> column.Cells)
-                |> ResizeArray
+                state.ActiveTable.Columns |> Seq.map (fun column -> column.Cells) |> ResizeArray
+
             ArcTable.create (templateName, state.ActiveTable.Headers, body)
 
-        state.ArcFile.Value.Tables().SetTable(state.ActiveTable.Name, newTable)
+        state.ArcFile.Value.ArcTables().SetTable(state.ActiveTable.Name, newTable)
 
     let table = state.ActiveTable
     table.Join(tableToAdd, ?index = index, ?joinOptions = options, forceReplace = true)
