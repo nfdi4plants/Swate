@@ -134,8 +134,7 @@ module V3 =
         |> Remoting.withErrorHandler Helper.errorHandler
         |> Remoting.buildHttpHandler
 
-open Swate.Components.Shared.SwateObsolete
-open Swate.Components.Shared.SwateObsolete.Regex
+open Swate.Components.Shared
 
 [<RequireQualifiedAccess>]
 module V1 =
@@ -190,7 +189,7 @@ module V1 =
                 }
 
             getTermSuggestionsByParentTerm =
-                fun (max: int, typedSoFar: string, parentTerm: TermMinimal) -> async {
+                fun (max: int, typedSoFar: string, parentTerm: SwateObsolete.TermMinimal) -> async {
                     let dbSearchRes =
                         match typedSoFar with
                         | Regex Regex.Pattern.TermAnnotationShortPattern foundAccession ->
@@ -218,7 +217,7 @@ module V1 =
                 }
 
             getAllTermsByParentTerm =
-                fun (parentTerm: TermMinimal) -> async {
+                fun (parentTerm: SwateObsolete.TermMinimal) -> async {
                     let searchRes =
                         Database.Term.Term(credentials).getAllByParent (parentTerm, limit = 500)
                         |> Array.ofSeq
@@ -227,7 +226,7 @@ module V1 =
                 }
 
             getTermSuggestionsByChildTerm =
-                fun (max: int, typedSoFar: string, childTerm: TermMinimal) -> async {
+                fun (max: int, typedSoFar: string, childTerm: SwateObsolete.TermMinimal) -> async {
 
                     let dbSearchRes =
                         match typedSoFar with
@@ -262,7 +261,7 @@ module V1 =
                 }
 
             getAllTermsByChildTerm =
-                fun (childTerm: TermMinimal) -> async {
+                fun (childTerm: SwateObsolete.TermMinimal) -> async {
                     let searchRes = Term.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
                     return searchRes
                 }
@@ -325,12 +324,13 @@ module V1 =
                                 )
                             // if none of the above apply we do a standard term search
                             else
-                                Term.TermQuery.getByName (searchTerm.Term.Name, searchType = FullTextSearch.Exact))
+                                Term.TermQuery.getByName (searchTerm.Term.Name, searchType = FullTextSearch.Exact)
+                        )
 
                     let result =
                         Helper.Neo4j.runQueries (queries, credentials)
                         |> Array.map2
-                            (fun termSearchable dbResults ->
+                            (fun (termSearchable: SwateObsolete.TermSearchable) dbResults ->
                                 // replicate if..elif..else conditions from 'queries'
                                 if termSearchable.Term.TermAccession <> "" then
                                     let result =
@@ -370,7 +370,8 @@ module V1 =
                                                     None
                                                 else
                                                     Some dbResults.[0]
-                                    })
+                                    }
+                            )
                             filteredQueries
 
                     return result
@@ -494,7 +495,7 @@ module V2 =
                     }
 
             getAllTermsByParentTerm =
-                fun (parentTerm: TermMinimal) -> async {
+                fun (parentTerm: SwateObsolete.TermMinimal) -> async {
                     let searchRes =
                         Database.Term.Term(credentials).getAllByParent (parentTerm, limit = 500)
                         |> Array.ofSeq
@@ -537,7 +538,7 @@ module V2 =
                 }
 
             getAllTermsByChildTerm =
-                fun (childTerm: TermMinimal) -> async {
+                fun (childTerm: SwateObsolete.TermMinimal) -> async {
                     let searchRes = Term.Term(credentials).getAllByChild (childTerm) |> Array.ofSeq
                     return searchRes
                 }
@@ -603,12 +604,13 @@ module V2 =
                                 )
                             // if none of the above apply we do a standard term search
                             else
-                                Term.TermQuery.getByName (searchTerm.Term.Name, searchType = FullTextSearch.Exact))
+                                Term.TermQuery.getByName (searchTerm.Term.Name, searchType = FullTextSearch.Exact)
+                        )
 
                     let result =
                         Helper.Neo4j.runQueries (queries, credentials)
                         |> Array.map2
-                            (fun termSearchable dbResults ->
+                            (fun (termSearchable: SwateObsolete.TermSearchable) dbResults ->
                                 // replicate if..elif..else conditions from 'queries'
                                 if termSearchable.Term.TermAccession <> "" then
                                     let result =
@@ -650,7 +652,8 @@ module V2 =
                                                     None
                                                 else
                                                     Some dbResults.[0]
-                                    })
+                                    }
+                            )
                             filteredQueries
 
                     return result
