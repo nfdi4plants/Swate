@@ -1,9 +1,7 @@
 name: Run Tests
 
 on:
-  pull_request:
-    branches:
-      - main
+  pull_request: # Triggers on pull requests
   workflow_dispatch: # Allows manual runs from the Actions tab
 
 jobs:
