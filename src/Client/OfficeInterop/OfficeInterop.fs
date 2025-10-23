@@ -2407,16 +2407,7 @@ type Main =
                                     let tmp =
                                         // Iterate over col values (1).
                                         range.values.[rowInd]
-                                        |> Seq.map (
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        fun _ ->
+                                        |> Seq.map (fun _ ->
                                             // This part is a design choice.
                                             // Should the user select less cells than we have items in the 'fileNameList' then we only fill the selected cells.
                                             // Should the user select more cells than we have items in the 'fileNameList' then we fill the leftover cells with none.

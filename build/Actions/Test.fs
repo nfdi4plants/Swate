@@ -59,9 +59,10 @@ let WatchJs () =
     ]
     |> runParallel
 
-let Run () =
-    [
-        runAsync "server" "dotnet" [ "run" ] ProjectPaths.serverTestsPath
+module Run =
+    let server = runAsync "server" "dotnet" [ "run" ] ProjectPaths.serverTestsPath
+
+    let client =
         runAsync
             "client"
             "dotnet"
@@ -77,6 +78,9 @@ let Run () =
                 $"{ProjectPaths.clientTestsPath}/output/Client.Tests.js"
             ]
             ProjectPaths.clientTestsPath
+
+    let components =
         runAsync "components" "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
-    ]
-    |> runParallel
+
+    let All () =
+        [ server; client; components ] |> runParallel

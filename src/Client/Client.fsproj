@@ -128,18 +128,17 @@
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" Version="3.0.0-beta.5" />
-    <PackageReference Include="ARCtrl.Javascript" Version="3.0.0-beta.5" />
-    <PackageReference Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.5" />
-    <PackageReference Include="Fable.Elmish" Version="4.2.0" />
-    <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />
-    <PackageReference Include="Fable.Elmish.React" Version="4.0.0" />
-    <PackageReference Include="Fable.Elmish.Browser" Version="4.0.3" />
-    <PackageReference Include="Fable.Elmish.Debugger" Version="4.1.0" />
-    <PackageReference Include="Fable.Fetch" Version="2.7.0" />
-    <PackageReference Include="Fable.SimpleJson" Version="3.24.0" />
-    <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
-    <PackageReference Include="Fable.Mocha" Version="2.17.0" />
+    <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Javascript" />
+    <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="Fable.Elmish" />
+    <PackageReference Include="Fable.Elmish.HMR" />
+    <PackageReference Include="Fable.Elmish.React" />
+    <PackageReference Include="Fable.Elmish.Browser" />
+    <PackageReference Include="Fable.Elmish.Debugger" />
+    <PackageReference Include="Fable.Fetch" />
+    <PackageReference Include="Fable.SimpleJson" />
+    <PackageReference Include="ExcelJS.Fable" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Components\src\Swate.Components.fsproj" />
