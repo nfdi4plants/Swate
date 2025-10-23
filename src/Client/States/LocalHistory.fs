@@ -145,8 +145,12 @@ module ConversionTypes =
                 | Some(ArcFiles.Study(s, _)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
-                | Some(ArcFiles.Run r) -> JsonArcFiles.Template, "" //We have to implement a toJsonString for run, currently autosave and load is not wokring for it
-                | Some(Workflow w) -> JsonArcFiles.Workflow, "" //We have to implement a toJsonString for workflow, currently autosave and load is not wokring for it
+                | Some(ArcFiles.Run r) -> 
+                    Browser.Dom.console.warn "We have to implement a toJsonString for run, currently autosave and load is not working for it"
+                    JsonArcFiles.Template, "" 
+                | Some(Workflow w) -> 
+                    Browser.Dom.console.warn "We have to implement a toJsonString for workflow, currently autosave and load is not working for it"
+                    JsonArcFiles.Workflow, "" 
                 | Some(ArcFiles.DataMap (p, d)) ->
                     let data = 
                         DataMap.encoder d
