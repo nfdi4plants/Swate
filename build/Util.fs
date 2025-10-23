@@ -27,6 +27,7 @@ open SimpleExec
 open System.Diagnostics
 open System.IO
 open System.Threading.Tasks
+open System.Threading
 
 let private shellCommand cmd args =
     let argStr = args |> String.concat " "
@@ -65,67 +66,118 @@ let runAsync (prefix: string) (cmd: string) (args: seq<string>) (workingDir: str
         return Error ex
 }
 
-let runAsyncColored prefix color cmd args workingDir = async {
-    let shell, arguments = shellCommand cmd args
-    let psi = ProcessStartInfo()
-    psi.FileName <- shell
-    psi.Arguments <- arguments
-    psi.WorkingDirectory <- workingDir
-    psi.RedirectStandardOutput <- true
-    psi.RedirectStandardError <- true
-    psi.UseShellExecute <- false
-    psi.CreateNoWindow <- true
+// let runAsyncColored prefix color (cmd: string) (args: seq<string>) (workingDir: string) = async {
+//     // Start the process directly (no cmd/bash wrapper) so killing the tree is reliable
+//     let psi = ProcessStartInfo()
+//     psi.FileName <- cmd
 
-    let proc = new Process()
-    proc.StartInfo <- psi
-    let oldColor = Console.ForegroundColor
+//     for a in args do
+//         psi.ArgumentList.Add(a)
 
-    let print (isError: bool) (line: string) =
-        if not (String.IsNullOrWhiteSpace line) then
-            Console.ForegroundColor <- color
-            Console.Write($"[{prefix}] ")
-            Console.ForegroundColor <- if isError then ConsoleColor.Red else oldColor
-            Console.WriteLine(line)
-            Console.ResetColor()
+//     psi.WorkingDirectory <- workingDir
+//     psi.RedirectStandardOutput <- false
+//     psi.RedirectStandardError <- false
+//     psi.RedirectStandardInput <- false
+//     psi.UseShellExecute <- false
+//     psi.CreateNoWindow <- true
 
-    proc.OutputDataReceived.Add(fun e ->
-        if e.Data <> null then
-            print false e.Data
-    )
+//     let! ct = Async.CancellationToken
 
-    proc.ErrorDataReceived.Add(fun e ->
-        if e.Data <> null then
-            print false e.Data
-    )
+//     use proc = new Process()
+//     proc.StartInfo <- psi
 
-    try
-        if not (proc.Start()) then
-            failwithf "Failed to start %s" cmd
+//     let oldColor = Console.ForegroundColor
 
-        proc.BeginOutputReadLine()
-        proc.BeginErrorReadLine()
+//     let print (isError: bool) (line: string) =
+//         if not (String.IsNullOrWhiteSpace line) then
+//             Console.ForegroundColor <- color
+//             Console.Write($"[{prefix}] ")
+//             Console.ForegroundColor <- if isError then ConsoleColor.Red else oldColor
+//             Console.WriteLine(line)
+//             Console.ResetColor()
 
-        do! proc.WaitForExitAsync() |> Async.AwaitTask
+//     proc.OutputDataReceived.Add(fun e ->
+//         if e.Data <> null then
+//             print false e.Data
+//     )
 
-        if proc.ExitCode = 0 then
-            proc.Close()
-            Console.ResetColor()
-            return Ok()
-        else
-            print true $"Exited with code {proc.ExitCode}"
-            proc.Close()
-            Console.ResetColor()
-            return Error(exn (sprintf "Process exited with code %d" proc.ExitCode))
-    with ex ->
-        print true $"Exception: {ex.Message}"
-        proc.Close()
-        Console.ResetColor()
-        return Error(ex)
-}
+//     proc.ErrorDataReceived.Add(fun e ->
+//         if e.Data <> null then
+//             print true e.Data
+//     )
+
+//     // Ensure we kill the full process tree on cancellation (with a short grace period), with a Windows fallback
+//     // use _killReg =
+//     //     ct.Register(fun () ->
+//     //         // Always log the intent so both client and server show a line
+//     //         print true $"Killing {prefix} (pid {proc.Id})..."
+
+//     //         if not proc.HasExited then
+
+//     //             if not proc.HasExited then
+//     //                 try
+//     //                     proc.Kill(entireProcessTree = true)
+//     //                     proc.WaitForExit(5000) |> ignore
+//     //                 with _ ->
+//     //                     ()
+
+//     //             if not proc.HasExited && OperatingSystem.IsWindows() then
+//     //                 try
+//     //                     let tk = ProcessStartInfo()
+//     //                     tk.FileName <- "taskkill"
+//     //                     tk.Arguments <- $"/PID {proc.Id} /T /F"
+//     //                     tk.UseShellExecute <- false
+//     //                     tk.CreateNoWindow <- true
+//     //                     use p = Process.Start(tk)
+
+//     //                     if not (isNull p) then
+//     //                         p.WaitForExit(5000) |> ignore
+//     //                 with _ ->
+//     //                     ()
+//     //     )
+
+//     try
+//         try
+//             if not (proc.Start()) then
+//                 failwithf "Failed to start %s" cmd
+
+//             proc.BeginOutputReadLine()
+//             proc.BeginErrorReadLine()
+
+//             do! proc.WaitForExitAsync(ct) |> Async.AwaitTask
+
+//             if proc.ExitCode = 0 then
+//                 return Ok()
+//             else
+//                 print true $"Exited with code {proc.ExitCode}"
+//                 return Error(exn (sprintf "Process exited with code %d" proc.ExitCode))
+//         with ex ->
+//             if not ct.IsCancellationRequested then
+//                 print true $"Exception: {ex.Message}"
+
+//             return Error(ex)
+//     finally
+//         Console.ResetColor()
+// }
 
 
 let runParallel (tasks: Async<Result<unit, exn>> list) =
+    let cts = new CancellationTokenSource()
+    Console.ResetColor()
+
+    Console.CancelKeyPress.Add(fun e ->
+        e.Cancel <- true
+        cts.Cancel()
+    )
+
     async {
+        // Print immediately when cancellation is requested
+        use! onCancel =
+            Async.OnCancel(fun () ->
+                printRedfn "Ctrl+C pressed → cancelling all tasks..."
+                Console.ResetColor()
+            )
+
         let! results = tasks |> Async.Parallel
 
         let errors =
@@ -143,7 +195,13 @@ let runParallel (tasks: Async<Result<unit, exn>> list) =
         else
             printGreenfn "All tasks completed successfully"
     }
-    |> Async.RunSynchronously
+    |> fun c ->
+        try
+            Async.RunSynchronously(c, cancellationToken = cts.Token)
+        with :? OperationCanceledException ->
+            // Swallow here; each child has already handled its own cancellation and printed
+            ()
+
 
 let getEnvironementVariableOrFail (name: string) =
     let value = Environment.GetEnvironmentVariable(name)
