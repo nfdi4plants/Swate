@@ -462,7 +462,15 @@ type TermSearch =
         | _ -> AdvancedSearchForm
 
     [<ReactComponent>]
-    static member ModalDetails(tempTerm: Term option, setTempTerm, term: Term option, ?tempValue: string, ?setTempValue: string -> unit, ?value: string) =
+    static member ModalDetails
+        (
+            tempTerm: Term option,
+            setTempTerm,
+            term: Term option,
+            ?tempValue: string,
+            ?setTempValue: string -> unit,
+            ?value: string
+        ) =
         let Label (str: string) =
             Html.label [ prop.className "swt:label"; prop.text str ]
 
@@ -486,6 +494,7 @@ type TermSearch =
             prop.children [
                 if value.IsSome && setTempValue.IsSome then
                     Label "Value"
+
                     Input(
                         Some tempValue,
                         value,
@@ -493,7 +502,9 @@ type TermSearch =
                             let nextValue = structuredClone (e)
                             setTempValue.Value nextValue
                     )
+
                     Label "Unit"
+
                     Input(
                         tempTerm.name,
                         term.name,
@@ -504,6 +515,7 @@ type TermSearch =
                     )
                 else
                     Label "Name"
+
                     Input(
                         tempTerm.name,
                         term.name,
@@ -833,12 +845,13 @@ type TermSearch =
 
                 fun (query: string) -> promise {
                     startLoadingBy id
+
                     let! termSearchResults =
                         search query
-                        |> Promise.catch(fun exn ->
-                          stopLoadingBy id
-                          console.error $"Error in search {exn.Message}"
-                          ResizeArray()
+                        |> Promise.catch (fun exn ->
+                            stopLoadingBy id
+                            console.error $"Error in search {exn.Message}"
+                            ResizeArray()
                         )
 
                     let termSearchResults =
@@ -859,25 +872,30 @@ type TermSearch =
         let createParentChildTermSearch =
             fun (id: string) (search: ParentSearchCall) ->
                 let id = "PC_" + id
+
                 fun (parentId: string, query: string) -> promise {
                     startLoadingBy id
+
                     let! termSearchResults =
                         search (parentId, query)
-                        |> Promise.catch(fun exn ->
-                          stopLoadingBy id
-                          console.error $"Error in parent child search {exn.Message}"
-                          ResizeArray()
+                        |> Promise.catch (fun exn ->
+                            stopLoadingBy id
+                            console.error $"Error in parent child search {exn.Message}"
+                            ResizeArray()
                         )
+
                     let termSearchResults =
                         termSearchResults.ConvertAll(fun t0 -> {
                             Term = t0
                             IsDirectedSearchResult = true
                         })
+
                     if not cancelled.current then
                         setSearchResults (fun prevResults ->
                             TermSearchResult.addSearchResults prevResults.Results termSearchResults
                             |> SearchState.SearchDone
                         )
+
                     stopLoadingBy id
                 }
 
@@ -887,12 +905,13 @@ type TermSearch =
 
                 fun (parentId: string) -> promise {
                     startLoadingBy id
+
                     let! termSearchResults =
                         search parentId
-                        |> Promise.catch(fun exn ->
-                          stopLoadingBy id
-                          console.error $"Error in all child search {exn.Message}"
-                          ResizeArray()
+                        |> Promise.catch (fun exn ->
+                            stopLoadingBy id
+                            console.error $"Error in all child search {exn.Message}"
+                            ResizeArray()
                         )
 
                     let termSearchResults =
@@ -933,7 +952,7 @@ type TermSearch =
                             createTermSearch id termSearch query
                 ]
                 |> Promise.all
-                |> Promise.catch(fun exn ->
+                |> Promise.catch (fun exn ->
                     console.error $"Error in termSearchFunc: {exn.Message}"
                     [||]
                 )
@@ -950,15 +969,17 @@ type TermSearch =
                                 "DEFAULT_PARENTCHILD"
                                 API.callParentSearch
                                 (parentId.Value, query)
+
                         if parentSearchQueries.IsSome then
                             for id, parentSearch in parentSearchQueries.Value do
                                 createParentChildTermSearch id parentSearch (parentId.Value, query)
+
                         if termSearchConfigCtx.hasProvider then
                             for id, parentSearch in termSearchConfigCtx.parentSearchQueries do
                                 createParentChildTermSearch id parentSearch (parentId.Value, query)
                 ]
                 |> Promise.all
-                |> Promise.catch(fun exn ->
+                |> Promise.catch (fun exn ->
                     console.error $"Error in parentSearch: {exn.Message}"
                     [||]
                 )
@@ -982,7 +1003,7 @@ type TermSearch =
                                 createAllChildTermSearch id allChildSearch parentId.Value
                 ]
                 |> Promise.all
-                |> Promise.catch(fun exn ->
+                |> Promise.catch (fun exn ->
                     console.error $"Error in allChildSearch: {exn.Message}"
                     [||]
                 )
@@ -1194,8 +1215,8 @@ type TermSearch =
         let shallSearchChild =
             fun _ ->
                 System.String.IsNullOrWhiteSpace input
-                    && parentId.IsSome
-                    && comboBoxRef.current.isOpen () |> not
+                && parentId.IsSome
+                && comboBoxRef.current.isOpen () |> not
 
         React.fragment [
             TermSearch.Modal(
@@ -1228,8 +1249,7 @@ type TermSearch =
                     (fun kbe ->
                         match kbe.code with
                         | kbdEventCode.f2 -> setModalOpen true
-                        | kbdEventCode.arrowDown when shallSearchChild()
-                            -> startAllChildSearch ()
+                        | kbdEventCode.arrowDown when shallSearchChild () -> startAllChildSearch ()
                         | _ -> onKeyDown |> Option.iter (fun fn -> fn kbe)
                     ),
                 noResultsRenderer =
@@ -1244,9 +1264,16 @@ type TermSearch =
                     ``data-debugresultcount`` = searchResults.Results.Count
                 |},
                 onDoubleClick =
-                    (fun _ ->
-                        if shallSearchChild() then
+                    (fun ev data ->
+                        match shallSearchChild () with
+                        | true ->
+                            data.setIsOpen true
                             startAllChildSearch ()
+                        | false ->
+
+                            if System.String.IsNullOrWhiteSpace input |> not then
+                                data.setIsOpen true
+                                startSearch input
                     )
             )
         ]
