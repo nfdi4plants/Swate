@@ -4,6 +4,13 @@ open Swate.Components
 open ARCtrl
 open FileImport
 
+type ImportJsonRawDTO = {|
+    jsonString: string
+    jsonType: JsonExportFormat option
+    filetype: ArcFilesDiscriminate option
+    fileName: string option
+|}
+
 ///<summary>This type is used to interface between standalone, electron and excel logic and will forward the command to the correct logic.</summary>
 type Msg =
     | Initialize of Swatehost
@@ -30,6 +37,7 @@ type Msg =
     | InsertOntologyAnnotation of range: CellCoordinateRange option * OntologyAnnotation
     | InsertFileNames of range: CellCoordinateRange option * string list
     | ImportXlsx of byte[]
+    | ImportRawJson of ImportJsonRawDTO
     | ImportJson of
         {|
             importState: SelectiveImportConfig

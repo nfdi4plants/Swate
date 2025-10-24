@@ -1,8 +1,8 @@
 module LocalHistory
 
+open System
 open Fable.Core
 open JsInterop
-open System
 
 open Fable.SimpleJson
 open IndexedDB
@@ -127,6 +127,9 @@ module ConversionTypes =
         | Study
         | Assay
         | Template
+        | Run
+        | Workflow
+        | DataMap of (DatamapParentInfo option)
         | None
 
     type SessionStorage = {
@@ -139,9 +142,14 @@ module ConversionTypes =
             let jsonArcFile, jsonString =
                 match model.ArcFile with
                 | Some(ArcFiles.Investigation i) -> JsonArcFiles.Investigation, ArcInvestigation.toJsonString 0 i
-                | Some(ArcFiles.Study(s, al)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
+                | Some(ArcFiles.Study(s, _)) -> JsonArcFiles.Study, ArcStudy.toJsonString 0 s
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
+                | Some(ArcFiles.Run r) -> JsonArcFiles.Run, ArcRun.toJsonString 0 r
+                | Some(Workflow w) -> JsonArcFiles.Workflow, ArcWorkflow.toJsonString 0 w
+                | Some(ArcFiles.DataMap(p, d)) ->
+                    let data = DataMap.encoder d |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                    JsonArcFiles.DataMap p, data
                 | None -> JsonArcFiles.None, ""
 
             let compressedJsonString = GeneralHelpers.compressJsonToBase64String jsonString
@@ -168,6 +176,12 @@ module ConversionTypes =
                         let s = ArcStudy.fromJsonString decompressedString
                         ArcFiles.Study(s, []) |> Some
                     | JsonArcFiles.Assay -> ArcAssay.fromJsonString decompressedString |> ArcFiles.Assay |> Some
+                    | JsonArcFiles.Run -> ArcRun.fromJsonString decompressedString |> ArcFiles.Run |> Some
+                    | JsonArcFiles.Workflow ->
+                        ArcWorkflow.fromJsonString decompressedString |> ArcFiles.Workflow |> Some
+                    | JsonArcFiles.DataMap p ->
+                        let dataMap = Decode.fromJsonString DataMap.decoder decompressedString
+                        ArcFiles.DataMap(p, dataMap) |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
                     | JsonArcFiles.None -> None
 
@@ -519,7 +533,8 @@ type Model = {
                 toRemoveList
                 |> List.iter (fun guid ->
                     let rmvKey = Keys.create_swate_session_history_table_key (guid)
-                    Browser.WebStorage.sessionStorage.removeItem (rmvKey))
+                    Browser.WebStorage.sessionStorage.removeItem (rmvKey)
+                )
 
             {
                 this with

@@ -46,8 +46,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
                                     prop.children [ SidebarView.SidebarView.Main(model, dispatch) ]
                                 ]
                             | _, _ ->
-                                let isActive =
-                                    model.SpreadsheetModel.TableViewIsActive() && model.PageState.ShowSideBar
+                                let isActive = model.PageState.ShowSideBar
 
                                 //Daisy.drawer [
                                 Html.div [

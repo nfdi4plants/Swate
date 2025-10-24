@@ -1,6 +1,9 @@
 namespace Components.Forms
 
 open System
+
+open Microsoft.FSharp.Reflection
+
 open Feliz
 open Feliz.DaisyUI
 
@@ -170,7 +173,6 @@ module private API =
 module private Helper =
 
     let addButton (clickEvent: MouseEvent -> unit) =
-        //Daisy.button.button [
         Html.button [
             prop.className "swt:btn swt:btn-info"
             prop.text "+"
@@ -178,13 +180,6 @@ module private Helper =
         ]
 
     let deleteButton (clickEvent: MouseEvent -> unit) =
-        //Html.div [
-        //    prop.className "swt:grow-0"
-        //    prop.children [
-        //        Daisy.button.button [ button.error; prop.text "Delete"; prop.onClick clickEvent ]
-        //    ]
-        //]
-
         Html.button [
             prop.className "swt:btn swt:btn-error swt:grow-0"
             prop.text "Delete"
@@ -194,16 +189,13 @@ module private Helper =
     let readOnlyFormElement (v: string option, label: string) =
         let v = defaultArg v "-"
 
-        //Daisy.fieldset [
         Html.div [
             prop.className "swt:fieldset"
             prop.children [
-                //Daisy.label label
                 Html.label [
                     prop.className "swt:label"
                     prop.children [ Html.span [ prop.className "swt:label-text"; prop.text label ] ]
                 ]
-                //Daisy.input [ prop.disabled true; prop.readOnly true; prop.valueOrDefault v ]
                 Html.input [
                     prop.className "swt:input"
                     prop.disabled true
@@ -220,13 +212,10 @@ module private Helper =
         ]
 
     let personModal (person: Person, confirm, back) =
-        //Daisy.modal.div [
         Html.div [
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop []
                 Html.div [ prop.className "swt:modal-backdrop" ]
-                //Daisy.modalBox.div [
                 Html.div [
                     prop.className "swt:modal-box"
                     prop.children [
@@ -243,13 +232,11 @@ module private Helper =
                             prop.className "swt:flex swt:justify-end swt:gap-4"
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
-                                //Daisy.button.button [ prop.text "back"; button.outline; prop.onClick back ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-outline"
                                     prop.text "back"
                                     prop.onClick back
                                 ]
-                                //Daisy.button.button [ button.success; prop.text "confirm"; prop.onClick confirm ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-success"
                                     prop.text "confirm"
@@ -263,14 +250,11 @@ module private Helper =
         ]
 
     let PersonsModal (existingPersons: ResizeArray<Person>, externalPersons: Person[], select: Person -> unit, back) =
-        //Daisy.modal.div [
         Html.div [
             //modal.active
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop []
                 Html.div [ prop.className "swt:modal-backdrop" ]
-                //Daisy.modalBox.div [
                 Html.div [
                     prop.className
                         "swt:modal-box swt:max-h-[80%] swt:overflow-y-hidden swt:flex swt:flex-col swt:space-y-2"
@@ -351,7 +335,6 @@ module private Helper =
                             prop.className "swt:flex swt:justify-end swt:gap-4"
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
-                                //Daisy.button.button [ prop.text "back"; button.outline; prop.onClick back ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-outline"
                                     prop.text "back"
@@ -365,14 +348,11 @@ module private Helper =
         ]
 
     let publicationModal (pub: Publication, confirm, back) =
-        //Daisy.modal.div [
         Html.div [
             //modal.active
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop []
                 Html.div [ prop.className "swt:modal-backdrop" ]
-                //Daisy.modalBox.form [
                 Html.form [
                     prop.className "swt:modal-box"
                     prop.children [
@@ -387,9 +367,7 @@ module private Helper =
                             prop.className "swt:is-flex swt:is-justify-content-flex-end"
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
-                                //Daisy.button.button [ prop.text "back"; prop.onClick back ]
                                 Html.button [ prop.className "swt:btn"; prop.text "back"; prop.onClick back ]
-                                //Daisy.button.button [ button.success; prop.text "confirm"; prop.onClick confirm ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-success"
                                     prop.text "confirm"
@@ -403,19 +381,14 @@ module private Helper =
         ]
 
     let errorModal (error: exn, back) =
-        //Daisy.modal.div [
         Html.div [
             //modal.active
             prop.className "swt:modal swt:modal-open"
             prop.children [
-                //Daisy.modalBackdrop [ prop.onClick back ]
                 Html.div [ prop.className "swt:modal-backdrop"; prop.onClick back ]
-                //Daisy.modalBox.div [
                 Html.form [
-                    //prop.className "swt:modal-box"
                     prop.className "swt:modal-box swt:bg-transparent swt:p-0 swt:border-0"
                     prop.children [
-                        //Daisy.alert [
                         Html.div [
                             //alert.error
                             prop.className "swt:alert"
@@ -454,7 +427,7 @@ type FormComponents =
                     for listener in Object.keys sortable.listeners do
                         prop.custom (listener, sortable.listeners.get listener)
                     prop.className "swt:cursor-grab swt:flex swt:items-center"
-                    prop.children [ Icons.ArrowDown() ]
+                    prop.children [ Icons.ArrowUpDown() ]
                 ]
                 Html.div [ prop.className "swt:grow"; prop.children listComponent ]
             ]
@@ -477,7 +450,7 @@ type FormComponents =
             constructor: unit -> 'A,
             setter: ResizeArray<'A> -> unit,
             inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement,
-            inputEquality: 'A -> 'A -> bool,
+            ?validator: ResizeArray<'A> -> Result<unit, string>,
             ?label: string,
             ?extendedElements: ReactElement
         ) =
@@ -485,6 +458,7 @@ type FormComponents =
         // The id is used to keep track of the order of the elements in the list.
         // Because most of our classes do not have a unique id, we generate a new guid for each element in the list.
         let sensors = DndKit.useSensors [| DndKit.useSensor (DndKit.PointerSensor) |]
+        let error, setError = React.useState (None: string option)
 
         /// This is a list of guids that are used to keep track of the order of the elements in the list.
         /// We use "React.useMemo" to keep the guids stable unless items are added/removed or reorder happens.
@@ -502,6 +476,24 @@ type FormComponents =
 
         let mkId index = guids.[index].ToString()
         let getIndexFromId (id: string) = guids.FindIndex(fun x -> x = Guid(id))
+        let tempInputs = React.useRef inputs
+
+        let validateSetter =
+            fun next ->
+                match validator with
+                | Some validatorFn ->
+                    match validatorFn next with
+                    | Ok() ->
+                        tempInputs.current <- next
+                        setter next
+                    | Error msg ->
+                        console.log "Validation error in InputSequence:"
+                        console.log ("Setting prev: ", inputs)
+                        setter tempInputs.current
+                        setError (Some <| sprintf "Validation Error: %A" msg)
+                | None ->
+                    tempInputs.current <- next
+                    setter next
 
         let handleDragEnd =
             fun (event: DndKit.IDndKitEvent) ->
@@ -511,24 +503,18 @@ type FormComponents =
                 if (active.id <> over.id) then
                     let oldIndex = getIndexFromId (active.id)
                     let newIndex = getIndexFromId (over.id)
-                    DndKit.arrayMove (inputs, oldIndex, newIndex) |> setter
+                    DndKit.arrayMove (inputs, oldIndex, newIndex) |> validateSetter
 
                 ()
 
-        let equalityFunc
-            (props1: 'A * ('A -> unit) * (MouseEvent -> unit))
-            (props2: 'A * ('A -> unit) * (MouseEvent -> unit))
-            =
-            let (a1, _, _) = props1
-            let (a2, _, _) = props2
-            inputEquality a1 a2
-        // let memoizeInputs = React.memo (
-        //     inputComponent,
-        //     areEqual = equalityFunc
-        // )
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
+                Swate.Components.BaseModal.ErrorBaseModal(
+                    error.IsSome,
+                    (fun _ -> setError None),
+                    error |> Option.defaultValue ""
+                )
                 if label.IsSome then
                     Generic.FieldTitle label.Value
                 if extendedElements.IsSome then
@@ -556,11 +542,11 @@ type FormComponents =
                                                     item,
                                                     (fun v ->
                                                         inputs.[i] <- v
-                                                        inputs |> setter
+                                                        inputs |> validateSetter
                                                     ),
                                                     (fun _ ->
                                                         inputs.RemoveAt i
-                                                        inputs |> setter
+                                                        inputs |> validateSetter
                                                     )
                                                 ))
                                             )
@@ -573,7 +559,7 @@ type FormComponents =
                     prop.children [
                         Helper.addButton (fun _ ->
                             inputs.Add(constructor ())
-                            inputs |> setter
+                            inputs |> validateSetter
                         )
                     ]
                 ]
@@ -586,98 +572,140 @@ type FormComponents =
             value: string,
             setValue: string -> unit,
             ?label: string,
-            ?validator: {| fn: string -> bool; msg: string |},
+            ?validator: string -> Result<unit, string>,
             ?placeholder: string,
             ?isarea: bool,
             ?isJoin,
             ?disabled,
+            ?rmv: MouseEvent -> unit,
             ?classes: string
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
+
+        let tempValue, setTempValue = React.useState (value)
         let loading, setLoading = React.useState (false)
-        let isValid, setIsValid = React.useState (true)
+        let isError, setIsError = React.useState (None: string option)
         let ref = React.useInputRef ()
-        let debounceSetter = React.useDebouncedCallback (setValue)
+        let debouncedValue = React.useDebounce (tempValue, 300)
+
+        let handleChange =
+            fun (e: string) ->
+                setTempValue e
+                setLoading true
 
         React.useEffect (
             (fun () ->
-                if ref.current.IsSome then
+                match validator with
+                | Some validatorFn ->
+                    match validatorFn debouncedValue with
+                    | Ok() ->
+                        setIsError None
+                        setValue debouncedValue
+                    | Error e -> setIsError (Some e)
+                | None ->
+                    setIsError None
+                    setValue debouncedValue
+
+                setLoading false
+            ),
+            [| box debouncedValue |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                setTempValue value
+
+                match ref.current with
+                | Some r ->
                     setLoading false
-                    setIsValid true
-                    ref.current.Value.value <- value
+                    setIsError None
+                    r.value <- value
+                | None -> ()
             ),
             [| box value |]
         )
 
-        let onChange =
-            fun (e: string) ->
-                if validator.IsSome then
-                    let isValid = validator.Value.fn e
-                    setIsValid isValid
+        // React.useEffect (
+        //     (fun () ->
+        //         if ref.current.IsSome then
+        //             setLoading false
+        //             setIsValid true
+        //             ref.current.Value.value <- value
+        //     ),
+        //     [| box value |]
+        // )
 
-                    if isValid then
-                        setLoading true
-                        debounceSetter e
-                else
-                    setLoading true
-                    debounceSetter e
+        // let onChange =
+        //     fun (e: string) ->
+        //         if validator.IsSome then
+        //             let isValid = validator.Value.fn e
+        //             setIsValid isValid
+
+        //             if isValid then
+        //                 setLoading true
+        //                 debounceSetter e
+        //         else
+        //             setLoading true
+        //             debounceSetter e
 
         Html.div [
             prop.className "swt:grow not-prose"
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
-                //Daisy.label [
-                Html.label [
-                    prop.className [
-                        "swt:label swt:flex swt:items-center swt:gap-2 swt:w-full"
-                        if isarea.IsSome && isarea.Value then
-                            "swt:label swt:textarea"
-                        else
-                            "swt:input"
-                        if isJoin then
-                            "swt:join-item"
-                        if classes.IsSome then
-                            classes.Value
-                    ]
+                Html.div [
+                    prop.className "swt:w-full swt:join"
                     prop.children [
-                        match isarea with
-                        | Some true ->
-                            Html.textarea [
-                                prop.className "swt:textarea swt:grow swt:ghost"
-                                prop.disabled disabled
-                                prop.readOnly disabled
-                                if placeholder.IsSome then
-                                    prop.placeholder placeholder.Value
-                                prop.ref ref
-                                prop.onChange onChange
+                        Html.label [
+                            prop.className [
+                                "swt:flex swt:items-center swt:gap-2 swt:w-full"
+                                if isarea.IsSome && isarea.Value then
+                                    "swt:textarea"
+                                else
+                                    "swt:input"
+                                if isJoin || rmv.IsSome then
+                                    "swt:join-item"
+                                if classes.IsSome then
+                                    classes.Value
                             ]
-                        | _ ->
-                            Html.input [
-                                prop.disabled disabled
-                                prop.readOnly disabled
-                                prop.className "swt:truncate swt:w-full"
-                                if placeholder.IsSome then
-                                    prop.placeholder placeholder.Value
-                                prop.ref ref
-                                prop.onChange onChange
+                            prop.children [
+                                match isarea with
+                                | Some true ->
+                                    Html.textarea [
+                                        prop.className "swt:textarea swt:grow swt:ghost"
+                                        prop.disabled disabled
+                                        prop.readOnly disabled
+                                        if placeholder.IsSome then
+                                            prop.placeholder placeholder.Value
+                                        prop.ref ref
+                                        prop.onChange handleChange
+                                    ]
+                                | _ ->
+                                    Html.input [
+                                        prop.disabled disabled
+                                        prop.readOnly disabled
+                                        prop.className "swt:truncate swt:w-full"
+                                        if placeholder.IsSome then
+                                            prop.placeholder placeholder.Value
+                                        prop.ref ref
+                                        prop.onChange handleChange
+                                    ]
+                                Html.div [
+                                    if not loading then
+                                        prop.className "swt:invisible"
+                                    else
+                                        prop.className "swt:loading"
+                                ]
                             ]
-                        //Daisy.loading [
-                        //    if not loading then
-                        //        prop.className "swt:invisible"
-                        //]
-                        Html.div [
-                            if not loading then
-                                prop.className "swt:invisible"
-                            else
-                                prop.className "swt:loading"
                         ]
+                        if rmv.IsSome then
+                            Helper.deleteButton rmv.Value
                     ]
                 ]
-                if not isValid then
-                    let txt = validator |> Option.map _.msg |> Option.defaultValue "Invalid input."
-                    Html.p [ prop.className "swt:text-error swt:text-sm swt:mt-1"; prop.text txt ]
+                match isError with
+                | None -> Html.none
+                | Some msg -> Html.p [ prop.className "swt:text-error swt:text-sm swt:mt-1"; prop.text msg ]
             ]
         ]
 
@@ -692,7 +720,7 @@ type FormComponents =
         ) =
 
         Html.div [
-            prop.className "swt:space-y-2"
+            prop.className "swt:space-y-2 swt:grow"
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
@@ -728,7 +756,6 @@ type FormComponents =
                     rmv = rmv
                 )
             ),
-            (fun oa1 oa2 -> oa1.Equals oa2),
             ?label = label
         )
 
@@ -756,25 +783,10 @@ type FormComponents =
                 | _ -> Html.none
                 if label.IsSome then
                     Generic.FieldTitle label.Value
-                //Daisy.join [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [
                         FormComponents.TextInput(orcid, doisetter, placeholder = "xxxx-xxxx-xxxx-xxxx", isJoin = true)
-                        //Daisy.button.button [
-                        //    join.item
-                        //    button.info
-                        //    prop.text "Search"
-                        //    prop.onClick (fun _ ->
-                        //        setState GenericApiState.Loading
-                        //        // setState <| API.Request.Error (new Exception("Not implemented"))
-                        //        // setState <| (API.Request.Ok (Person.create(orcid=orcid,firstName="John",lastName="Doe")))
-                        //        API.start
-                        //            API.requestByORCID
-                        //            orcid
-                        //            (GenericApiState.Ok >> setState)
-                        //            (GenericApiState.Error >> setState))
-                        //]
                         Html.button [
                             prop.className "swt:btn swt:btn-info swt:join-item"
                             prop.text "Search"
@@ -793,6 +805,207 @@ type FormComponents =
                 ]
             ]
         ]
+
+    [<ReactComponent>]
+    static member ValueInput
+        (input: ARCtrl.Value option, setter: ARCtrl.Value option -> unit, ?label: string, ?rmv: MouseEvent -> unit)
+        =
+        let list =
+            FSharpType.GetUnionCases(typeof<Value>) |> Array.map (fun item -> item.Name)
+
+        let NoneOption = "None"
+
+
+        let init =
+            match input with
+            | Some v ->
+                match FSharpValue.GetUnionFields(v, typeof<Value>) with
+                | case, _ -> case.Name
+            | None -> NoneOption
+
+        let valueType, setValueType = React.useState (init)
+
+        Html.div [
+            prop.children [
+                if label.IsSome then
+                    Generic.FieldTitle label.Value
+                Html.div [
+                    prop.className "swt:join swt:w-full"
+                    prop.children [
+                        Html.select [
+                            prop.className "swt:select swt:select-primary swt:w-min swt:join-item swt:z-1"
+                            prop.value (valueType)
+                            prop.onChange (fun v ->
+                                setValueType v
+                                setter None
+                            )
+                            prop.children [
+                                Html.option [ prop.value NoneOption; prop.text "None" ]
+                                for item in list do
+                                    Html.option [ prop.value item; prop.text item ]
+                            ]
+                        ]
+                        match valueType with
+                        | "Int"
+                        | "Float" ->
+                            Html.input [
+                                prop.className "swt:input swt:w-full swt:join-item"
+                                prop.type'.number
+                                prop.defaultValue (
+                                    match input with
+                                    | Some(Value.Int i) -> string i
+                                    | Some(Value.Float f) -> string f
+                                    | _ -> ""
+                                )
+                                prop.onChange (fun (value: string) ->
+
+                                    if System.String.IsNullOrWhiteSpace value then
+                                        setter None
+                                    else
+                                        match valueType with
+                                        | "Int" ->
+                                            match System.Int32.TryParse value with
+                                            | (true, v) -> (Value.Int v)
+                                            | _ -> (Value.Int 0)
+                                            |> Some
+                                            |> setter
+                                        | "Float" ->
+                                            match System.Double.TryParse value with
+                                            | (true, v) -> (Value.Float v)
+                                            | _ -> (Value.Float 0.0)
+                                            |> Some
+                                            |> setter
+                                        | _ -> setter None
+                                )
+                            ]
+                        | "Name" ->
+                            Html.input [
+                                prop.className "swt:input swt:w-full swt:join-item"
+                                prop.type'.text
+                                prop.defaultValue (
+                                    match input with
+                                    | Some(Value.Name s) -> s
+                                    | _ -> ""
+                                )
+                                prop.onChange (fun (value: string) ->
+                                    if System.String.IsNullOrWhiteSpace value then
+                                        setter None
+                                    else
+                                        Value.Name value |> Some |> setter
+                                )
+                            ]
+                        | "Ontology" ->
+                            let oa =
+                                match input with
+                                | Some(Value.Ontology oa) -> oa
+                                | _ -> OntologyAnnotation.create ("")
+
+                            FormComponents.OntologyAnnotationInput(
+                                Some oa,
+                                (fun oas ->
+                                    if oas.IsSome then
+                                        Value.Ontology oas.Value |> Some |> setter
+                                    else
+                                        setter None
+                                )
+                            )
+                        | "None" ->
+                            Html.div [
+                                prop.className "swt:text-base-content/70 swt:join-item swt:input"
+                                prop.text "Choose value type"
+                                prop.readOnly true
+                                prop.disabled true
+                            ]
+                        | _ ->
+                            Html.div [
+                                prop.className "swt:text-base-content/70 swt:join-item swt:input"
+                                prop.text "(Not implemented)"
+                            ]
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member ComponentInput
+        (input: Process.Component, setter: Process.Component -> unit, ?rmv: MouseEvent -> unit)
+        =
+
+        let title =
+            match input.ComponentValue with
+            | Some v -> v.Text
+            | None -> "<value>"
+
+        let subtitle =
+            let e = input.ComponentType |> Option.map _.NameText |> Option.defaultValue "<type>"
+            let u = input.ComponentUnit |> Option.map _.NameText |> Option.defaultValue "<unit>"
+            $"{e} [{u}]"
+
+        Generic.Collapse [ // title
+            Generic.CollapseTitle(title, subtitle)
+        ] [ // content
+            FormComponents.ValueInput(
+                input.ComponentValue,
+                (fun v -> { input with ComponentValue = v } |> setter),
+                label = "Component Value"
+            )
+            FormComponents.OntologyAnnotationInput(
+                input.ComponentType,
+                (fun oas -> { input with ComponentType = oas } |> setter),
+                label = "Component Type"
+            )
+            FormComponents.OntologyAnnotationInput(
+                input.ComponentUnit,
+                (fun oas -> { input with ComponentUnit = oas } |> setter),
+                label = "Component Unit"
+            )
+            if rmv.IsSome then
+                Helper.deleteButton rmv.Value
+        ]
+
+    [<ReactComponent>]
+    static member ComponentsInput
+        (parameters: ResizeArray<Process.Component>, setter: ResizeArray<Process.Component> -> unit, ?label: string)
+        =
+        FormComponents.InputSequence(
+            parameters,
+            Process.Component.create,
+            setter,
+            (fun (v, setV, rmv) -> FormComponents.ComponentInput(v, setV, rmv)),
+            ?label = label
+        )
+
+    [<ReactComponent>]
+    static member ParameterInput
+        (input: Process.ProtocolParameter, setter: Process.ProtocolParameter -> unit, ?rmv: MouseEvent -> unit)
+        =
+        FormComponents.OntologyAnnotationInput(
+            input.ParameterName,
+            (fun oas ->
+                if oas.IsSome then
+                    let temp = input.SetCategory(oas.Value)
+                    temp |> setter
+                else
+                    let temp = input.SetCategory(OntologyAnnotation.empty ())
+                    temp |> setter
+            ),
+            ?rmv = rmv
+        )
+
+    [<ReactComponent>]
+    static member ParametersInput
+        (
+            parameters: ResizeArray<Process.ProtocolParameter>,
+            setter: ResizeArray<Process.ProtocolParameter> -> unit,
+            ?label: string
+        ) =
+        FormComponents.InputSequence(
+            parameters,
+            Process.ProtocolParameter.create,
+            setter,
+            (fun (v, setV, rmv) -> FormComponents.ParameterInput(v, setV, rmv)),
+            ?label = label
+        )
 
     [<ReactComponent>]
     static member PersonInput(input: Person, setter: Person -> unit, ?rmv: MouseEvent -> unit) =
@@ -940,7 +1153,6 @@ type FormComponents =
             Person,
             setter,
             (fun (v, setV, rmv) -> FormComponents.PersonInput(v, setV, rmv)),
-            (fun person1 person2 -> person1.Equals person2),
             ?label = label,
             ?extendedElements = extendedElements
         )
@@ -966,7 +1178,6 @@ type FormComponents =
             prop.children [
                 if label.IsSome then
                     Generic.FieldTitle label.Value
-                //Daisy.input [
                 Html.input [
                     prop.className "swt:input"
                     prop.type'.dateTimeLocal
@@ -996,11 +1207,14 @@ type FormComponents =
             input.ToString(),
             (fun s -> System.Guid.Parse s |> setter),
             ?label = label,
-            validator = {|
-                fn = Guid.TryParse >> fst
-                msg =
-                    "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Using numbers 0 through 9 and letters A through F."
-            |}
+            validator =
+                (fun s ->
+                    match Guid.TryParse s with
+                    | true, _ -> Ok()
+                    | false, _ ->
+                        Error
+                            "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Using numbers 0 through 9 and letters A through F."
+                )
         )
 
     [<ReactComponent>]
@@ -1035,24 +1249,10 @@ type FormComponents =
                 | GenericApiState.Error e -> Helper.errorModal (e, resetState)
                 | GenericApiState.Loading -> Modals.Loading.Modal(rmv = resetState)
                 | _ -> Html.none
-                //Daisy.join [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [
                         FormComponents.TextInput(id, doisetter, isJoin = true)
-                        //Daisy.button.button [
-                        //    button.info
-                        //    join.item
-                        //    prop.text "Search"
-                        //    prop.onClick (fun _ ->
-                        //        setState GenericApiState.Loading
-
-                        //        API.start
-                        //            searchAPI
-                        //            id
-                        //            (GenericApiState.Ok >> setState)
-                        //            (GenericApiState.Error >> setState))
-                        //]
                         Html.button [
                             prop.className "swt:btn swt:btn-info swt:join-item"
                             prop.text "Search"
@@ -1083,11 +1283,17 @@ type FormComponents =
     static member PubMedIDInput(id: string option, doisetter, searchsetter: Publication -> unit, ?label: string) =
         FormComponents.PublicationRequestInput(id, API.requestByPubMedID, doisetter, searchsetter, ?label = label)
 
-    static member CommentInput(comment: Comment, setter: Comment -> unit, ?label: string, ?rmv: MouseEvent -> unit) =
+    static member CommentInput
+        (
+            comment: Comment,
+            setter: Comment -> unit,
+            ?label: string,
+            ?rmv: MouseEvent -> unit,
+            ?keyValidator: (string -> Result<unit, string>)
+        ) =
         Html.div [
             prop.children [
                 if label.IsSome then
-                    //Daisy.label label.Value
                     Html.label [ prop.className "swt:label"; prop.text label.Value ]
                 Html.div [
                     prop.className "swt:flex swt:flex-row swt:gap-2 swt:relative"
@@ -1098,7 +1304,8 @@ type FormComponents =
                                 comment.Name <- if s = "" then None else Some s
                                 comment |> setter
                             ),
-                            placeholder = "comment name"
+                            placeholder = "comment name",
+                            ?validator = keyValidator
                         )
                         FormComponents.TextInput(
                             comment.Value |> Option.defaultValue "",
@@ -1116,12 +1323,52 @@ type FormComponents =
         ]
 
     static member CommentsInput(comments: ResizeArray<Comment>, setter: ResizeArray<Comment> -> unit, ?label) =
+
+        // /// When working on this i encountered some additional issues. Will work with validators on input field level instead for now.
+        // let validator =
+        //     fun (comments: ResizeArray<Comment>) ->
+        //         let filter (c: ResizeArray<Comment>) =
+        //             c
+        //             |> Seq.filter (fun x ->
+        //                 match x.Name with
+        //                 | Some name when not (System.String.IsNullOrWhiteSpace name) -> true
+        //                 | _ -> false
+        //             )
+
+        //         let filteredNext = filter comments
+        //         let distinctCount = filteredNext |> Seq.distinctBy (fun x -> x.Name) |> Seq.length
+
+        //         if distinctCount = Seq.length filteredNext then
+        //             Ok()
+        //         else
+        //             Error "Comment names must be unique."
+
+        let keyValidator =
+            fun (name: string) ->
+                let isDuplicate =
+                    comments
+                    |> Seq.tryFind (fun c -> c.Name.IsSome && c.Name.Value = name)
+                    |> Option.isSome
+
+                if isDuplicate then
+                    Error "Comment names must be unique."
+                else
+                    Ok()
+
         FormComponents.InputSequence(
             comments,
             Comment,
             setter,
-            (fun (v, setV, rmv) -> FormComponents.CommentInput(v, setV, rmv = rmv)),
-            (fun c1 c2 -> c1.Equals c2),
+            (fun (v, setV, rmv) -> FormComponents.CommentInput(v, setV, rmv = rmv, keyValidator = keyValidator)),
+            ?label = label
+        )
+
+    static member CollectionOfStrings(identifiers: ResizeArray<string>, setIdentifiers, ?label: string) =
+        FormComponents.InputSequence(
+            identifiers,
+            (fun () -> ""),
+            setIdentifiers,
+            (fun (v, setV, rmv) -> FormComponents.TextInput(v, setV, rmv = rmv)),
             ?label = label
         )
 
@@ -1208,8 +1455,7 @@ type FormComponents =
             Publication,
             setter,
             (fun (a, b, c) -> FormComponents.PublicationInput(a, b, rmv = c)),
-            (fun p1 p2 -> p1.Equals p2),
-            label
+            label = label
         )
 
     [<ReactComponent>]
@@ -1280,6 +1526,5 @@ type FormComponents =
             OntologySourceReference,
             setter,
             (fun (a, b, c) -> FormComponents.OntologySourceReferenceInput(a, b, c)),
-            (fun o1 o2 -> o1.Equals o2),
-            label
+            label = label
         )

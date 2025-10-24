@@ -7,25 +7,17 @@ open ARCtrl
 module ARCtrl =
     type ArcTable with
         member this.ClearCell(cellIndex: CellCoordinate) =
-            let index = (cellIndex.x, cellIndex.y)
-            let c = this.Values.[index]
-            this.Values.[index] <- c.GetEmptyCell()
+            let index = (cellIndex.x - 1, cellIndex.y - 1)
+            let c = this.Values.Item(index).GetEmptyCell()
+            this.SetCellAt(cellIndex.x - 1, cellIndex.y - 1, c)
 
         member this.ClearSelectedCells(selectHandle: SelectHandle) =
-            match selectHandle.getCount () with
-            | c when c <= 100 ->
-                let selectedCells = selectHandle.getSelectedCells ()
-
-                selectedCells
-                |> Seq.iter (fun i ->
-                    let c = this.Values.[(i.x - 1, i.y - 1)]
-                    this.Values.[(i.x - 1, i.y - 1)] <- c.GetEmptyCell()
-                )
-            | c ->
-                for (x, y) in this.Values.Keys do
-                    if selectHandle.contains ({| x = x + 1; y = y + 1 |}) then
-                        let c = this.Values.[(x, y)]
-                        this.Values.[(x, y)] <- c.GetEmptyCell()
+            let selectedCells = selectHandle.getSelectedCells ()
+            selectedCells
+            |> Seq.iter (fun index ->
+                let tempIndex = (index.x - 1, index.y - 1)
+                let c = this.Values.Item(tempIndex).GetEmptyCell()
+                this.SetCellAt(index.x - 1, index.y - 1, c))
 
 [<AutoOpen>]
 module Extensions =

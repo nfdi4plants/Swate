@@ -19,6 +19,7 @@ type ComboBoxRef = {|
     isOpen: unit -> bool
 |}
 
+[<RequireQualifiedAccess>]
 type DaisyUIColors =
     | Primary
     | Secondary

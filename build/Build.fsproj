@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
@@ -23,5 +24,6 @@
     <PackageReference Include="Semver" Version="3.0.0" />
     <PackageReference Include="FsToolkit.ErrorHandling" Version="5.1.0" />
     <PackageReference Include="FSharp.Data" Version="5.0.2" />
+    <PackageReference Update="FSharp.Core" Version="8.0.403" />
   </ItemGroup>
 </Project>

@@ -1032,7 +1032,7 @@ module UpdateHandler =
                             | Some rows -> rows |> Array.map CompositeCell.FreeText
                             | None -> Array.init (int tableRange.rowCount - 1) (fun _ -> CompositeCell.emptyFreeText)
 
-                        inMemoryTable.AddColumn(CompositeHeader.Input IOType.Source, newCells)
+                        inMemoryTable.AddColumn(CompositeHeader.Input IOType.Source, newCells |> ResizeArray)
 
                         let tableStrings = inMemoryTable.ToStringSeqs()
 
@@ -1630,7 +1630,7 @@ type Main =
         <| fun context -> promise {
             let worksheetName, seqOfSeqs = arcFiles.MetadataToExcelStringValues()
             let! updatedWorksheet = updateWorkSheet context worksheetName seqOfSeqs
-            let tables = arcFiles.Tables()
+            let tables = arcFiles.ArcTables()
 
             for table in tables do
                 do! Main.createNewAnnotationTable(table, context).``then`` (fun _ -> ())
@@ -1678,6 +1678,7 @@ type Main =
 
                     let termAndUnitHeaders =
                         columns
+                        |> Array.ofSeq
                         |> Array.choose (fun item ->
                             if item.Header.IsTermColumn then
                                 Some(item.Header.ToString())
@@ -1910,12 +1911,12 @@ type Main =
             match arcTableRes with
             | Ok arcTable ->
                 let values =
-                    if newColumn.Cells.Length < arcTable.RowCount && newColumn.Cells.Length > 0 then
-                        Array.create arcTable.RowCount newColumn.Cells.[0]
+                    if newColumn.Cells.Count < arcTable.RowCount && newColumn.Cells.Count > 0 then
+                        Array.create arcTable.RowCount newColumn.Cells.[0] |> ResizeArray
                     else
-                        newColumn.Cells
+                        newColumn.Header.AsDiscriminate.CreateEmptyDefaultCells arcTable.RowCount
 
-                arcTable.AddColumn(newColumn.Header, values, forceReplace = true, skipFillMissing = false)
+                arcTable.AddColumn(newColumn.Header, values, forceReplace = true)
 
                 //Replace old excel table with new one
                 let! _ = Main.createNewAnnotationTable (arcTable)
@@ -2406,12 +2407,7 @@ type Main =
                                     let tmp =
                                         // Iterate over col values (1).
                                         range.values.[rowInd]
-                                        |> Seq.map (
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        // Ignore prevValue as it will be replaced anyways.
-                                        fun _ ->
+                                        |> Seq.map (fun _ ->
                                             // This part is a design choice.
                                             // Should the user select less cells than we have items in the 'fileNameList' then we only fill the selected cells.
                                             // Should the user select more cells than we have items in the 'fileNameList' then we fill the leftover cells with none.

@@ -13,48 +13,6 @@ open Swate
 
 open Elmish
 
-
-module private UploadHandler =
-
-    open Fable.Core.JsInterop
-
-    let mutable styleCounter = 0
-
-    [<Literal>]
-    let id = "droparea"
-
-    [<Literal>]
-    let HightlightBorderClasses = "swt:border-2 swt:border-primary"
-
-    let updateMsg = fun r -> r |> ImportXlsx |> InterfaceMsg
-
-    let setActive_DropArea () =
-        styleCounter <- styleCounter + 1
-        let ele = Browser.Dom.document.getElementById (id)
-        ele.classList.add HightlightBorderClasses
-
-    let setInActive_DropArea () =
-        styleCounter <- (System.Math.Max(styleCounter - 1, 0))
-
-        if styleCounter <= 0 then
-            let ele = Browser.Dom.document.getElementById (id)
-            ele.classList.remove HightlightBorderClasses
-
-    let ondrop dispatch =
-        fun (e: Browser.Types.DragEvent) ->
-            e.preventDefault ()
-
-            if e.dataTransfer.items <> null then
-                let item = e.dataTransfer.items.[0]
-
-                if item.kind = "file" then
-                    setInActive_DropArea ()
-                    styleCounter <- 0
-                    let file = item.getAsFile ()
-                    let reader = Browser.Dom.FileReader.Create()
-                    reader.onload <- (fun _ -> updateMsg !!reader.result |> dispatch)
-                    reader.readAsArrayBuffer (file)
-
 module private Helper =
 
     let uploadNewTable dispatch =
@@ -92,7 +50,6 @@ module private Helper =
                         ()
                     )
                 ]
-                //Daisy.button.button [
                 Html.button [
                     prop.className "swt:btn swt:btn-lg swt:btn-outline"
                     prop.onClick (fun e ->
@@ -108,7 +65,6 @@ module private Helper =
 
     let createNewTableItem (txt: string, onclick: Event -> unit) =
         Html.li [
-            //Daisy.button.a [
             Html.a [
                 prop.className "swt:btn swt:btn-block swt:btn-ghost swt:btn-sm swt:justify-start"
                 prop.onClick (fun e -> onclick e)
@@ -127,7 +83,6 @@ module private Helper =
                 ]
                 Html.ul [
                     prop.tabIndex 0
-                    //Daisy.dropdownContent
                     prop.className
                         "swt:dropdown-content swt:menu swt:p-2 swt:shadow swt:bg-base-300 swt:rounded-box swt:w-64"
                     prop.children [
@@ -152,10 +107,27 @@ module private Helper =
                                     let _ = a.InitTable("New Assay Table")
                                     ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
                             )
-                            Html.div [
-                                //Daisy.divider [
-                                prop.className "swt:divider swt:divider-neutral swt:m-0"
-                            ]
+                            createNewTableItem (
+                                "Run",
+                                fun _ ->
+                                    let r = ArcRun.init ("New Run")
+                                    let _ = r.InitTable("New Run Table")
+                                    ArcFiles.Run r |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
+                            createNewTableItem (
+                                "Workflow",
+                                fun _ ->
+                                    let w = ArcWorkflow.init ("New Workflow")
+                                    ArcFiles.Workflow w |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
+                            createNewTableItem (
+                                "Datamap",
+                                fun _ ->
+                                    let dataMap = DataMap.init ()
+                                    let arcFile = ArcFiles.DataMap(None, dataMap)
+                                    arcFile |> UpdateArcFile |> InterfaceMsg |> dispatch
+                            )
+                            Html.div [ prop.className "swt:divider swt:divider-neutral swt:m-0" ]
                             createNewTableItem (
                                 "Template",
                                 fun _ ->
@@ -178,9 +150,32 @@ open Fable.Core
 type NoFileElement =
 
     [<ReactComponent>]
-    static member Main(args: {| dispatch: Messages.Msg -> unit |}) =
+    static member Main(dispatch: Messages.Msg -> unit) =
+        let draggedOverCounter, setDraggedOverCounter =
+            React.useStateWithUpdater (None: int option)
+
+        let __MIN_DRAGGEDOVER_COUNT__ = 0
+
+        let isDraggedOver =
+            match draggedOverCounter with
+            | Some _ -> true
+            | _ -> false
+
+        let increaseDraggedOver =
+            fun latest ->
+
+                match latest with
+                | Some c -> Some(c + 1)
+                | _ -> Some __MIN_DRAGGEDOVER_COUNT__
+
+        let decreaseDraggedOver =
+            fun latest ->
+
+                match latest with
+                | Some c when c > __MIN_DRAGGEDOVER_COUNT__ -> Some(c - 1)
+                | _ -> None
+
         Html.div [
-            prop.id UploadHandler.id
             prop.onDragEnter (fun e ->
                 e.preventDefault ()
 
@@ -188,25 +183,73 @@ type NoFileElement =
                     let item = e.dataTransfer.items.[0]
 
                     if item.kind = "file" then
-                        UploadHandler.setActive_DropArea ()
+                        setDraggedOverCounter increaseDraggedOver
             )
             prop.onDragLeave (fun e ->
-                //e.preventDefault()
-                UploadHandler.setInActive_DropArea ()
+                e.preventDefault ()
+
+                if e.dataTransfer.items <> null then
+                    let item = e.dataTransfer.items.[0]
+
+                    if item.kind = "file" then
+                        setDraggedOverCounter decreaseDraggedOver
             )
             prop.onDragOver (fun e -> e.preventDefault ())
-            prop.onDrop <| UploadHandler.ondrop args.dispatch
-            prop.style [
-                style.height.inheritFromParent
-                style.width.inheritFromParent
-                style.display.flex
-                style.justifyContent.center
-                style.alignItems.center
+            prop.onDrop (fun e ->
+                e.preventDefault ()
+
+                if e.dataTransfer.items <> null then
+                    let item = e.dataTransfer.items.[0]
+
+                    if item.kind = "file" then
+                        let file = item.getAsFile ()
+                        let extension = file.name.Split('.') |> Array.last
+
+                        try
+                            match extension.ToLower() with
+                            | "xlsx" ->
+                                console.log ("Importing XLSX file")
+                                let reader = Browser.Dom.FileReader.Create()
+
+                                reader.onload <-
+                                    (fun _ -> unbox<byte[]> reader.result |> ImportXlsx |> InterfaceMsg |> dispatch)
+
+                                reader.readAsArrayBuffer (file)
+                            | "json" ->
+                                console.log ("Importing JSON file")
+                                let reader = Browser.Dom.FileReader.Create()
+
+                                reader.onload <-
+                                    (fun e ->
+
+                                        {|
+                                            jsonString = unbox<string> reader.result
+                                            jsonType = None
+                                            filetype = None
+                                            fileName = Some file.name
+                                        |}
+                                        |> ImportRawJson
+                                        |> InterfaceMsg
+                                        |> dispatch
+                                    )
+
+                                reader.readAsText (file)
+                            | _ -> failwithf "Unsupported file extension: %s" extension
+                        finally
+                            setDraggedOverCounter (fun _ -> None)
+
+            )
+            prop.className [
+                "swt:flex swt:h-full swt:w-full swt:justify-center swt:items-center swt:border-2 swt:border-dashed"
+                if isDraggedOver then
+                    "swt:border-primary"
+                else
+                    "swt:border-transparent"
             ]
             prop.children [
                 Html.div [
                     prop.className "swt:grid swt:grid-cols-1 swt:@md/main:grid-cols-2 swt:gap-4"
-                    prop.children [ Helper.createNewFile args.dispatch; Helper.uploadNewTable args.dispatch ]
+                    prop.children [ Helper.createNewFile dispatch; Helper.uploadNewTable dispatch ]
                 ]
             ]
         ]

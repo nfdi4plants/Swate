@@ -48,7 +48,8 @@ module SorensenDice =
         arrayToSort
         |> Array.sortByDescending (fun result ->
             let resultSet = f result |> createBigrams
-            calculateDistance resultSet searchSet)
+            calculateDistance resultSet searchSet
+        )
 
 open Swate.Components.Shared.DTOs
 
@@ -78,10 +79,12 @@ type ITemplateAPIv1 = {
 }
 
 
-[<System.ObsoleteAttribute>]
+/// This module is obsolete, use ARCtrl instead. I only did not add the Obsolete attribute to the module to avoid annoying warnings everywhere.
+[<RequireQualifiedAccess>]
 module SwateObsolete =
 
-    [<System.Obsolete("Use these functions from ARCtrl")>]
+    /// This module is obsolete, use ARCtrl instead. I only did not add the Obsolete attribute to the module to avoid annoying warnings everywhere.
+    [<RequireQualifiedAccess>]
     module Regex =
 
         module Pattern =

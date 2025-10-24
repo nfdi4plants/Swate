@@ -45,9 +45,11 @@ module Impl =
                 jsOptions<AddEventListenerOptions> (fun o ->
                     o.capture <- options.capture
                     o.once <- options.once
-                    o.passive <- false)
+                    o.passive <- false
+                )
             else
-                options)
+                options
+        )
 
     let createRemoveOptions (maybeOptions: AddEventListenerOptions option) =
         maybeOptions
@@ -55,7 +57,8 @@ module Impl =
             if options.capture then
                 Some(jsOptions<RemoveEventListenerOptions> (fun o -> o.capture <- true))
             else
-                None)
+                None
+        )
 
 type React =
 
@@ -72,7 +75,8 @@ type React =
                         func arg
 
                 timeout.current |> Option.iter (Fable.Core.JS.clearTimeout)
-                timeout.current <- Some(Fable.Core.JS.setTimeout later delay)),
+                timeout.current <- Some(Fable.Core.JS.setTimeout later delay)
+            ),
             [| func; delay |]
         )
 
@@ -99,7 +103,8 @@ type React =
 
                     ondebouncestart |> Option.iter (fun f -> f ())
                     timeout.current |> Option.iter (Fable.Core.JS.clearTimeout)
-                    timeout.current <- Some(Fable.Core.JS.setTimeout later delay)),
+                    timeout.current <- Some(Fable.Core.JS.setTimeout later delay)
+                ),
                 [| func; delay |]
             )
 
@@ -108,13 +113,17 @@ type React =
                 (fun () ->
                     if timeout.current.IsSome then
                         Fable.Core.JS.clearTimeout (timeout.current.Value)
-                        oncancel |> Option.iter (fun f -> f ()))
+                        oncancel |> Option.iter (fun f -> f ())
+                )
             )
 
         cancel, debouncedCallBack
 
     [<ImportMember("@uidotdev/usehooks")>]
     static member useLocalStorage<'A>(key: string, defaultValue: 'A) : ('A * ('A -> unit)) = jsNative
+
+    [<ImportMember("@uidotdev/usehooks")>]
+    static member useDebounce<'A>(value: 'A, delay: int) : 'A = jsNative
 
 [<Erase; RequireQualifiedAccess>]
 module React =
@@ -149,7 +158,9 @@ module React =
                     React.createDisposable (fun () ->
                         match removeOptions with
                         | Some options -> document.removeEventListener (eventType, fn, options)
-                        | None -> document.removeEventListener (eventType, fn)))
+                        | None -> document.removeEventListener (eventType, fn)
+                    )
+                )
 
             React.useEffect (listener)
 
@@ -182,7 +193,8 @@ module React =
                 (fun ev ->
                     match elemRef.current with
                     | Some elem when not (elem.contains (unbox ev.target)) -> callback ev
-                    | _ -> ()),
+                    | _ -> ()
+                ),
                 options
             )
 
@@ -190,7 +202,8 @@ module React =
                 (fun ev ->
                     match elemRef.current with
                     | Some elem when not (elem.contains (unbox ev.target)) -> touchCallback ev
-                    | _ -> ()),
+                    | _ -> ()
+                ),
                 options
             )
 
@@ -212,7 +225,8 @@ module React =
                 (fun ev ->
                     match elemRef.current with
                     | Some elem when not (elem.contains (unbox ev.target)) -> callback ev
-                    | _ -> ()),
+                    | _ -> ()
+                ),
                 options,
                 ?dependencies = dependencies
             )
@@ -221,12 +235,14 @@ module React =
                 (fun ev ->
                     match elemRef.current with
                     | Some elem when not (elem.contains (unbox ev.target)) -> callback ev
-                    | _ -> ()),
+                    | _ -> ()
+                ),
                 options,
                 ?dependencies = dependencies
             )
 
-        static member inline onKeyDown (action: KeyboardEvent -> unit, ?options: AddEventListenerOptions) = useListener.on("keydown", action, ?options = options)
+        static member inline onKeyDown(action: KeyboardEvent -> unit, ?options: AddEventListenerOptions) =
+            useListener.on ("keydown", action, ?options = options)
 
     [<Erase>]
     type useElementListener =
@@ -251,14 +267,18 @@ module React =
                     |> Option.iter (fun elem ->
                         match addOptions with
                         | Some options -> elem.addEventListener (eventType, fn, options)
-                        | None -> elem.addEventListener (eventType, fn))
+                        | None -> elem.addEventListener (eventType, fn)
+                    )
 
                     React.createDisposable (fun () ->
                         elemRef.current
                         |> Option.iter (fun elem ->
                             match removeOptions with
                             | Some options -> elem.removeEventListener (eventType, fn, options)
-                            | None -> elem.removeEventListener (eventType, fn))))
+                            | None -> elem.removeEventListener (eventType, fn)
+                        )
+                    )
+                )
 
             React.useEffect (listener)
 

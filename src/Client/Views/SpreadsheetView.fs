@@ -29,8 +29,6 @@ open FileImport
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
 
-    let selectTemplateIsOpen, setSelectTemplateIsOpen = React.useState (false)
-
     let widgets, setWidgets = React.useState ([])
 
     let rmvWidget (widget: Widget) =
@@ -65,18 +63,13 @@ let Main (model: Model, dispatch) =
                 prop.id "TableContainer"
                 prop.className "swt:flex swt:grow swt:flex-col swt:h-full swt:overflow-y-hidden"
                 prop.children [
-                    //
                     match state.ArcFile with
-                    | None -> MainComponents.NoFileElement.Main {| dispatch = dispatch |}
-                    | Some(ArcFiles.Assay _)
-                    | Some(ArcFiles.Study _)
-                    | Some(ArcFiles.Investigation _)
-                    | Some(ArcFiles.Template _) ->
+                    | None -> MainComponents.NoFileElement.Main(dispatch)
+                    | Some(arcfile) ->
                         match model.SpreadsheetModel.ActiveView with
                         | Spreadsheet.ActiveView.Table _ ->
                             match model.SpreadsheetModel.ActiveTable.ColumnCount with
-                            | 0 ->
-                                MainComponents.EmptyTableElement.Main(model, dispatch)
+                            | 0 -> MainComponents.EmptyTableElement.Main(model, dispatch)
                             | _ ->
                                 MainComponents.SpreadsheetView.ArcTable.Main(model, dispatch)
                                 MainComponents.TableFooter.Main dispatch
@@ -86,8 +79,8 @@ let Main (model: Model, dispatch) =
                                 prop.children [
                                     Html.div [
                                         prop.children [
-                                            match model.SpreadsheetModel.ArcFile with
-                                            | Some(ArcFiles.Assay assay) ->
+                                            match arcfile with
+                                            | ArcFiles.Assay assay ->
                                                 let setAssay assay =
                                                     assay
                                                     |> Assay
@@ -95,14 +88,8 @@ let Main (model: Model, dispatch) =
                                                     |> SpreadsheetMsg
                                                     |> dispatch
 
-                                                let setAssayDataMap assay dataMap =
-                                                    dataMap
-                                                    |> SpreadsheetInterface.UpdateDatamap
-                                                    |> InterfaceMsg
-                                                    |> dispatch
-
-                                                Components.Metadata.Assay.Main(assay, setAssay, setAssayDataMap, model)
-                                            | Some(ArcFiles.Study(study, assays)) ->
+                                                Components.Metadata.Assay.Main(assay, setAssay, model)
+                                            | ArcFiles.Study(study, assays) ->
                                                 let setStudy (study, assays) =
                                                     (study, assays)
                                                     |> Study
@@ -110,20 +97,8 @@ let Main (model: Model, dispatch) =
                                                     |> SpreadsheetMsg
                                                     |> dispatch
 
-                                                let setStudyDataMap study dataMap =
-                                                    dataMap
-                                                    |> SpreadsheetInterface.UpdateDatamap
-                                                    |> InterfaceMsg
-                                                    |> dispatch
-
-                                                Components.Metadata.Study.Main(
-                                                    study,
-                                                    assays,
-                                                    setStudy,
-                                                    setStudyDataMap,
-                                                    model
-                                                )
-                                            | Some(ArcFiles.Investigation investigation) ->
+                                                Components.Metadata.Study.Main(study, assays, setStudy, model)
+                                            | ArcFiles.Investigation investigation ->
                                                 let setInvesigation investigation =
                                                     investigation
                                                     |> Investigation
@@ -136,7 +111,25 @@ let Main (model: Model, dispatch) =
                                                     setInvesigation,
                                                     model
                                                 )
-                                            | Some(ArcFiles.Template template) ->
+                                            | ArcFiles.Run run ->
+                                                let setRun run =
+                                                    run
+                                                    |> ArcFiles.Run
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Run.Main(run, setRun, model)
+                                            | ArcFiles.Workflow workflow ->
+                                                let setWorkflow workflow =
+                                                    workflow
+                                                    |> ArcFiles.Workflow
+                                                    |> Spreadsheet.UpdateArcFile
+                                                    |> SpreadsheetMsg
+                                                    |> dispatch
+
+                                                Components.Metadata.Workflow.Main(workflow, setWorkflow, model)
+                                            | ArcFiles.Template template ->
                                                 let setTemplate template =
                                                     template
                                                     |> ArcFiles.Template
@@ -145,7 +138,7 @@ let Main (model: Model, dispatch) =
                                                     |> dispatch
 
                                                 Components.Metadata.Template.Main(template, setTemplate)
-                                            | None -> Html.none
+                                            | _ -> Html.none
                                         ]
                                     ]
                                 ]

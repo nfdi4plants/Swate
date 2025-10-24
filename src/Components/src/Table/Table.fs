@@ -36,10 +36,11 @@ module private TableHelper =
         =
         if activeCellIndex.IsNone then
             let nav = selectedCells.selectBy e
+
             if not nav && selectedCells.count > 0 then
                 onKeydown
                 |> Option.iter (fun onKeydown -> onKeydown (e, selectedCells, activeCellIndex))
-                
+
                 match e with
                 | ActiveTrigger ->
                     selectedCells.SelectOrigin
@@ -193,17 +194,17 @@ swt:p-0"""
                                     |}
                                 )
                             else
-                                let restartIndex: CellCoordinate =
-                                    {|
-                                        x = GridSelect.selectedCells.Value.xStart
-                                        y = GridSelect.selectedCells.Value.yStart
-                                    |}
+                                let restartIndex: CellCoordinate = {|
+                                    x = GridSelect.selectedCells.Value.xStart
+                                    y = GridSelect.selectedCells.Value.yStart
+                                |}
+
                                 setActiveCellIndex (Some restartIndex)
                         else
-                            let newIndex: CellCoordinate = {|x = index.x; y = index.y + 1|}
+                            let newIndex: CellCoordinate = {| x = index.x; y = index.y + 1 |}
                             setActiveCellIndex None
                             GridSelect.selectAt (newIndex, false)
-                            scrollContainerRef.current.Value.focus()
+                            scrollContainerRef.current.Value.focus ()
                     | kbdEventCode.escape ->
                         setActiveCellIndex (None)
                         scrollContainerRef.current.Value.focus ()
@@ -268,7 +269,7 @@ swt:p-0"""
                             prop.key "table-container"
                             prop.style [
                                 style.height (rowVirtualizer.getTotalSize ())
-                                style.width (columnVirtualizer.getTotalSize ())
+                                style.width (columnVirtualizer.getTotalSize () + 800) // extra space to improve UX with rightmost columns
                                 style.position.relative
                             ]
                             prop.children [

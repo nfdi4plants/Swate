@@ -52,7 +52,10 @@ module private Helper =
 
                     async {
                         setState { state with Loading = true }
-                        let p = Spreadsheet.IO.Json.readFromJson state.FileType state.JsonFormat r
+
+                        let p = promise {
+                            return Spreadsheet.IO.Json.readFromJsonMap.[(state.FileType, state.JsonFormat)] r
+                        }
 
                         do!
                             Promise.either

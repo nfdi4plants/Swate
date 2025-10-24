@@ -274,7 +274,7 @@ module Interface =
                             let activeTableIndex =
                                 match arcfileOpt, activeTable with
                                 | Some arcfile, Ok activeTable ->
-                                    arcfile.Tables() |> Seq.tryFindIndex (fun table -> table = activeTable)
+                                    arcfile.ArcTables() |> Seq.tryFindIndex (fun table -> table = activeTable)
                                 | _ -> None
 
                             return
@@ -428,6 +428,15 @@ module Interface =
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd = OfficeInterop.RectifyTermColumns |> OfficeInteropMsg |> Cmd.ofMsg
+                    model, cmd
+                | _ -> failwith "not implemented"
+            | ImportRawJson data ->
+                match host with
+                | Some Swatehost.Excel -> failwith "not implemented"
+                | Some Swatehost.Browser
+                | Some Swatehost.ARCitect ->
+                    let cmd = Spreadsheet.ImportJsonRaw data |> SpreadsheetMsg |> Cmd.ofMsg
+
                     model, cmd
                 | _ -> failwith "not implemented"
 

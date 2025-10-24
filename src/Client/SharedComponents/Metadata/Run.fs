@@ -1,4 +1,4 @@
-module Components.Metadata.Assay
+module Components.Metadata.Run
 
 open Swate.Components.Shared
 open Feliz
@@ -9,16 +9,16 @@ open Components
 open Components.Forms
 
 [<ReactComponent>]
-let Main (assay: ArcAssay, setArcAssay: ArcAssay -> unit, model: Model.Model) =
+let Main (run: ArcRun, setArcRun: ArcRun -> unit, model: Model.Model) =
     Generic.Section [
         Generic.BoxedField(
-            "Assay Metadata",
+            "Run Metadata",
             content = [
                 FormComponents.TextInput(
-                    assay.Identifier,
+                    run.Identifier,
                     (fun v ->
-                        let nextAssay = IdentifierSetters.setAssayIdentifier v assay
-                        setArcAssay nextAssay
+                        let nextRun = IdentifierSetters.setRunIdentifier v run
+                        setArcRun nextRun
                     ),
                     "Identifier",
                     validator =
@@ -33,62 +33,70 @@ let Main (assay: ArcAssay, setArcAssay: ArcAssay -> unit, model: Model.Model) =
                     classes = "swt:w-full"
                 )
                 FormComponents.TextInput(
-                    defaultArg assay.Title "",
+                    (Option.defaultValue "" run.Title),
                     (fun v ->
-                        assay.Title <- Option.whereNot System.String.IsNullOrWhiteSpace v
-                        setArcAssay <| assay
+                        run.Title <- Option.whereNot System.String.IsNullOrWhiteSpace v
+                        setArcRun <| run
                     ),
                     "Title",
                     classes = "swt:w-full"
                 )
                 FormComponents.TextInput(
-                    defaultArg assay.Description "",
+                    (Option.defaultValue "" run.Description),
                     (fun v ->
-                        assay.Description <- Option.whereNot System.String.IsNullOrWhiteSpace v
-                        setArcAssay <| assay
+                        run.Description <- Option.whereNot System.String.IsNullOrWhiteSpace v
+                        setArcRun <| run
                     ),
                     "Description",
                     classes = "swt:w-full",
                     isarea = true
                 )
                 FormComponents.OntologyAnnotationInput(
-                    assay.MeasurementType,
+                    run.MeasurementType,
                     (fun oa ->
-                        assay.MeasurementType <- oa
-                        setArcAssay <| assay
+                        run.MeasurementType <- oa
+                        setArcRun <| run
                     ),
                     "Measurement Type"
                 )
                 FormComponents.OntologyAnnotationInput(
-                    assay.TechnologyType,
+                    run.TechnologyType,
                     (fun oa ->
-                        assay.TechnologyType <- oa
-                        setArcAssay <| assay
+                        run.TechnologyType <- oa
+                        setArcRun <| run
                     ),
                     "Technology Type"
                 )
                 FormComponents.OntologyAnnotationInput(
-                    assay.TechnologyPlatform,
+                    run.TechnologyPlatform,
                     (fun oa ->
-                        assay.TechnologyPlatform <- oa
-                        setArcAssay <| assay
+                        run.TechnologyPlatform <- oa
+                        setArcRun <| run
                     ),
                     "Technology Platform"
                 )
+                FormComponents.CollectionOfStrings(
+                    run.WorkflowIdentifiers,
+                    (fun ids ->
+                        run.WorkflowIdentifiers <- ResizeArray ids
+                        setArcRun run
+                    ),
+                    "Workflow Identifiers"
+                )
                 FormComponents.PersonsInput(
-                    assay.Performers,
+                    run.Performers,
                     (fun persons ->
-                        assay.Performers <- persons
-                        setArcAssay assay
+                        run.Performers <- persons
+                        setArcRun run
                     ),
                     model.PersistentStorageState.IsARCitect,
                     "Performers"
                 )
                 FormComponents.CommentsInput(
-                    assay.Comments,
+                    run.Comments,
                     (fun comments ->
-                        assay.Comments <- ResizeArray comments
-                        setArcAssay assay
+                        run.Comments <- ResizeArray comments
+                        setArcRun run
                     ),
                     "Comments"
                 )
