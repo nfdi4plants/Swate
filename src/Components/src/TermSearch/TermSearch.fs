@@ -1191,6 +1191,12 @@ type TermSearch =
 
         let comboBoxRef = React.useRef<ComboBoxRef> (unbox None)
 
+        let shallSearchChild =
+            fun _ ->
+                System.String.IsNullOrWhiteSpace input
+                    && parentId.IsSome
+                    && comboBoxRef.current.isOpen () |> not
+
         React.fragment [
             TermSearch.Modal(
                 modalOpen,
@@ -1220,15 +1226,10 @@ type TermSearch =
                 comboBoxRef = comboBoxRef,
                 onKeyDown =
                     (fun kbe ->
-
                         match kbe.code with
                         | kbdEventCode.f2 -> setModalOpen true
-                        | kbdEventCode.arrowDown when
-                            System.String.IsNullOrWhiteSpace input
-                            && parentId.IsSome
-                            && comboBoxRef.current.isOpen () |> not
-                            ->
-                            startAllChildSearch ()
+                        | kbdEventCode.arrowDown when shallSearchChild()
+                            -> startAllChildSearch ()
                         | _ -> onKeyDown |> Option.iter (fun fn -> fn kbe)
                     ),
                 noResultsRenderer =
@@ -1241,6 +1242,11 @@ type TermSearch =
                     autoFocus = autoFocus
                     ``data-testid`` = "term-search-input"
                     ``data-debugresultcount`` = searchResults.Results.Count
-                |}
+                |},
+                onDoubleClick =
+                    (fun _ ->
+                        if shallSearchChild() then
+                            startAllChildSearch ()
+                    )
             )
         ]
