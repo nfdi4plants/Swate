@@ -32,10 +32,14 @@ let Main (workflow: ArcWorkflow, setArcWorkflow: ArcWorkflow -> unit, model: Mod
                         setArcWorkflow nextWorkflow
                     ),
                     "Identifier",
-                    validator = {|
-                        fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s)
-                        msg = "Invalid Identifier"
-                    |},
+                    validator =
+                        (fun s ->
+                            try
+                                ARCtrl.Helper.Identifier.checkValidCharacters s
+                                Ok()
+                            with ex ->
+                                Error ex.Message
+                        ),
                     disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host,
                     classes = "swt:w-full"
                 )
@@ -65,10 +69,12 @@ let Main (workflow: ArcWorkflow, setArcWorkflow: ArcWorkflow -> unit, model: Mod
                         setArcWorkflow workflow
                     ),
                     "Version",
-                    validator = {|
-                        fn = (fun s -> checkVersionStr s)
-                        msg = "Invalid Version"
-                    |},
+                    validator =
+                        (fun s ->
+                            match checkVersionStr s with
+                            | true -> Ok()
+                            | false -> Error "Version must follow SemVer format (e.g., 1.0.0 or v1.0.0)"
+                        ),
                     classes = "swt:w-full"
                 )
                 FormComponents.OntologyAnnotationInput(

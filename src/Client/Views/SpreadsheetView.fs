@@ -64,7 +64,7 @@ let Main (model: Model, dispatch) =
                 prop.className "swt:flex swt:grow swt:flex-col swt:h-full swt:overflow-y-hidden"
                 prop.children [
                     match state.ArcFile with
-                    | None -> MainComponents.NoFileElement.Main {| dispatch = dispatch |}
+                    | None -> MainComponents.NoFileElement.Main(dispatch)
                     | Some(arcfile) ->
                         match model.SpreadsheetModel.ActiveView with
                         | Spreadsheet.ActiveView.Table _ ->

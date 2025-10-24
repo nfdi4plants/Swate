@@ -117,6 +117,15 @@ module Spreadsheet =
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
             | UpdateState nextState -> nextState, model, Cmd.none
+            | ImportJsonRaw importData ->
+                let cmd =
+                    Cmd.OfFunc.either
+                        (UpdateUtil.JsonImportHelper.parseFromJsonString)
+                        (importData.jsonString, importData.jsonType, importData.filetype, importData.fileName)
+                        (UpdateArcFile >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+
+                state, model, cmd
             | UpdateDatamap datamapOption ->
                 let nextState = Controller.DataMap.updateDatamap datamapOption state
                 nextState, model, Cmd.none

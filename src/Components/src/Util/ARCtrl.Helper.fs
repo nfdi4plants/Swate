@@ -170,15 +170,19 @@ module ARCtrlHelper =
         | ISA
         | ROCrate
 
-        static member fromString(str: string) =
+        static member tryFromString(str: string) =
             match str.ToLower() with
-            | "arctrl" -> ARCtrl
+            | "arctrl" -> Some ARCtrl
             | "arctrl compressed"
-            | "arctrlcompressed" -> ARCtrlCompressed
-            | "isa" -> ISA
+            | "arctrlcompressed" -> Some ARCtrlCompressed
+            | "isa" -> Some ISA
             | "ro-crate metadata"
-            | "rocrate" -> ROCrate
-            | _ -> failwithf "Unknown JSON export format: %s" str
+            | "rocrate" -> Some ROCrate
+            | _ -> None
+
+        static member fromString(str: string) =
+            JsonExportFormat.tryFromString str
+            |> Option.defaultWith (fun () -> failwithf "Unknown JsonExportFormat: %s" str)
 
         member this.AsStringRdbl =
             match this with

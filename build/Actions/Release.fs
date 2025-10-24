@@ -111,10 +111,9 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
             "docker"
             [
                 "build"
-                if isPrerelease then
-                    "-t"
-                    imageNext
-                else
+                "-t"
+                imageNext
+                if not isPrerelease then
                     "-t"
                     imageVersioned
                     "-t"
@@ -127,9 +126,9 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
 
     let push =
         if not isDryRun then
-            if isPrerelease then
-                run "docker" [ "push"; imageNext ] ""
-            else
+            run "docker" [ "push"; imageNext ] ""
+
+            if not isPrerelease then
                 run "docker" [ "push"; imageVersioned ] ""
                 run "docker" [ "push"; imageLatest ] ""
 

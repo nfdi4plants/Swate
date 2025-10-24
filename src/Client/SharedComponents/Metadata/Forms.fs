@@ -450,7 +450,7 @@ type FormComponents =
             constructor: unit -> 'A,
             setter: ResizeArray<'A> -> unit,
             inputComponent: 'A * ('A -> unit) * (MouseEvent -> unit) -> ReactElement,
-            inputEquality: 'A -> 'A -> bool,
+            ?validator: ResizeArray<'A> -> Result<unit, string>,
             ?label: string,
             ?extendedElements: ReactElement
         ) =
@@ -458,6 +458,7 @@ type FormComponents =
         // The id is used to keep track of the order of the elements in the list.
         // Because most of our classes do not have a unique id, we generate a new guid for each element in the list.
         let sensors = DndKit.useSensors [| DndKit.useSensor (DndKit.PointerSensor) |]
+        let error, setError = React.useState (None: string option)
 
         /// This is a list of guids that are used to keep track of the order of the elements in the list.
         /// We use "React.useMemo" to keep the guids stable unless items are added/removed or reorder happens.
@@ -475,6 +476,24 @@ type FormComponents =
 
         let mkId index = guids.[index].ToString()
         let getIndexFromId (id: string) = guids.FindIndex(fun x -> x = Guid(id))
+        let tempInputs = React.useRef inputs
+
+        let validateSetter =
+            fun next ->
+                match validator with
+                | Some validatorFn ->
+                    match validatorFn next with
+                    | Ok() ->
+                        tempInputs.current <- next
+                        setter next
+                    | Error msg ->
+                        console.log "Validation error in InputSequence:"
+                        console.log ("Setting prev: ", inputs)
+                        setter tempInputs.current
+                        setError (Some <| sprintf "Validation Error: %A" msg)
+                | None ->
+                    tempInputs.current <- next
+                    setter next
 
         let handleDragEnd =
             fun (event: DndKit.IDndKitEvent) ->
@@ -484,24 +503,18 @@ type FormComponents =
                 if (active.id <> over.id) then
                     let oldIndex = getIndexFromId (active.id)
                     let newIndex = getIndexFromId (over.id)
-                    DndKit.arrayMove (inputs, oldIndex, newIndex) |> setter
+                    DndKit.arrayMove (inputs, oldIndex, newIndex) |> validateSetter
 
                 ()
 
-        let equalityFunc
-            (props1: 'A * ('A -> unit) * (MouseEvent -> unit))
-            (props2: 'A * ('A -> unit) * (MouseEvent -> unit))
-            =
-            let (a1, _, _) = props1
-            let (a2, _, _) = props2
-            inputEquality a1 a2
-        // let memoizeInputs = React.memo (
-        //     inputComponent,
-        //     areEqual = equalityFunc
-        // )
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
+                Swate.Components.BaseModal.ErrorBaseModal(
+                    error.IsSome,
+                    (fun _ -> setError None),
+                    error |> Option.defaultValue ""
+                )
                 if label.IsSome then
                     Generic.FieldTitle label.Value
                 if extendedElements.IsSome then
@@ -529,11 +542,11 @@ type FormComponents =
                                                     item,
                                                     (fun v ->
                                                         inputs.[i] <- v
-                                                        inputs |> setter
+                                                        inputs |> validateSetter
                                                     ),
                                                     (fun _ ->
                                                         inputs.RemoveAt i
-                                                        inputs |> setter
+                                                        inputs |> validateSetter
                                                     )
                                                 ))
                                             )
@@ -546,7 +559,7 @@ type FormComponents =
                     prop.children [
                         Helper.addButton (fun _ ->
                             inputs.Add(constructor ())
-                            inputs |> setter
+                            inputs |> validateSetter
                         )
                     ]
                 ]
@@ -559,7 +572,7 @@ type FormComponents =
             value: string,
             setValue: string -> unit,
             ?label: string,
-            ?validator: {| fn: string -> bool; msg: string |},
+            ?validator: string -> Result<unit, string>,
             ?placeholder: string,
             ?isarea: bool,
             ?isJoin,
@@ -569,33 +582,72 @@ type FormComponents =
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
+
+        let tempValue, setTempValue = React.useState (value)
         let loading, setLoading = React.useState (false)
-        let isValid, setIsValid = React.useState (true)
+        let isError, setIsError = React.useState (None: string option)
         let ref = React.useInputRef ()
-        let debounceSetter = React.useDebouncedCallback (setValue)
+        let debouncedValue = React.useDebounce (tempValue, 300)
+
+        let handleChange =
+            fun (e: string) ->
+                setTempValue e
+                setLoading true
 
         React.useEffect (
             (fun () ->
-                if ref.current.IsSome then
+                match validator with
+                | Some validatorFn ->
+                    match validatorFn debouncedValue with
+                    | Ok() ->
+                        setIsError None
+                        setValue debouncedValue
+                    | Error e -> setIsError (Some e)
+                | None ->
+                    setIsError None
+                    setValue debouncedValue
+
+                setLoading false
+            ),
+            [| box debouncedValue |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                setTempValue value
+
+                match ref.current with
+                | Some r ->
                     setLoading false
-                    setIsValid true
-                    ref.current.Value.value <- value
+                    setIsError None
+                    r.value <- value
+                | None -> ()
             ),
             [| box value |]
         )
 
-        let onChange =
-            fun (e: string) ->
-                if validator.IsSome then
-                    let isValid = validator.Value.fn e
-                    setIsValid isValid
+        // React.useEffect (
+        //     (fun () ->
+        //         if ref.current.IsSome then
+        //             setLoading false
+        //             setIsValid true
+        //             ref.current.Value.value <- value
+        //     ),
+        //     [| box value |]
+        // )
 
-                    if isValid then
-                        setLoading true
-                        debounceSetter e
-                else
-                    setLoading true
-                    debounceSetter e
+        // let onChange =
+        //     fun (e: string) ->
+        //         if validator.IsSome then
+        //             let isValid = validator.Value.fn e
+        //             setIsValid isValid
+
+        //             if isValid then
+        //                 setLoading true
+        //                 debounceSetter e
+        //         else
+        //             setLoading true
+        //             debounceSetter e
 
         Html.div [
             prop.className "swt:grow not-prose"
@@ -627,7 +679,7 @@ type FormComponents =
                                         if placeholder.IsSome then
                                             prop.placeholder placeholder.Value
                                         prop.ref ref
-                                        prop.onChange onChange
+                                        prop.onChange handleChange
                                     ]
                                 | _ ->
                                     Html.input [
@@ -637,7 +689,7 @@ type FormComponents =
                                         if placeholder.IsSome then
                                             prop.placeholder placeholder.Value
                                         prop.ref ref
-                                        prop.onChange onChange
+                                        prop.onChange handleChange
                                     ]
                                 Html.div [
                                     if not loading then
@@ -651,9 +703,9 @@ type FormComponents =
                             Helper.deleteButton rmv.Value
                     ]
                 ]
-                if not isValid then
-                    let txt = validator |> Option.map _.msg |> Option.defaultValue "Invalid input."
-                    Html.p [ prop.className "swt:text-error swt:text-sm swt:mt-1"; prop.text txt ]
+                match isError with
+                | None -> Html.none
+                | Some msg -> Html.p [ prop.className "swt:text-error swt:text-sm swt:mt-1"; prop.text msg ]
             ]
         ]
 
@@ -704,7 +756,6 @@ type FormComponents =
                     rmv = rmv
                 )
             ),
-            (fun oa1 oa2 -> oa1.Equals oa2),
             ?label = label
         )
 
@@ -921,7 +972,6 @@ type FormComponents =
             Process.Component.create,
             setter,
             (fun (v, setV, rmv) -> FormComponents.ComponentInput(v, setV, rmv)),
-            (fun parameter1 parameter2 -> parameter1.Equals parameter2),
             ?label = label
         )
 
@@ -954,7 +1004,6 @@ type FormComponents =
             Process.ProtocolParameter.create,
             setter,
             (fun (v, setV, rmv) -> FormComponents.ParameterInput(v, setV, rmv)),
-            (fun parameter1 parameter2 -> parameter1.Equals parameter2),
             ?label = label
         )
 
@@ -1104,7 +1153,6 @@ type FormComponents =
             Person,
             setter,
             (fun (v, setV, rmv) -> FormComponents.PersonInput(v, setV, rmv)),
-            (fun person1 person2 -> person1.Equals person2),
             ?label = label,
             ?extendedElements = extendedElements
         )
@@ -1159,11 +1207,14 @@ type FormComponents =
             input.ToString(),
             (fun s -> System.Guid.Parse s |> setter),
             ?label = label,
-            validator = {|
-                fn = Guid.TryParse >> fst
-                msg =
-                    "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Using numbers 0 through 9 and letters A through F."
-            |}
+            validator =
+                (fun s ->
+                    match Guid.TryParse s with
+                    | true, _ -> Ok()
+                    | false, _ ->
+                        Error
+                            "Guid should contain 32 digits with 4 dashes following: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Using numbers 0 through 9 and letters A through F."
+                )
         )
 
     [<ReactComponent>]
@@ -1232,7 +1283,14 @@ type FormComponents =
     static member PubMedIDInput(id: string option, doisetter, searchsetter: Publication -> unit, ?label: string) =
         FormComponents.PublicationRequestInput(id, API.requestByPubMedID, doisetter, searchsetter, ?label = label)
 
-    static member CommentInput(comment: Comment, setter: Comment -> unit, ?label: string, ?rmv: MouseEvent -> unit) =
+    static member CommentInput
+        (
+            comment: Comment,
+            setter: Comment -> unit,
+            ?label: string,
+            ?rmv: MouseEvent -> unit,
+            ?keyValidator: (string -> Result<unit, string>)
+        ) =
         Html.div [
             prop.children [
                 if label.IsSome then
@@ -1246,7 +1304,8 @@ type FormComponents =
                                 comment.Name <- if s = "" then None else Some s
                                 comment |> setter
                             ),
-                            placeholder = "comment name"
+                            placeholder = "comment name",
+                            ?validator = keyValidator
                         )
                         FormComponents.TextInput(
                             comment.Value |> Option.defaultValue "",
@@ -1264,12 +1323,43 @@ type FormComponents =
         ]
 
     static member CommentsInput(comments: ResizeArray<Comment>, setter: ResizeArray<Comment> -> unit, ?label) =
+
+        // /// When working on this i encountered some additional issues. Will work with validators on input field level instead for now.
+        // let validator =
+        //     fun (comments: ResizeArray<Comment>) ->
+        //         let filter (c: ResizeArray<Comment>) =
+        //             c
+        //             |> Seq.filter (fun x ->
+        //                 match x.Name with
+        //                 | Some name when not (System.String.IsNullOrWhiteSpace name) -> true
+        //                 | _ -> false
+        //             )
+
+        //         let filteredNext = filter comments
+        //         let distinctCount = filteredNext |> Seq.distinctBy (fun x -> x.Name) |> Seq.length
+
+        //         if distinctCount = Seq.length filteredNext then
+        //             Ok()
+        //         else
+        //             Error "Comment names must be unique."
+
+        let keyValidator =
+            fun (name: string) ->
+                let isDuplicate =
+                    comments
+                    |> Seq.tryFind (fun c -> c.Name.IsSome && c.Name.Value = name)
+                    |> Option.isSome
+
+                if isDuplicate then
+                    Error "Comment names must be unique."
+                else
+                    Ok()
+
         FormComponents.InputSequence(
             comments,
             Comment,
             setter,
-            (fun (v, setV, rmv) -> FormComponents.CommentInput(v, setV, rmv = rmv)),
-            (fun c1 c2 -> c1.Equals c2),
+            (fun (v, setV, rmv) -> FormComponents.CommentInput(v, setV, rmv = rmv, keyValidator = keyValidator)),
             ?label = label
         )
 
@@ -1279,7 +1369,6 @@ type FormComponents =
             (fun () -> ""),
             setIdentifiers,
             (fun (v, setV, rmv) -> FormComponents.TextInput(v, setV, rmv = rmv)),
-            (fun c1 c2 -> c1.Equals c2),
             ?label = label
         )
 
@@ -1366,8 +1455,7 @@ type FormComponents =
             Publication,
             setter,
             (fun (a, b, c) -> FormComponents.PublicationInput(a, b, rmv = c)),
-            (fun p1 p2 -> p1.Equals p2),
-            label
+            label = label
         )
 
     [<ReactComponent>]
@@ -1438,6 +1526,5 @@ type FormComponents =
             OntologySourceReference,
             setter,
             (fun (a, b, c) -> FormComponents.OntologySourceReferenceInput(a, b, c)),
-            (fun o1 o2 -> o1.Equals o2),
-            label
+            label = label
         )

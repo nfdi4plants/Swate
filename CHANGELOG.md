@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Full support for isa.run.xlsx files
 -   Full support for isa.workflow.xlsx files
 -   Full support for separate datamap.xlsx files
+-   Drag and drop support for file import #635
+    - Supports json with specific name restrictions: #532
+        - MUST contain json format ("ARCtrl", "ARCtrlCompressed", "ISA", "ROCrate") not case sensitive.
+        - MUST contain file type ("Assay", "Study", "Investigation", "DataMap", "Workflow", "Run", "Template") not case sensitive.
+        - MUST be separated by an underscore ("_")
+        - MUST have the ".json" file extension
 
 ### Changed
 
@@ -35,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 -   Restriction of Sidebar to table views.
+
+### Fixed
+
+- Context menu "Fill Column" indexing issue fixed. #891
+- Duplicate Comment keys on top level metadata are not validated until any export is triggered (ARCitect, download .xlsx, etc.) #883
+- Added whitespace to table components to improve UX when rightmost columns are in use. #859
 
 ## 1.0.0-rc.9 - 2025-10-10
 
