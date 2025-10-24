@@ -21,10 +21,14 @@ let Main (assay: ArcAssay, setArcAssay: ArcAssay -> unit, model: Model.Model) =
                         setArcAssay nextAssay
                     ),
                     "Identifier",
-                    validator = {|
-                        fn = (fun s -> ARCtrl.Helper.Identifier.tryCheckValidCharacters s)
-                        msg = "Invalid Identifier"
-                    |},
+                    validator =
+                        (fun s ->
+                            try
+                                ARCtrl.Helper.Identifier.checkValidCharacters s
+                                Ok()
+                            with ex ->
+                                Error ex.Message
+                        ),
                     disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host,
                     classes = "swt:w-full"
                 )

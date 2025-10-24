@@ -430,6 +430,15 @@ module Interface =
                     let cmd = OfficeInterop.RectifyTermColumns |> OfficeInteropMsg |> Cmd.ofMsg
                     model, cmd
                 | _ -> failwith "not implemented"
+            | ImportRawJson data ->
+                match host with
+                | Some Swatehost.Excel -> failwith "not implemented"
+                | Some Swatehost.Browser
+                | Some Swatehost.ARCitect ->
+                    let cmd = Spreadsheet.ImportJsonRaw data |> SpreadsheetMsg |> Cmd.ofMsg
+
+                    model, cmd
+                | _ -> failwith "not implemented"
 
         try
             innerUpdate model msg

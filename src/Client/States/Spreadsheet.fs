@@ -216,6 +216,7 @@ type Msg =
     | InsertOntologyAnnotations of OntologyAnnotation[]
     /// Starts chain to export active table to isa json
     | ExportJson of ArcFiles * JsonExportFormat
+    | ImportJsonRaw of SpreadsheetInterface.ImportJsonRawDTO
     /// Starts chain to export all tables to xlsx swate tables.
     | ExportXlsx of ArcFiles
     | ExportXlsxDownload of filename: string * byte[]
