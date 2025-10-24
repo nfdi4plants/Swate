@@ -12,6 +12,24 @@ open Fable.Core
 
 module SearchComponentHelper =
 
+    let fillColumnBody(header: CompositeHeaderDiscriminate) (rowCount: int) =
+        match header with
+        | CompositeHeaderDiscriminate.Component
+        | CompositeHeaderDiscriminate.Characteristic
+        | CompositeHeaderDiscriminate.Factor
+        | CompositeHeaderDiscriminate.Parameter -> ResizeArray(Array.create rowCount (CompositeCell.emptyTerm))
+        | CompositeHeaderDiscriminate.ProtocolType
+        | CompositeHeaderDiscriminate.ProtocolDescription
+        | CompositeHeaderDiscriminate.ProtocolUri
+        | CompositeHeaderDiscriminate.ProtocolVersion
+        | CompositeHeaderDiscriminate.ProtocolREF
+        | CompositeHeaderDiscriminate.Performer
+        | CompositeHeaderDiscriminate.Date
+        | CompositeHeaderDiscriminate.Input
+        | CompositeHeaderDiscriminate.Output
+        | CompositeHeaderDiscriminate.Freetext
+        | CompositeHeaderDiscriminate.Comment -> ResizeArray(Array.create rowCount (CompositeCell.emptyFreeText))
+
     let addBuildingBlock (selectedColumnIndex: int option) (model: Model) dispatch =
 
         let state = model.AddBuildingBlockState
@@ -24,7 +42,7 @@ module SearchComponentHelper =
                 Array.init rowCount (fun _ -> body.Value.Copy())
                 |> ResizeArray
             else
-                ResizeArray()
+                fillColumnBody state.HeaderCellType model.SpreadsheetModel.ActiveTable.RowCount
 
         let column = CompositeColumn.create (header, bodyCells)
 

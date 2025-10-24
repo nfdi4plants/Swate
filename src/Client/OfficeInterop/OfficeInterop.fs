@@ -1908,14 +1908,31 @@ type Main =
 
             let! arcTableRes = ArcTable.fromExcelTable (excelTable, context)
 
+            let fillColumnBody (header: CompositeHeaderDiscriminate) (rowCount: int) =
+                match header with
+                | CompositeHeaderDiscriminate.Component
+                | CompositeHeaderDiscriminate.Characteristic
+                | CompositeHeaderDiscriminate.Factor
+                | CompositeHeaderDiscriminate.Parameter -> ResizeArray(Array.create rowCount (CompositeCell.emptyTerm))
+                | CompositeHeaderDiscriminate.ProtocolType
+                | CompositeHeaderDiscriminate.ProtocolDescription
+                | CompositeHeaderDiscriminate.ProtocolUri
+                | CompositeHeaderDiscriminate.ProtocolVersion
+                | CompositeHeaderDiscriminate.ProtocolREF
+                | CompositeHeaderDiscriminate.Performer
+                | CompositeHeaderDiscriminate.Date
+                | CompositeHeaderDiscriminate.Input
+                | CompositeHeaderDiscriminate.Output
+                | CompositeHeaderDiscriminate.Freetext
+                | CompositeHeaderDiscriminate.Comment -> ResizeArray(Array.create rowCount (CompositeCell.emptyFreeText))
+
             match arcTableRes with
             | Ok arcTable ->
                 let values =
                     if newColumn.Cells.Count < arcTable.RowCount && newColumn.Cells.Count > 0 then
                         Array.create arcTable.RowCount newColumn.Cells.[0] |> ResizeArray
                     else
-                        newColumn.Cells
-
+                        fillColumnBody newColumn.Header.AsDiscriminate arcTable.RowCount
                 arcTable.AddColumn(newColumn.Header, values, forceReplace = true)
 
                 //Replace old excel table with new one

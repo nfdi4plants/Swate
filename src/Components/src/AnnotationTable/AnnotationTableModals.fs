@@ -657,7 +657,7 @@ type ContextMenuModals =
                 let range = tableRef.current.SelectHandle.getSelectedCellRange().Value
                 [| range.xStart - 1 .. range.xEnd - 1 |]
             else
-                [| arcTableIndex.x |]
+                [| arcTableIndex.x - 1 |]
 
         let Subtable = arcTable.Subtable(columnIndices)
 
