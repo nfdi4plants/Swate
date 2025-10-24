@@ -12,24 +12,6 @@ open Fable.Core
 
 module SearchComponentHelper =
 
-    let fillColumnBody(header: CompositeHeaderDiscriminate) (rowCount: int) =
-        match header with
-        | CompositeHeaderDiscriminate.Component
-        | CompositeHeaderDiscriminate.Characteristic
-        | CompositeHeaderDiscriminate.Factor
-        | CompositeHeaderDiscriminate.Parameter -> ResizeArray(Array.create rowCount (CompositeCell.emptyTerm))
-        | CompositeHeaderDiscriminate.ProtocolType
-        | CompositeHeaderDiscriminate.ProtocolDescription
-        | CompositeHeaderDiscriminate.ProtocolUri
-        | CompositeHeaderDiscriminate.ProtocolVersion
-        | CompositeHeaderDiscriminate.ProtocolREF
-        | CompositeHeaderDiscriminate.Performer
-        | CompositeHeaderDiscriminate.Date
-        | CompositeHeaderDiscriminate.Input
-        | CompositeHeaderDiscriminate.Output
-        | CompositeHeaderDiscriminate.Freetext
-        | CompositeHeaderDiscriminate.Comment -> ResizeArray(Array.create rowCount (CompositeCell.emptyFreeText))
-
     let addBuildingBlock (selectedColumnIndex: int option) (model: Model) dispatch =
 
         let state = model.AddBuildingBlockState
@@ -39,10 +21,9 @@ module SearchComponentHelper =
         let bodyCells =
             if body.IsSome then // create as many body cells as there are rows in the active table
                 let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
-                Array.init rowCount (fun _ -> body.Value.Copy())
-                |> ResizeArray
+                Array.init rowCount (fun _ -> body.Value.Copy()) |> ResizeArray
             else
-                fillColumnBody state.HeaderCellType model.SpreadsheetModel.ActiveTable.RowCount
+                state.HeaderCellType.CreateEmptyDefaultCells model.SpreadsheetModel.ActiveTable.RowCount
 
         let column = CompositeColumn.create (header, bodyCells)
 

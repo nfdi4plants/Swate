@@ -335,6 +335,26 @@ type CompositeHeaderDiscriminate =
     | Comment
     | Freetext
 
+    member this.CreateEmptyDefaultCells(?count: int) =
+        let count = defaultArg count 1
+
+        match this with
+        | CompositeHeaderDiscriminate.Component
+        | CompositeHeaderDiscriminate.Characteristic
+        | CompositeHeaderDiscriminate.Factor
+        | CompositeHeaderDiscriminate.Parameter
+        | CompositeHeaderDiscriminate.ProtocolType -> ResizeArray(Array.create count (CompositeCell.emptyTerm))
+        | CompositeHeaderDiscriminate.ProtocolDescription
+        | CompositeHeaderDiscriminate.ProtocolUri
+        | CompositeHeaderDiscriminate.ProtocolVersion
+        | CompositeHeaderDiscriminate.ProtocolREF
+        | CompositeHeaderDiscriminate.Performer
+        | CompositeHeaderDiscriminate.Date
+        | CompositeHeaderDiscriminate.Input
+        | CompositeHeaderDiscriminate.Output
+        | CompositeHeaderDiscriminate.Freetext
+        | CompositeHeaderDiscriminate.Comment -> ResizeArray(Array.create count (CompositeCell.emptyFreeText))
+
     /// <summary>
     /// Returns true if the Building Block is a term column
     /// </summary>

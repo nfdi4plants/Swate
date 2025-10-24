@@ -1,7 +1,6 @@
 <Project>
     <PropertyGroup>
         <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
-        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     </PropertyGroup>
     <ItemGroup>
         <!-- Depends on the same version of FSharp.Core for all the projects -->
