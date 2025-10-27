@@ -21,7 +21,6 @@ type FooterTabs =
         let mouseY = mouseY - 30
         Base.Main(mouseX, mouseY, children, dispatch)
 
-
     static member Plus(mouseX, mouseY, dispatch: Messages.Msg -> unit) =
         let addTable =
             fun _ ->
@@ -29,15 +28,15 @@ type FooterTabs =
                 |> Messages.InterfaceMsg
                 |> dispatch
 
-        let addDataMap =
-            fun _ ->
-                SpreadsheetInterface.UpdateDatamap(DataMap.init () |> Some)
-                |> Messages.InterfaceMsg
-                |> dispatch
+        // let addDataMap =
+        //     fun _ ->
+        //         SpreadsheetInterface.UpdateDatamap(DataMap.init () |> Some)
+        //         |> Messages.InterfaceMsg
+        //         |> dispatch
 
         let children (rmv: unit -> unit) : ReactElement seq = [
             Modals.ContextMenus.Base.Item("Add Table", addTable >> rmv, Icons.Table())
-            Modals.ContextMenus.Base.Item("Add Datamap", addDataMap >> rmv, Icons.Map())
+        // Modals.ContextMenus.Base.Item("Add Datamap", addDataMap >> rmv, Icons.Map())
         ]
 
         let mouseY = mouseY - 30

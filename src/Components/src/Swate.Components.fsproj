@@ -55,15 +55,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" Version="2.5.1" />
-    <PackageReference Include="ARCtrl.Spreadsheet" Version="2.5.1" />
-    <PackageReference Include="Fable.Remoting.Client" Version="7.32.0" />
-    <PackageReference Include="Fable.Fetch" Version="2.7.0" />
-    <PackageReference Include="Fable.React.Types" Version="18.4.0" />
-    <PackageReference Include="Fable.Core" Version="4.5.0" />
-    <PackageReference Include="Feliz" Version="2.9.0" />
-    <PackageReference Include="Feliz.DaisyUI" Version="5.2.0" />
-    <PackageReference Include="Fable.Browser.Dom" Version="2.18.0" />
+    <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="Fable.Remoting.Client" />
+    <PackageReference Include="Fable.Fetch" />
+    <PackageReference Include="Fable.React.Types" />
+    <PackageReference Include="Fable.Core" />
+    <PackageReference Include="Feliz" />
+    <PackageReference Include="Feliz.DaisyUI" />
+    <PackageReference Include="Fable.Browser.Dom" />
   </ItemGroup>
 
   <ItemGroup>

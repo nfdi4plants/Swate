@@ -25,11 +25,11 @@ type ATCMC =
 type AnnotationTableContextMenuUtil =
 
     static member fillColumn(index: CellCoordinate, table: ArcTable, setTable) =
-        let cell = table.GetCellAt(index.x, index.y)
+        let cell = table.GetCellAt(index.x - 1, index.y - 1)
         let nextTable = table.Copy()
 
         for y in 0 .. table.RowCount - 1 do
-            nextTable.SetCellAt(index.x, y, cell.Copy())
+            nextTable.SetCellAt(index.x - 1, y, cell.Copy())
 
         setTable nextTable
 
@@ -53,7 +53,7 @@ type AnnotationTableContextMenuUtil =
 
             table.RemoveRows(rowCoordinates)
         else
-            table.RemoveRow(rowIndex)
+            table.RemoveRow(rowIndex - 1)
 
         table.Copy()
 
@@ -93,7 +93,7 @@ type AnnotationTableContextMenuUtil =
 
             table.RemoveColumns(columnCoordinates)
         else
-            table.RemoveColumn(colIndex)
+            table.RemoveColumn(colIndex - 1)
 
         table.Copy()
 
@@ -128,7 +128,7 @@ type AnnotationTableContextMenuUtil =
                         cells.[1..]
                         |> Array.transpose
                         |> Array.mapi (fun index column ->
-                            CompositeColumn.create(headers.[index], column))
+                            CompositeColumn.create(headers.[index], column |> ResizeArray))
 
                     let tableString =
                         let table = ArcTable.init("placeholder")
@@ -334,7 +334,11 @@ type AnnotationTableContextMenuUtil =
                 coordinates = groupedCellCoordinates
             |}
         else
-            let fittedCells = AnnotationTableContextMenuUtil.getFittedCells (data, headers) |> Array.transpose
+            let fittedCells =
+                AnnotationTableContextMenuUtil.getFittedCells (data, headers) |> Array.transpose
+                |> Array.map (fun column ->
+                    column
+                    |> ResizeArray)
 
             let columns =
                 Array.map2 (fun header cells -> CompositeColumn.create(header, cells)) headers fittedCells
@@ -344,8 +348,8 @@ type AnnotationTableContextMenuUtil =
                 Array.isEmpty fittedCells
                 || fittedCells
                    |> Array.map (fun row ->
-                       Array.isEmpty row
-                       || Array.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
+                       Seq.isEmpty row
+                       || Seq.forall (fun (cell: CompositeCell) -> String.IsNullOrWhiteSpace(cell.ToTabStr())) row
                    )
                    |> Array.contains true
 
@@ -409,7 +413,7 @@ type AnnotationTableContextMenuUtil =
                 coordinates
                 |> Array.iteri (fun yi row ->
                     //Restart row index, when the amount of selected rows is bigger than copied rows
-                    let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, (pasteColumns.data.Item 0).Cells.Length)
+                    let yIndex = AnnotationTableContextMenuUtil.getIndex (yi, (pasteColumns.data.Item 0).Cells.Count)
                     row
                     |> Array.iteri (fun xi coordinate ->
                         let xIndex =

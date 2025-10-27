@@ -1,16 +1,19 @@
 namespace ARCtrl
 
+open System.Collections.Generic
+
 open Swate.Components
 open Swate.Components.Shared
+
 open ARCtrl
-open Database
-open System.Collections.Generic
-open Fable.Core.JsInterop
 open ARCtrl.Spreadsheet
 
-module TermCollection =
+open Database
 
-    open ARCtrl
+open Fable.Core
+open Fable.Core.JsInterop
+
+module TermCollection =
 
     /// <summary>
     /// https://github.com/nfdi4plants/nfdi4plants_ontology/issues/85
@@ -54,34 +57,111 @@ module ARCtrlHelper =
         | Assay
         | Study
         | Investigation
+        | Run
+        | Workflow
+        | DataMap
         | Template
+
+        static member tryFromString(str: string) =
+            match str.ToLower() with
+            | "assay" -> Some Assay
+            | "study" -> Some Study
+            | "investigation" -> Some Investigation
+            | "run" -> Some Run
+            | "workflow" -> Some Workflow
+            | "datamap" -> Some DataMap
+            | "template" -> Some Template
+            | _ -> None
+
+        static member fromString(str: string) =
+            match ArcFilesDiscriminate.tryFromString str with
+            | Some r -> r
+            | None -> failwithf "Unknown ArcFilesDiscriminate: %s" str
+
+    [<StringEnum>]
+    type DataMapParent =
+        | Assay
+        | Study
+        | Run
+        | Workflow
+
+        static member tryFromString(str: string) =
+            match str.ToLower() with
+            | "assay" -> Assay
+            | "study" -> Study
+            | "run" -> Run
+            | "workflow" -> Workflow
+            | _ -> failwith $"The type {str.ToLower()} is unknown"
+
+    type DatamapParentInfo = {|
+        ParentId: string
+        Parent: DataMapParent
+    |}
+
+    let createDataMapParentInfo (parentId: string) (parent: DataMapParent) : DatamapParentInfo = {|
+        ParentId = parentId
+        Parent = parent
+    |}
 
     type ArcFiles =
         | Template of Template
         | Investigation of ArcInvestigation
         | Study of ArcStudy * ArcAssay list
         | Assay of ArcAssay
+        | Run of ArcRun
+        | Workflow of ArcWorkflow
+        /// DatamapParentInfo is only required for ARCitect integration purposes.
+        | DataMap of (DatamapParentInfo option * DataMap)
 
         member this.HasTableAt(index: int) =
             match this with
             | Template _ -> index = 0 // Template always has exactly one table
-            | Investigation i -> false
+            | DataMap _ -> index = -1
+            | Workflow _ -> index = -2
+            | Investigation _ -> false
             | Study(s, _) -> s.TableCount <= index
             | Assay a -> a.TableCount <= index
+            | Run r -> r.TableCount <= index
 
-        member this.HasDataMap() =
+        member this.HasMetadata() =
             match this with
-            | Template _ -> false
-            | Investigation i -> false
-            | Study(s, _) -> s.DataMap.IsSome
-            | Assay a -> a.DataMap.IsSome
+            | Assay _
+            | Template _
+            | Run _
+            | Workflow _
+            | Investigation _ -> true
+            | Study(_, _) -> true
+            | DataMap _ -> false
 
-        member this.Tables() : ArcTables =
+        member this.ArcTables() : ArcTables =
             match this with
             | Template t -> ResizeArray([ t.Table ]) |> ArcTables
-            | Investigation _ -> ArcTables(ResizeArray [])
             | Study(s, _) -> s
             | Assay a -> a
+            | Run r -> r
+            | Investigation _
+            | Workflow _
+            | DataMap _ -> ArcTables(ResizeArray [])
+
+        member this.Tables() : ResizeArray<ArcTable> =
+            match this with
+            | Template t -> ResizeArray([ t.Table ])
+            | Study(s, _) -> s.Tables
+            | Assay a -> a.Tables
+            | Run r -> r.Tables
+            | Investigation _
+            | Workflow _
+            | DataMap _ -> ResizeArray()
+
+        member this.RelatedArcFilesDiscriminate: ArcFilesDiscriminate =
+            match this with
+            | Template _ -> ArcFilesDiscriminate.Template
+            | Investigation _ -> ArcFilesDiscriminate.Investigation
+            | Study _ -> ArcFilesDiscriminate.Study
+            | Assay _ -> ArcFilesDiscriminate.Assay
+            | Run _ -> ArcFilesDiscriminate.Run
+            | Workflow _ -> ArcFilesDiscriminate.Workflow
+            | DataMap _ -> ArcFilesDiscriminate.DataMap
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =
@@ -90,13 +170,19 @@ module ARCtrlHelper =
         | ISA
         | ROCrate
 
-        static member fromString(str: string) =
+        static member tryFromString(str: string) =
             match str.ToLower() with
-            | "arctrl" -> ARCtrl
-            | "arctrl compressed" -> ARCtrlCompressed
-            | "isa" -> ISA
-            | "ro-crate metadata" -> ROCrate
-            | _ -> failwithf "Unknown JSON export format: %s" str
+            | "arctrl" -> Some ARCtrl
+            | "arctrl compressed"
+            | "arctrlcompressed" -> Some ARCtrlCompressed
+            | "isa" -> Some ISA
+            | "ro-crate metadata"
+            | "rocrate" -> Some ROCrate
+            | _ -> None
+
+        static member fromString(str: string) =
+            JsonExportFormat.tryFromString str
+            |> Option.defaultWith (fun () -> failwithf "Unknown JsonExportFormat: %s" str)
 
         member this.AsStringRdbl =
             match this with
@@ -252,6 +338,26 @@ type CompositeHeaderDiscriminate =
     | Output
     | Comment
     | Freetext
+
+    member this.CreateEmptyDefaultCells(?count: int) =
+        let count = defaultArg count 1
+
+        match this with
+        | CompositeHeaderDiscriminate.Component
+        | CompositeHeaderDiscriminate.Characteristic
+        | CompositeHeaderDiscriminate.Factor
+        | CompositeHeaderDiscriminate.Parameter
+        | CompositeHeaderDiscriminate.ProtocolType -> ResizeArray(Array.create count (CompositeCell.emptyTerm))
+        | CompositeHeaderDiscriminate.ProtocolDescription
+        | CompositeHeaderDiscriminate.ProtocolUri
+        | CompositeHeaderDiscriminate.ProtocolVersion
+        | CompositeHeaderDiscriminate.ProtocolREF
+        | CompositeHeaderDiscriminate.Performer
+        | CompositeHeaderDiscriminate.Date
+        | CompositeHeaderDiscriminate.Input
+        | CompositeHeaderDiscriminate.Output
+        | CompositeHeaderDiscriminate.Freetext
+        | CompositeHeaderDiscriminate.Comment -> ResizeArray(Array.create count (CompositeCell.emptyFreeText))
 
     /// <summary>
     /// Returns true if the Building Block is a term column
@@ -496,7 +602,7 @@ module Extensions =
         member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
 
             SanityChecks.validateColumn
-            <| CompositeColumn.create (this.Headers.[columnIndex], [| cell |])
+            <| CompositeColumn.create (this.Headers.[columnIndex], [| cell |] |> ResizeArray)
 
             Unchecked.setCellAt (columnIndex, rowIndex, cell) this.Values
             Unchecked.fillMissingCells this.Headers this.Values
@@ -506,17 +612,12 @@ module Extensions =
 
             for coordinate, items in columns do
                 SanityChecks.validateColumn
-                <| CompositeColumn.create (this.Headers.[coordinate.x], items |> Array.map snd)
+                <| CompositeColumn.create (this.Headers.[coordinate.x], (items |> Array.map snd) |> ResizeArray)
 
             for index, cell in cells do
                 Unchecked.setCellAt (index.x, index.y, cell) this.Values
 
             Unchecked.fillMissingCells this.Headers this.Values
-
-        member this.MoveColumn(currentIndex: int, nextIndex: int) =
-            let updateHeaders = Helper.arrayMoveColumn currentIndex nextIndex this.Headers
-            let updateBody = Helper.dictMoveColumn currentIndex nextIndex this.Values
-            ()
 
         /// <summary>
         /// Returns a new ArcTable from all columns defined by ``indices``.
@@ -534,24 +635,25 @@ module Extensions =
         member this.FileName = this.Name.Replace(" ", "_") + ".xlsx"
 
     type ArcTable with
-            /// <summary>
-            /// Transforms ArcTable to excel compatible "values", row major
-            /// </summary>
-            member this.ToStringSeqs() =
+        /// <summary>
+        /// Transforms ArcTable to excel compatible "values", row major
+        /// </summary>
+        member this.ToStringSeqs() =
 
-                // Cancel if there are no columns
-                if this.Columns.Length = 0 then
-                    [||]
-                else
-                    let columns =
-                        this.Columns
-                        |> List.ofArray
-                        |> List.sortBy ArcTable.classifyColumnOrder
-                        |> List.collect CompositeColumn.toStringCellColumns
-                        |> Seq.transpose
-                        |> Seq.map (fun column -> column |> Array.ofSeq)
-                        |> Array.ofSeq
-                    columns
+            // Cancel if there are no columns
+            if this.Columns.Count = 0 then
+                [||]
+            else
+                let columns =
+                    this.Columns
+                    |> List.ofSeq
+                    |> List.sortBy ArcTable.classifyColumnOrder
+                    |> List.collect CompositeColumn.toStringCellColumns
+                    |> Seq.transpose
+                    |> Seq.map (fun column -> column |> Array.ofSeq)
+                    |> Array.ofSeq
+
+                columns
 
     type CompositeHeader with
 

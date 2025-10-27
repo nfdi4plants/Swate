@@ -58,7 +58,14 @@ type ComboBox =
             ?onFocus: Browser.Types.FocusEvent -> unit,
             ?onBlur: Browser.Types.FocusEvent -> unit,
             ?onOpen: bool -> unit,
-            ?props: obj
+            ?props: obj,
+            ?onDoubleClick:
+                Browser.Types.MouseEvent
+                    -> {|
+                        isOpen: bool
+                        setIsOpen: bool -> unit
+                    |}
+                    -> unit
         ) : ReactElement =
         let isOpen, setOpen = React.useState (false)
 
@@ -261,7 +268,15 @@ type ComboBox =
                                                 setActiveIndex None
 
                                             onKeyDown |> Option.iter (fun fn -> fn ev)
-
+                                    onDoubleClick =
+                                        fun (ev: Browser.Types.MouseEvent) ->
+                                            onDoubleClick
+                                            |> Option.iter (fun fn ->
+                                                fn ev {|
+                                                    isOpen = isOpen
+                                                    setIsOpen = setOpen
+                                                |}
+                                            )
                                 |}
                             )
                             |> Fable.Core.JS.Constructors.Object.entries do

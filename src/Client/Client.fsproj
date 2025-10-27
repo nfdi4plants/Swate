@@ -72,11 +72,12 @@
     <Compile Include="SharedComponents\ClickOutsideHandler.fs" />
     <Compile Include="SharedComponents\Metadata\Generic.fs" />
     <Compile Include="SharedComponents\Metadata\Forms.fs" />
-    <Compile Include="SharedComponents\Metadata\DatamapConfig.fs" />
     <Compile Include="SharedComponents\Metadata\Assay.fs" />
+    <Compile Include="SharedComponents\Metadata\Run.fs" />
     <Compile Include="SharedComponents\Metadata\Investigation.fs" />
     <Compile Include="SharedComponents\Metadata\Study.fs" />
     <Compile Include="SharedComponents\Metadata\Template.fs" />
+    <Compile Include="SharedComponents\Metadata\Workflow.fs" />
     <Compile Include="SharedComponents\BaseNavbar.fs" />
     <Compile Include="SharedComponents\NavbarBurger.fs" />
     <Compile Include="SidebarComponents\LayoutHelper.fs" />
@@ -102,16 +103,12 @@
     <Compile Include="Pages\JsonImport\JsonImport.fs" />
     <Compile Include="Pages\JsonExporter\JsonExporter.fs" />
     <Compile Include="Pages\DataAnnotator\DataAnnotator.fs" />
-    <Compile Include="MainComponents\CellStyles.fs" />
     <Compile Include="MainComponents\EmptyTableModals.fs" />
     <Compile Include="MainComponents\EmptyTableElement.fs" />
     <Compile Include="MainComponents\Widgets.fs" />
     <Compile Include="MainComponents\NoFileElement.fs" />
-    <Compile Include="MainComponents\ContextMenu.fs" />
-    <Compile Include="MainComponents\Cells.fs" />
     <Compile Include="MainComponents\KeyboardShortcuts.fs" />
     <Compile Include="MainComponents\TableFooter.fs" />
-    <Compile Include="MainComponents\SpreadsheetView\Generic.fs" />
     <Compile Include="MainComponents\SpreadsheetView\ArcTable.fs" />
     <Compile Include="MainComponents\SpreadsheetView\DataMap.fs" />
     <Compile Include="MainComponents\Navbar.fs" />
@@ -131,16 +128,17 @@
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Javascript" Version="2.5.1" />
-    <PackageReference Include="Fable.Elmish" Version="4.2.0" />
-    <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />
-    <PackageReference Include="Fable.Elmish.React" Version="4.0.0" />
-    <PackageReference Include="Fable.Elmish.Browser" Version="4.0.3" />
-    <PackageReference Include="Fable.Elmish.Debugger" Version="4.1.0" />
-    <PackageReference Include="Fable.Fetch" Version="2.7.0" />
-    <PackageReference Include="Fable.SimpleJson" Version="3.24.0" />
-    <PackageReference Include="ExcelJS.Fable" Version="0.3.0" />
-    <PackageReference Include="Fable.Mocha" Version="2.17.0" />
+    <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Javascript" />
+    <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="Fable.Elmish" />
+    <PackageReference Include="Fable.Elmish.HMR" />
+    <PackageReference Include="Fable.Elmish.React" />
+    <PackageReference Include="Fable.Elmish.Browser" />
+    <PackageReference Include="Fable.Elmish.Debugger" />
+    <PackageReference Include="Fable.Fetch" />
+    <PackageReference Include="Fable.SimpleJson" />
+    <PackageReference Include="ExcelJS.Fable" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Components\src\Swate.Components.fsproj" />

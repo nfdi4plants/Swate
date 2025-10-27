@@ -51,6 +51,8 @@ type FileExporter =
     static member JsonExport(model: Model, dispatch) =
         let state, setState = React.useState JsonExportState.init
 
+        let keys = Spreadsheet.IO.Json.readFromJsonMap |> Map.keys |> Seq.toList
+
         Html.div [
             prop.className "swt:join"
             prop.children [
@@ -58,13 +60,20 @@ type FileExporter =
                     prop.className "swt:select swt:join-item swt:min-w-fit"
                     prop.onChange (fun (e: Browser.Types.Event) ->
                         let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
-                        { state with ExportFormat = jef } |> setState)
+                        { state with ExportFormat = jef } |> setState
+                    )
                     prop.defaultValue (string state.ExportFormat)
                     prop.children [
-                        FileExporter.FileFormat(JsonExportFormat.ROCrate, state, setState)
-                        FileExporter.FileFormat(JsonExportFormat.ISA, state, setState)
-                        FileExporter.FileFormat(JsonExportFormat.ARCtrl, state, setState)
-                        FileExporter.FileFormat(JsonExportFormat.ARCtrlCompressed, state, setState)
+                        match model.SpreadsheetModel.ArcFile with
+                        | Some arcfile ->
+                            for af, jf in keys do
+                                if af = arcfile.RelatedArcFilesDiscriminate then
+                                    FileExporter.FileFormat(jf, state, setState)
+                        | None ->
+                            FileExporter.FileFormat(JsonExportFormat.ROCrate, state, setState)
+                            FileExporter.FileFormat(JsonExportFormat.ISA, state, setState)
+                            FileExporter.FileFormat(JsonExportFormat.ARCtrl, state, setState)
+                            FileExporter.FileFormat(JsonExportFormat.ARCtrlCompressed, state, setState)
                     ]
                 ]
                 Html.button [
@@ -96,7 +105,8 @@ type FileExporter =
                                 )
                                 |> InterfaceMsg
                                 |> dispatch
-                        | _ -> failwith "not implemented")
+                        | _ -> failwith "not implemented"
+                    )
                 ]
             ]
         ]

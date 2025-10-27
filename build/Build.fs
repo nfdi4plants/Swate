@@ -32,11 +32,24 @@ let main args =
         | _ ->
             Run.All(false)
             0
+    | "tests" :: a
     | "test" :: a ->
         Test.disableUserData ()
         Test.buildSharedTests ()
 
         match a with
+        | "run" :: "server" :: _ ->
+            match Test.Run.server |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
+        | "run" :: "client" :: _ ->
+            match Test.Run.client |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
+        | "run" :: "components" :: _ ->
+            match Test.Run.components |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
         | "watch" :: _ ->
             Test.Watch()
             0
@@ -44,7 +57,7 @@ let main args =
             Test.WatchJs()
             0
         | _ ->
-            Test.Run()
+            Test.Run.All()
             0
     | "release" :: target :: otherArgs ->
         let latestVersion = Changelog.getLatestVersion ()

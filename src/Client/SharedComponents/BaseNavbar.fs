@@ -5,7 +5,6 @@ open Feliz.DaisyUI
 
 type BaseNavbar =
     static member Main(children: ReactElement) =
-        //Daisy.navbar [
         Html.div [
             prop.className "swt:navbar swt:bg-base-300 swt:text-base-content swt:gap-2"
             prop.role "navigation"

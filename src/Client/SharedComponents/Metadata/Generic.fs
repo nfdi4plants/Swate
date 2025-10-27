@@ -16,13 +16,11 @@ type Generic =
         ]
 
     static member BoxedField(?title: string, ?description: string, ?content: ReactElement list) =
-        //Daisy.card [
         Html.div [
             prop.className
                 "swt:card swt:card-sm swt:space-y-6 swt:border-2 swt:border-base-300 swt:shadow-xl swt:bg-base
             swt:prose swt:prose-headings:text-primary swt:container swt:max-w-full swt:lg:max-w-[800px]"
             prop.children [
-                //Daisy.cardBody [
                 Html.div [
                     prop.className "swt:card-body"
                     prop.children [
@@ -59,19 +57,16 @@ type Generic =
         ]
 
     static member Collapse (title: ReactElement seq) (content: ReactElement seq) =
-        //Daisy.collapse [
         Html.div [
             prop.className
                 "swt:collapse swt:collapse-plus swt:grow swt:border swt:has-[:checked]:border-transparent swt:has-[:checked]:bg-base-200"
             prop.children [
                 Html.input [ prop.type'.checkbox; prop.className "peer" ]
-                //Daisy.collapseTitle [
                 Html.div [
                     prop.className
                         "swt:collapse-title swt:after:text-primary swt:@md/main:after:!size-4 swt:@md/main:after:text-xl swt:flex swt:gap-4"
                     prop.children title
                 ]
-                //Daisy.collapseContent [
                 Html.div [
                     prop.className "swt:collapse-content swt:space-y-4 swt:cursor-default"
                     prop.children content
@@ -82,15 +77,15 @@ type Generic =
     static member CollapseTitle(title: string, subtitle: string, ?count: string) =
         React.fragment [
             Html.div [
-                Html.h5 title
+                Html.h5 [ prop.className "swt:text-md swt:font-semibold"; prop.text title ]
                 Html.div [
-                    prop.className "not-prose swt:text-sm"
+                    prop.className "not-prose swt:text-xs swt:text-base-content/70"
                     prop.children [ Html.span [ prop.text subtitle ] ]
                 ]
             ]
             if count.IsSome then
                 Html.div [
-                    prop.className "not-prose swt:text-center swt:ml-auto"
+                    prop.className "not-prose swt:flex swt:flex-col swt:ml-auto swt:items-center swt:justify-center"
                     prop.children [
                         Icons.Edit()
                         Html.div [ prop.className "swt:text-sm"; prop.text (count.Value) ]

@@ -16,6 +16,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+-   Full support for isa.run.xlsx files
+-   Full support for isa.workflow.xlsx files
+-   Full support for separate datamap.xlsx files
+-   Drag and drop support for file import #635
+    -   Supports json with specific name restrictions: #532
+        -   MUST contain json format ("ARCtrl", "ARCtrlCompressed", "ISA", "ROCrate") not case sensitive.
+        -   MUST contain file type ("Assay", "Study", "Investigation", "DataMap", "Workflow", "Run", "Template") not case sensitive.
+        -   MUST be separated by an underscore ("\_")
+        -   MUST have the ".json" file extension
+-   Term search can be triggered by double clicking a into the input #888
+
+### Changed
+
+-   JSON import uses a more direct Select component to choose file type and json format.
+-   JSON export now checks compatibility of selected file type and json format before displaying options.
+-   Assay metadata sheet now has fields for: "Title" and "Description".
+
+### Deprecated
+
+-   Remove in file support for DataMaps
+
+### Removed
+
+-   Restriction of Sidebar to table views.
+
+### Fixed
+
+-   Context menu "Fill Column" indexing issue fixed. #891
+-   Duplicate Comment keys on top level metadata are not validated until any export is triggered (ARCitect, download .xlsx, etc.) #883
+-   Added whitespace to table components to improve UX when rightmost columns are in use. #859
+
 ## 1.0.0-rc.9 - 2025-10-10
 
 ### Added
@@ -526,8 +559,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
--       * Responsive design should now render immediatly upon window size change
--       * Add-in should not reload after navigating to a new tab for the first time.
+-           * Responsive design should now render immediatly upon window size change
+-           * Add-in should not reload after navigating to a new tab for the first time.
 -   Term search input field no longer looses focus after clicking into it.
 
 ## 0.0.2-alpha - 2020-10-29

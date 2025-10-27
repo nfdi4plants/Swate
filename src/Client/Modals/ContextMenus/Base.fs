@@ -7,10 +7,7 @@ open Swate.Components
 type Base =
 
     static member Divider() =
-        //Daisy.divider [ prop.className "swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2" ]
-        Html.div [
-            prop.className "swt:divider swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2"
-        ]
+        Html.div [ prop.className "swt:divider swt:!m-0 swt:pl-1 swt:pr-3 swt:h-2" ]
 
     static member Item(content: ReactElement, ?onclick, ?icon: ReactElement, ?inactive: bool) =
         Html.li [
@@ -18,12 +15,12 @@ type Base =
                 prop.onClick onclick.Value
             prop.className [
                 "swt:bg-base-300 swt:text-base-content"
-                "swt:flex swt:flex-row swt:justify-between swt:cursor-pointer"
+                "swt:flex swt:flex-row swt:justify-between swt:items-center swt:cursor-pointer"
                 "swt:text-sm swt:w-full swt:gap-4 swt:px-3 swt:py-1"
                 if inactive.IsSome && inactive.Value then
                     "swt:cursor-not-allowed swt:opacity-50"
                 else
-                    "swt:transition-colors swt:duration-200 swt:hover:bg-base-200"
+                    "swt:hover:outline-base-content swt:hover:outline"
 
             ]
             prop.children [
@@ -48,7 +45,8 @@ type Base =
                 React.fragment [
                     for i in icons do
                         i
-                ])
+                ]
+            )
 
         Base.Item(content, onclick, ?icon = icon, ?inactive = inactive)
 
@@ -61,6 +59,7 @@ type Base =
         Html.div [
             prop.ref ref
             prop.style [ style.left mousex; style.top mousey ]
-            prop.className "swt:fixed swt:z-50 swt:shadow-md swt:rounded-md swt:min-w-fit swt:bg-base-300 swt:text-black"
+            prop.className
+                "swt:fixed swt:z-50 swt:shadow-md swt:rounded-md swt:min-w-fit swt:bg-base-300 swt:text-black"
             prop.children [ Html.ul (children rmv) ]
         ]

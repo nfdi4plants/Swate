@@ -280,7 +280,9 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
                         prop.className "swt:tab swt:max-w-min swt:!px-2"
                         prop.style [ style.custom ("order", -2) ]
                     ]
-                    MainMetadata(model, dispatch)
+
+                    if model.SpreadsheetModel.HasMetadata() then
+                        MainMetadata(model, dispatch)
                     if model.SpreadsheetModel.HasDataMap() then
                         MainDataMap(model, dispatch)
                     for index in 0 .. (model.SpreadsheetModel.Tables.TableCount - 1) do
@@ -289,7 +291,6 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
                         MainPlus(model, dispatch)
                 ]
             ]
-            if model.SpreadsheetModel.TableViewIsActive() then
-                ToggleSidebar(model, dispatch)
+            ToggleSidebar(model, dispatch)
         ]
     ]

@@ -139,7 +139,7 @@ let addDataAnnotation
             CompositeCell.createData d
     |]
 
-    state.ActiveTable.AddColumn(newHeader, values, forceReplace = true)
+    state.ActiveTable.AddColumn(newHeader, values |> ResizeArray, forceReplace = true)
     { state with ArcFile = state.ArcFile }
 
 let joinTable
@@ -156,9 +156,12 @@ let joinTable
             System.Text.RegularExpressions.Regex.Replace(templateName.Value, "\W", "")
 
         let newTable =
-            ArcTable.create (templateName, state.ActiveTable.Headers, state.ActiveTable.Values)
+            let body =
+                state.ActiveTable.Columns |> Seq.map (fun column -> column.Cells) |> ResizeArray
 
-        state.ArcFile.Value.Tables().SetTable(state.ActiveTable.Name, newTable)
+            ArcTable.create (templateName, state.ActiveTable.Headers, body)
+
+        state.ArcFile.Value.ArcTables().SetTable(state.ActiveTable.Name, newTable)
 
     let table = state.ActiveTable
     table.Join(tableToAdd, ?index = index, ?joinOptions = options, forceReplace = true)
