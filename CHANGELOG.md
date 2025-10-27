@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 1.0.0-rc.10 - 2025-10-27
+
 ### Added
 
 -   Full support for isa.run.xlsx files
