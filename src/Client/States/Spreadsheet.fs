@@ -85,8 +85,8 @@ type Model = {
     ArcFile: ArcFiles option
 } with
 
-    static member init(?arcfile) = {
-        ActiveView = ActiveView.Metadata
+    static member init(?arcfile, ?activeView) = {
+        ActiveView = defaultArg activeView ActiveView.Metadata
         ArcFile = arcfile
     }
 
@@ -127,15 +127,6 @@ type Model = {
         match this.ArcFile with
         | Some(arcFile) -> arcFile.HasMetadata()
         | None -> false
-
-    member this.HasDataMap() =
-        match this.ArcFile with
-        | Some(Assay a) -> a.DataMap.IsSome
-        | Some(Run r) -> r.DataMap.IsSome
-        | Some(Workflow w) -> w.DataMap.IsSome
-        | Some(Study(s, _)) -> s.DataMap.IsSome
-        | Some(DataMap(_, _)) -> true
-        | _ -> false
 
     member this.DataMapOrDefault =
         match this.ArcFile with

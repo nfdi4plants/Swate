@@ -42,7 +42,6 @@ let run (cmd: string) (args: seq<string>) (workingDir: string) =
         Command.Run(cmd, args = args, workingDirectory = workingDir)
     with ex ->
         printRedfn "Error while running command: %s" ex.Message
-        exit 1
 
 let runReadAsync (cmd: string) (args: seq<string>) (workingDir: string) =
     try

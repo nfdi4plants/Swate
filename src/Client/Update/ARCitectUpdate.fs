@@ -24,7 +24,7 @@ module ARCitect =
         | ARCitect.Init msg ->
             match msg with
             | Start() ->
-                console.log "ARCitect.Init.Start"
+                console.log "[Swate] ARCitect.Init.Start"
 
                 let cmd =
                     Cmd.OfPromise.either
@@ -35,7 +35,8 @@ module ARCitect =
 
                 state, model, cmd
             | ApiCall.Finished(Some(arcFile, json, dataMapParent)) ->
-                let resolvedArcFile =
+
+                let resolvedArcFile = // if the fable transpiled string from ARCitect.Interop.InteropTypes.ARCFile does not exactly match any available here it will somehow fallback to "ARCitect.Interop.InteropTypes.ARCFile.Assay"
                     match arcFile with
                     | ARCitect.Interop.InteropTypes.ARCFile.Assay ->
                         let assay = ArcAssay.fromJsonString json
@@ -46,17 +47,22 @@ module ARCitect =
                     | ARCitect.Interop.InteropTypes.ARCFile.Investigation ->
                         let inv = ArcInvestigation.fromJsonString json
                         ArcFiles.Investigation inv
-                    | ARCitect.Interop.InteropTypes.ARCFile.Run -> failwith "Run has no fromJsonString implemented yet"
+                    | ARCitect.Interop.InteropTypes.ARCFile.Run ->
+                        let run = ArcRun.fromJsonString json
+                        ArcFiles.Run run
                     | ARCitect.Interop.InteropTypes.ARCFile.Workflow ->
-                        failwith "Workflow has no fromJsonString implemented yet"
+                        let workflow = ArcWorkflow.fromJsonString json
+                        ArcFiles.Workflow workflow
                     | ARCitect.Interop.InteropTypes.ARCFile.Template ->
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
                     | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
-                        let datamapParent, dataMap =
-                            Decode.fromJsonString UpdateUtil.JsonHelper.wholeDatamapDecoder json
+                        if dataMapParent.IsNone then
+                            failwith "No parent for datamap is available!"
 
-                        ArcFiles.DataMap(Some datamapParent, dataMap)
+                        let dataMap = DataMap.fromJsonString json
+
+                        ArcFiles.DataMap(dataMapParent, dataMap)
 
                 let cmd = Spreadsheet.InitFromArcFile resolvedArcFile |> SpreadsheetMsg |> Cmd.ofMsg
                 state, model, cmd
@@ -64,32 +70,27 @@ module ARCitect =
             | ApiCall.Finished(None) -> state, model, Cmd.none
 
         | ARCitect.Save arcFile ->
-            let arcFileEnum, json =
+            let arcFileEnum, json, datamapParent =
                 match arcFile with
-                | ArcFiles.Assay assay -> ARCitect.Interop.InteropTypes.ARCFile.Assay, ArcAssay.toJsonString 0 assay
-                | ArcFiles.Study(study, _) -> ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study
+                | ArcFiles.Assay assay ->
+                    ARCitect.Interop.InteropTypes.ARCFile.Assay, ArcAssay.toJsonString 0 assay, None
+                | ArcFiles.Study(study, _) ->
+                    ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study, None
                 | ArcFiles.Investigation inv ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv
-                | ArcFiles.Run run -> ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run
+                    ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv, None
+                | ArcFiles.Run run -> ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run, None
                 | ArcFiles.Workflow workflow ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Workflow, ArcWorkflow.toJsonString 0 workflow
+                    ARCitect.Interop.InteropTypes.ARCFile.Workflow, ArcWorkflow.toJsonString 0 workflow, None
                 | ArcFiles.Template template ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template
+                    ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template, None
                 | ArcFiles.DataMap(datamapParent, datamap) ->
-                    let json =
-                        if datamapParent.IsSome then
-                            UpdateUtil.JsonHelper.wholeDatamapEncoder
-                                datamapParent.Value.ParentId
-                                datamapParent.Value.Parent
-                                datamap
-                            |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
-                        else
-                            failwith "No parent for datamap is available!"
-
-                    ARCitect.Interop.InteropTypes.ARCFile.DataMap, json
+                    ARCitect.Interop.InteropTypes.ARCFile.DataMap, DataMap.toJsonString 0 datamap, datamapParent
 
             let cmd =
-                Cmd.OfPromise.attempt api.Save (arcFileEnum, json) (curry GenericError Cmd.none >> DevMsg)
+                Cmd.OfPromise.attempt
+                    api.Save
+                    (arcFileEnum, json, datamapParent)
+                    (curry GenericError Cmd.none >> DevMsg)
 
             state, model, cmd
 

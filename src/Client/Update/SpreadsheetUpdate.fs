@@ -10,7 +10,6 @@ open Swate.Components.Shared
 open Fable.Remoting.Client
 open FsSpreadsheet.Js
 open ARCtrl
-open Update.UpdateUtil.JsonHelper
 open ARCtrl.Spreadsheet
 open ARCtrl.Json
 
@@ -56,39 +55,50 @@ module Spreadsheet =
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, ArcAssay.toJsonString 0 assay)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Assay,
+                            ArcAssay.toJsonString 0 assay,
+                            None
+                        )
                         |> Promise.start
                     | Some(Study(study, _)) ->
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Study,
+                            ArcStudy.toJsonString 0 study,
+                            None
+                        )
                         |> Promise.start
                     | Some(Investigation inv) ->
                         ARCitect.api.Save(
                             ARCitect.Interop.InteropTypes.ARCFile.Investigation,
-                            ArcInvestigation.toJsonString 0 inv
+                            ArcInvestigation.toJsonString 0 inv,
+                            None
                         )
                         |> Promise.start
                     | Some(Run run) ->
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run)
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run, None)
                         |> Promise.start
                     | Some(Workflow workflow) ->
                         ARCitect.api.Save(
                             ARCitect.Interop.InteropTypes.ARCFile.Workflow,
-                            ArcWorkflow.toJsonString 0 workflow
+                            ArcWorkflow.toJsonString 0 workflow,
+                            None
                         )
                         |> Promise.start
                     | Some(Template template) ->
                         ARCitect.api.Save(
                             ARCitect.Interop.InteropTypes.ARCFile.Template,
-                            Template.toJsonString 0 template
+                            Template.toJsonString 0 template,
+                            None
                         )
                         |> Promise.start
                     | Some(DataMap(parent, datamap)) ->
                         if parent.IsSome then
-                            let json =
-                                wholeDatamapEncoder parent.Value.ParentId parent.Value.Parent datamap
-                                |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
-
-                            ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.DataMap, json)
+                            ARCitect.api.Save(
+                                ARCitect.Interop.InteropTypes.ARCFile.DataMap,
+                                DataMap.toJsonString 0 datamap,
+                                parent
+                            )
                             |> Promise.start
                         else
                             failwith "No datamap parent is available"
@@ -201,7 +211,11 @@ module Spreadsheet =
 
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState = Spreadsheet.Model.init (arcFile)
+                let nextState =
+                    match arcFile with
+                    | ArcFiles.DataMap _ -> Spreadsheet.Model.init (arcFile, ActiveView.DataMap)
+                    | _ -> Spreadsheet.Model.init (arcFile)
+
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation(range, oa) ->
                 let nextState = Controller.BuildingBlocks.insertTerm oa range state

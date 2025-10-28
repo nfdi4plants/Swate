@@ -11,32 +11,32 @@ let downloadFromString (filename, content: string) =
     let bytes = System.Text.Encoding.UTF8.GetBytes(content)
     bytes.SaveFileAs(filename)
 
-module JsonHelper =
+// module JsonHelper =
 
-    open ARCtrl.Json
+//     open ARCtrl.Json
 
-    open Thoth.Json
-    open Thoth.Json.Core
+//     open Thoth.Json
+//     open Thoth.Json.Core
 
-    let wholeDatamapEncoder (parentId: string) (parent: ARCtrl.ARCtrlHelper.DataMapParent) (datamap: ARCtrl.DataMap) =
-        Encode.object [
-            "ParentId", Encode.string parentId
-            "Parent", Encode.string (parent.ToString())
-            "Datamap", DataMap.encoder datamap
-        ]
+//     let wholeDatamapEncoder (parentId: string) (parent: ARCtrl.ARCtrlHelper.DataMapParent) (datamap: ARCtrl.DataMap) =
+//         Encode.object [
+//             "ParentId", Encode.string parentId
+//             "Parent", Encode.string (parent.ToString())
+//             "Datamap", DataMap.encoder datamap
+//         ]
 
-    let wholeDatamapDecoder =
-        Decode.object (fun get ->
-            let parentId = get.Required.Field "ParentId" Decode.string
+//     let wholeDatamapDecoder =
+//         Decode.object (fun get ->
+//             let parentId = get.Required.Field "ParentId" Decode.string
 
-            let parent =
-                let temp = get.Required.Field "Parent" Decode.string
-                DataMapParent.tryFromString (temp)
+//             let parent =
+//                 let temp = get.Required.Field "Parent" Decode.string
+//                 DataMapParent.tryFromString (temp)
 
-            let datamapParent = createDataMapParentInfo parentId parent
-            let datamap = get.Required.Field "Datamap" DataMap.decoder
-            datamapParent, datamap
-        )
+//             let datamapParent = createDataMapParentInfo parentId parent
+//             let datamap = get.Required.Field "Datamap" DataMap.decoder
+//             datamapParent, datamap
+//         )
 
 module JsonGenericHelper =
 

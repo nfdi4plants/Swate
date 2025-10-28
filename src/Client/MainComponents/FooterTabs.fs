@@ -283,8 +283,11 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
 
                     if model.SpreadsheetModel.HasMetadata() then
                         MainMetadata(model, dispatch)
-                    if model.SpreadsheetModel.HasDataMap() then
-                        MainDataMap(model, dispatch)
+                    match model.SpreadsheetModel.ArcFile with
+                    | Some(DataMap _) -> MainDataMap(model, dispatch)
+                    | _ -> ()
+                    // if model.SpreadsheetModel.HasDataMap() then
+                    //     MainDataMap(model, dispatch)
                     for index in 0 .. (model.SpreadsheetModel.Tables.TableCount - 1) do
                         Main(index, model.SpreadsheetModel.Tables, model, dispatch)
                     if model.SpreadsheetModel.CanHaveTables() then

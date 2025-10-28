@@ -208,7 +208,6 @@ type NoFileElement =
                         try
                             match extension.ToLower() with
                             | "xlsx" ->
-                                console.log ("Importing XLSX file")
                                 let reader = Browser.Dom.FileReader.Create()
 
                                 reader.onload <-
@@ -216,7 +215,6 @@ type NoFileElement =
 
                                 reader.readAsArrayBuffer (file)
                             | "json" ->
-                                console.log ("Importing JSON file")
                                 let reader = Browser.Dom.FileReader.Create()
 
                                 reader.onload <-

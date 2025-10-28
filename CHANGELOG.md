@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+-   ARCitect communication for Datamap, Workflow and Run files.
+
+### Deprecated
+
+-   Remove datamap tab on assays, studies.
+
+### Fixed
+
+-   Release process for npm had a hard exit on check if package exists, which is now removed.
+
+## 1.0.0-rc.10 - 2025-10-27
+
+### Added
+
 -   Full support for isa.run.xlsx files
 -   Full support for isa.workflow.xlsx files
 -   Full support for separate datamap.xlsx files
@@ -561,8 +575,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
--           * Responsive design should now render immediatly upon window size change
--           * Add-in should not reload after navigating to a new tab for the first time.
+-             * Responsive design should now render immediatly upon window size change
+-             * Add-in should not reload after navigating to a new tab for the first time.
 -   Term search input field no longer looses focus after clicking into it.
 
 ## 0.0.2-alpha - 2020-10-29

@@ -12,13 +12,13 @@ module Interop =
         [<RequireQualifiedAccessAttribute>]
         [<StringEnum>]
         type ARCFile =
-            | Investigation
-            | Study
-            | Assay
-            | Run
-            | Workflow
-            | DataMap
-            | Template
+            | [<CompiledName("investigation")>] Investigation
+            | [<CompiledName("study")>] Study
+            | [<CompiledName("assay")>] Assay
+            | [<CompiledName("run")>] Run
+            | [<CompiledName("workflow")>] Workflow
+            | [<CompiledName("datamap")>] DataMap
+            | [<CompiledName("template")>] Template
 
         type ARCitectFile = {|
             mimetype: string
@@ -29,7 +29,7 @@ module Interop =
 
     type IARCitectOutAPI = {
         Init: unit -> JS.Promise<(InteropTypes.ARCFile * string * DatamapParentInfo option) option>
-        Save: InteropTypes.ARCFile * string -> JS.Promise<unit>
+        Save: InteropTypes.ARCFile * string * DatamapParentInfo option -> JS.Promise<unit>
         /// selectDictionaries:bool -> JS.Promise<wasSuccessful: bool>
         RequestPaths: bool -> JS.Promise<bool>
         /// () -> JS.Promise<wasSuccessful: bool>
@@ -44,7 +44,7 @@ module Interop =
         ResponsePaths: string[] -> JS.Promise<bool>
         ResponseFile: InteropTypes.ARCitectFile -> JS.Promise<bool>
         Refresh: unit -> JS.Promise<bool>
-        SetARCFile: InteropTypes.ARCFile * string * DatamapParentInfo option-> JS.Promise<bool>
+        SetARCFile: InteropTypes.ARCFile * string * DatamapParentInfo option -> JS.Promise<bool>
     }
 
 let api =

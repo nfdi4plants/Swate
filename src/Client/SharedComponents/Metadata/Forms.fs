@@ -487,8 +487,6 @@ type FormComponents =
                         tempInputs.current <- next
                         setter next
                     | Error msg ->
-                        console.log "Validation error in InputSequence:"
-                        console.log ("Setting prev: ", inputs)
                         setter tempInputs.current
                         setError (Some <| sprintf "Validation Error: %A" msg)
                 | None ->
