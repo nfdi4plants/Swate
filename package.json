@@ -21,10 +21,10 @@
     "jsdom": "^25.0.1",
     "mocha": "^10.8.2",
     "office-addin-mock": "^2.4.6",
-    "remotedev": "^0.2.7",
+    "remotedev": "^0.2.9",
     "tailwindcss": "^4.1.7",
     "typescript": "^5.6.3",
-    "vite": "^6.3.5",
+    "vite": "^6.3.6",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^3.1.4"
   },
