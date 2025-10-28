@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 1.0.0-rc.12 - 2025-10-28
+
+### Fixed
+
+-   Fixes missing FSharp.Core package reference in .NET Server causing runtime errors in docker 🐋.
+
 ## 1.0.0-rc.11 - 2025-10-27
 
 ### Added
