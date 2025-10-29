@@ -68,11 +68,13 @@ let main args =
             printRedfn "Currently the worklow only supports CI releases!"
             exit 1
 
+        VersionIO.updateAllVersionInformationInFiles latestVersion
+
         match target with
         | "nuget" ->
             let key = getEnvironementVariableOrFail "NUGET_KEY"
 
-            Release.nuget key latestVersion isDryRun
+            Release.nuget key isDryRun
 
             printGreenfn ("Release nuget!")
             0
@@ -158,8 +160,7 @@ let main args =
     | "dev" :: a ->
 
         let version = Changelog.getLatestVersion ()
-
-        ()
+        printfn "%A" version
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")

@@ -83,11 +83,7 @@ let updateFSharpProjectVersions (version: Changelog.Version) =
         let nextContent =
             match Regex.Count(content, versionRegexPattern) with
             | 1 ->
-                Regex.Replace(
-                    content,
-                    versionRegexPattern,
-                    sprintf "<PackageVersion>%s</PackageVersion>" nextVersion
-                )
+                Regex.Replace(content, versionRegexPattern, sprintf "<PackageVersion>%s</PackageVersion>" nextVersion)
             | _ -> failwithf "Version line not found in version file: %s" path
 
         File.WriteAllText(path, nextContent)
@@ -109,3 +105,8 @@ let updateComponentsPackageJSONVersion (version: Changelog.Version) =
         "src/Components"
 
     printfn "Updated src/Components/package.json to version %O" version.Version
+
+let updateAllVersionInformationInFiles (version: Changelog.Version) =
+    updateVersionFiles version
+    updateFSharpProjectVersions version
+    updateComponentsPackageJSONVersion version

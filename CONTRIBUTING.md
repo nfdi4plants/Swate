@@ -1,24 +1,24 @@
 # Local Setup
 
-- [Requirements](#requirements)
-- [Setup](#setup)
-- [Start](#start)
-  - [Available commands](#available-commands)
-- [Contribute](#contribute)
+-   [Requirements](#requirements)
+-   [Setup](#setup)
+-   [Start](#start)
+    -   [Available commands](#available-commands)
+-   [Contribute](#contribute)
 
 ## Requirements
 
-- [.NET SDK](https://dotnet.microsoft.com/en-us/download), >= 8.0.0
-  - verify with `dotnet --version`
-- [nodejs](https://nodejs.org/en/download), >=18
-  - verify with `node --version`
-- npm, >=9
-  - likely part of nodejs installation
-  - verify with `npm --version`
-- [docker](https://docs.docker.com/engine/install/), >= 24
-  - verify with `docker --version`
-  - this is required for database setup
-- Any F# IDE, e.g. [Visual Studio Code](https://code.visualstudio.com/) + [Ionide extension](https://marketplace.visualstudio.com/items?itemName=Ionide.Ionide-fsharp#:~:text=Ionide-VSCode%20is%20a%20VSCode,powers%20language%20features%20is%20FSAutoComplete.), [Rider](https://www.jetbrains.com/rider/), [Visual Studio](https://visualstudio.microsoft.com/)
+-   [.NET SDK](https://dotnet.microsoft.com/en-us/download), >= 8.0.0
+    -   verify with `dotnet --version`
+-   [nodejs](https://nodejs.org/en/download), >=18
+    -   verify with `node --version`
+-   npm, >=9
+    -   likely part of nodejs installation
+    -   verify with `npm --version`
+-   [docker](https://docs.docker.com/engine/install/), >= 24
+    -   verify with `docker --version`
+    -   this is required for database setup
+-   Any F# IDE, e.g. [Visual Studio Code](https://code.visualstudio.com/) + [Ionide extension](https://marketplace.visualstudio.com/items?itemName=Ionide.Ionide-fsharp#:~:text=Ionide-VSCode%20is%20a%20VSCode,powers%20language%20features%20is%20FSAutoComplete.), [Rider](https://www.jetbrains.com/rider/), [Visual Studio](https://visualstudio.microsoft.com/)
 
 ## Setup
 
@@ -33,6 +33,7 @@ This needs to be done once per repository download.
 > [http://localhost:8000/docs](http://localhost:8000/docs). You can find the credentials in the [docker-compose](.db/docker-compose.yml) file (SWOBUP_USERNAME=swobup, SWOBUP_PASSWORD=test).
 >
 > Run:
+>
 > 1. PUT `api/v2/database/init`
 > 2. PUT `api/v2/ontology/build`
 >
@@ -67,6 +68,6 @@ test                                Run all tests
 
 If you want to contribute to Swate, open an issue with the feature/bug you want to work on. This way you can ensure that your approach is in line with the project goals and you can get feedback from the maintainers.
 
-Afterwards you can fork the repository and start working on your feature/bug. When you are done, open a pull request with a detailed description of your changes and the issue you are working on.
+Afterwards you can fork the repository and start working on your feature/bug. When you are done, describe your changes in [CHANGELOG.md](CHANGELOG.md) following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and open a pull request.
 
-We are currently still working on a nice project structure. For now ask us is any questions arise in the related GitHub issue!
+We are currently still working on a nice project structure. For now ask us if any questions arise in the related GitHub issue!

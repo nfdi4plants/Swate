@@ -6,8 +6,6 @@ open ProjectInfo
 
 let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
-    VersionIO.updateComponentsPackageJSONVersion version
-
     let isPrerelease = version.Version.IsPrerelease
 
     try
@@ -53,10 +51,7 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
     ()
 
-let nuget (key: string) (version: Changelog.Version) (isDryRun: bool) =
-
-    VersionIO.updateVersionFiles version
-    VersionIO.updateFSharpProjectVersions version
+let nuget (key: string) (isDryRun: bool) =
 
     let mkCssFile = run "npm" [ "run"; "prebuild:net" ] ProjectPaths.componentsPath
 
@@ -93,6 +88,9 @@ let nuget (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
 let docker (username: string) (key: string) (version: Changelog.Version) (isDryRun: bool) =
     // Placeholder for docker release logic
+
+    VersionIO.updateVersionFiles version
+    VersionIO.updateFSharpProjectVersions version
 
     let dockerRegistryTarget = "ghcr.io"
     let imageName = "ghcr.io/nfdi4plants/swate"
@@ -139,7 +137,6 @@ open System.IO.Compression
 
 /// This currently builds the frontend, zips it to add it as asset to github release
 let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
-    VersionIO.updateVersionFiles version
 
     let sourceDir = Path.Combine(ProjectPaths.deployPath, "public")
     let targetZip = "./SwateClient.zip"
