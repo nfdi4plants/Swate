@@ -6,6 +6,9 @@ let main args =
     let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
 
     match argv with
+    | "create-certs" :: _ ->
+        Run.createDevCertsForExcelAddIn ()
+        0
     | "bundle" :: a ->
         run "npm" [ "install" ] "."
 
@@ -22,16 +25,10 @@ let main args =
             Bundle.All()
             0
     | "run" :: a ->
-        match a with
-        | "db" :: a ->
-            Run.All(true)
-            0
-        | "client" :: a ->
-            run "dotnet" Run.ClientArgs ProjectPaths.clientPath
-            0
-        | _ ->
-            Run.All(false)
-            0
+        let runDb: bool = a |> List.contains "db"
+        let runExcel: bool = a |> List.contains "excel"
+        Run.All runDb runExcel
+        0
     | "tests" :: a
     | "test" :: a ->
         Test.disableUserData ()

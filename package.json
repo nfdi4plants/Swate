@@ -20,6 +20,7 @@
     "daisyui": "^5.0.40",
     "jsdom": "^25.0.1",
     "mocha": "^10.8.2",
+    "office-addin-dev-certs": "^2.0.3",
     "office-addin-mock": "^2.4.6",
     "remotedev": "^0.2.7",
     "tailwindcss": "^4.1.7",

@@ -22,6 +22,8 @@ module ProjectPaths =
     let dockerComposePath = Path.GetFullPath ".db/docker-compose.yml"
     let dockerFilePath = Path.GetFullPath "build/Dockerfile.publish"
 
+    let devManifestPath = Path.GetFullPath "build/manifest.xml"
+
 let developmentUrl = "https://localhost:3000"
 
 let gitOwner = "nfdi4plants"
