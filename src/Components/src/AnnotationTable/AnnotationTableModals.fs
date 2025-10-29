@@ -271,13 +271,14 @@ type CompositeCellModal =
             ?debug: string
         ) =
 
-        let initTerm = Some (Term.fromOntologyAnnotation oa)
+        let initTerm = Some(Term.fromOntologyAnnotation oa)
         let tempTerm, setTempTerm = React.useState (initTerm)
 
         let submit =
             fun () ->
                 if tempTerm.IsSome then
                     let tempTerm = tempTerm.Value
+
                     if setOa.IsSome then
                         tempTerm |> Term.toOntologyAnnotation |> setOa.Value
                         rmv ()
@@ -286,9 +287,11 @@ type CompositeCellModal =
                             match relevantCompositeHeader.Value with
                             | CompositeHeader.Characteristic _ ->
                                 CompositeHeader.Characteristic(Term.toOntologyAnnotation tempTerm)
-                            | CompositeHeader.Component _ -> CompositeHeader.Component(Term.toOntologyAnnotation tempTerm)
+                            | CompositeHeader.Component _ ->
+                                CompositeHeader.Component(Term.toOntologyAnnotation tempTerm)
                             | CompositeHeader.Factor _ -> CompositeHeader.Factor(Term.toOntologyAnnotation tempTerm)
-                            | CompositeHeader.Parameter _ -> CompositeHeader.Parameter(Term.toOntologyAnnotation tempTerm)
+                            | CompositeHeader.Parameter _ ->
+                                CompositeHeader.Parameter(Term.toOntologyAnnotation tempTerm)
                             | _ -> failwith $"Unknown CompositeHeader type {relevantCompositeHeader.Value.ToString()}"
 
                         header |> setHeader.Value
@@ -317,7 +320,7 @@ type CompositeCellModal =
             ?relevantCompositeHeader: CompositeHeader,
             ?debug
         ) =
-        let initTerm = Some (Term.fromOntologyAnnotation oa)
+        let initTerm = Some(Term.fromOntologyAnnotation oa)
         let tempTerm, setTempTerm = React.useState (initTerm)
         let tempValue, setTempValue = React.useState (value)
 
@@ -328,7 +331,8 @@ type CompositeCellModal =
                     setUnitized tempValue oa
                     rmv ()
 
-        let body = TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm, tempValue, setTempValue, value)
+        let body =
+            TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm, tempValue, setTempValue, value)
 
         BaseModal.Modal(
             true,
@@ -410,6 +414,7 @@ type CompositeCellModal =
             (fun _ -> rmv ()),
             Html.div "Data",
             React.fragment [
+
                 InputField.Input(
                     (tempData.FilePath |> Option.defaultValue ""),
                     (fun input ->
@@ -422,6 +427,18 @@ type CompositeCellModal =
                     autofocus = debug.IsNone
                 )
                 if setData.IsSome then
+
+                    InputField.Input(
+                        (tempData.Format |> Option.defaultValue ""),
+                        (fun input ->
+                            tempData.Format <- Option.whereNot System.String.IsNullOrWhiteSpace input
+                            setTempData tempData
+                        ),
+                        "Data Format",
+                        rmv,
+                        submit
+                    )
+
                     InputField.Input(
                         (tempData.Selector |> Option.defaultValue ""),
                         (fun input ->
@@ -439,7 +456,7 @@ type CompositeCellModal =
                             tempData.SelectorFormat <- Option.whereNot System.String.IsNullOrWhiteSpace input
                             setTempData tempData
                         ),
-                        "Selector Format",
+                        "Data Selector Format",
                         rmv,
                         submit
                     )
@@ -557,7 +574,7 @@ type ContextMenuModals =
                 tableRef.current.focus ()
                 setModal None
 
-        let compositeColumns = addColumns.data |> Array.ofSeq 
+        let compositeColumns = addColumns.data |> Array.ofSeq
 
         let addColumnsBtn compositeColumns columnIndex =
             Html.button [
@@ -570,16 +587,27 @@ type ContextMenuModals =
                 )
             ]
 
-        let pasteColumnsBtn (compositeColumns: ResizeArray<CompositeColumn>) (coordinate: CellCoordinate) (coordinates: CellCoordinate [][]) =
+        let pasteColumnsBtn
+            (compositeColumns: ResizeArray<CompositeColumn>)
+            (coordinate: CellCoordinate)
+            (coordinates: CellCoordinate[][])
+            =
             Html.button [
                 prop.className "swt:btn swt:btn-outline swt:btn-primary"
                 prop.text "Paste cells"
                 prop.onClick (fun _ ->
                     let pasteColumns = {|
-                            data = compositeColumns
-                            coordinates = coordinates
-                        |}
-                    AnnotationTableContextMenuUtil.pasteCells(pasteColumns, coordinate, selectHandle, arcTable, setArcTable)
+                        data = compositeColumns
+                        coordinates = coordinates
+                    |}
+
+                    AnnotationTableContextMenuUtil.pasteCells (
+                        pasteColumns,
+                        coordinate,
+                        selectHandle,
+                        arcTable,
+                        setArcTable
+                    )
 
                     arcTable.Copy() |> setArcTable
                     rmv ()
@@ -1130,8 +1158,7 @@ type CreateColumnModal =
         let column = arcTable.GetColumn(columnIndex)
 
         let getCellStrings () =
-            column.Cells |> Seq.map (fun c -> c.ToString())
-            |> Array.ofSeq
+            column.Cells |> Seq.map (fun c -> c.ToString()) |> Array.ofSeq
 
         let preview, setPreview = React.useState (getCellStrings)
 
@@ -1391,7 +1418,7 @@ type EditColumnModal =
             )
     //failwith "Freetext header type is not yet implemented"
 
-    static member modalActivity(state, setState) =
+    static member modalActivity(state: State, setState) =
         Html.div [
             prop.children [
                 Html.div [
@@ -1428,11 +1455,17 @@ type EditColumnModal =
                     match cell with
                     | cell when cell.isTerm -> cells.[i] <- EditColumnModal.placeHolderTermCell
                     | cell when cell.isUnitized -> cells.[i] <- EditColumnModal.placeHolderUnitCell
-                    | cell when cell.isData -> cells.[i] <- EditColumnModal.placeHolderTermCell
+                    | cell when cell.isData -> cells.[i] <- EditColumnModal.placeHolderDataCell
                     | _ -> cells.[i] <- EditColumnModal.placeHolderTermCell
             )
 
-            EditColumnModal.updateColumn ({ column0 with Cells = cells |> ResizeArray }, state)
+            EditColumnModal.updateColumn (
+                {
+                    column0 with
+                        Cells = cells |> ResizeArray
+                },
+                state
+            )
 
         React.fragment [
             Html.label [ prop.text "Preview:" ]
@@ -1562,9 +1595,7 @@ type UpdateColumnModal =
         let column = arcTable.GetColumn(columnIndex)
 
         let getCellStrings () =
-            column.Cells
-            |> Array.ofSeq
-            |> Array.map (fun c -> c.ToString())
+            column.Cells |> Array.ofSeq |> Array.map (fun c -> c.ToString())
 
         let preview, setPreview = React.useState (getCellStrings)
 

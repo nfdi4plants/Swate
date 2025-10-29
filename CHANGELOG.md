@@ -16,11 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 1.0.1 - 2025-10-29
+
+### 🐛 Fixed
+
+-   Added missing field for "Data Format" for Data cells.
+
 ## 1.0.0 - 2025-10-29
 
 ### 🐛 Fixed
 
-- Added missing version update to docker release pipeline step.
+-   Added missing version update to docker release pipeline step.
 
 ## 1.0.0-rc.12 - 2025-10-28
 
@@ -587,8 +593,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
--             * Responsive design should now render immediatly upon window size change
--             * Add-in should not reload after navigating to a new tab for the first time.
+-               * Responsive design should now render immediatly upon window size change
+-               * Add-in should not reload after navigating to a new tab for the first time.
 -   Term search input field no longer looses focus after clicking into it.
 
 ## 0.0.2-alpha - 2020-10-29
