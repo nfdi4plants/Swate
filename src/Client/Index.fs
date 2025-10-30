@@ -33,11 +33,34 @@ let View (model: Model) (dispatch: Msg -> unit) =
             ReactContext.ThemeCtx,
             Swate.Components.TermSearchConfigProvider.TIBQueryProvider(
                 Swate.Components.AnnotationTableContextProvider.AnnotationTableContextProvider(
+
                     Html.div [
                         prop.id "ClientView"
                         prop.className "swt:flex swt:w-full swt:overflow-auto swt:h-screen"
                         prop.children [
-                            Modals.ModalProvider.Main(model, dispatch)
+                            // handle logging/error modal display
+                            match model.DevState.DisplayLogList with
+                            | [] -> Html.none
+                            | errors when
+                                errors
+                                |> List.exists (
+                                    function
+                                    | LogItem.Error(_, _) -> true
+                                    | _ -> false
+                                )
+                                ->
+                                let errors =
+                                    errors
+                                    |> List.choose (
+                                        function
+                                        | LogItem.Error(_, msg) -> Some msg
+                                        | _ -> None
+                                    )
+                                    |> String.concat "\n\n"
+
+                                let close = fun b -> UpdateDisplayLogList [] |> DevMsg |> dispatch
+                                Swate.Components.BaseModal.ErrorBaseModal(true, close, errors)
+                            | _ -> Modals.InteropLogging.Main(model.DevState, dispatch)
                             match model.PageState.IsHome, model.PersistentStorageState.Host with
                             | false, _ -> View.MainPageView.Main(model, dispatch)
                             | _, Some Swatehost.Excel ->

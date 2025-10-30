@@ -57,11 +57,10 @@ let addBuildingBlock
                 let txt =
                     $"Found existing output column. Changed output column to \"{newColumn.Header.ToString()}\"."
 
+
                 let msg0 =
-                    Model.ModalState.GeneralModals.Warning txt
-                    |> Model.ModalState.ModalTypes.GeneralModal
-                    |> Some
-                    |> Messages.UpdateModal
+                    Messages.UpdateDisplayLogList [ Model.LogItem.createWarningNow txt ]
+                    |> Messages.DevMsg
 
                 newColumn <- {
                     newColumn with
@@ -79,10 +78,8 @@ let addBuildingBlock
                     $"Found existing input column. Changed input column to \"{newColumn.Header.ToString()}\"."
 
                 let msg0 =
-                    Model.ModalState.GeneralModals.Warning txt
-                    |> Model.ModalState.ModalTypes.GeneralModal
-                    |> Some
-                    |> Messages.UpdateModal
+                    Messages.UpdateDisplayLogList [ Model.LogItem.createWarningNow txt ]
+                    |> Messages.DevMsg
 
                 newColumn <- {
                     newColumn with

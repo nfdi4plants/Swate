@@ -250,6 +250,7 @@ module Table =
     let selectiveTablePrepare (activeTable: ArcTable) (toJoinTable: ArcTable) (removeColumns: int list) : ArcTable =
         // Remove existing columns
         let mutable columnsToRemove = removeColumns
+
         // find duplicate columns
         let tablecopy = toJoinTable.Copy()
 
@@ -263,22 +264,23 @@ module Table =
         tablecopy.RemoveColumns(Array.ofList columnsToRemove)
 
         tablecopy.IteriColumns(fun i c0 ->
-            let c1 = {
-                c0 with
-                    Cells = tablecopy.Columns.[i].Cells
-            }
+
+            // let c1 = { // removed this, this should be the same as c0
+            //     c0 with
+            //         Cells = tablecopy.Columns.[i].Cells
+            // }
 
             let c2 =
-                if c1.Header.isInput then
+                if c0.Header.isInput then
                     match activeTable.TryGetInputColumn() with
-                    | Some ic -> { c1 with Cells = ic.Cells }
-                    | _ -> c1
-                elif c1.Header.isOutput then
+                    | Some ic -> { c0 with Cells = ic.Cells }
+                    | _ -> c0
+                elif c0.Header.isOutput then
                     match activeTable.TryGetOutputColumn() with
-                    | Some oc -> { c1 with Cells = oc.Cells }
-                    | _ -> c1
+                    | Some oc -> { c0 with Cells = oc.Cells }
+                    | _ -> c0
                 else
-                    c1
+                    c0
 
             tablecopy.UpdateColumn(i, c2.Header, c2.Cells)
         )

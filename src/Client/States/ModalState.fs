@@ -1,41 +1,41 @@
 namespace Model
 
-open Swate.Components.Shared
-open ARCtrl
+// open Swate.Components.Shared
+// open ARCtrl
 
-open Feliz
+// open Feliz
 
-open Model
+// open Model
 
-module ModalState =
+// module ModalState =
 
-    type TableModals =
-        | EditColumn of columIndex: int
-        | MoveColumn of columnIndex: int
-        | BatchUpdateColumnValues of columIndex: int * column: CompositeColumn
-        | SelectiveFileImport of ArcFiles
-        | TemplateImport
-        | TermDetails of OntologyAnnotation
-        | TableCellDetailsAtIndex of columnIndex: int * rowIndex: int
-        | ResetTable
+//     type TableModals =
+//         | EditColumn of columIndex: int
+//         | MoveColumn of columnIndex: int
+//         | BatchUpdateColumnValues of columIndex: int * column: CompositeColumn
+//         | SelectiveFileImport of ArcFiles
+//         | TemplateImport
+//         | TermDetails of OntologyAnnotation
+//         | TableCellDetailsAtIndex of columnIndex: int * rowIndex: int
+//         | ResetTable
 
-    type ExcelModals = | InteropLogging
+//     type ExcelModals = | InteropLogging
 
-    type GeneralModals =
-        | Error of exn
-        | Warning of string
-        | Loading
+//     type GeneralModals =
+//         | Error of exn
+//         | Warning of string
+//         | Loading
 
-    type ModalTypes =
-        | TableModal of TableModals
-        | ExcelModal of ExcelModals
-        | GeneralModal of GeneralModals
-        | Force of ReactElement
+//     type ModalTypes =
+//         | TableModal of TableModals
+//         | ExcelModal of ExcelModals
+//         | GeneralModal of GeneralModals
+//         | Force of ReactElement
 
-open ModalState
+// open ModalState
 
-type ModalState = {
-    ActiveModal: ModalTypes option
-} with
+// type ModalState = {
+//     ActiveModal: ModalTypes option
+// } with
 
-    static member init() = { ActiveModal = None }
+//     static member init() = { ActiveModal = None }

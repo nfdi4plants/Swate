@@ -175,31 +175,30 @@ type BaseModal =
         BaseModal.Modal(
             isOpen = isOpen,
             setIsOpen = setIsOpen,
-            header = Html.text "Something went wrong",
-            children =
-                Html.div [
-                    prop.className "swt:alert swt:alert-error"
-                    prop.children [
-                        Svg.svg [
-                            svg.className "swt:w-6 swt:h-6 swt:stroke-current"
-                            svg.viewBox (0, 0, 24, 24)
-                            svg.fill "none"
-                            svg.children [
-                                Svg.path [
-                                    svg.d "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                    svg.strokeLineCap "round"
-                                    svg.strokeLineJoin "round"
-                                    svg.strokeWidth 2
-                                ]
+            header =
+                React.fragment [
+                    Svg.svg [
+                        svg.className "swt:w-6 swt:h-6 swt:stroke-current"
+                        svg.viewBox (0, 0, 24, 24)
+                        svg.fill "none"
+                        svg.children [
+                            Svg.path [
+                                svg.d "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                svg.strokeLineCap "round"
+                                svg.strokeLineJoin "round"
+                                svg.strokeWidth 2
                             ]
                         ]
-
-                        Html.div [
-                            yield!
-                                error.Split('\n')
-                                |> Array.collect (fun line -> [| Html.text line; Html.br [] |])
-                        ]
                     ]
+                    Html.text "Something went wrong"
+                ],
+            children =
+                Html.div [
+                    prop.className "swt:whitespace-pre-wrap"
+                    prop.children (
+                        error.Split('\n')
+                        |> Array.collect (fun line -> [| Html.text line; Html.br [] |])
+                    )
                 ],
             footer =
                 Html.button [
@@ -207,7 +206,8 @@ type BaseModal =
                     prop.text "Ok"
                     prop.onClick (fun _ -> setIsOpen (false))
                 ],
-            ?debug = debug
+            ?debug = debug,
+            className = "swt:bg-error swt:text-error-content"
         )
 
     [<ReactComponentAttribute>]

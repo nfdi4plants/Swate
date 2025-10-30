@@ -19,9 +19,8 @@ open TermModalUtil
 type TermModal =
 
     [<ReactComponent>]
-    static member Main(oa: OntologyAnnotation, dispatch) =
+    static member Main(isOpen, setIsOpen, oa: OntologyAnnotation) =
 
-        let isOpen, setIsOpen = React.useState (true)
         let state, setState = React.useState (State.Loading)
 
         React.useEffectOnce (fun _ ->
@@ -32,7 +31,8 @@ type TermModal =
                 | Some t -> Found t |> setState
                 | None -> NotFound |> setState
             }
-            |> Async.StartImmediate)
+            |> Async.StartImmediate
+        )
 
         let mkInfoPart (txt: string) (desc: string) =
             Html.div [

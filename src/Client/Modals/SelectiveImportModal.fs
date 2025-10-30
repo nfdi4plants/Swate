@@ -367,13 +367,7 @@ type SelectiveImportModal =
             footer = footer
         )
 
-    static member Main(import: ArcFiles, model, dispatch: Messages.Msg -> unit) =
-        let rmv = Util.RMV_MODAL dispatch
-        SelectiveImportModal.Main(import, model, dispatch, rmv = rmv)
-
-    static member Templates(model, dispatch: Messages.Msg -> unit) =
-
-        let rmv = Util.RMV_MODAL dispatch
+    static member Templates(model, dispatch: Messages.Msg -> unit, rmv) =
 
         let tables = model.ProtocolState.TemplatesSelected |> List.map (fun t -> t.Table)
 
@@ -418,6 +412,7 @@ type SelectiveImportModal =
                         prop.style [ style.marginLeft length.auto ]
                         prop.text "Submit"
                         prop.onClick (fun e ->
+
                             SpreadsheetInterface.AddTemplates(tables, model.ProtocolState.ImportConfig)
                             |> InterfaceMsg
                             |> dispatch

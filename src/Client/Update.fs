@@ -88,40 +88,49 @@ module Dev =
                 )
 
             let nextState = {
-                Log = parsedLogs @ currentState.Log
-                DisplayLogList = parsedDisplayLogs @ currentState.DisplayLogList
+                currentState with
+                    Log = parsedLogs @ currentState.Log
+                    DisplayLogList = parsedDisplayLogs @ currentState.DisplayLogList
             }
 
-            let batch =
-                Cmd.batch [
-                    if List.isEmpty parsedDisplayLogs |> not then
-                        Model.ModalState.ExcelModals.InteropLogging
-                        |> Model.ModalState.ModalTypes.ExcelModal
-                        |> Some
-                        |> Messages.UpdateModal
-                        |> Cmd.ofMsg
-                    nextCmd
-                ]
+            // let batch =
+            //     Cmd.batch [
+            //         // if List.isEmpty parsedDisplayLogs |> not then
+            //         //     Model.ModalState.ExcelModals.InteropLogging
+            //         //     |> Model.ModalState.ModalTypes.ExcelModal
+            //         //     |> Some
+            //         //     |> Messages.UpdateModal
+            //         //     |> Cmd.ofMsg
+            //         nextCmd
+            //     ]
 
-            nextState, batch
+            nextState, nextCmd
 
         | GenericError(nextCmd, e) ->
+            let item = LogItem.Error(System.DateTime.Now, e.GetPropagatedError())
+
             let nextState = {
                 currentState with
-                    Log = LogItem.Error(System.DateTime.Now, e.GetPropagatedError()) :: currentState.Log
+                    Log = item :: currentState.Log
+                    DisplayLogList = item :: currentState.DisplayLogList
             }
 
-            let batch =
-                Cmd.batch [
-                    Model.ModalState.GeneralModals.Error e
-                    |> Model.ModalState.ModalTypes.GeneralModal
-                    |> Some
-                    |> Messages.UpdateModal
-                    |> Cmd.ofMsg
-                    nextCmd
-                ]
+            // let errorMsg =
+            //     Model.ModalState.GeneralModals.Error e
+            //     |> Model.ModalState.ModalTypes.GeneralModal
+            //     |> Some
+            //     |> Messages.UpdateModal
 
-            nextState, batch
+            // let batch =
+            //     nextCmd
+            //     |> Cmd.map (fun cmd ->
+
+            //         match cmd with
+            //         | Messages.UpdateModel _ -> errorMsg
+            //         | _ -> Msg.Batch [ errorMsg; cmd ]
+            //     )
+
+            nextState, nextCmd
 
         | UpdateDisplayLogList newList ->
             let nextState = {
@@ -235,12 +244,12 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         | Run callback ->
             callback ()
             model, Cmd.none
-        | UpdateModal modal ->
-            {
-                model with
-                    Model.ModalState.ActiveModal = modal
-            },
-            Cmd.none
+        // | UpdateModal modal ->
+        //     {
+        //         model with
+        //             Model.ModalState.ActiveModal = modal
+        //     },
+        //     Cmd.none
         | TestMyAPI ->
             let cmd =
                 Cmd.OfAsync.either Api.testAPIv1.test () (curry GenericLog Cmd.none) (curry GenericError Cmd.none)

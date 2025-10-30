@@ -69,6 +69,15 @@ type LogItem =
                 Html.td m
             ]
 
+    static member createInfoNow(message: string) = Info(System.DateTime.UtcNow, message)
+
+    static member createErrorNow(message: string) = Error(System.DateTime.UtcNow, message)
+
+    static member createWarningNow(message: string) =
+        Warning(System.DateTime.UtcNow, message)
+
+    static member createDebugNow(message: string) = Debug(System.DateTime.UtcNow, message)
+
     static member ofStringNow (level: string) (message: string) =
         match level with
         | "Debug"
@@ -245,6 +254,7 @@ module Protocol =
     type Model = {
         // Client
         Loading: bool
+        ShowImportModal: bool
         LastUpdated: System.DateTime option
         ImportConfig: FileImport.SelectiveImportConfig
         TemplatesSelected: ARCtrl.Template list
@@ -255,6 +265,7 @@ module Protocol =
         static member init() = {
             // Client
             Loading = false
+            ShowImportModal = false
             LastUpdated = None
             ImportConfig = FileImport.SelectiveImportConfig.init ()
             TemplatesSelected = []
@@ -296,5 +307,4 @@ type Model = {
     SpreadsheetModel: Spreadsheet.Model
     History: LocalHistory.Model
     ARCitectState: ARCitect.Model
-    ModalState: ModalState
 }

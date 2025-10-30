@@ -110,6 +110,7 @@ let UpdateMetadataModalContent
                     excelMetadataType with
                         Metadata = Some(ArcFiles.Assay assay)
                 }
+
             Assay.Main(assay, setAssay, model)
         | {
               Metadata = Some(ArcFiles.Study(study, assays))
@@ -119,6 +120,7 @@ let UpdateMetadataModalContent
                     excelMetadataType with
                         Metadata = Some(ArcFiles.Study(study, assays))
                 }
+
             Study.Main(study, assays, setStudy, model)
         | {
               Metadata = Some(ArcFiles.Investigation investigation)
@@ -226,8 +228,27 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
         ]
     ]
 
+[<ReactComponent>]
 let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -> unit) =
-    [
+
+    let showTermDetails, setShowTermDetails =
+        React.useState (None: OntologyAnnotation option)
+
+    React.fragment [
+        match showTermDetails with
+        | None -> Html.none
+        | Some oa ->
+
+            Modals.TermModal.Main(
+                isOpen = showTermDetails.IsSome,
+                setIsOpen =
+                    (fun isOpen ->
+                        if not isOpen then
+                            setShowTermDetails None
+                    ),
+                oa = oa
+            )
+
         QuickAccessButton.QuickAccessButton(
             "Create Metadata",
             React.fragment [ Icons.CreateMetadata() ],
@@ -281,17 +302,12 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     | Result.Ok term ->
                         let ontologyAnnotation = OntologyAnnotation.fromDBTerm term
 
-                        Model.ModalState.TableModals.TermDetails ontologyAnnotation
-                        |> Model.ModalState.ModalTypes.TableModal
-                        |> Some
-                        |> Messages.UpdateModal
-                        |> dispatch
+                        setShowTermDetails (Some ontologyAnnotation)
                 }
                 |> Promise.start
             )
         )
     ]
-    |> React.fragment
 
 [<ReactComponent>]
 let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =

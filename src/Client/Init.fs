@@ -22,7 +22,7 @@ let initialModel = {
     SpreadsheetModel = Spreadsheet.Model.init ()
     History = LocalHistory.Model.init ()
     ARCitectState = ARCitect.Model.init ()
-    ModalState = ModalState.init ()
+// ModalState = ModalState.init ()
 }
 
 
@@ -35,6 +35,9 @@ let init (pageOpt: Routing.Route option) : Model * Cmd<Msg> =
     let newModel =
         autosaveConfig
         |> Option.defaultValue model.PersistentStorageState.Autosave
-        |> fun x -> {model with Model.PersistentStorageState.Autosave = x}
+        |> fun x -> {
+            model with
+                Model.PersistentStorageState.Autosave = x
+        }
 
     newModel, cmd

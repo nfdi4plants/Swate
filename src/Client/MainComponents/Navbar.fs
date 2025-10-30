@@ -59,7 +59,8 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                 //let overMax = newPosition_clamped = Spreadsheet.LocalStorage.MaxHistory
                 //let notEnoughHistory = Spreadsheet.LocalStorage.AvailableHistoryItems - (Spreadsheet.LocalStorage.CurrentHistoryPosition + 1) <= 0
                 if state.NextPositionIsValid(newPosition) then
-                    History.UpdateHistoryPosition newPosition |> Msg.HistoryMsg |> dispatch),
+                    History.UpdateHistoryPosition newPosition |> Msg.HistoryMsg |> dispatch
+            ),
             isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1) |> not)
         )
         QuickAccessButton.QuickAccessButton(
@@ -69,14 +70,18 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
                 let newPosition = state.HistoryCurrentPosition - 1
 
                 if state.NextPositionIsValid(newPosition) then
-                    History.UpdateHistoryPosition newPosition |> Msg.HistoryMsg |> dispatch),
+                    History.UpdateHistoryPosition newPosition |> Msg.HistoryMsg |> dispatch
+            ),
             isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition - 1) |> not)
         )
     ]
 
 let private QuickAccessButtonListEnd (model: Model) dispatch =
-    let autoSaveConfig = getAutosaveConfiguration()
+    let autoSaveConfig = getAutosaveConfiguration ()
+    let openReset, setOpenReset = React.useState false
+
     React.fragment [
+        Modals.ResetTable.Main(isOpen = openReset, setIsOpen = setOpenReset, dispatch = dispatch)
         match model.PersistentStorageState.Host with
         | Some Swatehost.Browser ->
             QuickAccessButton.QuickAccessButton(
@@ -90,19 +95,15 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                         |> dispatch
                     | Some(Swatehost.ARCitect) ->
                         ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
-                    | _ -> ()),
+                    | _ -> ()
+                ),
                 isDisabled = model.SpreadsheetModel.ArcFile.IsNone
             )
 
             QuickAccessButton.QuickAccessButton(
                 "Reset",
                 Icons.Delete(),
-                (fun _ ->
-                    Model.ModalState.TableModals.ResetTable
-                    |> Model.ModalState.ModalTypes.TableModal
-                    |> Some
-                    |> Messages.UpdateModal
-                    |> dispatch),
+                (fun _ -> setOpenReset (not openReset)),
                 color = DaisyUIColors.Error
             )
 
@@ -120,7 +121,8 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                             |> dispatch
                         | Some(Swatehost.ARCitect) ->
                             ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
-                        | _ -> ()),
+                        | _ -> ()
+                    ),
                     isDisabled = model.SpreadsheetModel.ArcFile.IsNone
                 )
 
@@ -174,9 +176,7 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
             add widget widgets
 
     Components.BaseNavbar.Main [
-        Html.div [
-            prop.className "swt:grow-0"
-        ]
+        Html.div [ prop.className "swt:grow-0" ]
         Html.div [
             prop.className "swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
             prop.children [

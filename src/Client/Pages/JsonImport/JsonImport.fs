@@ -21,7 +21,6 @@ open ARCtrl
 open Fable.Core.JsInterop
 
 open Modals
-open Model.ModalState
 
 type private TemplateFromFileState = {
     /// User select type to upload
@@ -37,70 +36,25 @@ type private TemplateFromFileState = {
         Loading = false
     }
 
-module private Helper =
-
-    let upload (state: TemplateFromFileState) setState (dispatch: Msg -> unit) (ev: File list) =
-        let fileList = ev //: FileList = ev.target?files
-
-        if fileList.Length > 0 then
-            let file = fileList.Item 0 |> fun f -> f.slice ()
-
-            let reader = Browser.Dom.FileReader.Create()
-
-            reader.onload <-
-                fun evt ->
-                    let (r: string) = evt.target?result
-
-                    async {
-                        setState { state with Loading = true }
-
-                        let p = promise {
-                            return Spreadsheet.IO.Json.readFromJsonMap.[(state.FileType, state.JsonFormat)] r
-                        }
-
-                        do!
-                            Promise.either
-                                (fun af ->
-                                    TableModals.SelectiveFileImport af
-                                    |> Model.ModalState.ModalTypes.TableModal
-                                    |> Some
-                                    |> Messages.UpdateModal
-                                    |> dispatch
-
-                                    setState { state with Loading = false }
-                                )
-                                (fun e -> GenericError(Cmd.none, e) |> DevMsg |> dispatch)
-                                p
-                            |> Async.AwaitPromise
-                    }
-                    |> Async.StartImmediate
-
-            reader.onerror <- fun evt -> curry GenericError Cmd.none (exn evt.Value) |> DevMsg |> dispatch
-
-            reader.readAsText (file)
-        else
-            ()
-
 type JsonImport =
 
-    static member private FileUploadButton
-        (state: TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)
-        =
-        Html.input [
-            prop.type'.file
-            prop.className "swt:file-input swt:file-input-neutral swt:w-full"
-            prop.onChange (fun (ev: File list) -> Helper.upload state setState dispatch ev)
-            prop.onClick (fun e -> e.target?value <- null)
-        ]
+    // static member private FileUploadButton
+    //     (state: TemplateFromFileState, setState: TemplateFromFileState -> unit, dispatch)
+    //     =
+
 
     [<ReactComponent>]
     static member JsonUploadComponent(model: Model, dispatch) =
         let state, setState = React.useState (TemplateFromFileState.init)
+        let arcFile, setArcFile = React.useState (None: ArcFiles option)
+        let closeImportModal = fun _ -> setArcFile None
+        let KEY_SEPARATOR = "@"
 
-        let keysToString (arcfile: ArcFilesDiscriminate, jsontype: JsonExportFormat) = sprintf "%A@%A" arcfile jsontype
+        let keysToString (arcfile: ArcFilesDiscriminate, jsontype: JsonExportFormat) =
+            sprintf "%A%s%A" arcfile KEY_SEPARATOR jsontype
 
         let tryKeysFromString (s: string) =
-            let parts = s.Split '@'
+            let parts = s.Split KEY_SEPARATOR
 
             if parts.Length = 2 then
                 let arcFile = parts.[0] |> ArcFilesDiscriminate.fromString
@@ -111,6 +65,9 @@ type JsonImport =
                 None
 
         React.fragment [
+            match arcFile with
+            | Some arcFile -> Modals.SelectiveImportModal.Main(arcFile, model, dispatch, closeImportModal)
+            | None -> ()
             Html.select [
                 prop.className "swt:select swt:w-full"
                 prop.value (sprintf "%A@%A" state.FileType state.JsonFormat)
@@ -127,13 +84,48 @@ type JsonImport =
                 prop.children [
                     for (arcfile, jsontype) in Spreadsheet.IO.Json.readFromJsonMap.Keys |> Seq.sortBy fst do
                         Html.option [
-                            prop.value (sprintf "%A@%A" arcfile jsontype)
+                            prop.value (keysToString (arcfile, jsontype))
                             prop.text (sprintf "%A - %A" arcfile jsontype)
                         ]
                 ]
             ]
 
-            Html.div [ JsonImport.FileUploadButton(state, setState, dispatch) ]
+            Html.div [
+                Html.input [
+                    prop.type'.file
+                    prop.className "swt:file-input swt:file-input-neutral swt:w-full"
+                    prop.onChange (fun (ev: File) ->
+                        let reader = Browser.Dom.FileReader.Create()
+
+                        reader.onload <-
+                            fun evt ->
+                                let (r: string) = evt.target?result
+
+                                promise {
+                                    setState { state with Loading = true }
+
+                                    let arcFile =
+                                        Spreadsheet.IO.Json.readFromJsonMap.[(state.FileType, state.JsonFormat)] r
+
+                                    setArcFile (Some arcFile)
+                                }
+                                |> Promise.catch (fun e ->
+                                    GenericError(Cmd.none, e) |> DevMsg |> dispatch
+                                    setState { state with Loading = false }
+                                )
+                                |> Promise.map (fun c ->
+                                    setState { state with Loading = false }
+                                    c
+                                )
+                                |> Promise.start
+
+                        reader.onerror <- fun evt -> curry GenericError Cmd.none (exn evt.Value) |> DevMsg |> dispatch
+
+                        reader.readAsText (ev)
+                    )
+                    prop.onClick (fun e -> e.target?value <- null)
+                ]
+            ]
         ]
 
     [<ReactComponent>]

@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔄 Changed
+
+-   Further unification of modal designs
+
+### 🐛 Fixed
+
+-   Update ARCtrl version to fix faulty template import with unit :bug: #905
+
 ## 1.0.1 - 2025-10-29
 
 ### 🐛 Fixed

@@ -197,6 +197,7 @@ module Interface =
                     model, cmd
                 | _ -> failwith "not implemented"
             | AddTemplates(tables, importType) ->
+
                 match host with
                 | Some Swatehost.Excel ->
                     let cmd =

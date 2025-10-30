@@ -24,7 +24,7 @@ module EmptyTableModals =
         [<ReactComponent>]
         static member Templates(model: Model, isOpen, setIsOpen, dispatch) =
 
-            let content = Protocol.Templates.TemplateSelect(model, dispatch, setIsOpen)
+            let content = Protocol.Templates.TemplateSelect(model, dispatch)
 
             BaseModal.Modal(isOpen, setIsOpen, Html.text "Select template(s)", content)
 

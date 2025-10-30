@@ -73,24 +73,20 @@ module Protocol =
         | UpdateTemplates templates ->
             let nextState = { state with Templates = templates }
             nextState, model, Cmd.none
+        | SetShowImportModal show ->
+            let nextState = { state with ShowImportModal = show }
+            nextState, model, Cmd.none
         | ImportProtocols ->
             let importArr: Types.FileImport.ImportTable list =
                 List.init model.ProtocolState.TemplatesSelected.Length (fun i -> { Index = i; FullImport = false })
 
             let nextState = {
                 state with
+                    ShowImportModal = true
                     ImportConfig = { // default append all selected templates
                         Types.FileImport.SelectiveImportConfig.init () with
                             ImportTables = importArr
                     }
-            }
-
-            let model = {
-                model with
-                    Model.ModalState.ActiveModal =
-                        ModalState.TableModals.TemplateImport
-                        |> ModalState.ModalTypes.TableModal
-                        |> Some
             }
 
             nextState, model, Cmd.none
