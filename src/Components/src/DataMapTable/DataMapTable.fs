@@ -343,7 +343,7 @@ type DataMapTable =
                     DataMapTable.ContextMenu(datamap, setDatamap, setModal, tableRef, containerRef, ?debug = debug)
                     Table.Table(
                         datamap.RowCount + 1,
-                        datamap.ColumnCount,
+                        datamap.ColumnCount + 1,
                         renderCell,
                         renderActiveCell,
                         ref = tableRef,

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🐛 Fixed
 
 -   Update ARCtrl version to fix faulty template import with unit :bug: #905
+-   Fixed missing "Object Type" column in Datamap #908
 
 ## 1.0.1 - 2025-10-29
 
