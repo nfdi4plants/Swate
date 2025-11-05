@@ -12,7 +12,7 @@
     <PackageVersion Include="Fable.Elmish" Version="4.2.0" />
     <PackageVersion Include="Fable.Elmish.HMR" Version="7.0.0" />
     <PackageVersion Include="Fable.Elmish.React" Version="4.0.0" />
-    <PackageVersion Include="Fable.Elmish.Browser" Version="4.0.3" />
+    <PackageVersion Include="Fable.Elmish.Browser" Version="4.1.0" />
     <PackageVersion Include="Fable.Elmish.Debugger" Version="4.1.0" />
     <PackageVersion Include="Fable.Fetch" Version="2.7.0" />
     <PackageVersion Include="Fable.SimpleJson" Version="3.24.0" />
