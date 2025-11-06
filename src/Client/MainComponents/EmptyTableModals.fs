@@ -24,14 +24,14 @@ module EmptyTableModals =
         [<ReactComponent>]
         static member Templates(model: Model, isOpen, setIsOpen, dispatch) =
 
-            let content = Protocol.Templates.TemplateSelect(model, dispatch, setIsOpen)
+            let content = Protocol.Templates.TemplateSelect(model, dispatch)
 
             BaseModal.Modal(isOpen, setIsOpen, Html.text "Select template(s)", content)
 
         [<ReactComponent>]
         static member PreviousTableSelect(model: Model, isOpen, setIsOpen, dispatch) =
 
-            let tables = model.SpreadsheetModel.ArcFile.Value.Tables().Tables |> Array.ofSeq
+            let tables = model.SpreadsheetModel.ArcFile.Value.ArcTables().Tables |> Array.ofSeq
 
             let activeTableIndex =
                 let activeTableName = model.SpreadsheetModel.ActiveTable.Name
@@ -88,7 +88,7 @@ module EmptyTableModals =
                                             ]
                                         ]
                                         Html.tbody [
-                                            if newInputColumn.Value.Cells.Length > 10 then
+                                            if newInputColumn.Value.Cells.Count > 10 then
                                                 for i in 0..9 do
                                                     let cell = newInputColumn.Value.Cells.[i]
 

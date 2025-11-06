@@ -16,6 +16,6 @@
     <ProjectReference Include="..\Shared\Shared.Tests.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Fable.Mocha" Version="2.17.0" />
+    <PackageReference Include="Fable.Mocha" />
   </ItemGroup>
 </Project>

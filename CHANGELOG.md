@@ -7,12 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Types of changes**
 
--   `Added` for new features.
--   `Changed` for changes in existing functionality.
--   `Deprecated` for soon-to-be removed features.
--   `Removed` for now removed features.
--   `Fixed` for any bug fixes.
--   `Security` in case of vulnerabilities.
+-   ✨ `Added` for new features.
+-   🔄 `Changed` for changes in existing functionality.
+-   🗑️ `Deprecated` for soon-to-be removed features.
+-   🔥 `Removed` for now removed features.
+-   🐛 `Fixed` for any bug fixes.
+-   🔒 `Security` in case of vulnerabilities.
 
 ## [Unreleased]
 
@@ -21,6 +21,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 -  [issue 834](https://github.com/nfdi4plants/Swate/issues/834)
+## 1.0.2 - 2025-10-29
+
+### 🔄 Changed
+
+-   Further unification of modal designs
+
+### 🐛 Fixed
+
+-   Update ARCtrl version to fix faulty template import with unit :bug: #905
+-   Fixed missing "Object Type" column in Datamap #908
+
+## 1.0.1 - 2025-10-29
+
+### 🐛 Fixed
+
+-   Added missing field for "Data Format" for Data cells.
+
+## 1.0.0 - 2025-10-29
+
+### 🐛 Fixed
+
+-   Added missing version update to docker release pipeline step.
+
+## 1.0.0-rc.12 - 2025-10-28
+
+### Fixed
+
+-   Fixes missing FSharp.Core package reference in .NET Server causing runtime errors in docker 🐋.
+
+## 1.0.0-rc.11 - 2025-10-27
+
+### Added
+
+-   ARCitect communication for Datamap, Workflow and Run files.
+
+### Deprecated
+
+-   Remove datamap tab on assays, studies.
+
+### Fixed
+
+-   Release process for npm had a hard exit on check if package exists, which is now removed.
+
+## 1.0.0-rc.10 - 2025-10-27
+
+### Added
+
+-   Full support for isa.run.xlsx files
+-   Full support for isa.workflow.xlsx files
+-   Full support for separate datamap.xlsx files
+-   Drag and drop support for file import #635
+    -   Supports json with specific name restrictions: #532
+        -   MUST contain json format ("ARCtrl", "ARCtrlCompressed", "ISA", "ROCrate") not case sensitive.
+        -   MUST contain file type ("Assay", "Study", "Investigation", "DataMap", "Workflow", "Run", "Template") not case sensitive.
+        -   MUST be separated by an underscore ("\_")
+        -   MUST have the ".json" file extension
+-   Term search can be triggered by double clicking a into the input #888
+
+### Changed
+
+-   JSON import uses a more direct Select component to choose file type and json format.
+-   JSON export now checks compatibility of selected file type and json format before displaying options.
+-   Assay metadata sheet now has fields for: "Title" and "Description".
+
+### Deprecated
+
+-   Remove in file support for DataMaps
+
+### Removed
+
+-   Restriction of Sidebar to table views.
+
+### Fixed
+
+-   Context menu "Fill Column" indexing issue fixed. #891
+-   Duplicate Comment keys on top level metadata are not validated until any export is triggered (ARCitect, download .xlsx, etc.) #883
+-   Added whitespace to table components to improve UX when rightmost columns are in use. #859
 
 ## 1.0.0-rc.9 - 2025-10-10
 
@@ -532,8 +609,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
--       * Responsive design should now render immediatly upon window size change
--       * Add-in should not reload after navigating to a new tab for the first time.
+-               * Responsive design should now render immediatly upon window size change
+-               * Add-in should not reload after navigating to a new tab for the first time.
 -   Term search input field no longer looses focus after clicking into it.
 
 ## 0.0.2-alpha - 2020-10-29

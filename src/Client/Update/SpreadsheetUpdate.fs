@@ -55,25 +55,53 @@ module Spreadsheet =
                 if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
                     match state.ArcFile with // model is not yet updated at this position.
                     | Some(Assay assay) ->
-                        let json = assay.ToJsonString()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, json)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Assay,
+                            ArcAssay.toJsonString 0 assay,
+                            None
+                        )
                         |> Promise.start
                     | Some(Study(study, _)) ->
-                        let json = study.ToJsonString()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, json)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Study,
+                            ArcStudy.toJsonString 0 study,
+                            None
+                        )
                         |> Promise.start
                     | Some(Investigation inv) ->
-                        let json = inv.ToJsonString()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Investigation, json)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Investigation,
+                            ArcInvestigation.toJsonString 0 inv,
+                            None
+                        )
+                        |> Promise.start
+                    | Some(Run run) ->
+                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run, None)
+                        |> Promise.start
+                    | Some(Workflow workflow) ->
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Workflow,
+                            ArcWorkflow.toJsonString 0 workflow,
+                            None
+                        )
                         |> Promise.start
                     | Some(Template template) ->
-                        let json = template.toJsonString ()
-
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Template, json)
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.Template,
+                            Template.toJsonString 0 template,
+                            None
+                        )
                         |> Promise.start
+                    | Some(DataMap(parent, datamap)) ->
+                        if parent.IsSome then
+                            ARCitect.api.Save(
+                                ARCitect.Interop.InteropTypes.ARCFile.DataMap,
+                                DataMap.toJsonString 0 datamap,
+                                parent
+                            )
+                            |> Promise.start
+                        else
+                            failwith "No datamap parent is available"
                     | _ -> ()
 
                 state, model, newCmd
@@ -95,9 +123,19 @@ module Spreadsheet =
 
         //let newHistoryController (state, model, cmd) =
         //    updateSessionStorageMsg msg, model
+
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
             match msg with
             | UpdateState nextState -> nextState, model, Cmd.none
+            | ImportJsonRaw importData ->
+                let cmd =
+                    Cmd.OfFunc.either
+                        (UpdateUtil.JsonImportHelper.parseFromJsonString)
+                        (importData.jsonString, importData.jsonType, importData.filetype, importData.fileName)
+                        (UpdateArcFile >> SpreadsheetMsg)
+                        (curry GenericError Cmd.none >> DevMsg)
+
+                state, model, cmd
             | UpdateDatamap datamapOption ->
                 let nextState = Controller.DataMap.updateDatamap datamapOption state
                 nextState, model, Cmd.none
@@ -154,14 +192,30 @@ module Spreadsheet =
                 let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
 
                 let nextState =
-                    if reset then
-                        Spreadsheet.Model.init (arcFile)
-                    else
-                        { state with ArcFile = Some arcFile }
+                    let baseState =
+                        if reset then
+                            Spreadsheet.Model.init (arcFile)
+                        else
+                            { state with ArcFile = Some arcFile }
+
+                    match arcFile with
+                    | ArcFiles.Workflow _ -> {
+                        baseState with
+                            ActiveView = ActiveView.Metadata
+                      }
+                    | ArcFiles.DataMap _ -> {
+                        baseState with
+                            ActiveView = ActiveView.DataMap
+                      }
+                    | _ -> baseState
 
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState = Spreadsheet.Model.init (arcFile)
+                let nextState =
+                    match arcFile with
+                    | ArcFiles.DataMap _ -> Spreadsheet.Model.init (arcFile, ActiveView.DataMap)
+                    | _ -> Spreadsheet.Model.init (arcFile)
+
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation(range, oa) ->
                 let nextState = Controller.BuildingBlocks.insertTerm oa range state
@@ -308,6 +362,9 @@ module Spreadsheet =
                     | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
                     | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
                     | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+                    | Run r -> n + "_" + ArcRun.FileName, ArcRun.toFsWorkbook r
+                    | Workflow w -> n + "_" + ArcWorkflow.FileName, ArcWorkflow.toFsWorkbook w
+                    | DataMap(_, d) -> n + "_" + "datamap.xlsx", Spreadsheet.DataMap.toFsWorkbook d
 
                 let cmd =
                     Cmd.OfPromise.either

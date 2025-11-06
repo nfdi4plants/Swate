@@ -1,4 +1,6 @@
-module Modals.Util
+// module Modals.Util
 
-let inline RMV_MODAL dispatch =
-    fun _ -> None |> Messages.UpdateModal |> dispatch
+// let inline RMV_MODAL dispatch =
+//     fun _ -> None |> Messages.UpdateModal |> dispatch
+
+namespace Modals

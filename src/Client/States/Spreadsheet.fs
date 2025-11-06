@@ -62,11 +62,12 @@ type ActiveView =
         | Table i -> Some i
         | _ -> None
 
+    /// This function is used to verify if the current arcfile supports the active view type.
     member this.ArcFileHasView(arcfile: ArcFiles) =
         match this with
         | Table i -> arcfile.HasTableAt(i)
-        | DataMap -> arcfile.HasDataMap()
-        | Metadata -> true
+        | DataMap -> arcfile.HasTableAt(-1)
+        | Metadata -> arcfile.HasMetadata()
 
 [<AutoOpen>]
 module ActivePattern =
@@ -84,8 +85,8 @@ type Model = {
     ArcFile: ArcFiles option
 } with
 
-    static member init(?arcfile) = {
-        ActiveView = ActiveView.Metadata
+    static member init(?arcfile, ?activeView) = {
+        ActiveView = defaultArg activeView ActiveView.Metadata
         ArcFile = arcfile
     }
 
@@ -94,12 +95,15 @@ type Model = {
         | Some(Assay _) -> "Assay"
         | Some(Study _) -> "Study"
         | Some(Investigation _) -> "Investigation"
+        | Some(Run _) -> "Run"
+        | Some(Workflow _) -> "Workflow"
+        | Some(DataMap _) -> "Datamap"
         | Some(Template _) -> "Template"
         | None -> "No File"
 
     member this.Tables =
         match this.ArcFile with
-        | Some(arcfile) -> arcfile.Tables()
+        | Some(arcfile) -> arcfile.ArcTables()
         | None -> ResizeArray() |> ArcTables
 
     member this.ActiveTable =
@@ -114,20 +118,23 @@ type Model = {
                 [|
                     CompositeCell.FreeText "If you see this table view, pls contact a developer and report it."
                 |]
+                |> ResizeArray
             )
 
             t
 
-    member this.HasDataMap() =
+    member this.HasMetadata() =
         match this.ArcFile with
-        | Some(Assay a) -> a.DataMap.IsSome
-        | Some(Study(s, _)) -> s.DataMap.IsSome
-        | _ -> false
+        | Some(arcFile) -> arcFile.HasMetadata()
+        | None -> false
 
     member this.DataMapOrDefault =
         match this.ArcFile with
         | Some(Assay a) when a.DataMap.IsSome -> a.DataMap.Value
+        | Some(Run r) when r.DataMap.IsSome -> r.DataMap.Value
+        | Some(Workflow w) when w.DataMap.IsSome -> w.DataMap.Value
         | Some(Study(s, _)) when s.DataMap.IsSome -> s.DataMap.Value
+        | Some(DataMap(_, d)) -> d
         | _ -> DataMap.init ()
 
     member this.GetAssay() =
@@ -138,7 +145,8 @@ type Model = {
     member this.CanHaveTables() =
         match this.ArcFile with
         | Some(ArcFiles.Assay _)
-        | Some(ArcFiles.Study _) -> true
+        | Some(ArcFiles.Study _)
+        | Some(ArcFiles.Run _) -> true
         | _ -> false
 
     member this.TableViewIsActive() =
@@ -199,6 +207,7 @@ type Msg =
     | InsertOntologyAnnotations of OntologyAnnotation[]
     /// Starts chain to export active table to isa json
     | ExportJson of ArcFiles * JsonExportFormat
+    | ImportJsonRaw of SpreadsheetInterface.ImportJsonRawDTO
     /// Starts chain to export all tables to xlsx swate tables.
     | ExportXlsx of ArcFiles
     | ExportXlsxDownload of filename: string * byte[]

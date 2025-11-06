@@ -343,7 +343,7 @@ type DataMapTable =
                     DataMapTable.ContextMenu(datamap, setDatamap, setModal, tableRef, containerRef, ?debug = debug)
                     Table.Table(
                         datamap.RowCount + 1,
-                        datamap.ColumnCount,
+                        datamap.ColumnCount + 1,
                         renderCell,
                         renderActiveCell,
                         ref = tableRef,
@@ -374,7 +374,7 @@ type DataMapTable =
 
         let datamap, setDatamap =
             React.useState (
-                DataMap(
+                ARCtrl.DataMap(
                     ResizeArray [
                         for i in 0..100 do
                             DataContext(

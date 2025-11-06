@@ -353,7 +353,6 @@ open Components
 
 type DataAnnotator =
 
-
     [<ReactComponent>]
     static member private Modal(model: Model, dispatch, rmvFile, rmv, isOpen, setIsOpen) =
         let init: unit -> Set<DataTarget> = fun () -> Set.empty
@@ -499,5 +498,4 @@ type DataAnnotator =
             SidebarComponents.SidebarLayout.Description "Specify exact data points for annotation."
 
             SidebarComponents.SidebarLayout.LogicContainer [ DataAnnotator.Main(model, dispatch) ]
-
         ]

@@ -86,13 +86,13 @@ type SelectiveImportModal =
             prop.children [
                 Html.thead [
                     Html.tr [
-                        for columnIndex in 0 .. columns.Length - 1 do
+                        for columnIndex in 0 .. columns.Count - 1 do
                             Html.th [
                                 Html.label [
                                     prop.className "swt:flex swt:flex-row swt:gap-2"
                                     prop.children [
                                         SelectiveImportModal.CheckBoxForTableColumnSelection(
-                                            columns,
+                                            columns |> Array.ofSeq,
                                             tableIndex,
                                             columnIndex,
                                             isActive,
@@ -275,6 +275,9 @@ type SelectiveImportModal =
             | Study(s, _) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([ t.Table ]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
+            | Workflow _ -> ResizeArray(), ArcFilesDiscriminate.Workflow
+            | Run r -> r.Tables, ArcFilesDiscriminate.Run
+            | DataMap _ -> ResizeArray(), ArcFilesDiscriminate.DataMap
 
         let setMetadataImport =
             fun b ->
@@ -364,13 +367,7 @@ type SelectiveImportModal =
             footer = footer
         )
 
-    static member Main(import: ArcFiles, model, dispatch: Messages.Msg -> unit) =
-        let rmv = Util.RMV_MODAL dispatch
-        SelectiveImportModal.Main(import, model, dispatch, rmv = rmv)
-
-    static member Templates(model, dispatch: Messages.Msg -> unit) =
-
-        let rmv = Util.RMV_MODAL dispatch
+    static member Templates(model, dispatch: Messages.Msg -> unit, rmv) =
 
         let tables = model.ProtocolState.TemplatesSelected |> List.map (fun t -> t.Table)
 
@@ -415,6 +412,7 @@ type SelectiveImportModal =
                         prop.style [ style.marginLeft length.auto ]
                         prop.text "Submit"
                         prop.onClick (fun e ->
+
                             SpreadsheetInterface.AddTemplates(tables, model.ProtocolState.ImportConfig)
                             |> InterfaceMsg
                             |> dispatch

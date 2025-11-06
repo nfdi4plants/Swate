@@ -6,6 +6,9 @@ let main args =
     let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
 
     match argv with
+    | "create-certs" :: _ ->
+        Run.createDevCertsForExcelAddIn ()
+        0
     | "bundle" :: a ->
         run "npm" [ "install" ] "."
 
@@ -22,21 +25,28 @@ let main args =
             Bundle.All()
             0
     | "run" :: a ->
-        match a with
-        | "db" :: a ->
-            Run.All(true)
-            0
-        | "client" :: a ->
-            run "dotnet" Run.ClientArgs ProjectPaths.clientPath
-            0
-        | _ ->
-            Run.All(false)
-            0
+        let runDb: bool = a |> List.contains "db"
+        let runExcel: bool = a |> List.contains "excel"
+        Run.All runDb runExcel
+        0
+    | "tests" :: a
     | "test" :: a ->
         Test.disableUserData ()
         Test.buildSharedTests ()
 
         match a with
+        | "run" :: "server" :: _ ->
+            match Test.Run.server |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
+        | "run" :: "client" :: _ ->
+            match Test.Run.client |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
+        | "run" :: "components" :: _ ->
+            match Test.Run.components |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
         | "watch" :: _ ->
             Test.Watch()
             0
@@ -44,7 +54,7 @@ let main args =
             Test.WatchJs()
             0
         | _ ->
-            Test.Run()
+            Test.Run.All()
             0
     | "release" :: target :: otherArgs ->
         let latestVersion = Changelog.getLatestVersion ()
@@ -55,11 +65,13 @@ let main args =
             printRedfn "Currently the worklow only supports CI releases!"
             exit 1
 
+        VersionIO.updateAllVersionInformationInFiles latestVersion
+
         match target with
         | "nuget" ->
             let key = getEnvironementVariableOrFail "NUGET_KEY"
 
-            Release.nuget key latestVersion isDryRun
+            Release.nuget key isDryRun
 
             printGreenfn ("Release nuget!")
             0
@@ -145,8 +157,7 @@ let main args =
     | "dev" :: a ->
 
         let version = Changelog.getLatestVersion ()
-
-        ()
+        printfn "%A" version
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")

@@ -539,7 +539,7 @@ type AnnotationTable =
 
     static member Entry() =
         let arcTable =
-            ARCtrl.ArcTable("TestTable", ResizeArray(), System.Collections.Generic.Dictionary())
+            ARCtrl.ArcTable("TestTable", ResizeArray())
 
         let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
 
@@ -549,6 +549,7 @@ type AnnotationTable =
                 for i in 0..100 do
                     CompositeCell.createFreeText $"Source {i}"
             |]
+            |> ResizeArray
         )
 
         arcTable.AddColumn(
@@ -557,6 +558,7 @@ type AnnotationTable =
                 for i in 0..100 do
                     CompositeCell.createTermFromString ("SCIEX instrument model", "MS", "MS:11111231")
             |]
+            |> ResizeArray
         )
 
         arcTable.AddColumn(
@@ -565,6 +567,7 @@ type AnnotationTable =
                 for i in 0..100 do
                     CompositeCell.createUnitizedFromString (string i, "Degree Celsius", "UO", "UO:000000001")
             |]
+            |> ResizeArray
         )
 
         arcTable.AddColumn(
@@ -583,6 +586,7 @@ type AnnotationTable =
 
                     CompositeCell.createData (newData)
             |]
+            |> ResizeArray
         )
 
         let table, setTable = React.useState (arcTable)

@@ -10,12 +10,7 @@ open Swate.Components
 
 type InteropLogging =
     static member Main(model: DevState, dispatch) =
-        let rmv = Util.RMV_MODAL dispatch
-
-        let closeMsg =
-            fun e ->
-                rmv e
-                UpdateDisplayLogList [] |> DevMsg |> dispatch
+        let closeMsg = fun _ -> UpdateDisplayLogList [] |> DevMsg |> dispatch
 
         let logs = model.DisplayLogList
 
@@ -24,10 +19,7 @@ type InteropLogging =
             prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop [ prop.onClick closeMsg ]
-                Html.div [
-                    prop.className "swt:modal-backdrop"
-                    prop.onClick closeMsg
-                ]
+                Html.div [ prop.className "swt:modal-backdrop"; prop.onClick closeMsg ]
                 //Daisy.modalBox.div [
                 Html.div [
                     prop.style [ style.width (length.percent 80); style.maxHeight (length.percent 80) ]
@@ -40,9 +32,7 @@ type InteropLogging =
                         //Daisy.table [
                         Html.div [
                             prop.className "swt:table swt:table-xs"
-                            prop.children [
-                                Html.tbody (logs |> List.map LogItem.toTableRow)
-                            ]
+                            prop.children [ Html.tbody (logs |> List.map LogItem.toTableRow) ]
                         ]
                         //Daisy.button.a [
                         Html.div [

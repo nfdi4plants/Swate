@@ -94,6 +94,7 @@ module Protocol =
         | UpdateLoading of bool
         //
         | UpdateTemplates of Template[]
+        | SetShowImportModal of bool
         /// trigger import modal for all selected protocols
         | ImportProtocols
         | ToggleSelectProtocol of Template
@@ -134,7 +135,7 @@ type Msg =
     | PageStateMsg of PageState.Msg
     | Batch of seq<Messages.Msg>
     | HistoryMsg of History.Msg
-    | UpdateModal of Model.ModalState.ModalTypes option
+    // | UpdateModal of Model.ModalState.ModalTypes option
     /// Top level msg to test specific api interactions, only for dev.
     | Run of (unit -> unit)
     | TestMyAPI

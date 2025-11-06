@@ -26,7 +26,8 @@ type Tabs =
                     model with
                         Model.PageState.SidebarPage = pageLink
                 }
-                |> dispatch)
+                |> dispatch
+            )
             prop.children (pageLink.AsIcon())
         ]
 
@@ -46,7 +47,7 @@ type Tabs =
                         Tabs.NavigationTab Routing.SidebarPage.TermSearch model dispatch
                         Tabs.NavigationTab Routing.SidebarPage.Protocol model dispatch
                         Tabs.NavigationTab Routing.SidebarPage.FilePicker model dispatch
-                        Tabs.NavigationTab Routing.SidebarPage.DataAnnotator model dispatch
+                        // Tabs.NavigationTab Routing.SidebarPage.DataAnnotator model dispatch
                         Tabs.NavigationTab Routing.SidebarPage.JsonImport model dispatch
                         Tabs.NavigationTab Routing.SidebarPage.JsonExport model dispatch
                     ]

@@ -1,0 +1,90 @@
+version: '3.8'
+
+name: swate_release
+
+services:
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis_new
+    ports:
+      - '127.0.0.1:6379:6379'
+    command: redis-server --save 20 1 --loglevel warning
+    volumes:
+      - ./cache:/data
+    networks:
+      - swobup_network
+
+  neo4j:
+    image: neo4j:5
+    container_name: neo4j_new
+    ports:
+      - "0.0.0.0:7474:7474"
+      - "0.0.0.0:7687:7687"
+    networks:
+      - swobup_network
+    environment:
+      - NEO4J_AUTH=neo4j/testing12345
+      - NEO4J_server_memory_pagecache_size=7G
+      - NEO4J_server_memory_heap_initial__size=5G
+      - NEO4J_server_memory_heap_max__size=5G
+      - NEO4J_server_default__listen__address=0.0.0.0
+      - NEO4J_server_default__advertised__address=10.20.51.223
+      - NEO4J_dbms.connector.bolt.address=0.0.0.0:7687
+      - NEO4J_PLUGINS=["graph-data-science", "apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=algo.*, apoc.*
+      - NEO4J_server_jvm_additional='-XX:+ExitOnOutOfMemoryError'
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+      - ./neo4j/import:/var/lib/neo4j/import
+      - ./neo4j/plugins:/plugins
+
+  swate:
+    image: ghcr.io/nfdi4plants/swate:next
+    container_name: swate_new
+    ports:
+      - 5000:5000
+    extra_hosts:
+    # cat /etc/hosts , as bash command in container
+      - "host.docker.internal:host-gateway"
+    networks:
+      - swobup_network
+    environment:
+      - DB_USER=neo4j
+      - DB_PASSWORD=testing12345
+      - DB_URL=bolt://neo4j:7687
+      - DB_NAME=neo4j
+
+  swobup:
+    container_name: swobup_new
+    environment:
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
+      - SWOBUP_USERNAME=swobup
+      - SWOBUP_PASSWORD=test
+      - SWOBUP_DATASTORAGE=local
+      - GITHUB_SECRET=test
+      - DB_URL=bolt://neo4j:7687
+      - DB_USER=neo4j
+      - DB_PASSWORD=testing12345
+      - ONTOLOGY_REPOSITORY=nfdi4plants/nfdi4plants_ontology
+      - TEMPLATE_REPOSITORY=nfdi4plants/SWATE_templates
+      - SWATE_API=https://swate-alpha.nfdi4plants.org
+      #- SWATE_API=https://host.docker.internal:3000
+      - TURN_OFF_SSL_VERIFY=True
+      - MAIL_NOTIFICATION=off
+    image: ghcr.io/nfdi4plants/swobup:main
+    # https://medium.com/@TimvanBaarsen/how-to-connect-to-the-docker-host-from-inside-a-docker-container-112b4c71bc66#:~:text=As%20of%20Docker%20version%2018.03,on%20Linux%20until%20Docker%2020.10.
+    extra_hosts:
+    # cat /etc/hosts , as bash command in container
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+      - "1111:1111"
+    networks:
+      - swobup_network
+
+networks:
+  swobup_network:
+    driver: bridge

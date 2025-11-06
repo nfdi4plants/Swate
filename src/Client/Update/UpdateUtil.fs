@@ -11,10 +11,103 @@ let downloadFromString (filename, content: string) =
     let bytes = System.Text.Encoding.UTF8.GetBytes(content)
     bytes.SaveFileAs(filename)
 
+// module JsonHelper =
+
+//     open ARCtrl.Json
+
+//     open Thoth.Json
+//     open Thoth.Json.Core
+
+//     let wholeDatamapEncoder (parentId: string) (parent: ARCtrl.ARCtrlHelper.DataMapParent) (datamap: ARCtrl.DataMap) =
+//         Encode.object [
+//             "ParentId", Encode.string parentId
+//             "Parent", Encode.string (parent.ToString())
+//             "Datamap", DataMap.encoder datamap
+//         ]
+
+//     let wholeDatamapDecoder =
+//         Decode.object (fun get ->
+//             let parentId = get.Required.Field "ParentId" Decode.string
+
+//             let parent =
+//                 let temp = get.Required.Field "Parent" Decode.string
+//                 DataMapParent.tryFromString (temp)
+
+//             let datamapParent = createDataMapParentInfo parentId parent
+//             let datamap = get.Required.Field "Datamap" DataMap.decoder
+//             datamapParent, datamap
+//         )
+
+module JsonGenericHelper =
+
+    let toFileName (id: string) (fileType: ArcFilesDiscriminate) (jsonType: JsonExportFormat) =
+        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
+        let formatString = jsonType.ToString()
+        let fileTypeString = fileType.ToString()
+        n + "_" + fileTypeString + "_" + id + "_" + formatString + ".json"
+
+    let tryParseJsonFileName (fileName: string) =
+        if fileName.EndsWith(".json") then
+            let parts = fileName.Substring(0, fileName.Length - 5).Split("_")
+
+            let jsonFormat =
+                parts |> Array.tryPick (fun part -> JsonExportFormat.tryFromString part)
+
+            let arcfile =
+                parts |> Array.tryPick (fun part -> ArcFilesDiscriminate.tryFromString part)
+
+            match jsonFormat, arcfile with
+            | Some jf, Some af -> Some(jf, af)
+            | _ -> None
+        else
+            None
+
 module JsonImportHelper =
 
     open ARCtrl
     open FileImport
+
+    let tryParseFromJsonString
+        (
+            jsonString: string,
+            jsonType: JsonExportFormat option,
+            filetype: ArcFilesDiscriminate option,
+            fileName: string option
+        ) : ArcFiles option =
+        let assumedJsonType =
+            match jsonType, filetype with
+            | Some jt, Some ft -> (jt, ft) |> Some
+            | _, _ ->
+                match fileName with
+                | Some name ->
+                    let resOpt = JsonGenericHelper.tryParseJsonFileName name
+
+                    match resOpt with
+                    | Some(jf, af) -> Some(jf, af)
+                    | None -> None
+                | None -> None
+
+        match assumedJsonType with
+        | Some(jsonFormat, arcfileType) ->
+            let arcfile =
+                Spreadsheet.IO.Json.readFromJsonMap.[(arcfileType, jsonFormat)] jsonString
+
+            Some arcfile
+        | None -> None
+
+    let parseFromJsonString
+        (
+            jsonString: string,
+            jsonType: JsonExportFormat option,
+            filetype: ArcFilesDiscriminate option,
+            fileName: string option
+        ) : ArcFiles =
+        match tryParseFromJsonString (jsonString, jsonType, filetype, fileName) with
+        | Some arcfile -> arcfile
+        | None ->
+            failwith
+                "Error. Unable to find correct JSON format. This function relies on correct naming conventions for the file. We will improve this in the future. The file name must contain the json format, as well as the file type, separated by \"_\". Example: 'ARCtrlCompressed_Assay.json"
+
 
     /// <summary>
     ///
@@ -65,6 +158,10 @@ module JsonImportHelper =
                 let tables = createUpdatedTables a.Tables state deselectedColumns None
                 a.Tables <- tables
                 arcFile
+            | Run r as arcFile ->
+                let tables = createUpdatedTables r.Tables state deselectedColumns None
+                r.Tables <- tables
+                arcFile
             | Study(s, _) as arcFile ->
                 let tables = createUpdatedTables s.Tables state deselectedColumns None
                 s.Tables <- tables
@@ -73,7 +170,9 @@ module JsonImportHelper =
                 let table = createUpdatedTables (ResizeArray[t.Table]) state deselectedColumns None
                 t.Table <- table.[0]
                 arcFile
-            | Investigation _ as arcFile -> arcFile
+            | Investigation _
+            | Workflow _
+            | DataMap _ as arcFile -> arcFile
 
         arcFile
 
@@ -95,12 +194,7 @@ module JsonImportHelper =
 
         match existingOpt with
         | Some existing ->
-            let existingTables =
-                match existing with
-                | Assay a -> a.Tables
-                | Study(s, _) -> s.Tables
-                | Template t -> ResizeArray([ t.Table ])
-                | Investigation _ -> ResizeArray()
+            let existingTables = existing.Tables()
 
             let appendTables =
                 // only append if the active table exists (this is to handle join call on investigations)
@@ -135,7 +229,8 @@ module JsonImportHelper =
                 |> Seq.map (fun table -> // update tables based on joinOptions
                     let nTable = ArcTable.init (table.Name)
                     nTable.Join(table, joinOptions = importConfig.ImportType)
-                    nTable)
+                    nTable
+                )
                 |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
                 |> Seq.iter (fun table -> existingTables.Add table)
 
@@ -160,8 +255,11 @@ module JsonImportHelper =
         let importTables =
             match import with
             | Assay a -> a.Tables
+            | Run r -> r.Tables
             | Study(s, _) -> s.Tables
             | Template t -> ResizeArray([ t.Table ])
+            | DataMap _
+            | Workflow _
             | Investigation _ -> ResizeArray()
 
         updateTables importTables importState activeTableIndex existingOpt
@@ -177,8 +275,8 @@ module JsonExportHelper =
     /// <param name="jef"></param>
     let parseToJsonString (arcfile: ArcFiles, jef: JsonExportFormat) =
         let name, jsonString =
-            let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
-            let nameFromId (id: string) = (n + "_" + id + ".json")
+            let nameFromId (id: string) =
+                JsonGenericHelper.toFileName id arcfile.RelatedArcFilesDiscriminate jef
 
             match arcfile, jef with
             | Investigation ai, JsonExportFormat.ARCtrl -> nameFromId ai.Identifier, ArcInvestigation.toJsonString 0 ai
@@ -207,5 +305,20 @@ module JsonExportHelper =
                 nameFromId t.FileName, Template.toCompressedJsonString 0 t
             | Template _, anyElse ->
                 failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
+
+            | Run r, JsonExportFormat.ARCtrl -> nameFromId r.Identifier, ArcRun.toJsonString 0 r
+            | Run r, JsonExportFormat.ARCtrlCompressed -> nameFromId r.Identifier, ArcRun.toCompressedJsonString 0 r
+            | Run _, anyElse -> failwithf "Error. It is not intended to parse Run to %s format." (string anyElse)
+
+            | Workflow w, JsonExportFormat.ARCtrl -> nameFromId w.Identifier, ArcWorkflow.toJsonString 0 w
+            | Workflow w, JsonExportFormat.ARCtrlCompressed ->
+                nameFromId w.Identifier, ArcWorkflow.toCompressedJsonString 0 w
+            | Workflow _, anyElse ->
+                failwithf "Error. It is not intended to parse Workflow to %s format." (string anyElse)
+
+            | DataMap(_, d), JsonExportFormat.ARCtrl -> nameFromId "", DataMap.toJsonString 0 d
+            | DataMap(_), anyElse ->
+                failwithf "Error. It is not intended to parse Datamap to %s format." (string anyElse)
+        // | _ -> failwith $"Error, the selected type {arcfile} is not supported to be exported." //Have to implement the logic for run when toJsonString has been implemented for it
 
         name, jsonString

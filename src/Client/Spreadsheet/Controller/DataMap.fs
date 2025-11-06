@@ -12,8 +12,13 @@ let updateDatamap (dataMapOpt: DataMap option) (state: Spreadsheet.Model) : Spre
         | Some(Study(s, _)) ->
             s.DataMap <- dataMapOpt
             Some(Study(s, []))
+        | Some(DataMap(p, d)) ->
+            if dataMapOpt.IsSome then
+                Some(DataMap(p, dataMapOpt.Value))
+            else
+                Some(DataMap(p, d))
         | _ ->
-            console.warn "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
+            console.warn "[WARNING] updateDatamap: No Assay, Study or Datamap found in ArcFile"
             state.ArcFile
 
     match dataMapOpt with
@@ -51,22 +56,19 @@ let updateDataMapDataContextAt (dtx) (index) (state: Spreadsheet.Model) : Spread
 let addRows (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let rows = Array.init n (fun _ -> DataContext())
 
-    if state.HasDataMap() then
-        state.DataMapOrDefault.DataContexts.AddRange(rows)
+    state.DataMapOrDefault.DataContexts.AddRange(rows)
 
     { state with ArcFile = state.ArcFile }
 
 let deleteRow (n: int) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    if state.HasDataMap() then
-        state.DataMapOrDefault.DataContexts.RemoveAt n
+    state.DataMapOrDefault.DataContexts.RemoveAt n
 
     { state with ArcFile = state.ArcFile }
 
 let deleteRows (rows: int[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    if state.HasDataMap() then
-        rows
-        |> Array.sortDescending
-        |> Array.iter (fun n -> state.DataMapOrDefault.DataContexts.RemoveAt n)
+    rows
+    |> Array.sortDescending
+    |> Array.iter (fun n -> state.DataMapOrDefault.DataContexts.RemoveAt n)
 
     { state with ArcFile = state.ArcFile }
 
