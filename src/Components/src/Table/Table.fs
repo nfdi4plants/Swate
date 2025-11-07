@@ -282,7 +282,7 @@ swt:p-0"""
                                 if isSafari then
                                     style.custom ("willChange", "transform")
                                     style.custom ("minHeight", $"{rowVirtualizer.getTotalSize ()}px")
-                                    style.custom ("minWidth", $"{columnVirtualizer.getTotalSize () + 800}px")
+                                    style.minWidth (columnVirtualizer.getTotalSize () + 800)
                                     style.custom ("contain", "size layout paint")
                                 else
                                     style.height (rowVirtualizer.getTotalSize ())
