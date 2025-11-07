@@ -1,4 +1,3 @@
-// src/stories/Table.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { within, expect } from 'storybook/test';
 import React from 'react';
@@ -23,6 +22,7 @@ const renderActiveCell = (index: { x: number; y: number }) =>
 export const SafariStyleCheck: Story = {
   decorators: [
     (Story) => {
+      // Create a userAgent safari mock to test for safari
       Object.defineProperty(window.navigator, "userAgent", {
         value:
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
@@ -62,7 +62,6 @@ export const SafariStyleCheck: Story = {
     const tableContainer = tableEl!.parentElement as HTMLElement | null;
     expect(tableContainer).not.toBeNull();
 
-    // Inspect computed styles on the container
     const computed = window.getComputedStyle(tableContainer!);
 
     expect(computed.willChange).toBe("transform");

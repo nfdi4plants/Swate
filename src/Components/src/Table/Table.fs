@@ -268,7 +268,7 @@ swt:p-0"""
                         if width.IsSome then
                             style.width width.Value
 
-                        style.minHeight 0 // crucial for Safari flex+overflow
+                        style.minHeight 0
                         style.minWidth 0
                     ]
                     prop.className
