@@ -9,6 +9,32 @@ open Fable.React
 open Swate.Components
 
 
+let globalThis: obj = JS.eval ("globalThis")
+
+let ensureWindowExists () =
+    // For if window is missing
+    if isNull (globalThis?window) then
+        globalThis?window <- createObj [ "navigator" ==> createObj [] ]
+
+    // For if document is missing
+    if isNull (globalThis?document) then
+        globalThis?document <-
+            createObj [
+                "body" ==> createObj [ "appendChild" ==> (fun (_: obj) -> ()) ]
+                "createElement"
+                ==> (fun (_: string) ->
+                    // Minimal element with style + querySelector returning self
+                    let style = createObj []
+
+                    createObj [
+                        "style" ==> style
+                        "querySelector" ==> (fun (_: string) -> createObj [ "style" ==> style ])
+                    ]
+                )
+            ]
+
+ensureWindowExists ()
+
 let mockSafariUserAgent () =
     let nav = unbox<obj> window?navigator
     nav?userAgent <- "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 Safari/605.1.15"
@@ -16,9 +42,6 @@ let mockSafariUserAgent () =
 let mockChromeUserAgent () =
     let nav = unbox<obj> window?navigator
     nav?userAgent <- "Mozilla/5.0 Chrome/118 Safari/605.1.15"
-
-
-
 
 let dummyCell _ = Html.div []
 let dummyActive _ = Html.div []
@@ -30,7 +53,6 @@ let renderTable (container: Browser.Types.HTMLElement) (table: ReactElement) =
 let getTableContainerStyle (container: Browser.Types.HTMLElement) =
     let el = unbox<obj> (container.querySelector ("[key='table-container']"))
     el?style
-
 
 let tests =
     testList "Safari Table View" [
@@ -90,11 +112,6 @@ let tests =
             Expect.notEqual (unbox<string> style?willChange) "transform" "Should not use Safari willChange style"
             Expect.isTrue (height.Length > 0) "Height should be set"
             Expect.isTrue (width.Length > 0) "Width should be set"
-
     ]
-
-
-
-
 
 let Main = testList "SafariTableView" [ tests ]
