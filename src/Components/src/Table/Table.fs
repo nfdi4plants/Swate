@@ -1,5 +1,6 @@
 namespace Swate.Components
 
+open System
 open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
@@ -77,6 +78,12 @@ swt:p-0"""
             ?debug: bool,
             ?annotator: bool
         ) =
+
+        // check for navigator agent if it is safari
+        let isSafari =
+            let userAgent = Browser.Dom.window?navigator?userAgent |> string
+            userAgent.Contains "Safari" && not (userAgent.Contains "Chrome")
+
         let debug = defaultArg debug false
         let annotator = defaultArg annotator false
         let enableColumnHeaderSelect = defaultArg enableColumnHeaderSelect false
@@ -115,6 +122,7 @@ swt:p-0"""
                         Set.toArray next
                     )
             )
+
 
         let scrollTo =
             fun (coordinate: CellCoordinate) ->
@@ -259,6 +267,9 @@ swt:p-0"""
                             style.height height.Value
                         if width.IsSome then
                             style.width width.Value
+
+                        style.minHeight 0
+                        style.minWidth 0
                     ]
                     prop.className
                         "swt:overflow-auto swt:h-full swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-100"
@@ -268,8 +279,15 @@ swt:p-0"""
                         Html.div [
                             prop.key "table-container"
                             prop.style [
-                                style.height (rowVirtualizer.getTotalSize ())
-                                style.width (columnVirtualizer.getTotalSize () + 800) // extra space to improve UX with rightmost columns
+                                if isSafari then
+                                    style.custom ("willChange", "transform")
+                                    style.custom ("minHeight", $"{rowVirtualizer.getTotalSize ()}px")
+                                    style.minWidth (columnVirtualizer.getTotalSize () + 800)
+                                    style.custom ("contain", "size layout paint")
+                                else
+                                    style.height (rowVirtualizer.getTotalSize ())
+                                    style.width (columnVirtualizer.getTotalSize () + 800) // extra space to improve UX with rightmost columns
+
                                 style.position.relative
                             ]
                             prop.children [

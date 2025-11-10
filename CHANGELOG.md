@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 1.0.0-rc.9 - 2025-11-6
+
+### Fixed
+
+-  Fixed table rendering for Safari [issue 834](https://github.com/nfdi4plants/Swate/issues/834) by @Gitarackur 
 ## 1.0.2 - 2025-10-29
 
 ### 🔄 Changed
