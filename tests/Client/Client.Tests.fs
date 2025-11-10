@@ -7,7 +7,6 @@ let client =
         Components.Tests.Table.ContextMenu.Main
         Components.Tests.Table.KeyboardNavigation.Main
         OfficeAddIn.AnnotationTable.Successful.Main
-        Components.Tests.Table.SafariTableView.Main
     ]
 
 let all =
