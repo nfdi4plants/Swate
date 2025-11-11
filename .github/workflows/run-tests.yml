@@ -1,8 +1,8 @@
 name: Run Tests
 
 on:
-  pull_request:
-  workflow_dispatch:
+  pull_request: # Triggers on pull requests
+  workflow_dispatch: # Allows manual runs from the Actions tab
 
 jobs:
   test:
@@ -17,28 +17,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Set up .NET
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.x
 
+      # Restore .NET tools
       - name: Restore .NET dependencies
         run: dotnet tool restore
 
+      # Install Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: "npm"
 
+      # Install npm dependencies
       - name: Install root npm dependencies
         run: npm ci
 
+      # Install component npm dependencies
       - name: Install component npm dependencies
         working-directory: src/Components
         run: npm ci
 
-      - name: Install Playwright Browsers
+      # Install playwright dependencies
+      - name: Install Playwright dependencies
         working-directory: src/Components
         run: npx playwright install --with-deps chromium
 
