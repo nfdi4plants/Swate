@@ -23,7 +23,7 @@ jobs:
           dotnet-version: 8.x
 
       - name: Restore .NET dependencies
-        run: dotnet restore ./build/Build.fsproj
+        run: dotnet tool restore
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
