@@ -1,62 +1,51 @@
 name: Run Tests
 
 on:
-  pull_request: # Triggers on pull requests
-  workflow_dispatch: # Allows manual runs from the Actions tab
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
-
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      # Checkout the repository
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up .NET
-      - name: Set up .NET
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x.x
+          dotnet-version: 8.x
 
-      # Restore .NET tools
       - name: Restore .NET dependencies
-        run: dotnet tool restore
+        run: dotnet restore
 
-      # Install Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: "npm"
 
-      - name: Remove root node_modules and lock file (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: rm -rf node_modules package-lock.json
+      - name: Install root npm dependencies
+        run: npm ci
 
-      - name: Remove Components node_modules and lock file (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: rm -rf node_modules package-lock.
+      - name: Install component npm dependencies
         working-directory: src/Components
+        run: npm ci
 
-      # Install npm dependencies
-      - name: Install root dependencies
-        run: npm i
+      # Only needed on Linux environments
+      - name: Install Playwright runtime dependencies (Linux only)
+        if: runner.os == 'Linux'
+        run: npx playwright install-deps
 
-      # Install component npm dependencies
-      - name: Install components dependencies
-        run: npm i
+      - name: Install Playwright Chromium
         working-directory: src/Components
-
-      # Install playwright dependencies
-      - name: Install Playwright dependencies
         run: npx playwright install chromium
-        working-directory: src/Components
 
       - name: Run Tests
         run: dotnet run --project ./build/Build.fsproj test
