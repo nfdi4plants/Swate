@@ -23,7 +23,7 @@ jobs:
           dotnet-version: 8.x
 
       - name: Restore .NET dependencies
-        run: dotnet restore
+        run: dotnet restore ./build/Build.fsproj
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,7 +38,6 @@ jobs:
         working-directory: src/Components
         run: npm ci
 
-      # Only needed on Linux environments
       - name: Install Playwright runtime dependencies (Linux only)
         if: runner.os == 'Linux'
         run: npx playwright install-deps
