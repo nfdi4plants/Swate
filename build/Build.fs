@@ -120,7 +120,9 @@ let main args =
         let tags = Git.getTags () |> Array.toList
         let nextTag = latestVersion.Version.ToString()
 
-        if tags |> List.contains (nextTag) && nextTag <> "1.0.0-rc.9" then
+        let releaseAlreadyExists = tags |> List.contains (nextTag)
+
+        if releaseAlreadyExists then
             printGreenfn
                 "The latest version %O from CHANGELOG.md is already tagged in git. No release needed."
                 latestVersion.Version
@@ -156,8 +158,11 @@ let main args =
         0
     | "dev" :: a ->
 
-        let version = Changelog.getLatestVersion ()
-        printfn "%A" version
+        let latestVersion = Changelog.getLatestVersion ()
+        let tags = Git.getTags () |> Array.toList
+        let nextTag = latestVersion.Version.ToString()
+        let releaseAlreadyExists = tags |> List.contains (nextTag)
+        printfn "releaseAlreadyExists: %A" releaseAlreadyExists
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")
