@@ -38,13 +38,9 @@ jobs:
         working-directory: src/Components
         run: npm ci
 
-      - name: Install Playwright runtime dependencies (Linux only)
-        if: runner.os == 'Linux'
-        run: npx playwright install-deps
-
-      - name: Install Playwright Chromium
+      - name: Install Playwright Browsers
         working-directory: src/Components
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Run Tests
         run: dotnet run --project ./build/Build.fsproj test
