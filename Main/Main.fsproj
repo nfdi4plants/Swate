@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="SimpleGitTest.fsx" />
     <None Include="ChokidarTest.fsx" />
   </ItemGroup>
 
