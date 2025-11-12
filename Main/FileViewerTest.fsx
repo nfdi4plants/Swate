@@ -32,6 +32,10 @@ type WatchOptions
     member val followSimlinks: bool option = followSimlinks with get, set
     member val cwd: string option = cwd with get, set
 
+type IWatched =
+    [<EmitIndexerAttribute>]
+    abstract member item: path:string -> string[] with get
+
 type IWatcher =
     abstract member close: unit -> Promise<unit>
     abstract member add: paths: string -> unit
@@ -39,6 +43,8 @@ type IWatcher =
     abstract member unwatch: paths: string -> Promise<unit>
     abstract member unwatch: paths: string[] -> Promise<unit>
     abstract member on: eventName: Events * callback: (string -> unit) -> IWatcher
+    abstract member getWatched: unit -> IWatched
+
 
 [<Erase>]
 type Chokidar =
@@ -55,9 +61,14 @@ type Chokidar =
 
 
 // let watcher = Chokidar.watch("C:/Users/User/source/repos/Fable.Electron/src/main", persistent = true, ignoreInitial = true, followSymlinks = true)
-let watcher = Chokidar.watch("C:/Users/User/source/repos/Fable.Electron/src/main", WatchOptions(persistent = true, ignoreInitial = true, followSimlinks = true))
+let watcher = Chokidar.watch("./", WatchOptions(persistent = true, ignoreInitial = true, followSimlinks = true))
 
 watcher
     .on(Events.Add, fun path -> console.log($"File added {path}"))
     .on(Events.Change, fun path -> console.log($"File changed {path}"))
     .on(Events.Unlink, fun path -> console.log($"File unlinked {path}"))
+    .on(Events.Ready, fun path ->
+        let getWatched = watcher.getWatched()
+        console.log($"getWatched: {getWatched}")
+        console.log(getWatched)
+    )
