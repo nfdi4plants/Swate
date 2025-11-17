@@ -42,6 +42,7 @@
     "jsonschema": "^1.4.1",
     "pako": "^2.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "simple-git": "^3.30.0"
   }
 }
