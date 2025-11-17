@@ -79,8 +79,133 @@ let cleanExcludePattern (pattern: string) =
     $"--exclude={pattern}"
 
 [<StringEnum>]
+type CheckoutWhat =
+    | [<CompiledName("-b")>] NewBranch
+    | [<CompiledName("-B")>] SelectBranch
+
+let checkOutBranchWhat (tag: CheckoutWhat) (branchName: string) (startPoint: string option) =
+    if startPoint.IsSome then
+        $"{tag} {branchName} {startPoint}"
+    else
+        $"{tag} {branchName}"
+
+[<StringEnum>]
+type CheckoutBranchOptions =
+    | [<CompiledName("-b")>] NewBranch
+    | [<CompiledName("-B")>] SelectBranch
+    | [<CompiledName("--orphan")>] Orphan
+
+let checkOutBranchOptions (tag: CheckoutBranchOptions) (branchName: string) (startPoint: string option) =
+    if startPoint.IsSome then
+        $"{tag} {branchName} {startPoint}"
+    else
+        $"{tag} {branchName}"
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type ConflictOptions =
+    | Merge
+    | [<CompiledName("diff3")>] Diff
+    | [<CompiledName("zdiff3")>] Zdiff
+
+let createCheckoutConflict (value: ConflictOptions) =
+    $"--conflict={value}"
+
+[<StringEnum>]
+type CheckoutOptionsWithNumbers =
+    | [<CompiledName("--unified")>] Unified
+    | [<CompiledName("--inter-hunk-context")>] InterHunkContext
+
+let createCheckoutOptionsWithNumbers (tag: CheckoutOptionsWithNumbers) (n: int) =
+    $"{tag}={n}"
+
+[<StringEnum>]
+type CheckoutOptionsWithValues =
+    | [<CompiledName("--pathspec-from-file=")>] PathspecFromFile
+
+let createCheckoutOptionsWithValues (tag: CheckoutOptionsWithValues) (value: string) =
+    $"{tag}={value}"
+
+[<StringEnum>]
+type CheckoutOptions =
+    | [<CompiledName("--quiet")>] Quiet
+    | [<CompiledName("--force")>] Force
+    | [<CompiledName("--ours")>] Ours
+    | [<CompiledName("--theirs")>] Theirs
+    | [<CompiledName("--no-track")>] NoTrack
+    | [<CompiledName("--guess")>] Guess
+    | [<CompiledName("--no-guess")>] NoGuess
+    | [<CompiledName("--l")>] L
+    | [<CompiledName("--detach")>] Detach
+    | [<CompiledName("--ignore-skip-worktree-bits")>] IgnoreSkipWorktreeBits
+    | [<CompiledName("--merge")>] Merge
+    | [<CompiledName("--patch")>] Patch
+    | [<CompiledName("--ignore-other-worktrees")>] IgnoreOtherWorktrees
+    | [<CompiledName("--overwrite-ignore")>] OverwriteIgnore
+    | [<CompiledName("--no-overwrite-ignore")>] NoOverwriteIgnore
+    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
+    | [<CompiledName("--no-recurse-submodules")>] NoRecurseSubmodules
+    | [<CompiledName("--overlay")>] Overlay
+    | [<CompiledName("--no-overlay")>] NoOverlay
+    | [<CompiledName("--pathspec-file-nul")>] PathspecFileNul
+    | [<CompiledName("--single-branch")>] SingleBranch
+    | [<CompiledName("--no-single-branch")>] NoSingleBranch
+    | [<CompiledName("--tags")>] GitTags
+    | [<CompiledName("--no-tags")>] NoTags
+    | [<CompiledName("--shallow-submodules")>] ShallowSubmodules
+    | [<CompiledName("--no-shallow-submodules")>] NoShallowSubmodules
+    | [<CompiledName("--remote-submodules")>] RemoteSubmodules
+    | [<CompiledName("--no-remote-submodules")>] NoRemoteSubmodules
+    
+
+[<StringEnum>]
+type CloneOptionsWithValues =
+    | [<CompiledName("--reference")>] Reference
+    | [<CompiledName("--reference-if-able")>] ReferenceIfAble
+    | [<CompiledName("--server-option")>] ServerOption
+    | [<CompiledName("--filter")>] Filter
+    | [<CompiledName("--origin")>] Origin
+    | [<CompiledName("--branch")>] Branch
+    | [<CompiledName("--revision")>] Revision
+    | [<CompiledName("--upload-pack")>] UploadPack
+    | [<CompiledName("--template")>] Template
+    //| [<CompiledName("--config")>] Config
+    | [<CompiledName("--shallow-since")>] ShallowSince
+    | [<CompiledName("--shallow-exclude")>] ShallowExclude
+    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
+    | [<CompiledName("--separate-git-dir")>] SeparateGitDir
+    | [<CompiledName("--ref-format")>] RefFormat
+    | [<CompiledName("--bundle-uri")>] BundleUri
+
+let cloneOptionWithValue (tag: CloneOptionsWithValues) (value: string) =
+    $"{tag}={value}"
+
+[<StringEnum>]
+type CloneOptionsWithNumbers =
+    | [<CompiledName("--depth")>] Depth
+    | [<CompiledName("--jobs")>] Jobs
+
+let cloneOptionWithNumber (tag: CloneOptionsWithNumbers) (n: int) =
+    $"{tag} {n}"
+
+[<StringEnum>]
+type CloneOptions =
+    | [<CompiledName("--local")>] Local
+    | [<CompiledName("--no-hardlinks")>] NoHardlinks
+    | [<CompiledName("--dissociate")>] Dissociate
+    | [<CompiledName("--quiet")>] Quiet
+    | [<CompiledName("--verbose")>] Verbose
+    | [<CompiledName("--progress")>] Progress
+    | [<CompiledName("--no-checkout")>] NoCheckout
+    | [<CompiledName("--reject-shallow")>] RejectShallow
+    | [<CompiledName("--no-reject-shallow")>] NoRejectShallow
+    | [<CompiledName("--bare")>] Bare
+    | [<CompiledName("--sparse")>] Sparse
+    | [<CompiledName("--also-filter-submodules")>] AlsoFilterSubmodules
+    | [<CompiledName("--mirror")>] Mirror
+
+[<StringEnum>]
 type InitOptions =
-    | [<CompiledName("-q")>] Quiet
+    | [<CompiledName("--quiet")>] Quiet
     | [<CompiledName("--bare")>] Bare
     | [<CompiledName("--shared")>] Shared
 
@@ -159,10 +284,6 @@ type BranchOptions =
     | [<CompiledName("--set-upstream")>] SetUpstream
     | [<CompiledName("--unset-upstream")>] UnsetUpstream
     | [<CompiledName("--edit-description ")>] EditDescription
-    //| [<CompiledName("branch-name")>] BranchName
-    //| [<CompiledName("start-point")>] StartPoint
-    //| [<CompiledName("old-branch")>] OldBranch
-    //| [<CompiledName("new-branch")>] NewBranch
 
 [<StringEnum>]
 type BranchOptionsWithValues =
@@ -287,6 +408,14 @@ type ISimpleGit =
     abstract member clean: options: string -> Promise<unit>
     abstract member clean: options: string[] -> Promise<unit>
     abstract member clean: cleanSwitches: string * options: string[] -> Promise<unit>
+
+    abstract member checkout: checkoutWhat: string -> Promise<string>
+    abstract member checkout: checkoutWhat: string * options: string[] -> Promise<string>
+
+    abstract member clone: repopath: string -> Promise<string>
+    abstract member clone: repopath: string * localPath: string -> Promise<string>
+    abstract member clone: repopath: string * options: string[] -> Promise<string>
+    abstract member clone: repopath: string * localPath: string * options: string[] -> Promise<string>
 
     abstract member init: unit -> Promise<ISimpleGit>
     abstract member init: bare: bool -> Promise<ISimpleGit>
