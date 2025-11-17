@@ -717,3 +717,8 @@ type SimpleGit =
 
     [<Import("simpleGit", "simple-git")>]
     static member simpleGit (options: SimpleGitOptions) : ISimpleGit = jsNative
+
+let simpleGit = SimpleGit.simpleGit(SimpleGitOptions(baseDir = "./", binary = "git", maxConcurrentProcesses = 6, trimmed = true))
+
+console.log("SimpleGit!")
+console.log(simpleGit)
