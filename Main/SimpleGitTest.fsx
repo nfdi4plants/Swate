@@ -722,3 +722,5 @@ let simpleGit = SimpleGit.simpleGit(SimpleGitOptions(baseDir = "./", binary = "g
 
 console.log("SimpleGit!")
 console.log(simpleGit)
+
+//ToAdd: AbortController; Progress Events; 
