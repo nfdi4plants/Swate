@@ -333,70 +333,80 @@ type SimpleGitOptions
     member val trimmed: bool option = trimmed with get, set
 
 [<AllowNullLiteral>]
-type BranchSummaryBranch
-    [<ParamObjectAttribute; Emit("$0")>](
-      ?current: bool,
-      ?name: string,
-      ?commit: string,
-      ?label: string,
-      ?linkedWorkTree: bool
-    ) =
-    member val current: bool option = current with get, set
-    member val name: string option = name with get, set
-    member val commit: string option = commit with get, set
-    member val label: string option = label with get, set
-    member val linkedWorkTree: bool option = linkedWorkTree with get, set
+type IBranchSummaryBranch =
+    abstract current: bool option
+    abstract name: string option
+    abstract commit: string option
+    abstract label: string option
+    abstract linkedWorkTree: bool option
 
 [<AllowNullLiteral>]
-type BranchSummaryResult
-    [<ParamObjectAttribute; Emit("$0")>](
-      ?all: string[],
-      ?branches: {|key: string; value: BranchSummaryBranch|},
-      ?current: string,
-      ?detached: bool
-    ) =
-    member val all: string[] option = all with get, set
-    member val branches: {|key: string; value: BranchSummaryBranch|} option = branches with get, set
-    member val current: string option = current with get, set
-    member val detached: bool option = detached with get, set
+type IBranchSummaryResult =
+    abstract all: string[] option
+    abstract branches: {|key: string; value: IBranchSummaryBranch|} option
+    abstract current: string option
+    abstract detached: bool option
 
 [<AllowNullLiteral>]
-type BranchSingleDeleteSuccess
-    [<ParamObjectAttribute; Emit("$0")>](
-      ?branch: string,
-      ?hash: string,
-      ?success: bool
-    ) =
-    member val branch: string option = branch with get, set
-    member val hash: string option = hash with get, set
-    member val success: bool option = success with get, set
+type IBranchSingleDeleteSuccess =
+    abstract branch: string option
+    abstract hash: string option
+    abstract success: bool option
 
 [<AllowNullLiteral>]
-type BranchSingleDeleteFailure
-    [<ParamObjectAttribute; Emit("$0")>](
-      ?branch: string,
-      ?hash: objnull,
-      ?success: bool
-    ) =
-    member val branch: string option = branch with get, set
-    member val hash: objnull option = hash with get, set
-    member val success: bool option = success with get, set
+type IBranchSingleDeleteFailure =
+    abstract branch: string option
+    abstract hash: objnull option
+    abstract success: bool option
 
 [<Erase>]
-type BranchSingleDeleteResult = U2<BranchSingleDeleteFailure, BranchSingleDeleteSuccess>
+type IBranchSingleDeleteResult = U2<IBranchSingleDeleteFailure, IBranchSingleDeleteSuccess>
 
 [<AllowNullLiteral>]
-type BranchMultiDeleteResult
-    [<ParamObjectAttribute; Emit("$0")>](
-      ?all: BranchSingleDeleteResult[],
-      ?branches: {|key: string; value: BranchSummaryBranch|},
-      ?errors: BranchSingleDeleteResult[],
-      ?success: bool
-    ) =
-    member val all: BranchSingleDeleteResult [] option = all with get, set
-    member val branches: {|key: string; value: BranchSummaryBranch|} option = branches with get, set
-    member val errors: BranchSingleDeleteResult [] option = errors with get, set
-    member val success: bool option = success with get, set
+type IBranchMultiDeleteResult =
+    abstract all: IBranchSingleDeleteResult [] option
+    abstract branches: {|key: string; value: IBranchSummaryBranch|} option
+    abstract errors: IBranchSingleDeleteResult [] option
+    abstract success: bool option
+
+[<AllowNullLiteral>]
+type CountObjectsResult =
+    abstract count: int option
+    abstract size: int option
+    abstract inPack: int option
+    abstract packs: int option
+    abstract sizePack: int option
+    abstract prunePackable: int option
+    abstract garbage: int option
+    abstract sizeGarbage: int option
+
+[<AllowNullLiteral>]
+type IDiffResultTextFile =
+    abstract file: string option
+    abstract changes: int option
+    abstract insertions: int option
+    abstract deletions: int option
+    abstract binary: bool option
+
+[<AllowNullLiteral>]
+type IDiffResultBinaryFile =
+    abstract file: string option
+    abstract before: int option
+    abstract after: int option
+    abstract binary: bool option
+
+[<AllowNullLiteral>]
+type IDiffSummary =
+    abstract changed: int option
+    abstract deletions: int option
+    abstract insertions: int option
+    abstract files: U2<IDiffResultTextFile, IDiffResultBinaryFile>[] option
+
+[<AllowNullLiteral>]
+type IMergeResult =
+    abstract merged: string[] option
+    abstract conflicts: string[] option
+    abstract failed: bool option
 
 type ISimpleGit =
 
@@ -404,6 +414,10 @@ type ISimpleGit =
     abstract member apply: patch:string * options: string[] -> Promise<unit>
     abstract member apply: patches:string[] -> Promise<unit>
     abstract member apply: patches:string[] * options: string[] -> Promise<unit>
+
+    abstract member branch: options: string[] -> Promise<U2<IBranchSummaryResult, IBranchSingleDeleteResult>>
+
+    abstract member branchLocal: unit ->  Promise<IBranchSummaryResult>
 
     abstract member clean: options: string -> Promise<unit>
     abstract member clean: options: string[] -> Promise<unit>
@@ -417,22 +431,27 @@ type ISimpleGit =
     abstract member clone: repopath: string * options: string[] -> Promise<string>
     abstract member clone: repopath: string * localPath: string * options: string[] -> Promise<string>
 
+    abstract member mirror: repopath: string * localPath: string -> Promise<string>
+    abstract member mirror: repopath: string * localPath: string * options: string[] -> Promise<string>
+
+    abstract member countObjects: unit -> Promise<CountObjectsResult>
+
+    abstract member deleteLocalBranch: branchName: string -> Promise<IBranchSingleDeleteResult>
+    abstract member deleteLocalBranch: branchName: string * forceDelete: bool -> Promise<IBranchSingleDeleteResult>
+
+    abstract member deleteLocalBranches: branchNames: string[] -> Promise<IBranchMultiDeleteResult>
+    abstract member deleteLocalBranches: branchNames: string[] * forceDelete: bool -> Promise<IBranchMultiDeleteResult>
+
+    abstract member diff: options: string[] -> Promise<string>
+
+    abstract member diffResult: options: string[] -> Promise<IDiffSummary>
+
     abstract member init: unit -> Promise<ISimpleGit>
     abstract member init: bare: bool -> Promise<ISimpleGit>
     abstract member init: options: string[] -> Promise<ISimpleGit>
     abstract member init: bare: bool * options: string[] -> Promise<ISimpleGit>
 
-    abstract member diff: options: string[] -> Promise<unit>
-
-    abstract member branch: options: string[] -> Promise<U2<BranchSummaryResult, BranchSingleDeleteResult>>
-
-    abstract member branchLocal: unit ->  Promise<BranchSummaryResult>
-
-    abstract member deleteLocalBranch: branchName: string -> Promise<BranchSingleDeleteResult>
-    abstract member deleteLocalBranch: branchName: string * forceDelete: bool -> Promise<BranchSingleDeleteResult>
-
-    abstract member deleteLocalBranches: branchNames: string[] -> Promise<BranchMultiDeleteResult>
-    abstract member deleteLocalBranches: branchNames: string[] * forceDelete: bool -> Promise<BranchMultiDeleteResult>
+    abstract member merge: options: string[] -> Promise<IMergeResult>
 
 [<Erase>]
 type SimpleGit =
