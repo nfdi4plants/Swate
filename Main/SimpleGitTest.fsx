@@ -319,6 +319,246 @@ type TrackOptions =
 let trackWithValue (value: TrackOptions) =
     $"--track={value}"
 
+[<StringEnum>]
+type MergeOptions =
+    | [<CompiledName("--edit")>] Edit
+    | [<CompiledName("--no-edit")>] NoEdit
+    | [<CompiledName("--ff")>] FF
+    | [<CompiledName("--no-ff")>] NoFF
+    | [<CompiledName("--ff-only")>] FFOnly
+    | [<CompiledName("--no-gpg-sign")>] NoGpgSign
+    | [<CompiledName("--no-log")>] NoLog
+    | [<CompiledName("--signoff")>] SignOff
+    | [<CompiledName("--no-signoff")>] NoSignOff
+    | [<CompiledName("--stat")>] Stat
+    | [<CompiledName("-n")>] N
+    | [<CompiledName("--no-stat")>] NoStat
+    | [<CompiledName("--compact-summary")>] CompactSummary
+    | [<CompiledName("--squash")>] Squash
+    | [<CompiledName("--no-squash")>] NoSquash
+    | [<CompiledName("--verify")>] Verify
+    | [<CompiledName("--no-verify")>] NoVerify
+    | [<CompiledName("--verify-signatures")>] VerifySignatures
+    | [<CompiledName("--no-verify-signatures")>] NoVerifySignatures
+    | [<CompiledName("--summary")>] Summary
+    | [<CompiledName("--no-Summary")>] NoSummary
+    | [<CompiledName("--quiet")>] Quiet
+    | [<CompiledName("--verbose")>] Verbose
+    | [<CompiledName("--progress")>] Progress
+    | [<CompiledName("--no-progress")>] NoProgress
+    | [<CompiledName("--autostash")>] Autostash
+    | [<CompiledName("--no-autostash")>] NoAutostash
+    | [<CompiledName("--allow-unrelated-histories")>] AllowUnrelatedHistories
+    | [<CompiledName("--rerere-autoupdate")>] RerereAutoupdate
+    | [<CompiledName("--no-rerere-autoupdate")>] NoRerereAutoupdate
+    | [<CompiledName("--overwrite-ignore")>] OverwriteIgnore
+    | [<CompiledName("--no-overwrite-ignore")>] NoOverwriteIgnore
+    | [<CompiledName("--abort")>] Abort
+    | [<CompiledName("--quit")>] Quit
+    | [<CompiledName("--continue")>] Continue
+
+[<StringEnum>]
+type MergeOptionsWithValues =
+    | [<CompiledName("--cleanup")>] Cleanup
+    | [<CompiledName("--s")>] S
+    | [<CompiledName("--gpg-sign")>] GpgSign
+    | [<CompiledName("--log")>] Log
+    | [<CompiledName("--strategy")>] Strategy
+    | [<CompiledName("--strategy-option")>] StrategyOption
+    | [<CompiledName("--m")>] M
+    | [<CompiledName("--into-name")>] IntoName
+    | [<CompiledName("--file")>] File
+
+let mergeWithValue (flag: MergeOptionsWithValues) (value: string) =
+    $"{flag}={value}"
+
+[<StringEnum>]
+type MoveOptions =
+    | [<CompiledName("--force")>] Force
+    | [<CompiledName("-k")>] K
+    | [<CompiledName("--dry-run")>] DryRun
+    | [<CompiledName("--verbose")>] Verbose
+
+[<StringEnum>]
+type PullOptions =
+    | [<CompiledName("--quiet")>] Force
+    | [<CompiledName("--verbose")>] Verbose
+
+[<StringEnum>]
+type PullOptionTags =
+    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
+    | [<CompiledName("--no-recurse-submodules")>] NoRecurseSubmodules
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type PullOptionValues =
+    | Yes
+    | No
+    | [<CompiledName("on-demand")>] OnDemand
+
+let createPullOptions (flag: PullOptionTags) (value: PullOptionValues) =
+    $"{flag}={value}"
+
+[<StringEnum>]
+type PullOptionsMerging =
+    | [<CompiledName("--commit")>] Commit
+    | [<CompiledName("--no-commit")>] NoCommit
+    | [<CompiledName("--edit")>] Edit
+    | [<CompiledName("--no-edit")>] NoEdit
+    | [<CompiledName("--ff-only")>] FFOnly
+    | [<CompiledName("--ff")>] FF
+    | [<CompiledName("--no-ff")>] NoFF
+    | [<CompiledName("--no-gpg-sign")>] NoGpgSign
+    | [<CompiledName("--no-log")>] NoLog
+    | [<CompiledName("--signoff")>] SignOff
+    | [<CompiledName("--no-signoff")>] NoSignOff
+    | [<CompiledName("--stat")>] Stat
+    | [<CompiledName("-n")>] N
+    | [<CompiledName("--no-stat")>] NoStat
+    | [<CompiledName("--compact-summary")>] CompactSummary
+    | [<CompiledName("--squash")>] Squash
+    | [<CompiledName("--no-squash")>] NoSquash
+    | [<CompiledName("--verify")>] Verify
+    | [<CompiledName("--no-verify")>] NoVerify
+    | [<CompiledName("--verify-signatures")>] VerifySignatures
+    | [<CompiledName("--no-verify-signatures")>] NoVerifySignatures
+    | [<CompiledName("--summary")>] Summary
+    | [<CompiledName("--no-summary")>] NoSummary
+    | [<CompiledName("--autostash")>] Autostash
+    | [<CompiledName("--no-autostash")>] NoAutostash
+    | [<CompiledName("--allow-unrelated-histories")>] AllowUnrelatedHistories
+    | [<CompiledName("--no-rebase")>] NoRebase
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type PullRebaseValues =
+    | False
+    | True
+    | Merges
+    | Interactive
+
+let rebaseWithValue (value: PullRebaseValues) =
+    $"rebase={value}"
+
+[<StringEnum>]
+type PullOptionsMergingWithValues =
+    | [<CompiledName("--cleanup")>] Cleanup
+    | [<CompiledName("--s")>] S
+    | [<CompiledName("--gpg-sign")>] GpgSign
+    | [<CompiledName("--log")>] Log
+    | [<CompiledName("--strategy")>] Strategy
+    | [<CompiledName("--strategy-option")>] StrategyOption
+
+let pullMergingWithValue (flag: PullOptionsMergingWithValues) (value: string) =
+    $"{flag}={value}"
+
+[<StringEnum>]
+type PullOptionsFetching =
+    | [<CompiledName("--all")>] All
+    | [<CompiledName("--no-all")>] NoAll
+    | [<CompiledName("--append")>] Append
+    | [<CompiledName("--atomic")>] Atomic
+    | [<CompiledName("--unshallow")>] Unshallow
+    | [<CompiledName("--update-shallow")>] UpdateShallow
+    | [<CompiledName("--negotiate-only")>] NegotiateOnly
+    | [<CompiledName("--dry-run")>] DryRun
+    | [<CompiledName("--porcelain")>] Porcelain
+    | [<CompiledName("--force")>] Force
+    | [<CompiledName("--keep")>] Keep
+    | [<CompiledName("--prune")>] Prune
+    | [<CompiledName("--no-tags")>] NoTags
+    | [<CompiledName("--tags")>] FetchTags
+    | [<CompiledName("--set-upstream")>] SetUpstream
+    | [<CompiledName("--progress")>] Progress
+    | [<CompiledName("--show-forced-updates")>] ShowForcedUpdates
+    | [<CompiledName("--no-show-forced-updates")>] NoShowForcedUpdates
+    | [<CompiledName("--ipv4")>] Ipv4
+    | [<CompiledName("--ipv6")>] Ipv6
+
+[<StringEnum>]
+type PullOptionsFetchingWithNumbers =
+    | [<CompiledName("--depth")>] Depth
+    | [<CompiledName("--deepen")>] Deepen
+    | [<CompiledName("--jobs")>] Jobs
+
+let createPullFetchOptionsWithNumbers (flag: PullOptionsFetchingWithNumbers) (value: int) =
+    $"{flag}={value}"
+
+[<StringEnum>]
+type PullOptionsFetchingWithValue =
+    | [<CompiledName("--shallow-since")>] ShallowSince
+    | [<CompiledName("--shallow-exclude")>] ShallowExclude
+    | [<CompiledName("--refmap")>] Refmap
+    | [<CompiledName("--upload-pack")>] UploadPack
+    | [<CompiledName("--server-option")>] ServerOption
+
+let createPullFetchOptionsWithValue (flag: PullOptionsFetchingWithValue) (value: string) =
+    $"{flag}={value}"
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type PullOptionNegotiateValues =
+    | [<CompiledName("--commit")>] Commit
+    | [<CompiledName("--glob")>] Glob
+
+let createPullOptionNegotiation (value: PullOptionNegotiateValues) =
+    $"--negotiation-tip={value}"
+
+[<StringEnum>]
+type PushOptions =
+    | [<CompiledName("--all")>] All
+    | [<CompiledName("--branches")>] Branches
+    | [<CompiledName("--prune")>] Prune
+    | [<CompiledName("--mirror")>] Mirror
+    | [<CompiledName("--dry-run")>] DryRun
+    | [<CompiledName("--porcelain")>] Porcelain
+    | [<CompiledName("--delete")>] Delete
+    | [<CompiledName("--tags")>] PushTags
+    | [<CompiledName("--follow-tags")>] FollowTags
+    | [<CompiledName("--no-signed")>] NoSigned
+    | [<CompiledName("--atomic")>] Atomic
+    | [<CompiledName("--no-atomic")>] NoAtomic
+    | [<CompiledName("--no-force-with-lease")>] NoForceWithLease
+    | [<CompiledName("--force")>] Force
+    | [<CompiledName("--set-upstream")>] SetUpstream
+    | [<CompiledName("--thin")>] Thin
+    | [<CompiledName("--no-thin")>] NoThin
+    | [<CompiledName("--quiet")>] Quiet
+    | [<CompiledName("--verbose")>] Verbose
+    | [<CompiledName("--progress")>] Progress
+    | [<CompiledName("--no-recurse-submodules")>] NoRecurseSubmodules
+    | [<CompiledName("--verify")>] Verify
+    | [<CompiledName("--no-verify")>] NoVerify
+    | [<CompiledName("--ipv4")>] Ipv4
+    | [<CompiledName("--ipv6")>] Ipv6
+
+[<StringEnum>]
+type PushOptionsWithValue =
+    | [<CompiledName("--push-option")>] PushOption
+    | [<CompiledName("--receive-pack")>] ReceivePack
+    | [<CompiledName("--exec")>] Exec
+    | [<CompiledName("--force-with-lease")>] ForceWithLease
+    | [<CompiledName("--repo")>] Repo
+
+let createPushOptionsWithValue (flag: PushOptionsWithValue) (value: string) =
+    $"{flag}={value}"
+    
+[<StringEnum(CaseRules.LowerFirst)>]
+type PushOptionsSignesValues =
+    | True
+    | False
+    | [<CompiledName("if-asked")>] IfAsked
+
+let createPushOptionSigned (value: PushOptionsSignesValues) =
+    $"--signed={value}"
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type PushOptionsRecureseValues =
+    | Check
+    | [<CompiledName("on-demand")>] OnDemand
+    | Only
+    | No
+
+let createPushOptionRecurse (value: PushOptionsSignesValues) =
+    $"--recurse-submodules={value}"
+
 [<AllowNullLiteral>]
 type SimpleGitOptions
     [<ParamObjectAttribute; Emit("$0")>](
@@ -451,7 +691,26 @@ type ISimpleGit =
     abstract member init: options: string[] -> Promise<ISimpleGit>
     abstract member init: bare: bool * options: string[] -> Promise<ISimpleGit>
 
+    abstract member merge: unit -> Promise<IMergeResult>
     abstract member merge: options: string[] -> Promise<IMergeResult>
+
+    abstract member mergeFromTo: remote:string * branch:string -> Promise<IMergeResult>
+    abstract member mergeFromTo: remote:string * branch:string * options: string[] -> Promise<IMergeResult>
+
+    abstract member mv: from:string * target:string -> Promise<unit>
+    abstract member mv: from:string * target:string * options: string[] -> Promise<unit>
+    abstract member mv: from:string[] * target:string -> Promise<unit>
+    abstract member mv: from:string[] * target:string * options: string[] -> Promise<unit>
+
+    abstract member pull: unit -> Promise<unit>
+    abstract member pull: options: string[] -> Promise<unit>
+    abstract member pull: remote:string * branch:string * options: string[] -> Promise<unit>
+
+    abstract member push: unit -> Promise<unit>
+    abstract member push: options: string[] -> Promise<unit>
+    abstract member push: remote:string -> Promise<unit>
+    abstract member push: remote:string * options: string[] -> Promise<unit>
+    abstract member push: remote:string * branch:string * options: string[] -> Promise<unit>
 
 [<Erase>]
 type SimpleGit =
