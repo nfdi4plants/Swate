@@ -117,7 +117,8 @@ let main args =
         let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
 
         let latestVersion = Changelog.getLatestVersion ()
-        let tags = Git.getTags () |> Array.toList
+        let tags = Git.getTags () |> Array.toList |> List.distinct
+
         let nextTag = latestVersion.Version.ToString()
 
         let releaseAlreadyExists = tags |> List.contains (nextTag)
@@ -157,12 +158,7 @@ let main args =
 
         0
     | "dev" :: a ->
-
         let latestVersion = Changelog.getLatestVersion ()
-        let tags = Git.getTags () |> Array.toList
-        let nextTag = latestVersion.Version.ToString()
-        let releaseAlreadyExists = tags |> List.contains (nextTag)
-        printfn "releaseAlreadyExists: %A" releaseAlreadyExists
         0
     | _ ->
         Console.WriteLine("No valid argument provided. Please provide a valid target.")

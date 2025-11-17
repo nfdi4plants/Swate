@@ -38,20 +38,15 @@ let private shellCommand cmd args =
         "/bin/bash", $"-c \"{cmd} {argStr}\""
 
 let run (cmd: string) (args: seq<string>) (workingDir: string) =
-    try
-        Command.Run(cmd, args = args, workingDirectory = workingDir)
-    with ex ->
-        printRedfn "Error while running command: %s" ex.Message
+    Command.Run(cmd, args = args, workingDirectory = workingDir)
+
 
 let runReadAsync (cmd: string) (args: seq<string>) (workingDir: string) =
-    try
-        Command.ReadAsync(cmd, args = args, workingDirectory = workingDir)
-        |> Async.AwaitTask
-        |> Async.RunSynchronously
-        |> _.ToTuple()
-    with ex ->
-        printRedfn "Error while running command: %s" ex.Message
-        exit 1
+    Command.ReadAsync(cmd, args = args, workingDirectory = workingDir)
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+    |> _.ToTuple()
+
 
 let runAsync (prefix: string) (cmd: string) (args: seq<string>) (workingDir: string) = async {
     try

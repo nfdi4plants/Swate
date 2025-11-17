@@ -17,6 +17,10 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
         printGreenfn
             $"Package {ProjectInfo.componentsPackageName} version {version.Version.ToString()} already published to npmjs.org, skipping publish step."
     with _ ->
+        printGreenfn
+            $"Publishing package {ProjectInfo.componentsPackageName} version {version.Version.ToString()} to npmjs.org."
+
+        let version = VersionIO.updateComponentsPackageJSONVersion version
 
         let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
 
