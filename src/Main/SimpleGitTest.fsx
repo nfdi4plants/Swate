@@ -650,67 +650,49 @@ type IMergeResult =
 
 type ISimpleGit =
 
-    abstract member apply: patch:string -> Promise<unit>
-    abstract member apply: patch:string * options: string[] -> Promise<unit>
-    abstract member apply: patches:string[] -> Promise<unit>
-    abstract member apply: patches:string[] * options: string[] -> Promise<unit>
+    abstract member apply: patch:string * ?options: string[] -> Promise<unit>
+    abstract member apply: patches:string[] * ?options: string[] -> Promise<unit>
 
-    abstract member branch: options: string[] -> Promise<U2<IBranchSummaryResult, IBranchSingleDeleteResult>>
+    abstract member branch: ?options: string[] -> Promise<U2<IBranchSummaryResult, IBranchSingleDeleteResult>>
 
     abstract member branchLocal: unit ->  Promise<IBranchSummaryResult>
 
-    abstract member clean: options: string -> Promise<unit>
-    abstract member clean: options: string[] -> Promise<unit>
-    abstract member clean: cleanSwitches: string * options: string[] -> Promise<unit>
+    abstract member clean: ?options: string[] -> Promise<unit>
+    abstract member clean: cleanSwitches: string * ?options: string[] -> Promise<unit>
 
-    abstract member checkout: checkoutWhat: string -> Promise<string>
-    abstract member checkout: checkoutWhat: string * options: string[] -> Promise<string>
+    abstract member checkout: checkoutWhat: string * ?options: string[] -> Promise<string>
 
-    abstract member clone: repopath: string -> Promise<string>
-    abstract member clone: repopath: string * localPath: string -> Promise<string>
-    abstract member clone: repopath: string * options: string[] -> Promise<string>
-    abstract member clone: repopath: string * localPath: string * options: string[] -> Promise<string>
+    abstract member clone: repopath: string * ?options: string[] -> Promise<string>
+    abstract member clone: repopath: string * localPath: string * ?options: string[] -> Promise<string>
 
-    abstract member mirror: repopath: string * localPath: string -> Promise<string>
-    abstract member mirror: repopath: string * localPath: string * options: string[] -> Promise<string>
+    abstract member mirror: repopath: string * localPath: string * ?options: string[] -> Promise<string>
 
     abstract member countObjects: unit -> Promise<CountObjectsResult>
 
-    abstract member deleteLocalBranch: branchName: string -> Promise<IBranchSingleDeleteResult>
-    abstract member deleteLocalBranch: branchName: string * forceDelete: bool -> Promise<IBranchSingleDeleteResult>
+    abstract member deleteLocalBranch: branchName: string * ?forceDelete: bool -> Promise<IBranchSingleDeleteResult>
 
-    abstract member deleteLocalBranches: branchNames: string[] -> Promise<IBranchMultiDeleteResult>
-    abstract member deleteLocalBranches: branchNames: string[] * forceDelete: bool -> Promise<IBranchMultiDeleteResult>
+    abstract member deleteLocalBranches: branchNames: string[] * ?forceDelete: bool -> Promise<IBranchMultiDeleteResult>
 
-    abstract member diff: options: string[] -> Promise<string>
+    abstract member diff: ?options: string[] -> Promise<string>
 
-    abstract member diffResult: options: string[] -> Promise<IDiffSummary>
+    abstract member diffResult: ?options: string[] -> Promise<IDiffSummary>
 
-    abstract member init: unit -> Promise<ISimpleGit>
-    abstract member init: bare: bool -> Promise<ISimpleGit>
-    abstract member init: options: string[] -> Promise<ISimpleGit>
-    abstract member init: bare: bool * options: string[] -> Promise<ISimpleGit>
+    abstract member init: ?bare: bool -> Promise<ISimpleGit>
+    abstract member init: bare: bool * ?options: string[] -> Promise<ISimpleGit>
 
-    abstract member merge: unit -> Promise<IMergeResult>
-    abstract member merge: options: string[] -> Promise<IMergeResult>
+    abstract member merge: ?options: string[] -> Promise<IMergeResult>
 
-    abstract member mergeFromTo: remote:string * branch:string -> Promise<IMergeResult>
-    abstract member mergeFromTo: remote:string * branch:string * options: string[] -> Promise<IMergeResult>
+    abstract member mergeFromTo: remote:string * branch:string * ?options: string[] -> Promise<IMergeResult>
 
-    abstract member mv: from:string * target:string -> Promise<unit>
-    abstract member mv: from:string * target:string * options: string[] -> Promise<unit>
-    abstract member mv: from:string[] * target:string -> Promise<unit>
-    abstract member mv: from:string[] * target:string * options: string[] -> Promise<unit>
+    abstract member mv: from:string * target:string * ?options: string[] -> Promise<unit>
+    abstract member mv: from:string[] * target:string * ?options: string[] -> Promise<unit>
 
-    abstract member pull: unit -> Promise<unit>
-    abstract member pull: options: string[] -> Promise<unit>
-    abstract member pull: remote:string * branch:string * options: string[] -> Promise<unit>
+    abstract member pull: ?options: string[] -> Promise<unit>
+    abstract member pull: remote:string * branch:string * ?options: string[] -> Promise<unit>
 
-    abstract member push: unit -> Promise<unit>
-    abstract member push: options: string[] -> Promise<unit>
-    abstract member push: remote:string -> Promise<unit>
-    abstract member push: remote:string * options: string[] -> Promise<unit>
-    abstract member push: remote:string * branch:string * options: string[] -> Promise<unit>
+    abstract member push: ?options: string[] -> Promise<unit>
+    abstract member push: remote:string * ?options: string[] -> Promise<unit>
+    abstract member push: remote:string * branch:string * ?options: string[] -> Promise<unit>
 
 [<Erase>]
 type SimpleGit =
