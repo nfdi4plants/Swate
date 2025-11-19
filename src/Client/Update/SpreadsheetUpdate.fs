@@ -182,7 +182,12 @@ module Spreadsheet =
                         ArcFile = Some updatedArcFile
                 }
 
-                nextState, model, Cmd.none
+                let nextModel: Model = {
+                    model with
+                        Model.ProtocolState.TemplatesSelected = []
+                }
+
+                nextState, nextModel, Cmd.none
             | JoinTable(table, index, options, templateName) ->
                 let nextState =
                     Controller.BuildingBlocks.joinTable table index options state templateName

@@ -87,7 +87,12 @@ module OfficeInterop =
                         (curry GenericInteropLogs Cmd.none >> DevMsg)
                         (curry GenericError Cmd.none >> DevMsg)
 
-                state, model, cmd
+                let nextModel: Model = {
+                    model with
+                        Model.ProtocolState.TemplatesSelected = []
+                }
+
+                state, nextModel, cmd
             | JoinTable(table, options) ->
                 let cmd =
                     Cmd.OfPromise.either
