@@ -59,24 +59,113 @@ let whiteSpaceWithActions (value: WhiteSpaceActions) =
     $"--whitespace={value}"
 
 [<StringEnum>]
-type CleanOptions =
-    | [<CompiledName("-d")>] D
-    | [<CompiledName("-f")>] F
+type BranchOptions =
+    | [<CompiledName("--delete")>] Delete
+    | [<CompiledName("-D")>] DeleteForce
+    | [<CompiledName("--create-reflog")>] CreateReflog
     | [<CompiledName("--force")>] Force
-    | [<CompiledName("-i")>] I
-    | [<CompiledName("--interactive")>] Interactive
-    | [<CompiledName("-n")>] N
-    | [<CompiledName("--dry-run")>] DryRun
-    | [<CompiledName("-q")>] Q
+    | [<CompiledName("--move")>] Move
+    | [<CompiledName("-M")>] MoveForce
+    | [<CompiledName("--copy")>] Copy
+    | [<CompiledName("-Copy")>] CopyForce
+    | [<CompiledName("--color")>] Colour
+    | [<CompiledName("--no-color")>] NoColour
+    | [<CompiledName("--ignore-case")>] IgnoreCase
+    | [<CompiledName("--omit-empty")>] OmitEmpty
+    | [<CompiledName("--column")>] Column
+    | [<CompiledName("--no-column")>] NoColumn
+    | [<CompiledName("--remotes")>] Remotes
+    | [<CompiledName("--all")>] All
+    | [<CompiledName("--list")>] List
+    | [<CompiledName("--show-current")>] ShowCurrent
+    | [<CompiledName("--verbose")>] Verbose
     | [<CompiledName("--quiet")>] Quiet
-    | [<CompiledName("-x")>] Ignore
-    | [<CompiledName("-X")>] X
+    | [<CompiledName("--no-abbrev")>] NoAbbrev
+    | [<CompiledName("--no-track")>] NoTrack
+    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
+    | [<CompiledName("--set-upstream")>] SetUpstream
+    | [<CompiledName("--unset-upstream")>] UnsetUpstream
+    | [<CompiledName("--edit-description ")>] EditDescription
 
-let cleanEPattern (pattern: string) =
-    $"-e {pattern}"
+[<StringEnum>]
+type BranchOptionsWithStrings =
+    | [<CompiledName("--column")>] Column
+    | [<CompiledName("--no-column")>] NoColumn
+    | [<CompiledName("--sort")>] Sort
+    | [<CompiledName("--abbrev")>] Abbrev
+    | [<CompiledName("--set-upstream-to")>] SetUpstreamTo
+    | [<CompiledName("--contains")>] Contains
+    | [<CompiledName("--no-contains")>] NoContains
+    | [<CompiledName("--merged")>] Merged
+    | [<CompiledName("--no-merged")>] NoMerged
+    | [<CompiledName("--points-at")>] PointsAt
+    | [<CompiledName("--format")>] Format
 
-let cleanExcludePattern (pattern: string) =
-    $"--exclude={pattern}"
+let branchWithValue (flag: BranchOptionsWithStrings) (value: string) =
+    $"{flag}={value}"
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type WhenColour =
+    | Always
+    | Never
+    | Auto
+
+let createColourWithValue (value: WhenColour) =
+    $"--color={value}"
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type TrackOptions =
+    | Direct
+    | Inherit
+
+let trackWithValue (value: TrackOptions) =
+    $"--track={value}"
+
+[<StringEnum>]
+type CheckoutOptions =
+    | [<CompiledName("--quiet")>] Quiet
+    | [<CompiledName("--force")>] Force
+    | [<CompiledName("--ours")>] Ours
+    | [<CompiledName("--theirs")>] Theirs
+    | [<CompiledName("--no-track")>] NoTrack
+    | [<CompiledName("--guess")>] Guess
+    | [<CompiledName("--no-guess")>] NoGuess
+    | [<CompiledName("--l")>] L
+    | [<CompiledName("--detach")>] Detach
+    | [<CompiledName("--ignore-skip-worktree-bits")>] IgnoreSkipWorktreeBits
+    | [<CompiledName("--merge")>] Merge
+    | [<CompiledName("--patch")>] Patch
+    | [<CompiledName("--ignore-other-worktrees")>] IgnoreOtherWorktrees
+    | [<CompiledName("--overwrite-ignore")>] OverwriteIgnore
+    | [<CompiledName("--no-overwrite-ignore")>] NoOverwriteIgnore
+    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
+    | [<CompiledName("--no-recurse-submodules")>] NoRecurseSubmodules
+    | [<CompiledName("--overlay")>] Overlay
+    | [<CompiledName("--no-overlay")>] NoOverlay
+    | [<CompiledName("--pathspec-file-nul")>] PathspecFileNul
+    | [<CompiledName("--single-branch")>] SingleBranch
+    | [<CompiledName("--no-single-branch")>] NoSingleBranch
+    | [<CompiledName("--tags")>] GitTags
+    | [<CompiledName("--no-tags")>] NoTags
+    | [<CompiledName("--shallow-submodules")>] ShallowSubmodules
+    | [<CompiledName("--no-shallow-submodules")>] NoShallowSubmodules
+    | [<CompiledName("--remote-submodules")>] RemoteSubmodules
+    | [<CompiledName("--no-remote-submodules")>] NoRemoteSubmodules
+
+[<StringEnum>]
+type CheckoutOptionsWithNumber =
+    | [<CompiledName("--unified")>] Unified
+    | [<CompiledName("--inter-hunk-context")>] InterHunkContext
+
+let createCheckoutOptionsWithNumber (tag: CheckoutOptionsWithNumber) (n: int) =
+    $"{tag}={n}"
+
+[<StringEnum>]
+type CheckoutOptionsWithString =
+    | [<CompiledName("--pathspec-from-file=")>] PathspecFromFile
+
+let createCheckoutOptionsWithValues (tag: CheckoutOptionsWithString) (value: string) =
+    $"{tag}={value}"
 
 [<StringEnum>]
 type CheckoutWhat =
@@ -111,81 +200,24 @@ let createCheckoutConflict (value: ConflictOptions) =
     $"--conflict={value}"
 
 [<StringEnum>]
-type CheckoutOptionsWithNumbers =
-    | [<CompiledName("--unified")>] Unified
-    | [<CompiledName("--inter-hunk-context")>] InterHunkContext
-
-let createCheckoutOptionsWithNumbers (tag: CheckoutOptionsWithNumbers) (n: int) =
-    $"{tag}={n}"
-
-[<StringEnum>]
-type CheckoutOptionsWithValues =
-    | [<CompiledName("--pathspec-from-file=")>] PathspecFromFile
-
-let createCheckoutOptionsWithValues (tag: CheckoutOptionsWithValues) (value: string) =
-    $"{tag}={value}"
-
-[<StringEnum>]
-type CheckoutOptions =
-    | [<CompiledName("--quiet")>] Quiet
+type CleanOptions =
+    | [<CompiledName("-d")>] D
+    | [<CompiledName("-f")>] F
     | [<CompiledName("--force")>] Force
-    | [<CompiledName("--ours")>] Ours
-    | [<CompiledName("--theirs")>] Theirs
-    | [<CompiledName("--no-track")>] NoTrack
-    | [<CompiledName("--guess")>] Guess
-    | [<CompiledName("--no-guess")>] NoGuess
-    | [<CompiledName("--l")>] L
-    | [<CompiledName("--detach")>] Detach
-    | [<CompiledName("--ignore-skip-worktree-bits")>] IgnoreSkipWorktreeBits
-    | [<CompiledName("--merge")>] Merge
-    | [<CompiledName("--patch")>] Patch
-    | [<CompiledName("--ignore-other-worktrees")>] IgnoreOtherWorktrees
-    | [<CompiledName("--overwrite-ignore")>] OverwriteIgnore
-    | [<CompiledName("--no-overwrite-ignore")>] NoOverwriteIgnore
-    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
-    | [<CompiledName("--no-recurse-submodules")>] NoRecurseSubmodules
-    | [<CompiledName("--overlay")>] Overlay
-    | [<CompiledName("--no-overlay")>] NoOverlay
-    | [<CompiledName("--pathspec-file-nul")>] PathspecFileNul
-    | [<CompiledName("--single-branch")>] SingleBranch
-    | [<CompiledName("--no-single-branch")>] NoSingleBranch
-    | [<CompiledName("--tags")>] GitTags
-    | [<CompiledName("--no-tags")>] NoTags
-    | [<CompiledName("--shallow-submodules")>] ShallowSubmodules
-    | [<CompiledName("--no-shallow-submodules")>] NoShallowSubmodules
-    | [<CompiledName("--remote-submodules")>] RemoteSubmodules
-    | [<CompiledName("--no-remote-submodules")>] NoRemoteSubmodules
-    
+    | [<CompiledName("-i")>] I
+    | [<CompiledName("--interactive")>] Interactive
+    | [<CompiledName("-n")>] N
+    | [<CompiledName("--dry-run")>] DryRun
+    | [<CompiledName("-q")>] Q
+    | [<CompiledName("--quiet")>] Quiet
+    | [<CompiledName("-x")>] Ignore
+    | [<CompiledName("-X")>] X
 
-[<StringEnum>]
-type CloneOptionsWithValues =
-    | [<CompiledName("--reference")>] Reference
-    | [<CompiledName("--reference-if-able")>] ReferenceIfAble
-    | [<CompiledName("--server-option")>] ServerOption
-    | [<CompiledName("--filter")>] Filter
-    | [<CompiledName("--origin")>] Origin
-    | [<CompiledName("--branch")>] Branch
-    | [<CompiledName("--revision")>] Revision
-    | [<CompiledName("--upload-pack")>] UploadPack
-    | [<CompiledName("--template")>] Template
-    //| [<CompiledName("--config")>] Config
-    | [<CompiledName("--shallow-since")>] ShallowSince
-    | [<CompiledName("--shallow-exclude")>] ShallowExclude
-    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
-    | [<CompiledName("--separate-git-dir")>] SeparateGitDir
-    | [<CompiledName("--ref-format")>] RefFormat
-    | [<CompiledName("--bundle-uri")>] BundleUri
+let cleanEPattern (pattern: string) =
+    $"-e {pattern}"
 
-let cloneOptionWithValue (tag: CloneOptionsWithValues) (value: string) =
-    $"{tag}={value}"
-
-[<StringEnum>]
-type CloneOptionsWithNumbers =
-    | [<CompiledName("--depth")>] Depth
-    | [<CompiledName("--jobs")>] Jobs
-
-let cloneOptionWithNumber (tag: CloneOptionsWithNumbers) (n: int) =
-    $"{tag} {n}"
+let cleanExcludePattern (pattern: string) =
+    $"--exclude={pattern}"
 
 [<StringEnum>]
 type CloneOptions =
@@ -204,34 +236,34 @@ type CloneOptions =
     | [<CompiledName("--mirror")>] Mirror
 
 [<StringEnum>]
-type InitOptions =
-    | [<CompiledName("--quiet")>] Quiet
-    | [<CompiledName("--bare")>] Bare
-    | [<CompiledName("--shared")>] Shared
+type CloneOptionsWithStrings =
+    | [<CompiledName("--reference")>] Reference
+    | [<CompiledName("--reference-if-able")>] ReferenceIfAble
+    | [<CompiledName("--server-option")>] ServerOption
+    | [<CompiledName("--filter")>] Filter
+    | [<CompiledName("--origin")>] Origin
+    | [<CompiledName("--branch")>] Branch
+    | [<CompiledName("--revision")>] Revision
+    | [<CompiledName("--upload-pack")>] UploadPack
+    | [<CompiledName("--template")>] Template
+    //| [<CompiledName("--config")>] Config
+    | [<CompiledName("--shallow-since")>] ShallowSince
+    | [<CompiledName("--shallow-exclude")>] ShallowExclude
+    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
+    | [<CompiledName("--separate-git-dir")>] SeparateGitDir
+    | [<CompiledName("--ref-format")>] RefFormat
+    | [<CompiledName("--bundle-uri")>] BundleUri
 
-[<StringEnum(CaseRules.LowerFirst)>]
-type SharedValues =
-    | False
-    | True
-    | Umask
-    | Group
-    | All
-    | World
-    | Everybody
-
-let sharedWithValue (value: SharedValues) =
-    $"--shared={value}"
+let cloneOptionWithValue (tag: CloneOptionsWithStrings) (value: string) =
+    $"{tag}={value}"
 
 [<StringEnum>]
-type InitOptionsWithValues =
-    | [<CompiledName("--object-format")>] ObjectFormat
-    | [<CompiledName("--ref-format")>] RefFormat
-    | [<CompiledName("--template")>] Template
-    | [<CompiledName("--separate-git-dir")>] SeparateGitDir
-    | [<CompiledName("--initial-branch")>] InitialBranch
+type CloneOptionsWithNumbers =
+    | [<CompiledName("--depth")>] Depth
+    | [<CompiledName("--jobs")>] Jobs
 
-let initFlagWithValue (flag: InitOptionsWithValues) (value: string) =
-    $"{flag}={value}"
+let cloneOptionWithNumber (tag: CloneOptionsWithNumbers) (n: int) =
+    $"{tag} {n}"
 
 [<StringEnum>]
 type DiffOptions =
@@ -256,68 +288,25 @@ type DiffAlgorithmOptions =
     | Patience
     | Histogram
 
+let diffAlgorithm (value: DiffAlgorithmOptions) =
+    $"--diff-algorithm={value}"
+
 [<StringEnum>]
-type BranchOptions =
-    | [<CompiledName("--delete")>] Delete
-    | [<CompiledName("-D")>] DeleteForce
-    | [<CompiledName("--create-reflog")>] CreateReflog
-    | [<CompiledName("--force")>] Force
-    | [<CompiledName("--move")>] Move
-    | [<CompiledName("-M")>] MoveForce
-    | [<CompiledName("--copy")>] Copy
-    | [<CompiledName("-Copy")>] CopyForce
-    | [<CompiledName("--color")>] Colour
-    | [<CompiledName("--no-color")>] NoColour
-    | [<CompiledName("--ignore-case")>] IgnoreCase
-    | [<CompiledName("--omit-empty")>] OmitEmpty
-    | [<CompiledName("--column")>] Column
-    | [<CompiledName("--no-column")>] NoColumn
-    | [<CompiledName("--remotes")>] Remotes
-    | [<CompiledName("--all")>] All
-    | [<CompiledName("--list")>] List
-    | [<CompiledName("--show-current")>] ShowCurrent
-    | [<CompiledName("--verbose")>] Verbose
+type InitOptions =
     | [<CompiledName("--quiet")>] Quiet
-    | [<CompiledName("--no-abbrev")>] NoAbbrev
-    | [<CompiledName("--no-track")>] NoTrack
-    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
-    | [<CompiledName("--set-upstream")>] SetUpstream
-    | [<CompiledName("--unset-upstream")>] UnsetUpstream
-    | [<CompiledName("--edit-description ")>] EditDescription
+    | [<CompiledName("--bare")>] Bare
+    | [<CompiledName("--shared")>] Shared
 
 [<StringEnum>]
-type BranchOptionsWithValues =
-    | [<CompiledName("--column")>] Column
-    | [<CompiledName("--no-column")>] NoColumn
-    | [<CompiledName("--sort")>] Sort
-    | [<CompiledName("--abbrev")>] Abbrev
-    | [<CompiledName("--set-upstream-to")>] SetUpstreamTo
-    | [<CompiledName("--contains")>] Contains
-    | [<CompiledName("--no-contains")>] NoContains
-    | [<CompiledName("--merged")>] Merged
-    | [<CompiledName("--no-merged")>] NoMerged
-    | [<CompiledName("--points-at")>] PointsAt
-    | [<CompiledName("--format")>] Format
+type InitOptionsWithStrings =
+    | [<CompiledName("--object-format")>] ObjectFormat
+    | [<CompiledName("--ref-format")>] RefFormat
+    | [<CompiledName("--template")>] Template
+    | [<CompiledName("--separate-git-dir")>] SeparateGitDir
+    | [<CompiledName("--initial-branch")>] InitialBranch
 
-let branchWithValue (flag: BranchOptionsWithValues) (value: string) =
+let initFlagWithValue (flag: InitOptionsWithStrings) (value: string) =
     $"{flag}={value}"
-
-[<StringEnum(CaseRules.LowerFirst)>]
-type WhenColour =
-    | Always
-    | Never
-    | Auto
-
-let createColourWithValue (value: WhenColour) =
-    $"--color={value}"
-
-[<StringEnum(CaseRules.LowerFirst)>]
-type TrackOptions =
-    | Direct
-    | Inherit
-
-let trackWithValue (value: TrackOptions) =
-    $"--track={value}"
 
 [<StringEnum>]
 type MergeOptions =
@@ -358,7 +347,7 @@ type MergeOptions =
     | [<CompiledName("--continue")>] Continue
 
 [<StringEnum>]
-type MergeOptionsWithValues =
+type MergeOptionsWithStrings =
     | [<CompiledName("--cleanup")>] Cleanup
     | [<CompiledName("--s")>] S
     | [<CompiledName("--gpg-sign")>] GpgSign
@@ -369,7 +358,7 @@ type MergeOptionsWithValues =
     | [<CompiledName("--into-name")>] IntoName
     | [<CompiledName("--file")>] File
 
-let mergeWithValue (flag: MergeOptionsWithValues) (value: string) =
+let mergeWithValue (flag: MergeOptionsWithStrings) (value: string) =
     $"{flag}={value}"
 
 [<StringEnum>]
@@ -380,23 +369,19 @@ type MoveOptions =
     | [<CompiledName("--verbose")>] Verbose
 
 [<StringEnum>]
-type PullOptions =
+type PullOptionsWithoutValues =
     | [<CompiledName("--quiet")>] Force
     | [<CompiledName("--verbose")>] Verbose
-
-[<StringEnum>]
-type PullOptionTags =
-    | [<CompiledName("--recurse-submodules")>] RecurseSubmodules
     | [<CompiledName("--no-recurse-submodules")>] NoRecurseSubmodules
 
 [<StringEnum(CaseRules.LowerFirst)>]
-type PullOptionValues =
+type PullOptionRecurseValues =
     | Yes
     | No
     | [<CompiledName("on-demand")>] OnDemand
 
-let createPullOptions (flag: PullOptionTags) (value: PullOptionValues) =
-    $"{flag}={value}"
+let createPullOptionRecurseSubmodul (value: PullOptionRecurseValues) =
+    $"--recurse-submodules={value}"
 
 [<StringEnum>]
 type PullOptionsMerging =
@@ -441,7 +426,6 @@ let rebaseWithValue (value: PullRebaseValues) =
 [<StringEnum>]
 type PullOptionsMergingWithValues =
     | [<CompiledName("--cleanup")>] Cleanup
-    | [<CompiledName("--s")>] S
     | [<CompiledName("--gpg-sign")>] GpgSign
     | [<CompiledName("--log")>] Log
     | [<CompiledName("--strategy")>] Strategy
@@ -502,7 +486,7 @@ let createPullOptionNegotiation (value: PullOptionNegotiateValues) =
     $"--negotiation-tip={value}"
 
 [<StringEnum>]
-type PushOptions =
+type PushOptionsWithoutValues =
     | [<CompiledName("--all")>] All
     | [<CompiledName("--branches")>] Branches
     | [<CompiledName("--prune")>] Prune
@@ -530,34 +514,47 @@ type PushOptions =
     | [<CompiledName("--ipv6")>] Ipv6
 
 [<StringEnum>]
-type PushOptionsWithValue =
+type PushOptionsWithStrings =
     | [<CompiledName("--push-option")>] PushOption
     | [<CompiledName("--receive-pack")>] ReceivePack
     | [<CompiledName("--exec")>] Exec
     | [<CompiledName("--force-with-lease")>] ForceWithLease
     | [<CompiledName("--repo")>] Repo
 
-let createPushOptionsWithValue (flag: PushOptionsWithValue) (value: string) =
+let createPushOptionsWithValue (flag: PushOptionsWithStrings) (value: string) =
     $"{flag}={value}"
     
 [<StringEnum(CaseRules.LowerFirst)>]
-type PushOptionsSignesValues =
+type PushOptionsSignedValues =
     | True
     | False
     | [<CompiledName("if-asked")>] IfAsked
 
-let createPushOptionSigned (value: PushOptionsSignesValues) =
+let createPushOptionSigned (value: PushOptionsSignedValues) =
     $"--signed={value}"
 
 [<StringEnum(CaseRules.LowerFirst)>]
-type PushOptionsRecureseValues =
+type PushOptionsRecurseValues =
     | Check
     | [<CompiledName("on-demand")>] OnDemand
     | Only
     | No
 
-let createPushOptionRecurse (value: PushOptionsSignesValues) =
+let createPushOptionRecurse (value: PushOptionsRecurseValues) =
     $"--recurse-submodules={value}"
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type SharedValues =
+    | False
+    | True
+    | Umask
+    | Group
+    | All
+    | World
+    | Everybody
+
+let sharedWithValue (value: SharedValues) =
+    $"--shared={value}"
 
 [<AllowNullLiteral>]
 type SimpleGitOptions
@@ -648,31 +645,101 @@ type IMergeResult =
     abstract conflicts: string[] option
     abstract failed: bool option
 
+type IApplyOptions = interface end
+
+type applyOptions =
+    static member inline options(tag: ApplyOptions): IApplyOptions = createObj [ string tag, null] |> unbox
+    static member inline optionsWithStrings(tag: ApplyOptionsWithValues, value: string): IApplyOptions = createObj [ string tag, value] |> unbox
+    static member inline whitespace(value: WhiteSpaceActions): IApplyOptions = createObj [ "--whitespace", value] |> unbox
+
+type IBranchOptions = interface end
+
+type branchOptions =
+    static member inline options(tag: BranchOptions): IBranchOptions = createObj [ string tag, null] |> unbox
+    static member inline optionsWithStrings(tag: BranchOptionsWithStrings, value: string): IBranchOptions = createObj [ string tag, value] |> unbox
+    static member inline colour(value: WhenColour): IBranchOptions = createObj [ "--color", value] |> unbox
+    static member inline track(value: TrackOptions): IBranchOptions = createObj [ "--track", value] |> unbox
+    
+type ICleanOptions = interface end
+
+type cleanOptions =
+    static member inline options(tag: CleanOptions): ICleanOptions = createObj [ string tag, null] |> unbox
+    static member inline exclude(value: string): ICleanOptions = createObj [ "--exclude", value] |> unbox
+
+type ICheckoutOptions = interface end
+
+type checkoutOptions =
+    static member inline checkout(tag: CheckoutOptions): ICheckoutOptions = createObj [ string tag, null] |> unbox
+    static member inline checkoutWithNumbers(tag: CheckoutOptionsWithNumber, value: int): ICheckoutOptions = createObj [ string tag, string value] |> unbox
+    static member inline checkoutWithStrings(tag: CheckoutOptionsWithString, value: string): ICheckoutOptions = createObj [ string tag, value] |> unbox
+    static member inline checkoutBranch(tag: CheckoutBranchOptions, newBranch: string): ICheckoutOptions = createObj [ string tag, newBranch] |> unbox
+    static member inline conflict(value: ConflictOptions): ICheckoutOptions = createObj [ "--conflict", string value] |> unbox
+
+type ICloneOptions = interface end
+
+type cloneOptions =
+    static member inline options(tag: CloneOptions): ICloneOptions = createObj [ string tag, null] |> unbox
+    static member inline optionsWithStrings(tag: CloneOptionsWithStrings, value: string): ICloneOptions = createObj [ string tag, value] |> unbox
+    static member inline optionsWithNumbers(tag: CloneOptionsWithNumbers, value: int): ICloneOptions = createObj [ string tag, string value] |> unbox
+
+type IDiff = interface end
+
+type diffOptions =
+    static member inline options(tag: DiffOptions): IBranchOptions = createObj [ string tag, null] |> unbox
+    static member inline optionsWithStrings(value: DiffAlgorithmOptions): IBranchOptions = createObj [ "--diff-algorithm", string value] |> unbox
+
+type IInitOptions = interface end
+
+type initOptions =
+    static member inline options(tag: InitOptions): IInitOptions = createObj [ string tag, null] |> unbox
+    static member inline optionsWithStrings(tag: InitOptionsWithStrings, value: string): IInitOptions = createObj [ string tag, value] |> unbox
+
+type IMergeOptions = interface end
+
+type mergeOptions =
+    static member inline options(tag: MergeOptions): IMergeOptions = createObj [ string tag, null] |> unbox
+    static member inline optionsWithValues(tag: MergeOptionsWithStrings, value: string): IMergeOptions = createObj [ string tag, value] |> unbox
+
+type IMoveOptions = interface end
+
+type moveOptions =
+    static member inline options(tag: MoveOptions): IMoveOptions = createObj [ string tag, null] |> unbox
+
+type IPullOptions = interface end
+
+type pullOptions =
+    static member inline options(tag: PullOptionsWithoutValues): IPullOptions = createObj [ string tag, null] |> unbox
+    static member inline rebase(value: PullRebaseValues): IPullOptions = createObj [ "--rebase", value] |> unbox
+    static member inline recurseSubmodules(value: PullOptionRecurseValues): IPullOptions = createObj [ "--recurse-submodules", value] |> unbox
+    static member inline merging(tag: PullOptionsMerging): IPullOptions = createObj [ string tag, null] |> unbox
+    static member inline mergingWithValues(tag: PullOptionsMergingWithValues, value: string): IPullOptions = createObj [ string tag, value] |> unbox
+
+type IPushOptions = interface end
+
+type pushOptions =
+    static member inline options(tag: PushOptionsWithoutValues): IPushOptions = createObj [ string tag, null] |> unbox
+    static member inline rebase(tag: PushOptionsWithStrings, value: string): IPushOptions = createObj [ string tag, value] |> unbox
+    static member inline signed(value: PushOptionsSignedValues): IPushOptions = createObj [ "--signed", string value] |> unbox
+    static member inline mergingWithValues(value: SharedValues): IPushOptions = createObj [ "--shared", string value] |> unbox
+    static member inline recurseSubmodules(value: PushOptionsRecurseValues): IPushOptions = createObj [ "--recurse-submodules", string value] |> unbox
+
 type ISimpleGit =
 
-    abstract member apply: patch:string -> Promise<unit>
-    abstract member apply: patch:string * options: string[] -> Promise<unit>
-    abstract member apply: patches:string[] -> Promise<unit>
-    abstract member apply: patches:string[] * options: string[] -> Promise<unit>
+    abstract member apply: patch:string * ?options: IApplyOptions[] -> Promise<unit>
+    abstract member apply: patches:string[] * ?options: IApplyOptions[] -> Promise<unit>
 
-    abstract member branch: options: string[] -> Promise<U2<IBranchSummaryResult, IBranchSingleDeleteResult>>
+    abstract member branch: ?options: IBranchOptions[] -> Promise<U2<IBranchSummaryResult, IBranchSingleDeleteResult>>
 
     abstract member branchLocal: unit ->  Promise<IBranchSummaryResult>
 
-    abstract member clean: options: string -> Promise<unit>
-    abstract member clean: options: string[] -> Promise<unit>
-    abstract member clean: cleanSwitches: string * options: string[] -> Promise<unit>
+    abstract member checkout: checkoutWhat: string * ?options: string[] -> Promise<string>
 
-    abstract member checkout: checkoutWhat: string -> Promise<string>
-    abstract member checkout: checkoutWhat: string * options: string[] -> Promise<string>
+    abstract member clean: ?options: ICleanOptions[] -> Promise<unit>
+    abstract member clean: cleanSwitches: string * ?options: ICleanOptions[] -> Promise<unit>
 
-    abstract member clone: repopath: string -> Promise<string>
-    abstract member clone: repopath: string * localPath: string -> Promise<string>
-    abstract member clone: repopath: string * options: string[] -> Promise<string>
-    abstract member clone: repopath: string * localPath: string * options: string[] -> Promise<string>
-
-    abstract member mirror: repopath: string * localPath: string -> Promise<string>
-    abstract member mirror: repopath: string * localPath: string * options: string[] -> Promise<string>
+    abstract member clone: repopath: string * ?options: ICloneOptions[] -> Promise<string>
+    abstract member clone: repopath: string * localPath: string * ?options: ICloneOptions[] -> Promise<string>
+    abstract member mirror: repopath: string * ?mirrorIotions:(string * ICloneOptions[])[] -> Promise<string>
 
     abstract member countObjects: unit -> Promise<CountObjectsResult>
 
@@ -682,35 +749,26 @@ type ISimpleGit =
     abstract member deleteLocalBranches: branchNames: string[] -> Promise<IBranchMultiDeleteResult>
     abstract member deleteLocalBranches: branchNames: string[] * forceDelete: bool -> Promise<IBranchMultiDeleteResult>
 
-    abstract member diff: options: string[] -> Promise<string>
+    abstract member diff: ?options: string[] -> Promise<string>
 
-    abstract member diffResult: options: string[] -> Promise<IDiffSummary>
+    abstract member diffResult: ?options: string[] -> Promise<IDiffSummary>
 
-    abstract member init: unit -> Promise<ISimpleGit>
-    abstract member init: bare: bool -> Promise<ISimpleGit>
-    abstract member init: options: string[] -> Promise<ISimpleGit>
-    abstract member init: bare: bool * options: string[] -> Promise<ISimpleGit>
+    abstract member init: ?options: IInitOptions[] -> Promise<ISimpleGit>
+    abstract member init: bare: bool * ?options: IInitOptions[] -> Promise<ISimpleGit>
 
-    abstract member merge: unit -> Promise<IMergeResult>
-    abstract member merge: options: string[] -> Promise<IMergeResult>
+    abstract member merge: ?options: IMergeOptions[] -> Promise<IMergeResult>
+    abstract member mergeFromTo: remote:string * branch:string * options: IMergeOptions[] -> Promise<IMergeResult>
 
-    abstract member mergeFromTo: remote:string * branch:string -> Promise<IMergeResult>
-    abstract member mergeFromTo: remote:string * branch:string * options: string[] -> Promise<IMergeResult>
+    abstract member mv: from:string * target:string * ?options: IMoveOptions[] -> Promise<unit>
+    abstract member mv: from:string[] * target:string * ?options: IMoveOptions[] -> Promise<unit>
 
-    abstract member mv: from:string * target:string -> Promise<unit>
-    abstract member mv: from:string * target:string * options: string[] -> Promise<unit>
-    abstract member mv: from:string[] * target:string -> Promise<unit>
-    abstract member mv: from:string[] * target:string * options: string[] -> Promise<unit>
+    abstract member pull: ?options: IPullOptions[] -> Promise<unit>
+    abstract member pull: remote:string * branch:string * ?options: IPullOptions[] -> Promise<unit>
 
-    abstract member pull: unit -> Promise<unit>
-    abstract member pull: options: string[] -> Promise<unit>
-    abstract member pull: remote:string * branch:string * options: string[] -> Promise<unit>
-
-    abstract member push: unit -> Promise<unit>
-    abstract member push: options: string[] -> Promise<unit>
-    abstract member push: remote:string -> Promise<unit>
-    abstract member push: remote:string * options: string[] -> Promise<unit>
-    abstract member push: remote:string * branch:string * options: string[] -> Promise<unit>
+    abstract member push: ?options: string[] -> Promise<unit>
+    abstract member push: remote:string * branch:string * ?options: string[] -> Promise<unit>
+    abstract member push: ?pushMultipletags:( string * string[])[] -> Promise<unit>
+    abstract member pushTags: remote:string * ?options: string[] -> Promise<unit>
 
 [<Erase>]
 type SimpleGit =
@@ -718,9 +776,22 @@ type SimpleGit =
     [<Import("simpleGit", "simple-git")>]
     static member simpleGit (options: SimpleGitOptions) : ISimpleGit = jsNative
 
+//How to
+
 let simpleGit = SimpleGit.simpleGit(SimpleGitOptions(baseDir = "./", binary = "git", maxConcurrentProcesses = 6, trimmed = true))
 
 console.log("SimpleGit!")
 console.log(simpleGit)
 
-//ToAdd: AbortController; Progress Events; 
+//ToAdd: AbortController; Progress Events;
+
+console.log("SimpleGit IPullOptions!")
+
+let x = pullOptions.merging(PullOptionsMerging.AllowUnrelatedHistories)
+let y = pullOptions.rebase(PullRebaseValues.False)
+let z = pullOptions.recurseSubmodules(PullOptionRecurseValues.Yes)
+
+console.log(x)
+console.log(y)
+
+simpleGit.pull([|pullOptions.options(PullOptionsWithoutValues.Force)|])
