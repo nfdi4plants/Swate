@@ -727,7 +727,7 @@ type FormComponents =
                     prop.children [
                         TermSearch.TermSearch(
                             (input |> Option.map _.ToTerm()),
-                            (fun term -> term |> Option.map OntologyAnnotation.fromTerm |> setter),
+                            (fun term -> term |> Option.map OntologyAnnotation.from |> setter),
                             ?parentId = (parent |> Option.map _.TermAccessionShort),
                             classNames = TermSearchStyle(Fable.Core.U2.Case1 "swt:w-full")
                         )

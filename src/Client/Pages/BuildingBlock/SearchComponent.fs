@@ -89,7 +89,7 @@ type SearchComponent =
                         SearchComponent.termOrUnitizedSwitch (model, dispatch)
                         // helper for setting the body cell type
                         let setter (termOpt: Swate.Components.Types.Term option) =
-                            let oa = termOpt |> Option.map OntologyAnnotation.fromTerm
+                            let oa = termOpt |> Option.map OntologyAnnotation.from
                             let case = oa |> Option.map (fun oa -> !^oa)
                             BuildingBlock.UpdateBodyArg case |> BuildingBlockMsg |> dispatch
 
@@ -134,9 +134,10 @@ type SearchComponent =
                                 )
                             ]
                         elif state.HeaderCellType.HasOA() then
-                            let setter (oaOpt: Swate.Components.Types.Term option) =
+                            let setter (termOpt: Swate.Components.Types.Term option) =
                                 let case =
-                                    oaOpt |> Option.map (fun oa -> OntologyAnnotation.fromTerm >> U2.Case1 <| oa)
+                                    termOpt
+                                    |> Option.map (fun term -> term |> (OntologyAnnotation.from >> U2.Case1))
 
                                 BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                             //selectHeader ui setUi h |> dispatch

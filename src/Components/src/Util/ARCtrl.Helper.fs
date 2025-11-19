@@ -554,7 +554,7 @@ module Extensions =
         static member private IsObsoleteCommentKey = "isObsolete"
         static member empty() = OntologyAnnotation.create ()
 
-        static member fromTerm(term: Swate.Components.Types.Term) =
+        static member from(term: Swate.Components.Types.Term) =
             let comments =
                 ResizeArray [
                     if term.description.IsSome then
@@ -565,7 +565,7 @@ module Extensions =
 
             OntologyAnnotation(?name = term.name, ?tsr = term.source, ?tan = term.id, comments = comments)
 
-        static member fromDBTerm(term: Term) =
+        static member from(term: Term) =
             let comments =
                 ResizeArray [
                     if System.String.IsNullOrWhiteSpace term.Description |> not then
@@ -600,132 +600,8 @@ module Extensions =
                 ?isObsolete = isObsolete
             )
 
-    type ArcTable with
-        member this.SetCellAt(columnIndex: int, rowIndex: int, cell: CompositeCell) =
-
-            SanityChecks.validateColumn
-            <| CompositeColumn.create (this.Headers.[columnIndex], [| cell |] |> ResizeArray)
-
-            Unchecked.setCellAt (columnIndex, rowIndex, cell) this.Values
-            Unchecked.fillMissingCells this.Headers this.Values
-
-        member this.SetCellsAt(cells: (CellCoordinate * CompositeCell)[]) =
-            let columns = cells |> Array.groupBy (fun (index, cell) -> index)
-
-            for coordinate, items in columns do
-                SanityChecks.validateColumn
-                <| CompositeColumn.create (this.Headers.[coordinate.x], (items |> Array.map snd) |> ResizeArray)
-
-            for index, cell in cells do
-                Unchecked.setCellAt (index.x, index.y, cell) this.Values
-
-            Unchecked.fillMissingCells this.Headers this.Values
-
-        /// <summary>
-        /// Returns a new ArcTable from all columns defined by ``indices``.
-        /// </summary>
-        member this.Subtable(indices: int[]) =
-            let cols = indices |> Array.sort |> Array.map this.GetColumn
-            let table = ArcTable.init (this.Name + " Subtable")
-
-            for col in cols do
-                table.AddColumn(col.Header, col.Cells)
-
-            table
-
     type Template with
         member this.FileName = this.Name.Replace(" ", "_") + ".xlsx"
-
-    type ArcTable with
-        /// <summary>
-        /// Transforms ArcTable to excel compatible "values", row major
-        /// </summary>
-        member this.ToStringSeqs() =
-
-            // Cancel if there are no columns
-            if this.Columns.Count = 0 then
-                [||]
-            else
-                let columns =
-                    this.Columns
-                    |> List.ofSeq
-                    |> List.sortBy ArcTable.classifyColumnOrder
-                    |> List.collect CompositeColumn.toStringCellColumns
-                    |> Seq.transpose
-                    |> Seq.map (fun column -> column |> Array.ofSeq)
-                    |> Array.ofSeq
-
-                columns
-
-    type CompositeHeader with
-
-        member this.UpdateWithOA(oa: OntologyAnnotation) =
-            match this with
-            | CompositeHeader.Component _ -> CompositeHeader.Component oa
-            | CompositeHeader.Parameter _ -> CompositeHeader.Parameter oa
-            | CompositeHeader.Characteristic _ -> CompositeHeader.Characteristic oa
-            | CompositeHeader.Factor _ -> CompositeHeader.Factor oa
-            | _ -> failwithf "Cannot update OntologyAnnotation on CompositeHeader without OntologyAnnotation: '%A'" this
-
-        static member ParameterEmpty = CompositeHeader.Parameter <| OntologyAnnotation.empty ()
-
-        static member CharacteristicEmpty =
-            CompositeHeader.Characteristic <| OntologyAnnotation.empty ()
-
-        static member ComponentEmpty = CompositeHeader.Component <| OntologyAnnotation.empty ()
-        static member FactorEmpty = CompositeHeader.Factor <| OntologyAnnotation.empty ()
-        static member InputEmpty = CompositeHeader.Input <| IOType.FreeText ""
-        static member OutputEmpty = CompositeHeader.Output <| IOType.FreeText ""
-
-        /// <summary>
-        /// Keep the outer `CompositeHeader` information (e.g.: Parameter, Factor, Input, Output..) and update the inner "of" value with the value from `other.`
-        /// This will only run successfully if the inner values are of the same type
-        /// </summary>
-        /// <param name="other">The header from which the inner value will be taken.</param>
-        member this.UpdateDeepWith(other: CompositeHeader) =
-            match this, other with
-            | h1, h2 when this.IsIOType && other.IsIOType ->
-                let io1 = h2.TryIOType().Value
-
-                match h1 with
-                | CompositeHeader.Input _ -> CompositeHeader.Input io1
-                | CompositeHeader.Output _ -> CompositeHeader.Output io1
-                | _ -> failwith "Error 1 in UpdateSurfaceTo. This should never hit."
-            | h1, h2 when
-                this.IsTermColumn
-                && other.IsTermColumn
-                && not this.IsFeaturedColumn
-                && not other.IsFeaturedColumn
-                ->
-                let oa1 = h2.ToTerm()
-                h1.UpdateWithOA oa1
-            | _ -> this
-
-        member this.TryOA() =
-            match this with
-            | CompositeHeader.Component oa -> Some oa
-            | CompositeHeader.Parameter oa -> Some oa
-            | CompositeHeader.Characteristic oa -> Some oa
-            | CompositeHeader.Factor oa -> Some oa
-            | _ -> None
-
-        member this.AsDiscriminate =
-            match this with
-            | CompositeHeader.Component _ -> CompositeHeaderDiscriminate.Component
-            | CompositeHeader.Characteristic _ -> CompositeHeaderDiscriminate.Characteristic
-            | CompositeHeader.Factor _ -> CompositeHeaderDiscriminate.Factor
-            | CompositeHeader.Parameter _ -> CompositeHeaderDiscriminate.Parameter
-            | CompositeHeader.ProtocolType -> CompositeHeaderDiscriminate.ProtocolType
-            | CompositeHeader.ProtocolDescription -> CompositeHeaderDiscriminate.ProtocolDescription
-            | CompositeHeader.ProtocolUri -> CompositeHeaderDiscriminate.ProtocolUri
-            | CompositeHeader.ProtocolVersion -> CompositeHeaderDiscriminate.ProtocolVersion
-            | CompositeHeader.ProtocolREF -> CompositeHeaderDiscriminate.ProtocolREF
-            | CompositeHeader.Performer -> CompositeHeaderDiscriminate.Performer
-            | CompositeHeader.Date -> CompositeHeaderDiscriminate.Date
-            | CompositeHeader.Input _ -> CompositeHeaderDiscriminate.Input
-            | CompositeHeader.Output _ -> CompositeHeaderDiscriminate.Output
-            | CompositeHeader.Comment _ -> CompositeHeaderDiscriminate.Comment
-            | CompositeHeader.FreeText _ -> CompositeHeaderDiscriminate.Freetext
 
     type CompositeCell with
 
@@ -753,17 +629,18 @@ module Extensions =
                 defaultArg d.SelectorFormat ""
               |]
 
-        member this.ToDataCell() =
-            match this with
-            | CompositeCell.Unitized(_, unit) -> CompositeCell.createDataFromString unit.NameText
-            | CompositeCell.FreeText txt -> CompositeCell.createDataFromString txt
-            | CompositeCell.Term term -> CompositeCell.createDataFromString term.NameText
-            | CompositeCell.Data _ -> this
-
         //static member fromContent (content: string []) =
         //    match tryFromContent' content with
         //    | Ok r -> r
         //    | Error msg -> raise (exn msg)
+
+        member this.GetEmptyCellFixed() =
+
+            match this with
+            | CompositeCell.FreeText _ -> CompositeCell.FreeText ""
+            | CompositeCell.Term _ -> CompositeCell.Term(OntologyAnnotation())
+            | CompositeCell.Unitized _ -> CompositeCell.Unitized("", OntologyAnnotation())
+            | CompositeCell.Data _ -> CompositeCell.Data(Data())
 
         /// <summary>
         ///
@@ -884,7 +761,7 @@ module Extensions =
             | CompositeCell.Data d -> OntologyAnnotation.create d.NameText
 
         member this.UpdateMainField(s: string) =
-            match this with
+            match this.Copy() with
             | CompositeCell.Term oa ->
                 oa.Name <- Some s
                 CompositeCell.Term oa
@@ -921,3 +798,134 @@ module Extensions =
             | CompositeCell.Term oa -> CompositeCell.Term(updateTAN oa)
             | CompositeCell.Unitized(v, oa) -> CompositeCell.Unitized(v, updateTAN oa)
             | _ -> this
+
+    type ArcTable with
+        member this.ClearCell(cellIndex: CellCoordinate) =
+            let index = (cellIndex.x - 1, cellIndex.y - 1)
+            let c = this.Values.Item(index).GetEmptyCellFixed()
+            this.SetCellAt(cellIndex.x - 1, cellIndex.y - 1, c)
+
+        member this.ClearSelectedCells(selectHandle: SelectHandle) =
+            let selectedCells = selectHandle.getSelectedCells ()
+            let indices = selectedCells |> Seq.map (fun i -> (i.x - 1, i.y - 1)) |> Seq.toArray
+
+            indices
+            |> Array.iter (fun (ci, ri) ->
+                let tempIndex = (ci, ri)
+                let prev = this.GetCellAt(tempIndex)
+                let next = prev.GetEmptyCellFixed()
+
+                this.SetCellAt(ci, ri, next, true)
+            )
+
+        member this.SetCellsAt(cells: (CellCoordinate * CompositeCell)[]) =
+            let columns = cells |> Array.groupBy (fun (index, cell) -> index)
+
+            for coordinate, items in columns do
+                SanityChecks.validateColumn
+                <| CompositeColumn.create (this.Headers.[coordinate.x], (items |> Array.map snd) |> ResizeArray)
+
+            for index, cell in cells do
+                this.SetCellAt(index.x, index.y, cell, true)
+
+        /// <summary>
+        /// Returns a new ArcTable from all columns defined by ``indices``.
+        /// </summary>
+        member this.Subtable(indices: int[]) =
+            let cols = indices |> Array.sort |> Array.map this.GetColumn
+            let table = ArcTable.init (this.Name + " Subtable")
+
+            for col in cols do
+                table.AddColumn(col.Header, col.Cells)
+
+            table
+
+        /// <summary>
+        /// Transforms ArcTable to excel compatible "values", row major
+        /// </summary>
+        member this.ToStringSeqs() =
+
+            // Cancel if there are no columns
+            if this.Columns.Count = 0 then
+                [||]
+            else
+                let columns =
+                    this.Columns
+                    |> List.ofSeq
+                    |> List.sortBy ArcTable.classifyColumnOrder
+                    |> List.collect CompositeColumn.toStringCellColumns
+                    |> Seq.transpose
+                    |> Seq.map (fun column -> column |> Array.ofSeq)
+                    |> Array.ofSeq
+
+                columns
+
+    type CompositeHeader with
+
+        member this.UpdateWithOA(oa: OntologyAnnotation) =
+            match this with
+            | CompositeHeader.Component _ -> CompositeHeader.Component oa
+            | CompositeHeader.Parameter _ -> CompositeHeader.Parameter oa
+            | CompositeHeader.Characteristic _ -> CompositeHeader.Characteristic oa
+            | CompositeHeader.Factor _ -> CompositeHeader.Factor oa
+            | _ -> failwithf "Cannot update OntologyAnnotation on CompositeHeader without OntologyAnnotation: '%A'" this
+
+        static member ParameterEmpty = CompositeHeader.Parameter <| OntologyAnnotation.empty ()
+
+        static member CharacteristicEmpty =
+            CompositeHeader.Characteristic <| OntologyAnnotation.empty ()
+
+        static member ComponentEmpty = CompositeHeader.Component <| OntologyAnnotation.empty ()
+        static member FactorEmpty = CompositeHeader.Factor <| OntologyAnnotation.empty ()
+        static member InputEmpty = CompositeHeader.Input <| IOType.FreeText ""
+        static member OutputEmpty = CompositeHeader.Output <| IOType.FreeText ""
+
+        /// <summary>
+        /// Keep the outer `CompositeHeader` information (e.g.: Parameter, Factor, Input, Output..) and update the inner "of" value with the value from `other.`
+        /// This will only run successfully if the inner values are of the same type
+        /// </summary>
+        /// <param name="other">The header from which the inner value will be taken.</param>
+        member this.UpdateDeepWith(other: CompositeHeader) =
+            match this, other with
+            | h1, h2 when this.IsIOType && other.IsIOType ->
+                let io1 = h2.TryIOType().Value
+
+                match h1 with
+                | CompositeHeader.Input _ -> CompositeHeader.Input io1
+                | CompositeHeader.Output _ -> CompositeHeader.Output io1
+                | _ -> failwith "Error 1 in UpdateSurfaceTo. This should never hit."
+            | h1, h2 when
+                this.IsTermColumn
+                && other.IsTermColumn
+                && not this.IsFeaturedColumn
+                && not other.IsFeaturedColumn
+                ->
+                let oa1 = h2.ToTerm()
+                h1.UpdateWithOA oa1
+            | _ -> this
+
+        member this.TryOA() =
+            match this with
+            | CompositeHeader.Component oa -> Some oa
+            | CompositeHeader.Parameter oa -> Some oa
+            | CompositeHeader.Characteristic oa -> Some oa
+            | CompositeHeader.Factor oa -> Some oa
+            | _ -> None
+
+        member this.AsDiscriminate =
+            match this with
+            | CompositeHeader.Component _ -> CompositeHeaderDiscriminate.Component
+            | CompositeHeader.Characteristic _ -> CompositeHeaderDiscriminate.Characteristic
+            | CompositeHeader.Factor _ -> CompositeHeaderDiscriminate.Factor
+            | CompositeHeader.Parameter _ -> CompositeHeaderDiscriminate.Parameter
+            | CompositeHeader.ProtocolType -> CompositeHeaderDiscriminate.ProtocolType
+            | CompositeHeader.ProtocolDescription -> CompositeHeaderDiscriminate.ProtocolDescription
+            | CompositeHeader.ProtocolUri -> CompositeHeaderDiscriminate.ProtocolUri
+            | CompositeHeader.ProtocolVersion -> CompositeHeaderDiscriminate.ProtocolVersion
+            | CompositeHeader.ProtocolREF -> CompositeHeaderDiscriminate.ProtocolREF
+            | CompositeHeader.Performer -> CompositeHeaderDiscriminate.Performer
+            | CompositeHeader.Date -> CompositeHeaderDiscriminate.Date
+            | CompositeHeader.Input _ -> CompositeHeaderDiscriminate.Input
+            | CompositeHeader.Output _ -> CompositeHeaderDiscriminate.Output
+            | CompositeHeader.Comment _ -> CompositeHeaderDiscriminate.Comment
+            | CompositeHeader.FreeText _ -> CompositeHeaderDiscriminate.Freetext

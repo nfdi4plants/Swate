@@ -28,7 +28,7 @@ let copyCellsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) : JS
 let cutCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = Generic.getCell (index.x, index.y) state
     // Remove selected cell value
-    let emptyCell = cell.GetEmptyCell()
+    let emptyCell = cell.GetEmptyCellFixed()
     Generic.setCell (index.x, index.y) emptyCell state
     copyCell cell |> Promise.start
     state
@@ -39,7 +39,7 @@ let cutCellsByIndices (indices: CellCoordinate[]) (state: Spreadsheet.Model) : S
     for index in indices do
         let cell = Generic.getCell (index.x, index.y) state
         // Remove selected cell value
-        let emptyCell = cell.GetEmptyCell()
+        let emptyCell = cell.GetEmptyCellFixed()
         Generic.setCell (index.x, index.y) emptyCell state
         cells.Add(cell)
 

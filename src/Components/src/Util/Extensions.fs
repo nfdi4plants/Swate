@@ -4,22 +4,6 @@ open Feliz
 open ARCtrl
 
 [<AutoOpen>]
-module ARCtrl =
-    type ArcTable with
-        member this.ClearCell(cellIndex: CellCoordinate) =
-            let index = (cellIndex.x - 1, cellIndex.y - 1)
-            let c = this.Values.Item(index).GetEmptyCell()
-            this.SetCellAt(cellIndex.x - 1, cellIndex.y - 1, c)
-
-        member this.ClearSelectedCells(selectHandle: SelectHandle) =
-            let selectedCells = selectHandle.getSelectedCells ()
-            selectedCells
-            |> Seq.iter (fun index ->
-                let tempIndex = (index.x - 1, index.y - 1)
-                let c = this.Values.Item(tempIndex).GetEmptyCell()
-                this.SetCellAt(index.x - 1, index.y - 1, c))
-
-[<AutoOpen>]
 module Extensions =
 
     type prop with

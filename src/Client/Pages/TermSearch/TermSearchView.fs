@@ -69,7 +69,7 @@ let private AddButton (model: Model, dispatch) =
 let Main (model: Model, dispatch) =
     let setTerm =
         fun (term: Swate.Components.Types.Term option) ->
-            let term = term |> Option.map OntologyAnnotation.fromTerm
+            let term = term |> Option.map OntologyAnnotation.from
             TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
 
     let excelGetParentTerm =

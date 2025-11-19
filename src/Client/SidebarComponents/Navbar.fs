@@ -300,7 +300,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                     match ontologyAnnotationRes with
                     | Result.Error msgs -> GenericInteropLogs(Elmish.Cmd.none, msgs) |> DevMsg |> dispatch
                     | Result.Ok term ->
-                        let ontologyAnnotation = OntologyAnnotation.fromDBTerm term
+                        let ontologyAnnotation = OntologyAnnotation.from term
 
                         setShowTermDetails (Some ontologyAnnotation)
                 }

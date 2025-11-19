@@ -165,7 +165,7 @@ let clearCells (indexArr: CellCoordinate[]) (state: Spreadsheet.Model) : Spreads
     let newCells = [|
         for index in indexArr do
             let cell = Generic.getCell (index.x, index.y) state
-            let emptyCell = cell.GetEmptyCell()
+            let emptyCell = cell.GetEmptyCellFixed()
             index, emptyCell
     |]
 

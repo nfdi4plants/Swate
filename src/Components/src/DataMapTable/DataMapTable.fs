@@ -50,7 +50,7 @@ type DataMapTable =
                         oa |> Term.fromOntologyAnnotation |> Some,
                         (fun (term: Term option) ->
                             term
-                            |> Option.map OntologyAnnotation.fromTerm
+                            |> Option.map OntologyAnnotation.from
                             |> Option.map (fun oa -> CompositeCell.Term oa)
                             |> Option.defaultValue CompositeCell.emptyTerm
                             |> setTempCell
@@ -100,7 +100,7 @@ type DataMapTable =
                         oa |> Term.fromOntologyAnnotation |> Some,
                         (fun (term: Term option) ->
                             term
-                            |> Option.map OntologyAnnotation.fromTerm
+                            |> Option.map OntologyAnnotation.from
                             |> Option.map (fun oa -> CompositeCell.Term oa)
                             |> Option.defaultValue CompositeCell.emptyTerm
                             |> setTempCell

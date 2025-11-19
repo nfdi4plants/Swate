@@ -7,13 +7,13 @@ open Swate.Components.Shared
 
 let getCell ((ci, ri): int * int) (state: Spreadsheet.Model) : CompositeCell =
     match state.ActiveView with
-    | IsTable -> state.ActiveTable.Values[ci, ri]
+    | IsTable -> state.ActiveTable.GetCellAt(ci, ri)
     | IsDataMap -> state.DataMapOrDefault.GetCell(ci, ri)
     | IsMetadata -> failwith "Cannot get cell in metadata view"
 
 let setCell ((ci, ri): int * int) (cell: CompositeCell) (state: Spreadsheet.Model) : unit =
     match state.ActiveView with
-    | IsTable -> state.ActiveTable.UpdateCellAt(ci, ri, cell)
+    | IsTable -> state.ActiveTable.SetCellAt(ci, ri, cell)
     | IsDataMap -> state.DataMapOrDefault.SetCell(ci, ri, cell)
     | IsMetadata -> failwith "Cannot set cell in metadata view"
 
