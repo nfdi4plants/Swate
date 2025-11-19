@@ -20,11 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔄 Changed
 
--  Deselect Swate Templates after Import #923 (by @Freymaurer)
+-  Deselect Swate templates after import #923 (by @Freymaurer)
 
 ### 🐛 Fixed
 
 -  FilePicker no longer inserts all rows and makes them undeletable #921 (by @Freymaurer)
+-  Fixed issue where "Edit table name"-input would close immediately #925 (by @Freymaurer)
 
 ## 1.0.3 - 2025-11-17
 

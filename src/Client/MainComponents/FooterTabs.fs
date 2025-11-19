@@ -68,14 +68,60 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
     let state, setState = React.useState (FooterTab.init (table.Name))
     let id = $"ReorderMe_{index}_{table.Name}"
     let tabRef = React.useElementRef ()
+
+    React.useEffect ((fun () -> console.log state), [| box state |])
+
+    /// https://github.com/nfdi4plants/Swate/issues/925
     let startEdit = fun _ -> { state with IsEditable = true } |> setState
+
+    let updateName =
+        fun e ->
+            if state.Name <> table.Name then
+                Spreadsheet.RenameTable(index, state.Name)
+                |> Messages.SpreadsheetMsg
+                |> dispatch
+
+            setState { state with IsEditable = false }
 
     React.fragment [
         Modals.ContextMenus.FooterTabs.Table(index, startEdit, dispatch, tabRef)
+        BaseModal.Modal(
+            state.IsEditable,
+            (fun b -> setState { state with IsEditable = b }),
+            header = Html.h1 "Edit Table Name",
+            children =
+                Html.input [
+                    prop.className "swt:input swt:w-full"
+                    prop.autoFocus (true)
+                    prop.id (id + "input")
+                    prop.onChange (fun e -> setState { state with Name = e })
+                    // .. when pressing "ENTER". "ESCAPE" will negate changes.
+                    prop.onKeyDown (fun e ->
+                        match e.code with
+                        | Swate.Components.kbdEventCode.enter -> updateName e
+                        | Swate.Components.kbdEventCode.escape ->
+                            setState {
+                                state with
+                                    IsEditable = false
+                                    Name = table.Name
+                            }
+                        | _ -> ()
+                    )
+                    prop.defaultValue table.Name
+                ],
+            footer =
+                Html.button [
+                    prop.className "swt:btn swt:btn-sm swt:btn-primary swt:ml-auto"
+                    prop.text "Save"
+                    prop.onClick updateName
+                ]
+        )
         Html.div [
             prop.ref tabRef
             prop.className [
-                "swt:tab swt:*:pointer-events-none"
+                "swt:tab"
+                if not (state.IsEditable) then
+                    "swt:*:pointer-events-none"
                 if state.IsDraggedOver then
                     DragOverClass
                 if model.SpreadsheetModel.ActiveView = Spreadsheet.ActiveView.Table index then
@@ -105,41 +151,8 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
             )
             prop.draggable true
             prop.children [
-                if state.IsEditable then
-                    let updateName =
-                        fun e ->
-                            if state.Name <> table.Name then
-                                Spreadsheet.RenameTable(index, state.Name)
-                                |> Messages.SpreadsheetMsg
-                                |> dispatch
-
-                            setState { state with IsEditable = false }
-
-                    Html.input [
-                        prop.className
-                            "swt:input swt:bg-transparent swt:p-0 swt:border-0 swt:focus-within:outline-0 swt:focus::outline-0"
-                        prop.autoFocus (true)
-                        prop.id (id + "input")
-                        prop.onChange (fun e -> setState { state with Name = e })
-                        prop.onBlur updateName
-                        // .. when pressing "ENTER". "ESCAPE" will negate changes.
-                        prop.onKeyDown (fun e ->
-                            match e.code with
-                            | Swate.Components.kbdEventCode.enter -> //enter
-                                updateName e
-                            | Swate.Components.kbdEventCode.escape -> //escape
-                                setState {
-                                    state with
-                                        IsEditable = false
-                                        Name = table.Name
-                                }
-                            | _ -> ()
-                        )
-                        prop.defaultValue table.Name
-                    ]
-                else
-                    Icons.Table()
-                    Html.span [ prop.className "swt:truncate"; prop.text table.Name ]
+                Icons.Table()
+                Html.span [ prop.className "swt:truncate"; prop.text table.Name ]
             ]
         ]
     ]
@@ -231,6 +244,7 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
         ]
     ]
 
+[<ReactComponent>]
 let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
     let show = model.PageState.ShowSideBar
     let id = "toggle-sidebar-button"
@@ -257,6 +271,7 @@ let ToggleSidebar (model: Model, dispatch: Messages.Msg -> unit) =
         ]
     ]
 
+[<ReactComponent>]
 let SpreadsheetSelectionFooter (model: Model) dispatch =
     Html.div [
         prop.className "swt:sticky swt:bottom-0 swt:flex swt:flex-row swt:border-t-2"
