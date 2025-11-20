@@ -28,7 +28,7 @@ export const Default: Story = {
   render: (args) => (
     <TermSearchConfigProvider {...args}>
       <TermSearch
-        onTermChange={fn((term) => console.log(term))}
+        onTermChange={fn()}
         disableDefaultSearch={true}
         disableDefaultParentSearch={true}
         disableDefaultAllChildrenSearch={true}

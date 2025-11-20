@@ -518,9 +518,6 @@ type AnnotationTableContextMenu =
         ) =
         let cellIndex = {| x = index.x; y = index.y |}
         let cell = arcTable.GetCellAt(cellIndex.x - 1, cellIndex.y - 1)
-        console.log ("Cell in Context Menu:")
-        console.log (cell)
-        console.log ("Table:", arcTable)
         let header = arcTable.GetColumn(cellIndex.x - 1).Header
 
         let containsHeaderRow =
