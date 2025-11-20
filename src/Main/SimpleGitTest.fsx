@@ -557,19 +557,6 @@ let sharedWithValue (value: SharedValues) =
     $"--shared={value}"
 
 [<AllowNullLiteral>]
-type SimpleGitOptions
-    [<ParamObjectAttribute; Emit("$0")>](
-      ?baseDir: string,
-      ?binary: string,
-      ?maxConcurrentProcesses: int,
-      ?trimmed: bool
-    ) =
-    member val baseDir: string option = baseDir with get, set
-    member val binary: string option = binary with get, set
-    member val maxConcurrentProcesses: int option = maxConcurrentProcesses with get, set
-    member val trimmed: bool option = trimmed with get, set
-
-[<AllowNullLiteral>]
 type IBranchSummaryBranch =
     abstract current: bool option
     abstract name: string option
@@ -768,17 +755,86 @@ type ISimpleGit =
     abstract member push: ?pushMultipletags:( string * string[])[] -> Promise<unit>
     abstract member pushTags: remote:string * ?options: string[] -> Promise<unit>
 
+type IAbortSignal =
+
+    abstract member aborted: bool
+    abstract member reason : string option
+
+type IAbortController =
+
+    abstract member signal: IAbortSignal
+    abstract member abort: ?reason: string -> unit
+
+[<AllowNullLiteral>]
+type SimpleGitOptions
+    [<ParamObjectAttribute; Emit("$0")>](
+      ?baseDir: string,
+      ?abort: IAbortController, 
+      ?binary: string,
+      ?maxConcurrentProcesses: int,
+      ?trimmed: bool
+    ) =
+    member val baseDir: string option = baseDir with get, set
+    member val abort: IAbortController option = abort with get, set
+    member val binary: string option = binary with get, set
+    member val maxConcurrentProcesses: int option = maxConcurrentProcesses with get, set
+    member val trimmed: bool option = trimmed with get, set
+
+[<AllowNullLiteral>]
+[<Import("GitPluginError", "simple-git")>]
+type IGitPluginError =
+
+    abstract member task: obj option
+    abstract member plugin: string option
+    abstract member message: string option
+
+type GitPluginException(err: IGitPluginError) =
+
+    inherit System.Exception(err.message |> Option.defaultValue "")
+
+    member _.Plugin = err.plugin
+    member _.Task = err.task
+
+[<Erase>]
+type GitPluginError =
+
+    [<Emit("$0, $1, $2")>]
+    static member create (?task: obj, ?plugin: string, ?message: string) : IGitPluginError = jsNative
+
+[<Erase>]
+type AbortController =
+
+    [<Emit("new AbortController()")>]
+    static member create () : IAbortController = jsNative
+
 [<Erase>]
 type SimpleGit =
 
     [<Import("simpleGit", "simple-git")>]
-    static member simpleGit (options: SimpleGitOptions) : ISimpleGit = jsNative
+    static member create (options: SimpleGitOptions) : ISimpleGit = jsNative
 
 //How to
 
-let simpleGit = SimpleGit.simpleGit(SimpleGitOptions(baseDir = "./", binary = "git", maxConcurrentProcesses = 6, trimmed = true))
+console.log("AbortController")
+
+let abortController = AbortController.create()
+
+console.log(abortController)
+
+console.log("aborted shall be false")
+
+console.log(abortController.signal.aborted)
+
+console.log("aborted shall be true")
+
+abortController.abort("Cancelled!")
+
+console.log(abortController.signal.aborted)
 
 console.log("SimpleGit!")
+
+let simpleGit = SimpleGit.create(SimpleGitOptions(baseDir = "./", abort = abortController, binary = "git", maxConcurrentProcesses = 6, trimmed = true))
+
 console.log(simpleGit)
 
 //ToAdd: AbortController; Progress Events;
@@ -792,4 +848,4 @@ let z = pullOptions.recurseSubmodules(PullOptionRecurseValues.Yes)
 console.log(x)
 console.log(y)
 
-simpleGit.pull([|pullOptions.options(PullOptionsWithoutValues.Force)|])
+//simpleGit.pull([|pullOptions.options(PullOptionsWithoutValues.Force)|])
