@@ -126,8 +126,6 @@ type BaseModal =
                             )
                     )
                 )
-            else
-                Html.none
         ]
 
     [<ReactComponent>]

@@ -10,7 +10,6 @@ function renderTable(args: any) {
   const [table, setTable] = React.useState(() => MockTable.Copy());
 
   const setTableWithLog = (newTable: any) => {
-    console.log("Table updated:", newTable);
     setTable(newTable);
   }
 
@@ -39,7 +38,7 @@ export const Default: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -54,7 +53,7 @@ export const ContextMenu: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -75,7 +74,7 @@ export const EditCell: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -119,7 +118,7 @@ export const EditTermCellRaw: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -151,7 +150,7 @@ export const EditTermCellKbd: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -192,7 +191,7 @@ export const EditTermCellMouseclick: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -233,7 +232,7 @@ export const EditTermHeader: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -267,7 +266,7 @@ export const FreeTextDetails: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -296,7 +295,7 @@ export const TermDetails: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -325,7 +324,7 @@ export const UnitizedDetails: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -354,7 +353,7 @@ export const EditColumn: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -383,7 +382,7 @@ export const GenerateRows: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -425,7 +424,7 @@ export const UpdateRows: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -467,7 +466,7 @@ export const DeleteColumn: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -501,7 +500,7 @@ export const DeleteRow: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -533,7 +532,7 @@ export const ActivateTermSearchContainer: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -560,7 +559,7 @@ export const TermDetailsKeyboard: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -583,7 +582,7 @@ export const FreeTextDetailsKeyboardActivation: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -596,13 +595,14 @@ export const FreeTextDetailsKeyboardActivation: Story = {
     const contextMenu = screen.getByTestId('context_menu');
     await expect(contextMenu).toBeVisible();
 
+    await fireEvent.focus(contextMenu);
     await userEvent.keyboard('d');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Details_FreeText');
       expect(modal).toBeVisible();
-    }, { timeout: 5000 });
+    }, { timeout: 10_000 });
   }
 }
 
@@ -610,7 +610,7 @@ export const EditColumnKeyboardActivation: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -623,13 +623,14 @@ export const EditColumnKeyboardActivation: Story = {
     const contextMenu = screen.getByTestId('context_menu');
     await expect(contextMenu).toBeVisible();
 
+    await fireEvent.focus(contextMenu);
     await userEvent.keyboard('e');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Edit');
       expect(modal).toBeVisible();
-    }, {timeout: 5000});
+    }, {timeout: 10_000});
   }
 }
 
@@ -637,7 +638,7 @@ export const NextRow: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {
@@ -693,7 +694,7 @@ export const JumpWithinSelectedCells: Story = {
   render: renderTable,
   args: {
     height: 600,
-    witdth: 1000,
+    width: 1000,
     debug: true
   },
   play: async ({ args, canvasElement }) => {

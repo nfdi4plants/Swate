@@ -43,7 +43,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: renderTermSearch,
   args: {
-    onTermChange: fn((term) => console.log(term)),
+    onTermChange: fn(),
     term: undefined,
     debug: true
   },
@@ -60,7 +60,7 @@ export const ParentSearch: Story = {
   render: renderTermSearch,
   parameters: {isolated: true},
   args: {
-    onTermChange: fn((term) => console.log(term)),
+    onTermChange: fn(),
     term: undefined,
     parentId: "MS:1000031",
     debug: true
@@ -88,7 +88,7 @@ export const DefaultAdvancedSearch: Story = {
   render: renderTermSearch,
   parameters: {isolated: true},
   args: {
-    onTermChange: fn((term) => console.log(term)),
+    onTermChange: fn(),
     term: undefined,
     parentId: "MS:1000031",
     showDetails: true,
@@ -127,7 +127,7 @@ export const TIBSearch: Story = {
   args: {
     term: undefined,
     parentId: "MS:1000031",
-    onTermChange: fn((term) => console.log(term)),
+    onTermChange: fn(),
     disableDefaultSearch: true,
     disableDefaultParentSearch: true,
     disableDefaultAllChildrenSearch: true,
@@ -173,7 +173,7 @@ export const TIBSearch: Story = {
 export const WithSearchConfigProvider: Story = {
   render: renderTermSearch,
   args: {
-    onTermChange: fn((term) => console.log(term)),
+    onTermChange: fn(),
     term: undefined,
     debug: true,
     disableDefaultSearch: true,
