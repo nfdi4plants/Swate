@@ -144,9 +144,9 @@ const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
-            <AnnoTableContainer />
+            {/* <AnnoTableContainer /> */}
             {/* <DataMapTableContainer /> */}
-            {/* <TermSearchContainer /> */}
+            <TermSearchContainer />
             {/* <BaseModalContainer /> */}
             {/* <ComboBoxContainer /> */}
             {/* <TemplateFilterContainer /> */}

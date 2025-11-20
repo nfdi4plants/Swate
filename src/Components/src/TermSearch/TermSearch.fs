@@ -223,15 +223,16 @@ type TermSearch =
                     if item.Term.href.IsSome then
                         Html.a [
                             prop.onClick (fun e -> e.stopPropagation ())
+                            prop.onMouseDown (fun e -> e.stopPropagation ())
                             prop.href item.Term.href.Value
                             prop.target.blank
                             prop.className "swt:link swt:hover:link-accent"
-                            prop.children [ Html.text (item.Term.id |> Option.defaultValue "<no-id>") ]
+                            prop.text (item.Term.id |> Option.defaultValue "<no-id>")
                         ]
                     else
                         Html.div [
                             prop.className "swt:text-muted"
-                            prop.children [ Html.text (item.Term.id |> Option.defaultValue "<no-id>") ]
+                            prop.text (item.Term.id |> Option.defaultValue "<no-id>")
                         ]
 
                 ]
