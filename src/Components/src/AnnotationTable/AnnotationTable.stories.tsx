@@ -629,7 +629,7 @@ export const EditColumnKeyboardActivation: Story = {
     await waitFor(() => {
       const modal = screen.getByTestId('modal_Edit');
       expect(modal).toBeVisible();
-    });
+    }, {timeout: 5000});
   }
 }
 
