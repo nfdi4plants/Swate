@@ -580,7 +580,7 @@ type FormComponents =
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
-
+        let startedChange = React.useRef (false)
         let tempValue, setTempValue = React.useState (value)
         let loading, setLoading = React.useState (false)
         let isError, setIsError = React.useState (None: string option)
@@ -588,9 +588,14 @@ type FormComponents =
         let debouncedValue = React.useDebounce (tempValue, 300)
 
         let handleChange =
-            fun (e: string) ->
-                setTempValue e
-                setLoading true
+            React.useCallback (
+                (fun (e: string) ->
+                    setTempValue e
+                    startedChange.current <- true
+                    setLoading true
+                ),
+                [||]
+            )
 
         React.useEffect (
             (fun () ->
@@ -598,14 +603,17 @@ type FormComponents =
                 | Some validatorFn ->
                     match validatorFn debouncedValue with
                     | Ok() ->
-                        setIsError None
-                        setValue debouncedValue
+                        if startedChange.current then
+                            setIsError None
+                            setValue debouncedValue
                     | Error e -> setIsError (Some e)
                 | None ->
-                    setIsError None
-                    setValue debouncedValue
+                    if startedChange.current then
+                        setIsError None
+                        setValue debouncedValue
 
                 setLoading false
+                startedChange.current <- false
             ),
             [| box debouncedValue |]
         )
@@ -717,6 +725,36 @@ type FormComponents =
             ?rmv: MouseEvent -> unit
         ) =
 
+        let startedChange = React.useRef (false)
+
+        let tempValue, setTempValue = React.useState (input |> Option.map _.ToTerm())
+
+        let setTempValueWrapper =
+            React.useCallback (fun (t: Term option) ->
+                setTempValue t
+                startedChange.current <- true
+            )
+
+        let debouncedValue = React.useDebounce (tempValue, 300)
+
+        React.useEffect (
+            (fun () ->
+                if startedChange.current then
+                    setter (debouncedValue |> Option.map OntologyAnnotation.from)
+
+                startedChange.current <- false
+            ),
+            [| box debouncedValue |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                setTempValue (input |> Option.map _.ToTerm())
+                startedChange.current <- false
+            ),
+            [| box input |]
+        )
+
         Html.div [
             prop.className "swt:space-y-2 swt:grow"
             prop.children [
@@ -726,8 +764,8 @@ type FormComponents =
                     prop.className "swt:w-full swt:flex swt:gap-2 swt:relative"
                     prop.children [
                         TermSearch.TermSearch(
-                            (input |> Option.map _.ToTerm()),
-                            (fun term -> term |> Option.map OntologyAnnotation.from |> setter),
+                            tempValue,
+                            setTempValueWrapper,
                             ?parentId = (parent |> Option.map _.TermAccessionShort),
                             classNames = TermSearchStyle(Fable.Core.U2.Case1 "swt:w-full")
                         )

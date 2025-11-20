@@ -128,6 +128,7 @@ type TableCell =
                     if isSetForced.current || isCancelledRef.current then
                         ()
                     else
+                        isSetForced.current <- true
                         setData tempData
                 | kbdEventCode.escape -> isCancelledRef.current <- true
                 | _ -> ()

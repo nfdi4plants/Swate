@@ -40,11 +40,8 @@ type MainPageView =
                     prop.role "navigation"
                     prop.ariaLabel "Back to spreadsheet view"
                     prop.onClick (fun _ ->
-                        UpdateModel {
-                            model with
-                                Model.PageState.MainPage = Routing.MainPage.Default
-                        }
-                        |> dispatch)
+                        PageState.UpdateMainPage Routing.MainPage.Default |> PageStateMsg |> dispatch
+                    )
                     prop.children [ Icons.Back(); Html.span "Back" ]
                 ]
                 Html.ul [
@@ -53,31 +50,19 @@ type MainPageView =
                         MainPageView.DrawerSideContentItem(
                             model,
                             Routing.MainPage.Settings,
-                            fun _ ->
-                                UpdateModel {
-                                    model with
-                                        Model.PageState.MainPage = Routing.MainPage.Settings
-                                }
-                                |> dispatch
+                            fun _ -> PageState.UpdateMainPage Routing.MainPage.Settings |> PageStateMsg |> dispatch
                         )
                         MainPageView.DrawerSideContentItem(
                             model,
                             Routing.MainPage.About,
-                            fun _ ->
-                                UpdateModel {
-                                    model with
-                                        Model.PageState.MainPage = Routing.MainPage.About
-                                }
-                                |> dispatch
+                            fun _ -> PageState.UpdateMainPage Routing.MainPage.About |> PageStateMsg |> dispatch
                         )
                         MainPageView.DrawerSideContentItem(
                             model,
                             Routing.MainPage.PrivacyPolicy,
                             fun _ ->
-                                UpdateModel {
-                                    model with
-                                        Model.PageState.MainPage = Routing.MainPage.PrivacyPolicy
-                                }
+                                PageState.UpdateMainPage Routing.MainPage.PrivacyPolicy
+                                |> PageStateMsg
                                 |> dispatch
                         )
                     ]
@@ -110,13 +95,7 @@ type MainPageView =
             ]
 
             Components.Logo.Main(
-                onClick =
-                    (fun _ ->
-                        UpdateModel {
-                            model with
-                                Model.PageState.MainPage = Routing.MainPage.Default
-                        }
-                        |> dispatch)
+                onClick = (fun _ -> PageState.UpdateMainPage Routing.MainPage.Default |> PageStateMsg |> dispatch)
             )
         ]
 

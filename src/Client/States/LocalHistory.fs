@@ -418,12 +418,42 @@ type Model = {
     /// Save the next table state to session storage for history control. Table state is stored with guid as key and order is stored as guid list.
     /// </summary>
     /// <param name="snapshotJsonString"></param>
-    member this.SaveSessionSnapshotIndexedDB(snapshotJsonString) : JS.Promise<Model> = promise {
+    static member SaveSessionSnapshotIndexedDB
+        (key: System.Guid, jsonStr: string, nextState: Model, toRemoveList: System.Guid list)
+        : JS.Promise<unit> =
+        promise {
+            if List.isEmpty toRemoveList |> not then
+                let toRemoveArray = toRemoveList |> Array.ofList
+
+                for rmvKey in toRemoveArray do
+                    do!
+                        Spreadsheet.Model.deleteItemIndexedDB (
+                            IndexedDB.swate_history_table,
+                            IndexedDB.LocalStorage.swate_history_items,
+                            rmvKey.ToString()
+                        )
+            // apply all storage changes after everything else went through
+            // set current table state with key and guid
+            do!
+                Spreadsheet.Model.saveToIndexedDB (
+                    IndexedDB.swate_history_table,
+                    IndexedDB.LocalStorage.swate_history_items,
+                    jsonStr,
+                    key.ToString()
+                )
+            // set new table guid history
+            do! Model.updateHistoryKeys (HistoryOrder.toJson (nextState.HistoryOrder))
+            // reset new table position to 0
+            do! Model.updateIndexedDBPosition (0)
+            return ()
+        }
+
+    static member UpdateBy(state: Model) =
         /// recursively generate new guids, check if existing and if so repeat until new guid.
         let rec generateNewGuid () =
             let key = System.Guid.NewGuid()
 
-            if List.contains key this.HistoryOrder then
+            if List.contains key state.HistoryOrder then
                 generateNewGuid ()
             else
                 key
@@ -435,58 +465,37 @@ type Model = {
         let nextState, toRemoveList =
             // if e.g at position 4 and we create new table state from position 4 we want to delete position 0 .. 3 and use 4 as new 0
             let rebranchedList, toRemoveList1 =
-                if this.HistoryCurrentPosition <> 0 then
-                    this.HistoryOrder
-                    |> List.splitAt this.HistoryCurrentPosition
+                if state.HistoryCurrentPosition <> 0 then
+                    state.HistoryOrder
+                    |> List.splitAt state.HistoryCurrentPosition
                     |> fun (remove, keep) -> keep, remove
                 else
-                    this.HistoryOrder, []
+                    state.HistoryOrder, []
 
             let newlist = newKey :: rebranchedList
 
             /// Split list into two at index of MaxHistory. Kepp the list with index below MaxHistory and iterate over the other list to remove the stored states.
             let newlist, toRemoveList2 =
-                if newlist.Length > this.HistoryItemCountLimit then
-                    List.splitAt this.HistoryItemCountLimit newlist
+                if newlist.Length > state.HistoryItemCountLimit then
+                    List.splitAt state.HistoryItemCountLimit newlist
                 else
                     newlist, []
 
             let toRemoveList = toRemoveList1 @ toRemoveList2
 
             {
-                this with
+                state with
                     HistoryOrder = newlist
                     HistoryExistingItemCount = newlist.Length
                     HistoryCurrentPosition = 0
             },
             toRemoveList
 
-        if List.isEmpty toRemoveList |> not then
-            let toRemoveArray = toRemoveList |> Array.ofList
-
-            for rmvKey in toRemoveArray do
-                do!
-                    Spreadsheet.Model.deleteItemIndexedDB (
-                        IndexedDB.swate_history_table,
-                        IndexedDB.LocalStorage.swate_history_items,
-                        rmvKey.ToString()
-                    )
-
-        // apply all storage changes after everything else went through
-        // set current table state with key and guid
-        do!
-            Spreadsheet.Model.saveToIndexedDB (
-                IndexedDB.swate_history_table,
-                IndexedDB.LocalStorage.swate_history_items,
-                snapshotJsonString,
-                newKey.ToString()
-            )
-        // set new table guid history
-        do! Model.updateHistoryKeys (HistoryOrder.toJson (nextState.HistoryOrder))
-        // reset new table position to 0
-        do! Model.updateIndexedDBPosition (0)
-        return nextState
-    }
+        {|
+            nextState = nextState
+            newKey = newKey
+            toRemoveList = toRemoveList
+        |}
 
     /// <summary>
     /// Save the next table state to session storage for history control. Table state is stored with guid as key and order is stored as guid list.

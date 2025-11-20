@@ -19,13 +19,13 @@ module FilePicker =
         : FilePicker.Model * Cmd<Messages.Msg> =
         match filePickerMsg with
         | LoadNewFiles fileNames ->
-            let nextModel = {
-                model with
-                    Model.FilePickerState.FileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
-                    Model.PageState.SidebarPage = Routing.SidebarPage.FilePicker
-            }
+            let fileNames = fileNames |> List.mapi (fun i x -> i + 1, x)
 
-            let nextCmd = UpdateModel nextModel |> Cmd.ofMsg
+            let nextCmd =
+                Messages.FilePicker.UpdateFileNames fileNames
+                |> Messages.FilePickerMsg
+                |> Cmd.ofMsg
+
             state, nextCmd
         | UpdateFileNames newFileNames ->
             let nextState: FilePicker.Model = { FileNames = newFileNames }

@@ -21,12 +21,7 @@ type Tabs =
             ]
             prop.onClick (fun e ->
                 e.preventDefault ()
-
-                UpdateModel {
-                    model with
-                        Model.PageState.SidebarPage = pageLink
-                }
-                |> dispatch
+                PageState.UpdateSidebarPage pageLink |> PageStateMsg |> dispatch
             )
             prop.children (pageLink.AsIcon())
         ]

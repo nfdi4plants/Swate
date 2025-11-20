@@ -114,11 +114,11 @@ type TopLevelMsg = | CloseSuggestions
 module History =
 
     type Msg =
-        | UpdateAnd of LocalHistory.Model * Cmd<Messages.Msg>
+        | Update of LocalHistory.Model
         | UpdateHistoryPosition of int
+        | UpdateHistoryPositionResponse of Spreadsheet.Model
 
 type Msg =
-    | UpdateModel of Model
     | DevMsg of DevMsg
     | TermSearchMsg of TermSearch.Msg
     | AdvancedSearchMsg of AdvancedSearch.Msg

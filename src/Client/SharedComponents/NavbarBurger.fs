@@ -64,12 +64,8 @@ type NavbarBurger =
 
         let navigateTo =
             fun (mainPage: Routing.MainPage) ->
-                {
-                    model with
-                        Model.PageState.MainPage = mainPage
-                }
-                |> Messages.UpdateModel
-                |> dispatch
+
+                Messages.PageState.UpdateMainPage mainPage |> Messages.PageStateMsg |> dispatch
 
         let openUrlInBrowser url : IReactProperty =
             prop.onClick (fun ev -> window.``open`` (url, "_blank") |> ignore)

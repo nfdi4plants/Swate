@@ -210,9 +210,107 @@ module DataAnnotator =
             nextState, model, Cmd.none
 
 module History =
-    let update (msg: History.Msg) (model: Model) : Model * Cmd<Msg> =
+
+    open LocalHistory
+    open Spreadsheet
+    open ARCtrl
+    open ARCtrl.Json
+
+    /// <summary>
+    /// This function will store the information correctly.
+    /// Can return save information to local storage (persistent between browser sessions) and session storage.
+    /// It works based of exlusion. As it specifies certain messages not triggering history update.
+    /// </summary>
+    /// <param name="msg"></param>
+    /// <param name="state"></param>
+    /// <param name="model"></param>
+    /// <param name="cmd"></param>
+    let updateHistoryStorageMsg
+        (msg: Spreadsheet.Msg)
+        (spreadsheetState: Spreadsheet.Model)
+        (historyState: LocalHistory.Model)
+        (isAutosave: bool)
+        (host: Swatehost option)
+        =
+
+        let snapshotJsonString = if isAutosave then spreadsheetState.ToJsonString() else ""
+
+        if isAutosave then
+            //This will cache the most up to date table state to local storage.
+            //This is used as a simple autosave feature.
+            Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
+
+        //This matchcase handles undo / redo functionality
         match msg with
-        | History.UpdateAnd(newHistory, cmd) -> { model with History = newHistory }, cmd
+        | UpdateActiveView _
+        | Reset
+        | ExportJson _
+        | ExportXlsx _
+        | ExportXlsxDownload _
+        | ImportXlsx _
+        | ImportJsonRaw _
+        | InitFromArcFile _ -> historyState
+        | _ ->
+            let props = LocalHistory.Model.UpdateBy(historyState)
+            let nextState = props.nextState
+            let key = props.newKey
+            let toRemoveList = props.toRemoveList
+
+            if isAutosave then
+
+                LocalHistory.Model.SaveSessionSnapshotIndexedDB(key, snapshotJsonString, nextState, toRemoveList)
+                |> Promise.catch (fun e -> console.error ("Error saving session snapshot to IndexedDB: " + e.Message))
+                |> Promise.start
+
+            if host = Some Swatehost.ARCitect then
+                match spreadsheetState.ArcFile with // model is not yet updated at this position.
+                | Some(Assay assay) ->
+                    ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, ArcAssay.toJsonString 0 assay, None)
+                    |> Promise.start
+                | Some(Study(study, _)) ->
+                    ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study, None)
+                    |> Promise.start
+                | Some(Investigation inv) ->
+                    ARCitect.api.Save(
+                        ARCitect.Interop.InteropTypes.ARCFile.Investigation,
+                        ArcInvestigation.toJsonString 0 inv,
+                        None
+                    )
+                    |> Promise.start
+                | Some(Run run) ->
+                    ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run, None)
+                    |> Promise.start
+                | Some(Workflow workflow) ->
+                    ARCitect.api.Save(
+                        ARCitect.Interop.InteropTypes.ARCFile.Workflow,
+                        ArcWorkflow.toJsonString 0 workflow,
+                        None
+                    )
+                    |> Promise.start
+                | Some(Template template) ->
+                    ARCitect.api.Save(
+                        ARCitect.Interop.InteropTypes.ARCFile.Template,
+                        Template.toJsonString 0 template,
+                        None
+                    )
+                    |> Promise.start
+                | Some(DataMap(parent, datamap)) ->
+                    if parent.IsSome then
+                        ARCitect.api.Save(
+                            ARCitect.Interop.InteropTypes.ARCFile.DataMap,
+                            DataMap.toJsonString 0 datamap,
+                            parent
+                        )
+                        |> Promise.start
+                    else
+                        failwith "No datamap parent is available"
+                | _ -> ()
+
+            nextState
+
+    let update (msg: History.Msg) (model: Model.Model) : Model.Model * Cmd<Messages.Msg> =
+        match msg with
+        | History.Update(newHistory) -> { model with History = newHistory }, Cmd.none
         | History.UpdateHistoryPosition newPosition ->
             match newPosition with
             | _ when model.History.NextPositionIsValid(newPosition) |> not -> model, Cmd.none
@@ -226,15 +324,18 @@ module History =
                     Cmd.OfPromise.either
                         LocalHistory.Model.fromIndexedDBByKeyPosition
                         (newPosition)
-                        (fun nextState ->
-                            Messages.UpdateModel {
-                                nextModel with
-                                    SpreadsheetModel = nextState
-                            }
-                        )
+                        (History.UpdateHistoryPositionResponse >> Msg.HistoryMsg)
                         (curry GenericError Cmd.none >> DevMsg)
 
-                model, cmd
+                nextModel, cmd
+        | History.UpdateHistoryPositionResponse spreadsheetModel ->
+            let nextModel = {
+                model with
+                    SpreadsheetModel = spreadsheetModel
+            }
+
+            nextModel, Cmd.none
+
 
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
@@ -267,7 +368,6 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         | Batch msgSeq ->
             let cmd = Cmd.batch [ yield! msgSeq |> Seq.map Cmd.ofMsg ]
             currentModel, cmd
-        | UpdateModel nextModel -> nextModel, Cmd.none
 
         | OfficeInteropMsg excelMsg ->
             let nextState, nextModel0, nextCmd =
@@ -284,9 +384,18 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let nextState, nextModel, nextCmd =
                 Update.Spreadsheet.update currentModel.SpreadsheetModel currentModel msg
 
+            let nextHistory =
+                History.updateHistoryStorageMsg
+                    msg
+                    nextState
+                    nextModel.History
+                    nextModel.PersistentStorageState.Autosave
+                    nextModel.PersistentStorageState.Host
+
             let nextModel' = {
                 nextModel with
                     SpreadsheetModel = nextState
+                    History = nextHistory
             }
 
             nextModel', nextCmd
@@ -402,8 +511,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     /// The function is exception based, so msg which should not be logged needs to be added here.
     let matchMsgToLog (msg: Msg) =
         match msg with
-        | DevMsg _
-        | UpdateModel _ -> false
+        | DevMsg _ -> false
         | _ -> true
 
     let logg (msg: Msg) (model: Model) : Model =

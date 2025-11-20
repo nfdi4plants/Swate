@@ -344,6 +344,8 @@ type AnnotationTable =
             }
         )
 
+        let setArcTable = fun (newTable: ArcTable) -> setArcTable newTable
+
         let onSelect: GridSelect.OnSelect =
             fun latest range ->
 
@@ -386,7 +388,6 @@ type AnnotationTable =
                             fun (cell: CellCoordinate) (cc: CompositeCell) ->
                                 let nextTable = arcTable |> ArcTable.setCellAt (cell.x - 1, cell.y - 1, cc)
                                 setArcTable nextTable
-
 
                         let cell = arcTable.GetCellAt(index.x - 1, index.y - 1)
 
@@ -538,8 +539,7 @@ type AnnotationTable =
         ]
 
     static member Entry() =
-        let arcTable =
-            ARCtrl.ArcTable("TestTable", ResizeArray())
+        let arcTable = ARCtrl.ArcTable("TestTable", ResizeArray())
 
         let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
 

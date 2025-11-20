@@ -146,7 +146,7 @@ const App = () => {
             <h1 className='swt:text-6xl'>Playground</h1>
             <AnnoTableContainer />
             {/* <DataMapTableContainer /> */}
-            <TermSearchContainer />
+            {/* <TermSearchContainer /> */}
             {/* <BaseModalContainer /> */}
             {/* <ComboBoxContainer /> */}
             {/* <TemplateFilterContainer /> */}

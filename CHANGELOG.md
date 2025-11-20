@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 1.0.5 - 2025-11-20
+
+### 🐛 Fixed
+
+-  Fix too many events triggered by metadata forms #900 (by @Freymaurer)
+-  Fix missing validation on Investigation identifier (by @Freymaurer)
+
 ## 1.0.4 - 2025-11-19
 
 ### 🔄 Changed

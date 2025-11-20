@@ -14,10 +14,12 @@ let Main (assay: ArcAssay, setArcAssay: ArcAssay -> unit, model: Model.Model) =
         Generic.BoxedField(
             "Assay Metadata",
             content = [
+                // Should never trigger UpdateArcFile on load
                 FormComponents.TextInput(
                     assay.Identifier,
                     (fun v ->
                         let nextAssay = IdentifierSetters.setAssayIdentifier v assay
+                        console.log ("Assay Identifier changed to", v)
                         setArcAssay nextAssay
                     ),
                     "Identifier",

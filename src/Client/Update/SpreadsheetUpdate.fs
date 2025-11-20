@@ -15,116 +15,14 @@ open ARCtrl.Json
 
 module Spreadsheet =
 
-    module Helper =
-
-        /// <summary>
-        /// This function will store the information correctly.
-        /// Can return save information to local storage (persistent between browser sessions) and session storage.
-        /// It works based of exlusion. As it specifies certain messages not triggering history update.
-        /// </summary>
-        /// <param name="msg"></param>
-        /// <param name="state"></param>
-        /// <param name="model"></param>
-        /// <param name="cmd"></param>
-        let updateHistoryStorageMsg (msg: Spreadsheet.Msg) (state: Spreadsheet.Model, model: Model, cmd) =
-
-            let mutable snapshotJsonString = ""
-
-            if model.PersistentStorageState.Autosave then
-                snapshotJsonString <- state.ToJsonString()
-                //This will cache the most up to date table state to local storage.
-                //This is used as a simple autosave feature.
-                Spreadsheet.Model.SaveToLocalStorage(snapshotJsonString)
-
-            //This matchcase handles undo / redo functionality
-            match msg with
-            | UpdateActiveView _
-            | Reset
-            | InitFromArcFile _ -> state, model, cmd
-            | _ ->
-                let newCmd =
-                    if model.PersistentStorageState.Autosave then
-                        Cmd.OfPromise.either
-                            model.History.SaveSessionSnapshotIndexedDB
-                            (snapshotJsonString)
-                            (fun newHistory -> Messages.History.UpdateAnd(newHistory, cmd) |> HistoryMsg)
-                            (curry GenericError Cmd.none >> DevMsg)
-                    else
-                        cmd
-
-                if model.PersistentStorageState.Host = Some Swatehost.ARCitect then
-                    match state.ArcFile with // model is not yet updated at this position.
-                    | Some(Assay assay) ->
-                        ARCitect.api.Save(
-                            ARCitect.Interop.InteropTypes.ARCFile.Assay,
-                            ArcAssay.toJsonString 0 assay,
-                            None
-                        )
-                        |> Promise.start
-                    | Some(Study(study, _)) ->
-                        ARCitect.api.Save(
-                            ARCitect.Interop.InteropTypes.ARCFile.Study,
-                            ArcStudy.toJsonString 0 study,
-                            None
-                        )
-                        |> Promise.start
-                    | Some(Investigation inv) ->
-                        ARCitect.api.Save(
-                            ARCitect.Interop.InteropTypes.ARCFile.Investigation,
-                            ArcInvestigation.toJsonString 0 inv,
-                            None
-                        )
-                        |> Promise.start
-                    | Some(Run run) ->
-                        ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run, None)
-                        |> Promise.start
-                    | Some(Workflow workflow) ->
-                        ARCitect.api.Save(
-                            ARCitect.Interop.InteropTypes.ARCFile.Workflow,
-                            ArcWorkflow.toJsonString 0 workflow,
-                            None
-                        )
-                        |> Promise.start
-                    | Some(Template template) ->
-                        ARCitect.api.Save(
-                            ARCitect.Interop.InteropTypes.ARCFile.Template,
-                            Template.toJsonString 0 template,
-                            None
-                        )
-                        |> Promise.start
-                    | Some(DataMap(parent, datamap)) ->
-                        if parent.IsSome then
-                            ARCitect.api.Save(
-                                ARCitect.Interop.InteropTypes.ARCFile.DataMap,
-                                DataMap.toJsonString 0 datamap,
-                                parent
-                            )
-                            |> Promise.start
-                        else
-                            failwith "No datamap parent is available"
-                    | _ -> ()
-
-                state, model, newCmd
-
     let update
         (state: Spreadsheet.Model)
         (model: Model)
         (msg: Spreadsheet.Msg)
         : Spreadsheet.Model * Model * Cmd<Messages.Msg> =
-        //let createPromiseCmd (func: unit -> Spreadsheet.Model) =
-        //    let nextState() = promise {
-        //        return func()
-        //    }
-        //    Cmd.OfPromise.either
-        //        nextState
-        //        ()
-        //        (updateSessionStorageMsg msg >> Messages.SpreadsheetMsg)
-        //        (Messages.curry Messages.GenericError Cmd.none >> Messages.DevMsg)
-
-        //let newHistoryController (state, model, cmd) =
-        //    updateSessionStorageMsg msg, model
 
         let innerUpdate (state: Spreadsheet.Model) (model: Model) (msg: Spreadsheet.Msg) =
+
             match msg with
             | UpdateState nextState -> nextState, model, Cmd.none
             | ImportJsonRaw importData ->
@@ -387,7 +285,7 @@ module Spreadsheet =
                 state, model, Cmd.none
 
         try
-            innerUpdate state model msg |> Helper.updateHistoryStorageMsg msg
+            innerUpdate state model msg
         with e ->
             let cmd = GenericError(Cmd.none, e) |> DevMsg |> Cmd.ofMsg
             state, model, cmd

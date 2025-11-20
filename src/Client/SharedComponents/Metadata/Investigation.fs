@@ -17,22 +17,34 @@ let Main (investigation: ArcInvestigation, setInvestigation: ArcInvestigation ->
                     investigation.Identifier,
                     (fun s ->
                         let nextInvestigation = IdentifierSetters.setInvestigationIdentifier s investigation
-                        setInvestigation nextInvestigation),
+                        setInvestigation nextInvestigation
+                    ),
+
                     "Identifier",
-                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host
+                    disabled = Generic.isDisabledInARCitect model.PersistentStorageState.Host,
+                    validator =
+                        (fun s ->
+                            try
+                                ARCtrl.Helper.Identifier.checkValidCharacters s
+                                Ok()
+                            with ex ->
+                                Error ex.Message
+                        )
                 )
                 FormComponents.TextInput(
                     Option.defaultValue "" investigation.Title,
                     (fun s ->
                         investigation.Title <- s |> Option.whereNot String.IsNullOrWhiteSpace
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     "Title"
                 )
                 FormComponents.TextInput(
                     Option.defaultValue "" investigation.Description,
                     (fun s ->
                         investigation.Description <- s |> Option.whereNot String.IsNullOrWhiteSpace
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     "Description",
                     isarea = true
                 )
@@ -40,7 +52,8 @@ let Main (investigation: ArcInvestigation, setInvestigation: ArcInvestigation ->
                     investigation.Contacts,
                     (fun i ->
                         investigation.Contacts <- ResizeArray i
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     model.PersistentStorageState.IsARCitect,
                     "Contacts"
                 )
@@ -48,45 +61,50 @@ let Main (investigation: ArcInvestigation, setInvestigation: ArcInvestigation ->
                     investigation.Publications,
                     (fun i ->
                         investigation.Publications <- i
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     "Publications"
                 )
                 FormComponents.DateTimeInput(
                     Option.defaultValue "" investigation.SubmissionDate,
                     (fun s ->
                         investigation.SubmissionDate <- if s = "" then None else Some s
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     "Submission Date"
                 )
                 FormComponents.DateTimeInput(
                     Option.defaultValue "" investigation.PublicReleaseDate,
                     (fun s ->
                         investigation.PublicReleaseDate <- if s = "" then None else Some s
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     "Public Release Date"
                 )
                 FormComponents.OntologySourceReferencesInput(
                     investigation.OntologySourceReferences,
                     (fun oas ->
                         investigation.OntologySourceReferences <- oas
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     "Ontology Source References"
                 )
-                //// This code might become relevant in the future. We decided to use implicit registrations for now. If this results in issues we can switch back to explicit registrations.
-                ////FormComponents.TextInputs(
-                ////    Array.ofSeq inv.RegisteredStudyIdentifiers,
-                ////    "RegisteredStudyIdentifiers",
-                ////    (fun i ->
-                ////        inv.RegisteredStudyIdentifiers <- ResizeArray i
-                ////        inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                ////)
                 FormComponents.CommentsInput(
                     investigation.Comments,
                     (fun comments ->
                         investigation.Comments <- ResizeArray comments
-                        setInvestigation investigation),
+                        setInvestigation investigation
+                    ),
                     "Comments"
                 )
+            //// This code might become relevant in the future. We decided to use implicit registrations for now. If this results in issues we can switch back to explicit registrations.
+            ////FormComponents.TextInputs(
+            ////    Array.ofSeq inv.RegisteredStudyIdentifiers,
+            ////    "RegisteredStudyIdentifiers",
+            ////    (fun i ->
+            ////        inv.RegisteredStudyIdentifiers <- ResizeArray i
+            ////        inv |> Investigation |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
+            ////)
             ]
         )
     ]
