@@ -710,6 +710,32 @@ type pushOptions =
     static member inline mergingWithValues(value: SharedValues): IPushOptions = createObj [ "--shared", string value] |> unbox
     static member inline recurseSubmodules(value: PushOptionsRecurseValues): IPushOptions = createObj [ "--recurse-submodules", string value] |> unbox
 
+type IAbortSignal =
+
+    abstract member aborted: bool
+    abstract member reason : string option
+
+type IAbortController =
+
+    abstract member signal: IAbortSignal
+    abstract member abort: ?reason: string -> unit
+
+[<StringEnum(CaseRules.LowerFirst)>]
+type Stages =
+    | Compressing
+    | Counting
+    | Receiving
+    | Resolving
+    | Unknown
+    | Writing
+
+type IProgressEvent =
+    abstract member method: string option
+    abstract member stage: Stages option
+    abstract member progress: int option
+    abstract member processed: int option
+    abstract member total: int option
+
 type ISimpleGit =
 
     abstract member apply: patch:string * ?options: IApplyOptions[] -> Promise<unit>
@@ -755,30 +781,24 @@ type ISimpleGit =
     abstract member push: ?pushMultipletags:( string * string[])[] -> Promise<unit>
     abstract member pushTags: remote:string * ?options: string[] -> Promise<unit>
 
-type IAbortSignal =
-
-    abstract member aborted: bool
-    abstract member reason : string option
-
-type IAbortController =
-
-    abstract member signal: IAbortSignal
-    abstract member abort: ?reason: string -> unit
+    abstract member raw: args:string[] * ?handlerFn: (exn option -> string -> unit) -> Promise<string>
 
 [<AllowNullLiteral>]
 type SimpleGitOptions
     [<ParamObjectAttribute; Emit("$0")>](
       ?baseDir: string,
-      ?abort: IAbortController, 
       ?binary: string,
       ?maxConcurrentProcesses: int,
-      ?trimmed: bool
+      ?trimmed: bool,
+      ?abort: IAbortController,
+      ?progress: IProgressEvent
     ) =
     member val baseDir: string option = baseDir with get, set
-    member val abort: IAbortController option = abort with get, set
     member val binary: string option = binary with get, set
     member val maxConcurrentProcesses: int option = maxConcurrentProcesses with get, set
     member val trimmed: bool option = trimmed with get, set
+    member val abort: IAbortController option = abort with get, set
+    member val progress: IProgressEvent option = progress with get, set
 
 [<AllowNullLiteral>]
 [<Import("GitPluginError", "simple-git")>]
@@ -808,6 +828,12 @@ type AbortController =
     static member create () : IAbortController = jsNative
 
 [<Erase>]
+type ProgressEvent =
+
+    [<Emit("{ method: $0, stage: $1, progress: $2, processed: $3, total: $4 }")>]
+    static member create (?method: string, ?stage: Stages, ?progress: int,  ?processed: int, ?total: int) : IProgressEvent = jsNative
+
+[<Erase>]
 type SimpleGit =
 
     [<Import("simpleGit", "simple-git")>]
@@ -831,9 +857,15 @@ abortController.abort("Cancelled!")
 
 console.log(abortController.signal.aborted)
 
+console.log("Progress Events")
+
+let progress = ProgressEvent.create("Test", Stages.Unknown, 0, 1, 2)
+
+console.log(progress)
+
 console.log("SimpleGit!")
 
-let simpleGit = SimpleGit.create(SimpleGitOptions(baseDir = "./", abort = abortController, binary = "git", maxConcurrentProcesses = 6, trimmed = true))
+let simpleGit = SimpleGit.create(SimpleGitOptions(baseDir = "./", binary = "git", maxConcurrentProcesses = 6, trimmed = true, abort = abortController, progress = progress))
 
 console.log(simpleGit)
 
