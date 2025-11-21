@@ -29,7 +29,7 @@ module Xlsx =
                     ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
                 | _ when ws.Exists(fun ws -> ws.Name.ToLower().Contains("datamap")) ->
                     let datamap = DataMap.fromFsWorkbook fswb
-                    DataMap(Some(createDataMapParentInfo "default" DataMapParent.Assay), datamap)
+                    DataMap(Some(DatamapParentInfo.create "default" DataMapParent.Assay), datamap)
 
                 //Adapt to FSWorkBook and FromFSWorkbook of ARCtrl to include DatamapParentInfo
                 //match ws with

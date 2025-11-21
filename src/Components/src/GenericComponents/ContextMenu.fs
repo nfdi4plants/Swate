@@ -224,7 +224,8 @@ type ContextMenu =
                                         prop.testId "context_menu"
                                     prop.custom ("style", floating.floatingStyles)
                                     for key, v in
-                                        interactions.getFloatingProps () |> Fable.Core.JS.Constructors.Object.entries do
+                                        interactions.getFloatingProps (null)
+                                        |> Fable.Core.JS.Constructors.Object.entries do
                                         prop.custom (key, v)
                                     prop.className
                                         "swt:grid swt:grid-cols-[auto_1fr_auto] swt:bg-base-100 swt:border-2 swt:border-base-300 swt:w-56 swt:rounded-md swt:focus:outline-hidden"

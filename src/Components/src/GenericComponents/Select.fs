@@ -331,7 +331,7 @@ type Select =
                 prop.className "swt:size-fit swt:cursor-pointer swt:select-none"
                 prop.ref (unbox flui.refs.setReference)
                 prop.tabIndex 0
-                yield! prop.spread <| interactions.getReferenceProps ()
+                yield! prop.spread <| interactions.getReferenceProps (null)
                 prop.children (TriggerRender {| isOpen = isOpen |})
             ]
             React.contextProvider (
@@ -347,7 +347,7 @@ type Select =
                                     Html.div [
                                         prop.ref (unbox flui.refs.setFloating)
                                         prop.style floatingStyle
-                                        yield! prop.spread <| interactions.getFloatingProps ()
+                                        yield! prop.spread <| interactions.getFloatingProps (null)
                                         prop.children [
                                             FloatingUI.FloatingList(
                                                 elementsRef = elementsRef,

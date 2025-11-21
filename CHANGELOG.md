@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 1.0.7 - 2025-11-21
+
+### ✨ Added
+
+-  Use predictive url for term search links where no url is given by db search (by @Freymaurer)
+
+### 🐛 Fixed
+
+-  Fix falsy pagination in advanced term search (by @Freymaurer)
+
 ## 1.0.6 - 2025-11-20
 
 ### 🐛 Fixed

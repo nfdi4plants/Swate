@@ -116,7 +116,7 @@ type BaseModal =
                                                     className.Value
                                             ]
                                             prop.ref flui.refs.setFloating
-                                            yield! prop.spread (useInteractions.getFloatingProps ())
+                                            yield! prop.spread (useInteractions.getFloatingProps (null))
                                             prop.children children
                                         ]
                                     ),

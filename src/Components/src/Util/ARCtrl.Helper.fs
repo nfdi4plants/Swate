@@ -98,10 +98,11 @@ module ARCtrlHelper =
         Parent: DataMapParent
     |}
 
-    let createDataMapParentInfo (parentId: string) (parent: DataMapParent) : DatamapParentInfo = {|
-        ParentId = parentId
-        Parent = parent
-    |}
+    module DatamapParentInfo =
+        let create (parentId: string) (parent: DataMapParent) : DatamapParentInfo = {|
+            ParentId = parentId
+            Parent = parent
+        |}
 
     type ArcFiles =
         | Template of Template
@@ -220,22 +221,6 @@ module Table =
         tablecopy.RemoveColumns(Array.ofList columnsToRemove)
         tablecopy
 
-    /// <summary>
-    /// Convert one array of cell types to another one, based on the first array of cell types
-    /// </summary>
-    /// <param name="cellsOrigin"></param>
-    /// <param name="cellsToAdd"></param>
-    let convertCellTypes (cellsOrigin: CompositeCell[]) (cellsToAdd: CompositeCell[]) =
-        let newCellsToAdd = cellsToAdd
-
-        for i in 0 .. cellsOrigin.Length - 1 do
-            if cellsOrigin.[i].isFreeText then
-                if cellsToAdd.[i].isData then
-                    newCellsToAdd.[i] <- cellsToAdd.[i].ToDataCell()
-            else if cellsToAdd.[i].isFreeText then
-                newCellsToAdd.[i] <- cellsToAdd.[i].ToFreeTextCell()
-
-        newCellsToAdd
 
     /// <summary>
     /// This function is meant to prepare a table for joining with another table.
@@ -265,11 +250,6 @@ module Table =
 
         tablecopy.IteriColumns(fun i c0 ->
 
-            // let c1 = { // removed this, this should be the same as c0
-            //     c0 with
-            //         Cells = tablecopy.Columns.[i].Cells
-            // }
-
             let c2 =
                 if c0.Header.isInput then
                     match activeTable.TryGetInputColumn() with
@@ -291,37 +271,6 @@ module Helper =
 
     let doptstr (o: string option) = Option.defaultValue "" o
 
-    let arrayMoveColumn (currentColumnIndex: int) (newColumnIndex: int) (arr: ResizeArray<'A>) =
-        let ele = arr.[currentColumnIndex]
-        arr.RemoveAt(currentColumnIndex)
-        arr.Insert(newColumnIndex, ele)
-
-    let dictMoveColumn (currentColumnIndex: int) (newColumnIndex: int) (table: Dictionary<int * int, 'A>) =
-        /// This is necessary to always access the correct value for an index.
-        /// It is possible to only copy the specific target column at "currentColumnIndex" and sort the keys in the for loop depending on "currentColumnIndex" and "newColumnIndex".
-        /// this means. If currentColumnIndex < newColumnIndex then Seq.sortByDescending keys else Seq.sortBy keys.
-        /// this implementation would result in performance increase, but readability would decrease a lot.
-        let backupTable = Dictionary(table)
-
-        let range = [
-            System.Math.Min(currentColumnIndex, newColumnIndex) .. System.Math.Max(currentColumnIndex, newColumnIndex)
-        ]
-
-        for columnIndex, rowIndex in backupTable.Keys do
-            let value = backupTable.[(columnIndex, rowIndex)]
-
-            let newColumnIndex =
-                if columnIndex = currentColumnIndex then
-                    newColumnIndex
-                elif List.contains columnIndex range then
-                    let modifier = if currentColumnIndex < newColumnIndex then -1 else +1
-                    let moveTo = modifier + columnIndex
-                    moveTo
-                else
-                    0 + columnIndex
-
-            let updatedKey = (newColumnIndex, rowIndex)
-            table.[updatedKey] <- value
 
 [<RequireQualifiedAccess>]
 type CompositeHeaderDiscriminate =
@@ -777,8 +726,9 @@ module Extensions =
         /// <param name="tsr"></param>
         member this.UpdateTSR(tsr: string) =
             let updateTSR (oa: OntologyAnnotation) =
-                oa.TermSourceREF <- Some tsr
-                oa
+                let next = oa.Copy()
+                next.TermSourceREF <- Some tsr
+                next
 
             match this with
             | CompositeCell.Term oa -> CompositeCell.Term(updateTSR oa)
@@ -791,8 +741,9 @@ module Extensions =
         /// <param name="tsr"></param>
         member this.UpdateTAN(tan: string) =
             let updateTAN (oa: OntologyAnnotation) =
-                oa.TermSourceREF <- Some tan
-                oa
+                let next = oa.Copy()
+                next.TermSourceREF <- Some tan
+                next
 
             match this with
             | CompositeCell.Term oa -> CompositeCell.Term(updateTAN oa)
@@ -802,8 +753,9 @@ module Extensions =
     type ArcTable with
         member this.ClearCell(cellIndex: CellCoordinate) =
             let index = (cellIndex.x - 1, cellIndex.y - 1)
-            let c = this.Values.Item(index).GetEmptyCellFixed()
+            let c = this.GetCellAt(index).GetEmptyCellFixed()
             this.SetCellAt(cellIndex.x - 1, cellIndex.y - 1, c)
+
 
         member this.ClearSelectedCells(selectHandle: SelectHandle) =
             let selectedCells = selectHandle.getSelectedCells ()

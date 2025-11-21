@@ -181,6 +181,15 @@ type TermSearch =
 
         let isDirectedSearch = item.IsDirectedSearchResult
 
+        let predictiveHref =
+            match item.Term.href with
+            | Some link when not (System.String.IsNullOrWhiteSpace link) -> Some link
+            | _ when item.Term.id.IsSome ->
+                match ARCtrl.Helper.Regex.tryParseTermAnnotation item.Term.id.Value with
+                | Some r -> ARCtrl.OntologyAnnotation.createUriAnnotation r.IDSpace r.LocalID |> Some
+                | None -> None
+            | _ -> None
+
         Html.li [
             prop.key index
             prop.className [
@@ -220,16 +229,17 @@ type TermSearch =
                     ]
 
                 Html.div [
-                    if item.Term.href.IsSome then
+                    match predictiveHref with
+                    | Some href ->
                         Html.a [
                             prop.onClick (fun e -> e.stopPropagation ())
                             prop.onMouseDown (fun e -> e.stopPropagation ())
-                            prop.href item.Term.href.Value
+                            prop.href href
                             prop.target.blank
                             prop.className "swt:link swt:hover:link-accent"
                             prop.text (item.Term.id |> Option.defaultValue "<no-id>")
                         ]
-                    else
+                    | None ->
                         Html.div [
                             prop.className "swt:text-muted"
                             prop.text (item.Term.id |> Option.defaultValue "<no-id>")
@@ -367,9 +377,7 @@ type TermSearch =
             onTermSelect: Term option -> unit,
             formRef
         ) =
-        /// tempPagination is used to store the value of the input field, which can differ from the actual current pagination value
-        let (tempPagination: int option), setTempPagination = React.useState (None)
-        let pagination, setPagination = React.useState (1)
+        let pagination, setPagination = React.useState (0)
 
 
         let AdvancedSearchForm =
@@ -388,11 +396,15 @@ type TermSearch =
         let BinCount =
             React.useMemo ((fun () -> searchResults.Results.Count / BinSize), [| box searchResults |])
 
+        let inputRef = React.useInputRef ()
+
         // Ensure that clicking on "Next"/"Previous" button will update the pagination input field
         let setPagination =
-            fun x ->
-                setTempPagination (Some x)
+            fun (x: int) ->
                 setPagination x
+
+                if inputRef.current.IsSome then
+                    inputRef.current.Value.valueAsNumber <- float (x + 1)
 
         let ResultsComponent (results: ResizeArray<TermSearchResult>) =
             let range = results.GetRange(pagination * BinSize, BinSize)
@@ -416,42 +428,35 @@ type TermSearch =
                                 prop.className "swt:input swt:join-item"
                                 prop.children [
                                     Html.input [
+                                        prop.ref inputRef
                                         prop.type'.number
                                         prop.min 1
-                                        prop.valueOrDefault (tempPagination |> Option.defaultValue pagination)
-                                        prop.max BinCount
+                                        prop.defaultValue (pagination + 1)
+                                        prop.max (BinCount + 1)
                                         prop.onChange (fun (e: int) ->
-                                            System.Math.Max(System.Math.Min(e, 1), BinCount)
-                                            |> Some
-                                            |> setTempPagination
+                                            let e = e - 1 //Convert to zero based index
+                                            System.Math.Min(System.Math.Max(e, 0), BinCount) |> setPagination
                                         )
                                     ]
-                                    Html.span ($"/{BinCount}")
+                                    Html.span ($"/{BinCount + 1}")
                                 ]
-                            ]
-                            Html.button [
-                                prop.className "swt:btn swt:btn-primary swt:join-item"
-                                let disabled = tempPagination.IsNone || (tempPagination.Value - 1) = pagination
-                                prop.disabled disabled
-
-                                prop.onClick (fun _ ->
-                                    tempPagination |> Option.iter ((fun current -> current - 1) >> setPagination)
-                                )
-
-                                prop.text "Go"
                             ]
                             Html.button [
                                 let disabled = pagination <= 1
                                 prop.className "swt:btn swt:join-item"
                                 prop.disabled disabled
-                                prop.onClick (fun _ -> setPagination (pagination - 1))
+
+                                prop.onClick (fun _ -> pagination - 1 |> setPagination)
+
                                 prop.text "Previous"
                             ]
                             Html.button [
                                 let disabled = pagination >= BinCount
                                 prop.disabled disabled
                                 prop.className "swt:btn swt:join-item"
-                                prop.onClick (fun _ -> setPagination (pagination + 1))
+
+                                prop.onClick (fun _ -> pagination + 1 |> setPagination)
+
                                 prop.text "Next"
                             ]
                         ]
