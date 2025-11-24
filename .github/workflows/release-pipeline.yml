@@ -22,7 +22,7 @@ jobs:
     steps:
       # Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Set up .NET
       - name: Set up .NET
@@ -65,7 +65,7 @@ jobs:
     outputs:
       should_skip: ${{ steps.buildscript.outputs.should_skip }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # actions/checkout@v4 uses shallow clones by default, so we need to fetch all tags
       - name: Fetch all git tags
@@ -92,7 +92,7 @@ jobs:
     steps:
       # Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Set up .NET
       - name: Set up .NET
@@ -145,7 +145,7 @@ jobs:
     steps:
       # Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Set up .NET
       - name: Set up .NET
