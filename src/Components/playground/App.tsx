@@ -13,6 +13,7 @@ import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/Te
 import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
 import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
+import { FileExplorerExample_Example } from '../src/FileExplorer/FileExplorer.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -140,6 +141,15 @@ function DataMapTableContainer() {
   </div>
 }
 
+
+
+function FileExplorerContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-3xl'>File Explorer</h2>
+    <FileExplorerExample_Example />
+  </div>
+}
+
 const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
@@ -153,6 +163,7 @@ const App = () => {
             {/* <SelectContainer /> */}
             {/* <ContextMenuContainer /> */}
             {/* <TableContainer /> */}
+            <FileExplorerContainer />
         </div>
     );
 };

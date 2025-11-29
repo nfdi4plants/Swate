@@ -30,6 +30,9 @@
     <Compile Include="Util\Api.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\ReactContexts.fs" />
+    <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
+    <Compile Include="FileExplorer\FileExplorerBreadcrumbs.fs" />
+    <Compile Include="FileExplorer\FileExplorer.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
