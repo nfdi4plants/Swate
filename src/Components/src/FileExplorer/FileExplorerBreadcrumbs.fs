@@ -13,6 +13,34 @@ open Swate.Components.FileExplorer.FileTreeDataStructures
 // ============================================================================
 [<Mangle(false); Erase>]
 type Breadcrumbs =
+
+    static member defaultIconPaths = {|
+        home =
+            "M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
+    |}
+
+    static member private icon(path: string) =
+        Html.span [
+            prop.className "swt:mr-2"
+            prop.children [
+                Svg.svg [
+                    svg.xmlns "http://www.w3.org/2000/svg"
+                    svg.fill "none"
+                    svg.viewBox (0, 0, 24, 24)
+                    svg.stroke "currentColor"
+                    svg.strokeWidth 1.5
+                    svg.className "swt:h-4 swt:w-4"
+                    svg.children [
+                        Svg.path [
+                            svg.custom ("strokeLinecap", "round")
+                            svg.custom ("strokeLinejoin", "round")
+                            svg.d path
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
     [<ReactComponent>]
     static member Breadcrumbs(path: FileItem list, onNavigate: string -> unit) =
         Html.div [
@@ -30,22 +58,7 @@ type Breadcrumbs =
                                         prop.onClick (fun _ -> onNavigate "")
                                         prop.children [
                                             // Home icon
-                                            Svg.svg [
-                                                svg.xmlns "http://www.w3.org/2000/svg"
-                                                svg.fill "none"
-                                                svg.viewBox (0, 0, 24, 24)
-                                                svg.stroke "currentColor"
-                                                svg.strokeWidth 1.5
-                                                svg.className "swt:h-4 swt:w-4"
-                                                svg.children [
-                                                    Svg.path [
-                                                        svg.custom ("strokeLinecap", "round")
-                                                        svg.custom ("strokeLinejoin", "round")
-                                                        svg.d
-                                                            "M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
-                                                    ]
-                                                ]
-                                            ]
+                                            Breadcrumbs.icon Breadcrumbs.defaultIconPaths.home
                                             Html.span "Root"
                                         ]
                                     ]

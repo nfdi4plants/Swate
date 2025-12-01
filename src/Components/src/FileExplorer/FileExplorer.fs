@@ -57,7 +57,6 @@ type FileExplorer =
         let initialModel = FileExplorerLogic.init (defaultArg initialItems [])
 
         let model, dispatch = React.useReducer (reducer, initialModel)
-        // --------------------------------------------------------
 
         let handleItemClick item =
             dispatch (FileExplorerLogic.SelectItem item.Id)
@@ -196,8 +195,8 @@ type FileExplorer =
             prop.children [
                 if not (List.isEmpty model.BreadcrumbPath) then
                     Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
-
                 Html.ul [
+                    prop.testId "file-explorer-container"
                     prop.className "swt:menu swt:w-full swt:bg-base-200 swt:rounded-box"
                     prop.children (model.Items |> List.map renderItem)
                 ]
@@ -226,6 +225,15 @@ module FileExplorerExample =
                                         Some [
                                             FileTree.createFile "nested-file-1.txt" icons.txt
                                             FileTree.createFile "nested-file-2.md" icons.markdown
+                                            {
+                                                FileTree.createFolder "NestedFolder" icons.folder with
+                                                    IsExpanded = true
+                                                    Children =
+                                                        Some [
+                                                            FileTree.createFile "Project-2-final.psd" icons.psd
+                                                            FileTree.createFile "Project-3-final.psd" icons.psd
+                                                        ]
+                                            }
                                         ]
                             }
                         ]

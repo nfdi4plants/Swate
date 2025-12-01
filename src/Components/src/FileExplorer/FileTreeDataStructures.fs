@@ -15,7 +15,7 @@ type FileItem = {
     IconPath: string
     IsExpanded: bool
     Children: FileItem list option
-    IdRel: string option // Relative path
+    IdRel: string option
     IsDirectory: bool
     IsLFS: bool option
     IsLFSPointer: bool option
@@ -23,12 +23,12 @@ type FileItem = {
     Downloaded: bool option
     Size: int64 option
     SizeFormatted: string option
-    ItemType: string // Maps to 'type' in Vue
+    ItemType: string
     Label: string option
     Selectable: bool
 }
 
-// Helper type for node creation
+// Helper type for file tree creation using a predefined config
 type FileItemConfig = {
     Name: string
     IconPath: string
@@ -44,7 +44,7 @@ module FileTree =
     let private generateId () = Guid.NewGuid().ToString()
 
     let formatSize (size: int64) : string =
-        let log = Math.Floor(Math.Log(float size) / Math.Log(1024.0))
+        let log = Math.Floor(Math.Log(float size) / Math.Log 1024.0)
         let log = Math.Max(0.0, Math.Min(4.0, log)) |> int
         let suffixes = [| "B"; "KB"; "MB"; "GB"; "TB" |]
         let divisor = Math.Pow(1024.0, float log)
@@ -252,6 +252,8 @@ module FileTree =
 
 // ============================================================================
 // FILE EXPLORER COMPONENT CONTEXT MENU
+// This menu contains the model and the actions (update actions) that the useReducer
+// hook will use to update the state
 // ============================================================================
 
 type ContextMenuItem = {
