@@ -33,12 +33,11 @@ function TermSearchContainer() {
           TIB Search
         </label>
         <TermSearch
-          onTermChange={(term) => setTerm2(term as Term | undefined)}
+          onTermChange={(term) => setTerm2(term)}
           term={term2}
           disableDefaultSearch
           disableDefaultParentSearch
           disableDefaultAllChildrenSearch
-          showDetails
           termSearchQueries={[
             ["tib_search", (query) => TIBApi.defaultSearch(query, 10, "DataPLANT")]
           ]}
@@ -59,7 +58,6 @@ function TermSearchContainer() {
           onTermChange={(term) => setTerm(term as Term | undefined)}
           term={term}
           parentId="MS:1000031"
-          showDetails
           debug={true}
           onBlur={() => console.log("TermSearch blurred")}
         />
@@ -69,12 +67,13 @@ function TermSearchContainer() {
           Term Search with Provider
         </label>
         <TermSearchConfigProvider>
-          <TermSearchConfigSetter />
-          <TermSearch
-            onTermChange={(term) => setTerm3(term as Term | undefined)}
-            term={term3}
-            debug={true}
-          />
+          <>
+            <TermSearchConfigSetter />
+            <TermSearch
+              onTermChange={(term) => setTerm3(term as Term | undefined)}
+              term={term3}
+            />
+          </>
         </TermSearchConfigProvider>
       </div>
     </div>
@@ -144,9 +143,9 @@ const App = () => {
     return (
         <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
             <h1 className='swt:text-6xl'>Playground</h1>
-            {/* <AnnoTableContainer /> */}
+            <AnnoTableContainer />
             {/* <DataMapTableContainer /> */}
-            <TermSearchContainer />
+            {/* <TermSearchContainer /> */}
             {/* <BaseModalContainer /> */}
             {/* <ComboBoxContainer /> */}
             {/* <TemplateFilterContainer /> */}

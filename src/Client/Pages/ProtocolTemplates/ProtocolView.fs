@@ -39,7 +39,7 @@ type Templates =
         let isSelectedClass = "swt:bg-primary/10"
         let sharedProps = [ prop.onClick (fun _ -> toggleIsSelected ()) ]
 
-        React.keyedFragment (
+        React.KeyedFragment(
             template.Id,
             [
                 Html.tr [
@@ -281,12 +281,12 @@ type Templates =
         ]
 
     [<ReactComponent>]
-    static member TemplateSelect(model: Model, dispatch) =
+    static member TemplateSelect(model: Model, dispatch: Messages.Msg -> unit) =
 
         React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
 
         Swate.Components.TemplateFilter.TemplateFilterProvider(
-            React.fragment [
+            React.Fragment [
 
                 Templates.ImportTemplatesBtn(model, dispatch)
 
@@ -307,7 +307,7 @@ type Templates =
             SidebarComponents.SidebarLayout.Header "Templates"
 
             SidebarComponents.SidebarLayout.Description(
-                React.fragment [
+                React.Fragment [
                     Html.p [
                         Html.b "Search the database for templates."
                         Html.text " Not sure where to begin? Take the "

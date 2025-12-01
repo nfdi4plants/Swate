@@ -185,7 +185,7 @@ type ContextMenu =
 
                 Browser.Dom.document.addEventListener ("mouseup", onMouseUp)
 
-                React.createDisposable (fun () ->
+                FsReact.createDisposable (fun () ->
 
                     Browser.Dom.document.removeEventListener ("mouseup", onMouseUp)
 

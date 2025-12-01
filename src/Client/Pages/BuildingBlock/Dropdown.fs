@@ -1,7 +1,6 @@
 module BuildingBlock.Dropdown
 
 open Feliz
-open Feliz.DaisyUI
 open Model.BuildingBlock
 open Model
 open Messages
@@ -34,7 +33,8 @@ let FreeTextInputElement (onSubmit: string -> unit) =
                 prop.className "swt:btn swt:btn-accent swt:btn-sm swt:join-item"
                 prop.onClick (fun e ->
                     e.stopPropagation ()
-                    onSubmit inputS)
+                    onSubmit inputS
+                )
                 prop.children [ Icons.Check() ]
             ]
         ]
@@ -42,15 +42,15 @@ let FreeTextInputElement (onSubmit: string -> unit) =
 
 module private DropdownElements =
 
-    let divider =
-        Html.div [ prop.className "swt:divider swt:mx-2 swt:my-0" ]
+    let divider = Html.div [ prop.className "swt:divider swt:mx-2 swt:my-0" ]
 
     let private annotationsPrinciplesLink =
         Html.a [
             prop.href "#"
             prop.onClick (fun _ ->
                 Browser.Dom.window.``open`` (Swate.Components.Shared.URLs.AnnotationPrinciplesUrl, "_blank")
-                |> ignore)
+                |> ignore
+            )
             prop.className "swt:ml-auto swt:link-info"
             prop.text "info"
         ]
@@ -64,14 +64,12 @@ module private DropdownElements =
             prop.onClick (fun e ->
                 e.preventDefault ()
                 e.stopPropagation ()
-                setState { state with DropdownPage = subpage })
+                setState { state with DropdownPage = subpage }
+            )
             prop.children [
                 Html.div [
                     prop.className "swt:flex swt:flex-row swt:justify-between"
-                    prop.children [
-                        Html.span subpage.toString
-                        Icons.ArrowRight()
-                    ]
+                    prop.children [ Html.span subpage.toString; Icons.ArrowRight() ]
                 ]
             ]
         ]
@@ -87,13 +85,11 @@ module private DropdownElements =
                 setState {
                     DropdownPage = BuildingBlock.DropdownPage.Main
                     DropdownIsActive = true
-                })
+                }
+            )
             prop.children [
                 if hasBack then
-                    Html.a [
-                        prop.className "swt:content-center"
-                        prop.children [ Icons.ArrowLeft() ]
-                    ]
+                    Html.a [ prop.className "swt:content-center"; prop.children [ Icons.ArrowLeft() ] ]
                 annotationsPrinciplesLink
             ]
         ]
@@ -109,10 +105,12 @@ module private DropdownElements =
             Html.a [
                 prop.onClick (fun e ->
                     e.stopPropagation ()
-                    Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch)
+                    Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
+                )
                 prop.onKeyDown (fun k ->
                     if k.code = Swate.Components.kbdEventCode.enter then
-                        Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch)
+                        Helper.selectCompositeHeaderDiscriminate headerType setUiState close dispatch
+                )
                 prop.text (headerType.ToString())
             ]
         ]
@@ -151,18 +149,20 @@ module private DropdownElements =
             | _ ->
                 prop.onClick (fun e ->
                     e.stopPropagation ()
-                    setIO iotype)
+                    setIO iotype
+                )
 
                 prop.onKeyDown (fun k ->
                     if k.code = Swate.Components.kbdEventCode.enter then
-                        setIO iotype)
+                        setIO iotype
+                )
 
                 prop.children [ Html.div [ prop.text (iotype.ToString()) ] ]
         ]
 
     /// Main column types subpage for dropdown
     let dropdownContentMain state setState close (model: Model) (dispatch: Msg -> unit) =
-        React.fragment [
+        React.Fragment [
             DropdownPage.IOTypes CompositeHeaderDiscriminate.Input
             |> createSubBuildingBlockDropdownLink state setState
             divider
@@ -184,7 +184,7 @@ module private DropdownElements =
 
     /// Protocol Type subpage for dropdown
     let dropdownContentProtocolTypeColumns state setState close (model: Model) dispatch =
-        React.fragment [
+        React.Fragment [
             CompositeHeaderDiscriminate.Comment
             |> createBuildingBlockDropdownItem model dispatch setState close
             CompositeHeaderDiscriminate.Date
@@ -207,7 +207,7 @@ module private DropdownElements =
 
     /// Output columns subpage for dropdown
     let dropdownContentIOTypeColumns header state setState close (model: Model) dispatch =
-        React.fragment [
+        React.Fragment [
             IOType.Source |> createIOTypeDropdownItem model dispatch setState close header
             IOType.Sample |> createIOTypeDropdownItem model dispatch setState close header
             IOType.Material |> createIOTypeDropdownItem model dispatch setState close header

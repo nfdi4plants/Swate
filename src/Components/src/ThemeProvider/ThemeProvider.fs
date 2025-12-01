@@ -11,7 +11,7 @@ type ThemeProvider =
     [<ReactComponent(true)>]
     static member ThemeProvider
         (
-            reactContext: IContext<StateContext<Theme>>,
+            reactContext: ReactContext<StateContext<Theme>>,
             children: ReactElement,
             ?dataAttribute: string,
             ?localStorageKey: string,
@@ -42,4 +42,4 @@ type ThemeProvider =
             [| box enforceTheme |]
         )
 
-        React.contextProvider (reactContext, { data = theme; setData = setTheme }, children)
+        reactContext.Provider({ data = theme; setData = setTheme }, children)

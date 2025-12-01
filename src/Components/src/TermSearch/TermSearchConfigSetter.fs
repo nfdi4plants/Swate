@@ -5,7 +5,6 @@ open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.DaisyUI
 
 [<Erase; Mangle(false)>]
 type TermSearchConfigSetter =
@@ -63,7 +62,7 @@ type TermSearchConfigSetter =
         let TriggerRender =
             fun _ -> TermSearchConfigSetter.TriggerRender(activeKeysCtx.data.aktiveKeys)
 
-        React.fragment [
+        React.Fragment [
 
             //Debugging component, storing data for storybook tests
             Html.div [
@@ -112,7 +111,7 @@ type TermSearchConfigSetter =
                         dropdownPlacement = FloatingUI.Placement.BottomEnd
                     )
                 description =
-                    React.fragment [
+                    React.Fragment [
                         Html.p
                             "Adds support for high performance TIB term search. Choose a collection of terms to search through."
                         Html.p [ prop.text "Selecting multiple collections may impact search performance." ]
@@ -131,7 +130,7 @@ type TermSearchConfigSetter =
                         settingElement: ReactElement
                         description: ReactElement
                     |}) ->
-                React.fragment [
+                React.Fragment [
                     Html.label [ prop.className "swt:label"; prop.text props.title ]
                     props.settingElement
                     Html.div [

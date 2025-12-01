@@ -1,11 +1,8 @@
 namespace Swate.Components
 
 open Feliz
-open Feliz.DaisyUI
 open Fable.Core
 open Fable.React
-open Feliz
-open Feliz.DaisyUI
 open Swate.Components
 
 //Modal that is the base of all error modals
@@ -13,14 +10,7 @@ open Swate.Components
 type ErrorBaseModal =
 
     ///<summary>This modal is used to display errors from for example api communication</summary>
-    static member ErrorBaseModal
-        (
-            rmv,
-            error: string,
-            ?width: int,
-            ?height: int,
-            ?debug: string
-        ) =
+    static member ErrorBaseModal(rmv, error: string, ?width: int, ?height: int, ?debug: string) =
 
         Html.div [
             if debug.IsSome then
@@ -29,9 +19,9 @@ type ErrorBaseModal =
             prop.onClick rmv
             prop.children [
                 Html.div [
-                    prop.onClick (fun ev -> ev.stopPropagation())
+                    prop.onClick (fun ev -> ev.stopPropagation ())
                     prop.style [
-                        if width.IsSome then 
+                        if width.IsSome then
                             style.width (length.percent width.Value)
                         else
                             style.minWidth 200
@@ -58,12 +48,9 @@ type ErrorBaseModal =
                                 ]
 
                                 Html.div [
-                                    Html.h3 [
-                                        prop.className "swt:font-bold"
-                                        prop.text "An error occured!"
-                                    ]
+                                    Html.h3 [ prop.className "swt:font-bold"; prop.text "An error occured!" ]
                                     Html.div [
-                                        yield! 
+                                        yield!
                                             error.Split('\n')
                                             |> Array.collect (fun line -> [| Html.text line; Html.br [] |])
                                     ]

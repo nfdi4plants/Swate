@@ -1,13 +1,6 @@
 namespace Swate.Components
 
 open Feliz
-open Feliz.DaisyUI
-
-[<AutoOpen>]
-module DaisyUiExtensions =
-
-    type modal with
-        static member active = prop.className "swt:modal swt:modal-open"
 
 type Components =
 
@@ -82,7 +75,8 @@ type Components =
             prop.onClick (fun e ->
                 e.preventDefault ()
                 e.stopPropagation ()
-                not isCollapsed |> setIsCollapsed)
+                not isCollapsed |> setIsCollapsed
+            )
             prop.children [
                 Html.input [
                     prop.type'.checkbox

@@ -1,7 +1,6 @@
 namespace BuildingBlock
 
 open Feliz
-open Feliz.DaisyUI
 open Swate.Components.Shared
 
 open OfficeInterop.Core
@@ -45,7 +44,8 @@ type CellConvertComponent =
                     prop.text "Refresh"
                     prop.onClick (fun _ ->
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
-                        |> Promise.start)
+                        |> Promise.start
+                    )
                 ]
                 Html.div (string cellDiscriminateState.SelectedCellState)
             ]
@@ -64,7 +64,8 @@ type CellConvertComponent =
                         CellConvertComponentHelpers.setCellTypes cellDiscriminateState setCellDiscriminateState
                         |> Promise.start
 
-                        OfficeInterop.Core.Main.convertBuildingBlock () |> Promise.start)
+                        OfficeInterop.Core.Main.convertBuildingBlock () |> Promise.start
+                    )
                 ]
                 Html.div (string cellDiscriminateState.TargetCellState)
             ]

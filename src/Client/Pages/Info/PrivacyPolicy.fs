@@ -2,7 +2,6 @@ namespace Pages
 
 open Fable.Core
 open Feliz
-open Feliz.DaisyUI
 
 // https://dsgvo-muster-datenschutzerklaerung.dg-datenschutz.de/#1487008989473-a9d4be68-00c7
 type PrivacyPolicy =

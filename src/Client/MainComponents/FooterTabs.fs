@@ -1,7 +1,6 @@
 module MainComponents.FooterTabs
 
 open Feliz
-open Feliz.DaisyUI
 open ARCtrl
 open Model
 open Swate.Components
@@ -81,7 +80,7 @@ let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg ->
 
             setState { state with IsEditable = false }
 
-    React.fragment [
+    React.Fragment [
         Modals.ContextMenus.FooterTabs.Table(index, startEdit, dispatch, tabRef)
         BaseModal.Modal(
             state.IsEditable,
@@ -185,7 +184,7 @@ let MainDataMap (model: Model, dispatch: Messages.Msg -> unit) =
     let order = nav.ViewIndex
     let tabRef = React.useElementRef ()
 
-    React.fragment [
+    React.Fragment [
         Modals.ContextMenus.FooterTabs.DataMap(dispatch, tabRef)
         Html.div [
             prop.className [
@@ -213,7 +212,7 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
     let id = "Add-Spreadsheet-Button"
     let tabRef = React.useElementRef ()
 
-    React.fragment [
+    React.Fragment [
         Modals.ContextMenus.FooterTabs.Plus(dispatch, tabRef)
         Html.div [
             prop.className [

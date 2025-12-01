@@ -1,7 +1,6 @@
 namespace Modals
 
 open Feliz
-open Feliz.DaisyUI
 
 // open Model.ModalState
 

@@ -1,7 +1,6 @@
 namespace Modals
 
 open Feliz
-open Feliz.DaisyUI
 open Model
 open Messages
 open Swate.Components.Shared
@@ -64,7 +63,7 @@ type ModalElements =
     static member Box(title: string, icon: ReactElement, content: ReactElement, ?className: string list) =
         Html.div [
             prop.className [
-                "swt:rounded-sm swt:shadow-sm swt:p-2 swt:flex swt:flex-col swt:gap-2 swt:border swt:border-3"
+                "swt:rounded-sm swt:shadow-sm swt:p-2 swt:flex swt:flex-col swt:gap-2 swt:border-3"
                 if className.IsSome then
                     className.Value |> String.concat " "
             ]

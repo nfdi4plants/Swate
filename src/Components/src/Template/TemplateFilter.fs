@@ -193,7 +193,6 @@ module TemplateFilterAux =
 
     let FilteredTemplateContext =
         React.createContext<StateContext<Template[]>> (
-            "TemplateFilterCtx",
             {
                 data = [||]
                 setData = fun _ -> console.warn "No setData function provided"
@@ -459,7 +458,7 @@ type TemplateFilter =
                     key = token.Id
                 )
             )
-            |> React.fragment
+            |> React.Fragment
 
         let onKeyDown =
             fun (ev: Browser.Types.KeyboardEvent) ->
@@ -596,7 +595,7 @@ type TemplateFilter =
 
                 TemplateFilterAux.filter templates orgs tokens
 
-        let hasInilizalized = React.useRef(false)
+        let hasInilizalized = React.useRef (false)
 
         //DataPLANT shall be set as the first available organization to select templates from.
         //Problem is, due to lazy loading in the beginning no organizations could be available.
@@ -612,7 +611,7 @@ type TemplateFilter =
                     match dpIndex with
                     | Some idx ->
                         setSelectedOrgIndices (selectedOrgIndices.Add idx)
-                        hasInilizalized.current <- true;
+                        hasInilizalized.current <- true
                     | None -> ()
             ),
             [| box availableTokens; box availableCommunities |]
@@ -650,8 +649,7 @@ type TemplateFilter =
     static member TemplateFilterProvider(children: ReactElement) =
         let filteredTemplates, setFilteredTemplatesFn = React.useState ([||])
 
-        React.contextProvider (
-            TemplateFilterAux.FilteredTemplateContext,
+        TemplateFilterAux.FilteredTemplateContext.Provider(
             {
                 data = filteredTemplates
                 setData = setFilteredTemplatesFn
@@ -674,34 +672,10 @@ type TemplateFilter =
         let templates, _ = React.useState (TemplateMocks.mkTemplates)
 
         TemplateFilter.TemplateFilterProvider(
-            React.fragment [
+            React.Fragment [
                 TemplateFilter.TemplateFilter(templates, key = "template-filter-provider")
                 TemplateFilter.FilteredTemplateRenderer(fun templates ->
                     Html.div [ prop.text (sprintf "%d templates found" templates.Length) ]
                 )
             ]
         )
-
-
-
-
-
-// Html.ul [
-//     prop.className
-//         "swt:bg-base-100 swt:rounded-box swt:shadow-md swt:max-w-lg swt:max-h-[500px] swt:overflow-y-scroll"
-//     prop.children [
-
-//         Html.li [
-//             prop.className "swt:p-4 swt:pb-2 swt:text-xs swt:opacity-60 swt:tracking-wide"
-//             prop.text (
-//                 if loading then
-//                     "...loading..."
-//                 else
-//                     $"{localTemplates.Length} templates found"
-//             )
-//         ]
-
-//         for template in localTemplates do
-//             TemplateFilter.TemplateItem(template, key = template.Id)
-//     ]
-// ]

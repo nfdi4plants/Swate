@@ -12,6 +12,30 @@ module private DataMapTableHelper =
 
 open DataMapTableHelper
 
+module private DatamapMemoComponents =
+
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
+    let InactiveCompositeCell (index: CellCoordinate, cell: CompositeCell, debug: bool) =
+        TableCell.CompositeCellInactiveCell(index, cell, debug = debug)
+
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
+    let InactiveHeaderCell (index: CellCoordinate, header: string, debug: bool) =
+        TableCell.StringInactiveCell(index, header, disableActivation = true, debug = debug)
+
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
+    let InactiveYIndexCell (index: CellCoordinate) =
+        TableCell.BaseCell(
+            index.y,
+            index.x,
+            Html.text index.y,
+            className =
+                "swt:rounded-0 swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200"
+        )
+
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
+    let ActiveCompositeCell (index: CellCoordinate, cell: CompositeCell, setCell: CompositeCell -> unit) =
+        TableCell.CompositeCellActiveCell(index, cell, setCell)
+
 [<Erase; Mangle(false)>]
 type DataMapTable =
 
@@ -45,7 +69,7 @@ type DataMapTable =
             | CompositeCell.Term oa ->
                 let parentOa = datamap.GetHeader(index.x - 1).TryGetTerm()
 
-                React.fragment [
+                React.Fragment [
                     AnnotationTableModals.InputField.TermCombi(
                         oa |> Term.fromOntologyAnnotation |> Some,
                         (fun (term: Term option) ->
@@ -87,7 +111,7 @@ type DataMapTable =
             | CompositeCell.Unitized(v, oa) ->
                 let parentOa = datamap.GetHeader(index.x - 1).TryGetTerm()
 
-                React.fragment [
+                React.Fragment [
                     AnnotationTableModals.InputField.Input(
                         v,
                         (fun input -> setTempCell (CompositeCell.Unitized(input, oa))),
@@ -134,7 +158,7 @@ type DataMapTable =
                     )
                 ]
             | CompositeCell.Data data ->
-                React.fragment [
+                React.Fragment [
                     AnnotationTableModals.InputField.Input(
                         data.FilePath |> Option.defaultValue "",
                         (fun input ->
@@ -186,20 +210,18 @@ type DataMapTable =
                 ]
 
 
-        React.fragment [
+        React.Fragment [
             BaseModal.ModalHeader(Html.div "Data Context Details", close)
 
             BaseModal.ModalContent(Content)
 
             BaseModal.ModalFooter(
-                React.fragment [
+                React.Fragment [
                     AnnotationTableModals.FooterButtons.Cancel(close)
                     AnnotationTableModals.FooterButtons.Submit(submit)
                 ]
             )
         ]
-
-
 
     [<ReactComponent>]
     static member private Modals(modal: Modal option, setModal: Modal option -> unit, datamap, setDatamap) =
@@ -287,49 +309,39 @@ type DataMapTable =
         let modal, setModal = React.useState (None: Modal option)
         let tableRef = React.useRef<TableHandle> (unbox null)
         let containerRef = React.useElementRef ()
+        let defaultDebug = defaultArg debug false
 
         let renderCell =
-            React.memo (
-                (fun (index: CellCoordinate) ->
-                    match index with
-                    | _ when index.x > 0 && index.y > 0 ->
-                        let cell = datamap.GetCell(index.x - 1, index.y - 1)
-                        TableCell.CompositeCellInactiveCell(index, cell, ?debug = debug)
-                    | _ when index.x > 0 && index.y = 0 ->
-                        let header = datamap.GetHeader(index.x - 1).ToString()
-                        TableCell.StringInactiveCell(index, header, disableActivation = true, ?debug = debug)
-                    | _ ->
-                        TableCell.BaseCell(
-                            index.y,
-                            index.x,
-                            Html.text index.y,
-                            className =
-                                "swt:rounded-0 swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-center swt:cursor-not-allowed swt:w-full swt:h-full swt:bg-base-200"
-                        )
-                )
+            (fun (index: CellCoordinate) ->
+                match index with
+                | _ when index.x > 0 && index.y > 0 ->
+                    let cell = datamap.GetCell(index.x - 1, index.y - 1)
+                    DatamapMemoComponents.InactiveCompositeCell(index, cell, defaultDebug)
+                | _ when index.x > 0 && index.y = 0 ->
+                    let header = datamap.GetHeader(index.x - 1).ToString()
+                    DatamapMemoComponents.InactiveHeaderCell(index, header, defaultDebug)
+                | _ -> DatamapMemoComponents.InactiveYIndexCell(index)
             )
 
         let renderActiveCell =
-            React.memo (
-                (fun (index: CellCoordinate) ->
-                    match index with
-                    | _ when index.x > 0 && index.y > 0 ->
-                        let cell = datamap.GetCell(index.x - 1, index.y - 1)
+            (fun (index: CellCoordinate) ->
+                match index with
+                | _ when index.x > 0 && index.y > 0 ->
+                    let cell = datamap.GetCell(index.x - 1, index.y - 1)
 
-                        let setCell =
-                            fun newValue ->
-                                datamap.SetCell(index.x - 1, index.y - 1, newValue)
-                                setDatamap datamap
+                    let setCell =
+                        fun newValue ->
+                            datamap.SetCell(index.x - 1, index.y - 1, newValue)
+                            setDatamap datamap
 
-                        TableCell.CompositeCellActiveCell(index, cell, setCell)
+                    DatamapMemoComponents.ActiveCompositeCell(index, cell, setCell)
 
-                    | _ when index.x > 0 && index.y = 0 -> Html.div "when index.x > 0 && index.y = 0"
-                    | _ -> Html.div "unknown table pattern"
-                )
+                | _ when index.x > 0 && index.y = 0 -> Html.div "when index.x > 0 && index.y = 0"
+                | _ -> Html.div "unknown table pattern"
             )
 
 
-        React.fragment [
+        React.Fragment [
             DataMapTable.Modals(modal, setModal, datamap, setDatamap)
             Html.div [
                 if debug.IsSome && debug.Value then

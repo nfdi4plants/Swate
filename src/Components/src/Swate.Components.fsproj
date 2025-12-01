@@ -62,7 +62,6 @@
     <PackageReference Include="Fable.React.Types" />
     <PackageReference Include="Fable.Core" />
     <PackageReference Include="Feliz" />
-    <PackageReference Include="Feliz.DaisyUI" />
     <PackageReference Include="Fable.Browser.Dom" />
   </ItemGroup>
 

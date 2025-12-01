@@ -9,7 +9,6 @@ open Model
 open Messages
 
 open Feliz
-open Feliz.DaisyUI
 
 open Swate.Components
 open Swate.Components.ReactHelper
@@ -19,8 +18,6 @@ open Browser.Dom
 open Fable
 open Feliz
 open Messages
-
-open Feliz.DaisyUI
 
 type Settings =
 

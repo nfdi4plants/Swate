@@ -1,7 +1,6 @@
 namespace MainComponents
 
 open Feliz
-open Feliz.DaisyUI
 open EmptyTableModals
 open Swate.Components
 open Model
@@ -96,7 +95,7 @@ type EmptyTableElement =
             | true -> setModal (Some modal)
             | false -> setModal None
 
-        React.fragment [
+        React.Fragment [
             EmptyTableModals.BuildingBlock(
                 model,
                 isOpen = (modal = Some Modals.BuildingBlock),

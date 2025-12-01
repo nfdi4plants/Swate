@@ -1,7 +1,6 @@
 namespace Components
 
 open Feliz
-open Feliz.DaisyUI
 
 type BaseNavbar =
     static member Main(children: ReactElement) =
@@ -14,7 +13,7 @@ type BaseNavbar =
         ]
 
     static member Main(children: ReactElement seq) =
-        BaseNavbar.Main(React.fragment children)
+        BaseNavbar.Main(React.Fragment children)
 
     static member Glow(children: ReactElement) =
         Html.div [
@@ -35,4 +34,4 @@ type BaseNavbar =
         ]
 
     static member Glow(children: ReactElement seq) =
-        BaseNavbar.Glow(React.fragment children)
+        BaseNavbar.Glow(React.Fragment children)

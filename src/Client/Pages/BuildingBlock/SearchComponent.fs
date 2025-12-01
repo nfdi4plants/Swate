@@ -1,7 +1,6 @@
 module BuildingBlock.SearchComponent
 
 open Feliz
-open Feliz.DaisyUI
 open Fable.Core.JsInterop
 open Model.BuildingBlock
 open Model
@@ -46,7 +45,7 @@ type SearchComponent =
             if isActive then "swt:btn-primary" else "swt:btn-neutral/50"
         ]
 
-        React.fragment [
+        React.Fragment [
             Html.button [
                 let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
 

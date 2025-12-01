@@ -1,7 +1,6 @@
 module MainComponents.Navbar
 
 open Feliz
-open Feliz.DaisyUI
 
 open LocalHistory
 open Messages
@@ -48,7 +47,7 @@ let private FileName (model: Model) =
     | None -> Html.none
 
 let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
-    React.fragment [
+    React.Fragment [
         QuickAccessButton.QuickAccessButton(
             "Backward",
             Icons.Backward(),
@@ -80,7 +79,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
     let autoSaveConfig = getAutosaveConfiguration ()
     let openReset, setOpenReset = React.useState false
 
-    React.fragment [
+    React.Fragment [
         Modals.ResetTable.Main(isOpen = openReset, setIsOpen = setOpenReset, dispatch = dispatch)
         match model.PersistentStorageState.Host with
         | Some Swatehost.Browser ->
@@ -152,7 +151,7 @@ let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
             classes = "swt:w-min"
         )
 
-    React.fragment [
+    React.Fragment [
         match model.SpreadsheetModel.ActiveView with
         | Spreadsheet.ActivePattern.IsTable ->
             addBuildingBlock

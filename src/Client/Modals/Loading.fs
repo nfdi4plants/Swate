@@ -3,7 +3,6 @@ namespace Modals
 open Fable.React
 open Fable.React.Props
 open Feliz
-open Feliz.DaisyUI
 
 type Loading =
     static member Component = //Daisy.loading [ loading.ring; loading.lg ]

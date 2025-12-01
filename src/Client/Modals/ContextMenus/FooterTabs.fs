@@ -2,7 +2,6 @@ namespace Modals.ContextMenus
 
 open ARCtrl
 open Feliz
-open Feliz.DaisyUI
 open Swate.Components
 open Swate.Components.Shared
 

@@ -150,12 +150,12 @@ module React =
                 )
 
             let listener =
-                React.useCallbackRef (fun () ->
+                React.useCallback (fun () ->
                     match addOptions with
                     | Some options -> document.addEventListener (eventType, fn, options)
                     | None -> document.addEventListener (eventType, fn)
 
-                    React.createDisposable (fun () ->
+                    FsReact.createDisposable (fun () ->
                         match removeOptions with
                         | Some options -> document.removeEventListener (eventType, fn, options)
                         | None -> document.removeEventListener (eventType, fn)
@@ -262,7 +262,7 @@ module React =
             let fn = React.useMemo ((fun () -> unbox<#Event> >> action), [| action |])
 
             let listener =
-                React.useCallbackRef (fun () ->
+                React.useCallback (fun () ->
                     elemRef.current
                     |> Option.iter (fun elem ->
                         match addOptions with
@@ -270,7 +270,7 @@ module React =
                         | None -> elem.addEventListener (eventType, fn)
                     )
 
-                    React.createDisposable (fun () ->
+                    FsReact.createDisposable (fun () ->
                         elemRef.current
                         |> Option.iter (fun elem ->
                             match removeOptions with

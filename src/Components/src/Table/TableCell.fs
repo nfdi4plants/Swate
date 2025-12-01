@@ -5,7 +5,6 @@ open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.DaisyUI
 open ARCtrl
 
 type ActiveCellProps<'a> = {|
@@ -151,6 +150,9 @@ type TableCell =
                 setData value
 
         let Renderer =
+            // ReactLegacy.createElement (
+            //     unbox<ReactElement>
+            // )
             dataRenderfn {|
                 data = tempData
                 setData = setTempData
@@ -219,7 +221,7 @@ type TableCell =
                 setOa (oa)
 
         let TermSearch =
-            React.memo (fun (props: ActiveCellProps<Term option>) ->
+            fun (props: ActiveCellProps<Term option>) ->
                 TermSearch.TermSearch(
                     props.data,
                     props.setData,
@@ -231,7 +233,6 @@ type TableCell =
                     onTermSelect = (fun term -> props.setDataForce (Some term)),
                     autoFocus = true
                 )
-            )
 
         TableCell.BaseActiveCell<Term option>(
             index,

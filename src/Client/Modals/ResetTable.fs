@@ -1,7 +1,6 @@
 namespace Modals
 
 open Feliz
-open Feliz.DaisyUI
 open Model
 open Messages
 open Swate.Components.Shared
@@ -24,7 +23,7 @@ type ResetTable =
             setIsOpen = setIsOpen,
             header = Html.text "Attention!",
             children =
-                (React.fragment [
+                (React.Fragment [
                     Html.div [
                         prop.className "swt:prose"
                         prop.children [
@@ -43,7 +42,7 @@ type ResetTable =
                     ]
                 ]),
             footer =
-                React.fragment [
+                React.Fragment [
                     Html.button [ prop.className "swt:btn swt:btn-info"; prop.text "Back"; prop.onClick rmv ]
                     //Daisy.button.a [ prop.onClick reset; button.error; prop.text "Delete" ]
                     Html.button [

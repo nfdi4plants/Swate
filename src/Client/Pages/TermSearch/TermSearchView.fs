@@ -15,7 +15,6 @@ let update (termSearchMsg: TermSearch.Msg) (currentState: TermSearch.Model) : Te
     | TermSearch.UpdateSelectedTerm oa -> { currentState with SelectedTerm = oa }, Cmd.none
 
 open Feliz
-open Feliz.DaisyUI
 open ARCtrl
 open Fable.Core.JsInterop
 

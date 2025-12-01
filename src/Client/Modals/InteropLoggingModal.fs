@@ -5,7 +5,6 @@ open Model
 open Messages
 open Swate.Components.Shared
 open Feliz
-open Feliz.DaisyUI
 open Swate.Components
 
 type InteropLogging =

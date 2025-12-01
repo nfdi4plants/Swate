@@ -1,7 +1,6 @@
 namespace View
 
 open Feliz
-open Feliz.DaisyUI
 open Messages
 open Swate.Components
 

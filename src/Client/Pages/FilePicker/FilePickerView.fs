@@ -6,7 +6,6 @@ open Elmish
 open Messages.FilePicker
 open Messages
 open Feliz
-open Feliz.DaisyUI
 open Swate
 open Swate.Components
 
@@ -128,7 +127,6 @@ type FilePicker =
 
     static member private SortButton icon msg =
         Html.button [
-            join.item
             prop.className "swt:btn swt:join-item"
             prop.onClick msg
             prop.children [ icon ]
