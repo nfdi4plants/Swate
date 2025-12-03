@@ -255,20 +255,19 @@ type FilePicker =
 
 
     static member Main(model: Model, dispatch, containerQueryClass: string) =
+        let hasFiles = not (List.isEmpty model.FilePickerState.FileNames)
+
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
             prop.children [
-                if model.FilePickerState.FileNames.Length > 0 then
+                FilePicker.UploadButtons(model, dispatch, containerQueryClass)
+
+                if hasFiles then
                     FilePicker.FileSortElements model dispatch
-                Html.div [
-                    prop.className "swt:overflow-y-auto swt:overflow-x-hidden swt:py-2"
-                    prop.children [
-                        match model.FilePickerState.FileNames with
-                        | [] -> FilePicker.UploadButtons(model, dispatch, containerQueryClass)
-                        | _ -> FilePicker.FileViewTable model dispatch
+                    Html.div [
+                        prop.className "swt:overflow-y-auto swt:overflow-x-hidden swt:py-2"
+                        prop.children [ FilePicker.FileViewTable model dispatch ]
                     ]
-                ]
-                if model.FilePickerState.FileNames.Length > 0 then
                     FilePicker.ActionButtons model dispatch
             ]
         ]
