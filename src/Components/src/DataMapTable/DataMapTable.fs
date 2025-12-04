@@ -296,9 +296,7 @@ type DataMapTable =
                         let col = int cell?dataset?column
                         let indices: CellCoordinate = {| y = row; x = col |}
                         if col > 0 && row > 0 then Some indices else None // disable context menu on index column
-                    | _ ->
-                        console.log ("No table cell found")
-                        None
+                    | _ -> None
                 ),
             ?debug = debug
         )

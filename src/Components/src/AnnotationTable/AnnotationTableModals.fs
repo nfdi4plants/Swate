@@ -1207,7 +1207,7 @@ type CreateColumnModal =
                     prop.children [ CreateColumnModal.CreateForm(getCellStrings (), setPreview) ]
                 ]
                 Html.div [
-                    prop.className "swt:flex-grow swt:overflow-y-auto swt:h-[200px]"
+                    prop.className "swt:grow swt:overflow-y-auto swt:h-[200px]"
                     prop.children [ content ]
                 ]
                 Html.div [ prop.className "swt:border-t swt:pt-2 swt:mt-2"; prop.children [ footer ] ]
@@ -1515,7 +1515,7 @@ type EditColumnModal =
                     prop.children [ EditColumnModal.modalActivity (state, setState) ]
                 ]
                 Html.div [
-                    prop.className "swt:flex-grow swt:overflow-y-auto swt:h-[200px]"
+                    prop.className "swt:grow swt:overflow-y-auto swt:h-[200px]"
                     prop.children [ EditColumnModal.content (column, state) ]
                 ]
                 Html.div [
@@ -1644,7 +1644,7 @@ type UpdateColumnModal =
                     prop.children [ UpdateColumnModal.UpdateForm(getCellStrings (), setPreview, regex, setRegex) ]
                 ]
                 Html.div [
-                    prop.className "swt:flex-grow swt:overflow-y-auto swt:h-[200px]"
+                    prop.className "swt:grow swt:overflow-y-auto swt:h-[200px]"
                     prop.children [ content ]
                 ]
                 Html.div [ prop.className "swt:border-t swt:pt-2 swt:mt-2"; prop.children [ footer ] ]

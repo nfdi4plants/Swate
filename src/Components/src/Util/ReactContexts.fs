@@ -75,7 +75,7 @@ module AnnotationTable =
         React.createContext<StateContext<Map<string, AnnotationTableContext>>> (
             {
                 data = Map.empty
-                setData = fun _ -> console.warn "No context provider for AnnotationTableStateCtx found!"
+                setData = fun _ -> ()
             }
         )
 

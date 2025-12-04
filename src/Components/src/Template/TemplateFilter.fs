@@ -192,12 +192,7 @@ module TemplateMocks =
 module TemplateFilterAux =
 
     let FilteredTemplateContext =
-        React.createContext<StateContext<Template[]>> (
-            {
-                data = [||]
-                setData = fun _ -> console.warn "No setData function provided"
-            }
-        )
+        React.createContext<StateContext<Template[]>> ({ data = [||]; setData = fun _ -> () })
 
     open System
 
@@ -419,7 +414,7 @@ type TemplateFilter =
                     prop.className [
                         "swt:border-l-4 swt:border-transparent swt:list-row swt:rounded-none swt:p-1"
                         if props.isActive then
-                            "swt:!border-primary swt:bg-base-content/10"
+                            "swt:border-primary! swt:bg-base-content/10"
                     ]
                     prop.children [
                         Html.div [

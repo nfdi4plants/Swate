@@ -358,9 +358,7 @@ type AnnotationTable =
                         let col = int cell?dataset?column
                         let indices: CellCoordinate = {| y = row; x = col |}
                         Some indices
-                    | _ ->
-                        console.log ("No table cell found")
-                        None
+                    | _ -> None
                 ),
             ?debug = debug
         )
@@ -530,8 +528,7 @@ type AnnotationTable =
         // Does currently not work, as the disposable is not correctly setup in feliz, will require feliz v3 to fix
         React.useEffectOnce (fun _ ->
             { new System.IDisposable with
-                member _.Dispose() =
-                    console.log ("unmounted table", arcTable.Name)
+                member _.Dispose() = ()
             }
         )
 
@@ -604,7 +601,6 @@ type AnnotationTable =
 
                             if index.y = 0 then
                                 let x = index.x - 1
-                                console.log arcTable.Headers.[x]
 
                                 let setHeader =
                                     fun (ch: CompositeHeader) ->
