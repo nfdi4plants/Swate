@@ -26,6 +26,7 @@
     "test:run": "npm run fable -- --run npx vitest run --project=storybook",
     "prelink": "npm run build",
     "storybook": "npm run fable -- --watch --run storybook dev -p 6006",
+    "storybook:no-compile": "storybook dev -p 6006",
     "prebuild:net": "npx @tailwindcss/cli -o ./src/swateBundleStyle.css -m",
     "build": "dotnet fable clean -e fs.ts --yes && npm run fable -- --fableLib @fable-org/fable-library-js --noCache -e fs.ts -o src/output && vite build",
     "build:net": "dotnet pack ./src/Swate.Components.fsproj",

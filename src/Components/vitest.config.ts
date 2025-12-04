@@ -23,7 +23,7 @@ export default mergeConfig(
               configDir: path.join(dirname, '.storybook'),
               // // This should match your package.json script to run Storybook
               // // The --no-open flag will skip the automatic opening of a browser
-              // storybookScript: 'npm run storybook --no-open',
+              storybookScript: 'npm run storybook:no-compile --no-open',
             }),
           ],
           test: {
