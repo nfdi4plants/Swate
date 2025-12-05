@@ -1,8 +1,0 @@
-{
-  "name": "renderer",
-  "private": true,
-  "version": "0.0.0",
-  "description": "Renderer process of electron app",
-  "dependencies": {
-  }
-}

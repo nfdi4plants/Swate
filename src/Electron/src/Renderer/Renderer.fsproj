@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="App.fs" />
+    <Compile Include="Program.fs" />
+    <Content Include="tailwind.css" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Electron" />
+    <PackageReference Include="Fable.Electron.Remoting" />
+    <PackageReference Include="Fable.Electron.Forge" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,39 @@
+{
+  "name": "swate",
+  "productName": "swate",
+  "version": "1.0.0",
+  "description": "My Electron application description",
+  "main": ".vite/build/main.fs.js",
+  "config": {
+    "forge": "./forge.config.js"
+  },
+  "scripts": {
+    "fable": "dotnet fable ./src/Swate.Electron.fsproj -o ./src/fable_output -e fs.jsx --verbose",
+    "start": "npm run fable -- --watch --run electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "echo \"No linting configured\""
+  },
+  "keywords": [],
+  "author": {
+    "name": "Kevin F",
+    "email": "Freymaurer@gmx.de"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1"
+  },
+  "devDependencies": {
+    "electron": "39.2.5",
+    "@electron-forge/cli": "^7.10.2",
+    "@electron-forge/maker-deb": "^7.10.2",
+    "@electron-forge/maker-rpm": "^7.10.2",
+    "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-zip": "^7.10.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
+    "@electron-forge/plugin-fuses": "^7.10.2",
+    "@electron-forge/plugin-vite": "^7.10.2",
+    "@electron/fuses": "^1.8.0"
+  }
+}

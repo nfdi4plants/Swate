@@ -19,24 +19,24 @@ const config: StorybookConfig = {
     name: "@storybook/react-vite",
     options: {},
   },
-  viteFinal: async (config) => {
-    config.optimizeDeps = {
-      ...(config.optimizeDeps || {}),
-      exclude: ['fs', 'path'], // Optional but good practice
-    };
+  // viteFinal: async (config) => {
+  //   config.optimizeDeps = {
+  //     ...(config.optimizeDeps || {}),
+  //     exclude: ['fs', 'path'], // Optional but good practice
+  //   };
 
-    config.resolve = {
-      ...config.resolve,
-      alias: {
-        ...(config.resolve?.alias || {}),
-        'fs/promises': resolve(__dirname, 'mocks/fs-promises-mock.js'),
-        fs: resolve(__dirname, 'mocks/fs-mock.js'),
-        path: resolve(__dirname, 'mocks/path-mock.js'),
-      },
-    };
+  //   config.resolve = {
+  //     ...config.resolve,
+  //     alias: {
+  //       ...(config.resolve?.alias || {}),
+  //       'fs/promises': resolve(__dirname, 'mocks/fs-promises-mock.js'),
+  //       fs: resolve(__dirname, 'mocks/fs-mock.js'),
+  //       path: resolve(__dirname, 'mocks/path-mock.js'),
+  //     },
+  //   };
 
-    return config;
-  },
+  //   return config;
+  // },
 
 };
 export default config;

@@ -1,4 +1,5 @@
 {
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,22 +9,11 @@
   "workspaces": [
     "src/Client",
     "src/Components",
-    "src/Main",
-    "src/Preload",
-    "src/Renderer",
+    "src/Electron",
     "tests/Client"
   ],
   "devDependencies": {
     "@chromatic-com/storybook": "^4.1.3",
-    "@electron-forge/cli": "^7.10.2",
-    "@electron-forge/maker-deb": "^7.10.2",
-    "@electron-forge/maker-rpm": "^7.10.2",
-    "@electron-forge/maker-squirrel": "^7.10.2",
-    "@electron-forge/maker-zip": "^7.10.2",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
-    "@electron-forge/plugin-fuses": "^7.10.2",
-    "@electron-forge/plugin-vite": "^7.10.2",
-    "@electron/fuses": "^1.8.0",
     "@fable-org/fable-library-js": "^1.10.0",
     "@storybook/addon-docs": "^10.1.4",
     "@storybook/addon-onboarding": "^10.1.4",
@@ -40,11 +30,10 @@
     "@types/react-dom": "^19.0.0",
     "@types/testing-library__react": "^10.0.1",
     "@vitejs/plugin-basic-ssl": "^2.0.0",
-    "@vitejs/plugin-react": "^4.5.0",
+    "@vitejs/plugin-react": "^5.1.1",
     "@vitest/browser": "^4.0.15",
     "@vitest/browser-playwright": "^4.0.15",
     "daisyui": "^5.0.40",
-    "electron": "39.2.5",
     "globals": "^15.14.0",
     "jsdom": "^25.0.1",
     "mocha": "^10.8.2",

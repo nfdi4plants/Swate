@@ -69,6 +69,21 @@
     <!-- Include all files that are compiled with this project -->
     <!-- Include the project file itself as well -->
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+    <Content Include="..\package.json">
+      <Link>package.json</Link>
+    </Content>
+    <Content Include="..\tailwind.css">
+      <Link>tailwind.css</Link>
+    </Content>
+    <Content Include="..\tsconfig.json">
+      <Link>tsconfig.json</Link>
+    </Content>
+    <Content Include="..\vite.config.mts">
+      <Link>vite.config.mts</Link>
+    </Content>
+    <TypeScriptCompile Include="..\vitest.config.ts">
+      <Link>vitest.config.ts</Link>
+    </TypeScriptCompile>
   </ItemGroup>
 
   <ItemGroup>

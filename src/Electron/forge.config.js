@@ -33,12 +33,12 @@ module.exports = {
         build: [
           {
             // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
-            entry: 'src/main.js',
+            entry: 'src/fable_output/Main/main.fs.jsx',
             config: 'vite.main.config.mjs',
             target: 'main',
           },
           {
-            entry: 'src/preload.js',
+            entry: 'src/fable_output/Preload/preload.fs.jsx',
             config: 'vite.preload.config.mjs',
             target: 'preload',
           },

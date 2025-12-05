@@ -1,8 +1,0 @@
-{
-  "name": "preload",
-  "private": true,
-  "version": "0.0.0",
-  "description": "Preload process of electron app",
-  "dependencies": {
-  }
-}
