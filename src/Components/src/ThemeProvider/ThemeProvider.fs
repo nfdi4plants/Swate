@@ -42,4 +42,4 @@ type ThemeProvider =
             [| box enforceTheme |]
         )
 
-        reactContext.Provider({ data = theme; setData = setTheme }, children)
+        reactContext.Provider({ state = theme; setState = setTheme }, children)

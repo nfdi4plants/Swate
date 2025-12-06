@@ -12,8 +12,8 @@ module TermSearch =
     let TermSearchActiveKeysCtx =
         React.createContext<StateContext<TermSearchConfigLocalStorageActiveKeysCtx>> (
             {
-                data = TermSearchConfigLocalStorageActiveKeysCtx.init ()
-                setData = fun keys -> printfn "Setting active keys not given: %A" keys
+                state = TermSearchConfigLocalStorageActiveKeysCtx.init ()
+                setState = fun keys -> printfn "Setting active keys not given: %A" keys
             }
         )
 
@@ -74,8 +74,8 @@ module AnnotationTable =
     let AnnotationTableStateCtx =
         React.createContext<StateContext<Map<string, AnnotationTableContext>>> (
             {
-                data = Map.empty
-                setData = fun _ -> ()
+                state = Map.empty
+                setState = fun _ -> ()
             }
         )
 

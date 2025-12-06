@@ -190,8 +190,8 @@ type TermSearchConfigProvider =
 
         Contexts.TermSearch.TermSearchActiveKeysCtx.Provider(
             {
-                data = activeKeys
-                setData = setActiveKeys
+                state = activeKeys
+                setState = setActiveKeys
             },
             Contexts.TermSearch.TermSearchConfigCtx.Provider(
                 queries,

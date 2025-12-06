@@ -25,7 +25,7 @@ let private AddButton (model: Model, dispatch) =
         React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
 
     let selectedCells =
-        ctx.data
+        ctx.state
         |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
         |> Option.bind (fun ctx -> ctx.SelectedCells)
         |> Option.map (fun x -> {|

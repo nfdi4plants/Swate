@@ -26,7 +26,10 @@ type Settings =
             prop.className "swt:grid swt:grid-cols-1 swt:md:grid-cols-2 swt:gap-2 swt:py-2"
             prop.children [
                 Html.p [ prop.className "swt:text-xl not-prose"; prop.text title ]
-                Html.div [ prop.className "not-prose"; prop.children [ settingElement ] ]
+                Html.div [
+                    prop.className "not-prose"
+                    prop.children [ settingElement ]
+                ]
                 if description.IsSome then
                     Html.div [
                         prop.className "swt:text-sm swt:text-base-content/70 swt:md:col-span-2 swt:prose"
@@ -102,7 +105,7 @@ type Settings =
         React.useLayoutEffect (
             (fun () ->
                 let icon =
-                    match themeCtx.data with
+                    match themeCtx.state with
                     | Swate.Components.Types.Theme.Sunrise -> animatedSun
                     | Swate.Components.Types.Finster -> animatedMoon
                     | Swate.Components.Types.Planti -> planti
@@ -112,7 +115,7 @@ type Settings =
                 iconRef.current?innerHTML <- icon
                 ()
             ),
-            [| box themeCtx.data |]
+            [| box themeCtx.state |]
         )
 
         let mkOption (theme: Swate.Components.Types.Theme) =
@@ -126,8 +129,8 @@ type Settings =
                 prop.children [
                     Html.label [ prop.className "swt:label"; prop.ref iconRef ]
                     Html.select [
-                        prop.defaultValue (Swate.Components.Types.Theme.toString themeCtx.data)
-                        prop.onChange (fun (e: string) -> themeCtx.setData (Swate.Components.Types.Theme.fromString e))
+                        prop.defaultValue (Swate.Components.Types.Theme.toString themeCtx.state)
+                        prop.onChange (fun (e: string) -> themeCtx.setState (Swate.Components.Types.Theme.fromString e))
                         prop.children [
                             mkOption Swate.Components.Types.Theme.Sunrise
                             mkOption Swate.Components.Types.Theme.Finster
@@ -157,7 +160,10 @@ type Settings =
     static member General(model, dispatch) =
         Components.Forms.Generic.BoxedField(
             "General",
-            content = [ Settings.ThemeToggle(); Settings.ToggleAutosaveConfig(model, dispatch) ]
+            content = [
+                Settings.ThemeToggle()
+                Settings.ToggleAutosaveConfig(model, dispatch)
+            ]
         )
 
     static member SearchConfig(model, dispatch) =
@@ -173,7 +179,9 @@ type Settings =
 
         Components.Forms.Generic.BoxedField(
             "Term Search Configuration",
-            content = [ Swate.Components.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer ]
+            content = [
+                Swate.Components.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer
+            ]
         )
 
     static member ActivityLog model =

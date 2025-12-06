@@ -39,7 +39,10 @@ type FilePicker =
         let inputId = "filePicker_OnFilePickerMainFunc"
 
         Html.div [
-            prop.className [ "swt:flex swt:flex-col swt:gap-2"; parentContainerResizeClass ]
+            prop.className [
+                "swt:flex swt:flex-col swt:gap-2"
+                parentContainerResizeClass
+            ]
             prop.children [
                 Html.input [
                     prop.style [ style.display.none ]
@@ -90,7 +93,7 @@ type FilePicker =
             React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
 
         let selectedCells =
-            ctx.data
+            ctx.state
             |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
             |> Option.bind (fun ctx -> ctx.SelectedCells)
             |> Option.map (fun x -> {|
@@ -243,10 +246,14 @@ type FilePicker =
                         Html.tr [
                             Html.td [ Html.b $"{index}" ]
                             Html.td fileName
-                            Html.td [ FilePicker.MoveButtonList (index, fileName) model dispatch ]
+                            Html.td [
+                                FilePicker.MoveButtonList (index, fileName) model dispatch
+                            ]
                             Html.td [
                                 prop.style [ style.textAlign.right ]
-                                prop.children [ FilePicker.DeleteFromTable (index, fileName) model dispatch ]
+                                prop.children [
+                                    FilePicker.DeleteFromTable (index, fileName) model dispatch
+                                ]
                             ]
                         ]
                 ]
@@ -264,10 +271,12 @@ type FilePicker =
 
                 if hasFiles then
                     FilePicker.FileSortElements model dispatch
+
                     Html.div [
                         prop.className "swt:overflow-y-auto swt:overflow-x-hidden swt:py-2"
                         prop.children [ FilePicker.FileViewTable model dispatch ]
                     ]
+
                     FilePicker.ActionButtons model dispatch
             ]
         ]

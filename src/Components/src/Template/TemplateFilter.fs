@@ -192,7 +192,7 @@ module TemplateMocks =
 module TemplateFilterAux =
 
     let FilteredTemplateContext =
-        React.createContext<StateContext<Template[]>> ({ data = [||]; setData = fun _ -> () })
+        React.createContext<StateContext<Template[]>> ({ state = [||]; setState = fun _ -> () })
 
     open System
 
@@ -520,7 +520,10 @@ type TemplateFilter =
                     prop.tabIndex -1
                     prop.className "swt:btn swt:btn-square swt:btn-neutral"
                     prop.onClick (fun e -> e.preventDefault ())
-                    prop.children [ Html.div selectedIndices.Count; Icons.Institution(className = "swt:size-4") ]
+                    prop.children [
+                        Html.div selectedIndices.Count
+                        Icons.Institution(className = "swt:size-4")
+                    ]
                 ]
 
         Select.Select(
@@ -529,7 +532,10 @@ type TemplateFilter =
             setSelectedIndices,
             triggerRenderFn = TriggerRenderFn,
             dropdownPlacement = FloatingUI.Placement.BottomEnd,
-            middleware = [| FloatingUI.Middleware.flip (); FloatingUI.Middleware.offset (10) |]
+            middleware = [|
+                FloatingUI.Middleware.flip ()
+                FloatingUI.Middleware.offset (10)
+            |]
         )
 
     /// <summary>
@@ -616,7 +622,7 @@ type TemplateFilter =
             (fun () ->
                 let nextTemplates = filter templates
 
-                filteredTemplatesCtx.setData nextTemplates
+                filteredTemplatesCtx.setState nextTemplates
             ),
             [| box selectedOrgIndices; box tokens |]
         )
@@ -646,8 +652,8 @@ type TemplateFilter =
 
         TemplateFilterAux.FilteredTemplateContext.Provider(
             {
-                data = filteredTemplates
-                setData = setFilteredTemplatesFn
+                state = filteredTemplates
+                setState = setFilteredTemplatesFn
             },
             children
         )
@@ -657,7 +663,7 @@ type TemplateFilter =
         let filteredTemplatesCtx =
             React.useContext<StateContext<Template[]>> TemplateFilterAux.FilteredTemplateContext
 
-        let templates = filteredTemplatesCtx.data
+        let templates = filteredTemplatesCtx.state
 
         children templates
 
@@ -670,7 +676,9 @@ type TemplateFilter =
             React.Fragment [
                 TemplateFilter.TemplateFilter(templates, key = "template-filter-provider")
                 TemplateFilter.FilteredTemplateRenderer(fun templates ->
-                    Html.div [ prop.text (sprintf "%d templates found" templates.Length) ]
+                    Html.div [
+                        prop.text (sprintf "%d templates found" templates.Length)
+                    ]
                 )
             ]
         )

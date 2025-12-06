@@ -199,7 +199,7 @@ type SearchComponent =
             React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
 
         let xIndex =
-            ctx.data
+            ctx.state
             |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
             |> Option.bind (fun x -> x.SelectedCells)
             |> Option.map (fun cells -> cells.xEnd)

@@ -539,8 +539,8 @@ type AnnotationTable =
 
                 if hasCtx then
                     let nextTable: Contexts.AnnotationTable.AnnotationTableContext = { SelectedCells = range }
-                    let nextData = ctx.data.Add(arcTable.Name, nextTable)
-                    ctx.setData nextData
+                    let nextData = ctx.state.Add(arcTable.Name, nextTable)
+                    ctx.setState nextData
 
                 onCellSelect |> Option.iter (fun f -> f latest range)
 
@@ -784,7 +784,7 @@ type AnnotationTable =
             Html.div [
                 prop.textf
                     "%A"
-                    (ctx.data
+                    (ctx.state
                      |> Map.tryFind table.Name
                      |> Option.bind _.SelectedCells
                      |> Option.map (fun x -> sprintf "%i - %i, %i - %i" x.xStart x.xEnd x.yStart x.yEnd))

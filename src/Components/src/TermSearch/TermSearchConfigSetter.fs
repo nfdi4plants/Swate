@@ -13,7 +13,9 @@ type TermSearchConfigSetter =
         Html.button [
             prop.testId "term-search-config-setter-tib-trigger"
             prop.tabIndex -1
-            prop.className [ "swt:btn swt:w-fit swt:btn-primary swt:pointer-events-none" ]
+            prop.className [
+                "swt:btn swt:w-fit swt:btn-primary swt:pointer-events-none"
+            ]
             prop.children [
                 Icons.SearchPlus("swt:size-4")
                 Html.text (
@@ -41,7 +43,7 @@ type TermSearchConfigSetter =
         let allKeysCtx = React.useContext (Contexts.TermSearch.TermSearchAllKeysCtx)
 
         let selectedIndices =
-            activeKeysCtx.data.aktiveKeys
+            activeKeysCtx.state.aktiveKeys
             |> Array.choose (fun key -> allKeysCtx |> Seq.tryFindIndex (fun activeKey -> activeKey = key))
             |> Set
 
@@ -52,15 +54,15 @@ type TermSearchConfigSetter =
             fun selectedIndices ->
                 let nextActiveKeys = selectedIndices |> Seq.map (fun i -> allKeysCtx |> Seq.item i)
 
-                activeKeysCtx.setData {
-                    activeKeysCtx.data with
+                activeKeysCtx.setState {
+                    activeKeysCtx.state with
                         aktiveKeys = Array.ofSeq nextActiveKeys
                 }
 
-        let defaultSearchActive = not activeKeysCtx.data.disableDefault
+        let defaultSearchActive = not activeKeysCtx.state.disableDefault
 
         let TriggerRender =
-            fun _ -> TermSearchConfigSetter.TriggerRender(activeKeysCtx.data.aktiveKeys)
+            fun _ -> TermSearchConfigSetter.TriggerRender(activeKeysCtx.state.aktiveKeys)
 
         React.Fragment [
 
@@ -69,9 +71,9 @@ type TermSearchConfigSetter =
                 prop.className "swt:hidden"
                 prop.ariaHidden true
                 prop.testId "term-search-config-setter"
-                prop.custom ("data-activekeyscount", activeKeysCtx.data.aktiveKeys.Length)
-                prop.custom ("data-defaultdisables", activeKeysCtx.data.disableDefault)
-                prop.custom ("data-activekeys", activeKeysCtx.data.aktiveKeys |> Array.sort |> String.concat "; ")
+                prop.custom ("data-activekeyscount", activeKeysCtx.state.aktiveKeys.Length)
+                prop.custom ("data-defaultdisables", activeKeysCtx.state.disableDefault)
+                prop.custom ("data-activekeys", activeKeysCtx.state.aktiveKeys |> Array.sort |> String.concat "; ")
             ]
 
             renderer {|
@@ -86,8 +88,8 @@ type TermSearchConfigSetter =
                         prop.type'.checkbox
                         prop.isChecked defaultSearchActive
                         prop.onChange (fun (b: bool) ->
-                            activeKeysCtx.setData {
-                                activeKeysCtx.data with
+                            activeKeysCtx.setState {
+                                activeKeysCtx.state with
                                     disableDefault = not b
                             }
                         )
@@ -114,7 +116,9 @@ type TermSearchConfigSetter =
                     React.Fragment [
                         Html.p
                             "Adds support for high performance TIB term search. Choose a collection of terms to search through."
-                        Html.p [ prop.text "Selecting multiple collections may impact search performance." ]
+                        Html.p [
+                            prop.text "Selecting multiple collections may impact search performance."
+                        ]
                     ]
             |}
         ]
@@ -142,7 +146,10 @@ type TermSearchConfigSetter =
         Html.fieldSet [
             prop.className "swt:fieldset swt:bg-base-200 swt:border-base-300 swt:rounded-box swt:border swt:p-4"
             prop.children [
-                Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Configure Term Search" ]
+                Html.legend [
+                    prop.className "swt:fieldset-legend"
+                    prop.text "Configure Term Search"
+                ]
                 TermSearchConfigSetter.TermSearchConfigSetter renderer
             ]
         ]

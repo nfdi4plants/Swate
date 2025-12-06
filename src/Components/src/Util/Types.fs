@@ -29,7 +29,7 @@ type DaisyUIColors =
     | Warning
     | Error
 
-type StateContext<'T> = { data: 'T; setData: 'T -> unit }
+type StateContext<'T> = { state: 'T; setState: 'T -> unit }
 
 [<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
 type Theme =
