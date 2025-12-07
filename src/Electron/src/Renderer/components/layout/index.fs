@@ -54,32 +54,75 @@ type Layout =
         )
 
     [<ReactComponent>]
-    static member ResizeHandler(isActive: bool, setWidth: int -> unit) =
-        if not isActive then
-            Html.none
-        else
-            Html.div [
-                prop.className
-                    "swt:w-1 swt:cursor-col-resize swt:hover:bg-accent swt:absolute swt:top-0 swt:bottom-0 swt:-right-0.5 swt:transition-colors"
-            ]
+    static member ResizeHandler(setWidth: float -> unit) =
+        let dragging = React.useRef false
+
+        React.useEffectOnce (fun () ->
+
+            let onMove =
+                fun (e: Browser.Types.PointerEvent) -> if dragging.current then setWidth e.clientX else ()
+
+            let rec stop =
+                fun () ->
+                    dragging.current <- false
+                    Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
+                    Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
+
+            Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
+            Browser.Dom.document.addEventListener ("pointerup", unbox stop)
+
+            let disp =
+                FsReact.createDisposable (fun () ->
+                    Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
+                    Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
+                )
+
+            disp
+        )
+
+        Html.div [
+            prop.onPointerDown (fun _ -> dragging.current <- true)
+            prop.className
+                "swt:w-1 swt:cursor-col-resize swt:hover:bg-primary swt:absolute swt:top-0 swt:bottom-0 swt:-right-0.5 swt:transition-colors swt:select-none"
+        ]
 
     [<ReactComponent>]
     static member LeftSidebar(children: ReactElement, content: ReactElement) =
         let ctx = React.useContext (LeftSidebarContext)
-        let startWidth = 400
-        let MinWidth = 300
-        /// If it goes below this width, auto toggle the sidebar
-        let ToggleWidth = 100
-        let width, setWidth = React.useLocalStorage ("swate-left-panel-width", startWidth)
+
+        let toggleSizeParams =
+            React.useMemo (fun () -> {|
+                MinWidth = 200
+                // If it goes below this width, auto toggle the sidebar
+                ToggleWidth = 75
+                StartWidth = 400
+            |})
+
+        let width, setWidth =
+            React.useLocalStorage ("swate-left-panel-width", toggleSizeParams.StartWidth)
+
+        let sidebarDockerRef = React.useElementRef ()
 
         let setWidthResizeHandler =
-            fun newWidth ->
-                if newWidth < ToggleWidth then
-                    ctx.setState false
-                else
-                    let clampedWidth = if newWidth < MinWidth then MinWidth else newWidth
+            React.useCallback (
+                (fun (clientX: float) ->
+                    let recalculatedWidth = clientX - sidebarDockerRef.current.Value.offsetLeft |> int
 
-                    setWidth clampedWidth
+                    if recalculatedWidth < toggleSizeParams.ToggleWidth then
+                        ctx.setState false
+                    else
+                        ctx.setState true
+
+                        let clampedWidth =
+                            if recalculatedWidth < toggleSizeParams.MinWidth then
+                                toggleSizeParams.MinWidth
+                            else
+                                recalculatedWidth
+
+                        setWidth clampedWidth
+                ),
+                [| box ctx.state |]
+            )
 
         Html.div [
             prop.className "swt:flex swt:h-full swt:w-full swt:flex-row"
@@ -94,11 +137,21 @@ type Layout =
                     prop.className [ "swt:flex swt:flex-row swt:grow" ]
                     prop.children [
                         Html.div [ // left dock area
+                            prop.ref sidebarDockerRef
+                            prop.style [ style.width (if ctx.state then width else 0) ]
                             prop.className
                                 "swt:flex swt:flex-row swt:h-full swt:relative swt:border-r swt:border-base-300"
                             prop.children [
-                                Html.div [ children ]
-                                Layout.ResizeHandler(ctx.state, setWidthResizeHandler)
+                                Html.div [
+                                    prop.className [
+                                        "swt:w-full swt:h-full"
+                                        if not ctx.state then
+                                            "swt:overflow-hidden"
+                                    ]
+
+                                    prop.children [ children ]
+                                ]
+                                Layout.ResizeHandler(setWidthResizeHandler)
                             ]
                         ]
                         Html.div [ // main content area
