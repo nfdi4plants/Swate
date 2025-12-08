@@ -73,10 +73,13 @@ type Layout =
             Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
             Browser.Dom.document.addEventListener ("pointerup", unbox stop)
 
-            FsReact.createDisposable (fun () ->
-                Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
-                Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
-            )
+            let disp =
+                FsReact.createDisposable (fun () ->
+                    Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
+                    Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
+                )
+
+            disp
         )
 
         Html.div [
