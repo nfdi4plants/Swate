@@ -4,4 +4,4 @@ open Feliz
 open Swate.Components
 
 [<ReactComponent>]
-let Main () = Components.Layout.Layout.Entry()
+let Main () = Layout.Entry()

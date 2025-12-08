@@ -36,6 +36,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/browser": "^4.0.15",
     "@vitest/browser-playwright": "^4.0.15",
+    "babel-plugin-react-compiler": "^1.0.0",
     "daisyui": "^5.5.8",
     "globals": "^15.14.0",
     "jsdom": "^25.0.1",
