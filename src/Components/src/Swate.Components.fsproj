@@ -51,7 +51,6 @@
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="DataMapTable\DataMapTable.fs" />
-    <Compile Include="ElectronComponents\Navbar.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 

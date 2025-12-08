@@ -4,8 +4,6 @@ open Fable.Core
 open Feliz
 open Swate.Components
 
-open ElectronComponents
-
 module Context =
 
 
@@ -247,8 +245,7 @@ type Layout =
 
         Layout.Main(
             children = Layout.Wrapper "Main Content" "swt:bg-red-300 swt:text-black swt:h-full",
-            //navbar = Layout.Wrapper "Navbar" "swt:bg-blue-300 swt:text-black swt:h-full",
-            navbar = Navbar.Entry(),
+            navbar = Layout.Wrapper "Navbar" "swt:bg-blue-300 swt:text-black swt:h-full",
             leftSidebar =
                 Html.ul [
                     prop.className "swt:menu swt:w-full swt:bg-base-200 swt:p-2 swt:rounded-box swt:h-full"
