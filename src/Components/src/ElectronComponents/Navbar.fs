@@ -57,59 +57,6 @@ type Navbar =
             ]
         ]
 
-    static member PopupExample(text: string) =
-        let show, setShow = React.useState (false)
-
-        Html.div [
-            // The button that triggers the popup
-            Html.button [
-                prop.text text
-                prop.onClick (fun _ -> setShow (true))
-                prop.style [ style.padding 10; style.borderRadius 6 ]
-            ]
-
-            // Popup overlay (only visible if show = true)
-            if show then
-                Html.div [
-                    prop.style [
-                        style.position.fixedRelativeToWindow
-                        style.top 0
-                        style.left 0
-                        style.width (length.percent 100)
-                        style.height (length.percent 100)
-                        style.backgroundColor "rgba(0,0,0,0.4)" // dim background
-                        style.display.flex
-                        style.justifyContent.center
-                        style.alignItems.center
-                        style.zIndex 9999
-                    ]
-                    prop.onClick (fun _ -> setShow (false)) // click outside closes
-                    prop.children [
-
-                        // The popup box itself
-                        Html.div [
-                            prop.onClick (fun e -> e.stopPropagation ()) // prevent closing when clicking inside
-                            prop.style [
-                                style.padding 20
-                                style.backgroundColor "white"
-                                style.borderRadius 10
-                                style.boxShadow (0, 4, 20, "rgba(0,0,0,0.3)")
-                                style.width 300
-                            ]
-                            prop.children [
-                                Html.h3 text
-                                Html.p "Click outside or press close to hide."
-                                Html.button [
-                                    prop.text "Close"
-                                    prop.onClick (fun _ -> setShow (false))
-                                    prop.style [ style.marginTop 10 ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-        ]
-
     [<ReactComponent>]
     static member Main(?left: ReactElement, ?middle: ReactElement, ?right: ReactElement, ?navbarHeight: int) =
         let left = defaultArg left (Html.div [])
