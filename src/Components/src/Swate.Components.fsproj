@@ -19,57 +19,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\README.md" Pack="true" PackagePath="\" />
-    <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
-    <Compile Include="Util\Types.fs" />
-    <Compile Include="Util\Virtual.fs" />
-    <Compile Include="Util\FloatingUI.fs" />
-    <Compile Include="Util\Constants.fs" />
-    <Compile Include="Util\Extensions.fs" />
-    <Compile Include="Util\React.useListener.fs" />
-    <Compile Include="Util\Api.fs" />
-    <Compile Include="Util\ARCtrl.Helper.fs" />
-    <Compile Include="Util\ReactContexts.fs" />
-    <Compile Include="GenericComponents\Icons.fs" />
-    <Compile Include="GenericComponents\GenericComponents.fs" />
-    <Compile Include="GenericComponents\ContextMenu.fs" />
-    <Compile Include="GenericComponents\ErrorBaseModal.fs" />
-    <Compile Include="GenericComponents\BaseModal.fs" />
-    <Compile Include="GenericComponents\Select.fs" />
-    <Compile Include="GenericComponents\ComboBox.fs" />
-    <Compile Include="ThemeProvider\ThemeProvider.fs" />
-    <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
-    <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
-    <Compile Include="TermSearch\TermSearchConfigSetter.fs" />
-    <Compile Include="TermSearch\TermSearch.fs" />
-    <Compile Include="Template\TemplateFilter.fs" />
-    <Compile Include="Table\KeyboardNavigation.fs" />
-    <Compile Include="Table\TableCell.fs" />
-    <Compile Include="Table\Table.fs" />
-    <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
-    <Compile Include="AnnotationTable\AnnotationTableModals.fs" />
-    <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
-    <Compile Include="AnnotationTable\AnnotationTable.fs" />
-    <Compile Include="DataMapTable\DataMapTable.fs" />
-    <Compile Include="ElectronComponents\Navbar.fs" />
-    <Compile Include="Style.fs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" />
-    <PackageReference Include="ARCtrl.Spreadsheet" />
-    <PackageReference Include="Fable.Remoting.Client" />
-    <PackageReference Include="Fable.Fetch" />
-    <PackageReference Include="Fable.React.Types" />
-    <PackageReference Include="Fable.Core" />
-    <PackageReference Include="Feliz" />
-    <PackageReference Include="Fable.Browser.Dom" />
+    <PackageReference Include="ARCtrl.Core"/>
+    <PackageReference Include="ARCtrl.Spreadsheet"/>
+    <PackageReference Include="Fable.Remoting.Client"/>
+    <PackageReference Include="Fable.Fetch"/>
+    <PackageReference Include="Fable.React.Types"/>
+    <PackageReference Include="Fable.Core"/>
+    <PackageReference Include="Feliz"/>
+    <PackageReference Include="Fable.Browser.Dom"/>
   </ItemGroup>
 
   <ItemGroup>
     <!-- Include all files that are compiled with this project -->
     <!-- Include the project file itself as well -->
-    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/"/>
     <Content Include="..\package.json">
       <Link>package.json</Link>
     </Content>
@@ -88,14 +51,52 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj" />
+    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\"/>
+    <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/"/>
+    <Compile Include="Util\Types.fs"/>
+    <Compile Include="Util\Virtual.fs"/>
+    <Compile Include="Util\FloatingUI.fs"/>
+    <Compile Include="Util\Constants.fs"/>
+    <Compile Include="Util\Extensions.fs"/>
+    <Compile Include="Util\React.useListener.fs"/>
+    <Compile Include="Util\Api.fs"/>
+    <Compile Include="Util\ARCtrl.Helper.fs"/>
+    <Compile Include="Util\ReactContexts.fs"/>
+    <Compile Include="Layout\Layout.fs"/>
+    <Compile Include="GenericComponents\Icons.fs"/>
+    <Compile Include="GenericComponents\GenericComponents.fs"/>
+    <Compile Include="GenericComponents\ContextMenu.fs"/>
+    <Compile Include="GenericComponents\ErrorBaseModal.fs"/>
+    <Compile Include="GenericComponents\BaseModal.fs"/>
+    <Compile Include="GenericComponents\Select.fs"/>
+    <Compile Include="GenericComponents\ComboBox.fs"/>
+    <Compile Include="ThemeProvider\ThemeProvider.fs"/>
+    <Compile Include="QuickAccessButton\QuickAccessButton.fs"/>
+    <Compile Include="TermSearch\TermSearchConfigProvider.fs"/>
+    <Compile Include="TermSearch\TermSearchConfigSetter.fs"/>
+    <Compile Include="TermSearch\TermSearch.fs"/>
+    <Compile Include="Template\TemplateFilter.fs"/>
+    <Compile Include="Table\KeyboardNavigation.fs"/>
+    <Compile Include="Table\TableCell.fs"/>
+    <Compile Include="Table\Table.fs"/>
+    <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs"/>
+    <Compile Include="AnnotationTable\AnnotationTableModals.fs"/>
+    <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs"/>
+    <Compile Include="AnnotationTable\AnnotationTable.fs"/>
+    <Compile Include="DataMapTable\DataMapTable.fs"/>
+    <Compile Include="Style.fs"/>
+	<Compile Include="ElectronComponents\Navbar.fs" />
   </ItemGroup>
 
   <PropertyGroup>
     <NpmDependencies>
-      <NpmPackage Name="@floating-ui/react" Version="gte 0.27.7 lt 1.0.0" ResolutionStrategy="Max" />
-      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max" />
-      <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@floating-ui/react" Version="gte 0.27.7 lt 1.0.0" ResolutionStrategy="Max"/>
+      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max"/>
+      <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max"/>
     </NpmDependencies>
   </PropertyGroup>
 
