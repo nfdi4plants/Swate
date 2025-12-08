@@ -5,12 +5,7 @@ open Feliz
 type Navbar =
 
     static member MaterialIcon(icon: string, ?className: string) =
-        let className = defaultArg className ""
-
-        Html.i [
-            prop.className ("material-icons " + className)
-            prop.text icon
-        ]
+        Html.i [ prop.className ("swt:iconify " + icon + " swt:size-6") ]
 
     static member Button(icon: ReactElement, tooltip: string, (onClick: unit -> unit), ?toolTipPosition: string) =
         let toolTipPosition = defaultArg toolTipPosition "swt:tooltip-right"
@@ -28,16 +23,23 @@ type Navbar =
             ]
         ]
 
-    static member Main(?left: ReactElement, ?middle: ReactElement, ?right: ReactElement) =
+    static member Main(?left: ReactElement, ?middle: ReactElement, ?right: ReactElement, ?navbarHeight: int) =
         let left = defaultArg left (Html.div [])
         let middle = defaultArg middle (Html.div [])
         let right = defaultArg right (Html.div [])
+
+        let navbarHeight = defaultArg navbarHeight 40
 
         Html.div [
             prop.className "swt:navbar swt:bg-base-300 swt:text-base-content swt:gap-2 swt:flex swt:items-center"
             prop.role "navigation"
             prop.ariaLabel "arc navigation"
-            prop.style [ style.minHeight (length.rem 3.25) ]
+            prop.style [
+                style.minHeight length.auto
+                style.height navbarHeight
+                style.paddingTop 0
+                style.paddingBottom 0
+            ]
             prop.children [
                 Html.div [ prop.className "swt:flex-none"; prop.children [ left ] ]
                 Html.div [
@@ -50,9 +52,14 @@ type Navbar =
 
     [<ReactComponent>]
     static member Entry() =
-        let noteAddIcon = Navbar.MaterialIcon("note_add", "swt:size-6")
-        let fileOpenIcon = Navbar.MaterialIcon("file_open", "swt:size-6")
-        let cloudDownloadIcon = Navbar.MaterialIcon("cloud_download", "swt:size-6")
+        let noteAddIcon =
+            Navbar.MaterialIcon("swt:material-symbols-light--left-panel-close")
+
+        let fileOpenIcon =
+            Navbar.MaterialIcon("swt:material-symbols-light--left-panel-close")
+
+        let cloudDownloadIcon =
+            Navbar.MaterialIcon("swt:material-symbols-light--left-panel-close")
 
         let newARCButton = Navbar.Button(noteAddIcon, "Create a new ARC", fun _ -> ())
 
