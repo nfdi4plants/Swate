@@ -11,7 +11,7 @@
 @source "**/*.fs.ts";
 @plugin "@tailwindcss/typography";
 @plugin "@iconify/tailwind4" {
-    prefixes: mdi-light, material-symbols-light
+    prefixes: fluent;
 }
 @plugin "daisyui" {
     themes: all;
@@ -231,5 +231,24 @@
 
     .animated-border:nth-of-type(4)::before {
         animation-delay: 6s;
+    }
+}
+
+@layer swt-utilities {
+    /* Scrollbar utilities: hide by default, show on hover */
+    .swt\:scrollbar-hide {
+        scrollbar-width: none; /* Firefox */
+    }
+    .swt\:scrollbar-hide::-webkit-scrollbar {
+        width: 0px; /* Chrome, Safari */
+        height: 0px;
+    }
+
+    .swt\:scrollbar-hide:hover {
+        scrollbar-width: auto; /* Firefox */
+    }
+    .swt\:scrollbar-hide:hover::-webkit-scrollbar {
+        width: 8px; /* Chrome, Safari */
+        height: 8px;
     }
 }
