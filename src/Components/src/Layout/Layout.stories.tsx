@@ -4,10 +4,6 @@ import Layout from "./Layout.fs.js";
 import {LayoutBtn, LeftSidebarToggleBtn} from "./Layout.fs.js";
 import React from 'react';
 
-const TERMSEARCH_INPUT_TESTID = 'term-search-input'
-
-const TERMSEARCH_DETAILSMODAL_TESTID = 'modal_termsearch_details_modal'
-
 const meta = {
   title: "Components/Layout",
   tags: ["autodocs"],

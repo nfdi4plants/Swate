@@ -12,9 +12,6 @@ if SquirrelStartup.started then
 type ArcVault(path: string) =
     member val path = path with get
 
-    member this.Dispose() =
-        // Dispose resources if needed
-        ()
 
 
 let windows = ResizeArray<BrowserWindow>()

@@ -205,7 +205,7 @@ type Layout =
         ]
 
     [<ReactMemoComponent>]
-    static member private SiderbarArea
+    static member private SidebarArea
         (
             children: ReactElement,
             width: int,
@@ -314,7 +314,6 @@ type Layout =
                     && StartResizeState.current.IsSome
                     && leftRef.current.IsSome
                 then
-                    console.log ("resize left")
                     let windowX = int Browser.Dom.window.innerWidth
 
                     let newWidth =
@@ -348,7 +347,6 @@ type Layout =
                     && rightRef.current.IsSome
                 then
                     let windowX = int Browser.Dom.window.innerWidth
-                    console.log ("resize right")
 
                     let offsetRight =
                         rightRef.current.Value.offsetLeft + rightRef.current.Value.clientWidth
@@ -380,7 +378,7 @@ type Layout =
                 if leftActions.IsSome then
                     Layout.SidebarActions(leftActions.Value, Sidebar.Side.Left)
                 if leftContent.IsSome then
-                    Layout.SiderbarArea(
+                    Layout.SidebarArea(
                         leftContent.Value,
                         widthLeft,
                         ctxLeft.state,
@@ -398,7 +396,7 @@ type Layout =
                     ]
                 ]
                 if rightContent.IsSome then
-                    Layout.SiderbarArea(
+                    Layout.SidebarArea(
                         rightContent.Value,
                         widthRight,
                         ctxRight.state,
@@ -406,27 +404,6 @@ type Layout =
                         setRightPointerPositionWrapper,
                         Sidebar.Side.Right
                     )
-                // Html.div [ // right dock area
-                //     prop.ref rightRef
-                //     prop.style [
-                //         if not ctxRight.state then
-                //             style.width 0
-                //         else
-                //             style.width widthRight
-                //     ]
-                //     prop.className
-                //         "swt:flex swt:flex-row swt:h-full swt:relative swt:border-l swt:border-base-content/50 swt:bg-base-100"
-                //     prop.children [
-                //         Layout.ResizeHandler(setRightPointerPositionWrapper, Sidebar.Side.Right)
-                //         Html.div [
-                //             prop.className [
-                //                 "swt:w-full swt:h-full swt:overflow-x-scroll swt:overflow-y-auto"
-                //                 "swt:scrollbar-hide"
-                //             ]
-                //             prop.children rightContent.Value
-                //         ]
-                //     ]
-                // ]
                 if rightActions.IsSome then
                     Layout.SidebarActions(rightActions.Value, Sidebar.Side.Right)
             ]
@@ -522,7 +499,14 @@ type Layout =
 
         Layout.Main(
             children = Layout.Wrapper "Main Content" "swt:bg-base-300 swt:h-full",
-            navbar = Layout.Wrapper "Navbar" "swt:swt:h-full",
+            navbar =
+                Html.div [
+                    prop.className "swt:flex swt:pl-2 swt:ml-auto"
+                    prop.children [
+                        Layout.LeftSidebarToggleBtn()
+                        Layout.RightSidebarToggleBtn()
+                    ]
+                ],
             leftSidebar =
                 Html.ul [
                     prop.className "swt:menu swt:w-full swt:p-2 swt:rounded-box swt:h-full swt:flex-nowrap"
