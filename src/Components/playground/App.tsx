@@ -14,6 +14,7 @@ import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfi
 import { Term } from '../../Shared/Database.fs.ts';
 import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
 import {Entry as Layout} from '../src/Layout/Layout.fs.js'
+import {FileExplorerExample_Example} from '../src/FileExplorer/FileExplorer.fs.ts'
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
