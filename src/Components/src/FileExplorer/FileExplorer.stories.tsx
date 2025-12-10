@@ -1,52 +1,32 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { within, expect } from 'storybook/test';
-import React from 'react';
-import {FileExplorer} from "./FileExplorer.fs.ts";
+import React from "react";
+import type { Meta, StoryObj, PlayFunction } from "@storybook/react";
+import { within, expect, userEvent } from "@storybook/test";
+import { Example as FileExplorerExample } from "./FileExplorerExample.fs";
 
-const meta: Meta<typeof FileExplorer> = {
+const meta: Meta<typeof FileExplorerExample> = {
   title: "Components/FileExplorer",
-  component: FileExplorer,
+  component: FileExplorerExample,
   parameters: {
-    layout: 'fullscreen',
+    layout: "fullscreen",
   },
 };
+
 export default meta;
-type Story = StoryObj<typeof FileExplorer>;
+type Story = StoryObj<typeof FileExplorerExample>;
 
-const renderCell = (index: { x: number; y: number }) =>
-  React.createElement('div', { style: { padding: 4 } }, `R${index.y}, C${index.x}`);
+export const Default: Story = {
+  render: () => <FileExplorerExample />,
 
-const renderActiveCell = (index: { x: number; y: number }) =>
-  React.createElement('div', { style: { padding: 4 } }, `A${index.y}, C${index.x}`);
-
-export const FileExplorerStory: Story = {
-  decorators: [
-    (Story) => {
-      return <Story />;
-    },
-  ],
-
-  render: (args) => {
-    return React.createElement(FileExplorer, { ...args });
-  },
-
-  args: {
-    rowCount: 20,
-    columnCount: 10,
-    height: 300,
-    width: 600,
-    renderCell,
-    renderActiveCell,
-    debug: true,
-  },
-
-  play: async ({ canvasElement }) => {
+  play: (async ({ canvasElement }: { canvasElement: HTMLElement }) => {
     const canvas = within(canvasElement);
 
-    // const findText = await canvas.findByText("File Explorer Demo")
-    // expect(findText).toBeTruthy();
+    const container = await canvas.findByTestId("file-explorer-container");
+    expect(container).toBeTruthy();
 
-    const filecontainer = await canvas.findByTestId("file-explorer-container");
-    expect(filecontainer).toBeTruthy();
-  },
+    const resume = await canvas.findByText("resume.pdf");
+    expect(resume).toBeTruthy();
+
+    const folder = await canvas.findByText("My Files");
+    await userEvent.click(folder);
+  }) as PlayFunction,
 };

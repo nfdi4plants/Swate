@@ -5,9 +5,6 @@ open System
 // ============================================================================
 // DATA STRUCTURES
 // ============================================================================
-type FileTreeNode<'T> =
-    | Leaf of 'T
-    | Branch of 'T * FileTreeNode<'T> list
 
 type FileItem = {
     Id: string
