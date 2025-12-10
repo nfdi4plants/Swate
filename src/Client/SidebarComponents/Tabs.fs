@@ -4,8 +4,6 @@ open Model
 open Messages
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.DaisyUI
-
 
 type Tabs =
 

@@ -1,7 +1,6 @@
 namespace MainComponents
 
 open Feliz
-open Feliz.DaisyUI
 
 open SpreadsheetInterface
 open Messages

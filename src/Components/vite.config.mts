@@ -1,11 +1,16 @@
-import { defineConfig } from 'vite';
+import {defineConfig} from 'vite';
 import dts from 'vite-plugin-dts'
 import react from "@vitejs/plugin-react";
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
     plugins: [
-        react({ include: /\.(fs|js|jsx|ts|tsx)$/ },),
+        react({
+            include: /\.(fs|js|jsx|ts|tsx)$/,
+            babel: {
+                plugins: ['babel-plugin-react-compiler'],
+            },
+        }),
         tailwindcss(),
         dts({
             include: ['src'],
@@ -45,7 +50,7 @@ export default defineConfig({
     },
     server: {
         watch: {
-            ignored: [ "**/*.fs" ]
+            ignored: ["**/*.fs"]
         },
     },
     define: {

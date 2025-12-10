@@ -3,7 +3,6 @@ namespace Pages
 open Model
 
 open Feliz
-open Feliz.DaisyUI
 
 type ActivityLog =
 

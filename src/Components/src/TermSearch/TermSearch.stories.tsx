@@ -4,6 +4,7 @@ import TermSearch from "./TermSearch.fs.js";
 import * as Provider from "./TermSearchConfigProvider.fs.js";
 import { TIBApi } from '../Util/Api.fs.js';
 import React from 'react';
+import type { Term } from '../Util/Types.fs.js';
 
 const TERMSEARCH_INPUT_TESTID = 'term-search-input'
 
@@ -18,7 +19,7 @@ function renderTermSearch(args: any) {
         {...args}
         term={term}
         onTermChange={(selectedTerm) => {
-          setTerm(selectedTerm);
+          setTerm(selectedTerm as Term | undefined);
           args.onTermChange(selectedTerm); // Call mock or external handler
         }}
       />
@@ -45,7 +46,6 @@ export const Default: Story = {
   args: {
     onTermChange: fn(),
     term: undefined,
-    debug: true
   },
   play: async ({ args, canvasElement }) => {
     const input = within(canvasElement).getByTestId(TERMSEARCH_INPUT_TESTID);
@@ -63,7 +63,7 @@ export const ParentSearch: Story = {
     onTermChange: fn(),
     term: undefined,
     parentId: "MS:1000031",
-    debug: true
+
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
@@ -91,9 +91,7 @@ export const DefaultAdvancedSearch: Story = {
     onTermChange: fn(),
     term: undefined,
     parentId: "MS:1000031",
-    showDetails: true,
-    advancedSearch: true,
-    debug: true
+
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
@@ -175,7 +173,7 @@ export const WithSearchConfigProvider: Story = {
   args: {
     onTermChange: fn(),
     term: undefined,
-    debug: true,
+    parentId: undefined,
     disableDefaultSearch: true,
     disableDefaultParentSearch: true,
     disableDefaultAllChildrenSearch: true,

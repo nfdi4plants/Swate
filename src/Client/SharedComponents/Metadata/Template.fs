@@ -1,7 +1,6 @@
 module Components.Metadata.Template
 
 open Feliz
-open Feliz.DaisyUI
 open ARCtrl
 open Components
 open Components.Forms
@@ -16,14 +15,16 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     template.Id,
                     (fun guid ->
                         template.Id <- guid
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Identifier"
                 )
                 FormComponents.TextInput(
                     template.Name,
                     (fun (s: string) ->
                         template.Name <- s
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Name"
                 )
                 FormComponents.TextInput(
@@ -31,7 +32,8 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     (fun (s: string) ->
                         template.Description <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Description",
                     isarea = true
                 )
@@ -39,7 +41,8 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     template.Organisation.ToString(),
                     (fun (s: string) ->
                         template.Organisation <- Organisation.ofString (s)
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Organisation"
                 )
                 FormComponents.TextInput(
@@ -47,7 +50,8 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     (fun (s: string) ->
                         template.Version <- s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch),
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Version"
                 )
                 FormComponents.DateTimeInput(
@@ -55,7 +59,8 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     (fun dt ->
                         template.LastUpdated <- dt
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Last Updated"
                 )
                 FormComponents.OntologyAnnotationsInput(
@@ -63,7 +68,8 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     (fun (s) ->
                         template.Tags <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Tags"
                 )
                 FormComponents.OntologyAnnotationsInput(
@@ -71,7 +77,8 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     (fun (s) ->
                         template.EndpointRepositories <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     "Endpoint Repositories"
                 )
                 FormComponents.PersonsInput(
@@ -79,7 +86,8 @@ let Main (template: Template, setTemplate: Template -> unit) =
                     (fun (s) ->
                         template.Authors <- ResizeArray s
                         //template |> ArcFiles.Template |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch)
-                        setTemplate template),
+                        setTemplate template
+                    ),
                     label = "Authors"
                 )
             ]

@@ -5,7 +5,6 @@ open Fable.React.Props
 open Fable.Core.JsInterop
 open Cytoscape
 open Feliz
-open Feliz.DaisyUI
 open Elmish
 open Messages
 

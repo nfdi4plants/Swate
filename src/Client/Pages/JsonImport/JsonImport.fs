@@ -15,7 +15,6 @@ open Messages
 open Elmish
 
 open Feliz
-open Feliz.DaisyUI
 open Swate.Components.Shared
 open ARCtrl
 open Fable.Core.JsInterop
@@ -64,7 +63,7 @@ type JsonImport =
             else
                 None
 
-        React.fragment [
+        React.Fragment [
             match arcFile with
             | Some arcFile -> Modals.SelectiveImportModal.Main(arcFile, model, dispatch, closeImportModal)
             | None -> ()

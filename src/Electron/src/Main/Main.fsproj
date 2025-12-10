@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="SimpleGitTest.fsx" />
+    <None Include="ChokidarTest.fsx" />
+    <Compile Include="main.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Electron" />
+    <PackageReference Include="Fable.Electron.Remoting" />
+    <PackageReference Include="Fable.Electron.Forge" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
+  </ItemGroup>
+
+</Project>

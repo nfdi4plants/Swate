@@ -5,7 +5,6 @@ open System
 open Microsoft.FSharp.Reflection
 
 open Feliz
-open Feliz.DaisyUI
 
 open Spreadsheet
 open Messages
@@ -1139,7 +1138,7 @@ type FormComponents =
         let extendedElements =
             match isARCitect with
             | true ->
-                React.fragment [
+                React.Fragment [
                     Html.div [
                         prop.className "swt:flex swt:justify-center"
                         prop.children [

@@ -3,7 +3,6 @@ namespace SidebarComponents
 
 open Messages
 open Feliz
-open Feliz.DaisyUI
 
 type Footer =
     [<ReactComponent>]

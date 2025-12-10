@@ -4,7 +4,6 @@ open Model
 open Messages
 
 open Feliz
-open Feliz.DaisyUI
 
 open Components
 open ARCtrl
@@ -100,7 +99,7 @@ let UpdateMetadataModalContent
     model
     (dispatch: Messages.Msg -> unit)
     =
-    React.fragment [
+    React.Fragment [
         match excelMetadataType with
         | {
               Metadata = Some(ArcFiles.Assay assay)
@@ -234,7 +233,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
     let showTermDetails, setShowTermDetails =
         React.useState (None: OntologyAnnotation option)
 
-    React.fragment [
+    React.Fragment [
         match showTermDetails with
         | None -> Html.none
         | Some oa ->
@@ -251,13 +250,13 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
 
         QuickAccessButton.QuickAccessButton(
             "Create Metadata",
-            React.fragment [ Icons.CreateMetadata() ],
+            React.Fragment [ Icons.CreateMetadata() ],
             toggleMetdadataModal
         )
 
         QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
-            React.fragment [ Icons.CreateAnnotationTable() ],
+            React.Fragment [ Icons.CreateAnnotationTable() ],
             (fun e ->
                 e.preventDefault ()
                 let e = e :?> Browser.Types.MouseEvent
@@ -269,7 +268,7 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         | Some Swatehost.Excel ->
             QuickAccessButton.QuickAccessButton(
                 "Autoformat Table",
-                React.fragment [ Icons.AutoformatTable() ],
+                React.Fragment [ Icons.AutoformatTable() ],
                 (fun e ->
                     e.preventDefault ()
                     let e = e :?> Browser.Types.MouseEvent
@@ -280,19 +279,19 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         | _ -> ()
         QuickAccessButton.QuickAccessButton(
             "Rectify Ontology Terms",
-            React.fragment [
+            React.Fragment [
                 Icons.RectifyOntologyTerms(Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString)
             ],
             (fun _ -> SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.QuickAccessButton(
             "Remove Building Block",
-            React.fragment [ Icons.RemoveBuildingBlock() ],
+            React.Fragment [ Icons.RemoveBuildingBlock() ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock None |> InterfaceMsg |> dispatch)
         )
         QuickAccessButton.QuickAccessButton(
             "Get Building Block Information",
-            React.fragment [ Icons.BuildingBlockInformation() ],
+            React.Fragment [ Icons.BuildingBlockInformation() ],
             (fun _ ->
                 promise {
                     let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails ()

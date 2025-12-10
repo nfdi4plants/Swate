@@ -7,7 +7,6 @@ open Messages
 open Browser
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.DaisyUI
 
 type SidebarView =
     static member private content (model: Model) (dispatch: Msg -> unit) =

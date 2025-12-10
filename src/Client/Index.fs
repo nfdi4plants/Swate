@@ -14,7 +14,6 @@ open Swate.Components.ReactHelper
 let sayHello name = $"Hello {name}"
 
 open Feliz
-open Feliz.DaisyUI
 
 open Fable.Core.JsInterop
 

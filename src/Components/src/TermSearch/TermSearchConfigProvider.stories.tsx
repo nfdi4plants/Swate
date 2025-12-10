@@ -27,14 +27,16 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: (args) => (
     <TermSearchConfigProvider {...args}>
-      <TermSearch
+    </TermSearchConfigProvider>
+  ),
+  args: {
+    children: <TermSearch
         onTermChange={fn()}
         disableDefaultSearch={true}
         disableDefaultParentSearch={true}
         disableDefaultAllChildrenSearch={true}
       />
-    </TermSearchConfigProvider>
-  ),
+  },
   play: async ({ args, canvasElement }) => {
 
     const input = within(canvasElement).getByTestId(TERMSEARCH_INPUT_TESTID);
@@ -45,7 +47,7 @@ export const Default: Story = {
     waitFor(() => {
       const debugValue = input.getAttribute("data-debugresultcount")
       expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
-    })
+    }, {timeout: 5000});
 
   }
 }

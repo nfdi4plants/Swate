@@ -13,7 +13,7 @@ import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/Te
 import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
 import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
-import { FileExplorerExample_Example } from '../src/FileExplorer/FileExplorer.fs.ts';
+import {Entry as Layout} from '../src/Layout/Layout.fs.js'
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -34,12 +34,11 @@ function TermSearchContainer() {
           TIB Search
         </label>
         <TermSearch
-          onTermChange={(term) => setTerm2(term as Term | undefined)}
+          onTermChange={(term) => setTerm2(term)}
           term={term2}
           disableDefaultSearch
           disableDefaultParentSearch
           disableDefaultAllChildrenSearch
-          showDetails
           termSearchQueries={[
             ["tib_search", (query) => TIBApi.defaultSearch(query, 10, "DataPLANT")]
           ]}
@@ -60,7 +59,6 @@ function TermSearchContainer() {
           onTermChange={(term) => setTerm(term as Term | undefined)}
           term={term}
           parentId="MS:1000031"
-          showDetails
           debug={true}
           onBlur={() => console.log("TermSearch blurred")}
         />
@@ -70,12 +68,13 @@ function TermSearchContainer() {
           Term Search with Provider
         </label>
         <TermSearchConfigProvider>
-          <TermSearchConfigSetter />
-          <TermSearch
-            onTermChange={(term) => setTerm3(term as Term | undefined)}
-            term={term3}
-            debug={true}
-          />
+          <>
+            <TermSearchConfigSetter />
+            <TermSearch
+              onTermChange={(term) => setTerm3(term as Term | undefined)}
+              term={term3}
+            />
+          </>
         </TermSearchConfigProvider>
       </div>
     </div>
@@ -152,19 +151,19 @@ function FileExplorerContainer() {
 
 const App = () => {
     return (
-        <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
-            <h1 className='swt:text-6xl'>Playground</h1>
-            {/* <AnnoTableContainer /> */}
-            {/* <DataMapTableContainer /> */}
-            <TermSearchContainer />
-            {/* <BaseModalContainer /> */}
-            {/* <ComboBoxContainer /> */}
-            {/* <TemplateFilterContainer /> */}
-            {/* <SelectContainer /> */}
-            {/* <ContextMenuContainer /> */}
-            {/* <TableContainer /> */}
-            <FileExplorerContainer />
-        </div>
+        <Layout />
+        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
+        //     <h1 className='swt:text-6xl'>Playground</h1>
+        //     <AnnoTableContainer />
+        //     {/* <DataMapTableContainer /> */}
+        //     {/* <TermSearchContainer /> */}
+        //     {/* <BaseModalContainer /> */}
+        //     {/* <ComboBoxContainer /> */}
+        //     {/* <TemplateFilterContainer /> */}
+        //     {/* <SelectContainer /> */}
+        //     {/* <ContextMenuContainer /> */}
+        //     {/* <TableContainer /> */}
+        // </div>
     );
 };
 

@@ -7,4 +7,3 @@ module Table =
 
     [<Literal>]
     let DefaultColumnWidth = 200
-

@@ -2,7 +2,6 @@ module MainComponents.SpreadsheetView.DataMap
 
 open ARCtrl
 open Feliz
-open Feliz.DaisyUI
 open Model
 open SpreadsheetInterface
 open Messages

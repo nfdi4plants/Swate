@@ -284,10 +284,10 @@ type FloatingUI =
     static member useTransitionStatus(context: obj) : FloatingUI.UseTransitionStatusReturn = jsNative
 
     [<ReactComponent("FloatingPortal", "@floating-ui/react")>]
-    static member FloatingPortal(children: ReactElement) = React.imported ()
+    static member FloatingPortal(children: ReactElement) = React.Imported()
 
     [<ReactComponent("FloatingOverlay", "@floating-ui/react")>]
-    static member FloatingOverlay(children: ReactElement, ?lockScroll: bool, ?className: string) = React.imported ()
+    static member FloatingOverlay(children: ReactElement, ?lockScroll: bool, ?className: string) = React.Imported()
 
     [<ReactComponent("FloatingFocusManager", "@floating-ui/react")>]
     static member FloatingFocusManager
@@ -307,7 +307,7 @@ type FloatingUI =
             ?order: string[],
             ?key: string
         ) =
-        React.imported ()
+        React.Imported()
 
     [<ReactComponent("FloatingList", "@floating-ui/react")>]
     static member FloatingList
@@ -316,4 +316,4 @@ type FloatingUI =
             elementsRef: IRefValue<Browser.Types.HTMLElement option[]>,
             labelsRef: IRefValue<string option[]>
         ) =
-        React.imported ()
+        React.Imported()

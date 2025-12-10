@@ -58,7 +58,6 @@ let update
         nextState, Cmd.none
 
 open Feliz
-open Feliz.DaisyUI
 
 let addBuildingBlockComponent (model: Model) (dispatch: Messages.Msg -> unit) =
     SidebarComponents.SidebarLayout.Container [

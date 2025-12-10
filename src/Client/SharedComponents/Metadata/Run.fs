@@ -2,7 +2,6 @@ module Components.Metadata.Run
 
 open Swate.Components.Shared
 open Feliz
-open Feliz.DaisyUI
 open ARCtrl
 open Swate.Components.Shared
 open Components

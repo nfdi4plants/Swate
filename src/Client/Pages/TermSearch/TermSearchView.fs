@@ -15,7 +15,6 @@ let update (termSearchMsg: TermSearch.Msg) (currentState: TermSearch.Model) : Te
     | TermSearch.UpdateSelectedTerm oa -> { currentState with SelectedTerm = oa }, Cmd.none
 
 open Feliz
-open Feliz.DaisyUI
 open ARCtrl
 open Fable.Core.JsInterop
 
@@ -26,7 +25,7 @@ let private AddButton (model: Model, dispatch) =
         React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
 
     let selectedCells =
-        ctx.data
+        ctx.state
         |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
         |> Option.bind (fun ctx -> ctx.SelectedCells)
         |> Option.map (fun x -> {|

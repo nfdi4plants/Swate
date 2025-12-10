@@ -16,7 +16,6 @@ module private SelectHelper =
 
     let SelectContext =
         React.createContext (
-            "SelectContext",
             {|
                 activeIndex = None
                 selectedIndex = None
@@ -35,7 +34,7 @@ type Select =
     static member private InnerBaseOptionRender
         (label: string, isSelected: bool, ?ref: IRefValue<option<Browser.Types.HTMLInputElement>>)
         =
-        React.fragment [
+        React.Fragment [
             Html.div [
                 prop.custom ("data-selectoption", label)
                 prop.className
@@ -326,7 +325,7 @@ type Select =
 
             entries @ [ style.zIndex 999 ]
 
-        React.fragment [
+        React.Fragment [
             Html.div [
                 prop.className "swt:size-fit swt:cursor-pointer swt:select-none"
                 prop.ref (unbox flui.refs.setReference)
@@ -334,10 +333,9 @@ type Select =
                 yield! prop.spread <| interactions.getReferenceProps (null)
                 prop.children (TriggerRender {| isOpen = isOpen |})
             ]
-            React.contextProvider (
-                SelectHelper.SelectContext,
+            SelectHelper.SelectContext.Provider(
                 selectContext,
-                React.fragment [
+                React.Fragment [
                     if isOpen then
                         FloatingUI.FloatingPortal(
                             FloatingUI.FloatingFocusManager(

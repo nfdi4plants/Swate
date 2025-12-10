@@ -6,7 +6,6 @@ open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.DaisyUI
 
 module private TableHelper =
 
@@ -250,10 +249,9 @@ swt:p-0"""
                 onClick = onClick
             )
 
-        React.contextProvider (
-            Contexts.Table.TableStateCtx,
+        Contexts.Table.TableStateCtx.Provider(
             ctx,
-            React.fragment [
+            React.Fragment [
 
                 Html.div [
                     prop.key "scroll-container"
@@ -381,7 +379,7 @@ swt:p-0"""
                                                         Html.none // skip header row, is part of thead
                                                     else
                                                         Html.tr [
-                                                            prop.key $"virtualRow-{virtualRow.key}"
+                                                            prop.key (sprintf "virtualRow-%s" virtualRow.key)
                                                             prop.style [
                                                                 style.position.absolute
                                                                 style.top 0
@@ -401,8 +399,12 @@ swt:p-0"""
                                                                     let isActive = isActive index
 
                                                                     Html.td [
-                                                                        prop.key
-                                                                            $"virtualCell-{virtualRow.key}-{virtualColumn.key}"
+                                                                        prop.key (
+                                                                            sprintf
+                                                                                "virtualCell-%s-%s"
+                                                                                virtualRow.key
+                                                                                virtualColumn.key
+                                                                        )
                                                                         prop.dataRow virtualRow.index
                                                                         prop.dataColumn virtualColumn.index
                                                                         prop.className [
@@ -461,6 +463,13 @@ swt:p-0"""
 
         TableCell.StringActiveCell(index, data, setData)
 
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
+    static member private RenderInactive(index: CellCoordinate, data: string) = Table.EntryInactiveCell(index, data)
+
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
+    static member private RenderActive(index: CellCoordinate, data: string, setData: (string -> unit)) =
+        Table.EntryActiveCell(index, data, setData)
+
     [<ReactComponent>]
     static member Entry() =
         let TableHandler = React.useRef<TableHandle> (null)
@@ -478,27 +487,12 @@ swt:p-0"""
                 |]
             )
 
-        let render =
-            React.memo (
-                (fun (index: CellCoordinate) ->
-                    let data = data.[index.y].[index.x]
-                    Table.EntryInactiveCell(index, data)
-                )
-            )
+        let getDataItem = (fun (index: CellCoordinate) -> data.[index.y].[index.x])
 
-        let renderActiveCell =
-            React.memo (
-                (fun (index: CellCoordinate) ->
-                    let dataItem = data.[index.y].[index.x]
-
-                    let setData =
-                        (fun newData ->
-                            data.[index.y].[index.x] <- newData
-                            setData data
-                        )
-
-                    Table.EntryActiveCell(index, dataItem, setData)
-                )
+        let setData =
+            (fun (index: CellCoordinate) newData ->
+                data.[index.y].[index.x] <- newData
+                setData data
             )
 
         Html.div [
@@ -515,8 +509,16 @@ swt:p-0"""
                 Table.Table(
                     rowCount = rowCount,
                     columnCount = columnCount,
-                    renderCell = render,
-                    renderActiveCell = renderActiveCell,
+                    renderCell =
+                        (fun index ->
+                            let data = getDataItem index
+                            Table.RenderInactive(index, data)
+                        ),
+                    renderActiveCell =
+                        (fun index ->
+                            let dataItem = getDataItem index
+                            Table.RenderActive(index, dataItem, setData index)
+                        ),
                     ref = TableHandler,
                     height = 400
                 )
