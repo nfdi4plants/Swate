@@ -71,7 +71,10 @@ type Breadcrumbs =
                                    prop.className "swt:flex swt:items-center"
                                    prop.children [
                                        // Separator
-                                       Html.span [ prop.className "swt:mx-2 swt:text-gray-400"; prop.text "/" ]
+                                       Html.span [
+                                           prop.className "swt:mx-2 swt:text-gray-400"
+                                           prop.text "/"
+                                       ]
                                        Html.a [
                                            prop.className "swt:link swt:link-hover"
                                            prop.text item.Name
@@ -90,10 +93,11 @@ type Breadcrumbs =
         let maxItems = defaultArg maxItems 3
 
         let displayPath =
-            if path.Length <= maxItems then
-                path
-            else
-                // Show first item, ellipsis, and last (maxItems - 1) items
+            match path.Length with
+            | 0 -> []
+            | n when n <= maxItems -> path
+            | n when n <= maxItems + 1 -> path
+            | _ ->
                 let ellipsisItem = {
                     Id = "ellipsis"
                     Name = "..."
@@ -113,9 +117,10 @@ type Breadcrumbs =
                     Selectable = false
                 }
 
-                [ path.[0] ]
+                [ List.head path ]
                 @ [ ellipsisItem ]
                 @ (path |> List.skip (path.Length - maxItems + 1))
+
 
         Html.div [
             prop.className "swt:breadcrumbs swt:text-sm swt:mb-4 swt:px-2"
@@ -135,7 +140,10 @@ type Breadcrumbs =
                                 Html.li [
                                     prop.className "swt:flex swt:items-center"
                                     prop.children [
-                                        Html.span [ prop.className "swt:mx-1 swt:text-gray-400"; prop.text "/" ]
+                                        Html.span [
+                                            prop.className "swt:mx-1 swt:text-gray-400"
+                                            prop.text "/"
+                                        ]
                                         if item.ItemType = "ellipsis" then
                                             Html.span [ prop.className "swt:text-gray-500"; prop.text "..." ]
                                         else
