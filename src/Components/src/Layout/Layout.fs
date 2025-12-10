@@ -322,7 +322,8 @@ type Layout =
 
         Layout.Main(
             children = Layout.Wrapper "Main Content" "swt:bg-base-300 swt:h-full",
-            navbar = Layout.Wrapper "Navbar" "swt:swt:h-full",
+            //navbar = Layout.Wrapper "Navbar" "swt:swt:h-full",
+            navbar = Navbar.Entry(),
             leftSidebar =
                 Html.ul [
                     prop.className "swt:menu swt:w-full swt:p-2 swt:rounded-box swt:h-full swt:flex-nowrap"

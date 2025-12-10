@@ -1,11 +1,16 @@
-namespace ElectronComponents
+namespace Swate.Components
 
 open Feliz
 
 type Navbar =
 
     static member MaterialIcon(icon: string, ?className: string) =
-        Html.i [ prop.className ("swt:iconify " + icon + " swt:size-6") ]
+        Html.i [
+            prop.className [
+                //"swt:material-symbols-light--document-search-outline"
+                "swt:iconify " + icon + " swt:size-6"
+            ]
+        ]
 
     static member Button(icon: ReactElement, tooltip: string, (onClick: unit -> unit), ?toolTipPosition: string) =
         let toolTipPosition = defaultArg toolTipPosition "swt:tooltip-right"
@@ -16,7 +21,7 @@ type Navbar =
             prop.children [
                 Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
                 Html.button [
-                    prop.className "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
+                    prop.className "swt:btn swt:btn-square swt:btn-ghost"
                     prop.children [ icon ]
                     prop.onClick (fun _ -> onClick ())
                 ]
@@ -37,7 +42,7 @@ type Navbar =
             ]
 
         Html.select [
-            prop.className "swt:select swt:join-item"
+            prop.className "swt:select swt:select-sm swt:join-item swt:border-none"
             prop.defaultValue "Select an action"
             prop.onChange (fun e -> setState (Some e))
             prop.children [
@@ -51,8 +56,8 @@ type Navbar =
                     )
                 ]
                 Html.optgroup [
-                    prop.label "Standar Methods"
-                    prop.children standardMethods
+                    prop.label "Standard Methods"
+                    prop.children (standardMethods |> Array.map (fun element -> Html.option element))
                 ]
             ]
         ]
@@ -93,13 +98,12 @@ type Navbar =
         let (state: string option), setState = React.useState (None)
 
         let noteAddIcon =
-            Navbar.MaterialIcon("swt:material-symbols-light--left-panel-close")
+            Navbar.MaterialIcon("swt:material-symbols-light--create-new-folder-outline")
 
         let fileOpenIcon =
-            Navbar.MaterialIcon("swt:material-symbols-light--left-panel-close")
+            Navbar.MaterialIcon("swt:material-symbols-light--document-search-outline")
 
-        let cloudDownloadIcon =
-            Navbar.MaterialIcon("swt:material-symbols-light--left-panel-close")
+        let cloudDownloadIcon = Navbar.MaterialIcon("swt:material-symbols-light--download")
 
         let newARCButton = Navbar.Button(noteAddIcon, "Create a new ARC", fun _ -> ())
 
