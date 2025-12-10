@@ -13,6 +13,7 @@ import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/Te
 import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
 import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
+import {Entry as Layout} from '../src/Layout/Layout.fs.js'
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -141,18 +142,19 @@ function DataMapTableContainer() {
 
 const App = () => {
     return (
-        <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
-            <h1 className='swt:text-6xl'>Playground</h1>
-            <AnnoTableContainer />
-            {/* <DataMapTableContainer /> */}
-            {/* <TermSearchContainer /> */}
-            {/* <BaseModalContainer /> */}
-            {/* <ComboBoxContainer /> */}
-            {/* <TemplateFilterContainer /> */}
-            {/* <SelectContainer /> */}
-            {/* <ContextMenuContainer /> */}
-            {/* <TableContainer /> */}
-        </div>
+        <Layout />
+        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
+        //     <h1 className='swt:text-6xl'>Playground</h1>
+        //     <AnnoTableContainer />
+        //     {/* <DataMapTableContainer /> */}
+        //     {/* <TermSearchContainer /> */}
+        //     {/* <BaseModalContainer /> */}
+        //     {/* <ComboBoxContainer /> */}
+        //     {/* <TemplateFilterContainer /> */}
+        //     {/* <SelectContainer /> */}
+        //     {/* <ContextMenuContainer /> */}
+        //     {/* <TableContainer /> */}
+        // </div>
     );
 };
 

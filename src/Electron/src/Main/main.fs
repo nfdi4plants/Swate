@@ -8,6 +8,12 @@ open Fable.Electron.Main
 if SquirrelStartup.started then
     app.quit ()
 
+
+type ArcVault(path: string) =
+    member val path = path with get
+
+
+
 let windows = ResizeArray<BrowserWindow>()
 
 let createWindow () =
