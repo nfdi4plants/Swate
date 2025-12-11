@@ -16,4 +16,8 @@
     <PackageReference Include="Fable.Electron.Forge" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
+  </ItemGroup>
+
 </Project>

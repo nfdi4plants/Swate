@@ -125,6 +125,9 @@ type React =
     [<ImportMember("@uidotdev/usehooks")>]
     static member useDebounce<'A>(value: 'A, delay: int) : 'A = jsNative
 
+    [<ImportMember("@uidotdev/usehooks")>]
+    static member useThrottle<'A>(value: 'A, delay: int) : 'A = jsNative
+
 [<Erase; RequireQualifiedAccess>]
 module React =
 
