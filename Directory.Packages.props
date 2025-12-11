@@ -1,38 +1,37 @@
 <Project>
-  <PropertyGroup>
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageVersion Include="FSharp.Core" Version="10.0.100" />
-    <PackageVersion Include="ARCtrl" Version="3.0.0-beta.12" />
-    <PackageVersion Include="ARCtrl.Javascript" Version="3.0.0-beta.12" />
-    <PackageVersion Include="ARCtrl.Core" Version="3.0.0-beta.12" />
-    <PackageVersion Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.12" />
-    <!-- client -->
-    <PackageVersion Include="Fable.Elmish" Version="4.2.0" />
-    <PackageVersion Include="Fable.Elmish.HMR" Version="7.0.0" />
-    <PackageVersion Include="Fable.Elmish.React" Version="4.0.0" />
-    <PackageVersion Include="Fable.Elmish.Browser" Version="4.0.3" />
-    <PackageVersion Include="Fable.Elmish.Debugger" Version="4.1.0" />
-    <PackageVersion Include="Fable.Fetch" Version="2.7.0" />
-    <PackageVersion Include="Fable.SimpleJson" Version="3.24.0" />
-    <PackageVersion Include="ExcelJS.Fable" Version="0.3.0" />
-    <PackageVersion Include="Fable.Remoting.Client" Version="7.32.0" />
-    <PackageVersion Include="Fable.React.Types" Version="18.4.0" />
-    <PackageVersion Include="Fable.Core" Version="5.0.0-beta.2" />
-    <PackageVersion Include="Feliz" Version="3.0.0-rc.14" />
-    <PackageVersion Include="Fable.Browser.Dom" Version="2.18.0" />
-    <!-- server -->
-    <PackageVersion Include="Saturn" Version="0.16.1" />
-    <PackageVersion Include="Fable.Remoting.Giraffe" Version="5.19.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
-    <PackageVersion Include="Neo4j.Driver" Version="5.18.1" />
-    <!-- electron -->
-     <PackageVersion Include="Fable.Electron" Version="39.2.4" />
-     <PackageVersion Include="Fable.Electron.Remoting" Version="7.0.0" />
-     <PackageVersion Include="Fable.Electron.Forge" Version="7.0.0" />
-    <!-- testing -->
-    <PackageVersion Include="Fable.Mocha" Version="2.17.0" />
-    <PackageVersion Include="Expecto" Version="10.2.3" />
-  </ItemGroup>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageVersion Include="FSharp.Core" Version="10.0.100"/>
+        <PackageVersion Include="ARCtrl" Version="3.0.0-beta.12"/>
+        <PackageVersion Include="ARCtrl.Javascript" Version="3.0.0-beta.12"/>
+        <PackageVersion Include="ARCtrl.Core" Version="3.0.0-beta.12"/>
+        <PackageVersion Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.12"/>
+        <!-- client -->
+        <PackageVersion Include="Fable.Elmish" Version="4.2.0"/>
+        <PackageVersion Include="Fable.Elmish.HMR" Version="7.0.0"/>
+        <PackageVersion Include="Fable.Elmish.React" Version="4.0.0"/>
+        <PackageVersion Include="Fable.Elmish.Browser" Version="4.0.3"/>
+        <PackageVersion Include="Fable.Elmish.Debugger" Version="4.1.0"/>
+        <PackageVersion Include="Fable.Fetch" Version="2.7.0"/>
+        <PackageVersion Include="Fable.SimpleJson" Version="3.24.0"/>
+        <PackageVersion Include="ExcelJS.Fable" Version="0.3.0"/>
+        <PackageVersion Include="Fable.Remoting.Client" Version="7.32.0"/>
+        <PackageVersion Include="Fable.React.Types" Version="18.4.0"/>
+        <PackageVersion Include="Fable.Core" Version="5.0.0-beta.2"/>
+        <PackageVersion Include="Feliz" Version="3.0.0"/>
+        <PackageVersion Include="Fable.Browser.Dom" Version="2.18.0"/>
+        <!-- server -->
+        <PackageVersion Include="Saturn" Version="0.17.0"/>
+        <PackageVersion Include="Fable.Remoting.Giraffe" Version="5.19.0"/>
+        <PackageVersion Include="Neo4j.Driver" Version="5.18.1"/>
+        <!-- electron -->
+        <PackageVersion Include="Fable.Electron" Version="39.2.4"/>
+        <PackageVersion Include="Fable.Electron.Remoting" Version="7.0.0"/>
+        <PackageVersion Include="Fable.Electron.Forge" Version="7.0.0"/>
+        <!-- testing -->
+        <PackageVersion Include="Fable.Mocha" Version="2.17.0"/>
+        <PackageVersion Include="Expecto" Version="10.2.3"/>
+    </ItemGroup>
 </Project>

@@ -3,27 +3,27 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="ProjectInfo.fs" />
-    <Compile Include="Util.fs" />
-    <Compile Include="IO\Changelog.fs" />
-    <Compile Include="IO\VersionIO.fs" />
-    <Compile Include="Tools\GHActions.fs" />
-    <Compile Include="Tools\Git.fs" />
-    <Compile Include="Tools\GitHub.fs" />
-    <Compile Include="Actions\Bundle.fs" />
-    <Compile Include="Actions\Run.fs" />
-    <Compile Include="Actions\Test.fs" />
-    <Compile Include="Actions\Release.fs" />
-    <Compile Include="Build.fs" />
+    <Compile Include="ProjectInfo.fs"/>
+    <Compile Include="Util.fs"/>
+    <Compile Include="IO\Changelog.fs"/>
+    <Compile Include="IO\VersionIO.fs"/>
+    <Compile Include="Tools\GHActions.fs"/>
+    <Compile Include="Tools\Git.fs"/>
+    <Compile Include="Tools\GitHub.fs"/>
+    <Compile Include="Actions\Bundle.fs"/>
+    <Compile Include="Actions\Run.fs"/>
+    <Compile Include="Actions\Test.fs"/>
+    <Compile Include="Actions\Release.fs"/>
+    <Compile Include="Build.fs"/>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="SimpleExec" Version="12.0.0" />
-    <PackageReference Include="Semver" Version="3.0.0" />
-    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.1.0" />
-    <PackageReference Include="FSharp.Data" Version="5.0.2" />
-    <PackageReference Update="FSharp.Core" Version="8.0.403" />
+    <PackageReference Include="SimpleExec" Version="12.0.0"/>
+    <PackageReference Include="Semver" Version="3.0.0"/>
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.1.0"/>
+    <PackageReference Include="FSharp.Data" Version="5.0.2"/>
+    <PackageReference Update="FSharp.Core" Version="9.0.300"/>
   </ItemGroup>
 </Project>

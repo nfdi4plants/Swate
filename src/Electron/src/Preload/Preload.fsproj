@@ -5,13 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="preload.fs" />
+    <Compile Include="preload.fs"/>
   </ItemGroup>
-
+  
   <ItemGroup>
-    <PackageReference Include="Fable.Electron" />
-    <PackageReference Include="Fable.Electron.Remoting" />
-    <PackageReference Include="Fable.Electron.Forge" />
+    <ProjectReference Include="..\Swate.Electron.Shared\Swate.Electron.Shared.fsproj"/>
   </ItemGroup>
 
 </Project>
