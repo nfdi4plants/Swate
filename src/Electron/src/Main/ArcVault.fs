@@ -1,6 +1,7 @@
 [<AutoOpen>]
 module rec Main.ArcVault
 
+open Browser
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
@@ -11,8 +12,6 @@ module ArcVaultHelper =
 
     open Fable.Core.JsInterop
     open Node.Api
-
-    let Debug = isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL
 
     let createWindow () = promise {
         printfn "[Swate] Creating new window"
@@ -36,97 +35,83 @@ module ArcVaultHelper =
         return window
     }
 
-/// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
-let arcIOApi (window: BrowserWindow) : IARCIOApi = {
-    openARC =
-        fun () -> promise {
-            let! r =
-                dialog.showOpenDialog (
-                    unbox window,
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
-
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne
-
-                do! ARC_VAULTS.InitVault(arcPath)
-                return Ok()
-        }
-}
-
 /// <summary>
 ///
 /// </summary>
 /// <param name="path">Can be None if not opened ARC.</param>
-type ArcVault private (path: string, window: BrowserWindow, debug: bool) =
+type ArcVault (window: BrowserWindow, ?path: string) =
 
-
-    member val path: string = path with get
+    member val path: string option = path with get, private set
     member val window: BrowserWindow = window with get
 
-    static member Init(path: string, ?window: BrowserWindow) = promise {
-        printfn $"[Swate] Open Arc in {path}"
+    // static member Init(window: BrowserWindow) = promise {
+    //
+    //     let mutable window = window
+    //
+    //     if window.IsNone then
+    //         let! newWindow = ArcVaultHelper.createWindow ()
+    //         window <- Some newWindow
+    //
+    //     let fileName = path.Replace("\\", "/").Split('/') |> Array.last
+    //     window.Value.setTitle ($"{fileName}")
+    //
+    //     return ArcVault(path, window.Value)
+    // }
 
-        let mutable window = window
-
-        if window.IsNone then
-            let! newWindow = ArcVaultHelper.createWindow ()
-            window <- Some newWindow
-
-        let fileName = path.Replace("\\", "/").Split('/') |> Array.last
-        window.Value.setTitle ($"{fileName}")
-
-        Remoting.init |> Remoting.buildHandler (arcIOApi window.Value)
-
-        return ArcVault(path, window.Value, ArcVaultHelper.Debug)
-    }
+    member this.SetPath(path: string) =
+        match this.path with
+        | Some _ ->
+            failwith "Setting path for vaults with existing path is currently not supported."
+        | None ->
+            let sendMsg =
+                Remoting.init
+                |> Remoting.withWindow this.window
+                |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+            sendMsg.pathChange (Some path)
+            this.path <- Some path
 
 type ArcVaults() =
-    member val Vaults = Dictionary<string, ArcVault>() with get
+    /// Key is window.id
+    member val Vaults = Dictionary<int, ArcVault>() with get
 
-    member this.InitVault(path: string) : Fable.Core.JS.Promise<unit> = promise {
-        // check if vault already open
-        if this.Vaults.ContainsKey(path) then
-            this.Vaults.[path].window.focus ()
-        else
-            let! newVault = ArcVault.Init(path)
+    member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
-            newVault.window.onClosed (fun () ->
-                if this.Vaults.Remove(path) then
-                    printfn $"Removed %i{newVault.window.id} from window array"
-                else
-                    failwith $"Failed to remove %i{newVault.window.id} from window array"
-            )
+    member this.InitVault(?path: string) : Fable.Core.JS.Promise<int> = promise {
+        let! window = ArcVaultHelper.createWindow()
+        let id = window.id
+        console.log($"Register window with id: {id}")
+        let vault = ArcVault(window, ?path = path)
+        this.Vaults.Add(id, vault)
 
-            this.Vaults.Add(path, newVault)
-            newVault.window.focus ()
+        window.onClosed (fun () ->
+            if this.Vaults.Remove(id) then
+                printfn $"Removed vault '{window.id}'"
+            else
+                failwith $"Failed to remove vault '{window.id}'"
+        )
 
-        return ()
+        window.focus()
+
+        return id
     }
 
-    member this.InitVault(path: string, existingWindow: BrowserWindow) : Fable.Core.JS.Promise<unit> = promise {
-        // check if vault already open
-        if this.Vaults.ContainsKey(path) then
-            this.Vaults.[path].window.focus ()
-        else
-            let! newVault = ArcVault.Init(path, existingWindow)
+    member this.SetPath(windowId: int, path: string) =
+        match this.Vaults.TryGetValue windowId with
+        | false, _ ->
+            failwith $"Vault with window-id '{windowId}' not found."
+        | true, vault ->
+            vault.SetPath path
 
-            newVault.window.onClosed (fun () ->
-                if this.Vaults.Remove(path) then
-                    printfn $"Removed %i{newVault.window.id} from window array"
-                else
-                    failwith $"Failed to remove %i{newVault.window.id} from window array"
-            )
+    member this.TryGetVault(windowId: int) =
+        match this.Vaults.TryGetValue windowId with
+        | true, vault -> Some vault
+        | false, _ -> None
 
-            this.Vaults.Add(path, newVault)
-            newVault.window.focus ()
-    }
+    member this.TryGetVaultByPath (path: string) =
+        this.Vaults.Values
+        |> Seq.tryFind (fun v ->
+            v.path = Some path
+        )
 
 
 let ARC_VAULTS: ArcVaults = ArcVaults()

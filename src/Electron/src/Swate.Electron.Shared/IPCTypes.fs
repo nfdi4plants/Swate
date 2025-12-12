@@ -1,14 +1,16 @@
 module Swate.Electron.Shared.IPCTypes
 
 open Fable.Core.JS // Promise type
+open Fable.Electron
 
-/// This IPC API is used to handle cases, in which no ARC is opened in the window yet
-type IStartUpApi = {
+type IArcVaultsApi = {
     /// Will open ARC in same window
-    openARC: unit -> Promise<Result<string, exn>>
+    openARC: IpcMainEvent -> Promise<Result<string, exn>>
+    /// Will open ARC in a new window
+    openARCInNewWindow: unit -> Promise<Result<unit, exn>>
+    getOpenPath: IpcMainEvent -> Promise<string option>
 }
 
-type IARCIOApi = {
-    /// Will open ARC in new window
-    openARC: unit -> Promise<Result<unit, exn>>
+type IMainUpdateRendererApi = {
+    pathChange: string option -> unit
 }

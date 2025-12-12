@@ -4,20 +4,19 @@ open Feliz
 open Swate.Components
 
 module private InitStateHelper =
-    let openARC setAppState =
+    let openARC =
         fun () -> promise {
-            let! r = Api.startUpApi.openARC ()
+            let! r = Api.arcVaultApi.openARC Fable.Core.JS.undefined
 
             match r with
-            | Error e -> failwith e.Message
-            | Ok v -> Swate.Electron.Shared.AppState.ARC v |> setAppState
+            | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
+            | Ok _ -> ()
         }
 
 open InitStateHelper
 
 [<ReactComponent>]
 let InitState () =
-    let appStateCtx = React.useContext (Renderer.context.AppStateCtx.AppStateCtx)
 
     CardGrid.CardGrid(
         React.Fragment [
@@ -27,7 +26,7 @@ let InitState () =
                 ],
                 "Open ARC",
                 "Open a locally existing ARC!",
-                (openARC appStateCtx.setState >> Promise.start)
+                (openARC >> Promise.start)
             )
             CardGrid.CardGridButton(
                 Html.i [

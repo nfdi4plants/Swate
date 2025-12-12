@@ -12,6 +12,36 @@ importSideEffects "./tailwind.css"
 // importSideEffects "../Components/tailwind.css"
 importSideEffects "./App.css"
 
+
+let private ARCitectInAPI (dispatch: Messages.Msg -> unit) : Model.ARCitect.Interop.IARCitectInAPI = {
+    TestHello = fun name -> promise { return sprintf "Hello %s" name }
+    ResponsePaths =
+        fun paths -> promise {
+            Model.ARCitect.ResponsePaths paths |> Messages.ARCitectMsg |> dispatch
+            return true
+        }
+    ResponseFile =
+        fun file -> promise {
+            Model.ARCitect.ResponseFile file |> Messages.ARCitectMsg |> dispatch
+            return true
+        }
+    Refresh =
+        fun () -> promise {
+            ApiCall.Start() |> Model.ARCitect.Init |> Messages.ARCitectMsg |> dispatch
+            return true
+        }
+    SetARCFile =
+        fun (file, name, dataMapParent) -> promise {
+            ApiCall.Finished(Some(file, name, dataMapParent))
+            |> Model.ARCitect.Init
+            |> Messages.ARCitectMsg
+            |> dispatch
+
+            return true
+        }
+}
+
+
 module Subscriptions =
 
     let private ARCitectInAPI (dispatch: Messages.Msg -> unit) : Model.ARCitect.Interop.IARCitectInAPI = {

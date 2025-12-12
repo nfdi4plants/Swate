@@ -1,12 +1,45 @@
 module Renderer.App
 
 open Feliz
+open Fable.Electron.Remoting.Renderer
+open Fable.Core
 open Swate.Components
 open Swate.Electron.Shared
+open Browser.Dom
 
 [<ReactComponent>]
 let Main () =
     let appState, setAppState = React.useState (AppState.Init)
+
+    React.useLayoutEffectOnce(fun _ ->
+        Api.arcVaultApi.getOpenPath JS.undefined
+        |> Promise.map (fun pathOption ->
+            match pathOption with
+            | Some p ->
+                console.log $"[Swate] Found open path: {p}"
+                AppState.ARC p
+                |> setAppState
+            | None ->
+                setAppState AppState.Init
+        )
+        |> Promise.start
+    )
+
+    let ipcHandler :Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
+        pathChange = fun pathOption ->
+            console.log ("[Swate] CHANGE PATH!")
+            match pathOption with
+            | Some p ->
+                AppState.ARC p
+                |> setAppState
+            | None ->
+                setAppState AppState.Init
+    }
+
+    React.useEffectOnce(fun _ ->
+        Remoting.init
+        |> Remoting.buildHandler ipcHandler
+    )
 
     let children =
         React.useMemo (
@@ -42,7 +75,7 @@ let Main () =
                 Html.button [
                     prop.onClick (fun _ ->
                         promise {
-                            match! Api.arcIOApi.openARC () with
+                            match! Api.arcVaultApi.openARCInNewWindow() with
                             | Ok _ -> ()
                             | Error exn -> failwith $"{exn.Message}"
 
