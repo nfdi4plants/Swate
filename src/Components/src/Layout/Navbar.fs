@@ -1,12 +1,13 @@
 namespace Swate.Components
 
+open System
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 open Browser.Dom
 open Browser.Types
 
-type RecentArc(name: string, path: string, onClick: MouseEvent -> unit, isActive: bool) =
+type RecentARC(name: string, path: string, onClick: MouseEvent -> unit, isActive: bool) =
 
     member val Name = name with get, set
     member val Path = path with get, set
@@ -16,12 +17,21 @@ type RecentArc(name: string, path: string, onClick: MouseEvent -> unit, isActive
     member this.SetActive() = this.IsActive <- true
     member this.SetInActive() = this.IsActive <- false
 
+type ARCButton(icon: ReactElement, toolTip: string, onClick: MouseEvent -> unit) =
+
+    member val Icon = icon with get, set
+    member val ToolTip = toolTip with get, set
+    member val OnClick = onClick with get, set
+
 type Dropdown =
 
     [<ReactComponent>]
-    static member Main(isOpen, setIsOpen, toggle: ReactElement, recentARCs: ReactElement[], actionBar: ReactElement) =
+    static member Main
+        (isOpen, setIsOpen, toggle: ReactElement, recentARCs: ReactElement[], actionBar: ReactElement, ?potMaxWidth: int) =
         let ref = React.useElementRef ()
         React.useListener.onClickAway (ref, fun _ -> setIsOpen false)
+
+        let maxWidth = defaultArg potMaxWidth 48
 
         Html.div [
             prop.ref ref
@@ -35,9 +45,9 @@ type Dropdown =
                 if isOpen then
                     Html.ul [
                         prop.tabIndex 0
-                        prop.className [
-                            "swt:dropdown-content swt:min-w-48 swt:menu swt:bg-base-200 swt:rounded-box swt:menu swt:z-[99] swt:p-2 swt:shadow-sm swt:!top-[110%] swt:rounded-box"
-                        ]
+                        prop.className
+                            "swt:dropdown-content swt:min-w-48 swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:gap-2 swt:shadow-sm swt:top-110%"
+                        prop.style [ style.maxWidth maxWidth ]
                         prop.children [ Html.div recentARCs; actionBar ]
                     ]
             ]
@@ -74,10 +84,17 @@ type Navbar =
         ]
 
     [<ReactComponent>]
-    static member ContextMenu(containerRef, buttons: ReactElement[], ?debug) =
+    static member ContextMenu(containerRef, buttons: ARCButton[], ?debug) =
+
+        let toolTipps =
+            buttons |> Array.map (fun toolTip -> Html.li [ prop.text toolTip.ToolTip ])
+
+        let icons = buttons |> Array.map (fun icon -> Html.li [ icon.Icon ])
 
         let buttonElements =
-            buttons |> Array.map (fun button -> ContextMenuItem(button)) |> List.ofArray
+            buttons
+            |> Array.map (fun (button: ARCButton) -> ContextMenuItem(Html.li [ prop.text button.ToolTip ], button.Icon))
+            |> List.ofArray
 
         ContextMenu.ContextMenu(
             (fun _ -> buttonElements),
@@ -94,13 +111,15 @@ type Navbar =
     static member createMouseEvent (eventType: string) (options: obj) : MouseEvent = jsNative
 
     [<ReactComponent>]
-    static member Actionbar(elements: ReactElement[], maxNumber: int) =
+    static member Actionbar(buttons: ARCButton[], maxNumber: int) =
 
         let selectedElements =
-            if elements.Length > 0 && elements.Length > maxNumber + 1 then
-                Array.take maxNumber elements
+            if buttons.Length > 0 && buttons.Length > maxNumber + 1 then
+                Array.take maxNumber buttons
+                |> Array.map (fun button -> Navbar.Button(button.Icon, button.ToolTip, button.OnClick))
             else
-                elements
+                buttons
+                |> Array.map (fun button -> Navbar.Button(button.Icon, button.ToolTip, button.OnClick))
 
         let fireOpenContextEvent (element: HTMLElement) clientX clientY =
             let options =
@@ -117,7 +136,7 @@ type Navbar =
 
         let restElements =
             let temp =
-                if elements.Length > 0 && elements.Length <= maxNumber + 1 then
+                if buttons.Length > 0 && buttons.Length <= maxNumber + 1 then
                     Html.div []
                 else
                     let containerRef = React.useElementRef ()
@@ -126,15 +145,18 @@ type Navbar =
                         prop.ref containerRef
                         prop.children [
                             Navbar.Button(
-                                Navbar.MaterialIcon("swt:fluent--line-horizontal-1-dot-20-filled swt:size-5"),
-                                "Tooltip",
+                                Navbar.MaterialIcon("swt:fluent--line-horizontal-1-dot-20-regular swt:size-5"),
+                                "Show more options",
                                 (fun e ->
                                     match containerRef.current with
                                     | Some container -> fireOpenContextEvent container e.clientX e.clientY
                                     | None -> ()
                                 )
                             )
-                            Navbar.ContextMenu(containerRef, elements.[maxNumber..])
+
+                            let restButtons = buttons.[maxNumber..] |> Array.map (fun button -> button)
+
+                            Navbar.ContextMenu(containerRef, restButtons)
                         ]
                     ]
 
@@ -143,16 +165,30 @@ type Navbar =
         let selectedElement = Html.div [ prop.children selectedElements ]
 
         Html.div [
-            prop.className "swt:flex swt:border swt:border-neutral swt:rounded-lg"
+            prop.className $"swt:flex swt:border swt:border-neutral swt:rounded-lg swt:w-full"
             prop.children [ selectedElement; restElements ]
         ]
 
     [<ReactComponent>]
-    static member Selector(recentARCs: RecentArc[], setRecentARCs, buttons: ReactElement[], maxNumber) =
+    static member Selector
+        (
+            recentARCs: RecentARC[],
+            setRecentARCs,
+            buttons: ARCButton[],
+            maxNumberRecentElements,
+            maxNumberActionBar,
+            ?potMaxWidth: int
+        ) =
+
+        let maxWidth = defaultArg potMaxWidth 48
 
         let isOpen, setOpen = React.useState (false)
 
-        let setArcActivity (arcElement: RecentArc) =
+        if recentARCs.Length > maxNumberRecentElements then
+            let tmp = Array.take maxNumberRecentElements recentARCs
+            setRecentARCs tmp
+
+        let setArcActivity (arcElement: RecentARC) =
             match arcElement.IsActive with
             | true -> arcElement.SetInActive()
             | false -> arcElement.SetActive()
@@ -176,12 +212,24 @@ type Navbar =
             |> Array.map (fun arcElement ->
                 Html.li [
                     prop.key arcElement.Path
-                    prop.className [
-                        "swt:menu-item"
-                        if arcElement.IsActive then
-                            "swt:bg-primary"
+                    prop.className [ "swt:menu-item" ]
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:flex swt:justify-between"
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:truncate swt:block swt:min-w-30"
+                                    prop.style [ style.maxWidth maxWidth ]
+                                    prop.text arcElement.Name
+                                ]
+                                if arcElement.IsActive then
+                                    Html.i [
+                                        prop.className
+                                            "swt:iconify swt:fluent--checkmark-20-regular swt:size-5 swt:flex-none"
+                                    ]
+                            ]
+                        ]
                     ]
-                    prop.text arcElement.Name
                     prop.onClick (fun _ -> onARCClick arcElement)
                 ]
             )
@@ -193,11 +241,18 @@ type Navbar =
                 prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
                 prop.children [
                     Html.div [ prop.text "Placeholder" ]
-                    Navbar.MaterialIcon "swt:iconify swt:fluent--arrow-fit-height-24-regular swt:size-5"
+                    Navbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5"
                 ]
             ]
 
-        Dropdown.Main(isOpen, setOpen, dropDownSwitch, recentARCElements, Navbar.Actionbar(buttons, maxNumber))
+        Dropdown.Main(
+            isOpen,
+            setOpen,
+            dropDownSwitch,
+            recentARCElements,
+            Navbar.Actionbar(buttons, maxNumberActionBar),
+            potMaxWidth = maxWidth
+        )
 
     [<ReactComponent>]
     static member Main(?left: ReactElement, ?middle: ReactElement, ?right: ReactElement, ?navbarHeight: int) =
@@ -238,29 +293,36 @@ type Navbar =
         let cloudDownloadIcon =
             Navbar.MaterialIcon("swt:fluent--cloud-arrow-down-24-regular swt:size-5")
 
-        let newARCButton = Navbar.Button(noteAddIcon, "Create a new ARC", fun _ -> ())
+        let newARCButton = ARCButton(noteAddIcon, "Create a new ARC", fun _ -> ())
 
-        let openARCButton = Navbar.Button(fileOpenIcon, "Open an existing ARC", fun _ -> ())
+        let openARCButton = ARCButton(fileOpenIcon, "Open an existing ARC", fun _ -> ())
 
         let downLoadARCButton =
-            Navbar.Button(cloudDownloadIcon, "Download an existing ARC", (fun _ -> ()))
+            ARCButton(cloudDownloadIcon, "Download an existing ARC", fun _ -> ())
 
         let standardButtons = [|
             newARCButton
             openARCButton
             downLoadARCButton
             newARCButton
-            newARCButton
+            openARCButton
         |]
 
         let testRecentARCs = [|
-            RecentArc("Test 1", "/Here", (fun _ -> ()), false)
-            RecentArc("Test 2", "/Here/Here", (fun _ -> ()), false)
-            RecentArc("Test 3", "/Here/Here/Here", (fun _ -> ()), false)
+            RecentARC("Test 1", "/Here", (fun _ -> ()), false)
+            RecentARC("Test 2", "/Here/Here", (fun _ -> ()), false)
+            RecentARC("Test 3", "/Here/Here/Here", (fun _ -> ()), false)
+            RecentARC(
+                "Test jfcesjföisjyfnwjtiewhroiajlkfnnalkfjwarkoiewfanflkndslkfjwiajofkcmscnskjfafdölmsalknoisjfamlkcnkj<ycwaklfnewjföosajö",
+                "/Here/Here/Here/Here",
+                (fun _ -> ()),
+                false
+            )
         |]
 
         let recentARCs, setRecentARCs = React.useState (testRecentARCs)
 
-        let selector = Navbar.Selector(recentARCs, setRecentARCs, standardButtons, 3)
+        let selector =
+            Navbar.Selector(recentARCs, setRecentARCs, standardButtons, 5, 3, potMaxWidth = 48)
 
         Navbar.Main(selector)
