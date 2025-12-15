@@ -36,10 +36,10 @@ module ArcVaultHelper =
     }
 
 /// <summary>
-///
+/// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
 /// <param name="path">Can be None if not opened ARC.</param>
-type ArcVault (window: BrowserWindow, ?path: string) =
+type ArcVault(window: BrowserWindow, ?path: string) =
 
     member val path: string option = path with get, private set
     member val window: BrowserWindow = window with get
@@ -60,13 +60,13 @@ type ArcVault (window: BrowserWindow, ?path: string) =
 
     member this.SetPath(path: string) =
         match this.path with
-        | Some _ ->
-            failwith "Setting path for vaults with existing path is currently not supported."
+        | Some _ -> failwith "Setting path for vaults with existing path is currently not supported."
         | None ->
             let sendMsg =
                 Remoting.init
                 |> Remoting.withWindow this.window
                 |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+
             sendMsg.pathChange (Some path)
             this.path <- Some path
 
@@ -77,41 +77,36 @@ type ArcVaults() =
     member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
     member this.InitVault(?path: string) : Fable.Core.JS.Promise<int> = promise {
-        let! window = ArcVaultHelper.createWindow()
+        let! window = ArcVaultHelper.createWindow ()
         let id = window.id
-        console.log($"Register window with id: {id}")
+        console.log ($"Register window with id: {id}")
         let vault = ArcVault(window, ?path = path)
         this.Vaults.Add(id, vault)
 
         window.onClosed (fun () ->
             if this.Vaults.Remove(id) then
-                printfn $"Removed vault '{window.id}'"
+                printfn $"[Swate] Removed vault '{window.id}'"
             else
                 failwith $"Failed to remove vault '{window.id}'"
         )
 
-        window.focus()
+        window.focus ()
 
         return id
     }
 
     member this.SetPath(windowId: int, path: string) =
         match this.Vaults.TryGetValue windowId with
-        | false, _ ->
-            failwith $"Vault with window-id '{windowId}' not found."
-        | true, vault ->
-            vault.SetPath path
+        | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
+        | true, vault -> vault.SetPath path
 
     member this.TryGetVault(windowId: int) =
         match this.Vaults.TryGetValue windowId with
         | true, vault -> Some vault
         | false, _ -> None
 
-    member this.TryGetVaultByPath (path: string) =
-        this.Vaults.Values
-        |> Seq.tryFind (fun v ->
-            v.path = Some path
-        )
+    member this.TryGetVaultByPath(path: string) =
+        this.Vaults.Values |> Seq.tryFind (fun v -> v.path = Some path)
 
 
 let ARC_VAULTS: ArcVaults = ArcVaults()
