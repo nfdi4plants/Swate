@@ -1,6 +1,5 @@
-﻿module Renderer
+﻿module Renderer.Main
 
-open Fable.Core
 open Browser.Dom
 open Feliz
 

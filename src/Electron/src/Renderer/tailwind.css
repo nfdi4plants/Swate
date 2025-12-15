@@ -233,3 +233,25 @@
         animation-delay: 6s;
     }
 }
+
+@layer swt-utilities {
+    /* Scrollbar utilities: keep constant width, fade thumb on hover (no layout shift) */
+    .swt\:scrollbar-fade {
+        scrollbar-width: thin; /* Firefox: keep a constant gutter */
+        scrollbar-color: transparent transparent; /* hide thumb until hover */
+    }
+    .swt\:scrollbar-fade::-webkit-scrollbar {
+        width: 8px; /* WebKit: constant width prevents layout shift */
+        height: 8px;
+    }
+    .swt\:scrollbar-fade::-webkit-scrollbar-thumb {
+        background-color: transparent; /* hidden by default */
+        border-radius: 8px;
+    }
+    .swt\:scrollbar-fade:hover {
+        scrollbar-color: color-mix(in oklch, var(--color-base-content) 40%, transparent) transparent;
+    }
+    .swt\:scrollbar-fade:hover::-webkit-scrollbar-thumb {
+        background-color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+    }
+}
