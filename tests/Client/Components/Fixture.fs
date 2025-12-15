@@ -358,3 +358,73 @@ type Fixture =
         CompositeColumn.create (header, [| body |] |> ResizeArray)
 
     static member Body_Empty = [| [| "" |] |]
+
+
+    static member InitARCitect() =
+
+        let btnActive, setBtnActive = React.useState false
+
+        let children =
+
+            Html.div [
+                prop.className [
+                    "swt:flex swt:grow swt:items-center swt:justify-center"
+                    "swt:bg-base-300 swt:h-full"
+                ]
+                prop.text "Main Content"
+            ]
+
+        Layout.Main(
+            children = children,
+            navbar = Navbar.Entry(debug = true),
+            leftSidebar =
+                Html.ul [
+                    prop.className "swt:menu swt:w-full swt:p-2 swt:rounded-box swt:h-full swt:flex-nowrap"
+                    prop.children [
+                        for i in 0..100 do
+                            Html.li [ Html.a [ prop.text $"Sidebar Item {i}" ] ]
+                    ]
+                ],
+            rightSidebar =
+                Html.ul [
+                    prop.className "swt:menu swt:w-full swt:flex-nowrap swt:p-2 swt:h-full"
+                    prop.children [
+                        for i in 0..100 do
+                            Html.li [ Html.a [ prop.text $"Right Sidebar Item {i}" ] ]
+                    ]
+                ],
+            rightActions =
+                React.Fragment [
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--search-24-regular",
+                        tooltip = "Search",
+                        onClick = fun () -> Browser.Dom.window.alert "Search clicked"
+                    )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--info-24-regular",
+                        tooltip = "Help",
+                        onClick = fun () -> Browser.Dom.window.alert "Help clicked"
+                    )
+                ],
+            leftActions =
+                React.Fragment [
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--home-24-regular",
+                        tooltip = "Home",
+                        isActive = btnActive,
+                        onClick = fun () -> setBtnActive (not btnActive)
+                    )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--settings-24-regular",
+                        tooltip = "Settings",
+                        onClick = fun () -> Browser.Dom.window.alert "Settings clicked"
+                    )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--info-24-regular",
+                        tooltip = "Info",
+                        onClick = fun () -> Browser.Dom.window.alert "Info clicked"
+                    )
+                ],
+            sidebarLeftDefault = true,
+            sidebarRightDefault = true
+        )

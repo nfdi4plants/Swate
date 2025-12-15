@@ -3,6 +3,7 @@ import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'story
 import Layout from "./Layout.fs.js";
 import {LayoutBtn, LeftSidebarToggleBtn} from "./Layout.fs.js";
 import React from 'react';
+import { Navbar, Navbar_Entry_6FCE9E49 as NavbarEntry } from './Navbar.fs.js';
 
 const meta = {
   title: "Components/Layout",
@@ -160,4 +161,44 @@ export const ContentRightSidebar: Story = {
     </ul>,
     sidebarRightDefault: true,
   }
+}
+
+export const ARCitectNavbarExists: Story = {
+  name: "ARCitect Navbar is visible",
+  args: {
+    navbar: < NavbarEntry debug={true} />,
+    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
+      Main Content
+    </div>,
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await waitFor(async () => {
+      const navbarTest = await canvas.findByTestId("navbar-test");
+      expect(navbarTest).toBeVisible();
+    });
+  },
+}
+
+export const NavbarActionbarExists: Story = {
+  name: "ARCitect Navbar Actionbar is visible",
+  args: {
+    navbar: < NavbarEntry debug={true} />,
+    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
+      Main Content
+    </div>,
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const selectorTest = await canvas.findByTestId("selector-test");
+
+    await userEvent.click(selectorTest);
+
+    await waitFor(async () => {
+      const actionbarTest = await canvas.findByTestId("actionbar-test");
+      expect(actionbarTest).toBeVisible();
+    });
+  },
 }

@@ -498,15 +498,6 @@ type Layout =
 
         Layout.Main(
             children = Layout.Wrapper "Main Content" "swt:bg-base-300 swt:h-full",
-            //navbar = Layout.Wrapper "Navbar" "swt:h-full",
-            //navbar =
-            //    Html.div [
-            //        prop.className "swt:flex swt:pl-2 swt:ml-auto"
-            //        prop.children [
-            //            Layout.LeftSidebarToggleBtn()
-            //            Layout.RightSidebarToggleBtn()
-            //        ]
-            //    ],
             navbar = Navbar.Entry(),
             leftSidebar =
                 Html.ul [
