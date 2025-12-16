@@ -3,7 +3,8 @@ import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'story
 import Layout from "./Layout.fs.js";
 import {LayoutBtn, LeftSidebarToggleBtn} from "./Layout.fs.js";
 import React from 'react';
-import { Navbar, Navbar_Entry_6FCE9E49 as NavbarEntry } from './Navbar.fs.js';
+import { Entry as SelectorEntry } from '../GenericComponents/Selector.fs.js';
+import { Main as NavbarMain } from '../GenericComponents/Navbar.fs.js';
 
 const meta = {
   title: "Components/Layout",
@@ -163,10 +164,10 @@ export const ContentRightSidebar: Story = {
   }
 }
 
-export const ARCitectNavbarExists: Story = {
+export const ARCitectNavbarIsVisible: Story = {
   name: "ARCitect Navbar is visible",
   args: {
-    navbar: < NavbarEntry debug={true} />,
+    navbar: < NavbarMain debug={true} />,
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
       Main Content
     </div>,
@@ -181,10 +182,28 @@ export const ARCitectNavbarExists: Story = {
   },
 }
 
-export const NavbarActionbarExists: Story = {
-  name: "ARCitect Navbar Actionbar is visible",
+export const SelectorIsVisible: Story = {
+  name: "Selector is visible",
   args: {
-    navbar: < NavbarEntry debug={true} />,
+    navbar: <SelectorEntry maxNumber = {3} debug={true} />,
+    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
+      Main Content
+    </div>,
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await waitFor(async () => {
+      const selectorTest = await canvas.findByTestId("selector-test");
+      expect(selectorTest).toBeVisible();
+    });
+  },
+}
+
+export const SelectorActionbarisVisible: Story = {
+  name: "Selector Actionbar is visible",
+  args: {
+    navbar: <SelectorEntry maxNumber = {3} debug={true} />,
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
       Main Content
     </div>,
@@ -199,6 +218,50 @@ export const NavbarActionbarExists: Story = {
     await waitFor(async () => {
       const actionbarTest = await canvas.findByTestId("actionbar-test");
       expect(actionbarTest).toBeVisible();
+    });
+  },
+}
+
+export const RestElementButtonInActionbarIsVisible: Story = {
+  name: "RestElementbutton in Actionbar is visible",
+  args: {
+    navbar: <SelectorEntry maxNumber = {3} debug={true} />,
+    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
+      Main Content
+    </div>,
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const selectorTest = await canvas.findByTestId("selector-test");
+
+    await userEvent.click(selectorTest);
+
+    await waitFor(async () => {
+      const restElementButton = await canvas.findByTestId("button-test");
+      expect(restElementButton).toBeVisible();
+    });
+  },
+}
+
+export const RestElementButtonInActionbarIsNotVisible: Story = {
+  name: "RestElementbutton in Actionbar is not visible",
+  args: {
+    navbar: <SelectorEntry maxNumber = {5} debug={true} />,
+    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
+      Main Content
+    </div>,
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const selectorTest = await canvas.findByTestId("selector-test");
+
+    await userEvent.click(selectorTest);
+
+    await waitFor(async () => {
+      const restElementButton = await canvas.findByTestId("button-test");
+      !expect(restElementButton).toBeVisible();
     });
   },
 }
