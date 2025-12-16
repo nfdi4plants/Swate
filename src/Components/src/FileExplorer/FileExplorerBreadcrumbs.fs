@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.FileExplorer.FileExplorerBreadcrumbs
 
 open Swate.Components.Shared
 open Swate.Components

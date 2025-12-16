@@ -88,6 +88,9 @@
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs"/>
     <Compile Include="AnnotationTable\AnnotationTable.fs"/>
     <Compile Include="DataMapTable\DataMapTable.fs"/>
+    <Compile Include="FileExplorer\FileTreeDataStructures.fs"/>
+    <Compile Include="FileExplorer\FileExplorerBreadcrumbs.fs"/>
+    <Compile Include="FileExplorer\FileExplorer.fs"/>
     <Compile Include="Style.fs"/>
   </ItemGroup>
 

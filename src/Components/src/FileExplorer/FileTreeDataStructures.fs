@@ -276,7 +276,7 @@ module FileExplorerLogic =
         | ToggleExpanded of string
         | SelectItem of string
         | NavigateTo of string
-        | ShowContextMenu of float * float * FileItem * ContextMenuItem list
+        | ShowContextMenu of float * float * ContextMenuItem list
         | HideContextMenu
         | UpdateItems of FileItem list
         | AddChild of parentId: string * child: FileItem
@@ -334,7 +334,7 @@ module FileExplorerLogic =
             else
                 update (SelectItem itemId) model
 
-        | ShowContextMenu(x, y, item, menuItems) -> {
+        | ShowContextMenu(x, y, menuItems) -> {
             model with
                 ContextMenuVisible = true
                 ContextMenuX = x
