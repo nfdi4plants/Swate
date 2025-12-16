@@ -58,6 +58,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Preload", "src\Electron\src
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Renderer", "src\Electron\src\Renderer\Renderer.fsproj", "{60C5B05E-08AE-4288-A917-64836FDACD8B}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Swate.Electron.Shared", "src\Electron\src\Swate.Electron.Shared\Swate.Electron.Shared.fsproj", "{48343EC6-B313-495B-B205-CC0A65B98ED6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -112,6 +114,10 @@ Global
 		{60C5B05E-08AE-4288-A917-64836FDACD8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{60C5B05E-08AE-4288-A917-64836FDACD8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{60C5B05E-08AE-4288-A917-64836FDACD8B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48343EC6-B313-495B-B205-CC0A65B98ED6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48343EC6-B313-495B-B205-CC0A65B98ED6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48343EC6-B313-495B-B205-CC0A65B98ED6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48343EC6-B313-495B-B205-CC0A65B98ED6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -130,6 +136,7 @@ Global
 		{4C9C0EE0-9001-44BA-92C5-44B55BAEFCED} = {EF593C33-9F4D-46E9-BC0E-8EC6B663C589}
 		{1A06927D-B7F7-4540-B3A9-EB37C05EDE84} = {EF593C33-9F4D-46E9-BC0E-8EC6B663C589}
 		{60C5B05E-08AE-4288-A917-64836FDACD8B} = {EF593C33-9F4D-46E9-BC0E-8EC6B663C589}
+		{48343EC6-B313-495B-B205-CC0A65B98ED6} = {EF593C33-9F4D-46E9-BC0E-8EC6B663C589}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7A0AA30E-4CD9-4359-9513-BA68E2E85245}

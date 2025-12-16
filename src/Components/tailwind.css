@@ -235,20 +235,23 @@
 }
 
 @layer swt-utilities {
-    /* Scrollbar utilities: hide by default, show on hover */
-    .swt\:scrollbar-hide {
-        scrollbar-width: none; /* Firefox */
+    /* Scrollbar utilities: keep constant width, fade thumb on hover (no layout shift) */
+    .swt\:scrollbar-fade {
+        scrollbar-width: thin; /* Firefox: keep a constant gutter */
+        scrollbar-color: transparent transparent; /* hide thumb until hover */
     }
-    .swt\:scrollbar-hide::-webkit-scrollbar {
-        width: 0px; /* Chrome, Safari */
-        height: 0px;
-    }
-
-    .swt\:scrollbar-hide:hover {
-        scrollbar-width: auto; /* Firefox */
-    }
-    .swt\:scrollbar-hide:hover::-webkit-scrollbar {
-        width: 8px; /* Chrome, Safari */
+    .swt\:scrollbar-fade::-webkit-scrollbar {
+        width: 8px; /* WebKit: constant width prevents layout shift */
         height: 8px;
+    }
+    .swt\:scrollbar-fade::-webkit-scrollbar-thumb {
+        background-color: transparent; /* hidden by default */
+        border-radius: 8px;
+    }
+    .swt\:scrollbar-fade:hover {
+        scrollbar-color: color-mix(in oklch, var(--color-base-content) 40%, transparent) transparent;
+    }
+    .swt\:scrollbar-fade:hover::-webkit-scrollbar-thumb {
+        background-color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
     }
 }

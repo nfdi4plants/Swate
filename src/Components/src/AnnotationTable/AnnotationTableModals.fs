@@ -173,12 +173,6 @@ open Swate.Components.AnnotationTableContextMenu
 
 
 open System
-open ARCtrl
-open Feliz
-open Swate.Components
-open Swate.Components.Shared
-open Fable.Core
-open Browser.Types
 open System.Text.RegularExpressions
 
 
@@ -1044,8 +1038,6 @@ type CompositeCellEditModal =
 
 module ComponentHelper =
 
-    open System
-
     let calculateRegex (regex: string) (input: string) =
         try
             let regex = Regex(regex)
@@ -1068,7 +1060,12 @@ module ComponentHelper =
             Html.td [
                 let s0, marked, s2 = split (fst markedIndices) (snd markedIndices) cell0
                 Html.span s0
-                Html.mark [ prop.className "swt:bg-info swt:text-info-content"; prop.text marked ]
+
+                Html.mark [
+                    prop.className "swt:bg-info swt:text-info-content"
+                    prop.text marked
+                ]
+
                 Html.span s2
             ]
             Html.td (cell)
@@ -1083,7 +1080,9 @@ module ComponentHelper =
                     Html.table [
                         prop.className "swt:table"
                         prop.children [
-                            Html.thead [ Html.tr [ Html.th ""; Html.th "Before"; Html.th "After" ] ]
+                            Html.thead [
+                                Html.tr [ Html.th ""; Html.th "Before"; Html.th "After" ]
+                            ]
                             Html.tbody [
                                 let previewCount = 5
                                 let preview = Array.truncate previewCount cellValues
@@ -1204,13 +1203,18 @@ type CreateColumnModal =
             prop.children [
                 Html.div [
                     prop.className "swt:border-b swt:pb-2 swt:mb-2"
-                    prop.children [ CreateColumnModal.CreateForm(getCellStrings (), setPreview) ]
+                    prop.children [
+                        CreateColumnModal.CreateForm(getCellStrings (), setPreview)
+                    ]
                 ]
                 Html.div [
                     prop.className "swt:grow swt:overflow-y-auto swt:h-[200px]"
                     prop.children [ content ]
                 ]
-                Html.div [ prop.className "swt:border-t swt:pt-2 swt:mt-2"; prop.children [ footer ] ]
+                Html.div [
+                    prop.className "swt:border-t swt:pt-2 swt:mt-2"
+                    prop.children [ footer ]
+                ]
             ]
         ]
 
@@ -1469,7 +1473,11 @@ type EditColumnModal =
         React.Fragment [
             Html.label [ prop.text "Preview:" ]
             Html.div [
-                prop.style [ style.maxHeight (length.perc 85); style.overflow.hidden; style.display.flex ]
+                prop.style [
+                    style.maxHeight (length.perc 85)
+                    style.overflow.hidden
+                    style.display.flex
+                ]
                 prop.children [ EditColumnModal.Preview(previewColumn) ]
             ]
         ]
@@ -1544,6 +1552,7 @@ type UpdateColumnModal =
 
                         match m.Success with
                         | true ->
+                            // regex.Replace(c, replacement)
                             let replaced = c.Replace(m.Value, replacement)
                             replaced
                         | false -> c
@@ -1572,7 +1581,10 @@ type UpdateColumnModal =
                                 updateCells replacement value
                             )
                         ]
-                        Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Replacement" ]
+                        Html.legend [
+                            prop.className "swt:fieldset-legend"
+                            prop.text "Replacement"
+                        ]
                         Html.input [
                             prop.className "swt:input swt:input-xs swt:sm:input-sm swt:md:input-md"
                             prop.valueOrDefault replacement
@@ -1641,13 +1653,18 @@ type UpdateColumnModal =
             prop.children [
                 Html.div [
                     prop.className "swt:border-b swt:pb-2 swt:mb-2"
-                    prop.children [ UpdateColumnModal.UpdateForm(getCellStrings (), setPreview, regex, setRegex) ]
+                    prop.children [
+                        UpdateColumnModal.UpdateForm(getCellStrings (), setPreview, regex, setRegex)
+                    ]
                 ]
                 Html.div [
                     prop.className "swt:grow swt:overflow-y-auto swt:h-[200px]"
                     prop.children [ content ]
                 ]
-                Html.div [ prop.className "swt:border-t swt:pt-2 swt:mt-2"; prop.children [ footer ] ]
+                Html.div [
+                    prop.className "swt:border-t swt:pt-2 swt:mt-2"
+                    prop.children [ footer ]
+                ]
             ]
         ]
 

@@ -22,14 +22,14 @@ module FloatingUI =
         | LeftEnd
 
     [<AllowNullLiteral; Global>]
-    type VirtualElement [<ParamObjectAttribute; Emit("$0")>] (getBoundingClientRect: unit -> ClientRect) =
+    type VirtualElement [<ParamObject; Emit("$0")>] (getBoundingClientRect: unit -> ClientRect) =
         member val getBoundingClientRect = getBoundingClientRect with get, set
 
     type ReferenceElement = U2<HTMLElement, VirtualElement>
 
     [<AllowNullLiteral; Import("UseFloatingReturn", "@floating-ui/react")>]
     type UseFloatingReturn
-        [<ParamObjectAttribute; Emit("$0")>]
+        [<ParamObject; Emit("$0")>]
         (
             context: obj,
             placement: Placement,
@@ -84,7 +84,7 @@ module FloatingUI =
 
     [<AllowNullLiteral; Import("UseDismissProps", "@floating-ui/react")>]
     type UseDismissProps
-        [<ParamObjectAttribute; Emit("$0")>]
+        [<ParamObject; Emit("$0")>]
         (
             ?enabled: bool,
             ?escapeKey: bool,
@@ -122,13 +122,13 @@ module FloatingUI =
         | Combobox
 
     [<AllowNullLiteral; Global>]
-    type UseRoleProps [<ParamObjectAttribute; Emit("$0")>] (?enabled: bool, ?role: RoleAttribute) =
+    type UseRoleProps [<ParamObject; Emit("$0")>] (?enabled: bool, ?role: RoleAttribute) =
         member val enabled = enabled
         member val role = role
 
     [<AllowNullLiteral; Import("UseListNavigationProps", "@floating-ui/react")>]
     type UseListNavigationProps
-        [<ParamObjectAttribute; Emit("$0")>]
+        [<ParamObject; Emit("$0")>]
         (
             listRef,
             activeIndex: int option,
@@ -174,7 +174,7 @@ module FloatingUI =
 
     [<AllowNullLiteral; ImportMember("@floating-ui/react")>]
     type UseTypeaheadProps
-        [<ParamObjectAttribute; Emit("$0")>]
+        [<ParamObject; Emit("$0")>]
         (
             listRef,
             activeIndex: int option,
@@ -203,16 +203,16 @@ module FloatingUI =
 
     [<Erase>]
     type Middleware =
-        [<ImportMemberAttribute("@floating-ui/react")>]
+        [<ImportMember("@floating-ui/react")>]
         static member offset(?options: obj) : IMiddleware = jsNative
 
-        [<ImportMemberAttribute("@floating-ui/react")>]
+        [<ImportMember("@floating-ui/react")>]
         static member flip(?options: obj) : IMiddleware = jsNative
 
-        [<ImportMemberAttribute("@floating-ui/react")>]
+        [<ImportMember("@floating-ui/react")>]
         static member shift(?options: obj) : IMiddleware = jsNative
 
-        [<ImportMemberAttribute("@floating-ui/react")>]
+        [<ImportMember("@floating-ui/react")>]
         static member size(?options: obj) : IMiddleware = jsNative
 
     [<StringEnum(CaseRules.LowerAll)>]
@@ -237,7 +237,7 @@ type FloatingUI =
     [<ImportMember("@floating-ui/react")>]
     static member autoUpdate (reference: obj) (floating: obj) (update: unit -> unit) : unit = jsNative
 
-    [<ImportMember("@floating-ui/react"); ParamObjectAttribute>]
+    [<ImportMember("@floating-ui/react"); ParamObject>]
     static member useFloating
         (
             ?``open``: bool,

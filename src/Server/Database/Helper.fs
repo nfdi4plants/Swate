@@ -66,8 +66,8 @@ type Neo4j =
                 Neo4j.Driver.AuthTokens.Basic(c.User, c.Pw),
                 fun o ->
                     o
-                        .WithMaxTransactionRetryTime(TimeSpan.FromSeconds(3))
-                        .WithConnectionTimeout(TimeSpan.FromSeconds(3))
+                        .WithMaxTransactionRetryTime(TimeSpan.FromSeconds(3: int64))
+                        .WithConnectionTimeout(TimeSpan.FromSeconds(3: int64))
                     |> ignore
             )
 
@@ -106,7 +106,8 @@ type Neo4j =
                         |> Map.fold
                             (fun s k v ->
                                 let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
-                                kvp :: s)
+                                kvp :: s
+                            )
                             []
                         |> fun x -> Collections.Generic.Dictionary<string, obj>(x :> Collections.Generic.IEnumerable<_>)
 
@@ -114,14 +115,16 @@ type Neo4j =
                         Query(query, param),
                         action =
                             Action<TransactionConfigBuilder>(fun (config: TransactionConfigBuilder) ->
-                                config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                                config.WithTimeout(TimeSpan.FromSeconds(1: int64)) |> ignore
+                            )
                     )
                 else
                     currentSession.RunAsync(
                         query,
                         action =
                             Action<TransactionConfigBuilder>(fun (config: TransactionConfigBuilder) ->
-                                config.WithTimeout(TimeSpan.FromSeconds(1)) |> ignore)
+                                config.WithTimeout(TimeSpan.FromSeconds(1: int64)) |> ignore
+                            )
                     )
                 |> Async.AwaitTask
 
@@ -153,14 +156,16 @@ type Neo4j =
                             |> Map.fold
                                 (fun s k v ->
                                     let kvp = Collections.Generic.KeyValuePair.Create(k, box v)
-                                    kvp :: s)
+                                    kvp :: s
+                                )
                                 []
                             |> fun x ->
                                 Collections.Generic.Dictionary<string, obj>(x :> Collections.Generic.IEnumerable<_>)
 
                         Query(q, param)
                     else
-                        Query(q))
+                        Query(q)
+                )
 
             let transactions =
                 queries
@@ -173,15 +178,18 @@ type Neo4j =
                                 let! result = tx.RunAsync query |> Async.AwaitTask
                                 return! result.ToListAsync() |> Async.AwaitTask
                             }
-                            |> Async.StartAsTask)
+                            |> Async.StartAsTask
+                        )
 
-                    transaction)
+                    transaction
+                )
 
             let parsedToResult =
                 transactions
                 |> Array.mapi (fun i x ->
                     let _, _, resultAs = queryArr.[i]
-                    Seq.map resultAs x.Result |> Array.ofSeq)
+                    Seq.map resultAs x.Result |> Array.ofSeq
+                )
 
             return parsedToResult
 
