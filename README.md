@@ -11,7 +11,7 @@ Swate is a powerful web tool designed for research data management, providing ve
 -   **Web Tool**: [swate-alpha.nfdi4plants.org](https://swate-alpha.nfdi4plants.org)
 -   **VS Code Plugin**: [arc-vs-code](https://github.com/nfdi4plants/arc-vs-code)
 -   **Electron App**: [ARCitect](https://github.com/nfdi4plants/ARCitect)
--   **Excel Add-In**: [ARC Excel Add-In](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/annotate-in-excel/)
+-   **Excel Add-In**: [ARC Excel Add-In](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/swate/annotate-in-excel/)
 
 ### Features:
 
@@ -27,7 +27,7 @@ To get started with Swate, choose your preferred platform:
 
 1. **Web Tool**: Visit [swate-alpha.nfdi4plants.org](https://swate-alpha.nfdi4plants.org)
 2. **Electron App**: Download and install the app from the [GitHub Releases Page](https://github.com/nfdi4plants/ARCitect/releases)
-3. **Excel Add-In**: Find installation instructions in the [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/guides/annotate-in-excel/)
+3. **Excel Add-In**: Find installation instructions in the [knowledgebase](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/swate/annotate-in-excel/)
 
 If you choose to use the ARCitect you can also follow along our Tutorial [Violas Journey](https://nfdi4plants.github.io/nfdi4plants.knowledgebase/start-here/) 🪻
 
