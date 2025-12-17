@@ -149,7 +149,7 @@ type Actionbar =
         let selectedElement = React.Fragment selectedElements
 
         Html.div [
-            prop.className $"swt:flex swt:border swt:border-neutral swt:rounded-lg swt:w-full"
+            prop.className $"swt:flex swt:border swt:border-neutral swt:rounded-lg swt:w-max"
             prop.children [ selectedElement; restElements ]
         ]
 

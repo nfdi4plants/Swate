@@ -66,8 +66,6 @@
     <Compile Include="Util\Api.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\ReactContexts.fs" />
-    <Compile Include="GenericComponents\TypeHolder.fs" />
-    <Compile Include="GenericComponents\Dropdown.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
@@ -76,8 +74,9 @@
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
     <Compile Include="GenericComponents\Actionbar.fs" />
-    <Compile Include="GenericComponents\Selector.fs" />
     <Compile Include="GenericComponents\Navbar.fs" />
+    <Compile Include="ARCSelector\Dropdown.fs" />
+    <Compile Include="ARCSelector\Selector.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />

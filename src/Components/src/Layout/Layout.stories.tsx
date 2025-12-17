@@ -3,11 +3,11 @@ import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'story
 import Layout from "./Layout.fs.js";
 import {LayoutBtn, LeftSidebarToggleBtn} from "./Layout.fs.js";
 import React from 'react';
-import { Entry as SelectorEntry } from '../GenericComponents/Selector.fs.js';
+import { NavbarSelectorEntry as SelectorEntry } from '../ARCSelector/Selector.fs.js';
 import { Main as NavbarMain } from '../GenericComponents/Navbar.fs.js';
 
 const meta = {
-  title: "Components/Layout",
+  title: "Components/Layout/Layout",
   tags: ["autodocs"],
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout
@@ -172,7 +172,7 @@ export const ARCitectNavbarIsVisible: Story = {
       Main Content
     </div>,
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await waitFor(async () => {
@@ -190,7 +190,7 @@ export const SelectorIsVisible: Story = {
       Main Content
     </div>,
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await waitFor(async () => {
@@ -208,7 +208,7 @@ export const SelectorActionbarisVisible: Story = {
       Main Content
     </div>,
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     const selectorTest = await canvas.findByTestId("selector-test");
@@ -230,7 +230,7 @@ export const RestElementButtonInActionbarIsVisible: Story = {
       Main Content
     </div>,
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     const selectorTest = await canvas.findByTestId("selector-test");
@@ -244,15 +244,15 @@ export const RestElementButtonInActionbarIsVisible: Story = {
   },
 }
 
-export const RestElementButtonInActionbarIsNotVisible: Story = {
+export const RestElementButtonInActionbarExistsNot: Story = {
   name: "RestElementbutton in Actionbar is not visible",
   args: {
-    navbar: <SelectorEntry maxNumber = {5} debug={true} />,
+    navbar: < SelectorEntry maxNumber = {5} debug={true} />,
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
       Main Content
     </div>,
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     const selectorTest = await canvas.findByTestId("selector-test");
@@ -260,8 +260,7 @@ export const RestElementButtonInActionbarIsNotVisible: Story = {
     await userEvent.click(selectorTest);
 
     await waitFor(async () => {
-      const restElementButton = await canvas.findByTestId("button-test");
-      !expect(restElementButton).toBeVisible();
+      expect(canvas.queryByTestId("button-test")).not.toBeInTheDocument();
     });
   },
 }

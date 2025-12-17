@@ -41,41 +41,4 @@ type Navbar =
     [<ReactComponent>]
     static member Entry(?debug: bool) =
 
-        let newARCButton =
-            ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", fun _ -> ())
-
-        let openARCButton =
-            ButtonInfo.create ("swt:fluent--folder-arrow-up-24-regular swt:size-5", "Open an existing ARC", fun _ -> ())
-
-        let downLoadARCButton =
-            ButtonInfo.create (
-                "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
-                "Download an existing ARC",
-                fun _ -> ()
-            )
-
-        let standardButtons = [|
-            newARCButton
-            openARCButton
-            downLoadARCButton
-            newARCButton
-            openARCButton
-        |]
-
-        let testRecentARCs = [|
-            ARCPointer.create ("Test 1", "/Here", false)
-            ARCPointer.create ("Test 2", "/Here/Here", false)
-            ARCPointer.create ("Test 3", "/Here/Here/Here", false)
-            ARCPointer.create (
-                "Test jfcesjföisjyfnwjtiewhroiajlkfnnalkfjwarkoiewfanflkndslkfjwiajofkcmscnskjfafdölmsalknoisjfamlkcnkj<ycwaklfnewjföosajö",
-                "/Here/Here/Here/Here",
-                false
-            )
-        |]
-
-        let recentARCs, setRecentARCs = React.useState (testRecentARCs)
-
-        let selector =
-            Selector.Main(recentARCs, setRecentARCs, standardButtons, 5, 3, potMaxWidth = 48, ?debug = debug)
-
-        Navbar.Main(selector, ?debug = debug)
+        Navbar.Main(Html.div [], ?debug = debug)

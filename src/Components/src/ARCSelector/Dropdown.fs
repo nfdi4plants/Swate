@@ -11,17 +11,17 @@ type Dropdown =
 
     [<ReactComponent>]
     static member Main
-        (isOpen, setIsOpen, toggle: ReactElement, recentARCs: ReactElement[], actionBar: ReactElement, ?potMaxWidth: int) =
+        (isOpen, setIsOpen, toggle: ReactElement, recentARCs: ReactElement[], ?actionbar: ReactElement) =
+
+        let actionbar = defaultArg actionbar (Html.div [])
 
         let ref = React.useElementRef ()
         React.useListener.onClickAway (ref, fun _ -> setIsOpen false)
 
-        let maxWidth = defaultArg potMaxWidth 48
-
         Html.div [
             prop.ref ref
             prop.className [
-                "swt:dropdown"
+                "swt:dropdown swt:inline-block"
                 if isOpen then
                     "swt:dropdown-open"
             ]
@@ -31,9 +31,9 @@ type Dropdown =
                     Html.ul [
                         prop.tabIndex 0
                         prop.className
-                            "swt:dropdown-content swt:min-w-48 swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:gap-2 swt:shadow-sm swt:top-110%"
-                        prop.style [ style.maxWidth maxWidth ]
-                        prop.children [ Html.div recentARCs; actionBar ]
+                            "swt:dropdown-content swt:w-max swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:gap-2 swt:shadow-sm swt:top-110%"
+                        //prop.style [ style.maxWidth maxWidth ]
+                        prop.children [ React.Fragment recentARCs; actionbar ]
                     ]
             ]
         ]
