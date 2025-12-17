@@ -73,9 +73,9 @@
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
+    <Compile Include="GenericComponents\Dropdown.fs" />
     <Compile Include="GenericComponents\Actionbar.fs" />
     <Compile Include="GenericComponents\Navbar.fs" />
-    <Compile Include="ARCSelector\Dropdown.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />

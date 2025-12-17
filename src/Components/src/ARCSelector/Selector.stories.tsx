@@ -1,9 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
-import Layout from "./Layout.fs.js";
-import {LayoutBtn, LeftSidebarToggleBtn} from "./Layout.fs.js";
-import React from 'react';
-import { Entry as SelectorEntry } from '../ARCSelector/Selector.fs.js';
+import Layout from "../Layout/Layout.fs.js";
+import { Entry as SelectorEntry } from './Selector.fs.js';
 
 const meta = {
   title: "Components/Layout/Selector",

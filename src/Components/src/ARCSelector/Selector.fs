@@ -51,6 +51,7 @@ type Selector =
         ) =
 
         let debug = defaultArg debug false
+        let actionbar = defaultArg actionbar (Html.div [])
 
         let isOpen, setOpen = React.useState (false)
 
@@ -101,13 +102,7 @@ type Selector =
                 [| isOpen |]
             )
 
-        Dropdown.Main(
-            isOpen,
-            setOpen,
-            dropDownSwitch,
-            recentARCElements,
-            ?actionbar = actionbar
-        )
+        Dropdown.Main(isOpen, setOpen, dropDownSwitch, React.Fragment [ React.Fragment recentARCElements; actionbar ])
 
     [<ReactComponent>]
     static member Entry(maxNumber, ?debug: bool) =
@@ -132,27 +127,6 @@ type Selector =
 
         let maxNumberActionbar = defaultArg maxNumberActionbar 3
 
-        let newARCButton =
-            ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", fun _ -> ())
-
-        let openARCButton =
-            ButtonInfo.create ("swt:fluent--folder-arrow-up-24-regular swt:size-5", "Open an existing ARC", fun _ -> ())
-
-        let downLoadARCButton =
-            ButtonInfo.create (
-                "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
-                "Download an existing ARC",
-                fun _ -> ()
-            )
-
-        let standardButtons = [|
-            newARCButton
-            openARCButton
-            downLoadARCButton
-            newARCButton
-            openARCButton
-        |]
-
         let testRecentARCs = [|
             ARCPointer.create ("Test 1", "/Here", false)
             ARCPointer.create ("Test 2", "/Here/Here", false)
@@ -168,40 +142,12 @@ type Selector =
 
         let actionbar = Actionbar.Entry(maxNumberActionbar)
 
-        Selector.Main(
-            recentARCs,
-            setRecentARCs,
-            maxNumber,
-            potMaxWidth = 48,
-            actionbar = actionbar,
-            ?debug = debug
-        )
+        Selector.Main(recentARCs, setRecentARCs, maxNumber, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
     [<ReactComponent>]
     static member NavbarSelectorEntry(maxNumber, ?maxNumberActionbar, ?debug: bool) =
 
         let maxNumberActionbar = defaultArg maxNumberActionbar 3
-
-        let newARCButton =
-            ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", fun _ -> ())
-
-        let openARCButton =
-            ButtonInfo.create ("swt:fluent--folder-arrow-up-24-regular swt:size-5", "Open an existing ARC", fun _ -> ())
-
-        let downLoadARCButton =
-            ButtonInfo.create (
-                "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
-                "Download an existing ARC",
-                fun _ -> ()
-            )
-
-        let standardButtons = [|
-            newARCButton
-            openARCButton
-            downLoadARCButton
-            newARCButton
-            openARCButton
-        |]
 
         let testRecentARCs = [|
             ARCPointer.create ("Test 1", "/Here", false)
@@ -219,13 +165,6 @@ type Selector =
         let actionbar = Actionbar.Entry(maxNumberActionbar)
 
         let selector =
-            Selector.Main(
-                recentARCs,
-                setRecentARCs,
-                maxNumber,
-                potMaxWidth = 48,
-                actionbar = actionbar,
-                ?debug = debug
-            )
+            Selector.Main(recentARCs, setRecentARCs, maxNumber, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
         Navbar.Main(selector, ?debug = debug)

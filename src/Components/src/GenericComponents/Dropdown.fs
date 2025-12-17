@@ -11,9 +11,7 @@ type Dropdown =
 
     [<ReactComponent>]
     static member Main
-        (isOpen, setIsOpen, toggle: ReactElement, recentARCs: ReactElement[], ?actionbar: ReactElement) =
-
-        let actionbar = defaultArg actionbar (Html.div [])
+        (isOpen, setIsOpen, toggle: ReactElement, children: ReactElement) =
 
         let ref = React.useElementRef ()
         React.useListener.onClickAway (ref, fun _ -> setIsOpen false)
@@ -32,8 +30,7 @@ type Dropdown =
                         prop.tabIndex 0
                         prop.className
                             "swt:dropdown-content swt:w-max swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:gap-2 swt:shadow-sm swt:top-110%"
-                        //prop.style [ style.maxWidth maxWidth ]
-                        prop.children [ React.Fragment recentARCs; actionbar ]
+                        prop.children children
                     ]
             ]
         ]

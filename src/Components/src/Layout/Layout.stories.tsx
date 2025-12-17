@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
+import { within, expect, userEvent, waitFor } from 'storybook/test';
 import Layout from "./Layout.fs.js";
 import {LayoutBtn, LeftSidebarToggleBtn} from "./Layout.fs.js";
-import React from 'react';
 import { NavbarSelectorEntry as SelectorEntry } from '../ARCSelector/Selector.fs.js';
 import { Main as NavbarMain } from '../GenericComponents/Navbar.fs.js';
 

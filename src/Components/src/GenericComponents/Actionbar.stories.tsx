@@ -1,10 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
-import Layout from "./Layout.fs.js";
-import {LayoutBtn, LeftSidebarToggleBtn} from "./Layout.fs.js";
-import React from 'react';
+import Layout from "../Layout/Layout.fs.js";
 import { ActionbarInSelectorEntry } from '../ARCSelector/Selector.fs.js';
-import { Entry as ActionbarEntry } from '../GenericComponents/Actionbar.fs.js';
+import { Entry as ActionbarEntry } from './Actionbar.fs.js';
 
 const meta = {
   title: "Components/Layout/Actionbar",
