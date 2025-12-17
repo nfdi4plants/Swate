@@ -356,5 +356,3 @@ type Fixture =
 
         let body = CompositeCell.createUnitizedFromString ("4")
         CompositeColumn.create (header, [| body |] |> ResizeArray)
-
-    static member Body_Empty = [| [| "" |] |]

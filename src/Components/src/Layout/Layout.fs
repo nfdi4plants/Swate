@@ -1,7 +1,7 @@
 namespace Swate.Components
 
-open Fable.Core
 open Feliz
+open Fable.Core
 
 module Context =
 
@@ -72,7 +72,6 @@ module private LayoutHelper =
 
                     ResizeTargetCollapseOther clampedWidth
                 else // resize both
-
                     ResizeBoth(newWidth, newRightWidth)
 
 
@@ -508,14 +507,7 @@ type Layout =
 
         Layout.Main(
             children = Layout.Wrapper "Main Content" "swt:bg-base-300 swt:h-full",
-            navbar =
-                Html.div [
-                    prop.className "swt:flex swt:pl-2 swt:ml-auto"
-                    prop.children [
-                        Layout.LeftSidebarToggleBtn()
-                        Layout.RightSidebarToggleBtn()
-                    ]
-                ],
+            navbar = Selector.NavbarSelectorEntry(3),
             leftSidebar =
                 Html.ul [
                     prop.className "swt:menu swt:w-full swt:p-2 swt:rounded-box swt:h-full swt:flex-nowrap"

@@ -319,7 +319,10 @@ type ContextMenu =
             prop.ref containerRef
 
             prop.children [
-                Html.span [ prop.className "swt:select-none"; prop.text "Click here for context menu!" ]
+                Html.span [
+                    prop.className "swt:select-none"
+                    prop.text "Click here for context menu!"
+                ]
                 Html.button [
                     prop.className "swt:btn swt:btn-primary"
                     prop.text "Example Table Cell"
