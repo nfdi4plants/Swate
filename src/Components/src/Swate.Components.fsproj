@@ -70,7 +70,6 @@
     <Compile Include="GenericComponents\Icons.fs"/>
     <Compile Include="GenericComponents\GenericComponents.fs"/>
     <Compile Include="GenericComponents\ContextMenu.fs"/>
-    <Compile Include="GenericComponents\ErrorBaseModal.fs"/>
     <Compile Include="GenericComponents\BaseModal.fs"/>
     <Compile Include="GenericComponents\Select.fs"/>
     <Compile Include="GenericComponents\ComboBox.fs"/>
