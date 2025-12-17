@@ -6,7 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 
-open Swate.Components.FileExplorer.FileTreeDataStructures
+open Swate.Components.FileExplorerTypes
 
 // ---------------------------------------------------------------------------
 [<Mangle(false); Erase>]
@@ -71,7 +71,7 @@ type FileExplorer =
                 | None -> []
 
             if not (List.isEmpty menuItems) then
-                dispatch (FileExplorerLogic.ShowContextMenu(e.clientX, e.clientY, item))
+                dispatch (FileExplorerLogic.ShowContextMenu(e.clientX, e.clientY, menuItems))
 
         let rec renderItem item =
             let isSelected = model.SelectedId = Some item.Id

@@ -1,7 +1,7 @@
 import React from "react";
-import type { Meta, StoryObj, PlayFunction } from "@storybook/react";
-import { within, expect, userEvent } from "@storybook/test";
-import { Example as FileExplorerExample } from "./FileExplorerExample.fs";
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { within, expect, userEvent } from "storybook/test";
+import { FileExplorerExample_Example as FileExplorerExample } from "./FileExplorer.fs.js";
 
 const meta: Meta<typeof FileExplorerExample> = {
   title: "Components/FileExplorer",
@@ -28,5 +28,5 @@ export const Default: Story = {
 
     const folder = await canvas.findByText("My Files");
     await userEvent.click(folder);
-  }) as PlayFunction,
+  }),
 };

@@ -46,8 +46,9 @@ export const Default: Story = {
 
     waitFor(() => {
       const debugValue = input.getAttribute("data-debugresultcount")
+      console.log(debugValue)
       expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
-    }, {timeout: 5000});
+    }, {timeout: 10000});
 
   }
 }

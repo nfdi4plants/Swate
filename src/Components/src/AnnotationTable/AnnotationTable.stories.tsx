@@ -13,7 +13,13 @@ import { TIBApi } from "../Util/Api.fs.js";
 import React, { act } from "react";
 import MockTable from "./MockTable.js";
 
-function renderTable(args: any) {
+type TableOptionalProps = Omit<
+  React.ComponentProps<typeof Table>,
+  "arcTable" | "setArcTable"
+>;
+
+
+function renderTable(args: TableOptionalProps) {
   const [table, setTable] = React.useState(() => MockTable.Copy());
 
   const setTableWithLog = (newTable: any) => {

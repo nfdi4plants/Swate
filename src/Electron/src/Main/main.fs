@@ -1,4 +1,4 @@
-﻿module Main
+﻿module Main.Main
 
 open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
@@ -24,7 +24,8 @@ app
 |> ignore
 
 app.onWindowAllClosed (fun () ->
-    Browser.Dom.console.log("App quit")
+    Browser.Dom.console.log ("App quit")
     app.quit ()
 )
+
 app.onBeforeQuit (fun _ -> Browser.Dom.console.log ("Quitting"))

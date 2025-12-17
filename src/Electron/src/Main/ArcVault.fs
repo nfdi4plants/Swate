@@ -44,20 +44,6 @@ type ArcVault(window: BrowserWindow, ?path: string) =
     member val path: string option = path with get, private set
     member val window: BrowserWindow = window with get
 
-    // static member Init(window: BrowserWindow) = promise {
-    //
-    //     let mutable window = window
-    //
-    //     if window.IsNone then
-    //         let! newWindow = ArcVaultHelper.createWindow ()
-    //         window <- Some newWindow
-    //
-    //     let fileName = path.Replace("\\", "/").Split('/') |> Array.last
-    //     window.Value.setTitle ($"{fileName}")
-    //
-    //     return ArcVault(path, window.Value)
-    // }
-
     member this.SetPath(path: string) =
         match this.path with
         | Some _ -> failwith "Setting path for vaults with existing path is currently not supported."

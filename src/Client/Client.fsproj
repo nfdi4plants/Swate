@@ -117,6 +117,7 @@
     <Compile Include="App.fs"/>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="YAMLicious" />
     <PackageReference Include="ARCtrl.Core"/>
     <PackageReference Include="ARCtrl.Javascript"/>
     <PackageReference Include="ARCtrl.Spreadsheet"/>

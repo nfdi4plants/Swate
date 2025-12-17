@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="YAMLicious" />
     <PackageReference Include="Fable.Electron"/>
     <PackageReference Include="Fable.Electron.Remoting"/>
     <PackageReference Include="Fable.Electron.Forge"/>

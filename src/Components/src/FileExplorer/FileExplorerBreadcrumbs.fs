@@ -6,7 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 
-open Swate.Components.FileExplorer.FileTreeDataStructures
+open Swate.Components.FileExplorerTypes
 
 // ============================================================================
 // BREADCRUMBS COMPONENT
