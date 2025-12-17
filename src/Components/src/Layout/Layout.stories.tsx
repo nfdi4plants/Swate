@@ -246,7 +246,7 @@ export const RestElementButtonInActionbarIsVisible: Story = {
 export const RestElementButtonInActionbarExistsNot: Story = {
   name: "RestElementbutton in Actionbar is not visible",
   args: {
-    navbar: < SelectorEntry maxNumber = {5} debug={true} />,
+    navbar: < SelectorEntry maxNumber = {5} maxNumberActionbar = {5} debug={true} />,
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
       Main Content
     </div>,

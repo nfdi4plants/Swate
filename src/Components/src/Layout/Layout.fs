@@ -227,8 +227,8 @@ type Layout =
             prop.children [
                 Html.div [
                     prop.className [
-                        "swt:w-full swt:h-full swt:overflow-x-scroll swt:overflow-y-auto"
-                        "swt:scrollbar-hide"
+                        "swt:w-full swt:h-full swt:overflow-x-hidden swt:overflow-y-auto"
+                        "swt:scrollbar-fade"
                     ]
                     prop.children children
                 ]
@@ -243,8 +243,10 @@ type Layout =
             ?leftContent: ReactElement,
             ?leftActions: ReactElement,
             ?rightContent: ReactElement,
-            ?rightActions: ReactElement
+            ?rightActions: ReactElement,
+            ?hasNavbar: bool
         ) =
+        let hasNavbar = defaultArg hasNavbar false
         let ctxLeft = React.useContext (LeftSidebarContext)
         let ctxRight = React.useContext (RightSidebarContext)
 
@@ -372,7 +374,13 @@ type Layout =
         )
 
         Html.div [
-            prop.className "swt:flex swt:flex-row swt:size-full"
+            prop.className [
+                "swt:flex swt:flex-row swt:w-full"
+                if hasNavbar then
+                    "swt:grow-0 swt:h-[calc(100%-2.5rem)]"
+                else
+                    "swt:grow swt:h-full"
+            ]
             prop.children [
                 if leftActions.IsSome then
                     Layout.SidebarActions(leftActions.Value, Sidebar.Side.Left)
@@ -473,7 +481,8 @@ type Layout =
                             ?leftContent = leftSidebar,
                             ?leftActions = leftActions,
                             ?rightContent = rightSidebar,
-                            ?rightActions = rightActions
+                            ?rightActions = rightActions,
+                            hasNavbar = navbar.IsSome
                         )
                     ]
                 ]

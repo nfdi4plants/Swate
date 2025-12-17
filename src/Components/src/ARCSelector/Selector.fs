@@ -162,7 +162,7 @@ type Selector =
 
         let recentARCs, setRecentARCs = React.useState (testRecentARCs)
 
-        let actionbar = Actionbar.Entry(maxNumberActionbar)
+        let actionbar = Actionbar.Entry(maxNumberActionbar, ?debug = debug)
 
         let selector =
             Selector.Main(recentARCs, setRecentARCs, maxNumber, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
