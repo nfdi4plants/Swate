@@ -15,19 +15,20 @@ type Events =
     | Error
     | Ready
     | Raw
+    | All
 
 [<Pojo>]
 type WatchOptions
     (
         ?persistent: bool,
-        ?ignored: U2<string, ResizeArray<string>>,
+        ?ignored: U3<string, ResizeArray<string>, string -> bool>,
         ?ignoreInitial: bool,
         ?followSimlinks: bool,
         ?cwd: string,
         ?awaitWriteFinish: bool
     ) =
     member val persistent: bool option = persistent with get, set
-    member val ignored: U2<string, ResizeArray<string>> option = ignored with get, set
+    member val ignored = ignored with get, set
     member val ignoreInitial: bool option = ignoreInitial with get, set
     member val followSimlinks: bool option = followSimlinks with get, set
     member val cwd: string option = cwd with get, set
@@ -44,6 +45,7 @@ type IWatcher =
     abstract member unwatch: paths: string -> Promise<unit>
     abstract member unwatch: paths: string[] -> Promise<unit>
     abstract member on: eventName: Events * callback: (string -> unit) -> IWatcher
+    abstract member on: eventName: Events * callback: (string -> string -> unit) -> IWatcher
     abstract member getWatched: unit -> IWatched
 
 

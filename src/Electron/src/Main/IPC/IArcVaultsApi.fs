@@ -24,7 +24,7 @@ let api: IArcVaultsApi = {
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let windowId = windowIdFromIpcEvent event
 
-                do! ARC_VAULTS.OpenARC(windowId, arcPath)
+                do! ARC_VAULTS.OpenARCInVault(windowId, arcPath)
 
                 return Ok arcPath
         }
@@ -48,7 +48,7 @@ let api: IArcVaultsApi = {
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let windowId = windowIdFromIpcEvent event
 
-                do! ARC_VAULTS.CreateARC(windowId, arcPath, identifier)
+                do! ARC_VAULTS.CreateARCInVault(windowId, arcPath, identifier)
 
                 return Ok arcPath
         }
@@ -70,7 +70,7 @@ let api: IArcVaultsApi = {
 
                 match ARC_VAULTS.TryGetVaultByPath arcPath with
                 | None ->
-                    let! _ = ARC_VAULTS.InitVault(arcPath, identifier)
+                    let! _ = ARC_VAULTS.RegisterVaultWithNewArc(arcPath, identifier)
                     return Ok()
                 | Some vault ->
                     vault.window.focus ()
@@ -94,7 +94,7 @@ let api: IArcVaultsApi = {
 
                 match ARC_VAULTS.TryGetVaultByPath arcPath with
                 | None ->
-                    let! _ = ARC_VAULTS.InitVault(arcPath)
+                    let! _ = ARC_VAULTS.RegisterVaultWithArc(arcPath)
                     return Ok()
                 | Some vault ->
                     vault.window.focus ()
