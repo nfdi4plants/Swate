@@ -1,5 +1,6 @@
 module Main.IPC.IArcVaultsApi
 
+open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
 open Fable.Electron.Main
 open Main
@@ -28,13 +29,16 @@ let api: IArcVaultsApi = {
                 return Ok arcPath
         }
     createARC =
-        fun event identifier -> promise {
+        fun (event: IpcMainEvent) (identifier: string) -> promise {
+
             let! r =
                 dialog.showOpenDialog (
                     properties = [|
                         Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                     |]
                 )
+
+            Browser.Dom.console.log ("[Main] identifier:", identifier)
 
             if r.canceled then
                 return Error(exn "Cancelled")
@@ -95,6 +99,14 @@ let api: IArcVaultsApi = {
                 | Some vault ->
                     vault.window.focus ()
                     return Ok()
+        }
+    closeARC =
+        fun event -> promise {
+            try
+                ARC_VAULTS.DisposeVault(windowIdFromIpcEvent event)
+                return Ok()
+            with e ->
+                return Error e
         }
     getOpenPath =
         fun event -> promise {

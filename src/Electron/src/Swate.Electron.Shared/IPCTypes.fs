@@ -10,6 +10,7 @@ type IArcVaultsApi = {
     /// Will open ARC in a new window
     openARCInNewWindow: unit -> Promise<Result<unit, exn>>
     createARCInNewWindow: string -> Promise<Result<unit, exn>>
+    closeARC: IpcMainEvent -> Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> Promise<string option>
 }
 

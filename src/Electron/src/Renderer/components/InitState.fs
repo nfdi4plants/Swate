@@ -15,6 +15,7 @@ module private InitStateHelper =
 
     let createARC =
         fun identifier -> promise {
+            console.log ("createARC:", identifier)
             let! r = Api.arcVaultApi.createARC Fable.Core.JS.undefined identifier
 
             match r with
@@ -33,6 +34,7 @@ let CreateNewArcModalContent (close: unit -> unit) =
     let handleSubmit =
         fun () ->
             if isValid then
+                console.log ("Starting Create ARC:", temp)
                 createARC temp |> Promise.start
 
             close ()
