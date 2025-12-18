@@ -56,7 +56,7 @@ type ArcVault(window: BrowserWindow, ?path: string, ?arc, ?watcher) =
 
     member this.LoadArc() = promise {
         if this.path.IsSome then
-            match! ARC.tryLoadAsync (path.Value) with
+            match! ARC.tryLoadAsync (this.path.Value) with
             | Error e -> failwith $"[Swate-{this.window.id}] Unable to load ARC: {e}"
             | Ok arc -> this.arc <- Some arc
         else
@@ -64,13 +64,13 @@ type ArcVault(window: BrowserWindow, ?path: string, ?arc, ?watcher) =
     }
 
     member this.StartFileWatcher() =
-        if path.IsSome then
-            let watcher = ArcVaultHelper.createFileWatcher path.Value
+        if this.path.IsSome then
+            let watcher = ArcVaultHelper.createFileWatcher this.path.Value
 
             let sendMsg =
                 Remoting.init
                 |> Remoting.withWindow this.window
-                |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IArcFileWatcherApi>
+                |> Remoting.buildClient<IArcFileWatcherApi>
 
             watcher.on (
                 Chokidar.Events.Raw,
@@ -90,8 +90,11 @@ type ArcVault(window: BrowserWindow, ?path: string, ?arc, ?watcher) =
 
     /// This functions should be called once, when an vault is first started with a path
     member this.Startup() = promise {
+        printfn "StartFileWatcher"
         this.StartFileWatcher()
+        printfn "LoadArc"
         do! this.LoadArc()
+        printfn "Set Window Title"
         this.window.title <- this.arc.Value.Identifier
     }
 
@@ -102,8 +105,9 @@ type ArcVault(window: BrowserWindow, ?path: string, ?arc, ?watcher) =
             let sendMsg =
                 Remoting.init
                 |> Remoting.withWindow this.window
-                |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+                |> Remoting.buildClient<IMainUpdateRendererApi>
 
+            console.log ($"[Swate-{this.window.id}] path: {path}")
             this.path <- Some path
             do! this.Startup()
             sendMsg.pathChange (Some path)
@@ -117,7 +121,7 @@ type ArcVault(window: BrowserWindow, ?path: string, ?arc, ?watcher) =
             let sendMsg =
                 Remoting.init
                 |> Remoting.withWindow this.window
-                |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+                |> Remoting.buildClient<IMainUpdateRendererApi>
 
             let arc = ARC(identifier)
             this.path <- Some path

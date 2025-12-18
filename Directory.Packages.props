@@ -10,7 +10,7 @@
         <PackageVersion Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.12"/>
         <!-- client -->
         <PackageVersion Include="Fable.Core" Version="5.0.0-beta.4"/>
-        <PackageVersion Include="YAMLicious" Version="1.0.0-alpha.1" />
+        <PackageVersion Include="YAMLicious" Version="1.0.0-alpha.1"/>
         <PackageVersion Include="Fable.Elmish" Version="4.2.0"/>
         <PackageVersion Include="Fable.Elmish.HMR" Version="7.0.0"/>
         <PackageVersion Include="Fable.Elmish.React" Version="4.0.0"/>
@@ -28,7 +28,7 @@
         <PackageVersion Include="Fable.Remoting.Giraffe" Version="5.19.0"/>
         <PackageVersion Include="Neo4j.Driver" Version="5.18.1"/>
         <!-- electron -->
-        <PackageVersion Include="Fable.Electron" Version="39.2.4"/>
+        <PackageVersion Include="Fable.Electron" Version="39.2.6"/>
         <PackageVersion Include="Fable.Electron.Remoting" Version="7.0.0"/>
         <PackageVersion Include="Fable.Electron.Forge" Version="7.0.0"/>
         <!-- testing -->
