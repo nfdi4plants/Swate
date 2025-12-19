@@ -8,7 +8,6 @@
     <None Include="SimpleGitTest.fsx"/>
     <None Include="ChokidarTest.fsx"/>
     <Compile Include="Bindings\Chokidar.fs"/>
-    <Compile Include="Bindings\fs.fs"/>
     <Compile Include="ArcVault.fs"/>
     <Compile Include="IPC\IPCHelper.fs"/>
     <Compile Include="IPC\IArcVaultsApi.fs"/>
