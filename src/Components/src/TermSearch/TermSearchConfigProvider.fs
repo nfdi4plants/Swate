@@ -97,14 +97,6 @@ type TermSearchConfigProvider =
             defaultActive = Set [ TIB_PREFIX + TIB_DATAPLANT_COLLECTION_KEY ]
         )
 
-    // TermSearchConfigProvider.TermSearchConfigProvider(
-    //     children,
-    //     allTermSearchQueries,
-    //     allParentSearchQueries,
-    //     allAllChildrenSearchQueries,
-    //     defaultActive = Set [ TIB_PREFIX + TIB_DATAPLANT_COLLECTION_KEY ]
-    // )
-
 
     [<ReactComponent(true)>]
     static member TermSearchConfigProvider
