@@ -43,5 +43,11 @@ jobs:
         working-directory: src/Components
         run: npx playwright install --with-deps chromium
 
+      - name: Test Restore
+        run: dotnet restore ./Swate.sln
+
+      - name: Test Build
+        run: dotnet build ./Swate.sln
+
       - name: Run Tests
         run: dotnet run --project ./build/Build.fsproj test
