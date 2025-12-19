@@ -191,7 +191,12 @@ type Fixture =
             "Term Source REF (PO:0009012)"
             "Term Accession Number (PO:0009012)"
         |]
-        [| "My mass spec"; "SCIEX instrument model"; "MS"; "MS:424242" |]
+        [|
+            "My mass spec"
+            "SCIEX instrument model"
+            "MS"
+            "MS:424242"
+        |]
     |]
 
     static member Component_InstrumentModel_Unit_Column =
@@ -356,5 +361,3 @@ type Fixture =
 
         let body = CompositeCell.createUnitizedFromString ("4")
         CompositeColumn.create (header, [| body |] |> ResizeArray)
-
-    static member Body_Empty = [| [| "" |] |]

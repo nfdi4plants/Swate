@@ -205,6 +205,6 @@ let Main =
                     [| Fixture.Body_Integer_Column |]
                 )
             testCase $"Add unknown value"
-            <| fun _ -> TestCases.AddUnknownPattern(Fixture.Body_Empty)
+            <| fun _ -> TestCases.AddUnknownPattern([| [| "" |] |])
         ]
     ]
