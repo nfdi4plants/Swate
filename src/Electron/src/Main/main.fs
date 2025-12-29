@@ -12,13 +12,13 @@ if SquirrelStartup.started then
 app
     .whenReady()
     .``then`` (fun () ->
-        ARC_VAULTS.InitVault() |> ignore
+        ARC_VAULTS.RegisterVault() |> ignore
 
         Remoting.init |> Remoting.buildHandler IPC.IArcVaultsApi.api
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then
-                ARC_VAULTS.InitVault() |> ignore
+                ARC_VAULTS.RegisterVault() |> ignore
         )
     )
 |> ignore

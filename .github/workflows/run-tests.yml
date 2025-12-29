@@ -15,13 +15,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Set up .NET
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.x
+          dotnet-version: 10.x
 
       # Restore .NET tools
       - name: Restore .NET dependencies
@@ -31,22 +31,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: "npm"
 
       # Install npm dependencies
       - name: Install root npm dependencies
         run: npm ci
 
-      # Install component npm dependencies
-      - name: Install component npm dependencies
-        working-directory: src/Components
-        run: npm ci
-
       # Install playwright dependencies
       - name: Install Playwright dependencies
         working-directory: src/Components
         run: npx playwright install --with-deps chromium
+
+      - name: Test Restore
+        run: dotnet restore ./Swate.sln
+
+      - name: Test Build
+        run: dotnet build ./Swate.sln
 
       - name: Run Tests
         run: dotnet run --project ./build/Build.fsproj test

@@ -11,35 +11,29 @@ open Browser.Dom
 let Main () =
     let appState, setAppState = React.useState (AppState.Init)
 
-    React.useLayoutEffectOnce(fun _ ->
+    React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p ->
                 console.log $"[Swate] Found open path: {p}"
-                AppState.ARC p
-                |> setAppState
-            | None ->
-                setAppState AppState.Init
+                AppState.ARC p |> setAppState
+            | None -> setAppState AppState.Init
         )
         |> Promise.start
     )
 
-    let ipcHandler :Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-        pathChange = fun pathOption ->
-            console.log ("[Swate] CHANGE PATH!")
-            match pathOption with
-            | Some p ->
-                AppState.ARC p
-                |> setAppState
-            | None ->
-                setAppState AppState.Init
+    let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
+        pathChange =
+            fun pathOption ->
+                console.log ("[Swate] CHANGE PATH!")
+
+                match pathOption with
+                | Some p -> AppState.ARC p |> setAppState
+                | None -> setAppState AppState.Init
     }
 
-    React.useEffectOnce(fun _ ->
-        Remoting.init
-        |> Remoting.buildHandler ipcHandler
-    )
+    React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     let children =
         React.useMemo (
@@ -75,7 +69,7 @@ let Main () =
                 Html.button [
                     prop.onClick (fun _ ->
                         promise {
-                            match! Api.arcVaultApi.openARCInNewWindow() with
+                            match! Api.arcVaultApi.openARCInNewWindow () with
                             | Ok _ -> ()
                             | Error exn -> failwith $"{exn.Message}"
 
