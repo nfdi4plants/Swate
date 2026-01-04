@@ -47,6 +47,8 @@ type Selector =
             maxNumberRecentElements,
             ?actionbar: ReactElement,
             ?potMaxWidth: int,
+            ?onClick: int -> unit,
+            ?refreshCounter: int,
             ?debug: bool
         ) =
 
@@ -88,7 +90,12 @@ type Selector =
             React.useMemo (
                 (fun _ ->
                     Html.button [
-                        prop.onClick (fun _ -> setOpen (not isOpen))
+                        prop.onClick (fun _ ->
+                            if onClick.IsSome && refreshCounter.IsSome then
+                                onClick.Value (refreshCounter.Value + 1)
+                            console.log("dropDownSwitch")
+                            setOpen (not isOpen)
+                        )
                         prop.role.button
                         prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
                         if debug then

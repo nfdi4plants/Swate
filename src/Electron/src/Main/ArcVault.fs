@@ -2,10 +2,14 @@
 module rec Main.ArcVault
 
 open Browser
+open System.Collections.Generic
+
 open Fable.Electron
 open Fable.Electron.Remoting.Main
+
 open Main
-open System.Collections.Generic
+
+open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 
 module ArcVaultHelper =
@@ -39,7 +43,7 @@ module ArcVaultHelper =
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
 /// <param name="path">Can be None if not opened ARC.</param>
-type ArcVault(window: BrowserWindow, ?path: string) =
+type ArcVault(window: BrowserWindow, ?path: string, ?recentARCs: ARCPointer[]) =
 
     member val path: string option = path with get, private set
     member val window: BrowserWindow = window with get
@@ -93,6 +97,5 @@ type ArcVaults() =
 
     member this.TryGetVaultByPath(path: string) =
         this.Vaults.Values |> Seq.tryFind (fun v -> v.path = Some path)
-
 
 let ARC_VAULTS: ArcVaults = ArcVaults()

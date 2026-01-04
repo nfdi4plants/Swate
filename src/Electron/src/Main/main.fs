@@ -1,10 +1,9 @@
 ﻿module Main.Main
 
 open Fable.Electron
-open Swate.Electron.Shared.IPCTypes
 open Fable.Electron.Remoting.Main
+
 open Main
-open Fable.Core
 
 if SquirrelStartup.started then
     app.quit ()

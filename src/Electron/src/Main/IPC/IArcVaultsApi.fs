@@ -4,6 +4,8 @@ open Swate.Electron.Shared.IPCTypes
 open Fable.Electron.Main
 open Main
 
+open Swate.Components
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IArcVaultsApi = {
     openARC =
@@ -22,6 +24,7 @@ let api: IArcVaultsApi = {
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let windowId = windowIdFromIpcEvent event
+                let selectedARC = ARCPointer.create(arcPath, arcPath, true)
                 ARC_VAULTS.SetPath(windowId, arcPath)
                 return Ok arcPath
         }
@@ -54,5 +57,19 @@ let api: IArcVaultsApi = {
             return
                 ARC_VAULTS.TryGetVault (windowIdFromIpcEvent event)
                 |> Option.bind (fun v -> v.path)
+        }
+    getRecentARCs =
+        fun _ -> promise {
+            let test =
+                ARC_VAULTS.Vaults.Values
+                |> Array.ofSeq
+                |> Array.map (fun arc ->
+                    if arc.path.IsSome then
+                        Some (ARCPointer.create(arc.path.Value, arc.path.Value, false))
+                    else
+                        None
+                )
+                |> Array.choose (fun item -> item)
+            return test
         }
 }

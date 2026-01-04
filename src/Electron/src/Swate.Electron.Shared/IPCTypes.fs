@@ -9,6 +9,7 @@ type IArcVaultsApi = {
     /// Will open ARC in a new window
     openARCInNewWindow: unit -> Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> Promise<string option>
+    getRecentARCs: unit -> Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
 }
 
 type IMainUpdateRendererApi = {

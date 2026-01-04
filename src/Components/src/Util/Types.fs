@@ -1,9 +1,8 @@
 [<AutoOpenAttribute>]
 module Swate.Components.Types
 
-open Fable.Core
 open Feliz
-
+open Fable.Core
 
 type SelectItem<'a> = {| item: 'a; label: string |}
 
@@ -337,7 +336,7 @@ module SelectorTypes =
         static member create (name: string, path: string, isActive: bool) = { name = name; path = path; isActive = isActive }
 
     type ButtonInfo =
-        { icon: string; toolTip: string; onClick: MouseEvent -> unit }
+        { icon: string; toolTip: string; onClick: unit -> unit }
 
-        static member create (icon: string, toolTip: string, (onClick: MouseEvent -> unit)) =
+        static member create (icon: string, toolTip: string, (onClick: unit -> unit)) =
             { icon = icon; toolTip = toolTip; onClick = onClick }

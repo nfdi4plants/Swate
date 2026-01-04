@@ -3,7 +3,7 @@ module Renderer.components.InitState
 open Feliz
 open Swate.Components
 
-module private InitStateHelper =
+module internal InitStateHelper =
     let openARC =
         fun () -> promise {
             let! r = Api.arcVaultApi.openARC Fable.Core.JS.undefined
