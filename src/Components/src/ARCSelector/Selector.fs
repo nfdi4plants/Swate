@@ -24,6 +24,7 @@ type Selector =
                                     prop.className "swt:truncate swt:block swt:min-w-30"
                                     prop.style [ style.maxWidth maxWidth ]
                                     prop.text arcPointer.name
+                                    prop.title arcPointer.name
                                 ]
                                 if arcPointer.isActive then
                                     Html.i [
@@ -43,12 +44,11 @@ type Selector =
     static member Main
         (
             arcPointers: ARCPointer[],
-            setRecentARCs,
+            onARCClick: ARCPointer -> unit,
             maxNumberRecentElements,
             ?actionbar: ReactElement,
             ?potMaxWidth: int,
-            ?onClick: int -> unit,
-            ?refreshCounter: int,
+            ?onOpenSelector,
             ?debug: bool
         ) =
 
@@ -63,24 +63,14 @@ type Selector =
             else
                 arcPointers
 
-        let setArcActivity (arcElement: ARCPointer) =
-            {
-                arcElement with
-                    isActive = not arcElement.isActive
-            }
-            : ARCPointer
+        let onOpenSelector shallBeOpen =
+            setOpen shallBeOpen
+            onOpenSelector
+            |> Option.iter(fun f -> f())
 
-        let onARCClick (clickedARC) =
-            let updated =
-                latestARCs
-                |> Array.map (fun arc ->
-                    if arc = clickedARC then
-                        setArcActivity arc
-                    else
-                        { arc with isActive = false }: ARCPointer
-                )
-
-            setRecentARCs updated
+        let onARCClick arcPointer =
+            onOpenSelector false
+            onARCClick arcPointer
 
         let recentARCElements =
             latestARCs
@@ -91,10 +81,7 @@ type Selector =
                 (fun _ ->
                     Html.button [
                         prop.onClick (fun _ ->
-                            if onClick.IsSome && refreshCounter.IsSome then
-                                onClick.Value (refreshCounter.Value + 1)
-                            console.log("dropDownSwitch")
-                            setOpen (not isOpen)
+                            onOpenSelector (not isOpen)
                         )
                         prop.role.button
                         prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
@@ -127,7 +114,10 @@ type Selector =
 
         let recentARCs, setRecentARCs = React.useState (testRecentARCs)
 
-        Selector.Main(recentARCs, setRecentARCs, maxNumber, potMaxWidth = 48, ?debug = debug)
+        let onARCClick (arcPointer:ARCPointer) =
+            console.log($"arcPointer: {arcPointer.path}")
+
+        Selector.Main(recentARCs, onARCClick, maxNumber, potMaxWidth = 48, ?debug = debug)
 
     [<ReactComponent>]
     static member ActionbarInSelectorEntry(maxNumber, ?maxNumberActionbar, ?debug: bool) =
@@ -149,7 +139,10 @@ type Selector =
 
         let actionbar = Actionbar.Entry(maxNumberActionbar)
 
-        Selector.Main(recentARCs, setRecentARCs, maxNumber, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
+        let onARCClick (arcPointer:ARCPointer) =
+            console.log($"arcPointer: {arcPointer.path}")
+
+        Selector.Main(recentARCs, onARCClick, maxNumber, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
     [<ReactComponent>]
     static member NavbarSelectorEntry(maxNumber, ?maxNumberActionbar, ?debug: bool) =
@@ -171,7 +164,10 @@ type Selector =
 
         let actionbar = Actionbar.Entry(maxNumberActionbar, ?debug = debug)
 
+        let onARCClick (arcPointer:ARCPointer) =
+            console.log($"arcPointer: {arcPointer.path}")
+
         let selector =
-            Selector.Main(recentARCs, setRecentARCs, maxNumber, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
+            Selector.Main(recentARCs, onARCClick, maxNumber, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
         Navbar.Main(selector, ?debug = debug)

@@ -1,7 +1,6 @@
 [<AutoOpen>]
 module rec Main.ArcVault
 
-open Browser
 open System.Collections.Generic
 
 open Fable.Electron
@@ -43,7 +42,7 @@ module ArcVaultHelper =
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
 /// <param name="path">Can be None if not opened ARC.</param>
-type ArcVault(window: BrowserWindow, ?path: string, ?recentARCs: ARCPointer[]) =
+type ArcVault(window: BrowserWindow, ?path: string) =
 
     member val path: string option = path with get, private set
     member val window: BrowserWindow = window with get
@@ -97,5 +96,15 @@ type ArcVaults() =
 
     member this.TryGetVaultByPath(path: string) =
         this.Vaults.Values |> Seq.tryFind (fun v -> v.path = Some path)
+
+    member this.BroadcastRecentARCs(recentARCs: ARCPointer[]) =
+        this.Vaults.Values
+        |> Array.ofSeq
+        |> Array.iter (fun vault ->
+            Remoting.init
+            |> Remoting.withWindow vault.window
+            |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+            |> fun client -> client.recentARCsUpdate recentARCs
+        )
 
 let ARC_VAULTS: ArcVaults = ArcVaults()

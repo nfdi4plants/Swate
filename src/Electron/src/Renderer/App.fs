@@ -14,24 +14,8 @@ let Main () =
 
     let recentARCs, setRecentARCs = React.useState ([||])
     let appState, setAppState = React.useState (AppState.Init)
-    let refreshTrigger, setRefresh = React.useState (0)
 
     let maxNumberRecentARCs = 5
-
-    React.useEffect ((fun _ ->
-        fun _ ->
-            promise {
-                let! arcs = Api.arcVaultApi.getRecentARCs()
-                arcs
-                |> Array.iter (fun arc -> console.log($"arc: {arc.name}"))
-
-                if recentARCs <> arcs then
-                    setRecentARCs arcs
-            }
-            |> Promise.start
-        ),
-        [| box refreshTrigger |]
-    )
 
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
@@ -49,10 +33,13 @@ let Main () =
         pathChange =
             fun pathOption ->
                 console.log ("[Swate] CHANGE PATH!")
-
                 match pathOption with
                 | Some p -> AppState.ARC p |> setAppState
                 | None -> setAppState AppState.Init
+        recentARCsUpdate =
+            fun arcs ->
+                console.log ("[Swate] CHANGE RECENTARCS !")
+                setRecentARCs arcs
     }
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
@@ -101,6 +88,16 @@ let Main () =
         else
             InitStateHelper.openARC >> Promise.start
 
+    let onARCClick (clickedARC: ARCPointer) =
+        promise {
+            match! Api.arcVaultApi.focusExistingARCWindow clickedARC.path with
+            | Ok _ -> ()
+            | Error exn -> failwith $"{exn.Message}"
+
+            return ()
+        }
+        |> Promise.start
+
     let actionbar =
         let createARC =
             ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", fun _ -> ())
@@ -121,31 +118,23 @@ let Main () =
 
         Actionbar.Main([| createARC; openARCButtonInfo; downloadARC |], 3)
 
-    let selector = Selector.Main(recentARCs, setRecentARCs, maxNumberRecentARCs, actionbar, onClick = setRefresh, refreshCounter = refreshTrigger)
+    let onOpenSelector () =
+        promise {
+            let! newARCs = Api.arcVaultApi.getRecentARCs()
+
+            match appState with
+            | AppState.Init -> ()
+            | AppState.ARC path ->
+                newARCs
+                |> Array.map (fun arc ->
+                    ARCPointer.create(arc.name, arc.path, arc.path = path))
+                |> setRecentARCs
+        }
+        |> Promise.start
+
+    let selector = Selector.Main(recentARCs, onARCClick, maxNumberRecentARCs, actionbar, onOpenSelector = onOpenSelector)
 
     let navbar = Navbar.Main(selector)
-
-    let ARCPointerExists (path: string) =
-        recentARCs
-        |> Array.exists (fun arcPointer -> arcPointer.path = path)
-
-    let createNewARCPointers (currentARC: ARCPointer) (recentARCs: ARCPointer []) =
-        if recentARCs.Length = maxNumberRecentARCs then
-            let tmp = Array.take (maxNumberRecentARCs - 1) recentARCs
-            Array.append [| currentARC |] tmp
-        else
-            Array.append [| currentARC |] recentARCs
-
-    match appState with
-    | AppState.Init -> ()
-    | AppState.ARC path ->
-        if ARCPointerExists path then
-            ()
-        else
-            let newARCPointers =
-                let newARCPointer = ARCPointer.create(path, path, true)
-                createNewARCPointers newARCPointer recentARCs
-            setRecentARCs newARCPointers
 
     context.AppStateCtx.AppStateCtx.Provider(
         {

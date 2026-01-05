@@ -23,34 +23,50 @@ let api: IArcVaultsApi = {
                 return Error(exn "Not exactly one path")
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
+                let recentARCs = ARCHolder.updateRecentARCs arcPath 5
                 let windowId = windowIdFromIpcEvent event
-                let selectedARC = ARCPointer.create(arcPath, arcPath, true)
                 ARC_VAULTS.SetPath(windowId, arcPath)
+                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                 return Ok arcPath
         }
     openARCInNewWindow =
-        fun _ -> promise {
-            let! r =
-                dialog.showOpenDialog (
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
+        fun _ ->
+            promise {
+                let! r =
+                    dialog.showOpenDialog (
+                        properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                        |]
+                    )
 
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne
+                if r.canceled then
+                    return Error(exn "Cancelled")
+                elif r.filePaths.Length <> 1 then
+                    return Error(exn "Not exactly one path")
+                else
+                    let arcPath = r.filePaths |> Array.exactlyOne
+                    let recentARCs = ARCHolder.updateRecentARCs arcPath 5
 
-                match ARC_VAULTS.TryGetVaultByPath arcPath with
-                | None ->
-                    let! _ = ARC_VAULTS.InitVault(arcPath)
-                    return Ok()
-                | Some vault ->
-                    vault.window.focus()
-                    return Ok()
+                    match ARC_VAULTS.TryGetVaultByPath arcPath with
+                    | None ->
+                        let! _ = ARC_VAULTS.InitVault(arcPath)
+                        ARC_VAULTS.BroadcastRecentARCs(recentARCs)
+                        return Ok()
+                    | Some vault ->
+                        vault.window.focus()
+                        ARC_VAULTS.BroadcastRecentARCs(recentARCs)
+                        return Ok()
+        }
+    focusExistingARCWindow =
+        fun arcPath -> promise {
+            match ARC_VAULTS.TryGetVaultByPath arcPath with
+            | None ->
+                return Error(exn $"The ARC for path {arcPath} should exist")
+            | Some vault ->
+                let recentARCs = ARCHolder.updateRecentARCs arcPath 5
+                vault.window.focus()
+                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
+                return Ok()
         }
     getOpenPath =
         fun event -> promise {
@@ -60,16 +76,6 @@ let api: IArcVaultsApi = {
         }
     getRecentARCs =
         fun _ -> promise {
-            let test =
-                ARC_VAULTS.Vaults.Values
-                |> Array.ofSeq
-                |> Array.map (fun arc ->
-                    if arc.path.IsSome then
-                        Some (ARCPointer.create(arc.path.Value, arc.path.Value, false))
-                    else
-                        None
-                )
-                |> Array.choose (fun item -> item)
-            return test
+            return recentARCs
         }
 }
