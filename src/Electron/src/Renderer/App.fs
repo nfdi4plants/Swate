@@ -15,8 +15,6 @@ let Main () =
     let recentARCs, setRecentARCs = React.useState ([||])
     let appState, setAppState = React.useState (AppState.Init)
 
-    let maxNumberRecentARCs = 5
-
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
         |> Promise.map (fun pathOption ->
@@ -98,22 +96,28 @@ let Main () =
         }
         |> Promise.start
 
-    let actionbar =
+    let actionbar onClick =
         let createARC =
-            ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", fun _ -> ())
+            ButtonInfo.create (
+                "swt:fluent--document-add-24-regular swt:size-5",
+                "Create a new ARC",
+                onClick
+            )
 
         let openARCButtonInfo =
             ButtonInfo.create (
                 "swt:fluent--folder-open-24-regular swt:size-5",
                 "Open an existing ARC",
-                openARC
+                fun _ ->
+                    onClick()
+                    openARC()
             )
 
         let downloadARC =
             ButtonInfo.create (
                 "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
                 "Download an existing ARC",
-                fun _ -> ()
+                onClick
             )
 
         Actionbar.Main([| createARC; openARCButtonInfo; downloadARC |], 3)
@@ -132,7 +136,7 @@ let Main () =
         }
         |> Promise.start
 
-    let selector = Selector.Main(recentARCs, onARCClick, maxNumberRecentARCs, actionbar, onOpenSelector = onOpenSelector)
+    let selector = Selector.Main(recentARCs, onARCClick, actionbar, onOpenSelector = onOpenSelector)
 
     let navbar = Navbar.Main(selector)
 

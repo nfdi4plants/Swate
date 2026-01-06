@@ -5,9 +5,11 @@ open Swate.Components
 
 let mutable recentARCs: ARCPointer[] = [||]
 
-let maxNumberRecentARCs = 5
-
 let setRecentARCs(newARCs: ARCPointer[]) = recentARCs <- newARCs
+
+let mutable maxNumberRecentARCs = 5
+
+let setMaxNumberRecentARCs(newMaxNumberRecentARCs: int) = maxNumberRecentARCs <- newMaxNumberRecentARCs
 
 let ARCPointerExists (path: string) =
     recentARCs
@@ -18,14 +20,14 @@ let reorderARCPointers (path: string) =
         recentARCs
         |> Array.filter (fun arc -> arc.path <> path)
         |> Array.map (fun arc -> ARCPointer.create(arc.name, arc.path, false))
-    Array.append filteredRecentARCs [| ARCPointer.create(path, path, true) |]
+    Array.append [| ARCPointer.create(path, path, true) |] filteredRecentARCs
 
 let createNewARCPointers (currentARC: ARCPointer) (recentARCs: ARCPointer []) maxNumberRecentARCs =
     if recentARCs.Length = maxNumberRecentARCs then
-        let tmp = recentARCs.[1..]
-        Array.append tmp [| currentARC |]
+        let tmp = Array.take (maxNumberRecentARCs - 1) recentARCs
+        Array.append [| currentARC |] tmp
     else
-        Array.append recentARCs [| currentARC |]
+        Array.append [| currentARC |] recentARCs
 
 let updateRecentARCs path maxNumberRecentARCs =
     if ARCPointerExists path then

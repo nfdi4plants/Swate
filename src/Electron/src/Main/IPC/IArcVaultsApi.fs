@@ -3,7 +3,7 @@ module Main.IPC.IArcVaultsApi
 open Swate.Electron.Shared.IPCTypes
 open Fable.Electron.Main
 open Main
-open Swate.Components
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IArcVaultsApi = {
     openARC =
@@ -22,7 +22,6 @@ let api: IArcVaultsApi = {
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let windowId = windowIdFromIpcEvent event
-                console.log ($"Register window with path: {arcPath}")
                 ARC_VAULTS.SetPath(windowId, arcPath)
 
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
@@ -46,7 +45,6 @@ let api: IArcVaultsApi = {
                 else
                     let arcPath = r.filePaths |> Array.exactlyOne
                     let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
-
                     match ARC_VAULTS.TryGetVaultByPath arcPath with
                     | None ->
                         let! _ = ARC_VAULTS.InitVault(arcPath)

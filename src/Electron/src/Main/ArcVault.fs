@@ -79,7 +79,6 @@ type ArcVaults() =
     member this.InitVault(?path: string) : Fable.Core.JS.Promise<int> = promise {
         let! window = ArcVaultHelper.createWindow ()
         let id = window.id
-        console.log ($"Register window with id: {id}")
         let vault = ArcVault(window, ?path = path)
         this.Vaults.Add(id, vault)
 
