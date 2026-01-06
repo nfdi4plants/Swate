@@ -3,25 +3,7 @@ module Main.Main
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 
-open Swate.Components
-
 open Main
-
-module States =
-    let mutable recentARCs: ARCPointer[] = [||]
-
-    let updateRecentARCs maxCount path =
-        let updated =
-            recentARCs
-            |> Array.filter (fun arc -> arc.path <> path)
-            |> fun arr -> Array.append arr [| ARCPointer.create(path, path, false) |]
-            |> fun arr ->
-                if arr.Length > maxCount then
-                    arr.[arr.Length - maxCount ..]
-                else arr
-
-        recentARCs <- updated
-        updated
 
 if SquirrelStartup.started then
     app.quit ()

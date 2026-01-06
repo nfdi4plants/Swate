@@ -5,7 +5,7 @@ open Swate.Components
 
 module internal InitStateHelper =
     let openARC =
-        fun _ -> promise {
+        fun () -> promise {
             let! r = Api.arcVaultApi.openARC Fable.Core.JS.undefined
 
             match r with

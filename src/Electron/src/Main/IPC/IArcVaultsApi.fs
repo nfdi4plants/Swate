@@ -3,9 +3,7 @@ module Main.IPC.IArcVaultsApi
 open Swate.Electron.Shared.IPCTypes
 open Fable.Electron.Main
 open Main
-
 open Swate.Components
-
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IArcVaultsApi = {
     openARC =
@@ -23,9 +21,11 @@ let api: IArcVaultsApi = {
                 return Error(exn "Not exactly one path")
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
-                let recentARCs = ARCHolder.updateRecentARCs arcPath 5
                 let windowId = windowIdFromIpcEvent event
+                console.log ($"Register window with path: {arcPath}")
                 ARC_VAULTS.SetPath(windowId, arcPath)
+
+                let recentARCs = ARCHolder.updateRecentARCs arcPath 5
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                 return Ok arcPath
         }
@@ -77,5 +77,9 @@ let api: IArcVaultsApi = {
     getRecentARCs =
         fun _ -> promise {
             return recentARCs
+        }
+    checkForARC =
+        fun path -> promise {
+            return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
 }

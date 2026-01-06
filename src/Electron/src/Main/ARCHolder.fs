@@ -3,8 +3,6 @@ module Main.ARCHolder
 
 open Swate.Components
 
-//type ARCHolder(recentARCs: ARCPointer[]) =
-
 let mutable recentARCs: ARCPointer[] = [||]
 
 let setRecentARCs(newARCs: ARCPointer[]) = recentARCs <- newARCs

@@ -13,6 +13,7 @@ type IArcVaultsApi = {
     focusExistingARCWindow: string -> Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> Promise<string option>
     getRecentARCs: unit -> Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
+    checkForARC: string -> Promise<bool>
 }
 
 type IMainUpdateRendererApi = {

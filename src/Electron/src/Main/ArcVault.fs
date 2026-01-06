@@ -59,6 +59,17 @@ type ArcVault(window: BrowserWindow, ?path: string) =
             sendMsg.pathChange (Some path)
             this.path <- Some path
 
+    member this.OnClose() =
+        match this.path with
+        | Some path ->
+            let arcs =
+                recentARCs
+                |> Array.filter (fun arc -> arc.path <> path)
+            setRecentARCs arcs
+            printfn $"[Swate] Removed vault '{window.id}'"
+            arcs
+        | None -> [||]
+
 type ArcVaults() =
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
@@ -74,7 +85,8 @@ type ArcVaults() =
 
         window.onClosed (fun () ->
             if this.Vaults.Remove(id) then
-                printfn $"[Swate] Removed vault '{window.id}'"
+                let recentARCs = vault.OnClose()
+                this.BroadcastRecentARCs recentARCs
             else
                 failwith $"Failed to remove vault '{window.id}'"
         )

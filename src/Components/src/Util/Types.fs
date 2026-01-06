@@ -325,8 +325,6 @@ module AnnotationTable =
         | UnknownPasteCase of PasteCases
         | None
 
-open Browser.Types
-
 [<AutoOpen>]
 module SelectorTypes =
 
