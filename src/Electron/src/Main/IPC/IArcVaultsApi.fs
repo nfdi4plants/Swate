@@ -26,6 +26,9 @@ let api: IArcVaultsApi = {
 
                 do! ARC_VAULTS.OpenARCInVault(windowId, arcPath)
 
+                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
+                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
+
                 return Ok arcPath
         }
     createARC =
@@ -49,6 +52,9 @@ let api: IArcVaultsApi = {
                 let windowId = windowIdFromIpcEvent event
 
                 do! ARC_VAULTS.CreateARCInVault(windowId, arcPath, identifier)
+
+                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
+                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
                 return Ok arcPath
         }
@@ -91,14 +97,28 @@ let api: IArcVaultsApi = {
                 return Error(exn "Not exactly one path")
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
+                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
 
                 match ARC_VAULTS.TryGetVaultByPath arcPath with
                 | None ->
                     let! _ = ARC_VAULTS.RegisterVaultWithArc(arcPath)
+                    ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                     return Ok()
                 | Some vault ->
                     vault.window.focus ()
+                    ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                     return Ok()
+        }
+    focusExistingARCWindow =
+        fun arcPath -> promise {
+            match ARC_VAULTS.TryGetVaultByPath arcPath with
+            | None ->
+                return Error(exn $"The ARC for path {arcPath} should exist")
+            | Some vault ->
+                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
+                vault.window.focus()
+                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
+                return Ok()
         }
     closeARC =
         fun event -> promise {
@@ -113,5 +133,13 @@ let api: IArcVaultsApi = {
             return
                 ARC_VAULTS.TryGetVault(windowIdFromIpcEvent event)
                 |> Option.bind (fun v -> v.path)
+        }
+    getRecentARCs =
+        fun _ -> promise {
+            return recentARCs
+        }
+    checkForARC =
+        fun path -> promise {
+            return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
 }

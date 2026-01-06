@@ -1,12 +1,12 @@
 [<AutoOpen>]
 module Main.ArcVault
 
-open Browser
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open System.Collections.Generic
 open Main.Bindings
+open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open ARCtrl
 
@@ -183,17 +183,40 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some path)
         }
 
+        member this.OnClose() =
+            match this.path with
+            | Some path ->
+                let arcs =
+                    recentARCs
+                    |> Array.filter (fun arc -> arc.path <> path)
+                setRecentARCs arcs
+                printfn $"[Swate] Removed vault '{this.window.id}'"
+                arcs
+            | None -> [||]
+
 type ArcVaults() =
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
 
     member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
+    member this.BroadcastRecentARCs(recentARCs: ARCPointer[]) =
+        this.Vaults.Values
+        |> Array.ofSeq
+        |> Array.iter (fun vault ->
+            Remoting.init
+            |> Remoting.withWindow vault.window
+            |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+            |> fun client -> client.recentARCsUpdate recentARCs
+        )
+
     member this.DisposeVault(id: int) =
         match this.Vaults.TryGetValue(id) with
         | false, _ -> swatefailfn id $"Failed to remove vault."
         | true, vault ->
             vault.watcher |> Option.iter (fun watcher -> watcher.close () |> Promise.start)
+            let recentARCs = vault.OnClose()
+            this.BroadcastRecentARCs recentARCs
             this.Vaults.Remove(id) |> ignore
             swatelogfn id $"Removed vault."
 

@@ -133,12 +133,15 @@ type Actionbar =
         let selectedElements =
             React.useMemo (
                 (fun _ ->
+                    let onClick button =
+                        fun (e: MouseEvent) -> button.onClick ()
+
                     if buttons.Length > 0 && buttons.Length > maxNumber + 1 then
                         Array.take maxNumber buttons
-                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, button.onClick))
+                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, (onClick button)))
                     else
                         buttons
-                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, button.onClick))
+                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, (onClick button)))
                 ),
                 [| buttons |]
             )
