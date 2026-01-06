@@ -25,7 +25,7 @@ let api: IArcVaultsApi = {
                 console.log ($"Register window with path: {arcPath}")
                 ARC_VAULTS.SetPath(windowId, arcPath)
 
-                let recentARCs = ARCHolder.updateRecentARCs arcPath 5
+                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                 return Ok arcPath
         }
@@ -45,7 +45,7 @@ let api: IArcVaultsApi = {
                     return Error(exn "Not exactly one path")
                 else
                     let arcPath = r.filePaths |> Array.exactlyOne
-                    let recentARCs = ARCHolder.updateRecentARCs arcPath 5
+                    let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
 
                     match ARC_VAULTS.TryGetVaultByPath arcPath with
                     | None ->
@@ -63,7 +63,7 @@ let api: IArcVaultsApi = {
             | None ->
                 return Error(exn $"The ARC for path {arcPath} should exist")
             | Some vault ->
-                let recentARCs = ARCHolder.updateRecentARCs arcPath 5
+                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 vault.window.focus()
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                 return Ok()

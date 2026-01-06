@@ -5,6 +5,8 @@ open Swate.Components
 
 let mutable recentARCs: ARCPointer[] = [||]
 
+let maxNumberRecentARCs = 5
+
 let setRecentARCs(newARCs: ARCPointer[]) = recentARCs <- newARCs
 
 let ARCPointerExists (path: string) =
