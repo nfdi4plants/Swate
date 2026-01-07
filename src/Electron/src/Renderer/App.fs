@@ -39,7 +39,7 @@ let Main () =
                 setRecentARCs arcs
     }
 
-    let openARC =
+    let openNewWindow =
         fun _ ->
             promise {
                 match! Api.arcVaultApi.openARCInNewWindow () with
@@ -49,6 +49,23 @@ let Main () =
                 return ()
             }
             |> Promise.start
+
+    let openCurrentWindow =
+        fun _ ->
+            promise {
+                let! r = Api.arcVaultApi.openARC Fable.Core.JS.undefined
+
+                match r with
+                | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
+                | Ok _ -> ()
+            }
+            |> Promise.start
+
+    let openARC =
+        if appState.IsInit then
+            openCurrentWindow
+        else
+            openNewWindow
 
     let onARCClick (clickedARC: ARCPointer) =
         promise {

@@ -215,10 +215,19 @@ type ArcVaults() =
         | false, _ -> swatefailfn id $"Failed to remove vault."
         | true, vault ->
             vault.watcher |> Option.iter (fun watcher -> watcher.close () |> Promise.start)
-            let recentARCs = vault.OnClose()
-            this.BroadcastRecentARCs recentARCs
             this.Vaults.Remove(id) |> ignore
             swatelogfn id $"Removed vault."
+
+    member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
+
+        window.onClose (fun _ ->
+            let recentARCs = vault.OnClose()
+            this.BroadcastRecentARCs recentARCs
+        )
+
+        window.onClosed (fun () ->
+            this.DisposeVault(id)
+        )
 
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
         let! window = ArcVaultHelper.createWindow ()
@@ -226,7 +235,8 @@ type ArcVaults() =
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
-        window.onClosed (fun () -> this.DisposeVault(id))
+        this.OnCloseWindow(window, vault, id)
+
         window.focus ()
         swatelogfn id $"Register window"
 
@@ -240,7 +250,8 @@ type ArcVaults() =
         this.Vaults.Add(id, vault)
         do! vault.OpenARC(path)
 
-        window.onClosed (fun () -> this.DisposeVault(id))
+        this.OnCloseWindow(window, vault, id)
+
         window.focus ()
         swatelogfn id $"Register window"
 
@@ -255,7 +266,8 @@ type ArcVaults() =
 
         do! vault.CreateARC(path, newIdentifier)
 
-        window.onClosed (fun () -> this.DisposeVault(id))
+        this.OnCloseWindow(window, vault, id)
+
         window.focus ()
         swatelogfn id $"Register window"
 
