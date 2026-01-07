@@ -55,18 +55,18 @@ type Selector =
 
         let isOpen, setOpen = React.useState (false)
 
-        let onOpenSelector shallBeOpen =
+        let openSelector shallBeOpen =
             setOpen shallBeOpen
             onOpenSelector
             |> Option.iter(fun f -> f())
 
         let actionbar =
             actionbar
-            |> Option.map (fun actions -> actions (fun () -> onOpenSelector false))
+            |> Option.map (fun actions -> actions (fun () -> openSelector false))
             |> Option.defaultValue Html.none
 
         let onARCClick arcPointer =
-            onOpenSelector false
+            openSelector false
             onARCClick arcPointer
 
         let recentARCElements =
@@ -78,7 +78,7 @@ type Selector =
                 (fun _ ->
                     Html.button [
                         prop.onClick (fun _ ->
-                            onOpenSelector (not isOpen)
+                            openSelector (not isOpen)
                         )
                         prop.role.button
                         prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
@@ -96,7 +96,7 @@ type Selector =
         Dropdown.Main(isOpen, setOpen, dropDownSwitch, React.Fragment [ React.Fragment recentARCElements; actionbar ])
 
     [<ReactComponent>]
-    static member Entry(maxNumber, ?debug: bool) =
+    static member Entry(?debug: bool) =
 
         let testRecentARCs = [|
             ARCPointer.create ("Test 1", "/Here", false)
@@ -114,10 +114,10 @@ type Selector =
         let onARCClick (arcPointer:ARCPointer) =
             console.log($"arcPointer: {arcPointer.path}")
 
-        Selector.Main(recentARCs, onARCClick, maxNumber, potMaxWidth = 48, ?debug = debug)
+        Selector.Main(recentARCs, onARCClick, potMaxWidth = 48, ?debug = debug)
 
     [<ReactComponent>]
-    static member ActionbarInSelectorEntry(maxNumber, ?maxNumberActionbar, ?debug: bool) =
+    static member ActionbarInSelectorEntry(?maxNumberActionbar, ?debug: bool) =
 
         let maxNumberActionbar = defaultArg maxNumberActionbar 3
 

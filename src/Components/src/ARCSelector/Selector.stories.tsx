@@ -19,7 +19,7 @@ type Story = StoryObj<typeof meta>;
 export const DisplaySelector: Story = {
   args: {
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      < SelectorEntry maxNumber = {5} debug={true} />
+      < SelectorEntry debug={true} />
     </div>
   }
 }
