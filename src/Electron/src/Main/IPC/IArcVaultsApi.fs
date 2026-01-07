@@ -109,6 +109,14 @@ let api: IArcVaultsApi = {
                     ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                     return Ok()
         }
+    closeARC =
+        fun event -> promise {
+            try
+                ARC_VAULTS.DisposeVault(windowIdFromIpcEvent event)
+                return Ok()
+            with e ->
+                return Error e
+        }
     focusExistingARCWindow =
         fun arcPath -> promise {
             match ARC_VAULTS.TryGetVaultByPath arcPath with
@@ -119,14 +127,6 @@ let api: IArcVaultsApi = {
                 vault.window.focus()
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
                 return Ok()
-        }
-    closeARC =
-        fun event -> promise {
-            try
-                ARC_VAULTS.DisposeVault(windowIdFromIpcEvent event)
-                return Ok()
-            with e ->
-                return Error e
         }
     getOpenPath =
         fun event -> promise {

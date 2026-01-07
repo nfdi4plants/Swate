@@ -24,6 +24,7 @@ type Selector =
                                     prop.className "swt:truncate swt:block swt:min-w-30"
                                     prop.style [ style.maxWidth maxWidth ]
                                     prop.text arcPointer.name
+                                    prop.title arcPointer.name
                                 ]
                                 if arcPointer.isActive then
                                     Html.i [

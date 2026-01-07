@@ -9,6 +9,8 @@ open Browser.Dom
 
 [<ReactComponent>]
 let Main () =
+
+    let recentARCs, setRecentARCs = React.useState ([||])
     let appState, setAppState = React.useState (AppState.Init)
 
     React.useLayoutEffectOnce (fun _ ->
@@ -31,7 +33,74 @@ let Main () =
                 match pathOption with
                 | Some p -> AppState.ARC p |> setAppState
                 | None -> setAppState AppState.Init
+        recentARCsUpdate =
+            fun arcs ->
+                console.log ("[Swate] CHANGE RECENTARCS !")
+                setRecentARCs arcs
     }
+
+    let openARC =
+        fun _ ->
+            promise {
+                match! Api.arcVaultApi.openARCInNewWindow () with
+                | Ok _ -> ()
+                | Error exn -> failwith $"{exn.Message}"
+
+                return ()
+            }
+            |> Promise.start
+
+    let onARCClick (clickedARC: ARCPointer) =
+        promise {
+            match! Api.arcVaultApi.focusExistingARCWindow clickedARC.path with
+            | Ok _ -> ()
+            | Error exn -> failwith $"{exn.Message}"
+
+            return ()
+        }
+        |> Promise.start
+
+    let actionbar onClick =
+        let createARC =
+            ButtonInfo.create (
+                "swt:fluent--document-add-24-regular swt:size-5",
+                "Create a new ARC",
+                onClick
+            )
+
+        let openARCButtonInfo =
+            ButtonInfo.create (
+                "swt:fluent--folder-open-24-regular swt:size-5",
+                "Open an existing ARC",
+                fun _ ->
+                    onClick()
+                    openARC()
+            )
+
+        let downloadARC =
+            ButtonInfo.create (
+                "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
+                "Download an existing ARC",
+                onClick
+            )
+
+        Actionbar.Main([| createARC; openARCButtonInfo; downloadARC |], 3)
+
+    let onOpenSelector () =
+        promise {
+            let! newARCs = Api.arcVaultApi.getRecentARCs()
+
+            match appState with
+            | AppState.Init -> ()
+            | AppState.ARC path ->
+                newARCs
+                |> Array.map (fun arc ->
+                    ARCPointer.create(arc.name, arc.path, arc.path = path))
+                |> setRecentARCs
+        }
+        |> Promise.start
+
+    let selector = Selector.Main(recentARCs, onARCClick, actionbar, onOpenSelector = onOpenSelector)
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
@@ -62,31 +131,33 @@ let Main () =
             [| appState |]
         )
 
-    let navbar =
-        Html.div [
-            prop.className "swt:size-full swt:flex swt:items-center swt:p-2 swt:gap-2"
-            prop.children [
-                Html.button [
-                    prop.onClick (fun _ ->
-                        promise {
-                            match! Api.arcVaultApi.openARCInNewWindow () with
-                            | Ok _ -> ()
-                            | Error exn -> failwith $"{exn.Message}"
+    //let navbar =
+    //    Html.div [
+    //        prop.className "swt:size-full swt:flex swt:items-center swt:p-2 swt:gap-2"
+    //        prop.children [
+    //            Html.button [
+    //                prop.onClick (fun _ ->
+    //                    promise {
+    //                        match! Api.arcVaultApi.openARCInNewWindow () with
+    //                        | Ok _ -> ()
+    //                        | Error exn -> failwith $"{exn.Message}"
 
-                            return ()
-                        }
-                        |> Promise.start
-                    )
-                    prop.title "Open ARC"
-                    prop.className "swt:btn swt:btn-square swt:btn-xs swt:btn-ghost"
-                    prop.children [
-                        Html.i [
-                            prop.className "swt:iconify swt:fluent--folder-open-24-filled swt:size-4"
-                        ]
-                    ]
-                ]
-            ]
-        ]
+    //                        return ()
+    //                    }
+    //                    |> Promise.start
+    //                )
+    //                prop.title "Open ARC"
+    //                prop.className "swt:btn swt:btn-square swt:btn-xs swt:btn-ghost"
+    //                prop.children [
+    //                    Html.i [
+    //                        prop.className "swt:iconify swt:fluent--folder-open-24-filled swt:size-4"
+    //                    ]
+    //                ]
+    //            ]
+    //        ]
+    //    ]
+
+    let navbar = Navbar.Main(selector)
 
     context.AppStateCtx.AppStateCtx.Provider(
         {
