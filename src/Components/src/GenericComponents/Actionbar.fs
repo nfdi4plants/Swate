@@ -33,7 +33,7 @@ type Actionbar =
             prop.children [
                 Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
                 Html.button [
-                    prop.className [ "swt:btn swt:btn-square swt:btn-ghost" ]
+                    prop.className [ "swt:btn swt:btn-square swt:btn-ghost swt:p-0" ]
                     prop.children [
                         Html.i [
                             prop.className [ "swt:iconify " + icon ]
@@ -152,7 +152,7 @@ type Actionbar =
         let selectedElement = React.Fragment selectedElements
 
         Html.div [
-            prop.className $"swt:flex swt:border swt:border-neutral swt:rounded-lg swt:w-max"
+            prop.className $"swt:flex swt:items-center swt:border swt:border-neutral swt:rounded-lg swt:w-max swt:p-1"
             prop.children [ selectedElement; restElements ]
         ]
 

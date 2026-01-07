@@ -24,7 +24,7 @@ type Selector =
                                     prop.className "swt:truncate swt:block swt:min-w-30"
                                     prop.style [ style.maxWidth maxWidth ]
                                     prop.text arcPointer.name
-                                    prop.title arcPointer.name
+                                    prop.title arcPointer.path
                                 ]
                                 if arcPointer.isActive then
                                     Html.i [
@@ -93,7 +93,21 @@ type Selector =
                 [| isOpen |]
             )
 
-        Dropdown.Main(isOpen, setOpen, dropDownSwitch, React.Fragment [ React.Fragment recentARCElements; actionbar ])
+        let children =
+            React.Fragment [
+                React.Fragment recentARCElements
+                Html.li [
+                    prop.className "swt:w-full swt:mt-2"
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:flex swt:justify-center swt:w-full"
+                            prop.children [ actionbar ]
+                        ]
+                    ]
+                ]
+            ]
+
+        Dropdown.Main(isOpen, setOpen, dropDownSwitch, children)
 
     [<ReactComponent>]
     static member Entry(?debug: bool) =

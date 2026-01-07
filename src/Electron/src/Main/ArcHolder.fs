@@ -11,6 +11,12 @@ let mutable maxNumberRecentARCs = 5
 
 let setMaxNumberRecentARCs(newMaxNumberRecentARCs: int) = maxNumberRecentARCs <- newMaxNumberRecentARCs
 
+let getNameFromPath(path: string) =
+    path
+    |> fun p -> p.Replace("\\", "/")
+    |> fun p -> p.Split("/")
+    |> Array.last
+
 let ARCPointerExists (path: string) =
     recentARCs
     |> Array.exists (fun arcPointer -> arcPointer.path = path)
@@ -20,7 +26,7 @@ let reorderARCPointers (path: string) =
         recentARCs
         |> Array.filter (fun arc -> arc.path <> path)
         |> Array.map (fun arc -> ARCPointer.create(arc.name, arc.path, false))
-    Array.append [| ARCPointer.create(path, path, true) |] filteredRecentARCs
+    Array.append [| ARCPointer.create(getNameFromPath path, path, true) |] filteredRecentARCs
 
 let createNewARCPointers (currentARC: ARCPointer) (recentARCs: ARCPointer []) maxNumberRecentARCs =
     if recentARCs.Length = maxNumberRecentARCs then
@@ -36,7 +42,7 @@ let updateRecentARCs path maxNumberRecentARCs =
         reorderedARCPointers
     else
         let newARCPointers =
-            let newARCPointer = ARCPointer.create(path, path, true)
+            let newARCPointer = ARCPointer.create(getNameFromPath path, path, true)
             let tmp =
                 recentARCs
                 |> Array.map (fun arc -> ARCPointer.create(arc.name, arc.path, false))

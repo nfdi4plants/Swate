@@ -148,32 +148,6 @@ let Main () =
             [| appState |]
         )
 
-    //let navbar =
-    //    Html.div [
-    //        prop.className "swt:size-full swt:flex swt:items-center swt:p-2 swt:gap-2"
-    //        prop.children [
-    //            Html.button [
-    //                prop.onClick (fun _ ->
-    //                    promise {
-    //                        match! Api.arcVaultApi.openARCInNewWindow () with
-    //                        | Ok _ -> ()
-    //                        | Error exn -> failwith $"{exn.Message}"
-
-    //                        return ()
-    //                    }
-    //                    |> Promise.start
-    //                )
-    //                prop.title "Open ARC"
-    //                prop.className "swt:btn swt:btn-square swt:btn-xs swt:btn-ghost"
-    //                prop.children [
-    //                    Html.i [
-    //                        prop.className "swt:iconify swt:fluent--folder-open-24-filled swt:size-4"
-    //                    ]
-    //                ]
-    //            ]
-    //        ]
-    //    ]
-
     let navbar = Navbar.Main(selector)
 
     context.AppStateCtx.AppStateCtx.Provider(
