@@ -507,7 +507,7 @@ type Layout =
 
         Layout.Main(
             children = Layout.Wrapper "Main Content" "swt:bg-base-300 swt:h-full",
-            navbar = Selector.NavbarSelectorEntry(3),
+            navbar = Selector.NavbarSelectorEntry(),
             leftSidebar =
                 Html.ul [
                     prop.className "swt:menu swt:w-full swt:p-2 swt:rounded-box swt:h-full swt:flex-nowrap"

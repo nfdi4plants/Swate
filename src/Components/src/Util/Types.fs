@@ -326,8 +326,6 @@ module AnnotationTable =
         | UnknownPasteCase of PasteCases
         | None
 
-open Browser.Types
-
 [<AutoOpen>]
 module SelectorTypes =
 
@@ -337,7 +335,7 @@ module SelectorTypes =
         static member create (name: string, path: string, isActive: bool) = { name = name; path = path; isActive = isActive }
 
     type ButtonInfo =
-        { icon: string; toolTip: string; onClick: MouseEvent -> unit }
+        { icon: string; toolTip: string; onClick: unit -> unit }
 
-        static member create (icon: string, toolTip: string, (onClick: MouseEvent -> unit)) =
+        static member create (icon: string, toolTip: string, (onClick: unit -> unit)) =
             { icon = icon; toolTip = toolTip; onClick = onClick }

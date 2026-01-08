@@ -6,15 +6,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="IPCTypes.fs"/>
-    <Compile Include="Types.fs"/>
+    <Compile Include="IPCTypes.fs" />
+    <Compile Include="Types.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="YAMLicious" />
-    <PackageReference Include="Fable.Electron"/>
-    <PackageReference Include="Fable.Electron.Remoting"/>
-    <PackageReference Include="Fable.Electron.Forge"/>
+    <PackageReference Include="Fable.Electron" />
+    <PackageReference Include="Fable.Electron.Remoting" />
+    <PackageReference Include="Fable.Electron.Forge" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
   </ItemGroup>
 
 </Project>

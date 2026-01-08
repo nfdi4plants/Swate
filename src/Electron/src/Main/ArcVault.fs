@@ -1,12 +1,12 @@
 [<AutoOpen>]
 module Main.ArcVault
 
-open Browser
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open System.Collections.Generic
 open Main.Bindings
+open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open ARCtrl
 
@@ -183,11 +183,32 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some path)
         }
 
+        member this.OnClose() =
+            match this.path with
+            | Some path ->
+                let arcs =
+                    recentARCs
+                    |> Array.filter (fun arc -> arc.path <> path)
+                setRecentARCs arcs
+                printfn $"[Swate] Removed vault '{this.window.id}'"
+                arcs
+            | None -> [||]
+
 type ArcVaults() =
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
 
     member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
+
+    member this.BroadcastRecentARCs(recentARCs: ARCPointer[]) =
+        this.Vaults.Values
+        |> Array.ofSeq
+        |> Array.iter (fun vault ->
+            Remoting.init
+            |> Remoting.withWindow vault.window
+            |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+            |> fun client -> client.recentARCsUpdate recentARCs
+        )
 
     member this.DisposeVault(id: int) =
         match this.Vaults.TryGetValue(id) with
@@ -197,13 +218,25 @@ type ArcVaults() =
             this.Vaults.Remove(id) |> ignore
             swatelogfn id $"Removed vault."
 
+    member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
+
+        window.onClose (fun _ ->
+            let recentARCs = vault.OnClose()
+            this.BroadcastRecentARCs recentARCs
+        )
+
+        window.onClosed (fun () ->
+            this.DisposeVault(id)
+        )
+
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
         let! window = ArcVaultHelper.createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
-        window.onClosed (fun () -> this.DisposeVault(id))
+        this.OnCloseWindow(window, vault, id)
+
         window.focus ()
         swatelogfn id $"Register window"
 
@@ -217,7 +250,8 @@ type ArcVaults() =
         this.Vaults.Add(id, vault)
         do! vault.OpenARC(path)
 
-        window.onClosed (fun () -> this.DisposeVault(id))
+        this.OnCloseWindow(window, vault, id)
+
         window.focus ()
         swatelogfn id $"Register window"
 
@@ -232,7 +266,8 @@ type ArcVaults() =
 
         do! vault.CreateARC(path, newIdentifier)
 
-        window.onClosed (fun () -> this.DisposeVault(id))
+        this.OnCloseWindow(window, vault, id)
+
         window.focus ()
         swatelogfn id $"Register window"
 
