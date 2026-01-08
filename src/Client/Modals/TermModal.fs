@@ -2,7 +2,6 @@ namespace Modals
 
 open Swate.Components.Shared.Database
 open Feliz
-open Feliz.DaisyUI
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared

@@ -5,7 +5,6 @@ open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.DaisyUI
 
 module private APIExtentions =
 
@@ -298,7 +297,7 @@ type TermSearch =
 
         React.useImperativeHandle (ref, fun () -> (fun () -> API.callAdvancedSearch advancedSearchState))
 
-        React.fragment [
+        React.Fragment [
             Html.div [
                 prop.className "swt:text-xs swt:text-base-content/50"
                 prop.children [
@@ -409,7 +408,7 @@ type TermSearch =
         let ResultsComponent (results: ResizeArray<TermSearchResult>) =
             let range = results.GetRange(pagination * BinSize, BinSize)
 
-            React.fragment [
+            React.Fragment [
                 Html.div [ Html.textf "Results: %i" results.Count ]
                 Html.ul [
                     prop.className "swt:max-h-[50%] swt:overflow-y-auto swt:list"
@@ -703,7 +702,7 @@ type TermSearch =
             ]
 
         let footer =
-            React.fragment [
+            React.Fragment [
                 Html.button [
                     prop.text "Close"
                     prop.className "swt:btn"
@@ -1070,9 +1069,9 @@ type TermSearch =
 
                 let id = Fable.Core.JS.setTimeout (fun () -> inputRef.current.Value.focus ()) 0
 
-                React.createDisposable (fun () -> Fable.Core.JS.clearTimeout id)
+                FsReact.createDisposable (fun () -> Fable.Core.JS.clearTimeout id)
             else
-                React.createDisposable (fun () -> ())
+                FsReact.createDisposable (fun () -> ())
         )
 
         let InputLeadingVisual =
@@ -1098,7 +1097,7 @@ type TermSearch =
             && not (System.String.IsNullOrWhiteSpace term.Value.id.Value)
 
         let InputTrailingVisual =
-            React.fragment [
+            React.Fragment [
                 Html.div [
                     if isLoading then
                         Html.span [ prop.className "swt:loading swt:loading-spinner swt:loading-sm" ]
@@ -1224,7 +1223,7 @@ type TermSearch =
                 && parentId.IsSome
                 && comboBoxRef.current.isOpen () |> not
 
-        React.fragment [
+        React.Fragment [
             TermSearch.Modal(
                 modalOpen,
                 setModalOpen,

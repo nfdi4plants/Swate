@@ -19,6 +19,42 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="Fable.Remoting.Client" />
+    <PackageReference Include="Fable.Fetch" />
+    <PackageReference Include="Fable.React.Types" />
+    <PackageReference Include="Fable.Core" />
+    <PackageReference Include="Feliz" />
+    <PackageReference Include="Fable.Browser.Dom" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include all files that are compiled with this project -->
+    <!-- Include the project file itself as well -->
+    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+    <Content Include="..\package.json">
+      <Link>package.json</Link>
+    </Content>
+    <Content Include="..\tailwind.css">
+      <Link>tailwind.css</Link>
+    </Content>
+    <Content Include="..\tsconfig.json">
+      <Link>tsconfig.json</Link>
+    </Content>
+    <Content Include="..\vite.config.mts">
+      <Link>vite.config.mts</Link>
+    </Content>
+    <TypeScriptCompile Include="..\vitest.config.ts">
+      <Link>vitest.config.ts</Link>
+    </TypeScriptCompile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
     <Compile Include="Util\Types.fs" />
@@ -33,10 +69,18 @@
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
-    <Compile Include="GenericComponents\ErrorBaseModal.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
+    <Compile Include="GenericComponents\CardGrid.fs" />
+    <Compile Include="GenericComponents\Dropdown.fs" />
+    <Compile Include="GenericComponents\Actionbar.fs" />
+    <Compile Include="GenericComponents\Navbar.fs" />
+    <Compile Include="ARCSelector\Selector.fs" />
+    <Compile Include="Layout\Layout.fs" />
+    <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
+    <Compile Include="FileExplorer\FileExplorerBreadcrumbs.fs" />
+    <Compile Include="FileExplorer\FileExplorer.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
@@ -52,28 +96,6 @@
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="DataMapTable\DataMapTable.fs" />
     <Compile Include="Style.fs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" />
-    <PackageReference Include="ARCtrl.Spreadsheet" />
-    <PackageReference Include="Fable.Remoting.Client" />
-    <PackageReference Include="Fable.Fetch" />
-    <PackageReference Include="Fable.React.Types" />
-    <PackageReference Include="Fable.Core" />
-    <PackageReference Include="Feliz" />
-    <PackageReference Include="Feliz.DaisyUI" />
-    <PackageReference Include="Fable.Browser.Dom" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Include all files that are compiled with this project -->
-    <!-- Include the project file itself as well -->
-    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -2,7 +2,6 @@ namespace Components
 
 open Fable
 open Feliz
-open Feliz.DaisyUI
 open System
 
 /// https://www.bekk.christmas/post/2021/02/how-to-lazy-render-large-data-tables-to-up-performance
@@ -60,7 +59,8 @@ type LazyLoadTable =
                         Math.Round(Math.Min(displayStartPosition + rowsToRender, data.Length - 1))
                     //
                     setDisplayStart (int displayStartPosition)
-                    setDisplayEnd (int displayEndPosition)),
+                    setDisplayEnd (int displayEndPosition)
+                ),
                 [| box data.Length |]
             )
         //Attach a listener to the scroll event on the window. This function will run every time the scroll changes.
@@ -74,7 +74,8 @@ type LazyLoadTable =
 
                                 if data.Length <> 0 then
                                     setScrollPosition scrollTop
-                                    setDisplayPositions scrollTop),
+                                    setDisplayPositions scrollTop
+                            ),
                             100
                         )
 
@@ -87,7 +88,8 @@ type LazyLoadTable =
                                     ref.current.Value.removeEventListener ("scroll", onScroll)
                         }
                 else
-                    None),
+                    None
+            ),
             [| box setDisplayPositions; box data.Length |]
         )
         //We also need to make sure our calculations are run when we first render our page, even before we have started to scroll. So let's add this

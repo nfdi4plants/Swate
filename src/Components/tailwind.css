@@ -10,182 +10,183 @@
 
 @source "**/*.fs.ts";
 @plugin "@tailwindcss/typography";
-
+@plugin "@iconify/tailwind4" {
+    prefixes: fluent;
+}
 @plugin "daisyui" {
     themes: all;
 }
 
 @plugin "daisyui/theme" {
-  name: "finster";
-  default: true;
-  prefersdark: true;
-  color-scheme: "dark";
-  --color-base-100: oklch(25.33% 0.016 252.42);
-  --color-base-200: oklch(23.26% 0.014 253.1);
-  --color-base-300: oklch(21.15% 0.012 254.09);
-  --color-base-content: oklch(97.807% 0.029 256.847);
-  --color-primary: oklch(0.7305 0.13 177.47);
-  --color-primary-content: oklch(0% 0 0);
-  --color-secondary: oklch(0.3571 0.0384 250.36);
-  --color-secondary-content: oklch(100% 0 0);
-  --color-accent: oklch(0.8141 0.1041 124.06);
-  --color-accent-content: oklch(0% 0 0);
-  --color-neutral: oklch(14% 0.005 285.823);
-  --color-neutral-content: oklch(92% 0.004 286.32);
-  --color-info: oklch(74% 0.16 232.661);
-  --color-info-content: oklch(29% 0.066 243.157);
-  --color-success: oklch(76% 0.177 163.223);
-  --color-success-content: oklch(37% 0.077 168.94);
-  --color-warning: oklch(82% 0.189 84.429);
-  --color-warning-content: oklch(41% 0.112 45.904);
-  --color-error: oklch(71% 0.194 13.428);
-  --color-error-content: oklch(27% 0.105 12.094);
-  --radius-selector: 0.5rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
+    name: "finster";
+    default: true;
+    prefersdark: true;
+    color-scheme: "dark";
+    --color-base-100: oklch(25.33% 0.016 252.42);
+    --color-base-200: oklch(23.26% 0.014 253.1);
+    --color-base-300: oklch(21.15% 0.012 254.09);
+    --color-base-content: oklch(97.807% 0.029 256.847);
+    --color-primary: oklch(0.7305 0.13 177.47);
+    --color-primary-content: oklch(0% 0 0);
+    --color-secondary: oklch(0.3571 0.0384 250.36);
+    --color-secondary-content: oklch(100% 0 0);
+    --color-accent: oklch(0.8141 0.1041 124.06);
+    --color-accent-content: oklch(0% 0 0);
+    --color-neutral: oklch(14% 0.005 285.823);
+    --color-neutral-content: oklch(92% 0.004 286.32);
+    --color-info: oklch(74% 0.16 232.661);
+    --color-info-content: oklch(29% 0.066 243.157);
+    --color-success: oklch(76% 0.177 163.223);
+    --color-success-content: oklch(37% 0.077 168.94);
+    --color-warning: oklch(82% 0.189 84.429);
+    --color-warning-content: oklch(41% 0.112 45.904);
+    --color-error: oklch(71% 0.194 13.428);
+    --color-error-content: oklch(27% 0.105 12.094);
+    --radius-selector: 0.5rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
 }
 
 @plugin "daisyui/theme" {
-  name: "sunrise";
-  default: true;
-  prefersdark: false;
-  color-scheme: "light";
-  --color-base-100: oklch(100% 0 0);
-  --color-base-200: oklch(98% 0 0);
-  --color-base-300: oklch(95% 0 0);
-  --color-base-content: oklch(21% 0.006 285.885);
-  --color-primary: oklch(0.7305 0.13 177.47);
-  --color-primary-content: oklch(0% 0 0);
-  --color-secondary: oklch(0.3571 0.0384 250.36);
-  --color-secondary-content: oklch(100% 0 0);
-  --color-accent: oklch(0.8141 0.1041 124.06);
-  --color-accent-content: oklch(0% 0 0);
-  --color-neutral: oklch(14% 0.005 285.823);
-  --color-neutral-content: oklch(92% 0.004 286.32);
-  --color-info: oklch(74% 0.16 232.661);
-  --color-info-content: oklch(29% 0.066 243.157);
-  --color-success: oklch(76% 0.177 163.223);
-  --color-success-content: oklch(37% 0.077 168.94);
-  --color-warning: oklch(82% 0.189 84.429);
-  --color-warning-content: oklch(41% 0.112 45.904);
-  --color-error: oklch(71% 0.194 13.428);
-  --color-error-content: oklch(27% 0.105 12.094);
-  --radius-selector: 0.5rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
+    name: "sunrise";
+    default: true;
+    prefersdark: false;
+    color-scheme: "light";
+    --color-base-100: oklch(100% 0 0);
+    --color-base-200: oklch(98% 0 0);
+    --color-base-300: oklch(95% 0 0);
+    --color-base-content: oklch(21% 0.006 285.885);
+    --color-primary: oklch(0.7305 0.13 177.47);
+    --color-primary-content: oklch(0% 0 0);
+    --color-secondary: oklch(0.3571 0.0384 250.36);
+    --color-secondary-content: oklch(100% 0 0);
+    --color-accent: oklch(0.8141 0.1041 124.06);
+    --color-accent-content: oklch(0% 0 0);
+    --color-neutral: oklch(14% 0.005 285.823);
+    --color-neutral-content: oklch(92% 0.004 286.32);
+    --color-info: oklch(74% 0.16 232.661);
+    --color-info-content: oklch(29% 0.066 243.157);
+    --color-success: oklch(76% 0.177 163.223);
+    --color-success-content: oklch(37% 0.077 168.94);
+    --color-warning: oklch(82% 0.189 84.429);
+    --color-warning-content: oklch(41% 0.112 45.904);
+    --color-error: oklch(71% 0.194 13.428);
+    --color-error-content: oklch(27% 0.105 12.094);
+    --radius-selector: 0.5rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
 }
 
 @plugin "daisyui/theme" {
-  name: "planti";
-  default: false;
-  prefersdark: false;
-  color-scheme: "dark";
-  --color-base-100: oklch(43% 0.078 188.216);
-  --color-base-200: oklch(38% 0.063 188.416);
-  --color-base-300: oklch(27% 0.046 192.524);
-  --color-base-content: oklch(95% 0.051 180.801);
-  --color-primary: oklch(84% 0.143 164.978);
-  --color-primary-content: oklch(0% 0 0);
-  --color-secondary: oklch(83% 0.128 66.29);
-  --color-secondary-content: oklch(0% 0 0);
-  --color-accent: oklch(80% 0.105 251.813);
-  --color-accent-content: oklch(0% 0 0);
-  --color-neutral: oklch(51% 0.096 186.391);
-  --color-neutral-content: oklch(98% 0.014 180.72);
-  --color-info: oklch(54% 0.245 262.881);
-  --color-info-content: oklch(100% 0 0);
-  --color-success: oklch(62% 0.194 149.214);
-  --color-success-content: oklch(100% 0 0);
-  --color-warning: oklch(66% 0.179 58.318);
-  --color-warning-content: oklch(100% 0 0);
-  --color-error: oklch(57% 0.245 27.325);
-  --color-error-content: oklch(100% 0 0);
-  --radius-selector: 0.25rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0rem;
-  --size-selector: 0.21875rem;
-  --size-field: 0.25rem;
-  --border: 1.5px;
-  --depth: 1;
-  --noise: 0;
+    name: "planti";
+    default: false;
+    prefersdark: false;
+    color-scheme: "dark";
+    --color-base-100: oklch(43% 0.078 188.216);
+    --color-base-200: oklch(38% 0.063 188.416);
+    --color-base-300: oklch(27% 0.046 192.524);
+    --color-base-content: oklch(95% 0.051 180.801);
+    --color-primary: oklch(84% 0.143 164.978);
+    --color-primary-content: oklch(0% 0 0);
+    --color-secondary: oklch(83% 0.128 66.29);
+    --color-secondary-content: oklch(0% 0 0);
+    --color-accent: oklch(80% 0.105 251.813);
+    --color-accent-content: oklch(0% 0 0);
+    --color-neutral: oklch(51% 0.096 186.391);
+    --color-neutral-content: oklch(98% 0.014 180.72);
+    --color-info: oklch(54% 0.245 262.881);
+    --color-info-content: oklch(100% 0 0);
+    --color-success: oklch(62% 0.194 149.214);
+    --color-success-content: oklch(100% 0 0);
+    --color-warning: oklch(66% 0.179 58.318);
+    --color-warning-content: oklch(100% 0 0);
+    --color-error: oklch(57% 0.245 27.325);
+    --color-error-content: oklch(100% 0 0);
+    --radius-selector: 0.25rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0rem;
+    --size-selector: 0.21875rem;
+    --size-field: 0.25rem;
+    --border: 1.5px;
+    --depth: 1;
+    --noise: 0;
 }
 
 
-
 @plugin "daisyui/theme" {
-  name: "viola";
-  default: false;
-  prefersdark: false;
-  color-scheme: "dark";
-  --color-base-100: oklch(43% 0.232 292.759);
-  --color-base-200: oklch(38% 0.189 293.745);
-  --color-base-300: oklch(28% 0.141 291.089);
-  --color-base-content: oklch(89% 0.057 293.283);
-  --color-primary: oklch(69% 0.17 162.48);
-  --color-primary-content: oklch(0% 0 0);
-  --color-secondary: oklch(74% 0.238 322.16);
-  --color-secondary-content: oklch(0% 0 0);
-  --color-accent: oklch(80% 0.114 19.571);
-  --color-accent-content: oklch(0% 0 0);
-  --color-neutral: oklch(26% 0 0);
-  --color-neutral-content: oklch(100% 0 0);
-  --color-info: oklch(54% 0.245 262.881);
-  --color-info-content: oklch(95% 0.045 203.388);
-  --color-success: oklch(72% 0.219 149.579);
-  --color-success-content: oklch(0% 0 0);
-  --color-warning: oklch(66% 0.179 58.318);
-  --color-warning-content: oklch(98% 0.016 73.684);
-  --color-error: oklch(63% 0.237 25.331);
-  --color-error-content: oklch(14% 0.004 49.25);
-  --radius-selector: 0.25rem;
-  --radius-field: 1rem;
-  --radius-box: 1rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 2px;
-  --depth: 1;
-  --noise: 1;
+    name: "viola";
+    default: false;
+    prefersdark: false;
+    color-scheme: "dark";
+    --color-base-100: oklch(43% 0.232 292.759);
+    --color-base-200: oklch(38% 0.189 293.745);
+    --color-base-300: oklch(28% 0.141 291.089);
+    --color-base-content: oklch(89% 0.057 293.283);
+    --color-primary: oklch(69% 0.17 162.48);
+    --color-primary-content: oklch(0% 0 0);
+    --color-secondary: oklch(74% 0.238 322.16);
+    --color-secondary-content: oklch(0% 0 0);
+    --color-accent: oklch(80% 0.114 19.571);
+    --color-accent-content: oklch(0% 0 0);
+    --color-neutral: oklch(26% 0 0);
+    --color-neutral-content: oklch(100% 0 0);
+    --color-info: oklch(54% 0.245 262.881);
+    --color-info-content: oklch(95% 0.045 203.388);
+    --color-success: oklch(72% 0.219 149.579);
+    --color-success-content: oklch(0% 0 0);
+    --color-warning: oklch(66% 0.179 58.318);
+    --color-warning-content: oklch(98% 0.016 73.684);
+    --color-error: oklch(63% 0.237 25.331);
+    --color-error-content: oklch(14% 0.004 49.25);
+    --radius-selector: 0.25rem;
+    --radius-field: 1rem;
+    --radius-box: 1rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 2px;
+    --depth: 1;
+    --noise: 1;
 }
 
 
 @utility container {
-  margin-inline: auto;
-  padding-inline: 1rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
 
-  @variant sm {
-    padding-inline: 2rem;
-    max-width: 640px;
-  }
+    @variant sm {
+        padding-inline: 2rem;
+        max-width: 640px;
+    }
 
-  @variant md {
-    padding-inline: 3rem;
-    max-width: 768px;
-  }
+    @variant md {
+        padding-inline: 3rem;
+        max-width: 768px;
+    }
 
-  @variant lg {
-    padding-inline: 4rem;
-    max-width: 1024px;
-  }
+    @variant lg {
+        padding-inline: 4rem;
+        max-width: 1024px;
+    }
 
-  @variant xl {
-    padding-inline: 5rem;
-    max-width: 1280px;
-  }
+    @variant xl {
+        padding-inline: 5rem;
+        max-width: 1280px;
+    }
 
-  @variant 2xl {
-    padding-inline: 6rem;
-    max-width: 1536px;
-  }
+    @variant 2xl {
+        padding-inline: 6rem;
+        max-width: 1536px;
+    }
 }
 
 
@@ -203,17 +204,17 @@
 
 @layer swt-utilities {
     .animated-border::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      z-index: -1;
-      padding: 2px;
-      border-radius: 8px;
-      background: linear-gradient(180deg, var(--color-primary), var(--color-neutral));
-      background-size: 200% 200%;
-      animation: border-gradient-flow 8s ease-in-out infinite;
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: -1;
+        padding: 2px;
+        border-radius: 8px;
+        background: linear-gradient(180deg, var(--color-primary), var(--color-neutral));
+        background-size: 200% 200%;
+        animation: border-gradient-flow 8s ease-in-out infinite;
     }
 
     .animated-border:nth-of-type(1)::before {
@@ -230,5 +231,27 @@
 
     .animated-border:nth-of-type(4)::before {
         animation-delay: 6s;
+    }
+}
+
+@layer swt-utilities {
+    /* Scrollbar utilities: keep constant width, fade thumb on hover (no layout shift) */
+    .swt\:scrollbar-fade {
+        scrollbar-width: thin; /* Firefox: keep a constant gutter */
+        scrollbar-color: transparent transparent; /* hide thumb until hover */
+    }
+    .swt\:scrollbar-fade::-webkit-scrollbar {
+        width: 8px; /* WebKit: constant width prevents layout shift */
+        height: 8px;
+    }
+    .swt\:scrollbar-fade::-webkit-scrollbar-thumb {
+        background-color: transparent; /* hidden by default */
+        border-radius: 8px;
+    }
+    .swt\:scrollbar-fade:hover {
+        scrollbar-color: color-mix(in oklch, var(--color-base-content) 40%, transparent) transparent;
+    }
+    .swt\:scrollbar-fade:hover::-webkit-scrollbar-thumb {
+        background-color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
     }
 }

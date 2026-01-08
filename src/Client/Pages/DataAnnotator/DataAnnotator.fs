@@ -6,7 +6,6 @@ open DataAnnotator
 open Model
 open Messages
 open Feliz
-open Feliz.DaisyUI
 open Swate.Components
 
 module private DataAnnotatorHelper =
@@ -229,6 +228,7 @@ module private DataAnnotatorHelper =
             prop.children [ Icons.SquarePlus() ]
         ]
 
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     let CellButton
         (rowIndex: int, columnIndex: int, content: string, dtrgt: DataTarget option, state: Set<DataTarget>, setState)
         =
@@ -307,31 +307,7 @@ module private DataAnnotatorHelper =
 
         let colCount = bodyRows |> Array.map (fun row -> row.Length) |> Array.max
 
-        let tableRef = React.useRef<TableHandle> null
-
-        let render =
-            React.memo (
-                (fun (index: CellCoordinate) ->
-                    if index.y = 0 && file.HeaderRow.IsSome then
-                        // Header Row
-                        let content =
-                            headerRow
-                            |> Option.bind (fun x -> x |> List.tryItem index.x)
-                            |> Option.defaultValue (getDefault index)
-                        // let content = headerRow.Value.[index.x]
-                        CellButton content
-                    else
-                        // Body Row
-                        let input =
-                            bodyRows
-                            |> Array.tryItem (index.y - 1)
-                            |> Option.bind (fun row -> row |> List.tryItem index.x)
-                            |> Option.defaultValue (getDefault index)
-                        // let input = bodyRows.[index.y].[index.x]
-                        CellButton input
-                ),
-                withKey = (fun (index: CellCoordinate) -> $"{index.x}-{index.y}")
-            )
+        let tableRef = React.useRef<TableHandle> (null)
 
         Html.div [
             prop.className "swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[80%]"
@@ -339,7 +315,26 @@ module private DataAnnotatorHelper =
                 Swate.Components.Table.Table(
                     file.BodyRows.Length,
                     colCount,
-                    render,
+                    (fun index ->
+                        if index.y = 0 && file.HeaderRow.IsSome then
+                            // Header Row
+                            let content =
+                                headerRow
+                                |> Option.bind (fun x -> x |> List.tryItem index.x)
+                                |> Option.defaultValue (getDefault index)
+                            // let content = headerRow.Value.[index.x]
+                            CellButton content
+                        else
+                            // Body Row
+                            let input =
+                                bodyRows
+                                |> Array.tryItem (index.y - 1)
+                                |> Option.bind (fun row -> row |> List.tryItem index.x)
+                                |> Option.defaultValue (getDefault index)
+                            // let input = bodyRows.[index.y].[index.x]
+                            CellButton input
+
+                    ),
                     (fun _ -> Html.div []),
                     tableRef,
                     annotator = true
@@ -462,7 +457,7 @@ type DataAnnotator =
 
         let activateModal = fun _ -> setShowModal true
 
-        React.fragment [
+        React.Fragment [
             ModalMangementContainer [
                 match model.PersistentStorageState.IsARCitect with
                 | true ->

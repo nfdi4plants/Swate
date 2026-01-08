@@ -82,5 +82,29 @@ module Run =
     let components =
         runAsync "components" "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
 
-    let All () =
-        [ server; client; components ] |> runParallel
+    let All () = async {
+        printGreenfn "Running all tests..."
+        printGreenfn "Running server tests..."
+        let! serverResult = server
+        printGreenfn "Running client tests..."
+        let! clientResult = client
+        printGreenfn "Running component tests..."
+        let! componentsResult = components
+
+        match serverResult, clientResult, componentsResult with
+        | Ok(), Ok(), Ok() ->
+            printGreenfn "All tests passed!"
+            exit 0
+        | _ ->
+            if serverResult.IsError then
+                printRedfn "Server tests failed."
+
+            if clientResult.IsError then
+                printRedfn "Client tests failed."
+
+            if componentsResult.IsError then
+                printRedfn "Component tests failed."
+
+            exit 1
+
+    }

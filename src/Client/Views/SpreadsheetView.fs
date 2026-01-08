@@ -1,11 +1,9 @@
 module SpreadsheetView
 
 open Feliz
-open Feliz.DaisyUI
 open Messages
 open Swate.Components.Shared
 open MainComponents
-open Swate.Components.Shared
 open Fable.Core.JsInterop
 open Model
 open ARCtrl

@@ -13,7 +13,6 @@ open Messages
 open Browser.Dom
 
 open Feliz
-open Feliz.DaisyUI
 
 open ExcelJS.Fable
 open GlobalBindings

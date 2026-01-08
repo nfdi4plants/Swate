@@ -5,7 +5,6 @@ open ARCtrl
 
 [<AutoOpen>]
 module Extensions =
-
     type prop with
         static member inline testid(value: string) : IReactProperty = unbox ("data-testid", value)
 
@@ -19,6 +18,11 @@ module Extensions =
             |> Array.ofSeq
 
         static member inline style(value: obj) : IReactProperty = unbox ("style", value)
+
+module Keys =
+    let inline mkLocalStorageKey (file: string) (component': string) (function': string) : string =
+        $"swate-{file}-{component'}-{function'}"
+
 
 [<RequireQualifiedAccess>]
 module kbdEventCode =

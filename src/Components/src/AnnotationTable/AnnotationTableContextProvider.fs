@@ -12,8 +12,4 @@ type AnnotationTableContextProvider =
         let (data: Map<string, Contexts.AnnotationTable.AnnotationTableContext>), setData =
             React.useState (Map.empty)
 
-        React.contextProvider (
-            Contexts.AnnotationTable.AnnotationTableStateCtx,
-            { data = data; setData = setData },
-            [ children ]
-        )
+        Contexts.AnnotationTable.AnnotationTableStateCtx.Provider({ state = data; setState = setData }, [ children ])

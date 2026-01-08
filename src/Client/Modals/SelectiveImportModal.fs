@@ -1,7 +1,6 @@
 namespace Modals
 
 open Feliz
-open Feliz.DaisyUI
 open Model
 open Messages
 open Swate.Components.Shared
@@ -42,7 +41,7 @@ type SelectiveImportModal =
         ModalElements.Box(
             boxName,
             icon,
-            React.fragment [
+            React.Fragment [
                 Html.div [
                     for i in 0 .. radioData.Length - 1 do
                         myradio (radioData.[i])
@@ -123,7 +122,7 @@ type SelectiveImportModal =
         ModalElements.Box(
             sprintf "%s Metadata" name,
             Icons.LightBulb(),
-            React.fragment [
+            React.Fragment [
                 Html.fieldSet [
                     prop.className "swt:fieldset"
                     prop.children [
@@ -201,7 +200,7 @@ type SelectiveImportModal =
         ModalElements.Box(
             name,
             Icons.Table(),
-            React.fragment [
+            React.Fragment [
                 Html.div [
                     ModalElements.RadioPlugin(
                         radioGroup,
@@ -298,7 +297,7 @@ type SelectiveImportModal =
                 |> dispatch
 
         let content =
-            React.fragment [
+            React.Fragment [
                 SelectiveImportModal.RadioPluginsBox(
                     "Import Type",
                     Icons.Cog(),
@@ -372,7 +371,7 @@ type SelectiveImportModal =
         let tables = model.ProtocolState.TemplatesSelected |> List.map (fun t -> t.Table)
 
         let content =
-            React.fragment [
+            React.Fragment [
                 SelectiveImportModal.RadioPluginsBox(
                     "Import Type",
                     Icons.Cog(),

@@ -5,7 +5,6 @@ open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Feliz.DaisyUI
 
 
 module private TermSearchConfigProviderHelper =
@@ -98,14 +97,6 @@ type TermSearchConfigProvider =
             defaultActive = Set [ TIB_PREFIX + TIB_DATAPLANT_COLLECTION_KEY ]
         )
 
-    // TermSearchConfigProvider.TermSearchConfigProvider(
-    //     children,
-    //     allTermSearchQueries,
-    //     allParentSearchQueries,
-    //     allAllChildrenSearchQueries,
-    //     defaultActive = Set [ TIB_PREFIX + TIB_DATAPLANT_COLLECTION_KEY ]
-    // )
-
 
     [<ReactComponent(true)>]
     static member TermSearchConfigProvider
@@ -189,15 +180,13 @@ type TermSearchConfigProvider =
                 |]
             )
 
-        React.contextProvider (
-            Contexts.TermSearch.TermSearchActiveKeysCtx,
+        Contexts.TermSearch.TermSearchActiveKeysCtx.Provider(
             {
-                data = activeKeys
-                setData = setActiveKeys
+                state = activeKeys
+                setState = setActiveKeys
             },
-            React.contextProvider (
-                Contexts.TermSearch.TermSearchConfigCtx,
+            Contexts.TermSearch.TermSearchConfigCtx.Provider(
                 queries,
-                React.contextProvider (Contexts.TermSearch.TermSearchAllKeysCtx, allKeys, children)
+                Contexts.TermSearch.TermSearchAllKeysCtx.Provider(allKeys, children)
             )
         )

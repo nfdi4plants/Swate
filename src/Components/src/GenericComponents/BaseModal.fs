@@ -1,7 +1,6 @@
 namespace Swate.Components
 
 open Feliz
-open Feliz.DaisyUI
 open Fable.Core
 
 [<Mangle(false); Erase>]
@@ -91,7 +90,7 @@ type BaseModal =
             descId = descId
         }
 
-        React.fragment [
+        React.Fragment [
             if isOpen then
                 FloatingUI.FloatingPortal(
                     FloatingUI.FloatingOverlay(
@@ -101,8 +100,7 @@ type BaseModal =
                             FloatingUI.FloatingFocusManager(
                                 flui.context,
                                 children =
-                                    React.contextProvider (
-                                        Contexts.BaseModal.BaseModalCtx,
+                                    Contexts.BaseModal.BaseModalCtx.Provider(
                                         Some ctx,
                                         Html.div [
                                             prop.ariaDescribedBy descId
@@ -147,7 +145,7 @@ type BaseModal =
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             children =
-                React.fragment [
+                React.Fragment [
                     BaseModal.ModalHeader(header, fun () -> setIsOpen false)
                     if description.IsSome then
                         BaseModal.ModalDescription(description.Value)
@@ -174,7 +172,7 @@ type BaseModal =
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header =
-                React.fragment [
+                React.Fragment [
                     Svg.svg [
                         svg.className "swt:w-6 swt:h-6 swt:stroke-current"
                         svg.viewBox (0, 0, 24, 24)
@@ -246,7 +244,7 @@ type BaseModal =
                         ]
                     ],
                 modalActions =
-                    React.fragment [
+                    React.Fragment [
                         Html.input [
                             prop.className "swt:input"
                             prop.placeholder "...filter"
@@ -254,7 +252,7 @@ type BaseModal =
                         ]
                     ],
                 footer =
-                    React.fragment [
+                    React.Fragment [
                         Html.button [
                             prop.className "swt:btn"
                             prop.onClick (fun _ -> setIsOpen (false))

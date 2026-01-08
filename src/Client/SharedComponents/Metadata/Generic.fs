@@ -1,7 +1,6 @@
 namespace Components.Forms
 
 open Feliz
-open Feliz.DaisyUI
 open Swate.Components
 
 type Generic =
@@ -75,7 +74,7 @@ type Generic =
         ]
 
     static member CollapseTitle(title: string, subtitle: string, ?count: string) =
-        React.fragment [
+        React.Fragment [
             Html.div [
                 Html.h5 [ prop.className "swt:text-md swt:font-semibold"; prop.text title ]
                 Html.div [

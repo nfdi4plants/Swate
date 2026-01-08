@@ -36,14 +36,12 @@ type AnnotationTableContextMenuUtil =
     static member clear(cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle) : ArcTable =
         let nextTable = table.Copy()
 
-        console.log ("current", nextTable)
 
         if selectHandle.contains cellIndex then
             nextTable.ClearSelectedCells(selectHandle)
         else
             nextTable.ClearCell(cellIndex)
 
-        console.log ("after", nextTable)
 
         nextTable
 
@@ -162,7 +160,6 @@ type AnnotationTableContextMenuUtil =
         navigator.clipboard.writeText result
 
     static member cut(cellIndex: CellCoordinate, table: ArcTable, setTable, selectHandle: SelectHandle) = promise {
-        console.log (cellIndex)
         do! AnnotationTableContextMenuUtil.copy (cellIndex, table, selectHandle)
 
         let nextTable =

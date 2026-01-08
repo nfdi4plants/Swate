@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Api.fs"/>
+    <Compile Include="context\AppStateCtx.fs"/>
+    <Compile Include="components\InitState.fs"/>
+    <Compile Include="App.fs"/>
+    <Compile Include="Program.fs"/>
+    <Content Include="tailwind.css"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj"/>
+    <ProjectReference Include="..\Swate.Electron.Shared\Swate.Electron.Shared.fsproj"/>
+  </ItemGroup>
+
+</Project>

@@ -3,7 +3,6 @@ namespace Pages
 open Model
 open Messages
 open Feliz
-open Feliz.DaisyUI
 
 module private AboutHelper =
 
@@ -61,9 +60,9 @@ module private AboutHelper =
         ]
 
     let GetInContactElements =
-        React.fragment [
+        React.Fragment [
             MediaContainer(
-                React.fragment [
+                React.Fragment [
                     Html.strong "DataPLANT"
                     Html.br []
                     Html.p "Swate is part of the DataPLANT organisation."
@@ -97,7 +96,7 @@ module private AboutHelper =
             )
 
             MediaContainer(
-                React.fragment [
+                React.Fragment [
                     Html.strong "X - @nfdi4plants"
                     Html.br []
                     Html.span "Follow us on X for more up-to-date information about research data management! "
@@ -112,7 +111,7 @@ module private AboutHelper =
             )
 
             MediaContainer(
-                React.fragment [
+                React.Fragment [
                     Html.strong "GitHub"
                     Html.br []
                     Html.text "You can find the Swate source code  "

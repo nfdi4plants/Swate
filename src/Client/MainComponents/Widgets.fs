@@ -1,7 +1,6 @@
 namespace MainComponents
 
 open Feliz
-open Feliz.DaisyUI
 open Browser.Types
 open LocalStorage.Widgets
 open Swate
@@ -122,7 +121,7 @@ module private ResizeEventListener =
 
             Browser.Dom.window.addEventListener ("resize", onResize)
             // Cleanup function to remove event listener when the component unmounts
-            React.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize))
+            FsReact.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize))
         )
 
 [<RequireQualifiedAccess>]

@@ -185,7 +185,7 @@ type ContextMenu =
 
                 Browser.Dom.document.addEventListener ("mouseup", onMouseUp)
 
-                React.createDisposable (fun () ->
+                FsReact.createDisposable (fun () ->
 
                     Browser.Dom.document.removeEventListener ("mouseup", onMouseUp)
 
@@ -319,7 +319,10 @@ type ContextMenu =
             prop.ref containerRef
 
             prop.children [
-                Html.span [ prop.className "swt:select-none"; prop.text "Click here for context menu!" ]
+                Html.span [
+                    prop.className "swt:select-none"
+                    prop.text "Click here for context menu!"
+                ]
                 Html.button [
                     prop.className "swt:btn swt:btn-primary"
                     prop.text "Example Table Cell"
@@ -365,11 +368,8 @@ type ContextMenu =
                                 let row = int cell?dataset?row
                                 let col = int cell?dataset?column
                                 let indices: CellCoordinate = {| y = row; x = col |}
-                                console.log (indices)
                                 Some indices
-                            | _ ->
-                                console.log ("No table cell found")
-                                None
+                            | _ -> None
                         )
                 )
             ]

@@ -29,7 +29,7 @@ type DaisyUIColors =
     | Warning
     | Error
 
-type StateContext<'T> = { data: 'T; setData: 'T -> unit }
+type StateContext<'T> = { state: 'T; setState: 'T -> unit }
 
 [<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
 type Theme =
@@ -87,10 +87,8 @@ module CellCoordinateRange =
         else
             false
 
-[<AllowNullLiteral>]
-[<Global>]
+[<JS.Pojo>]
 type SelectHandle
-    [<ParamObjectAttribute; Emit("$0")>]
     (
         contains: CellCoordinate -> bool,
         selectAt: (CellCoordinate * bool) -> unit,
@@ -106,19 +104,14 @@ type SelectHandle
     member val getSelectedCells: unit -> ResizeArray<CellCoordinate> = getSelectedCells with get, set
     member val getCount: unit -> int = getCount with get, set
 
-[<AllowNullLiteral>]
-[<Global>]
-type TableHandle
-    [<ParamObjectAttribute; Emit("$0")>]
-    (focus: unit -> unit, scrollTo: CellCoordinate -> unit, SelectHandle: SelectHandle) =
+[<JS.Pojo>]
+type TableHandle(focus: unit -> unit, scrollTo: CellCoordinate -> unit, SelectHandle: SelectHandle) =
     member val focus: unit -> unit = focus with get, set
     member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
     member val SelectHandle: SelectHandle = SelectHandle with get, set
 
-[<AllowNullLiteral>]
-[<Global>]
+[<JS.PojoAttribute>]
 type Term
-    [<ParamObjectAttribute; Emit("$0")>]
     (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
     member val name: string option = jsNative with get, set
     member val id: string option = jsNative with get, set
@@ -225,9 +218,8 @@ module Term =
             ?data = data
         )
 
-[<AllowNullLiteral>]
-[<Global>]
-type TermSearchStyle [<ParamObjectAttribute; Emit("$0")>] (?inputLabel: U2<string, string[]>) =
+[<JS.Pojo>]
+type TermSearchStyle(?inputLabel: U2<string, string[]>) =
     member val inputLabel: U2<string, string[]> option = inputLabel with get, set
 
 
@@ -243,10 +235,8 @@ type style =
         | Some(U2.Case2 classNames) -> classNames |> String.concat " "
         | None -> null
 
-[<AllowNullLiteral>]
-[<Global>]
+[<JS.Pojo>]
 type AdvancedSearchOptions
-    [<ParamObjectAttribute; Emit("$0")>]
     (setResults: (ResizeArray<Term> -> unit), formRef: IRefValue<unit -> JS.Promise<ResizeArray<Term>>>) =
     member val setResults = setResults with get, set
     member val formRef = formRef with get, set
@@ -335,3 +325,17 @@ module AnnotationTable =
         | Error of string
         | UnknownPasteCase of PasteCases
         | None
+
+[<AutoOpen>]
+module SelectorTypes =
+
+    type ARCPointer =
+        {name: string; path: string; isActive: bool}
+
+        static member create (name: string, path: string, isActive: bool) = { name = name; path = path; isActive = isActive }
+
+    type ButtonInfo =
+        { icon: string; toolTip: string; onClick: unit -> unit }
+
+        static member create (icon: string, toolTip: string, (onClick: unit -> unit)) =
+            { icon = icon; toolTip = toolTip; onClick = onClick }

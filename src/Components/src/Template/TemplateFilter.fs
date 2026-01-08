@@ -192,13 +192,7 @@ module TemplateMocks =
 module TemplateFilterAux =
 
     let FilteredTemplateContext =
-        React.createContext<StateContext<Template[]>> (
-            "TemplateFilterCtx",
-            {
-                data = [||]
-                setData = fun _ -> console.warn "No setData function provided"
-            }
-        )
+        React.createContext<StateContext<Template[]>> ({ state = [||]; setState = fun _ -> () })
 
     open System
 
@@ -420,7 +414,7 @@ type TemplateFilter =
                     prop.className [
                         "swt:border-l-4 swt:border-transparent swt:list-row swt:rounded-none swt:p-1"
                         if props.isActive then
-                            "swt:!border-primary swt:bg-base-content/10"
+                            "swt:border-primary! swt:bg-base-content/10"
                     ]
                     prop.children [
                         Html.div [
@@ -459,7 +453,7 @@ type TemplateFilter =
                     key = token.Id
                 )
             )
-            |> React.fragment
+            |> React.Fragment
 
         let onKeyDown =
             fun (ev: Browser.Types.KeyboardEvent) ->
@@ -526,7 +520,10 @@ type TemplateFilter =
                     prop.tabIndex -1
                     prop.className "swt:btn swt:btn-square swt:btn-neutral"
                     prop.onClick (fun e -> e.preventDefault ())
-                    prop.children [ Html.div selectedIndices.Count; Icons.Institution(className = "swt:size-4") ]
+                    prop.children [
+                        Html.div selectedIndices.Count
+                        Icons.Institution(className = "swt:size-4")
+                    ]
                 ]
 
         Select.Select(
@@ -535,7 +532,10 @@ type TemplateFilter =
             setSelectedIndices,
             triggerRenderFn = TriggerRenderFn,
             dropdownPlacement = FloatingUI.Placement.BottomEnd,
-            middleware = [| FloatingUI.Middleware.flip (); FloatingUI.Middleware.offset (10) |]
+            middleware = [|
+                FloatingUI.Middleware.flip ()
+                FloatingUI.Middleware.offset (10)
+            |]
         )
 
     /// <summary>
@@ -596,7 +596,7 @@ type TemplateFilter =
 
                 TemplateFilterAux.filter templates orgs tokens
 
-        let hasInilizalized = React.useRef(false)
+        let hasInilizalized = React.useRef (false)
 
         //DataPLANT shall be set as the first available organization to select templates from.
         //Problem is, due to lazy loading in the beginning no organizations could be available.
@@ -612,7 +612,7 @@ type TemplateFilter =
                     match dpIndex with
                     | Some idx ->
                         setSelectedOrgIndices (selectedOrgIndices.Add idx)
-                        hasInilizalized.current <- true;
+                        hasInilizalized.current <- true
                     | None -> ()
             ),
             [| box availableTokens; box availableCommunities |]
@@ -622,7 +622,7 @@ type TemplateFilter =
             (fun () ->
                 let nextTemplates = filter templates
 
-                filteredTemplatesCtx.setData nextTemplates
+                filteredTemplatesCtx.setState nextTemplates
             ),
             [| box selectedOrgIndices; box tokens |]
         )
@@ -650,11 +650,10 @@ type TemplateFilter =
     static member TemplateFilterProvider(children: ReactElement) =
         let filteredTemplates, setFilteredTemplatesFn = React.useState ([||])
 
-        React.contextProvider (
-            TemplateFilterAux.FilteredTemplateContext,
+        TemplateFilterAux.FilteredTemplateContext.Provider(
             {
-                data = filteredTemplates
-                setData = setFilteredTemplatesFn
+                state = filteredTemplates
+                setState = setFilteredTemplatesFn
             },
             children
         )
@@ -664,7 +663,7 @@ type TemplateFilter =
         let filteredTemplatesCtx =
             React.useContext<StateContext<Template[]>> TemplateFilterAux.FilteredTemplateContext
 
-        let templates = filteredTemplatesCtx.data
+        let templates = filteredTemplatesCtx.state
 
         children templates
 
@@ -674,34 +673,12 @@ type TemplateFilter =
         let templates, _ = React.useState (TemplateMocks.mkTemplates)
 
         TemplateFilter.TemplateFilterProvider(
-            React.fragment [
+            React.Fragment [
                 TemplateFilter.TemplateFilter(templates, key = "template-filter-provider")
                 TemplateFilter.FilteredTemplateRenderer(fun templates ->
-                    Html.div [ prop.text (sprintf "%d templates found" templates.Length) ]
+                    Html.div [
+                        prop.text (sprintf "%d templates found" templates.Length)
+                    ]
                 )
             ]
         )
-
-
-
-
-
-// Html.ul [
-//     prop.className
-//         "swt:bg-base-100 swt:rounded-box swt:shadow-md swt:max-w-lg swt:max-h-[500px] swt:overflow-y-scroll"
-//     prop.children [
-
-//         Html.li [
-//             prop.className "swt:p-4 swt:pb-2 swt:text-xs swt:opacity-60 swt:tracking-wide"
-//             prop.text (
-//                 if loading then
-//                     "...loading..."
-//                 else
-//                     $"{localTemplates.Length} templates found"
-//             )
-//         ]
-
-//         for template in localTemplates do
-//             TemplateFilter.TemplateItem(template, key = template.Id)
-//     ]
-// ]

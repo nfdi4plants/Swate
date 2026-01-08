@@ -6,7 +6,6 @@ open Elmish
 open Messages.FilePicker
 open Messages
 open Feliz
-open Feliz.DaisyUI
 open Swate
 open Swate.Components
 
@@ -40,7 +39,10 @@ type FilePicker =
         let inputId = "filePicker_OnFilePickerMainFunc"
 
         Html.div [
-            prop.className [ "swt:flex swt:flex-col swt:gap-2"; parentContainerResizeClass ]
+            prop.className [
+                "swt:flex swt:flex-col swt:gap-2"
+                parentContainerResizeClass
+            ]
             prop.children [
                 Html.input [
                     prop.style [ style.display.none ]
@@ -91,7 +93,7 @@ type FilePicker =
             React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
 
         let selectedCells =
-            ctx.data
+            ctx.state
             |> Map.tryFind model.SpreadsheetModel.ActiveTable.Name
             |> Option.bind (fun ctx -> ctx.SelectedCells)
             |> Option.map (fun x -> {|
@@ -128,7 +130,6 @@ type FilePicker =
 
     static member private SortButton icon msg =
         Html.button [
-            join.item
             prop.className "swt:btn swt:join-item"
             prop.onClick msg
             prop.children [ icon ]
@@ -245,10 +246,14 @@ type FilePicker =
                         Html.tr [
                             Html.td [ Html.b $"{index}" ]
                             Html.td fileName
-                            Html.td [ FilePicker.MoveButtonList (index, fileName) model dispatch ]
+                            Html.td [
+                                FilePicker.MoveButtonList (index, fileName) model dispatch
+                            ]
                             Html.td [
                                 prop.style [ style.textAlign.right ]
-                                prop.children [ FilePicker.DeleteFromTable (index, fileName) model dispatch ]
+                                prop.children [
+                                    FilePicker.DeleteFromTable (index, fileName) model dispatch
+                                ]
                             ]
                         ]
                 ]
@@ -257,20 +262,21 @@ type FilePicker =
 
 
     static member Main(model: Model, dispatch, containerQueryClass: string) =
+        let hasFiles = not (List.isEmpty model.FilePickerState.FileNames)
+
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
             prop.children [
-                if model.FilePickerState.FileNames.Length > 0 then
+                FilePicker.UploadButtons(model, dispatch, containerQueryClass)
+
+                if hasFiles then
                     FilePicker.FileSortElements model dispatch
-                Html.div [
-                    prop.className "swt:overflow-y-auto swt:overflow-x-hidden swt:py-2"
-                    prop.children [
-                        match model.FilePickerState.FileNames with
-                        | [] -> FilePicker.UploadButtons(model, dispatch, containerQueryClass)
-                        | _ -> FilePicker.FileViewTable model dispatch
+
+                    Html.div [
+                        prop.className "swt:overflow-y-auto swt:overflow-x-hidden swt:py-2"
+                        prop.children [ FilePicker.FileViewTable model dispatch ]
                     ]
-                ]
-                if model.FilePickerState.FileNames.Length > 0 then
+
                     FilePicker.ActionButtons model dispatch
             ]
         ]

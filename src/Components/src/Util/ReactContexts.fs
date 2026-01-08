@@ -7,19 +7,17 @@ open Feliz
 module TermSearch =
 
     let TermSearchConfigCtx =
-        React.createContext<TermSearchConfigCtx> ("TermSearchConfigCtx", TermSearchConfigCtx.init ())
+        React.createContext<TermSearchConfigCtx> (TermSearchConfigCtx.init ())
 
     let TermSearchActiveKeysCtx =
         React.createContext<StateContext<TermSearchConfigLocalStorageActiveKeysCtx>> (
-            "TermSearchActiveKeysCtx",
             {
-                data = TermSearchConfigLocalStorageActiveKeysCtx.init ()
-                setData = fun keys -> printfn "Setting active keys not given: %A" keys
+                state = TermSearchConfigLocalStorageActiveKeysCtx.init ()
+                setState = fun keys -> printfn "Setting active keys not given: %A" keys
             }
         )
 
-    let TermSearchAllKeysCtx =
-        React.createContext<Set<string>> ("TermSearchAllKeysCtx", Set.empty)
+    let TermSearchAllKeysCtx = React.createContext<Set<string>> (Set.empty)
 
 [<Erase; Mangle(false)>]
 module Table =
@@ -61,8 +59,7 @@ module Table =
                 (fun _ _ -> console.warn "TableCtx default onClick")
             )
 
-    let TableStateCtx =
-        React.createContext<TableState> ("TableStateCtx", TableState.init ())
+    let TableStateCtx = React.createContext<TableState> (TableState.init ())
 
 
 [<Erase; Mangle(false)>]
@@ -76,10 +73,9 @@ module AnnotationTable =
 
     let AnnotationTableStateCtx =
         React.createContext<StateContext<Map<string, AnnotationTableContext>>> (
-            "AnnotationTableStateCtx",
             {
-                data = Map.empty
-                setData = fun _ -> console.warn "No context provider for AnnotationTableStateCtx found!"
+                state = Map.empty
+                setState = fun _ -> ()
             }
         )
 
@@ -92,5 +88,4 @@ module BaseModal =
         descId: string
     }
 
-    let BaseModalCtx =
-        React.createContext<BaseModalContext option> ("BaseModalCtx", None)
+    let BaseModalCtx = React.createContext<BaseModalContext option> (None)

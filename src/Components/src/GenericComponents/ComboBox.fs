@@ -224,7 +224,7 @@ type ComboBox =
 
         let inputId = FloatingUI.useId ()
 
-        React.fragment [
+        React.Fragment [
             Html.label [
                 prop.htmlFor inputId
                 prop.ref (unbox fluiContext.refs.setReference)
@@ -305,7 +305,7 @@ type ComboBox =
                                      |> Seq.map (fun (key, v) -> prop.custom (key, v))
                                      |> ResizeArray)
                                 children =
-                                    React.fragment [
+                                    React.Fragment [
                                         if loading.IsSome && loading.Value then
                                             LoadingRenderer()
                                         elif filteredItems.Length = 0 then
@@ -478,7 +478,7 @@ type ComboBox =
                     comboBoxRef = comboBoxRef,
                     inputLeadingVisual = Icons.MagnifyingClass(),
                     inputTrailingVisual =
-                        React.fragment [ Html.kbd [ prop.className "swt:kbd"; prop.text "/" ]; Icons.ChevronDown() ],
+                        React.Fragment [ Html.kbd [ prop.className "swt:kbd"; prop.text "/" ]; Icons.ChevronDown() ],
                     onBlur = fun e -> console.log ("ComboBox blurred")
                 )
             ]
