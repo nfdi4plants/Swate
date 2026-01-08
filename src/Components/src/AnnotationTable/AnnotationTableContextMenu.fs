@@ -81,8 +81,10 @@ type AnnotationTableContextMenuUtil =
         | header when ARCtrl.Helper.Regex.tryParseOutputColumnHeader(header).IsSome -> true
         | header when ARCtrl.Helper.Regex.tryParseParameterColumnHeader(header).IsSome -> true
         | header when
+            //header with a short length can lead to a problem here, so they must be at least as long as an expected header
+            let shortestHeaderLength = headerNames |> Array.minBy String.length |> String.length
             headerNames
-            |> Array.exists (fun case -> not (System.String.IsNullOrEmpty header) && case.StartsWith(header))
+            |> Array.exists (fun case -> not (System.String.IsNullOrEmpty header) && case.StartsWith(header) && header.Length >= shortestHeaderLength)
             ->
             true
         | _ -> false
@@ -126,13 +128,18 @@ type AnnotationTableContextMenuUtil =
                     |> Array.unzip
 
                 let headers = headers |> Array.concat
-
+                
                 if headers.Length > 0 then
                     let columns =
-                        cells.[1..]
-                        |> Array.transpose
-                        |> Array.mapi (fun index column ->
-                            CompositeColumn.create (headers.[index], column |> ResizeArray)
+                        let body =
+                            cells.[1..]
+                            |> Array.transpose
+                        headers
+                        |> Array.mapi (fun index header ->
+                            if body.Length - 1 >= index then
+                                CompositeColumn.create (header, body.[index] |> ResizeArray)
+                            else
+                                CompositeColumn.create (header, Array.empty |> ResizeArray)
                         )
 
                     let tableString =
@@ -369,6 +376,24 @@ type AnnotationTableContextMenuUtil =
                     coordinates = groupedCellCoordinates
                 |}
 
+    static member getValueOfCompositeHeader (compositeHeader: CompositeHeader) =
+        match compositeHeader with
+        | CompositeHeader.Component oa -> defaultArg oa.Name (compositeHeader.ToString())
+        | CompositeHeader.Characteristic oa -> defaultArg oa.Name (compositeHeader.ToString())
+        | CompositeHeader.Factor oa -> defaultArg oa.Name (compositeHeader.ToString())
+        | CompositeHeader.Parameter oa -> defaultArg oa.Name (compositeHeader.ToString())
+        | CompositeHeader.ProtocolType -> CompositeHeaderDiscriminate.ProtocolType.ToString()
+        | CompositeHeader.ProtocolDescription -> CompositeHeaderDiscriminate.ProtocolDescription.ToString()
+        | CompositeHeader.ProtocolUri -> CompositeHeaderDiscriminate.ProtocolUri.ToString()
+        | CompositeHeader.ProtocolVersion -> CompositeHeaderDiscriminate.ProtocolVersion.ToString()
+        | CompositeHeader.ProtocolREF -> CompositeHeaderDiscriminate.ProtocolREF.ToString()
+        | CompositeHeader.Performer -> CompositeHeaderDiscriminate.Performer.ToString()
+        | CompositeHeader.Date -> CompositeHeaderDiscriminate.Date.ToString()
+        | CompositeHeader.Input io -> io.ToString()
+        | CompositeHeader.Output io -> io.ToString()
+        | CompositeHeader.Comment s -> s
+        | CompositeHeader.FreeText s -> s
+
     static member pasteCells
         (
             pasteColumns:
@@ -382,12 +407,13 @@ type AnnotationTableContextMenuUtil =
             setTable
         ) =
 
-        let getCorrectTarget
+        let getCorrectTargetForCell
             (currentCell: CompositeCell)
             (table: ArcTable)
             (targetCoordinate: CellCoordinate)
             adaption
             =
+
             if currentCell.isUnitized then
                 let targetCell =
                     table.GetCellAt(targetCoordinate.x - adaption, targetCoordinate.y - adaption)
@@ -407,6 +433,34 @@ type AnnotationTableContextMenuUtil =
             else
                 currentCell
 
+        let getCorrectTargetForHeader
+            (currentHeader: CompositeHeader)
+            (table: ArcTable)
+            (targetCoordinate: CellCoordinate)
+            adaption
+            =
+
+            let targetCell =
+                table.GetCellAt(targetCoordinate.x - adaption, targetCoordinate.y - adaption)
+
+            if targetCell.isUnitized then
+                let _, targetUnit = targetCell.AsUnitized
+                let value = AnnotationTableContextMenuUtil.getValueOfCompositeHeader(currentHeader)
+                let newTarget = CompositeCell.createUnitized (value, targetUnit)
+                newTarget
+            elif targetCell.isTerm then
+                let targetTerm = defaultArg (currentHeader.TryGetTerm()) targetCell.AsTerm
+                let newTarget = CompositeCell.createTerm (targetTerm)
+                newTarget
+            elif targetCell.isData then
+                let targetInfo = targetCell.AsData
+                let targetData = AnnotationTableContextMenuUtil.getValueOfCompositeHeader(currentHeader)
+                let newTarget = CompositeCell.createDataFromString(targetData, ?format = targetInfo.Format, ?selectorFormat = targetInfo.SelectorFormat)
+                newTarget
+            else
+                let value = AnnotationTableContextMenuUtil.getValueOfCompositeHeader(currentHeader)
+                CompositeCell.createFreeText(value)
+
         //Check amount of selected cells
         //When multiple cells are selected a different handling is required
         let headerCoordinates, bodyCoordinates =
@@ -422,8 +476,10 @@ type AnnotationTableContextMenuUtil =
                 |> Array.iteri (fun yi row ->
                     //Restart row index, when the amount of selected rows is bigger than copied rows
                     let yIndex =
-                        AnnotationTableContextMenuUtil.getIndex (yi, (pasteColumns.data.Item 0).Cells.Count)
-
+                        if (pasteColumns.data.Item 0).Cells.Count = 0 then
+                            1
+                        else
+                            AnnotationTableContextMenuUtil.getIndex (yi, (pasteColumns.data.Item 0).Cells.Count)
                     row
                     |> Array.iteri (fun xi coordinate ->
                         let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.Count)
@@ -431,17 +487,27 @@ type AnnotationTableContextMenuUtil =
                         if coordinate.y - 1 < 0 then
                             table.UpdateHeader(coordinate.x - 1, pasteColumns.data.[xIndex].Header, true)
                         else
-                            let cells = (pasteColumns.data.Item xIndex).Cells
-                            let currentCell = cells.[yIndex]
-                            let newTarget = getCorrectTarget currentCell table coordinate 1
+                            let newTarget =
+                                if pasteColumns.data.[0].Cells.Count = 0 then
+                                    let currentHeader = pasteColumns.data.[xIndex].Header
+                                    getCorrectTargetForHeader currentHeader table coordinate 1
+                                else
+                                    let cells = (pasteColumns.data.Item xIndex).Cells
+                                    let currentCell = cells.[yIndex]
+                                    getCorrectTargetForCell currentCell table coordinate 1
                             table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
                     )
                 )
             else if coordinate.y - 1 < 0 then
                 table.UpdateHeader(coordinate.x - 1, pasteColumns.data.[0].Header, true)
             else
-                let currentCell = pasteColumns.data.[0].Cells.[0]
-                let newTarget = getCorrectTarget currentCell table coordinate 1
+                let newTarget =
+                    if pasteColumns.data.[0].Cells.Count = 0 then
+                        let currentHeader = pasteColumns.data.[0].Header
+                        getCorrectTargetForHeader currentHeader table coordinate 1
+                    else
+                        let currentCell = pasteColumns.data.[0].Cells.[0]
+                        getCorrectTargetForCell currentCell table coordinate 1
                 table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
 
         if headerCoordinates.Length > 0 then
