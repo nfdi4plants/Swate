@@ -7,7 +7,7 @@ open Fable.Core
 type Selector =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member SelectorItem(arcPointer: ARCPointer, onARCClick: ARCPointer -> unit, ?potMaxWidth) =
+    static member SelectorItem(arcPointer: ARCPointer, onClick: ARCPointer -> unit, ?potMaxWidth) =
 
         let maxWidth = defaultArg potMaxWidth 48
 
@@ -34,7 +34,7 @@ type Selector =
                             ]
                         ]
                     ]
-                    prop.onClick (fun _ -> onARCClick (arcPointer))
+                    prop.onClick (fun _ -> onClick (arcPointer))
                 ]
             ),
             [| arcPointer.name, arcPointer.path |]
@@ -43,8 +43,7 @@ type Selector =
     [<ReactComponent>]
     static member Main
         (
-            arcPointers: ARCPointer[],
-            onARCClick: ARCPointer -> unit,
+            recentARCElements: ReactElement [],
             ?actionbar: (unit -> unit) -> ReactElement,
             ?potMaxWidth: int,
             ?onOpenSelector,
@@ -55,30 +54,22 @@ type Selector =
 
         let isOpen, setOpen = React.useState (false)
 
-        let openSelector shallBeOpen =
+        let onOpenSelector shallBeOpen =
             setOpen shallBeOpen
             onOpenSelector
             |> Option.iter(fun f -> f())
 
         let actionbar =
             actionbar
-            |> Option.map (fun actions -> actions (fun () -> openSelector false))
+            |> Option.map (fun actions -> actions (fun () -> onOpenSelector false))
             |> Option.defaultValue Html.none
-
-        let onARCClick arcPointer =
-            openSelector false
-            onARCClick arcPointer
-
-        let recentARCElements =
-            arcPointers
-            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
 
         let dropDownSwitch =
             React.useMemo (
                 (fun _ ->
                     Html.button [
                         prop.onClick (fun _ ->
-                            openSelector (not isOpen)
+                            onOpenSelector (not isOpen)
                         )
                         prop.role.button
                         prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
@@ -126,9 +117,14 @@ type Selector =
         let recentARCs, setRecentARCs = React.useState (testRecentARCs)
 
         let onARCClick (arcPointer:ARCPointer) =
-            console.log($"arcPointer: {arcPointer.path}")
+            //For testing in story book, print the name of the arc pointer
+            console.log($"arcPointer: {arcPointer.name}")
 
-        Selector.Main(recentARCs, onARCClick, potMaxWidth = 48, ?debug = debug)
+        let recentARCElements =
+            recentARCs
+            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
+
+        Selector.Main(recentARCElements, potMaxWidth = 48, ?debug = debug)
 
     [<ReactComponent>]
     static member ActionbarInSelectorEntry(?maxNumberActionbar, ?debug: bool) =
@@ -153,7 +149,11 @@ type Selector =
         let onARCClick (arcPointer:ARCPointer) =
             console.log($"arcPointer: {arcPointer.path}")
 
-        Selector.Main(recentARCs, onARCClick, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
+        let recentARCElements =
+            recentARCs
+            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
+
+        Selector.Main(recentARCElements, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
     [<ReactComponent>]
     static member NavbarSelectorEntry(?maxNumberActionbar, ?debug: bool) =
@@ -178,7 +178,11 @@ type Selector =
         let onARCClick (arcPointer:ARCPointer) =
             console.log($"arcPointer: {arcPointer.path}")
 
+        let recentARCElements =
+            recentARCs
+            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
+
         let selector =
-            Selector.Main(recentARCs, onARCClick, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
+            Selector.Main(recentARCElements, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
         Navbar.Main(selector, ?debug = debug)

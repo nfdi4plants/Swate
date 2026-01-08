@@ -16,8 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+-  Add ARC-Selector that enables selection of recently used ARCs without searching in the folder structure
+-  Implement foundation for filetree and combine it with chokidar filewatcher
+-  Implement Javascript bindings for chockidar and simple git
+-  Add basic layout for ARCitect, implementing Electron
+
 ### 🔄 Changed
 
+-  Update to ARCtrl 3.0 and updated dependencies
 -  Keep FilePicker upload buttons visible so users can overwrite previously selected files without clearing the list (by @Caroott)
 
 ## 1.0.7 - 2025-11-21

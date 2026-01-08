@@ -117,7 +117,11 @@ let Main () =
         }
         |> Promise.start
 
-    let selector = Selector.Main(recentARCs, onARCClick, actionbar, onOpenSelector = onOpenSelector)
+    let recentARCElements =
+        recentARCs
+        |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
+
+    let selector = Selector.Main(recentARCElements, actionbar, onOpenSelector = onOpenSelector)
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
