@@ -33,9 +33,7 @@ let Main () =
                 | true ->
                     let tmp =
                         parent.Value.children
-                        |> Array.map (fun entry ->
-                            printfn $"entry: {entry.name}"
-                            (loop (Some entry)))
+                        |> Array.map (fun entry -> loop (Some entry))
                         |> Array.choose (fun item -> item)
                         |> List.ofArray
                     let result =
