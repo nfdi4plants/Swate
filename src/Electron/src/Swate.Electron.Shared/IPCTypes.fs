@@ -1,6 +1,7 @@
 module Swate.Electron.Shared.IPCTypes
 
-open Fable.Core.JS // Promise type
+open System.Collections.Generic
+open Fable.Core // Promise type
 open Fable.Electron
 
 open Swate.Components
@@ -8,34 +9,40 @@ open Swate.Components
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Will open ARC in same window
-    openARC: IpcMainEvent -> Promise<Result<string, exn>>
-    createARC: IpcMainEvent -> string -> Promise<Result<string, exn>>
-    focusExistingARCWindow: string -> Promise<Result<unit, exn>>
+    openARC: IpcMainEvent -> JS.Promise<Result<string, exn>>
+    createARC: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    focusExistingARCWindow: string -> JS.Promise<Result<unit, exn>>
     /// Will open ARC in a new window
-    openARCInNewWindow: unit -> Promise<Result<unit, exn>>
-    createARCInNewWindow: string -> Promise<Result<unit, exn>>
-    closeARC: IpcMainEvent -> Promise<Result<unit, exn>>
-    getOpenPath: IpcMainEvent -> Promise<string option>
-    getRecentARCs: unit -> Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
-    checkForARC: string -> Promise<bool>
+    openARCInNewWindow: unit -> JS.Promise<Result<unit, exn>>
+    createARCInNewWindow: string -> JS.Promise<Result<unit, exn>>
+    closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
+    getOpenPath: IpcMainEvent -> JS.Promise<string option>
+    getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
+    checkForARC: string -> JS.Promise<bool>
 }
 
 type FileEntry =
-    {name: string; path: string; isDirectory: bool; children: FileEntry []}
+    {name: string; path: string; isDirectory: bool; children: Dictionary<string, FileEntry>}
 
 [<AutoOpen>]
 module FileEntryExtensions =
 
+    let createFileEntryDictionary(fileEntries: FileEntry []) =
+        let dic = Dictionary<string, FileEntry>()
+        fileEntries
+        |> Array.iter (fun fileEntry -> dic.Add(fileEntry.path, fileEntry))
+        dic
+
     type FileEntry with
         member this.updateChildren (children: FileEntry []) =
-            {this with children = children}
+            {this with children = createFileEntryDictionary children}
 
         static member create (name: string, path: string, isDirectory: bool, ?children) =
             {
                 name = name
                 path = path
                 isDirectory = isDirectory
-                children = defaultArg children [||]
+                children = defaultArg children (Dictionary<string, FileEntry>())
             }
 
 /// One Way Bridge: Main -> Renderer

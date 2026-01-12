@@ -32,10 +32,10 @@ let Main () =
                 match parent.Value.isDirectory with
                 | true ->
                     let tmp =
-                        parent.Value.children
-                        |> Array.map (fun entry -> loop (Some entry))
-                        |> Array.choose (fun item -> item)
-                        |> List.ofArray
+                        parent.Value.children.Values
+                        |> Seq.map (fun entry -> loop (Some entry))
+                        |> Seq.choose (fun item -> item)
+                        |> List.ofSeq
                     let result =
                         {
                             FileTree.createFolder parent.Value.name "swt:fluent--folder-24-regular" with
@@ -72,7 +72,7 @@ let Main () =
                 setRecentARCs arcs
         fileTreeUpdate =
             fun fileExplorer ->
-                console.log ("[Swate] FILETREE UPDATE!")
+                console.log ("[Swate] FILETREE Create!")
                 setFileTree fileExplorer
     }
 

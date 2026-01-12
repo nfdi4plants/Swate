@@ -48,12 +48,13 @@ let rec getFileTree path =
                     getFileTree (pathMod?join(path, entry?name))
                 )
             let! children = Promise.all(children)
+            let fileTree = createFileEntryDictionary children
             return
                 IPCTypes.FileEntry.create(
                     pathMod?basename(path),
                     path,
                     true,
-                    children
+                    fileTree
                 )
         else
             return
