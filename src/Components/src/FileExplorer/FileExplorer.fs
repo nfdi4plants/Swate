@@ -103,7 +103,10 @@ type FileExplorer =
                                                 Html.div [
                                                     prop.className "swt:flex swt:items-center swt:gap-2"
                                                     prop.children [
-                                                        FileExplorer.icon item.IconPath
+                                                        Html.i [
+                                                            prop.className [ "swt:iconify " + item.IconPath ]
+                                                        ]
+                                                        //FileExplorer.icon item.IconPath
                                                         Html.span item.Name
                                                     ]
                                                 ]
@@ -162,7 +165,13 @@ type FileExplorer =
                             prop.children [
                                 Html.div [
                                     prop.className "swt:flex swt:items-center swt:gap-2"
-                                    prop.children [ FileExplorer.icon item.IconPath; Html.span item.Name ]
+                                    prop.children [
+                                        Html.i [
+                                            prop.className [ "swt:iconify " + item.IconPath ]
+                                        ]
+                                        //FileExplorer.icon item.IconPath;
+                                        Html.span item.Name
+                                    ]
                                 ]
 
                                 // LFS badge for files

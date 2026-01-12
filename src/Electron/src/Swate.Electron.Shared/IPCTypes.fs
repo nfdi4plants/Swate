@@ -20,10 +20,29 @@ type IArcVaultsApi = {
     checkForARC: string -> Promise<bool>
 }
 
+type FileEntry =
+    {name: string; path: string; isDirectory: bool; children: FileEntry []}
+
+[<AutoOpen>]
+module FileEntryExtensions =
+
+    type FileEntry with
+        member this.updateChildren (children: FileEntry []) =
+            {this with children = children}
+
+        static member create (name: string, path: string, isDirectory: bool, ?children) =
+            {
+                name = name
+                path = path
+                isDirectory = isDirectory
+                children = defaultArg children [||]
+            }
+
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: ARCPointer [] -> unit
+    fileTreeUpdate: FileEntry option -> unit
 }
 
 // Todo: What should filewatcher do when detecting changes?

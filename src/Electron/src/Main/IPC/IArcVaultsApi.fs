@@ -29,6 +29,9 @@ let api: IArcVaultsApi = {
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
+                let! fileTree = getFileTree arcPath
+                ARC_VAULTS.SetFileTree(windowId, fileTree)
+
                 return Ok arcPath
         }
     createARC =
@@ -50,12 +53,14 @@ let api: IArcVaultsApi = {
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let windowId = windowIdFromIpcEvent event
-
                 do! ARC_VAULTS.CreateARCInVault(windowId, arcPath, identifier)
 
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
+                let! fileTree = getFileTree arcPath
+
+                ARC_VAULTS.SetFileTree(windowId, fileTree)
                 return Ok arcPath
         }
     createARCInNewWindow =
@@ -102,11 +107,14 @@ let api: IArcVaultsApi = {
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
-
                 match ARC_VAULTS.TryGetVaultByPath arcPath with
                 | None ->
-                    let! _ = ARC_VAULTS.RegisterVaultWithArc(arcPath)
+                    let! windowId = ARC_VAULTS.RegisterVaultWithArc(arcPath)
                     ARC_VAULTS.BroadcastRecentARCs(recentARCs)
+
+                    let! fileTree = getFileTree arcPath
+                    ARC_VAULTS.SetFileTree(windowId, fileTree)
+
                     return Ok()
                 | Some vault ->
                     vault.window.focus ()

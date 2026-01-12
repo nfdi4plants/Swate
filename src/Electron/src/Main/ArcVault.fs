@@ -80,6 +80,7 @@ type ArcVault(window: BrowserWindow) =
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, set
+    member val fileTree: FileEntry option = None with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     /// Indicates whether the vault is currently busy writing changes to disk.
@@ -114,12 +115,26 @@ module ArcVaultExtensions =
                                     swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
                                     do! this.LoadArc()
                                     sendMsgApi.IsLoadingChanges false
+
+                                    console.log($"this.path.IsSome: {this.path.IsSome}")
+
+                                    if this.path.IsSome then
+                                        let! fileTree = getFileTree this.path.Value
+                                        this.SetFileTree(fileTree)
                                 }
                                 |> Promise.start
                             )
                             500
 
                     this.fileWatcherReloadArcTimeout <- Some timeoutId
+
+        member this.SetFileTree(fileTree: FileEntry) =
+            this.fileTree <- (Some fileTree)
+            let sendMsg =
+                Remoting.init
+                |> Remoting.withWindow this.window
+                |> Remoting.buildClient<IMainUpdateRendererApi>
+            sendMsg.fileTreeUpdate (Some fileTree)
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
@@ -289,6 +304,12 @@ type ArcVaults() =
 
         return ()
     }
+
+    member this.SetFileTree(windowId: int, fileTree: FileEntry) =
+        let potVault = this.TryGetVault(windowId)
+        match potVault with
+        | Some (vault: ArcVault) -> vault.SetFileTree(fileTree)
+        | None -> failwith $"Vault with window-id '{windowId}' not found."
 
     member this.TryGetVault(windowId: int) =
         match this.Vaults.TryGetValue windowId with

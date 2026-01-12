@@ -15,14 +15,12 @@ type Actionbar =
             icon: string,
             tooltip: string,
             (onClick: MouseEvent -> unit),
-            ?styling: bool,
             ?toolTipPosition: string,
             ?debug: bool
         ) =
 
         let debug = defaultArg debug false
 
-        let styling = defaultArg styling false
         let toolTipPosition = defaultArg toolTipPosition "swt:tooltip-right"
 
         Html.div [
@@ -37,8 +35,6 @@ type Actionbar =
                     prop.children [
                         Html.i [
                             prop.className [ "swt:iconify " + icon ]
-                            if styling then
-                                prop.style [ style.transform [ transform.rotate 90 ] ]
                         ]
                     ]
                     prop.onClick (fun e -> onClick e)
@@ -109,7 +105,7 @@ type Actionbar =
                     prop.testId "actionbar-test"
                 prop.children [
                     Actionbar.Button(
-                        "swt:fluent--line-horizontal-1-dot-20-regular swt:size-5",
+                        "swt:fluent--line-horizontal-1-dot-24-regular swt:size-5",
                         "Show more options",
                         (fun e ->
                             match containerRef.current with

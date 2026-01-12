@@ -29,7 +29,7 @@ type Selector =
                                 if arcPointer.isActive then
                                     Html.i [
                                         prop.className
-                                            "swt:iconify swt:fluent--checkmark-20-regular swt:size-5 swt:flex-none"
+                                            "swt:iconify swt:fluent--checkmark-24-regular swt:size-5 swt:flex-none"
                                     ]
                             ]
                         ]
