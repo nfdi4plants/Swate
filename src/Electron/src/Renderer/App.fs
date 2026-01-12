@@ -20,9 +20,7 @@ let Main () =
         Api.arcVaultApi.getOpenPath JS.undefined
         |> Promise.map (fun pathOption ->
             match pathOption with
-            | Some p ->
-                console.log $"[Swate] Found open path: {p}"
-                AppState.ARC p |> setAppState
+            | Some p -> AppState.ARC p |> setAppState
             | None -> setAppState AppState.Init
         )
         |> Promise.start
@@ -59,9 +57,8 @@ let Main () =
     let fileExplorer =
         React.useMemo (
             (fun _ ->
-                console.log("fileExplorer")
-                createFileTree(fileTree)),
-            [| fileTree |]
+                createFileTree(fileTree)
+            ), [| fileTree |]
         )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
@@ -206,7 +203,6 @@ let Main () =
             navbar = navbar,
             ?leftSidebar =
                 if fileTree.IsSome then
-                    console.log "Filetree is some!"
                     Some (
                         Html.div [
                             prop.className "swt:p-4"

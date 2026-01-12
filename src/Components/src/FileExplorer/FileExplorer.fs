@@ -58,6 +58,13 @@ type FileExplorer =
 
         let model, dispatch = React.useReducer (reducer, initialModel)
 
+        React.useEffect(
+            (fun () ->
+                dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems []))
+            ),
+            [| box initialItems |]
+        )
+
         let handleItemClick item =
             dispatch (FileExplorerLogic.SelectItem item.Id)
             onItemClick |> Option.iter (fun fn -> fn item)

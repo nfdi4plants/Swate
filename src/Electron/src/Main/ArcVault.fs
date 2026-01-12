@@ -116,8 +116,6 @@ module ArcVaultExtensions =
                                     do! this.LoadArc()
                                     sendMsgApi.IsLoadingChanges false
 
-                                    console.log($"this.path.IsSome: {this.path.IsSome}")
-
                                     if this.path.IsSome then
                                         let! fileTree = getFileTree this.path.Value
                                         this.SetFileTree(fileTree)
