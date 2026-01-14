@@ -29,7 +29,12 @@ let api: IArcVaultsApi = {
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                let! fileTree = getFileTree arcPath
+                let fileTree = getFileEntries arcPath |> createFileEntryTree
+
+                fileTree.Values
+                |> Array.ofSeq
+                |> Array.iter (fun item -> Swate.Components.console.log($"item: {item.path}"))
+
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
 
                 return Ok arcPath
@@ -58,7 +63,7 @@ let api: IArcVaultsApi = {
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                let! fileTree = getFileTree arcPath
+                let fileTree = getFileEntries arcPath |> createFileEntryTree
 
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
                 return Ok arcPath
@@ -112,7 +117,7 @@ let api: IArcVaultsApi = {
                     let! windowId = ARC_VAULTS.RegisterVaultWithArc(arcPath)
                     ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                    let! fileTree = getFileTree arcPath
+                    let fileTree = getFileEntries arcPath |> createFileEntryTree
                     ARC_VAULTS.SetFileTree(windowId, fileTree)
 
                     return Ok()

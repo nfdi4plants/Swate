@@ -19,48 +19,16 @@ let getFileEntry (path: string) =
             )
     }
 
-let getFiles path =
-    promise {
-        let! filePaths = fs?promises?readdir(path, {| withFileTypes = true |})
-        let entries =
-            filePaths
-            |> Array.map (fun entry ->
-                IPCTypes.FileEntry.create(
-                    entry?name,
-                    pathMod?join(path, entry?name),
-                    entry?isDirectory()
-                )
-            )
-        return entries
-    }
-
-///Finds all files and subfolders of the given filepath and uses the file located in the path as the parent
-let rec getFileTree path =
-    promise {
-
-        let! stats = fs?promises?stat(path)
-
-        if(stats?isDirectory()) then
-            let! filePaths = fs?promises?readdir(path, {| withFileTypes = true |})
-            let children =
-                filePaths
-                |> Array.map (fun entry ->
-                    getFileTree (pathMod?join(path, entry?name))
-                )
-            let! children = Promise.all(children)
-            let fileTree = createFileEntryDictionary children
-            return
-                IPCTypes.FileEntry.create(
-                    pathMod?basename(path),
-                    path,
-                    true,
-                    fileTree
-                )
+///Finds all files and subfolders of the given filepath
+let rec getFileEntries path =
+    let entries: string[] = fs?readdirSync(path)
+    entries
+    |> Array.collect (fun entry ->
+        let fullPath = pathMod?join(path, entry)
+        let isDir = fs?statSync(fullPath)?isDirectory()
+        let currentEntry = IPCTypes.FileEntry.create(entry?name, fullPath, isDir)
+        if isDir then
+            Array.append [| currentEntry |] (getFileEntries fullPath)
         else
-            return
-                IPCTypes.FileEntry.create(
-                    pathMod?basename(path),
-                    path,
-                    false
-                )
-    }
+            [| currentEntry |]
+    )

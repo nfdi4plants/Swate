@@ -22,34 +22,45 @@ type IArcVaultsApi = {
 }
 
 type FileEntry =
-    {name: string; path: string; isDirectory: bool; children: Dictionary<string, FileEntry>}
+    {name: string; path: string; isDirectory: bool}
 
 [<AutoOpen>]
 module FileEntryExtensions =
 
-    let createFileEntryDictionary(fileEntries: FileEntry []) =
+    let createFileEntryTree(fileEntries: FileEntry []) =
         let dic = Dictionary<string, FileEntry>()
         fileEntries
         |> Array.iter (fun fileEntry -> dic.Add(fileEntry.path, fileEntry))
         dic
 
     type FileEntry with
-        member this.updateChildren (children: FileEntry []) =
-            {this with children = createFileEntryDictionary children}
 
-        static member create (name: string, path: string, isDirectory: bool, ?children) =
+        static member create (name: string, path: string, isDirectory: bool) =
             {
                 name = name
                 path = path
                 isDirectory = isDirectory
-                children = defaultArg children (Dictionary<string, FileEntry>())
+            }
+
+type FileItemDTO = { name: string; isDirectory: bool; children: FileItemDTO [] }
+
+[<AutoOpen>]
+module FileItemDTOExtensions =
+
+    type FileItemDTO with
+
+        static member create (name: string, isDirectory: bool, children: FileItemDTO []) =
+            {
+                name = name
+                isDirectory = isDirectory
+                children = children
             }
 
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: ARCPointer [] -> unit
-    fileTreeUpdate: FileEntry option -> unit
+    fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
 }
 
 // Todo: What should filewatcher do when detecting changes?

@@ -6,6 +6,7 @@ open Fable.Electron.Remoting.Renderer
 open Swate.Components
 open Swate.Components.FileExplorerTypes
 open Swate.Electron.Shared
+open Swate.Electron.Shared.IPCTypes
 open Browser.Dom
 
 [<ReactComponent>]
@@ -14,7 +15,7 @@ let Main () =
     let btnActive, setBtnActive = React.useState false
     let recentARCs, setRecentARCs = React.useState ([||])
     let appState, setAppState = React.useState (AppState.Init)
-    let (fileTree: IPCTypes.FileEntry option), setFileTree = React.useState (None)
+    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
@@ -26,14 +27,14 @@ let Main () =
         |> Promise.start
     )
 
-    let createFileTree (parent: IPCTypes.FileEntry option) =
-        let rec loop (parent: IPCTypes.FileEntry option) =
+    let createFileTree (parent: FileItemDTO option) =
+        let rec loop (parent: FileItemDTO option) =
             if parent.IsSome then
                 match parent.Value.isDirectory with
                 | true ->
                     let tmp =
-                        parent.Value.children.Values
-                        |> Seq.map (fun entry -> loop (Some entry))
+                        parent.Value.children
+                        |> Array.map (fun entry -> loop (Some entry))
                         |> Seq.choose (fun item -> item)
                         |> List.ofSeq
                     let result =
@@ -48,14 +49,44 @@ let Main () =
 
         let fileItem = loop parent
         if fileItem.IsSome then
-            FileExplorer.FileExplorer([fileItem.Value])
+            Some (FileExplorer.FileExplorer([fileItem.Value]))
         else
-            Html.div []
+            None
+
+    let rec getFileTree (fileEntries: FileEntry []) =
+
+        let rec loop (fileEntries: FileEntry []) =
+            fileEntries
+            |> Array.map (fun fileEntry ->
+                if(fileEntry.isDirectory) then
+                    let childrenEntries = fileEntries |> Array.where (fun childFile -> childFile.path.Contains(fileEntry.path))
+                    let children = getFileTree (childrenEntries)
+                    FileItemDTO.create(
+                        fileEntry.name,
+                        true,
+                        children
+                    )
+                else
+                    FileItemDTO.create(
+                        fileEntry.name,
+                        false,
+                        [||]
+                    )
+                )
+        loop fileEntries
 
     let fileExplorer =
         React.useMemo (
             (fun _ ->
-                createFileTree(fileTree)
+                let fileEntries =
+                    fileTree.Values
+                    |> Array.ofSeq
+                let fileTree =
+                    if fileEntries.Length > 0 then
+                        Some (getFileTree(fileEntries).[0])
+                    else
+                        None
+                createFileTree fileTree
             ), [| fileTree |]
         )
 
@@ -200,7 +231,7 @@ let Main () =
             children = children,
             navbar = navbar,
             ?leftSidebar =
-                if fileTree.IsSome then
+                if fileExplorer.IsSome then
                     Some (
                         Html.div [
                             prop.className "swt:p-4"
@@ -208,7 +239,7 @@ let Main () =
                                 Html.h2 [
                                     prop.text "ARC-Tree"
                                 ]
-                                fileExplorer
+                                fileExplorer.Value
                             ]
                         ]
                     )
