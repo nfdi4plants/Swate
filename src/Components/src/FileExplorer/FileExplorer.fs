@@ -113,7 +113,6 @@ type FileExplorer =
                                                         Html.i [
                                                             prop.className [ "swt:iconify " + item.IconPath ]
                                                         ]
-                                                        //FileExplorer.icon item.IconPath
                                                         Html.span item.Name
                                                     ]
                                                 ]
@@ -176,7 +175,6 @@ type FileExplorer =
                                         Html.i [
                                             prop.className [ "swt:iconify " + item.IconPath ]
                                         ]
-                                        //FileExplorer.icon item.IconPath;
                                         Html.span item.Name
                                     ]
                                 ]
