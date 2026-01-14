@@ -42,14 +42,15 @@ module FileEntryExtensions =
                 isDirectory = isDirectory
             }
 
-type FileItemDTO = { name: string; isDirectory: bool; children: FileItemDTO [] }
+type FileItemDTO =
+    { name: string; isDirectory: bool; children: Dictionary<string, FileItemDTO> }
 
 [<AutoOpen>]
 module FileItemDTOExtensions =
 
     type FileItemDTO with
 
-        static member create (name: string, isDirectory: bool, children: FileItemDTO []) =
+        static member create (name: string, isDirectory: bool, children: Dictionary<string, FileItemDTO>) =
             {
                 name = name
                 isDirectory = isDirectory

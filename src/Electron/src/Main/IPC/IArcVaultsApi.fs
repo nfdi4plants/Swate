@@ -31,10 +31,6 @@ let api: IArcVaultsApi = {
 
                 let fileTree = getFileEntries arcPath |> createFileEntryTree
 
-                fileTree.Values
-                |> Array.ofSeq
-                |> Array.iter (fun item -> Swate.Components.console.log($"item: {item.path}"))
-
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
 
                 return Ok arcPath
@@ -48,8 +44,6 @@ let api: IArcVaultsApi = {
                         Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                     |]
                 )
-
-            Browser.Dom.console.log ("[Main] identifier:", identifier)
 
             if r.canceled then
                 return Error(exn "Cancelled")

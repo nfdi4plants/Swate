@@ -16,6 +16,7 @@ let Main () =
     let recentARCs, setRecentARCs = React.useState ([||])
     let appState, setAppState = React.useState (AppState.Init)
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+    let fileExplorer, setFileExplorer = React.useState (None)
 
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
@@ -33,7 +34,8 @@ let Main () =
                 match parent.Value.isDirectory with
                 | true ->
                     let tmp =
-                        parent.Value.children
+                        parent.Value.children.Values
+                        |> Array.ofSeq
                         |> Array.map (fun entry -> loop (Some entry))
                         |> Seq.choose (fun item -> item)
                         |> List.ofSeq
@@ -42,7 +44,7 @@ let Main () =
                             FileTree.createFolder parent.Value.name "swt:fluent--folder-24-regular" with
                                 Children = Some tmp
                         }
-                    (Some result)
+                    Some result
                 | false -> Some (FileTree.createFile parent.Value.name "swt:fluent--document-24-regular")
             else
                 None
@@ -53,42 +55,73 @@ let Main () =
         else
             None
 
-    let rec getFileTree (fileEntries: FileEntry []) =
+    let insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry) =
+        let parts =
+            entry.path.Split('/', System.StringSplitOptions.RemoveEmptyEntries)
 
-        let rec loop (fileEntries: FileEntry []) =
+        let splittedRootPath =
+            rootPath.Split('/', System.StringSplitOptions.RemoveEmptyEntries)
+
+        let rec loop (node: FileItemDTO) index =
+            let part = parts[index]
+            let isLast = index = parts.Length - 1
+
+            let child =
+                match node.children.TryGetValue(part) with
+                | true, existing -> existing
+                | false, _ ->
+                    let newNode =
+                        FileItemDTO.create(
+                            part,
+                            entry.isDirectory,
+                            System.Collections.Generic.Dictionary()
+                        )
+                    node.children.Add(part, newNode)
+                    newNode
+
+            if not isLast then
+                loop child (index + 1)
+
+        loop root splittedRootPath.Length
+
+    let getFileTree (fileEntries: FileEntry []) =
+
+        let rootPath =
             fileEntries
-            |> Array.map (fun fileEntry ->
-                if(fileEntry.isDirectory) then
-                    let childrenEntries = fileEntries |> Array.where (fun childFile -> childFile.path.Contains(fileEntry.path))
-                    let children = getFileTree (childrenEntries)
-                    FileItemDTO.create(
-                        fileEntry.name,
-                        true,
-                        children
-                    )
-                else
-                    FileItemDTO.create(
-                        fileEntry.name,
-                        false,
-                        [||]
-                    )
-                )
-        loop fileEntries
+            |> Array.map (fun fileEntry -> fileEntry.path)
+            |> Array.map (fun path -> path.Split("/"))
+            |> Array.sortByDescending (fun path -> path.Length)
+            |> Array.last
+            |> String.concat "/"
 
-    let fileExplorer =
-        React.useMemo (
-            (fun _ ->
-                let fileEntries =
-                    fileTree.Values
-                    |> Array.ofSeq
-                let fileTree =
-                    if fileEntries.Length > 0 then
-                        Some (getFileTree(fileEntries).[0])
-                    else
-                        None
-                createFileTree fileTree
-            ), [| fileTree |]
-        )
+        let adaptedFileEntires = fileEntries |> Array.filter (fun fileEntry -> fileEntry.path <> rootPath)
+
+        let rootElement =
+            let tmp =
+                fileEntries
+                |> Array.find(fun fileEntry -> fileEntry.path = rootPath)
+            FileItemDTO.create(tmp.name, tmp.isDirectory, System.Collections.Generic.Dictionary())
+
+        adaptedFileEntires
+        |> Array.iter (fun fileEntry -> insertEntry rootElement rootPath fileEntry)
+
+        rootElement
+
+    React.useEffect (
+        (fun _ ->
+            let fileEntries =
+                fileTree.Values
+                |> Array.ofSeq
+            let fileTree =
+                if fileEntries.Length > 0 then
+                    Some (getFileTree fileEntries)
+                else
+                    None
+            createFileTree fileTree
+            |> setFileExplorer
+            |> ignore
+        ), [| box fileTree |]
+    )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
         pathChange =

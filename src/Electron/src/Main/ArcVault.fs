@@ -115,45 +115,42 @@ module ArcVaultExtensions =
                                     swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
                                     do! this.LoadArc()
                                     sendMsgApi.IsLoadingChanges false
-
-                                    console.log($"eventName: {eventName.ToLower()}")
-
                                     match eventName.ToLower() with
-                                    //| name when name = Chokidar.Events.Add.ToString() ->
-                                    //    if this.path.IsSome then
-                                    //        let dictionary = Dictionary<string, FileEntry>()
-                                    //        dictionary.Add(this.path.Value, this.fileTree.Value)
-                                    //        let! addedFile = getFileEntry($"{this.path.Value}\{path}")
-                                    //        let newFileItem = addFileEntry dictionary addedFile
-                                    //        this.SetFileTree(newFileItem.Item(this.path.Value))
-                                    //| name when name = Chokidar.Events.AddDir.ToString() ->
-                                    //    if this.path.IsSome then
-                                    //        let dictionary = Dictionary<string, FileEntry>()
-                                    //        dictionary.Add(this.path.Value, this.fileTree.Value)
-                                    //        let! addedFile = getFileEntry($"{this.path.Value}\{path}")
-                                    //        let newFileItem = addFileEntry dictionary addedFile
-                                    //        this.SetFileTree(newFileItem.Item(this.path.Value))
-                                    //| name when name = Chokidar.Events.Unlink.ToString() ->
-                                    //    if this.path.IsSome && this.fileTree.IsSome then
-                                    //        let dictionary = Dictionary<string, FileEntry>()
-                                    //        dictionary.Add(this.path.Value, this.fileTree.Value)
-                                    //        let newFileItem = removeFileEntry dictionary ($"{this.path.Value}\{path}")
-                                    //        this.SetFileTree(newFileItem.Item(this.path.Value))
-                                    //| name when name = Chokidar.Events.UnlinkDir.ToString() ->
-                                    //    if this.path.IsSome then
-                                    //        let dictionary = Dictionary<string, FileEntry>()
-                                    //        dictionary.Add(this.path.Value, this.fileTree.Value)
-                                    //        let newFileItem = removeFileEntry dictionary ($"{this.path.Value}\{path}")
-                                    //        this.SetFileTree(newFileItem.Item(this.path.Value))
-                                    //| name when name = Chokidar.Events.Change.ToString() ->
-                                    //    if this.path.IsSome then
-                                    //        let! fileTree = getFileTree this.path.Value
-                                    //        this.SetFileTree(fileTree)
+                                    | name when name = Chokidar.Events.Add.ToString() ->
+                                        if this.path.IsSome then
+                                            let newPath = $"{this.path.Value}\{path}".Replace("\\", "/")
+                                            let! addedFile = getFileEntry(newPath)
+                                            let newFileTree = this.fileTree
+                                            newFileTree.Add(addedFile.path, addedFile)
+                                            this.SetFileTree(newFileTree)
+                                    | name when name = Chokidar.Events.AddDir.ToString() ->
+                                        if this.path.IsSome then
+                                            let newPath = $"{this.path.Value}\{path}".Replace("\\", "/")
+                                            let! addedFile = getFileEntry(newPath)
+                                            let newFileTree = this.fileTree
+                                            newFileTree.Add(addedFile.path, addedFile)
+                                            this.SetFileTree(newFileTree)
+                                    | name when name = Chokidar.Events.Unlink.ToString() ->
+                                        let newPath = $"{this.path.Value}\{path}".Replace("\\", "/")
+                                        if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
+                                            let newFileTree = this.fileTree
+                                            newFileTree.Remove(newPath) |> ignore
+                                            this.SetFileTree(newFileTree)
+                                    | name when name = Chokidar.Events.UnlinkDir.ToString() ->
+                                        let newPath = $"{this.path.Value}\{path}".Replace("\\", "/")
+                                        if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
+                                            let newFileTree = this.fileTree
+                                            let affectedPaths =
+                                                this.fileTree.Keys
+                                                |> Array.ofSeq
+                                                |> Array.filter (fun path -> path.Contains(newPath))
+                                            newFileTree.Remove(newPath) |> ignore
+                                            affectedPaths
+                                            |> Array.iter (fun path -> newFileTree.Remove(newPath) |> ignore)
+                                            this.SetFileTree(newFileTree)
                                     | _ ->
                                         if this.path.IsSome then
-                                            console.log "Stuff 0"
                                             let fileTree = getFileEntries this.path.Value |> createFileEntryTree
-                                            console.log "Stuff 1"
                                             this.SetFileTree(fileTree)
                                 }
                                 |> Promise.start
@@ -164,6 +161,7 @@ module ArcVaultExtensions =
 
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <-  fileTree
+
             let sendMsg =
                 Remoting.init
                 |> Remoting.withWindow this.window

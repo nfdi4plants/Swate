@@ -20,15 +20,26 @@ let getFileEntry (path: string) =
     }
 
 ///Finds all files and subfolders of the given filepath
-let rec getFileEntries path =
-    let entries: string[] = fs?readdirSync(path)
-    entries
-    |> Array.collect (fun entry ->
-        let fullPath = pathMod?join(path, entry)
-        let isDir = fs?statSync(fullPath)?isDirectory()
-        let currentEntry = IPCTypes.FileEntry.create(entry?name, fullPath, isDir)
-        if isDir then
-            Array.append [| currentEntry |] (getFileEntries fullPath)
-        else
-            [| currentEntry |]
-    )
+let rec getFileEntries (path: string) =
+    let stat = fs?statSync(path)
+    let isDir = stat?isDirectory()
+    let name = pathMod?basename(path)
+
+    let normalizedPath = path.Replace("\\", "/")
+
+    let currentEntry =
+        IPCTypes.FileEntry.create(name, normalizedPath, isDir)
+
+    if isDir then
+        let entries: string[] = fs?readdirSync(normalizedPath)
+
+        let children =
+            entries
+            |> Array.collect (fun entry ->
+                let fullPath = pathMod?join(normalizedPath, entry)
+                getFileEntries fullPath
+            )
+
+        Array.append [| currentEntry |] children
+    else
+        [| currentEntry |]
