@@ -160,4 +160,28 @@ let api: IArcVaultsApi = {
         fun path -> promise {
             return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
+    openAssay =
+        fun (*(event: IpcMainEvent)*) (name: string) -> promise {
+            //let windowId = windowIdFromIpcEvent event
+            match ARC_VAULTS.TryGetVault(1) with
+            | None ->
+                return Error(exn $"The ARC for window id {1} should exist")
+            | Some vault ->
+
+                Swate.Components.console.log($"name: {name}")
+
+                vault.arc.Value.Assays
+                |> Array.ofSeq
+                |> Array.iter (fun item ->
+                    Swate.Components.console.log($"item.Identifier: {item.Identifier}")
+                )
+                let assay = vault.OpenAssay(name)
+
+                match assay with
+                | Some assay ->
+                    Swate.Components.console.log($"openAssay assay: {assay.Identifier}")
+                    return Ok(assay)
+                | None ->
+                    return Error(exn $"No assay found for {name}")
+        }
 }

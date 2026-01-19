@@ -243,6 +243,18 @@ module ArcVaultExtensions =
                 arcs
             | None -> [||]
 
+        member this.OpenAssay(identifier: string) =
+            let assay = this.arc.Value.TryGetAssay(identifier)
+
+            match assay with
+            | Some assay ->
+                console.log($"an assay is here!")
+                console.log($"assay: {assay.Identifier}")
+                Some assay
+            | None ->
+                console.log($"no assay!")
+                None
+
 type ArcVaults() =
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get

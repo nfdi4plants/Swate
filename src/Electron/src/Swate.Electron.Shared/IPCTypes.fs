@@ -19,6 +19,7 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
     checkForARC: string -> JS.Promise<bool>
+    openAssay: string -> JS.Promise<Result<ARCtrl.ArcAssay, exn>>
 }
 
 type FileEntry =

@@ -17,6 +17,7 @@ let Main () =
     let appState, setAppState = React.useState (AppState.Init)
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
     let fileExplorer, setFileExplorer = React.useState (None)
+    let (assay: ARCtrl.ArcAssay option), setAssay = React.useState (None)
 
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
@@ -27,6 +28,11 @@ let Main () =
         )
         |> Promise.start
     )
+
+    React.useEffect ((fun _ ->
+        if assay.IsSome then
+            Swate.Components.console.log($"getFileName assay: {assay.Value.Identifier}")
+    ), [| box assay |])
 
     let createFileTree (parent: FileItemDTO option) =
         let rec loop (parent: FileItemDTO option) =
@@ -50,8 +56,24 @@ let Main () =
                 None
 
         let fileItem = loop parent
+
+        let getFileName (item: FileItem) =
+            promise {
+                let! result = Api.arcVaultApi.openAssay item.Name
+
+                match result with
+                | Ok assay ->
+                    
+                    setAssay (Some assay)
+                    return ()
+                | Error exn ->
+                    setAssay (None)
+                    failwith $"{exn.Message}"
+            }
+            |> Promise.start
+
         if fileItem.IsSome then
-            Some (FileExplorer.FileExplorer([fileItem.Value]))
+            Some (FileExplorer.FileExplorer([fileItem.Value], getFileName))
         else
             None
 
