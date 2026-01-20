@@ -180,7 +180,10 @@ let api: IArcVaultsApi = {
                 match assay with
                 | Some assay ->
                     Swate.Components.console.log($"openAssay assay: {assay.Identifier}")
-                    return Ok(assay)
+
+                    let arcJson =
+                        vault.arc.Value.ToROCrateJsonString()
+                    return Ok(assay.Identifier)
                 | None ->
                     return Error(exn $"No assay found for {name}")
         }

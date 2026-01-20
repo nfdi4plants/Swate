@@ -63,8 +63,8 @@ let Main () =
 
                 match result with
                 | Ok assay ->
-                    
-                    setAssay (Some assay)
+                    Swate.Components.console.log($"App assay: {assay}")
+                    //setAssay (Some assay)
                     return ()
                 | Error exn ->
                     setAssay (None)
@@ -255,7 +255,9 @@ let Main () =
                 | AppState.Init ->
                     Html.div [
                         prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
-                        prop.children [ components.InitState.InitState() ]
+                        prop.children [
+                            components.InitState.InitState()
+                        ]
                     ]
                 | AppState.ARC path ->
                     Html.div [
@@ -299,25 +301,25 @@ let Main () =
                         ]
                     )
                 else None
-                ,
-            leftActions =
-                React.Fragment [
-                    Layout.LayoutBtn(
-                        iconClassName = "swt:fluent--home-24-regular size-5",
-                        tooltip = "Home",
-                        isActive = btnActive,
-                        onClick = fun () -> setBtnActive (not btnActive)
-                    )
-                    Layout.LayoutBtn(
-                        iconClassName = "swt:fluent--settings-24-regular size-5",
-                        tooltip = "Settings",
-                        onClick = fun () -> Browser.Dom.window.alert "Settings clicked"
-                    )
-                    Layout.LayoutBtn(
-                        iconClassName = "swt:fluent--info-24-regular size-5",
-                        tooltip = "Info",
-                        onClick = fun () -> Browser.Dom.window.alert "Info clicked"
-                    )
-                ]
+            //,
+            //leftActions =
+            //    React.Fragment [
+            //        Layout.LayoutBtn(
+            //            iconClassName = "swt:fluent--home-24-regular size-5",
+            //            tooltip = "Home",
+            //            isActive = btnActive,
+            //            onClick = fun () -> setBtnActive (not btnActive)
+            //        )
+            //        Layout.LayoutBtn(
+            //            iconClassName = "swt:fluent--settings-24-regular size-5",
+            //            tooltip = "Settings",
+            //            onClick = fun () -> Browser.Dom.window.alert "Settings clicked"
+            //        )
+            //        Layout.LayoutBtn(
+            //            iconClassName = "swt:fluent--info-24-regular size-5",
+            //            tooltip = "Info",
+            //            onClick = fun () -> Browser.Dom.window.alert "Info clicked"
+            //        )
+            //    ]
         )
     )
