@@ -7,7 +7,6 @@ open Feliz
 
 open Components
 open ARCtrl
-open Swate.Components.Shared
 open Components.Metadata
 open Swate.Components
 
@@ -148,7 +147,6 @@ let UpdateMetadataModalContent
                     Html.div [
                         prop.className "swt:flex swt:flex-col swt:md:flex-row swt:gap-4"
                         prop.children [
-                            //Daisy.button.a [
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary"
                                 prop.text "Update Metadata Type"
@@ -163,7 +161,6 @@ let UpdateMetadataModalContent
                                         console.warn ("Tried updating metadata sheet without given metadata")
                                 )
                             ]
-                            //Daisy.button.a [
                             Html.button [
                                 prop.className "swt:btn swt:btn-error"
                                 prop.text "Delete Metadata Type"

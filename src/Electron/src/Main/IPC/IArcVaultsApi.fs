@@ -58,8 +58,8 @@ let api: IArcVaultsApi = {
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
                 let fileTree = getFileEntries arcPath |> createFileEntryTree
-
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
+
                 return Ok arcPath
         }
     createARCInNewWindow =
@@ -183,7 +183,7 @@ let api: IArcVaultsApi = {
 
                     let arcJson =
                         vault.arc.Value.ToROCrateJsonString()
-                    return Ok(assay.Identifier)
+                    return Ok(arcJson)
                 | None ->
                     return Error(exn $"No assay found for {name}")
         }

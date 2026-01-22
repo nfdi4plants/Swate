@@ -111,13 +111,11 @@ module Interface =
                         OfficeInterop.CreateAnnotationTable usePrevOutput
                         |> OfficeInteropMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
                     let cmd =
                         Spreadsheet.CreateAnnotationTable usePrevOutput |> SpreadsheetMsg |> Cmd.ofMsg
-
                     model, cmd
                 | _ -> failwith "not implemented"
             | UpdateDatamap datamapOption ->
@@ -140,7 +138,6 @@ module Interface =
                 | Some Swatehost.ARCitect ->
                     let cmd =
                         Spreadsheet.UpdateDataMapDataContextAt(index, dc) |> SpreadsheetMsg |> Cmd.ofMsg
-
                     model, cmd
                 | _ -> failwith "not implemented"
             | AddTable table ->
@@ -161,7 +158,6 @@ module Interface =
                         OfficeInterop.AddAnnotationBlock minBuildingBlockInfo
                         |> OfficeInteropMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
@@ -169,7 +165,6 @@ module Interface =
                         Spreadsheet.AddAnnotationBlock(index, minBuildingBlockInfo)
                         |> SpreadsheetMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | _ -> failwith "not implemented"
             | ValidateBuildingBlock ->
@@ -185,7 +180,6 @@ module Interface =
                         OfficeInterop.AddAnnotationBlocks compositeColumns
                         |> OfficeInteropMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
@@ -193,7 +187,6 @@ module Interface =
                         Spreadsheet.AddAnnotationBlocks(index, compositeColumns)
                         |> SpreadsheetMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | _ -> failwith "not implemented"
             | AddTemplates(tables, importType) ->
@@ -204,7 +197,6 @@ module Interface =
                         OfficeInterop.AddTemplates(Array.ofList tables, importType)
                         |> OfficeInteropMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | Some Swatehost.Browser
                 | Some Swatehost.ARCitect ->
@@ -212,7 +204,6 @@ module Interface =
                         Spreadsheet.AddTemplates(Array.ofList tables, importType)
                         |> SpreadsheetMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | _ -> failwith "not implemented"
             | JoinTable(table, index, options) ->
@@ -226,7 +217,6 @@ module Interface =
                         Spreadsheet.JoinTable(table, index, options, None)
                         |> SpreadsheetMsg
                         |> Cmd.ofMsg
-
                     model, cmd
                 | _ -> failwith "not implemented"
             | UpdateArcFile arcFiles ->

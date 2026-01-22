@@ -3,21 +3,50 @@ module Renderer.App
 open Feliz
 open Fable.Core
 open Fable.Electron.Remoting.Renderer
+open Components.Metadata
 open Swate.Components
 open Swate.Components.FileExplorerTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
-open Browser.Dom
+open ARCtrl.Json
 
 [<ReactComponent>]
 let Main () =
+
+    console.log("start")
+    let (initialModel: Model.Model) = {
+        PageState = Model.PageState.init ()
+        PersistentStorageState = Model.PersistentStorageState.init ()
+        DevState = Model.DevState.init ()
+        TermSearchState = Model.TermSearch.Model.init ()
+        ExcelState = OfficeInterop.Model.init ()
+        FilePickerState = Model.FilePicker.Model.init ()
+        AddBuildingBlockState = Model.BuildingBlock.Model.init ()
+        ProtocolState = Model.Protocol.Model.init ()
+        CytoscapeModel = Cytoscape.Model.init ()
+        DataAnnotatorModel = DataAnnotator.Model.init ()
+        SpreadsheetModel = Spreadsheet.Model.init ()
+        History = LocalHistory.Model.init ()
+        ARCitectState = Model.ARCitect.Model.init ()
+    }
+    console.log("end")
+
+    let autosaveConfig = LocalStorage.AutosaveConfig.getAutosaveConfiguration ()
+
+    let newModel =
+        autosaveConfig
+        |> Option.defaultValue initialModel.PersistentStorageState.Autosave
+        |> fun x -> {
+            initialModel with
+                Model.PersistentStorageState.Autosave = x
+        }
 
     let btnActive, setBtnActive = React.useState false
     let recentARCs, setRecentARCs = React.useState ([||])
     let appState, setAppState = React.useState (AppState.Init)
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
     let fileExplorer, setFileExplorer = React.useState (None)
-    let (assay: ARCtrl.ArcAssay option), setAssay = React.useState (None)
+    let (assay: ARCtrl.ArcAssay), setAssay = React.useState (ARCtrl.ArcAssay.create(""))
 
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
@@ -30,8 +59,8 @@ let Main () =
     )
 
     React.useEffect ((fun _ ->
-        if assay.IsSome then
-            Swate.Components.console.log($"getFileName assay: {assay.Value.Identifier}")
+        Swate.Components.console.log($"getFileName assay: {assay.Identifier}")
+        ()
     ), [| box assay |])
 
     let createFileTree (parent: FileItemDTO option) =
@@ -62,12 +91,13 @@ let Main () =
                 let! result = Api.arcVaultApi.openAssay item.Name
 
                 match result with
-                | Ok assay ->
-                    Swate.Components.console.log($"App assay: {assay}")
-                    //setAssay (Some assay)
+                | Ok json ->
+                    let assay = ARCtrl.ArcAssay.fromROCrateJsonString(json)
+                    Swate.Components.console.log($"App assay: {assay.Identifier}")
+                    setAssay assay
                     return ()
                 | Error exn ->
-                    setAssay (None)
+                    setAssay (ARCtrl.ArcAssay.create(""))
                     failwith $"{exn.Message}"
             }
             |> Promise.start
@@ -254,27 +284,33 @@ let Main () =
                 match appState with
                 | AppState.Init ->
                     Html.div [
+                        Swate.Components.console.log("We should be here!")
                         prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
                         prop.children [
                             components.InitState.InitState()
                         ]
                     ]
                 | AppState.ARC path ->
-                    Html.div [
-                        prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
-                        prop.children (
-                            Html.h1 [
-                                prop.text path
-                                prop.className
+                    if assay.Identifier <> "" then
+                        Swate.Components.console.log("Path is available?")
+                        Assay.Main(assay, setAssay, initialModel)
+                    else
+                        Swate.Components.console.log("No path available!")
+                        Html.div [
+                            prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
+                            prop.children (
+                                Html.h1 [
+                                    prop.text path
+                                    prop.className
+                                        "
+                                        swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text
+                                        swt:bg-linear-to-r swt:from-primary swt:to-secondary
                                     "
-                                    swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text
-                                    swt:bg-linear-to-r swt:from-primary swt:to-secondary
-                                "
-                            ]
-                        )
-                    ]
+                                ]
+                            )
+                        ]
             ),
-            [| appState |]
+            [| appState; assay |]
         )
 
     let navbar = Navbar.Main(selector)

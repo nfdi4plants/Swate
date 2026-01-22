@@ -245,7 +245,7 @@ module ArcVaultExtensions =
 
         member this.OpenAssay(identifier: string) =
             let assay = this.arc.Value.TryGetAssay(identifier)
-
+            console.log($"OpenAssay identifier: {identifier}")
             match assay with
             | Some assay ->
                 console.log($"an assay is here!")

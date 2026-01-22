@@ -89,7 +89,7 @@ let CreateNewArcModalContent (close: unit -> unit) =
 let InitState () =
 
     let modalIsOpen, setModalIsOpen = React.useState (false)
-
+    Swate.Components.console.log("InitState")
     React.Fragment [
         BaseModal.BaseModal(modalIsOpen, setModalIsOpen, CreateNewArcModalContent(fun () -> setModalIsOpen false))
         CardGrid.CardGrid(
