@@ -8,6 +8,7 @@
     <Compile Include="Api.fs"/>
     <Compile Include="context\AppStateCtx.fs"/>
     <Compile Include="components\InitState.fs"/>
+    <Compile Include="MetadataForms.fs"/>
     <Compile Include="App.fs"/>
     <Compile Include="Program.fs"/>
     <Content Include="tailwind.css"/>
@@ -16,6 +17,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj"/>
     <ProjectReference Include="..\Swate.Electron.Shared\Swate.Electron.Shared.fsproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ARCtrl.Javascript" />
   </ItemGroup>
 
 </Project>

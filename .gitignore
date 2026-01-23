@@ -26,7 +26,7 @@ release.sh
 /.paket
 */**/fable_modules
 *.fs.ts
-# *.fs.js
+*.fs.js
 *.fs.js.map
 dist/
 output/

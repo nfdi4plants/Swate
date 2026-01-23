@@ -23,6 +23,7 @@ type FileItem = {
     ItemType: string
     Label: string option
     Selectable: bool
+    Path: string option
 }
 
 // Helper type for file tree creation using a predefined config
@@ -47,7 +48,7 @@ module FileTree =
         let divisor = Math.Pow(1024.0, float log)
         sprintf "%.0f %s" (float size / divisor) suffixes.[log]
 
-    let createFile (name: string) (iconPath: string) : FileItem = {
+    let createFile (name: string) (path: string option) (iconPath: string) : FileItem = {
         Id = generateId ()
         Name = name
         IconPath = iconPath
@@ -64,9 +65,10 @@ module FileTree =
         ItemType = "node"
         Label = Some name
         Selectable = false
+        Path = path
     }
 
-    let createFolder (name: string) (iconPath: string) : FileItem = {
+    let createFolder (name: string) (path: string option) (iconPath: string) : FileItem = {
         Id = generateId ()
         Name = name
         IconPath = iconPath
@@ -83,6 +85,7 @@ module FileTree =
         ItemType = "node"
         Label = Some name
         Selectable = false
+        Path = path
     }
 
     let createFromConfig (config: FileItemConfig) (id: string) : FileItem = {
@@ -102,6 +105,7 @@ module FileTree =
         ItemType = config.ItemType
         Label = Some config.Name
         Selectable = false
+        Path = None
     }
 
     let rec addChild parentId child items =
@@ -242,6 +246,7 @@ module FileTree =
         ItemType = "empty"
         Label = Some "empty"
         Selectable = false
+        Path = None
     }
 
 
