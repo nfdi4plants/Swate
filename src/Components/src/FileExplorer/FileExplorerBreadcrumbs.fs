@@ -8,9 +8,7 @@ open Feliz
 
 open Swate.Components.FileExplorerTypes
 
-// ============================================================================
-// BREADCRUMBS COMPONENT
-// ============================================================================
+
 [<Mangle(false); Erase>]
 type Breadcrumbs =
 
