@@ -153,10 +153,6 @@ let api: IArcVaultsApi = {
         }
     getOpenPath =
         fun event -> promise {
-            //return
-            //    ARC_VAULTS.TryGetVault(windowIdFromIpcEvent event)
-            //    |> Option.bind (fun v -> v.path)
-
             let windowId = windowIdFromIpcEvent event
             let vault = ARC_VAULTS.TryGetVault(windowId)
 
