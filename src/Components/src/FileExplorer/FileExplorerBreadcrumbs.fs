@@ -115,6 +115,7 @@ type Breadcrumbs =
                     ItemType = "ellipsis"
                     Label = Some "..."
                     Selectable = false
+                    Path = None
                 }
 
                 [ List.head path ]

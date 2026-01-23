@@ -247,13 +247,29 @@ module ArcVaultExtensions =
             let assay = this.arc.Value.TryGetAssay(identifier)
 
             match assay with
-            | Some assay ->
-                console.log($"an assay is here!")
-                console.log($"assay: {assay.Identifier}")
-                Some assay
-            | None ->
-                console.log($"no assay!")
-                None
+            | Some assay -> Some assay
+            | None -> None
+
+        member this.OpenStudy(identifier: string) =
+            let study = this.arc.Value.TryGetStudy(identifier)
+
+            match study with
+            | Some study -> Some study
+            | None -> None
+
+        member this.OpenWorkflow(identifier: string) =
+            let workflow = this.arc.Value.TryGetWorkflow(identifier)
+
+            match workflow with
+            | Some workflow -> Some workflow
+            | None -> None
+
+        member this.OpenRun(identifier: string) =
+            let run = this.arc.Value.TryGetRun(identifier)
+
+            match run with
+            | Some run -> Some run
+            | None -> None
 
 type ArcVaults() =
     /// Key is window.id

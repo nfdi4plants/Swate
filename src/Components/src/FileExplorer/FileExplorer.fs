@@ -225,34 +225,34 @@ module FileExplorerExample =
         let icons = FileExplorer.defaultIconPaths
 
         let initialItems: FileItem list = [
-            FileTree.createFile "resume.pdf" icons.pdf
+            FileTree.createFile "resume.pdf" None icons.pdf
             {
-                FileTree.createFolder "My Files" icons.folder with
+                FileTree.createFolder "My Files" None icons.folder with
                     IsExpanded = true
                     Children =
                         Some [
-                            FileTree.createFile "Project-final.psd" icons.psd
+                            FileTree.createFile "Project-final.psd" None icons.psd
                             {
-                                FileTree.createFolder "Subfolder" icons.folder with
+                                FileTree.createFolder "Subfolder" None icons.folder with
                                     IsExpanded = true
                                     Children =
                                         Some [
-                                            FileTree.createFile "nested-file-1.txt" icons.txt
-                                            FileTree.createFile "nested-file-2.md" icons.markdown
+                                            FileTree.createFile "nested-file-1.txt" None icons.txt
+                                            FileTree.createFile "nested-file-2.md" None icons.markdown
                                             {
-                                                FileTree.createFolder "NestedFolder" icons.folder with
+                                                FileTree.createFolder "NestedFolder" None icons.folder with
                                                     IsExpanded = true
                                                     Children =
                                                         Some [
-                                                            FileTree.createFile "Project-2-final.psd" icons.psd
-                                                            FileTree.createFile "Project-3-final.psd" icons.psd
+                                                            FileTree.createFile "Project-2-final.psd" None icons.psd
+                                                            FileTree.createFile "Project-3-final.psd" None icons.psd
                                                         ]
                                             }
                                         ]
                             }
                         ]
             }
-            FileTree.createFile "notes.txt" icons.txt
+            FileTree.createFile "notes.txt" None icons.txt
         ]
 
         let handleItemClick (item: FileItem) =
