@@ -1,4 +1,4 @@
-namespace JsBindings
+namespace Components.JsBindings
 
 open Feliz
 open Fable.Core

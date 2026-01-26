@@ -17,7 +17,7 @@ open Swate.Components
 open Components
 open Swate.Components.Shared
 
-module private API =
+module API =
 
     module Null =
         let defaultValue (def: 'A) (x: 'A) = if isNull x then def else x
@@ -401,7 +401,7 @@ module private Helper =
             ]
         ]
 
-open JsBindings
+open Components.JsBindings
 
 type FormComponents =
 

@@ -7,11 +7,16 @@ open Swate.Components
 open Swate.Components.FileExplorerTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
-//open Renderer.MetadataForms
 open Browser.Dom
 open ARCtrl
 open ARCtrl.Json
 open MetadataForms
+
+module private MainPageUtil =
+    [<Literal>]
+    let DrawerId = "MainPageDrawerId"
+
+open MainPageUtil
 
 [<RequireQualifiedAccess>]
 type PreviewActiveView =
@@ -47,9 +52,38 @@ let TablePreview (table: ARCtrl.ArcTable) =
         ]
     )
 
+[<ReactComponent>]
+let createARCitectNavbar () =
+    Components.BaseNavbar.Glow [
+        Html.label [
+            prop.className "swt:btn swt:btn-square swt:btn-ghost swt:md:hidden"
+            prop.htmlFor DrawerId
+            prop.children [
+                Svg.svg [
+                    svg.xmlns "http://www.w3.org/2000/svg"
+                    svg.className "swt:size-5"
+                    svg.fill "none"
+                    svg.viewBox (0, 0, 24, 24)
+                    svg.stroke "currentColor"
+                    svg.children [
+                        Svg.path [
+                            svg.strokeLineCap "round"
+                            svg.strokeLineJoin "round"
+                            svg.strokeWidth 2
+                            svg.d "M4 6h16M4 12h16M4 18h7"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+        //Components.Logo.Main(
+        //    onClick = (fun _ -> PageState.UpdateMainPage Routing.MainPage.Default |> PageStateMsg |> dispatch)
+        //)
+    ]
+
 /// Footer tabs for switching between metadata and tables
 [<ReactComponent>]
-let PreviewFooterTabs (arcFile: ArcFiles, activeView: PreviewActiveView, setActiveView: PreviewActiveView -> unit) =
+let createARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) =
     let tables = arcFile.Tables()
 
     Html.div [
@@ -89,7 +123,7 @@ let PreviewFooterTabs (arcFile: ArcFiles, activeView: PreviewActiveView, setActi
                         Html.span [ prop.text table.Name ]
                     |]
                 ]
-            // DataMap tab (if applicable)
+            // DataMap tab
             match arcFile with
             | ArcFiles.Assay a when a.DataMap.IsSome ->
                 Html.button [
@@ -176,17 +210,47 @@ let MetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
         ]
     ]
 
-/// Main preview component for ArcFiles with tab switching
+let createTableView activeView arcFileState setArcFileState =
+    match activeView with
+    | PreviewActiveView.Metadata -> MetadataPreview(arcFileState, setArcFileState)
+    | PreviewActiveView.Table index ->
+        let tables = arcFileState.Tables()
+
+        if index < tables.Count then
+            TablePreview(tables.[index])
+        else
+            Html.div [
+                prop.className "swt:p-4 swt:text-error"
+                prop.text "Table not found"
+            ]
+    | PreviewActiveView.DataMap ->
+        match arcFileState with
+        | ArcFiles.Assay a when a.DataMap.IsSome ->
+            let dm, setDm = React.useState a.DataMap.Value
+            DataMapTable.DataMapTable(dm, setDm)
+        | ArcFiles.Study(s, _) when s.DataMap.IsSome ->
+            let dm, setDm = React.useState s.DataMap.Value
+            DataMapTable.DataMapTable(dm, setDm)
+        | ArcFiles.Run r when r.DataMap.IsSome ->
+            let dm, setDm = React.useState r.DataMap.Value
+            DataMapTable.DataMapTable(dm, setDm)
+        | ArcFiles.DataMap(_, datamap) ->
+            let dm, setDm = React.useState datamap
+            DataMapTable.DataMapTable(dm, setDm)
+        | _ ->
+            Html.div [
+                prop.className "swt:p-4 swt:text-error"
+                prop.text "No DataMap available"
+            ]
+
 [<ReactComponent>]
-let ArcFilePreview (arcFile: ArcFiles) =
+let createARCPreview (arcFile: ArcFiles) =
     let arcFileState, setArcFileState = React.useState arcFile
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
 
-    // Reset state when arcFile prop changes (new file selected)
     React.useEffect (
         (fun () ->
             setArcFileState arcFile
-            // Determine initial view based on file type
             let tables = arcFile.Tables()
 
             if tables.Count > 0 then
@@ -200,49 +264,16 @@ let ArcFilePreview (arcFile: ArcFiles) =
     Html.div [
         prop.className "swt:flex swt:flex-col swt:h-full"
         prop.children [|
-            // Main content area
             Html.div [
                 prop.className "swt:flex-1 swt:overflow-hidden"
                 prop.children [
-                    match activeView with
-                    | PreviewActiveView.Metadata -> MetadataPreview(arcFileState, setArcFileState)
-                    | PreviewActiveView.Table index ->
-                        let tables = arcFileState.Tables()
-
-                        if index < tables.Count then
-                            TablePreview(tables.[index])
-                        else
-                            Html.div [
-                                prop.className "swt:p-4 swt:text-error"
-                                prop.text "Table not found"
-                            ]
-                    | PreviewActiveView.DataMap ->
-                        match arcFileState with
-                        | ArcFiles.Assay a when a.DataMap.IsSome ->
-                            let dm, setDm = React.useState a.DataMap.Value
-                            DataMapTable.DataMapTable(dm, setDm)
-                        | ArcFiles.Study(s, _) when s.DataMap.IsSome ->
-                            let dm, setDm = React.useState s.DataMap.Value
-                            DataMapTable.DataMapTable(dm, setDm)
-                        | ArcFiles.Run r when r.DataMap.IsSome ->
-                            let dm, setDm = React.useState r.DataMap.Value
-                            DataMapTable.DataMapTable(dm, setDm)
-                        | ArcFiles.DataMap(_, datamap) ->
-                            let dm, setDm = React.useState datamap
-                            DataMapTable.DataMapTable(dm, setDm)
-                        | _ ->
-                            Html.div [
-                                prop.className "swt:p-4 swt:text-error"
-                                prop.text "No DataMap available"
-                            ]
+                    createTableView activeView arcFileState setArcFileState
                 ]
             ]
-            // Footer tabs
-            PreviewFooterTabs(arcFileState, activeView, setActiveView)
+            createARCitectFooter arcFileState activeView setActiveView
         |]
     ]
 
-/// Parse JSON to ArcFiles based on file type
 let parseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
     try
         match fileType with
@@ -311,7 +342,6 @@ let Main () =
                         FileTree.createFolder parent.Value.name (Some parent.Value.path) "swt:fluent--folder-24-regular" with
                             Children = Some tmp
                     }
-
                     Some result
                 | false ->
                     Some(
@@ -525,7 +555,7 @@ let Main () =
             | ArcFileData(fileType, json) ->
                 // Parse JSON and render using ArcFilePreview
                 match parseArcFileFromJson fileType json with
-                | Some arcFile -> ArcFilePreview(arcFile)
+                | Some arcFile -> createARCPreview(arcFile)
                 | None ->
                     Html.div [
                         prop.className "swt:p-4 swt:text-error"
@@ -575,15 +605,41 @@ let Main () =
                 match appState with
                 | AppState.Init ->
                     Html.div [
-                        prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
+                        prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
                         prop.children [
-                            components.InitState.InitState()
+                            Html.div [
+                                prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:flex-none" 
+                                        prop.children [ createARCitectNavbar () ]
+                                    ]
+                                    Html.div [
+                                        prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
+                                        prop.children [ components.InitState.InitState() ]
+                                    ]
+                                ]
+                            ]
                         ]
                     ]
                 | AppState.ARC path ->
                     Html.div [
-                        prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
-                        prop.children [| computeARCContent path |]
+                        prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
+                        prop.children [
+                            Html.div [
+                                prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:flex-none" 
+                                        prop.children [ createARCitectNavbar () ]
+                                    ]
+                                    Html.div [
+                                        prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
+                                        prop.children [ computeARCContent path ]
+                                    ]
+                                ]
+                            ]
+                        ]
                     ]
             ),
             [| appState; box previewData |]
