@@ -129,7 +129,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
         | _ -> Html.none
     ]
 
-let private WidgetNavbarList (model, dispatch, addWidget: Widget -> unit) =
+let private WidgetNavbarList (model, addWidget: Widget -> unit) =
     let addBuildingBlock =
         QuickAccessButton.QuickAccessButton(
             "Add Building Block",
@@ -180,7 +180,7 @@ let Main (model: Model, dispatch, widgets, setWidgets) =
             prop.className "swt:overflow-x-auto swt:min-w-0 swt:shrink swt:grow"
             prop.children [
                 QuickAccessButtonListStart model.History dispatch
-                WidgetNavbarList(model, dispatch, addWidget)
+                WidgetNavbarList(model, addWidget)
             ]
         ]
         // match model.PersistentStorageState.Host with

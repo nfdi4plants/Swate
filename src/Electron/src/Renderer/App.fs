@@ -3,13 +3,17 @@ module Renderer.App
 open Feliz
 open Fable.Core
 open Fable.Electron.Remoting.Renderer
+
 open Swate.Components
-open Swate.Components.FileExplorerTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
+open Swate.Components.FileExplorerTypes
+
 open Browser.Dom
+
 open ARCtrl
 open ARCtrl.Json
+
 open MetadataForms
 
 module private MainPageUtil =
@@ -33,7 +37,6 @@ type ArcFileState = {
 let TablePreview (table: ARCtrl.ArcTable) =
     let tableState, setTableState = React.useState (table)
 
-    // Update table state when prop changes
     React.useEffect (
         (fun () ->
             console.log ("TablePreview received table object")
@@ -42,46 +45,77 @@ let TablePreview (table: ARCtrl.ArcTable) =
         [| box table |]
     )
 
-    // Wrap in context provider as required by AnnotationTable
     AnnotationTableContextProvider.AnnotationTableContextProvider(
         Html.div [
-            prop.className "swt:size-full"
+            //It works but not as clean as we want it
+            prop.className "swt:w-screen"
             prop.children [
                 AnnotationTable.AnnotationTable(tableState, setTableState)
             ]
         ]
     )
 
-[<ReactComponent>]
-let createARCitectNavbar () =
-    Components.BaseNavbar.Glow [
-        Html.label [
-            prop.className "swt:btn swt:btn-square swt:btn-ghost swt:md:hidden"
-            prop.htmlFor DrawerId
-            prop.children [
-                Svg.svg [
-                    svg.xmlns "http://www.w3.org/2000/svg"
-                    svg.className "swt:size-5"
-                    svg.fill "none"
-                    svg.viewBox (0, 0, 24, 24)
-                    svg.stroke "currentColor"
-                    svg.children [
-                        Svg.path [
-                            svg.strokeLineCap "round"
-                            svg.strokeLineJoin "round"
-                            svg.strokeWidth 2
-                            svg.d "M4 6h16M4 12h16M4 18h7"
-                        ]
-                    ]
-                ]
-            ]
-        ]
-        //Components.Logo.Main(
-        //    onClick = (fun _ -> PageState.UpdateMainPage Routing.MainPage.Default |> PageStateMsg |> dispatch)
-        //)
+let createARCitectWidgetNavbarList (activeView: PreviewActiveView) (*addWidget: Widget -> unit*) =
+    let addBuildingBlock =
+        QuickAccessButton.QuickAccessButton(
+            "Add Building Block",
+            Icons.BuildingBlock(),
+            fun _ -> ()
+            //(fun _ -> addWidget Widget._BuildingBlock)
+        )
+
+    let addTemplate =
+        QuickAccessButton.QuickAccessButton(
+            "Add Template",
+            Icons.Templates(),
+            //(fun _ -> addWidget Widget._Template)
+            fun _ -> ()
+        )
+
+    let filePicker =
+        QuickAccessButton.QuickAccessButton(
+            "File Picker",
+            Icons.FilePicker(),
+            //(fun _ -> addWidget Widget._FilePicker)
+            fun _ -> ()
+        )
+
+    let dataAnnotator =
+        QuickAccessButton.QuickAccessButton(
+            "Data Annotator",
+            Icons.DataAnnotator(),
+            //(fun _ -> addWidget Widget._DataAnnotator),
+            (fun _ -> ()),
+            classes = "swt:w-min"
+        )
+
+    React.Fragment [
+        match activeView with
+        | PreviewActiveView.Table _ ->
+            addBuildingBlock
+            addTemplate
+            filePicker
+            dataAnnotator
+        | PreviewActiveView.DataMap -> dataAnnotator
+        | PreviewActiveView.Metadata -> Html.none
     ]
 
-/// Footer tabs for switching between metadata and tables
+[<ReactComponent>]
+let createARCitectNavbar () (*(activeView: PreviewActiveView)*) =
+    let state, setState = React.useState (SidebarComponents.Navbar.NavbarState.init)
+
+    let inline toggleMetdadataModal _ =
+        {
+            state with
+                ExcelMetadataModalActive = not state.ExcelMetadataModalActive
+        }
+        |> setState
+
+    Components.BaseNavbar.Glow [
+        Components.Logo.Main()
+        //createARCitectWidgetNavbarList(activeView)
+    ]
+
 [<ReactComponent>]
 let createARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) =
     let tables = arcFile.Tables()
@@ -98,7 +132,9 @@ let createARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
                     else
                         "swt:btn-ghost"
                 ]
-                prop.onClick (fun _ -> setActiveView PreviewActiveView.Metadata)
+                prop.onClick (fun _ ->
+                    setActiveView PreviewActiveView.Metadata
+                )
                 prop.children [|
                     Html.span [ prop.className "swt:i-fluent--info-24-regular" ]
                     Html.span [ prop.text "Metadata" ]
@@ -193,7 +229,7 @@ let createARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
 [<ReactComponent>]
 let MetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
     Html.div [
-        prop.className "swt:p-4 swt:overflow-y-auto swt:h-full"
+        prop.className "swt:p-4 swt:h-full"
         prop.children [
             match arcFile with
             | ArcFiles.Investigation inv ->
@@ -204,7 +240,7 @@ let MetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
             | ArcFiles.Run run -> RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
             | ArcFiles.Workflow workflow ->
                 WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
-            | ArcFiles.DataMap(path, datamap) -> DataMapMetadata(datamap)
+            | ArcFiles.DataMap(_, datamap) -> DataMapMetadata(datamap)
             | ArcFiles.Template template ->
                 TemplateMetadata(template, fun updated -> setArcFile (ArcFiles.Template updated))
         ]
@@ -265,7 +301,7 @@ let createARCPreview (arcFile: ArcFiles) =
         prop.className "swt:flex swt:flex-col swt:h-full"
         prop.children [|
             Html.div [
-                prop.className "swt:flex-1 swt:overflow-hidden"
+                prop.className "swt:flex-1 swt:overflow-auto"
                 prop.children [
                     createTableView activeView arcFileState setArcFileState
                 ]
@@ -624,18 +660,22 @@ let Main () =
                     ]
                 | AppState.ARC path ->
                     Html.div [
-                        prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
+                        prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
                         prop.children [
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
+                                    // Navbar
                                     Html.div [
-                                        prop.className "swt:flex-none" 
+                                        prop.className "swt:flex-none"
                                         prop.children [ createARCitectNavbar () ]
                                     ]
+                                    // Main content
                                     Html.div [
-                                        prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
-                                        prop.children [ computeARCContent path ]
+                                        prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
+                                        prop.children [
+                                            computeARCContent path
+                                        ]
                                     ]
                                 ]
                             ]
