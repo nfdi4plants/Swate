@@ -14,7 +14,7 @@ open Browser.Dom
 open ARCtrl
 open ARCtrl.Json
 
-open MetadataForms
+open components.MainElement
 
 module private MainPageUtil =
     [<Literal>]
@@ -22,265 +22,8 @@ module private MainPageUtil =
 
 open MainPageUtil
 
-[<RequireQualifiedAccess>]
-type PreviewActiveView =
-    | Metadata
-    | Table of int
-    | DataMap
-
-type ArcFileState = {
-    ArcFile: ArcFiles
-    ActiveView: PreviewActiveView
-}
-
 [<ReactComponent>]
-let TablePreview (table: ARCtrl.ArcTable) =
-    let tableState, setTableState = React.useState (table)
-
-    React.useEffect (
-        (fun () ->
-            console.log ("TablePreview received table object")
-            setTableState (table)
-        ),
-        [| box table |]
-    )
-
-    AnnotationTableContextProvider.AnnotationTableContextProvider(
-        Html.div [
-            //It works but not as clean as we want it
-            prop.className "swt:w-screen"
-            prop.children [
-                AnnotationTable.AnnotationTable(tableState, setTableState)
-            ]
-        ]
-    )
-
-let createARCitectWidgetNavbarList (activeView: PreviewActiveView) (*addWidget: Widget -> unit*) =
-    let addBuildingBlock =
-        QuickAccessButton.QuickAccessButton(
-            "Add Building Block",
-            Icons.BuildingBlock(),
-            fun _ -> ()
-            //(fun _ -> addWidget Widget._BuildingBlock)
-        )
-
-    let addTemplate =
-        QuickAccessButton.QuickAccessButton(
-            "Add Template",
-            Icons.Templates(),
-            //(fun _ -> addWidget Widget._Template)
-            fun _ -> ()
-        )
-
-    let filePicker =
-        QuickAccessButton.QuickAccessButton(
-            "File Picker",
-            Icons.FilePicker(),
-            //(fun _ -> addWidget Widget._FilePicker)
-            fun _ -> ()
-        )
-
-    let dataAnnotator =
-        QuickAccessButton.QuickAccessButton(
-            "Data Annotator",
-            Icons.DataAnnotator(),
-            //(fun _ -> addWidget Widget._DataAnnotator),
-            (fun _ -> ()),
-            classes = "swt:w-min"
-        )
-
-    React.Fragment [
-        match activeView with
-        | PreviewActiveView.Table _ ->
-            addBuildingBlock
-            addTemplate
-            filePicker
-            dataAnnotator
-        | PreviewActiveView.DataMap -> dataAnnotator
-        | PreviewActiveView.Metadata -> Html.none
-    ]
-
-[<ReactComponent>]
-let createARCitectNavbar (activeView: PreviewActiveView) =
-    let state, setState = React.useState (SidebarComponents.Navbar.NavbarState.init)
-
-    //let inline toggleMetdadataModal _ =
-    //    {
-    //        state with
-    //            ExcelMetadataModalActive = not state.ExcelMetadataModalActive
-    //    }
-    //    |> setState
-
-    Components.BaseNavbar.Glow [
-        Components.Logo.Main()
-        createARCitectWidgetNavbarList(activeView)
-    ]
-
-[<ReactComponent>]
-let createARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) =
-    let tables = arcFile.Tables()
-
-    Html.div [
-        prop.className "swt:flex swt:gap-1 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300 swt:overflow-x-auto"
-        prop.children [|
-            // Metadata tab
-            Html.button [
-                prop.className [
-                    "swt:btn swt:btn-sm"
-                    if activeView = PreviewActiveView.Metadata then
-                        "swt:btn-primary"
-                    else
-                        "swt:btn-ghost"
-                ]
-                prop.onClick (fun _ ->
-                    setActiveView PreviewActiveView.Metadata
-                )
-                prop.children [|
-                    Html.span [ prop.className "swt:i-fluent--info-24-regular" ]
-                    Html.span [ prop.text "Metadata" ]
-                |]
-            ]
-            // Table tabs
-            for i = 0 to tables.Count - 1 do
-                let table = tables.[i]
-
-                Html.button [
-                    prop.key (string i)
-                    prop.className [
-                        "swt:btn swt:btn-sm"
-                        if activeView = PreviewActiveView.Table i then
-                            "swt:btn-primary"
-                        else
-                            "swt:btn-ghost"
-                    ]
-                    prop.onClick (fun _ -> setActiveView (PreviewActiveView.Table i))
-                    prop.children [|
-                        Html.span [ prop.className "swt:i-fluent--table-24-regular" ]
-                        Html.span [ prop.text table.Name ]
-                    |]
-                ]
-            // DataMap tab
-            match arcFile with
-            | ArcFiles.Assay a when a.DataMap.IsSome ->
-                Html.button [
-                    prop.className [
-                        "swt:btn swt:btn-sm"
-                        if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
-                        else
-                            "swt:btn-ghost"
-                    ]
-                    prop.onClick (fun _ -> setActiveView PreviewActiveView.DataMap)
-                    prop.children [|
-                        Html.span [ prop.className "swt:i-fluent--database-24-regular" ]
-                        Html.span [ prop.text "DataMap" ]
-                    |]
-                ]
-            | ArcFiles.Study(s, _) when s.DataMap.IsSome ->
-                Html.button [
-                    prop.className [
-                        "swt:btn swt:btn-sm"
-                        if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
-                        else
-                            "swt:btn-ghost"
-                    ]
-                    prop.onClick (fun _ -> setActiveView PreviewActiveView.DataMap)
-                    prop.children [|
-                        Html.span [ prop.className "swt:i-fluent--database-24-regular" ]
-                        Html.span [ prop.text "DataMap" ]
-                    |]
-                ]
-            | ArcFiles.Run r when r.DataMap.IsSome ->
-                Html.button [
-                    prop.className [
-                        "swt:btn swt:btn-sm"
-                        if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
-                        else
-                            "swt:btn-ghost"
-                    ]
-                    prop.onClick (fun _ -> setActiveView PreviewActiveView.DataMap)
-                    prop.children [|
-                        Html.span [ prop.className "swt:i-fluent--database-24-regular" ]
-                        Html.span [ prop.text "DataMap" ]
-                    |]
-                ]
-            | ArcFiles.DataMap _ ->
-                Html.button [
-                    prop.className [
-                        "swt:btn swt:btn-sm"
-                        if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
-                        else
-                            "swt:btn-ghost"
-                    ]
-                    prop.onClick (fun _ -> setActiveView PreviewActiveView.DataMap)
-                    prop.children [|
-                        Html.span [ prop.className "swt:i-fluent--database-24-regular" ]
-                        Html.span [ prop.text "DataMap" ]
-                    |]
-                ]
-            | _ -> ()
-        |]
-    ]
-
-/// Render metadata view based on ArcFile type using editable form components
-[<ReactComponent>]
-let createMetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
-    Html.div [
-        prop.className "swt:p-4 swt:h-full"
-        prop.children [
-            match arcFile with
-            | ArcFiles.Investigation inv ->
-                InvestigationMetadata(inv, fun updated -> setArcFile (ArcFiles.Investigation updated))
-            | ArcFiles.Study(study, assays) ->
-                StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
-            | ArcFiles.Assay assay -> AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
-            | ArcFiles.Run run -> RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
-            | ArcFiles.Workflow workflow ->
-                WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
-            | ArcFiles.DataMap(_, datamap) -> DataMapMetadata(datamap)
-            | ArcFiles.Template template ->
-                TemplateMetadata(template, fun updated -> setArcFile (ArcFiles.Template updated))
-        ]
-    ]
-
-let createTableView activeView arcFileState setArcFileState =
-    match activeView with
-    | PreviewActiveView.Metadata -> createMetadataPreview(arcFileState, setArcFileState)
-    | PreviewActiveView.Table index ->
-        let tables = arcFileState.Tables()
-
-        if index < tables.Count then
-            TablePreview(tables.[index])
-        else
-            Html.div [
-                prop.className "swt:p-4 swt:text-error"
-                prop.text "Table not found"
-            ]
-    | PreviewActiveView.DataMap ->
-        match arcFileState with
-        | ArcFiles.Assay a when a.DataMap.IsSome ->
-            let dm, setDm = React.useState a.DataMap.Value
-            DataMapTable.DataMapTable(dm, setDm)
-        | ArcFiles.Study(s, _) when s.DataMap.IsSome ->
-            let dm, setDm = React.useState s.DataMap.Value
-            DataMapTable.DataMapTable(dm, setDm)
-        | ArcFiles.Run r when r.DataMap.IsSome ->
-            let dm, setDm = React.useState r.DataMap.Value
-            DataMapTable.DataMapTable(dm, setDm)
-        | ArcFiles.DataMap(_, datamap) ->
-            let dm, setDm = React.useState datamap
-            DataMapTable.DataMapTable(dm, setDm)
-        | _ ->
-            Html.div [
-                prop.className "swt:p-4 swt:text-error"
-                prop.text "No DataMap available"
-            ]
-
-[<ReactComponent>]
-let createARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
+let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
 
     let setArcFile arcFile =
         setArcFileState (Some arcFile)
@@ -305,14 +48,14 @@ let createARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
             Html.div [
                 prop.className "swt:flex-1 swt:overflow-auto"
                 prop.children [
-                    createTableView activeView arcFile setArcFile
+                    CreateTableView activeView arcFile setArcFile
                 ]
             ]
-            createARCitectFooter arcFile activeView setActiveView
+            CreateARCitectFooter arcFile activeView setActiveView
         |]
     ]
 
-let parseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
+let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
     try
         match fileType with
         | ArcFileType.Investigation ->
@@ -340,9 +83,10 @@ let parseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
 [<ReactComponent>]
 let Main () =
 
-    let didSelectFile, setDidSelectFile = React.useState false
+    let widgets, setWidgets = React.useState ([])
     let recentARCs, setRecentARCs = React.useState ([||])
     let fileExplorer, setFileExplorer = React.useState (None)
+    let didSelectFile, setDidSelectFile = React.useState false
     let appState, setAppState = React.useState (AppState.Init)
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
@@ -359,6 +103,39 @@ let Main () =
         )
         |> Promise.start
     )
+
+    let addWidget (widget: MainComponents.Widget) =
+        let add (widget) widgets =
+            widget :: widgets |> List.rev |> setWidgets
+
+        if widgets |> List.contains widget then
+            List.filter (fun w -> w <> widget) widgets
+            |> fun filteredWidgets -> add widget filteredWidgets
+        else
+            add widget widgets
+
+    let rmvWidget (widget: MainComponents.Widget) =
+        widgets |> List.except [ widget ] |> setWidgets
+
+    let bringWidgetToFront (widget: MainComponents.Widget) =
+        let newList =
+            widgets |> List.except [ widget ] |> (fun x -> widget :: x |> List.rev)
+
+        setWidgets newList
+
+    let WidgetOrderContainer bringWidgetToFront (widget) =
+        Html.div [ prop.onClick bringWidgetToFront; prop.children [ widget ] ]
+
+    let displayWidget (widget: MainComponents.Widget) =
+        let rmv (widget: MainComponents.Widget) = fun _ -> rmvWidget widget
+        let bringWidgetToFront = fun _ -> bringWidgetToFront widget
+
+        match widget with
+        | MainComponents.Widget._BuildingBlock -> MainComponents.Widget.BuildingBlock(model, dispatch, rmv widget)
+        | MainComponents.Widget._Template -> MainComponents.Widget.Templates(model, dispatch, rmv widget)
+        | MainComponents.Widget._FilePicker -> MainComponents.Widget.FilePicker(model, dispatch, rmv widget)
+        | MainComponents.Widget._DataAnnotator -> MainComponents.Widget.DataAnnotator(model, dispatch, rmv widget)
+        |> WidgetOrderContainer bringWidgetToFront
 
     let createFileTree (parent: FileItemDTO option) =
         let rec loop (parent: FileItemDTO option) =
@@ -589,8 +366,8 @@ let Main () =
         | Some data ->
             match data with
             | ArcFileData(fileType, json) ->
-                match parseArcFileFromJson fileType json with
-                | Some arcFile -> createARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
+                match ParseArcFileFromJson fileType json with
+                | Some arcFile -> CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
                 | None ->
                     Html.div [
                         prop.className "swt:p-4 swt:text-error"
@@ -647,7 +424,7 @@ let Main () =
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex-none" 
-                                        prop.children [ createARCitectNavbar activeView ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget ]
                                     ]
                                     Html.div [
                                         prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
@@ -667,7 +444,7 @@ let Main () =
                                     // Navbar
                                     Html.div [
                                         prop.className "swt:flex-none"
-                                        prop.children [ createARCitectNavbar activeView ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget ]
                                     ]
                                     // Main content
                                     Html.div [
