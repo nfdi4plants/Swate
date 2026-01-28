@@ -101,19 +101,19 @@ let createARCitectWidgetNavbarList (activeView: PreviewActiveView) (*addWidget: 
     ]
 
 [<ReactComponent>]
-let createARCitectNavbar () (*(activeView: PreviewActiveView)*) =
+let createARCitectNavbar (activeView: PreviewActiveView) =
     let state, setState = React.useState (SidebarComponents.Navbar.NavbarState.init)
 
-    let inline toggleMetdadataModal _ =
-        {
-            state with
-                ExcelMetadataModalActive = not state.ExcelMetadataModalActive
-        }
-        |> setState
+    //let inline toggleMetdadataModal _ =
+    //    {
+    //        state with
+    //            ExcelMetadataModalActive = not state.ExcelMetadataModalActive
+    //    }
+    //    |> setState
 
     Components.BaseNavbar.Glow [
         Components.Logo.Main()
-        //createARCitectWidgetNavbarList(activeView)
+        createARCitectWidgetNavbarList(activeView)
     ]
 
 [<ReactComponent>]
@@ -647,7 +647,7 @@ let Main () =
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex-none" 
-                                        prop.children [ createARCitectNavbar () ]
+                                        prop.children [ createARCitectNavbar activeView ]
                                     ]
                                     Html.div [
                                         prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
@@ -667,7 +667,7 @@ let Main () =
                                     // Navbar
                                     Html.div [
                                         prop.className "swt:flex-none"
-                                        prop.children [ createARCitectNavbar () ]
+                                        prop.children [ createARCitectNavbar activeView ]
                                     ]
                                     // Main content
                                     Html.div [
