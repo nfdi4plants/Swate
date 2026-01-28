@@ -227,7 +227,7 @@ let createARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
 
 /// Render metadata view based on ArcFile type using editable form components
 [<ReactComponent>]
-let MetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
+let createMetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
     Html.div [
         prop.className "swt:p-4 swt:h-full"
         prop.children [
@@ -248,7 +248,7 @@ let MetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
 
 let createTableView activeView arcFileState setArcFileState =
     match activeView with
-    | PreviewActiveView.Metadata -> MetadataPreview(arcFileState, setArcFileState)
+    | PreviewActiveView.Metadata -> createMetadataPreview(arcFileState, setArcFileState)
     | PreviewActiveView.Table index ->
         let tables = arcFileState.Tables()
 
@@ -280,19 +280,21 @@ let createTableView activeView arcFileState setArcFileState =
             ]
 
 [<ReactComponent>]
-let createARCPreview (arcFile: ArcFiles) =
-    let arcFileState, setArcFileState = React.useState arcFile
-    let activeView, setActiveView = React.useState PreviewActiveView.Metadata
+let createARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
+
+    let setArcFile arcFile =
+        setArcFileState (Some arcFile)
 
     React.useEffect (
         (fun () ->
-            setArcFileState arcFile
-            let tables = arcFile.Tables()
-
-            if tables.Count > 0 then
-                setActiveView (PreviewActiveView.Table 0)
-            else
-                setActiveView PreviewActiveView.Metadata
+            if didSelectFile then
+                setArcFile arcFile
+                let tables = arcFile.Tables()
+                setDidSelectFile false
+                if tables.Count > 0 then
+                    setActiveView (PreviewActiveView.Table 0)
+                else
+                    setActiveView PreviewActiveView.Metadata
         ),
         [| box arcFile |]
     )
@@ -303,10 +305,10 @@ let createARCPreview (arcFile: ArcFiles) =
             Html.div [
                 prop.className "swt:flex-1 swt:overflow-auto"
                 prop.children [
-                    createTableView activeView arcFileState setArcFileState
+                    createTableView activeView arcFile setArcFile
                 ]
             ]
-            createARCitectFooter arcFileState activeView setActiveView
+            createARCitectFooter arcFile activeView setActiveView
         |]
     ]
 
@@ -338,13 +340,15 @@ let parseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
 [<ReactComponent>]
 let Main () =
 
+    let didSelectFile, setDidSelectFile = React.useState false
     let recentARCs, setRecentARCs = React.useState ([||])
-    let appState, setAppState = React.useState (AppState.Init)
-    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
     let fileExplorer, setFileExplorer = React.useState (None)
-    let (assay: ARCtrl.ArcAssay option), setAssay = React.useState (None)
-    let (previewData: PreviewData option), setPreviewData = React.useState (None)
+    let appState, setAppState = React.useState (AppState.Init)
+    let (arcFileState: ArcFiles option), setArcFileState = React.useState None
+    let activeView, setActiveView = React.useState PreviewActiveView.Metadata
     let (previewError: string option), setPreviewError = React.useState (None)
+    let (previewData: PreviewData option), setPreviewData = React.useState (None)
+    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
@@ -355,11 +359,6 @@ let Main () =
         )
         |> Promise.start
     )
-
-    React.useEffect ((fun _ ->
-        if assay.IsSome then
-            Swate.Components.console.log($"getFileName assay: {assay.Value.Identifier}")
-    ), [| box assay |])
 
     let createFileTree (parent: FileItemDTO option) =
         let rec loop (parent: FileItemDTO option) =
@@ -380,9 +379,7 @@ let Main () =
                     }
                     Some result
                 | false ->
-                    Some(
-                        FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular"
-                    )
+                    Some(FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular")
             else
                 None
 
@@ -399,10 +396,13 @@ let Main () =
                         console.log ("[Renderer] Received data, processing...")
                         setPreviewData (Some data)
                         setPreviewError None
+                        setDidSelectFile true
+
                     | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
                         setPreviewData (None)
                         setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
+                        setDidSelectFile true
                 else
                     setPreviewError (Some $"File '{item.Name}' has no path.")
             }
@@ -477,7 +477,7 @@ let Main () =
                     None
 
             createFileTree fileTree |> setFileExplorer |> ignore
-        ),
+        ), 
         [| box fileTree |]
     )
 
@@ -589,9 +589,8 @@ let Main () =
         | Some data ->
             match data with
             | ArcFileData(fileType, json) ->
-                // Parse JSON and render using ArcFilePreview
                 match parseArcFileFromJson fileType json with
-                | Some arcFile -> createARCPreview(arcFile)
+                | Some arcFile -> createARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
                 | None ->
                     Html.div [
                         prop.className "swt:p-4 swt:text-error"
@@ -682,7 +681,7 @@ let Main () =
                         ]
                     ]
             ),
-            [| appState; box previewData |]
+            [| appState; box previewData; box activeView; box arcFileState |]
         )
 
     let navbar = Navbar.Main(selector)
@@ -704,7 +703,12 @@ let Main () =
                  Some(
                      Html.div [
                          prop.className "swt:p-4"
-                         prop.children [| Html.h2 [ prop.text "ARC-Tree" ]; sidebarContent |]
+                         prop.children [|
+                            Html.h2 [
+                                prop.text "ARC-Tree"
+                            ]
+                            sidebarContent
+                        |]
                      ]
                  )),
             leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
