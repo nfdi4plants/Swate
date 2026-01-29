@@ -45,7 +45,6 @@ let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: M
             "Add Building Block",
             Icons.BuildingBlock(),
             (fun _ -> addWidget MainComponents.Widget._BuildingBlock)
-            //fun _ -> ()
         )
 
     let addTemplate =
@@ -53,7 +52,6 @@ let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: M
             "Add Template",
             Icons.Templates(),
             (fun _ -> addWidget MainComponents.Widget._Template)
-            //fun _ -> ()
         )
 
     let filePicker =
@@ -61,7 +59,6 @@ let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: M
             "File Picker",
             Icons.FilePicker(),
             (fun _ -> addWidget MainComponents.Widget._FilePicker)
-            //fun _ -> ()
         )
 
     let dataAnnotator =
@@ -69,7 +66,6 @@ let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: M
             "Data Annotator",
             Icons.DataAnnotator(),
             (fun _ -> addWidget MainComponents.Widget._DataAnnotator),
-            //(fun _ -> ()),
             classes = "swt:w-min"
         )
 
@@ -96,7 +92,6 @@ let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget =
     //    |> setState
 
     Components.BaseNavbar.Glow [
-        Components.Logo.Main()
         CreateARCitectWidgetNavbarList activeView addWidget
     ]
 

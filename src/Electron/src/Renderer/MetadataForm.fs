@@ -1087,11 +1087,6 @@ type FormHelpers =
             ]
         ]
 
-// ==========================================
-// Metadata Form Components
-// ==========================================
-
-/// Assay metadata form
 [<ReactComponent>]
 let AssayMetadata (assay: ArcAssay, setAssay: ArcAssay -> unit) =
     FormHelpers.Section [
@@ -1100,7 +1095,7 @@ let AssayMetadata (assay: ArcAssay, setAssay: ArcAssay -> unit) =
             content = [
                 FormHelpers.TextInput(
                     assay.Identifier,
-                    (fun _ -> ()), // Identifier is read-only
+                    (fun _ -> ()),
                     label = "Identifier",
                     disabled = true
                 )
@@ -1165,7 +1160,6 @@ let AssayMetadata (assay: ArcAssay, setAssay: ArcAssay -> unit) =
         )
     ]
 
-/// Study metadata form
 [<ReactComponent>]
 let StudyMetadata (study: ArcStudy, setStudy: ArcStudy -> unit) =
     FormHelpers.Section [
@@ -1174,7 +1168,7 @@ let StudyMetadata (study: ArcStudy, setStudy: ArcStudy -> unit) =
             content = [
                 FormHelpers.TextInput(
                     study.Identifier,
-                    (fun _ -> ()), // Identifier is read-only
+                    (fun _ -> ()),
                     label = "Identifier",
                     disabled = true
                 )
@@ -1247,7 +1241,6 @@ let StudyMetadata (study: ArcStudy, setStudy: ArcStudy -> unit) =
         )
     ]
 
-/// Investigation metadata form
 [<ReactComponent>]
 let InvestigationMetadata (investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
     FormHelpers.Section [
@@ -1256,7 +1249,7 @@ let InvestigationMetadata (investigation: ArcInvestigation, setInvestigation: Ar
             content = [
                 FormHelpers.TextInput(
                     investigation.Identifier,
-                    (fun _ -> ()), // Identifier is read-only
+                    (fun _ -> ()),
                     label = "Identifier",
                     disabled = true
                 )
@@ -1329,7 +1322,6 @@ let InvestigationMetadata (investigation: ArcInvestigation, setInvestigation: Ar
         )
     ]
 
-/// Run metadata form
 [<ReactComponent>]
 let RunMetadata (run: ArcRun, setRun: ArcRun -> unit) =
     FormHelpers.Section [
@@ -1338,7 +1330,7 @@ let RunMetadata (run: ArcRun, setRun: ArcRun -> unit) =
             content = [
                 FormHelpers.TextInput(
                     run.Identifier,
-                    (fun _ -> ()), // Identifier is read-only
+                    (fun _ -> ()),
                     label = "Identifier",
                     disabled = true
                 )
@@ -1411,7 +1403,6 @@ let RunMetadata (run: ArcRun, setRun: ArcRun -> unit) =
         )
     ]
 
-/// Workflow metadata form
 [<ReactComponent>]
 let WorkflowMetadata (workflow: ArcWorkflow, setWorkflow: ArcWorkflow -> unit) =
     FormHelpers.Section [
@@ -1420,7 +1411,7 @@ let WorkflowMetadata (workflow: ArcWorkflow, setWorkflow: ArcWorkflow -> unit) =
             content = [
                 FormHelpers.TextInput(
                     workflow.Identifier,
-                    (fun _ -> ()), // Identifier is read-only
+                    (fun _ -> ()),
                     label = "Identifier",
                     disabled = true
                 )
@@ -1485,7 +1476,6 @@ let WorkflowMetadata (workflow: ArcWorkflow, setWorkflow: ArcWorkflow -> unit) =
         )
     ]
 
-/// Template metadata form
 [<ReactComponent>]
 let TemplateMetadata (template: Template, setTemplate: Template -> unit) =
     FormHelpers.Section [
@@ -1494,7 +1484,7 @@ let TemplateMetadata (template: Template, setTemplate: Template -> unit) =
             content = [
                 FormHelpers.TextInput(
                     template.Id.ToString(),
-                    (fun _ -> ()), // GUID is read-only
+                    (fun _ -> ()),
                     label = "Identifier",
                     disabled = true
                 )
@@ -1567,7 +1557,6 @@ let TemplateMetadata (template: Template, setTemplate: Template -> unit) =
         )
     ]
 
-/// DataMap metadata form (minimal - just shows info)
 [<ReactComponent>]
 let DataMapMetadata (datamap: DataMap) =
     FormHelpers.Section [

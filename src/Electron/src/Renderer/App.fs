@@ -16,11 +16,6 @@ open ARCtrl.Json
 
 open components.MainElement
 
-module private MainPageUtil =
-    [<Literal>]
-    let DrawerId = "MainPageDrawerId"
-
-open MainPageUtil
 
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
@@ -126,16 +121,16 @@ let Main () =
     let WidgetOrderContainer bringWidgetToFront (widget) =
         Html.div [ prop.onClick bringWidgetToFront; prop.children [ widget ] ]
 
-    let displayWidget (widget: MainComponents.Widget) =
-        let rmv (widget: MainComponents.Widget) = fun _ -> rmvWidget widget
-        let bringWidgetToFront = fun _ -> bringWidgetToFront widget
+    //let displayWidget (widget: MainComponents.Widget) =
+    //    let rmv (widget: MainComponents.Widget) = fun _ -> rmvWidget widget
+    //    let bringWidgetToFront = fun _ -> bringWidgetToFront widget
 
-        match widget with
-        | MainComponents.Widget._BuildingBlock -> MainComponents.Widget.BuildingBlock(model, dispatch, rmv widget)
-        | MainComponents.Widget._Template -> MainComponents.Widget.Templates(model, dispatch, rmv widget)
-        | MainComponents.Widget._FilePicker -> MainComponents.Widget.FilePicker(model, dispatch, rmv widget)
-        | MainComponents.Widget._DataAnnotator -> MainComponents.Widget.DataAnnotator(model, dispatch, rmv widget)
-        |> WidgetOrderContainer bringWidgetToFront
+    //    match widget with
+    //    | MainComponents.Widget._BuildingBlock -> MainComponents.Widget.BuildingBlock(model, dispatch, rmv widget)
+    //    | MainComponents.Widget._Template -> MainComponents.Widget.Templates(model, dispatch, rmv widget)
+    //    | MainComponents.Widget._FilePicker -> MainComponents.Widget.FilePicker(model, dispatch, rmv widget)
+    //    | MainComponents.Widget._DataAnnotator -> MainComponents.Widget.DataAnnotator(model, dispatch, rmv widget)
+    //    |> WidgetOrderContainer bringWidgetToFront
 
     let createFileTree (parent: FileItemDTO option) =
         let rec loop (parent: FileItemDTO option) =
