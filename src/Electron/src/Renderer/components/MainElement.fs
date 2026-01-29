@@ -91,7 +91,7 @@ let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget =
     //    }
     //    |> setState
 
-    Components.BaseNavbar.Glow [
+    Components.BaseNavbar.Main [
         CreateARCitectWidgetNavbarList activeView addWidget
     ]
 

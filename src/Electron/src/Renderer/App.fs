@@ -21,6 +21,7 @@ open components.MainElement
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
 
     let setArcFile arcFile =
+        console.log("setArcFile")
         setArcFileState (Some arcFile)
 
     React.useEffect (
