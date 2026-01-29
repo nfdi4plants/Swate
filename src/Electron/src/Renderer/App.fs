@@ -90,6 +90,24 @@ let Main () =
     let (previewData: PreviewData option), setPreviewData = React.useState (None)
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
+    React.useEffect (
+        (fun () ->
+            match previewData with
+            | Some (ArcFileData(fileType, json)) ->
+                match ParseArcFileFromJson fileType json with
+                | Some arcFile ->
+                    match arcFileState with
+                    | None ->
+                        setArcFileState (Some arcFile)
+                    | Some existing when existing.getIdentifier() <> arcFile.getIdentifier() ->
+                        setArcFileState (Some arcFile)
+                    | _ -> ()
+                | None -> ()
+            | _ -> ()
+        ),
+        [| box previewData |]
+    )
+
     React.useLayoutEffectOnce (fun _ ->
         Api.arcVaultApi.getOpenPath JS.undefined
         |> Promise.map (fun pathOption ->
@@ -357,13 +375,29 @@ let Main () =
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
+    //let changedArcFile arcFileState arcFile =
+    //    match arcFileState with
+    //    | ArcFiles.Assay a when a.DataMap.IsSome ->
+    //        let dm, setDm = React.useState a.DataMap.Value
+    //        DataMapTable.DataMapTable(dm, setDm)
+    //    | ArcFiles.Study(s, _) when s.DataMap.IsSome ->
+    //        let dm, setDm = React.useState s.DataMap.Value
+    //        DataMapTable.DataMapTable(dm, setDm)
+    //    | ArcFiles.Run r when r.DataMap.IsSome ->
+    //        let dm, setDm = React.useState r.DataMap.Value
+    //        DataMapTable.DataMapTable(dm, setDm)
+    //    | ArcFiles.DataMap(_, datamap) ->
+    //        let dm, setDm = React.useState datamap
+    //        DataMapTable.DataMapTable(dm, setDm)
+
     let computeARCContent (path: string) =
         match previewData with
         | Some data ->
             match data with
-            | ArcFileData(fileType, json) ->
-                match ParseArcFileFromJson fileType json with
-                | Some arcFile -> CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
+            | ArcFileData _ ->
+                match arcFileState with
+                | Some arcFile ->
+                    CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
                 | None ->
                     Html.div [
                         prop.className "swt:p-4 swt:text-error"
