@@ -58,10 +58,8 @@ type FileExplorer =
 
         let model, dispatch = React.useReducer (reducer, initialModel)
 
-        React.useEffect(
-            (fun () ->
-                dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems []))
-            ),
+        React.useEffect (
+            (fun () -> dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems []))),
             [| box initialItems |]
         )
 
@@ -110,9 +108,7 @@ type FileExplorer =
                                                 Html.div [
                                                     prop.className "swt:flex swt:items-center swt:gap-2"
                                                     prop.children [
-                                                        Html.i [
-                                                            prop.className [ "swt:iconify " + item.IconPath ]
-                                                        ]
+                                                        Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
                                                         Html.span item.Name
                                                     ]
                                                 ]
@@ -172,9 +168,7 @@ type FileExplorer =
                                 Html.div [
                                     prop.className "swt:flex swt:items-center swt:gap-2"
                                     prop.children [
-                                        Html.i [
-                                            prop.className [ "swt:iconify " + item.IconPath ]
-                                        ]
+                                        Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
                                         Html.span item.Name
                                     ]
                                 ]
@@ -205,13 +199,13 @@ type FileExplorer =
                 ]
 
         Html.div [
-            prop.className "swt:w-full swt:bg-base-100 swt:rounded-box swt:shadow-md"
+            prop.className "swt:w-full"
             prop.children [
                 if not (List.isEmpty model.BreadcrumbPath) then
                     Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
                 Html.ul [
                     prop.testId "file-explorer-container"
-                    prop.className "swt:menu swt:w-full swt:bg-base-200 swt:rounded-box"
+                    prop.className "swt:menu swt:w-full"
                     prop.children (model.Items |> List.map renderItem)
                 ]
             ]
