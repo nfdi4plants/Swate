@@ -33,7 +33,6 @@ type MainPageView =
         Html.div [
             prop.className "swt:bg-base-200 swt:text-base-content swt:min-h-full swt:w-80 swt:p-4"
             prop.children [
-                //Daisy.button.button [
                 Html.button [
                     prop.className "swt:btn swt:btn-link swt:btn-sm"
                     prop.role "navigation"
@@ -110,12 +109,10 @@ type MainPageView =
             ]
 
     static member Main(model: Model.Model, dispatch) =
-        //Daisy.drawer [
         Html.div [
             prop.className "swt:drawer swt:md:drawer-open"
             prop.children [
                 Html.input [ prop.id DrawerId; prop.type'.checkbox; prop.className "swt:drawer-toggle" ]
-                //Daisy.drawerContent [
                 Html.div [
                     prop.className "swt:drawer-content swt:flex swt:flex-col swt:items-center swt:overflow-y-auto"
                     prop.children [
@@ -123,11 +120,9 @@ type MainPageView =
                         MainPageView.MainContent(model, dispatch)
                     ]
                 ]
-                //Daisy.drawerSide [
                 Html.div [
                     prop.className "swt:drawer-side swt:z-10"
                     prop.children [
-                        //Daisy.drawerOverlay [
                         Html.label [
                             prop.className "swt:drawer-overlay"
                             prop.htmlFor DrawerId

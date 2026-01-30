@@ -212,7 +212,6 @@ type SearchComponent =
             Html.form [
                 prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-2"
                 prop.onSubmit (fun ev -> ev.preventDefault ()
-                // callback ()
                 )
                 prop.children [
                     SearchComponent.SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)

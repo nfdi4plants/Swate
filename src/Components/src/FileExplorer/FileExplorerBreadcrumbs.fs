@@ -8,9 +8,7 @@ open Feliz
 
 open Swate.Components.FileExplorerTypes
 
-// ============================================================================
-// BREADCRUMBS COMPONENT
-// ============================================================================
+
 [<Mangle(false); Erase>]
 type Breadcrumbs =
 
@@ -115,6 +113,7 @@ type Breadcrumbs =
                     ItemType = "ellipsis"
                     Label = Some "..."
                     Selectable = false
+                    Path = None
                 }
 
                 [ List.head path ]

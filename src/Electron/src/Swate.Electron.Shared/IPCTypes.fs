@@ -5,6 +5,21 @@ open Fable.Core // Promise type
 open Fable.Electron
 
 open Swate.Components
+open ARCtrl
+
+[<RequireQualifiedAccess>]
+type ArcFileType =
+    | Investigation
+    | Study
+    | Assay
+    | Run
+    | Workflow
+    | DataMap
+
+type PreviewData =
+    | ArcFileData of fileType: ArcFileType * json: string
+    | Text of string
+    | Unknown
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
@@ -19,12 +34,15 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
     checkForARC: string -> JS.Promise<bool>
-    //openAssay: string -> JS.Promise<Result<ARCtrl.ArcAssay, exn>>
-    openAssay: string -> JS.Promise<Result<string, exn>>
+    openFile: string -> JS.Promise<Result<PreviewData, exn>>
 }
 
 type FileEntry =
-    {name: string; path: string; isDirectory: bool}
+    {
+        name: string
+        path: string
+        isDirectory: bool
+    }
 
 [<AutoOpen>]
 module FileEntryExtensions =
@@ -45,17 +63,23 @@ module FileEntryExtensions =
             }
 
 type FileItemDTO =
-    { name: string; isDirectory: bool; children: Dictionary<string, FileItemDTO> }
+    {
+        name: string
+        isDirectory: bool
+        path: string
+        children: Dictionary<string, FileItemDTO>
+    }
 
 [<AutoOpen>]
 module FileItemDTOExtensions =
 
     type FileItemDTO with
 
-        static member create (name: string, isDirectory: bool, children: Dictionary<string, FileItemDTO>) =
+        static member create (name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>) =
             {
                 name = name
                 isDirectory = isDirectory
+                path = path
                 children = children
             }
 
