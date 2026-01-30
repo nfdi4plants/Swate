@@ -289,16 +289,30 @@ module FileExplorerLogic =
         | RenameItem of string * string
         | ToggleLFSDownload of string
 
-    let init items = {
-        Items = items
-        SelectedId = None
-        BreadcrumbPath = []
-        ExpandedIds = Set.empty
-        ContextMenuVisible = false
-        ContextMenuX = 0.0
-        ContextMenuY = 0.0
-        ContextMenuItems = []
-    }
+    let init items =
+        // Collect IDs of items that have IsExpanded = true
+        let rec collectExpandedIds acc items =
+            items
+            |> List.fold
+                (fun accIds item ->
+                    let newAcc = if item.IsExpanded then Set.add item.Id accIds else accIds
+
+                    match item.Children with
+                    | Some children -> collectExpandedIds newAcc children
+                    | None -> newAcc
+                )
+                acc
+
+        {
+            Items = items
+            SelectedId = None
+            BreadcrumbPath = []
+            ExpandedIds = collectExpandedIds Set.empty items
+            ContextMenuVisible = false
+            ContextMenuX = 0.0
+            ContextMenuY = 0.0
+            ContextMenuItems = []
+        }
 
     let rec update msg model =
         match msg with
