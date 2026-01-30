@@ -10,4 +10,12 @@
     <ProjectReference Include="Preload\Preload.fsproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="ARCtrl" />
+    <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Javascript" />
+    <PackageReference Include="ARCtrl.Json" />
+    <PackageReference Include="ARCtrl.Spreadsheet" />
+  </ItemGroup>
+
 </Project>
