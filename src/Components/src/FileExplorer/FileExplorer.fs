@@ -58,6 +58,11 @@ type FileExplorer =
 
         let model, dispatch = React.useReducer (reducer, initialModel)
 
+        React.useEffect (
+            (fun () -> dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems []))),
+            [| box initialItems |]
+        )
+
         let handleItemClick item =
             dispatch (FileExplorerLogic.SelectItem item.Id)
             onItemClick |> Option.iter (fun fn -> fn item)
@@ -103,7 +108,7 @@ type FileExplorer =
                                                 Html.div [
                                                     prop.className "swt:flex swt:items-center swt:gap-2"
                                                     prop.children [
-                                                        FileExplorer.icon item.IconPath
+                                                        Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
                                                         Html.span item.Name
                                                     ]
                                                 ]
@@ -162,7 +167,10 @@ type FileExplorer =
                             prop.children [
                                 Html.div [
                                     prop.className "swt:flex swt:items-center swt:gap-2"
-                                    prop.children [ FileExplorer.icon item.IconPath; Html.span item.Name ]
+                                    prop.children [
+                                        Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
+                                        Html.span item.Name
+                                    ]
                                 ]
 
                                 // LFS badge for files
@@ -191,13 +199,13 @@ type FileExplorer =
                 ]
 
         Html.div [
-            prop.className "swt:w-full swt:bg-base-100 swt:rounded-box swt:shadow-md"
+            prop.className "swt:w-full"
             prop.children [
                 if not (List.isEmpty model.BreadcrumbPath) then
                     Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
                 Html.ul [
                     prop.testId "file-explorer-container"
-                    prop.className "swt:menu swt:w-full swt:bg-base-200 swt:rounded-box"
+                    prop.className "swt:menu swt:w-full"
                     prop.children (model.Items |> List.map renderItem)
                 ]
             ]
@@ -211,34 +219,34 @@ module FileExplorerExample =
         let icons = FileExplorer.defaultIconPaths
 
         let initialItems: FileItem list = [
-            FileTree.createFile "resume.pdf" icons.pdf
+            FileTree.createFile "resume.pdf" None icons.pdf
             {
-                FileTree.createFolder "My Files" icons.folder with
+                FileTree.createFolder "My Files" None icons.folder with
                     IsExpanded = true
                     Children =
                         Some [
-                            FileTree.createFile "Project-final.psd" icons.psd
+                            FileTree.createFile "Project-final.psd" None icons.psd
                             {
-                                FileTree.createFolder "Subfolder" icons.folder with
+                                FileTree.createFolder "Subfolder" None icons.folder with
                                     IsExpanded = true
                                     Children =
                                         Some [
-                                            FileTree.createFile "nested-file-1.txt" icons.txt
-                                            FileTree.createFile "nested-file-2.md" icons.markdown
+                                            FileTree.createFile "nested-file-1.txt" None icons.txt
+                                            FileTree.createFile "nested-file-2.md" None icons.markdown
                                             {
-                                                FileTree.createFolder "NestedFolder" icons.folder with
+                                                FileTree.createFolder "NestedFolder" None icons.folder with
                                                     IsExpanded = true
                                                     Children =
                                                         Some [
-                                                            FileTree.createFile "Project-2-final.psd" icons.psd
-                                                            FileTree.createFile "Project-3-final.psd" icons.psd
+                                                            FileTree.createFile "Project-2-final.psd" None icons.psd
+                                                            FileTree.createFile "Project-3-final.psd" None icons.psd
                                                         ]
                                             }
                                         ]
                             }
                         ]
             }
-            FileTree.createFile "notes.txt" icons.txt
+            FileTree.createFile "notes.txt" None icons.txt
         ]
 
         let handleItemClick (item: FileItem) =

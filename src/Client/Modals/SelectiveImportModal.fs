@@ -134,7 +134,10 @@ type SelectiveImportModal =
                                     prop.className "swt:checkbox"
                                     prop.onChange (fun (b: bool) -> setActive b)
                                 ]
-                                Html.span [ prop.className "swt:text-sm"; prop.text "Import" ]
+                                Html.span [
+                                    prop.className "swt:text-sm"
+                                    prop.text "Import"
+                                ]
                             ]
                         ]
                     ]

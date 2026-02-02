@@ -2,10 +2,6 @@ namespace Swate.Components.FileExplorerTypes
 
 open System
 
-// ============================================================================
-// DATA STRUCTURES
-// ============================================================================
-
 type FileItem = {
     Id: string
     Name: string
@@ -23,6 +19,7 @@ type FileItem = {
     ItemType: string
     Label: string option
     Selectable: bool
+    Path: string option
 }
 
 // Helper type for file tree creation using a predefined config
@@ -47,7 +44,7 @@ module FileTree =
         let divisor = Math.Pow(1024.0, float log)
         sprintf "%.0f %s" (float size / divisor) suffixes.[log]
 
-    let createFile (name: string) (iconPath: string) : FileItem = {
+    let createFile (name: string) path (iconPath: string) : FileItem = {
         Id = generateId ()
         Name = name
         IconPath = iconPath
@@ -64,9 +61,10 @@ module FileTree =
         ItemType = "node"
         Label = Some name
         Selectable = false
+        Path = path
     }
 
-    let createFolder (name: string) (iconPath: string) : FileItem = {
+    let createFolder (name: string) path (iconPath: string) : FileItem = {
         Id = generateId ()
         Name = name
         IconPath = iconPath
@@ -83,9 +81,10 @@ module FileTree =
         ItemType = "node"
         Label = Some name
         Selectable = false
+        Path = path
     }
 
-    let createFromConfig (config: FileItemConfig) (id: string) : FileItem = {
+    let createFromConfig (config: FileItemConfig) path (id: string) : FileItem = {
         Id = id
         Name = config.Name
         IconPath = config.IconPath
@@ -102,6 +101,7 @@ module FileTree =
         ItemType = config.ItemType
         Label = Some config.Name
         Selectable = false
+        Path = path
     }
 
     let rec addChild parentId child items =
@@ -242,16 +242,8 @@ module FileTree =
         ItemType = "empty"
         Label = Some "empty"
         Selectable = false
+        Path = None
     }
-
-
-
-
-// ============================================================================
-// FILE EXPLORER COMPONENT CONTEXT MENU
-// This menu contains the model and the actions (update actions) that the useReducer
-// hook will use to update the state
-// ============================================================================
 
 type ContextMenuItem = {
     Label: string
@@ -284,16 +276,30 @@ module FileExplorerLogic =
         | RenameItem of string * string
         | ToggleLFSDownload of string
 
-    let init items = {
-        Items = items
-        SelectedId = None
-        BreadcrumbPath = []
-        ExpandedIds = Set.empty
-        ContextMenuVisible = false
-        ContextMenuX = 0.0
-        ContextMenuY = 0.0
-        ContextMenuItems = []
-    }
+    let init items =
+        // Collect IDs of items that have IsExpanded = true
+        let rec collectExpandedIds acc items =
+            items
+            |> List.fold
+                (fun accIds item ->
+                    let newAcc = if item.IsExpanded then Set.add item.Id accIds else accIds
+
+                    match item.Children with
+                    | Some children -> collectExpandedIds newAcc children
+                    | None -> newAcc
+                )
+                acc
+
+        {
+            Items = items
+            SelectedId = None
+            BreadcrumbPath = []
+            ExpandedIds = collectExpandedIds Set.empty items
+            ContextMenuVisible = false
+            ContextMenuX = 0.0
+            ContextMenuY = 0.0
+            ContextMenuItems = []
+        }
 
     let rec update msg model =
         match msg with

@@ -17,7 +17,7 @@ open Swate.Components
 open Components
 open Swate.Components.Shared
 
-module private API =
+module API =
 
     module Null =
         let defaultValue (def: 'A) (x: 'A) = if isNull x then def else x
@@ -169,7 +169,7 @@ module private API =
     let start (call: 't -> Fable.Core.JS.Promise<'a>) (args: 't) (success) (fail) =
         call args |> Promise.either success fail |> Promise.start
 
-module private Helper =
+module Helper =
 
     let addButton (clickEvent: MouseEvent -> unit) =
         Html.button [
@@ -401,7 +401,7 @@ module private Helper =
             ]
         ]
 
-open JsBindings
+open Components.JsBindings
 
 type FormComponents =
 
@@ -1084,9 +1084,9 @@ type FormComponents =
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
 
-        Generic.Collapse [ // title
+        Generic.Collapse [
             Generic.CollapseTitle(nameStr, orcid, countFilledFieldsString input)
-        ] [ // content
+        ] [
             Helper.cardFormGroup [
                 createPersonFieldTextInput (input.FirstName, "First Name", fun input s -> input.FirstName <- s)
                 createPersonFieldTextInput (input.LastName, "Last Name", fun input s -> input.LastName <- s)
@@ -1191,7 +1191,6 @@ type FormComponents =
             ?label = label,
             ?extendedElements = extendedElements
         )
-
 
     [<ReactComponent>]
     static member DateTimeInput(input_: string, setter: string -> unit, ?label: string) =

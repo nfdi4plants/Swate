@@ -164,6 +164,16 @@ module ARCtrlHelper =
             | Workflow _ -> ArcFilesDiscriminate.Workflow
             | DataMap _ -> ArcFilesDiscriminate.DataMap
 
+        member this.getIdentifier(): string =
+            match this with
+            | Template t -> t.Id.ToString()
+            | Investigation i -> i.Identifier
+            | Study (s, _) -> s.Identifier
+            | Assay a -> a.Identifier
+            | Run r -> r.Identifier
+            | Workflow w -> w.Identifier
+            | DataMap (d, _) -> if d.IsSome then d.Value.ParentId else ""
+
     [<RequireQualifiedAccess>]
     type JsonExportFormat =
         | ARCtrl

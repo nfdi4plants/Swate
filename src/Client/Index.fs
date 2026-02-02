@@ -70,7 +70,6 @@ let View (model: Model) (dispatch: Msg -> unit) =
                         | _, _ ->
                             let isActive = model.PageState.ShowSideBar
 
-                            //Daisy.drawer [
                             Html.div [
                                 prop.className [
                                     "swt:drawer swt:drawer-end"
@@ -84,12 +83,10 @@ let View (model: Model) (dispatch: Msg -> unit) =
                                         prop.type'.checkbox
                                         prop.isChecked isActive
                                     ]
-                                    //Daisy.drawerContent [ SpreadsheetView.Main(model, dispatch) ]
                                     Html.div [
                                         prop.className "swt:drawer-content"
                                         prop.children [ SpreadsheetView.Main(model, dispatch) ]
                                     ]
-                                    //Daisy.drawerSide [ SidebarView.SidebarView.Main(model, dispatch) ]
                                     Html.div [
                                         prop.className "swt:drawer-side"
                                         prop.children [ SidebarView.SidebarView.Main(model, dispatch) ]

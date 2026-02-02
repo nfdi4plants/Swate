@@ -1,10 +1,10 @@
 [<AutoOpen>]
 module Main.ArcVault
 
+open System.Collections.Generic
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
-open System.Collections.Generic
 open Main.Bindings
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
@@ -80,6 +80,7 @@ type ArcVault(window: BrowserWindow) =
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, set
+    member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     /// Indicates whether the vault is currently busy writing changes to disk.
@@ -114,12 +115,60 @@ module ArcVaultExtensions =
                                     swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
                                     do! this.LoadArc()
                                     sendMsgApi.IsLoadingChanges false
+                                    let pathUpdater (path: string) =
+                                        $"{this.path.Value}\{path}".Replace(ArcPathHelper.PathSeperatorWindows, ArcPathHelper.PathSeperator)
+                                    match eventName.ToLower() with
+                                    | name when name = Chokidar.Events.Add.ToString() ->
+                                        if this.path.IsSome then
+                                            let newPath = pathUpdater path
+                                            let! addedFile = getFileEntry(newPath)
+                                            let newFileTree = this.fileTree
+                                            newFileTree.Add(addedFile.path, addedFile)
+                                            this.SetFileTree(newFileTree)
+                                    | name when name = Chokidar.Events.AddDir.ToString() ->
+                                        if this.path.IsSome then
+                                            let newPath = pathUpdater path
+                                            let! addedFile = getFileEntry(newPath)
+                                            let newFileTree = this.fileTree
+                                            newFileTree.Add(addedFile.path, addedFile)
+                                            this.SetFileTree(newFileTree)
+                                    | name when name = Chokidar.Events.Unlink.ToString() ->
+                                        let newPath = pathUpdater path
+                                        if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
+                                            let newFileTree = this.fileTree
+                                            newFileTree.Remove(newPath) |> ignore
+                                            this.SetFileTree(newFileTree)
+                                    | name when name = Chokidar.Events.UnlinkDir.ToString() ->
+                                        let newPath = pathUpdater path
+                                        if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
+                                            let newFileTree = this.fileTree
+                                            let affectedPaths =
+                                                this.fileTree.Keys
+                                                |> Array.ofSeq
+                                                |> Array.filter (fun path -> path.Contains(newPath))
+                                            newFileTree.Remove(newPath) |> ignore
+                                            affectedPaths
+                                            |> Array.iter (fun path -> newFileTree.Remove(path) |> ignore)
+                                            this.SetFileTree(newFileTree)
+                                    | _ ->
+                                        if this.path.IsSome then
+                                            let fileTree = getFileEntries this.path.Value |> createFileEntryTree
+                                            this.SetFileTree(fileTree)
                                 }
                                 |> Promise.start
                             )
                             500
-
+                            
                     this.fileWatcherReloadArcTimeout <- Some timeoutId
+
+        member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
+            this.fileTree <-  fileTree
+
+            let sendMsg =
+                Remoting.init
+                |> Remoting.withWindow this.window
+                |> Remoting.buildClient<IMainUpdateRendererApi>
+            sendMsg.fileTreeUpdate fileTree
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
@@ -193,6 +242,34 @@ module ArcVaultExtensions =
                 printfn $"[Swate] Removed vault '{this.window.id}'"
                 arcs
             | None -> [||]
+
+        member this.OpenAssay(identifier: string) =
+            let assay = this.arc.Value.TryGetAssay(identifier)
+
+            match assay with
+            | Some assay -> Some assay
+            | None -> None
+
+        member this.OpenStudy(identifier: string) =
+            let study = this.arc.Value.TryGetStudy(identifier)
+
+            match study with
+            | Some study -> Some study
+            | None -> None
+
+        member this.OpenWorkflow(identifier: string) =
+            let workflow = this.arc.Value.TryGetWorkflow(identifier)
+
+            match workflow with
+            | Some workflow -> Some workflow
+            | None -> None
+
+        member this.OpenRun(identifier: string) =
+            let run = this.arc.Value.TryGetRun(identifier)
+
+            match run with
+            | Some run -> Some run
+            | None -> None
 
 type ArcVaults() =
     /// Key is window.id
@@ -289,6 +366,12 @@ type ArcVaults() =
 
         return ()
     }
+
+    member this.SetFileTree(windowId: int, fileTree: Dictionary<string, FileEntry>) =
+        let potVault = this.TryGetVault(windowId)
+        match potVault with
+        | Some (vault: ArcVault) -> vault.SetFileTree(fileTree)
+        | None -> failwith $"Vault with window-id '{windowId}' not found."
 
     member this.TryGetVault(windowId: int) =
         match this.Vaults.TryGetValue windowId with

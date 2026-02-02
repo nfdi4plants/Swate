@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="FileTreeCreator.fs" />
     <None Include="SimpleGitTest.fsx" />
     <None Include="ChokidarTest.fsx" />
     <Compile Include="ArcHolder.fs" />

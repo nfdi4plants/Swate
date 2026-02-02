@@ -11,7 +11,7 @@ open Swate.Components.Shared
 open Components.Metadata
 open Swate.Components
 
-type private NavbarState = {
+type public NavbarState = {
     BurgerActive: bool
     QuickAccessActive: bool
     ExcelMetadataModalActive: bool
