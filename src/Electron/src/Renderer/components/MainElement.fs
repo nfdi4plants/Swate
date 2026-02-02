@@ -80,8 +80,27 @@ let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: M
         | PreviewActiveView.Metadata -> Html.none
     ]
 
+let CreateARCitectNavbarList (arcFile: ArcFiles option) onClick =
+
+    let openReset, setOpenReset = React.useState false
+
+    React.Fragment [
+        //Modals.ResetTable.Main(isOpen = openReset, setIsOpen = setOpenReset, dispatch = dispatch)
+        QuickAccessButton.QuickAccessButton(
+            "Save",
+            Icons.Save(),
+            onClick,
+            //(fun _ ->
+            //    ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
+            //),
+            isDisabled = arcFile.IsNone
+        )
+
+        //NavbarBurger.Main(model, dispatch, host = Swatehost.ARCitect)
+    ]
+
 [<ReactComponent>]
-let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget =
+let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onClick =
     let state, setState = React.useState (SidebarComponents.Navbar.NavbarState.init)
 
     //let inline toggleMetdadataModal _ =
@@ -93,6 +112,7 @@ let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget =
 
     Components.BaseNavbar.Main [
         CreateARCitectWidgetNavbarList activeView addWidget
+        CreateARCitectNavbarList arcFile onClick
     ]
 
 [<ReactComponent>]

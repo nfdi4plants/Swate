@@ -2,10 +2,6 @@ namespace Swate.Components.FileExplorerTypes
 
 open System
 
-// ============================================================================
-// DATA STRUCTURES
-// ============================================================================
-
 type FileItem = {
     Id: string
     Name: string
@@ -248,15 +244,6 @@ module FileTree =
         Selectable = false
         Path = None
     }
-
-
-
-
-// ============================================================================
-// FILE EXPLORER COMPONENT CONTEXT MENU
-// This menu contains the model and the actions (update actions) that the useReducer
-// hook will use to update the state
-// ============================================================================
 
 type ContextMenuItem = {
     Label: string

@@ -441,6 +441,9 @@ let Main () =
                         "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
                 ]
 
+    let onClick test =
+        ()
+
     let children =
         React.useMemo (
             (fun _ ->
@@ -454,7 +457,7 @@ let Main () =
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex-none" 
-                                        prop.children [ CreateARCitectNavbar activeView addWidget ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
                                     ]
                                     Html.div [
                                         prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
@@ -474,7 +477,7 @@ let Main () =
                                     // Navbar
                                     Html.div [
                                         prop.className "swt:flex-none"
-                                        prop.children [ CreateARCitectNavbar activeView addWidget ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
                                     ]
                                     // Main content
                                     Html.div [
