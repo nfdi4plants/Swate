@@ -213,6 +213,31 @@ module JsonImportHelper =
                     let tempTable = activeTable.Copy()
 
                     for table in selectedColumnTables do
+
+                        if table.RowCount = 0 then
+                            let cells =
+                                table.Columns
+                                |> Array.ofSeq
+                                |> Array.map (fun column ->
+                                    match column.Header with
+                                    | CompositeHeader.Factor _
+                                    | CompositeHeader.Component _
+                                    | CompositeHeader.Parameter _
+                                    | CompositeHeader.Characteristic _ ->
+                                        match importConfig.ImportType with
+                                        | TableJoinOptions.WithUnit ->
+                                            CompositeCell.Unitized("", (OntologyAnnotation.empty()))
+                                        | _ -> CompositeCell.Term (OntologyAnnotation.empty())
+                                    | _ -> CompositeCell.FreeText ""
+                                )
+                                |> ResizeArray
+
+                            let rows = Array.create tempTable.RowCount cells
+                            table.AddRows(ResizeArray rows)
+
+                        elif table.RowCount < tempTable.RowCount then
+                            table.AddRowsEmpty(tempTable.RowCount - table.RowCount)
+
                         let preparedTemplate = Table.distinctByHeader tempTable table
                         tempTable.Join(preparedTemplate, joinOptions = importConfig.ImportType)
 
@@ -233,7 +258,6 @@ module JsonImportHelper =
                 )
                 |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
                 |> Seq.iter (fun table -> existingTables.Add table)
-
             existing
         | None -> //
             failwith "Error! Can only append information if metadata sheet exists!"
