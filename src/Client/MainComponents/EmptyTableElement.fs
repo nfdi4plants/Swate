@@ -32,7 +32,7 @@ type EmptyTableElement =
                 CompositeColumn.create (header)
 
             let parameterColumn =
-                let header = CompositeHeader.ProtocolREF
+                let header = CompositeHeader.ProtocolUri
                 CompositeColumn.create (header)
 
             let outPutColumn =
