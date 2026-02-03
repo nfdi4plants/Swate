@@ -42,7 +42,7 @@ let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
         prop.className "swt:flex swt:flex-col swt:h-full"
         prop.children [|
             Html.div [
-                prop.className "swt:flex-1 swt:overflow-auto"
+                prop.className "swt:flex-1 swt:overflow-x-hidden swt:overflow-y-auto"
                 prop.children [
                     CreateTableView activeView arcFile setArcFile
                 ]

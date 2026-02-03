@@ -32,7 +32,7 @@ let CreateTablePreview (table: ARCtrl.ArcTable) =
     AnnotationTableContextProvider.AnnotationTableContextProvider(
         Html.div [
             //It works but not as clean as we want it
-            prop.className "swt:w-screen"
+            prop.className "swt:w-screen swt:pb-4"
             prop.children [
                 AnnotationTable.AnnotationTable(tableState, setTableState)
             ]
