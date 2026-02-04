@@ -213,7 +213,7 @@ type Layout =
             setPointerPosition,
             side: Sidebar.Side
         ) =
-        Html.div [ // left dock area
+        Html.div [
             prop.ref ref
             prop.style [
                 if not isOpen then style.width 0 else style.width width
@@ -393,7 +393,7 @@ type Layout =
                         setLeftPointerPositionWrapper,
                         Sidebar.Side.Left
                     )
-                Html.div [ // main content area
+                Html.div [
                     prop.className "swt:grow"
                     prop.children [
                         Html.div [
@@ -470,13 +470,13 @@ type Layout =
                     prop.className "swt:flex-1 swt:flex swt:flex-col swt:h-screen swt:overflow-hidden"
                     prop.children [
                         if navbar.IsSome then
-                            Html.div [ // navbar
+                            Html.div [
                                 prop.className
                                     "swt:h-10 swt:flex swt:flex-row swt:items-center swt:grow-0 swt:border-b swt:border-base-content"
                                 prop.testId "layout-main-navbar"
                                 prop.children navbar.Value
                             ]
-                        Layout.Sidebars( // left sidebar + docking
+                        Layout.Sidebars(
                             children,
                             ?leftContent = leftSidebar,
                             ?leftActions = leftActions,

@@ -277,6 +277,31 @@ module ArcVaultExtensions =
             | Some run -> Some run
             | None -> None
 
+        member this.GetContracts() =
+            match this.arc with
+            | Some arc -> arc.GetUpdateContracts()
+            | None -> failwith "No arc available"
+
+        member this.UpdateAsync() =
+            match this.arc with
+            | Some arc ->
+                console.log($"this.path.Value: {this.path.Value}")
+
+                let contracts = arc.GetUpdateContracts()
+
+                console.log($"contracts: {contracts.Length}")
+
+                contracts
+                |> Array.iter (fun contract ->
+                    console.log($"contract.Path: {contract.Path}"))
+
+                arc.UpdateAsync(this.path.Value)
+                |> Promise.start
+                arc.WriteAsync(this.path.Value)
+                |> Promise.start
+            | None -> failwith "No arc available"
+            
+
 type ArcVaults() =
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
