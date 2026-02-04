@@ -390,6 +390,39 @@ let Main () =
     //        let dm, setDm = React.useState datamap
     //        DataMapTable.DataMapTable(dm, setDm)
 
+    let updateAssay (assay: ArcAssay) =
+
+        let json = assay.ToJsonString()
+
+        Api.arcVaultApi.updateAssay(json)
+
+    let updateStudies (study: ArcStudy) =
+
+        let json = study.ToJsonString()
+
+        Api.arcVaultApi.updateStudy(json)
+
+    let updateWorkflow (workflow: ArcWorkflow) =
+
+        let json = workflow.ToJsonString()
+
+        Api.arcVaultApi.updateWorkflows(json)
+
+    let updateARC (arcFiles: ArcFiles option) (onClick) =
+        let result =
+            match arcFiles with
+            | Some (ArcFiles.Assay assay) ->
+                updateAssay assay
+            | Some (ArcFiles.Study (study, _)) ->
+                updateStudies study
+            | Some (ArcFiles.Workflow workflow) ->
+                updateWorkflow workflow
+            | _ -> failwith "Not implemented yet"
+
+        match result with
+        | Ok _ -> Api.arcVaultApi.updateARC()
+        | Error error -> failwith error.Message
+
     let computeARCContent (path: string) =
         match previewData with
         | Some data ->
@@ -441,9 +474,6 @@ let Main () =
                         "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
                 ]
 
-    let onClick test =
-        ()
-
     let children =
         React.useMemo (
             (fun _ ->
@@ -457,7 +487,7 @@ let Main () =
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex-none" 
-                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (updateARC arcFileState) ]
                                     ]
                                     Html.div [
                                         prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
@@ -474,12 +504,10 @@ let Main () =
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
-                                    // Navbar
                                     Html.div [
                                         prop.className "swt:flex-none"
-                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (updateARC arcFileState) ]
                                     ]
-                                    // Main content
                                     Html.div [
                                         prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                                         prop.children [

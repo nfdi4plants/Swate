@@ -288,4 +288,49 @@ let api: IArcVaultsApi = {
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }
+    updateAssay =
+        fun (json: string) ->
+            let updatedAssay = ArcAssay.fromJsonString json
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> Error(exn $"The ARC for window id {1} should exist")
+            | Some vault ->
+                let oldAssay = vault.OpenAssay(updatedAssay.Identifier)
+                match oldAssay with
+                | Some assay ->
+                    vault.arc.Value.Assays.Remove(assay)
+                    vault.arc.Value.Assays.Add(updatedAssay)
+                    Ok()
+                | None -> Error(exn $"The ARC with the identifier {updatedAssay.Identifier} should exist")
+    updateStudy =
+        fun (json: string) ->
+            let updatedStudy = ArcStudy.fromJsonString json
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> Error(exn $"The ARC for window id {1} should exist")
+            | Some vault ->
+                let oldStudy = vault.OpenStudy(updatedStudy.Identifier)
+                match oldStudy with
+                | Some study ->
+                    vault.arc.Value.Studies.Remove(study)
+                    vault.arc.Value.Studies.Add(updatedStudy)
+                    Ok()
+                | None -> Error(exn $"The ARC with the identifier {updatedStudy.Identifier} should exist")
+    updateWorkflows =
+        fun (json: string) ->
+            let updatedWorkflow = ArcWorkflow.fromJsonString json
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> Error(exn $"The ARC for window id {1} should exist")
+            | Some vault ->
+                let oldWorkflow = vault.OpenWorkflow(updatedWorkflow.Identifier)
+                match oldWorkflow with
+                | Some workFlow ->
+                    vault.arc.Value.Workflows.Remove(workFlow)
+                    vault.arc.Value.Workflows.Add(updatedWorkflow)
+                    Ok()
+                | None -> Error(exn $"The ARC with the identifier {updatedWorkflow.Identifier} should exist")
+
+    updateARC =
+        fun _ ->
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> failwith $"The ARC for window id {1} should exist"
+            | Some vault -> vault.UpdateAsync()
 }

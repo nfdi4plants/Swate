@@ -35,6 +35,15 @@ type IArcVaultsApi = {
     getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
     checkForARC: string -> JS.Promise<bool>
     openFile: string -> JS.Promise<Result<PreviewData, exn>>
+
+    updateAssay: string -> Result<unit, exn>
+    updateStudy: string -> Result<unit, exn>
+    updateWorkflows: string -> Result<unit, exn>
+
+
+
+
+    updateARC: unit -> unit
 }
 
 type FileEntry =
