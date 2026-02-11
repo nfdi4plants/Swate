@@ -170,13 +170,16 @@ let api: IArcVaultsApi = {
             return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
     openFile =
-        fun (path: string) -> promise {
-            //let windowId = windowIdFromIpcEvent event
-            match ARC_VAULTS.TryGetVault(1) with
+        fun (dataHolder: DataHolder) -> promise {
+
+            let windowId = windowIdFromIpcEvent dataHolder.event
+
+            match ARC_VAULTS.TryGetVault(windowId) with
             | None -> return Error(exn $"The ARC for window id {1} should exist")
             | Some vault ->
-                Swate.Components.console.log ($"openFile path: {path}")
-                let normalizedPath = path.Replace("\\", "/")
+                let newPath = dataHolder.path
+                Swate.Components.console.log ($"openFile path: {newPath}")
+                let normalizedPath = newPath.Replace("\\", "/")
                 let pathParts = normalizedPath.Split('/')
                 let fileName = pathParts |> Array.last
 
@@ -216,6 +219,7 @@ let api: IArcVaultsApi = {
                     | Some arc ->
                         // ARC inherits from ArcInvestigation, serialize as investigation
                         let json = ARCtrl.ArcInvestigation.toJsonString 0 arc
+
                         return Ok(ArcFileData(ArcFileType.Investigation, json))
                     | None -> return Error(exn "ARC not loaded")
 
@@ -241,7 +245,18 @@ let api: IArcVaultsApi = {
                             "Found assay: " + a.Identifier + " with " + string a.Tables.Count + " tables"
                         )
 
+                        Swate.Components.console.log ($"dataHolder.newJson: {dataHolder.newJson}")
+                        Swate.Components.console.log ($"dataHolder.oldJson: {dataHolder.oldJson}")
+
                         let json = ARCtrl.ArcAssay.toJsonString 0 a
+
+                        //if dataHolder.newJson = "" then
+                        //    Swate.Components.console.log ("Something initiated!")
+                        //elif dataHolder.newJson = dataHolder.oldJson then
+                        //    Swate.Components.console.log ("Nothing changed!")
+                        //else
+                        //    Swate.Components.console.log ("Something changed!")
+
                         return Ok(ArcFileData(ArcFileType.Assay, json))
                     | None -> return Error(exn ("Assay '" + identifier + "' not found in ARC"))
 
@@ -283,7 +298,7 @@ let api: IArcVaultsApi = {
                     Swate.Components.console.log ("Unknown ISA file type, falling back to text preview")
 
                     try
-                        let content = fs.readFileSync (path, "utf8")
+                        let content = fs.readFileSync (newPath, "utf8")
                         return Ok(Text content)
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")

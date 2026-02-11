@@ -21,6 +21,18 @@ type PreviewData =
     | Text of string
     | Unknown
 
+type DataHolder =
+    {
+        path: string
+        event: IpcMainEvent
+    }
+
+let createDataHolder path event : DataHolder =
+    {
+        path = path
+        event = event
+    }
+
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Will open ARC in same window
@@ -34,7 +46,7 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
     checkForARC: string -> JS.Promise<bool>
-    openFile: string -> JS.Promise<Result<PreviewData, exn>>
+    openFile: DataHolder -> JS.Promise<Result<PreviewData, exn>>
 
     updateAssay: string -> Result<unit, exn>
     updateStudy: string -> Result<unit, exn>

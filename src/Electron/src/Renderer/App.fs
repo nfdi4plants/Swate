@@ -20,9 +20,9 @@ open components.MainElement
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
 
-    let setArcFile arcFile =
-        console.log("setArcFile")
-        setArcFileState (Some arcFile)
+    let setArcFile potArcFile =
+        Swate.Components.console.log("setArcFile")
+        setArcFileState (Some potArcFile)
 
     React.useEffect (
         (fun () ->
@@ -79,15 +79,16 @@ let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
 [<ReactComponent>]
 let Main () =
 
-    let widgets, setWidgets = React.useState ([])
-    let recentARCs, setRecentARCs = React.useState ([||])
-    let fileExplorer, setFileExplorer = React.useState (None)
+    let widgets, setWidgets = React.useState []
+    let recentARCs, setRecentARCs = React.useState [||]
+    let fileExplorer, setFileExplorer = React.useState None
     let didSelectFile, setDidSelectFile = React.useState false
-    let appState, setAppState = React.useState (AppState.Init)
+    let appState, setAppState = React.useState AppState.Init
+    let oldJson, setOldJson = React.useState None
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
-    let (previewError: string option), setPreviewError = React.useState (None)
-    let (previewData: PreviewData option), setPreviewData = React.useState (None)
+    let (previewError: string option), setPreviewError = React.useState None
+    let (previewData: PreviewData option), setPreviewData = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     React.useEffect (
@@ -170,7 +171,12 @@ let Main () =
                     }
                     Some result
                 | false ->
-                    Some(FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular")
+                    let path =
+                        if (parent.Value.path.Length > 0) && (parent.Value.path <> "") then
+                            Some parent.Value.path
+                        else
+                            None
+                    Some(FileTree.createFile parent.Value.name path "swt:fluent--document-24-regular")
             else
                 None
 
@@ -180,19 +186,40 @@ let Main () =
             promise {
                if item.Path.IsSome && not item.IsDirectory then
                     console.log ($"[Renderer] Opening file: {item.Path.Value}")
-                    let! result = Api.arcVaultApi.openFile item.Path.Value
+
+                    console.log ($"previewData: {previewData.IsSome}")
+
+                    console.log($"activeView: {activeView}")
+
+                    let currentJson =
+                        match previewData with
+                        | Some (ArcFileData (ft, js)) -> js
+                        | _ -> ""
+
+                    let! result =
+                        Api.arcVaultApi.openFile (createDataHolder item.Path.Value JS.undefined)
 
                     match result with
                     | Ok data ->
                         console.log ("[Renderer] Received data, processing...")
                         setPreviewData (Some data)
                         setPreviewError None
+
+                        let newJson =
+                            match data with
+                            | ArcFileData (ft, js) -> js
+                            | _ -> ""
+
+                        console.log ($"newJson: {newJson}")
+
+                        setOldJson (Some newJson)
                         setDidSelectFile true
 
                     | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
                         setPreviewData (None)
                         setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
+                        //setOldJson None
                         setDidSelectFile true
                 else
                     setPreviewError (Some $"File '{item.Name}' has no path.")
@@ -408,20 +435,21 @@ let Main () =
 
         Api.arcVaultApi.updateWorkflows(json)
 
-    let updateARC (arcFiles: ArcFiles option) (onClick) =
-        let result =
-            match arcFiles with
-            | Some (ArcFiles.Assay assay) ->
-                updateAssay assay
-            | Some (ArcFiles.Study (study, _)) ->
-                updateStudies study
-            | Some (ArcFiles.Workflow workflow) ->
-                updateWorkflow workflow
-            | _ -> failwith "Not implemented yet"
+    let updateARC (arcFiles: ArcFiles option) =
+        fun _ ->
+            let result =
+                match arcFiles with
+                | Some (ArcFiles.Assay assay) ->
+                    updateAssay assay
+                | Some (ArcFiles.Study (study, _)) ->
+                    updateStudies study
+                | Some (ArcFiles.Workflow workflow) ->
+                    updateWorkflow workflow
+                | _ -> failwith "Not implemented yet"
 
-        match result with
-        | Ok _ -> Api.arcVaultApi.updateARC()
-        | Error error -> failwith error.Message
+            match result with
+            | Ok _ -> Api.arcVaultApi.updateARC()
+            | Error error -> failwith error.Message
 
     let computeARCContent (path: string) =
         match previewData with
@@ -430,6 +458,7 @@ let Main () =
             | ArcFileData _ ->
                 match arcFileState with
                 | Some arcFile ->
+                    console.log ($"path: {path}")
                     CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
                 | None ->
                     Html.div [
@@ -519,7 +548,7 @@ let Main () =
                         ]
                     ]
             ),
-            [| appState; box previewData; box activeView; box arcFileState |]
+            [| appState; previewData; activeView; arcFileState |]
         )
 
     let navbar = Navbar.Main(selector)
