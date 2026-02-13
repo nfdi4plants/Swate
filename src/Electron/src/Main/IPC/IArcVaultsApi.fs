@@ -170,13 +170,16 @@ let api: IArcVaultsApi = {
             return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
     openFile =
-        fun (path: string) -> promise {
-            //let windowId = windowIdFromIpcEvent event
+        fun (dataHolder: DataHolder) -> promise {
+
+            //let windowId = windowIdFromIpcEvent dataHolder.event
+
             match ARC_VAULTS.TryGetVault(1) with
             | None -> return Error(exn $"The ARC for window id {1} should exist")
             | Some vault ->
-                Swate.Components.console.log ($"openFile path: {path}")
-                let normalizedPath = path.Replace("\\", "/")
+                let newPath = dataHolder.path
+                Swate.Components.console.log ($"openFile path: {newPath}")
+                let normalizedPath = newPath.Replace("\\", "/")
                 let pathParts = normalizedPath.Split('/')
                 let fileName = pathParts |> Array.last
 
@@ -216,6 +219,7 @@ let api: IArcVaultsApi = {
                     | Some arc ->
                         // ARC inherits from ArcInvestigation, serialize as investigation
                         let json = ARCtrl.ArcInvestigation.toJsonString 0 arc
+
                         return Ok(ArcFileData(ArcFileType.Investigation, json))
                     | None -> return Error(exn "ARC not loaded")
 
@@ -242,6 +246,7 @@ let api: IArcVaultsApi = {
                         )
 
                         let json = ARCtrl.ArcAssay.toJsonString 0 a
+
                         return Ok(ArcFileData(ArcFileType.Assay, json))
                     | None -> return Error(exn ("Assay '" + identifier + "' not found in ARC"))
 
@@ -283,9 +288,54 @@ let api: IArcVaultsApi = {
                     Swate.Components.console.log ("Unknown ISA file type, falling back to text preview")
 
                     try
-                        let content = fs.readFileSync (path, "utf8")
+                        let content = fs.readFileSync (newPath, "utf8")
                         return Ok(Text content)
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }
+    updateAssay =
+        fun (json: string) ->
+            let updatedAssay = ArcAssay.fromJsonString json
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> Error(exn $"The ARC for window id {1} should exist")
+            | Some vault ->
+                let oldAssay = vault.OpenAssay(updatedAssay.Identifier)
+                match oldAssay with
+                | Some assay ->
+                    vault.arc.Value.Assays.Remove(assay)
+                    vault.arc.Value.Assays.Add(updatedAssay)
+                    Ok()
+                | None -> Error(exn $"The ARC with the identifier {updatedAssay.Identifier} should exist")
+    updateStudy =
+        fun (json: string) ->
+            let updatedStudy = ArcStudy.fromJsonString json
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> Error(exn $"The ARC for window id {1} should exist")
+            | Some vault ->
+                let oldStudy = vault.OpenStudy(updatedStudy.Identifier)
+                match oldStudy with
+                | Some study ->
+                    vault.arc.Value.Studies.Remove(study)
+                    vault.arc.Value.Studies.Add(updatedStudy)
+                    Ok()
+                | None -> Error(exn $"The ARC with the identifier {updatedStudy.Identifier} should exist")
+    updateWorkflows =
+        fun (json: string) ->
+            let updatedWorkflow = ArcWorkflow.fromJsonString json
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> Error(exn $"The ARC for window id {1} should exist")
+            | Some vault ->
+                let oldWorkflow = vault.OpenWorkflow(updatedWorkflow.Identifier)
+                match oldWorkflow with
+                | Some workFlow ->
+                    vault.arc.Value.Workflows.Remove(workFlow)
+                    vault.arc.Value.Workflows.Add(updatedWorkflow)
+                    Ok()
+                | None -> Error(exn $"The ARC with the identifier {updatedWorkflow.Identifier} should exist")
+
+    updateARC =
+        fun _ ->
+            match ARC_VAULTS.TryGetVault(1) with
+            | None -> failwith $"The ARC for window id {1} should exist"
+            | Some vault -> vault.UpdateAsync()
 }

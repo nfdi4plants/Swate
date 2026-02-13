@@ -20,9 +20,8 @@ open components.MainElement
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
 
-    let setArcFile arcFile =
-        console.log("setArcFile")
-        setArcFileState (Some arcFile)
+    let setArcFile potArcFile =
+        setArcFileState (Some potArcFile)
 
     React.useEffect (
         (fun () ->
@@ -76,18 +75,87 @@ let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
+let updateAssay (assay: ArcAssay) =
+
+    let json = assay.ToJsonString()
+
+    Api.arcVaultApi.updateAssay(json)
+
+let updateStudies (study: ArcStudy) =
+
+    let json = study.ToJsonString()
+
+    Api.arcVaultApi.updateStudy(json)
+
+let updateWorkflow (workflow: ArcWorkflow) =
+
+    let json = workflow.ToJsonString()
+
+    Api.arcVaultApi.updateWorkflows(json)
+
+let updateARCVault (arcFiles: ArcFiles option) =
+
+    match arcFiles with
+    | Some (ArcFiles.Assay assay) ->
+        updateAssay assay
+    | Some (ArcFiles.Study (study, _)) ->
+        updateStudies study
+    | Some (ArcFiles.Workflow workflow) ->
+        updateWorkflow workflow
+    | _ -> failwith "Not implemented yet"
+
+let updateARC (arcFiles: ArcFiles option) =
+    fun _ ->
+        let result =
+            match arcFiles with
+            | Some (ArcFiles.Assay assay) ->
+                updateAssay assay
+            | Some (ArcFiles.Study (study, _)) ->
+                updateStudies study
+            | Some (ArcFiles.Workflow workflow) ->
+                updateWorkflow workflow
+            | _ -> failwith "Not implemented yet"
+
+        match result with
+        | Ok _ -> Api.arcVaultApi.updateARC()
+        | Error error -> failwith error.Message
+
+
+let openPreview setPreviewData setPreviewError setDidSelectFile (item: FileItem) =
+    promise {
+        if item.Path.IsSome && not item.IsDirectory then
+            console.log ($"[Renderer] Opening file: {item.Path.Value}")
+
+            let! result =
+                Api.arcVaultApi.openFile (createDataHolder item.Path.Value)
+
+            match result with
+            | Ok data ->
+                console.log ("[Renderer] Received data, processing...")
+                setPreviewData (Some data)
+                setPreviewError None
+                setDidSelectFile true
+            | Error exn ->
+                console.log ($"[Renderer] Error: {exn.Message}")
+                setPreviewData (None)
+                setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
+                setDidSelectFile true
+        else
+            setPreviewError (Some $"File '{item.Name}' has no path.")
+    }
+    |> Promise.start
+
 [<ReactComponent>]
 let Main () =
 
-    let widgets, setWidgets = React.useState ([])
-    let recentARCs, setRecentARCs = React.useState ([||])
-    let fileExplorer, setFileExplorer = React.useState (None)
+    let widgets, setWidgets = React.useState []
+    let recentARCs, setRecentARCs = React.useState [||]
     let didSelectFile, setDidSelectFile = React.useState false
-    let appState, setAppState = React.useState (AppState.Init)
+    let appState, setAppState = React.useState AppState.Init
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
-    let (previewError: string option), setPreviewError = React.useState (None)
-    let (previewData: PreviewData option), setPreviewData = React.useState (None)
+    let (previewError: string option), setPreviewError = React.useState None
+    let (previewData: PreviewData option), setPreviewData = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     React.useEffect (
@@ -106,6 +174,14 @@ let Main () =
             | _ -> ()
         ),
         [| box previewData |]
+    )
+
+    React.useEffect (
+        (fun () ->
+            if arcFileState.IsSome then
+                updateARCVault arcFileState |>  ignore
+        ),
+        [| box didSelectFile |]
     )
 
     React.useLayoutEffectOnce (fun _ ->
@@ -170,37 +246,20 @@ let Main () =
                     }
                     Some result
                 | false ->
-                    Some(FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular")
+                    let path =
+                        if (parent.Value.path.Length > 0) && (parent.Value.path <> "") then
+                            Some parent.Value.path
+                        else
+                            None
+                    Some(FileTree.createFile parent.Value.name path "swt:fluent--document-24-regular")
             else
                 None
 
         let fileItem = loop parent
 
-        let openPreview (item: FileItem) =
-            promise {
-               if item.Path.IsSome && not item.IsDirectory then
-                    console.log ($"[Renderer] Opening file: {item.Path.Value}")
-                    let! result = Api.arcVaultApi.openFile item.Path.Value
-
-                    match result with
-                    | Ok data ->
-                        console.log ("[Renderer] Received data, processing...")
-                        setPreviewData (Some data)
-                        setPreviewError None
-                        setDidSelectFile true
-
-                    | Error exn ->
-                        console.log ($"[Renderer] Error: {exn.Message}")
-                        setPreviewData (None)
-                        setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
-                        setDidSelectFile true
-                else
-                    setPreviewError (Some $"File '{item.Name}' has no path.")
-            }
-            |> Promise.start
-
         if fileItem.IsSome then
-            Some(FileExplorer.FileExplorer([fileItem.Value], openPreview))
+            let onClick = openPreview setPreviewData setPreviewError setDidSelectFile
+            Some(FileExplorer.FileExplorer([fileItem.Value], onClick))
         else
             None
 
@@ -255,22 +314,6 @@ let Main () =
         |> Array.iter (fun fileEntry -> insertEntry rootElement rootPath fileEntry)
 
         rootElement
-
-    React.useEffect (
-        (fun _ ->
-            let ra = ResizeArray(fileTree.Values)
-            let fileEntries = ra.ToArray()
-
-            let fileTree =
-                if fileEntries.Length > 0 then
-                    Some(getFileTree fileEntries)
-                else
-                    None
-
-            createFileTree fileTree |> setFileExplorer |> ignore
-        ), 
-        [| box fileTree |]
-    )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
         pathChange =
@@ -441,9 +484,6 @@ let Main () =
                         "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
                 ]
 
-    let onClick test =
-        ()
-
     let children =
         React.useMemo (
             (fun _ ->
@@ -457,7 +497,7 @@ let Main () =
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex-none" 
-                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (updateARC arcFileState) ]
                                     ]
                                     Html.div [
                                         prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
@@ -474,12 +514,10 @@ let Main () =
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
-                                    // Navbar
                                     Html.div [
                                         prop.className "swt:flex-none"
-                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (updateARC arcFileState) ]
                                     ]
-                                    // Main content
                                     Html.div [
                                         prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                                         prop.children [
@@ -491,9 +529,25 @@ let Main () =
                         ]
                     ]
             ),
-            [| appState; box previewData; box activeView; box arcFileState |]
+            [| appState; previewData; activeView; arcFileState |]
         )
 
+    let fileExplorer =
+        React.useMemo (
+            (fun _ ->
+                let ra = ResizeArray(fileTree.Values)
+                let fileEntries = ra.ToArray()
+
+                let fileTree =
+                    if fileEntries.Length > 0 then
+                        Some(getFileTree fileEntries)
+                    else
+                        None
+
+                createFileTree fileTree
+            ), 
+            [| fileTree |]
+        )
     let navbar = Navbar.Main(selector)
 
     context.AppStateCtx.AppStateCtx.Provider(
@@ -509,7 +563,6 @@ let Main () =
                     match fileExplorer with
                     | Some fe -> fe
                     | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
-
                  Some(
                      Html.div [
                          prop.className "swt:p-4"

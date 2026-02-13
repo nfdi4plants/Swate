@@ -111,8 +111,12 @@ let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onCli
     //    |> setState
 
     Components.BaseNavbar.Main [
-        CreateARCitectWidgetNavbarList activeView addWidget
+        //CreateARCitectWidgetNavbarList activeView addWidget
         CreateARCitectNavbarList arcFile onClick
+        //Html.div [
+        //    prop.className "swt:ml-auto"
+        //    prop.children [ CreateARCitectNavbarList arcFile onClick ]
+        //]
     ]
 
 [<ReactComponent>]
