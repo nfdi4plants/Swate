@@ -172,9 +172,9 @@ let api: IArcVaultsApi = {
     openFile =
         fun (dataHolder: DataHolder) -> promise {
 
-            let windowId = windowIdFromIpcEvent dataHolder.event
+            //let windowId = windowIdFromIpcEvent dataHolder.event
 
-            match ARC_VAULTS.TryGetVault(windowId) with
+            match ARC_VAULTS.TryGetVault(1) with
             | None -> return Error(exn $"The ARC for window id {1} should exist")
             | Some vault ->
                 let newPath = dataHolder.path
@@ -245,17 +245,7 @@ let api: IArcVaultsApi = {
                             "Found assay: " + a.Identifier + " with " + string a.Tables.Count + " tables"
                         )
 
-                        Swate.Components.console.log ($"dataHolder.newJson: {dataHolder.newJson}")
-                        Swate.Components.console.log ($"dataHolder.oldJson: {dataHolder.oldJson}")
-
                         let json = ARCtrl.ArcAssay.toJsonString 0 a
-
-                        //if dataHolder.newJson = "" then
-                        //    Swate.Components.console.log ("Something initiated!")
-                        //elif dataHolder.newJson = dataHolder.oldJson then
-                        //    Swate.Components.console.log ("Nothing changed!")
-                        //else
-                        //    Swate.Components.console.log ("Something changed!")
 
                         return Ok(ArcFileData(ArcFileType.Assay, json))
                     | None -> return Error(exn ("Assay '" + identifier + "' not found in ARC"))

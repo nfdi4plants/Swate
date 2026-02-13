@@ -21,7 +21,6 @@ open components.MainElement
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
 
     let setArcFile potArcFile =
-        Swate.Components.console.log("setArcFile")
         setArcFileState (Some potArcFile)
 
     React.useEffect (
@@ -76,15 +75,83 @@ let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
+let updateAssay (assay: ArcAssay) =
+
+    let json = assay.ToJsonString()
+
+    Api.arcVaultApi.updateAssay(json)
+
+let updateStudies (study: ArcStudy) =
+
+    let json = study.ToJsonString()
+
+    Api.arcVaultApi.updateStudy(json)
+
+let updateWorkflow (workflow: ArcWorkflow) =
+
+    let json = workflow.ToJsonString()
+
+    Api.arcVaultApi.updateWorkflows(json)
+
+let updateARCVault (arcFiles: ArcFiles option) =
+
+    match arcFiles with
+    | Some (ArcFiles.Assay assay) ->
+        updateAssay assay
+    | Some (ArcFiles.Study (study, _)) ->
+        updateStudies study
+    | Some (ArcFiles.Workflow workflow) ->
+        updateWorkflow workflow
+    | _ -> failwith "Not implemented yet"
+
+let updateARC (arcFiles: ArcFiles option) =
+    fun _ ->
+        let result =
+            match arcFiles with
+            | Some (ArcFiles.Assay assay) ->
+                updateAssay assay
+            | Some (ArcFiles.Study (study, _)) ->
+                updateStudies study
+            | Some (ArcFiles.Workflow workflow) ->
+                updateWorkflow workflow
+            | _ -> failwith "Not implemented yet"
+
+        match result with
+        | Ok _ -> Api.arcVaultApi.updateARC()
+        | Error error -> failwith error.Message
+
+
+let openPreview setPreviewData setPreviewError setDidSelectFile (item: FileItem) =
+    promise {
+        if item.Path.IsSome && not item.IsDirectory then
+            console.log ($"[Renderer] Opening file: {item.Path.Value}")
+
+            let! result =
+                Api.arcVaultApi.openFile (createDataHolder item.Path.Value)
+
+            match result with
+            | Ok data ->
+                console.log ("[Renderer] Received data, processing...")
+                setPreviewData (Some data)
+                setPreviewError None
+                setDidSelectFile true
+            | Error exn ->
+                console.log ($"[Renderer] Error: {exn.Message}")
+                setPreviewData (None)
+                setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
+                setDidSelectFile true
+        else
+            setPreviewError (Some $"File '{item.Name}' has no path.")
+    }
+    |> Promise.start
+
 [<ReactComponent>]
 let Main () =
 
     let widgets, setWidgets = React.useState []
     let recentARCs, setRecentARCs = React.useState [||]
-    let fileExplorer, setFileExplorer = React.useState None
     let didSelectFile, setDidSelectFile = React.useState false
     let appState, setAppState = React.useState AppState.Init
-    let oldJson, setOldJson = React.useState None
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
     let (previewError: string option), setPreviewError = React.useState None
@@ -107,6 +174,14 @@ let Main () =
             | _ -> ()
         ),
         [| box previewData |]
+    )
+
+    React.useEffect (
+        (fun () ->
+            if arcFileState.IsSome then
+                updateARCVault arcFileState |>  ignore
+        ),
+        [| box didSelectFile |]
     )
 
     React.useLayoutEffectOnce (fun _ ->
@@ -182,52 +257,9 @@ let Main () =
 
         let fileItem = loop parent
 
-        let openPreview (item: FileItem) =
-            promise {
-               if item.Path.IsSome && not item.IsDirectory then
-                    console.log ($"[Renderer] Opening file: {item.Path.Value}")
-
-                    console.log ($"previewData: {previewData.IsSome}")
-
-                    console.log($"activeView: {activeView}")
-
-                    let currentJson =
-                        match previewData with
-                        | Some (ArcFileData (ft, js)) -> js
-                        | _ -> ""
-
-                    let! result =
-                        Api.arcVaultApi.openFile (createDataHolder item.Path.Value JS.undefined)
-
-                    match result with
-                    | Ok data ->
-                        console.log ("[Renderer] Received data, processing...")
-                        setPreviewData (Some data)
-                        setPreviewError None
-
-                        let newJson =
-                            match data with
-                            | ArcFileData (ft, js) -> js
-                            | _ -> ""
-
-                        console.log ($"newJson: {newJson}")
-
-                        setOldJson (Some newJson)
-                        setDidSelectFile true
-
-                    | Error exn ->
-                        console.log ($"[Renderer] Error: {exn.Message}")
-                        setPreviewData (None)
-                        setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
-                        //setOldJson None
-                        setDidSelectFile true
-                else
-                    setPreviewError (Some $"File '{item.Name}' has no path.")
-            }
-            |> Promise.start
-
         if fileItem.IsSome then
-            Some(FileExplorer.FileExplorer([fileItem.Value], openPreview))
+            let onClick = openPreview setPreviewData setPreviewError setDidSelectFile
+            Some(FileExplorer.FileExplorer([fileItem.Value], onClick))
         else
             None
 
@@ -282,22 +314,6 @@ let Main () =
         |> Array.iter (fun fileEntry -> insertEntry rootElement rootPath fileEntry)
 
         rootElement
-
-    React.useEffect (
-        (fun _ ->
-            let ra = ResizeArray(fileTree.Values)
-            let fileEntries = ra.ToArray()
-
-            let fileTree =
-                if fileEntries.Length > 0 then
-                    Some(getFileTree fileEntries)
-                else
-                    None
-
-            createFileTree fileTree |> setFileExplorer |> ignore
-        ), 
-        [| box fileTree |]
-    )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
         pathChange =
@@ -417,40 +433,6 @@ let Main () =
     //        let dm, setDm = React.useState datamap
     //        DataMapTable.DataMapTable(dm, setDm)
 
-    let updateAssay (assay: ArcAssay) =
-
-        let json = assay.ToJsonString()
-
-        Api.arcVaultApi.updateAssay(json)
-
-    let updateStudies (study: ArcStudy) =
-
-        let json = study.ToJsonString()
-
-        Api.arcVaultApi.updateStudy(json)
-
-    let updateWorkflow (workflow: ArcWorkflow) =
-
-        let json = workflow.ToJsonString()
-
-        Api.arcVaultApi.updateWorkflows(json)
-
-    let updateARC (arcFiles: ArcFiles option) =
-        fun _ ->
-            let result =
-                match arcFiles with
-                | Some (ArcFiles.Assay assay) ->
-                    updateAssay assay
-                | Some (ArcFiles.Study (study, _)) ->
-                    updateStudies study
-                | Some (ArcFiles.Workflow workflow) ->
-                    updateWorkflow workflow
-                | _ -> failwith "Not implemented yet"
-
-            match result with
-            | Ok _ -> Api.arcVaultApi.updateARC()
-            | Error error -> failwith error.Message
-
     let computeARCContent (path: string) =
         match previewData with
         | Some data ->
@@ -458,7 +440,6 @@ let Main () =
             | ArcFileData _ ->
                 match arcFileState with
                 | Some arcFile ->
-                    console.log ($"path: {path}")
                     CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
                 | None ->
                     Html.div [
@@ -551,6 +532,22 @@ let Main () =
             [| appState; previewData; activeView; arcFileState |]
         )
 
+    let fileExplorer =
+        React.useMemo (
+            (fun _ ->
+                let ra = ResizeArray(fileTree.Values)
+                let fileEntries = ra.ToArray()
+
+                let fileTree =
+                    if fileEntries.Length > 0 then
+                        Some(getFileTree fileEntries)
+                    else
+                        None
+
+                createFileTree fileTree
+            ), 
+            [| fileTree |]
+        )
     let navbar = Navbar.Main(selector)
 
     context.AppStateCtx.AppStateCtx.Provider(
@@ -566,7 +563,6 @@ let Main () =
                     match fileExplorer with
                     | Some fe -> fe
                     | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
-
                  Some(
                      Html.div [
                          prop.className "swt:p-4"

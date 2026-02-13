@@ -24,13 +24,11 @@ type PreviewData =
 type DataHolder =
     {
         path: string
-        event: IpcMainEvent
     }
 
-let createDataHolder path event : DataHolder =
+let createDataHolder path : DataHolder =
     {
         path = path
-        event = event
     }
 
 /// Two Way Bridge: Renderer <-> Main
@@ -51,9 +49,6 @@ type IArcVaultsApi = {
     updateAssay: string -> Result<unit, exn>
     updateStudy: string -> Result<unit, exn>
     updateWorkflows: string -> Result<unit, exn>
-
-
-
 
     updateARC: unit -> unit
 }
