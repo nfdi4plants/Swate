@@ -101,8 +101,8 @@ let CreateARCitectNavbarList (arcFile: ArcFiles option) onClick =
 
 [<ReactComponent>]
 let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onClick =
-    let state, setState = React.useState (SidebarComponents.Navbar.NavbarState.init)
 
+    //let state, setState = React.useState (SidebarComponents.Navbar.NavbarState.init)
     //let inline toggleMetdadataModal _ =
     //    {
     //        state with
@@ -111,7 +111,7 @@ let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onCli
     //    |> setState
 
     Components.BaseNavbar.Main [
-        //CreateARCitectWidgetNavbarList activeView addWidget
+        CreateARCitectWidgetNavbarList activeView addWidget
         CreateARCitectNavbarList arcFile onClick
         //Html.div [
         //    prop.className "swt:ml-auto"

@@ -25,7 +25,7 @@ module WidgetLiterals =
     let Templates = "Templates"
 
     [<Literal>]
-    let FilePicker = "FilerPicker"
+    let FilePicker = "FilePicker"
 
     [<Literal>]
     let TableSelect = "TableSelect"
@@ -69,8 +69,9 @@ module Size =
 
     let load (modalName: string) =
         let key = Key_Prefix + modalName
-
+        console.log $"modalName: {modalName}"
         try
+            console.log $"key: {key}"
             WebStorage.localStorage.getItem (key) |> Json.parseAs<Rect> |> Some
         with _ ->
             WebStorage.localStorage.removeItem (key)

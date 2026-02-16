@@ -10,11 +10,12 @@ open Swate.Components
 open ARCtrl
 open BuildingBlock.SearchComponent
 
-module private InitExtensions =
+module InitExtensions =
 
     type Rect with
 
         static member initSizeFromPrefix(prefix: string) =
+            console.log($"initSizeFromPrefix: {prefix}")
             match Size.load prefix with
             | Some p -> Some p
             | None -> None
@@ -31,7 +32,7 @@ open Fable.Core.JsInterop
 open Protocol
 open Model
 
-module private MoveEventListener =
+module MoveEventListener =
 
     open Fable.Core.JsInterop
 
@@ -65,7 +66,7 @@ module private MoveEventListener =
             let position = { X = int rect.left; Y = int rect.top }
             Position.write (prefix, position)
 
-module private ResizeEventListener =
+module ResizeEventListener =
 
     open Fable.Core.JsInterop
 
