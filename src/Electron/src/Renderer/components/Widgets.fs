@@ -2,12 +2,43 @@ module Renderer.components.Widgets
 
 open Feliz
 
+open ARCtrl
+
 open Swate.Components
 
 open LocalStorage.Widgets
 
 open MainComponents
 open MainComponents.InitExtensions
+
+
+[<RequireQualifiedAccess>]
+    type DropdownPage =
+        | Main
+        | More
+        | IOTypes of CompositeHeaderDiscriminate
+
+        member this.toString =
+            match this with
+            | Main -> "Main Page"
+            | More -> "More"
+            | IOTypes t -> t.ToString()
+
+        member this.toTooltip =
+            match this with
+            | More -> "More"
+            | IOTypes t -> $"Per table only one {t} is allowed. The value of this column must be a unique identifier."
+            | _ -> ""
+
+type BuildingBlockUIState = {
+    DropdownIsActive: bool
+    DropdownPage: DropdownPage
+} with
+
+    static member init() = {
+        DropdownIsActive = false
+        DropdownPage = DropdownPage.Main
+    }
 
 let addWidget widgets setWidgets (widget: MainComponents.Widget) =
     let add (widget) widgets =
@@ -160,14 +191,48 @@ let prefixOf (w: MainComponents.Widget) =
     | MainComponents.Widget._BuildingBlock -> WidgetLiterals.BuildingBlock
 
 [<ReactComponent>]
+let searchComponent model dispatch tableName : ReactElement =
+    let state_bb, setState_bb = React.useState (BuildingBlockUIState.init)
+
+    let ctx =
+        React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
+
+    let xIndex =
+        ctx.state
+        |> Map.tryFind tableName
+        |> Option.bind (fun x -> x.SelectedCells)
+        |> Option.map (fun cells -> cells.xEnd)
+        |> Option.map (fun x -> x - 2)
+
+    let callback =
+        fun () -> SearchComponentHelper.addBuildingBlock xIndex model dispatch
+
+    Html.div [
+        Html.form [
+            prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-2"
+            prop.onSubmit (fun ev -> ev.preventDefault ()
+            )
+            prop.children [
+                SearchComponent.SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)
+                if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
+                    SearchComponent.SearchBuildingBlockBodyElement(model, dispatch)
+                SearchComponent.AddBuildingBlockButton(model, callback)
+                Html.input [ prop.type'.submit; prop.style [ style.display.none ] ]
+            ]
+        ]
+    ]
+
+let createBuildingBlockWidget () =
+    Html.div [
+        prop.title "Building Block"
+        prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
+    ]
+
+[<ReactComponent>]
 let WidgetView (widget: MainComponents.Widget) (onRemove: Browser.Types.MouseEvent -> unit) (onBringToFront: unit -> unit) =
     let content =
         match widget with
-        | MainComponents.Widget._BuildingBlock ->
-            Html.div [
-                prop.title "Building Block"
-                prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
-            ]
+        | MainComponents.Widget._BuildingBlock -> createBuildingBlockWidget()
         | MainComponents.Widget._Template ->
             Html.div [
                 prop.title "Template"
