@@ -10,6 +10,7 @@
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="components\BuildingBlockWidget.fs" />
     <Compile Include="components\TemplateWidget.fs" />
+    <Compile Include="components\FilePickerWidget.fs" />
     <Compile Include="components\Widgets.fs" />
     <Compile Include="components\MainElement.fs" />
     <Compile Include="components\InitState.fs" />

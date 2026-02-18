@@ -17,6 +17,7 @@ open ARCtrl.Json
 open components.MainElement
 open components.ExperimentLanding
 open Renderer.components.BuildingBlockWidget
+open Renderer.components.FilePickerWidget
 
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
@@ -642,6 +643,30 @@ let Main () =
                 None
         | _ -> None
 
+    let activeDataMapData : ActiveDataMapData option =
+        match arcFileState, activeView with
+        | Some (ArcFiles.Assay assay as arcFile), PreviewActiveView.DataMap when assay.DataMap.IsSome ->
+            Some {
+                ArcFile = arcFile
+                DataMap = assay.DataMap.Value
+            }
+        | Some (ArcFiles.Study(study, _) as arcFile), PreviewActiveView.DataMap when study.DataMap.IsSome ->
+            Some {
+                ArcFile = arcFile
+                DataMap = study.DataMap.Value
+            }
+        | Some (ArcFiles.Run run as arcFile), PreviewActiveView.DataMap when run.DataMap.IsSome ->
+            Some {
+                ArcFile = arcFile
+                DataMap = run.DataMap.Value
+            }
+        | Some (ArcFiles.DataMap(_, datamap) as arcFile), PreviewActiveView.DataMap ->
+            Some {
+                ArcFile = arcFile
+                DataMap = datamap
+            }
+        | _ -> None
+
     let onTableMutated () =
         setTableMutationTick (fun latest -> latest + 1)
 
@@ -653,7 +678,7 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
                         prop.children [
-                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData onTableMutated
+                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
@@ -673,7 +698,7 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
                         prop.children [
-                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData onTableMutated
+                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [

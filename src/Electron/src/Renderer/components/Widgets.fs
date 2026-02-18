@@ -13,6 +13,7 @@ open MainComponents.InitExtensions
 
 open Renderer.components.BuildingBlockWidget
 open Renderer.components.TemplateWidget
+open Renderer.components.FilePickerWidget
 
 let addWidget widgets setWidgets (widget: MainComponents.Widget) =
     let add widget widgets =
@@ -196,22 +197,33 @@ let createTemplateWidget (activeTableData: ActiveTableData option) (onTableMutat
     ]
 
 [<ReactComponent>]
+let createFilePickerWidget
+    (activeTableData: ActiveTableData option)
+    (activeDataMapData: ActiveDataMapData option)
+    (onTableMutated: unit -> unit)
+    =
+    Html.div [
+        prop.title "FilePicker"
+        prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
+        prop.children [
+            FilePickerWidget.Main(activeTableData, activeDataMapData, onTableMutated)
+        ]
+    ]
+
+[<ReactComponent>]
 let WidgetView
     (widget: MainComponents.Widget)
     (onRemove: Browser.Types.MouseEvent -> unit)
     (onBringToFront: unit -> unit)
     (activeTableData: ActiveTableData option)
+    (activeDataMapData: ActiveDataMapData option)
     (onTableMutated: unit -> unit)
     =
     let content =
         match widget with
         | MainComponents.Widget._BuildingBlock -> createBuildingBlockWidget activeTableData onTableMutated
         | MainComponents.Widget._Template -> createTemplateWidget activeTableData onTableMutated
-        | MainComponents.Widget._FilePicker ->
-            Html.div [
-                prop.title "FilePicker"
-                prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
-            ]
+        | MainComponents.Widget._FilePicker -> createFilePickerWidget activeTableData activeDataMapData onTableMutated
         | MainComponents.Widget._DataAnnotator ->
             Html.div [
                 prop.title "DataAnnotator"
@@ -230,6 +242,7 @@ let FloatingWidgetLayer
     (widgets: MainComponents.Widget list)
     (setWidgets: MainComponents.Widget list -> unit)
     (activeTableData: ActiveTableData option)
+    (activeDataMapData: ActiveDataMapData option)
     (onTableMutated: unit -> unit)
     =
 
@@ -247,6 +260,7 @@ let FloatingWidgetLayer
                         (fun e -> e.stopPropagation(); rmvWidget w)
                         (fun () -> bringToFront w)
                         activeTableData
+                        activeDataMapData
                         onTableMutated
                 ]
             ]
