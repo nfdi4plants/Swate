@@ -1,11 +1,18 @@
 module Api
 
 open Swate.Electron.Shared.IPCTypes
+open Swate.Components.Shared
 open Fable.Electron.Remoting.Renderer
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.Remoting.Client
 
 let arcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
+
+let templateApi: ITemplateAPIv1 =
+    Remoting.createApi ()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<ITemplateAPIv1>
 
 // Event-first IPC methods must be invoked from renderer without sending a placeholder event argument.
 let openARC () : JS.Promise<Result<string, exn>> =

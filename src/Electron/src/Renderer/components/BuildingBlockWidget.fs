@@ -12,6 +12,7 @@ type ActiveTableData = {
     ArcFile: ArcFiles
     Table: ArcTable
     TableName: string
+    TableIndex: int
 }
 
 [<RequireQualifiedAccess>]

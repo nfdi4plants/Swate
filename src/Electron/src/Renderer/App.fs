@@ -636,6 +636,7 @@ let Main () =
                     ArcFile = arcFile
                     Table = table
                     TableName = table.Name
+                    TableIndex = tableIndex
                 }
             else
                 None

@@ -12,6 +12,7 @@ open MainComponents
 open MainComponents.InitExtensions
 
 open Renderer.components.BuildingBlockWidget
+open Renderer.components.TemplateWidget
 
 let addWidget widgets setWidgets (widget: MainComponents.Widget) =
     let add widget widgets =
@@ -185,6 +186,16 @@ let createBuildingBlockWidget (activeTableData: ActiveTableData option) (onTable
     ]
 
 [<ReactComponent>]
+let createTemplateWidget (activeTableData: ActiveTableData option) (onTableMutated: unit -> unit) =
+    Html.div [
+        prop.title "Template"
+        prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
+        prop.children [
+            TemplateWidget.Main(activeTableData, onTableMutated)
+        ]
+    ]
+
+[<ReactComponent>]
 let WidgetView
     (widget: MainComponents.Widget)
     (onRemove: Browser.Types.MouseEvent -> unit)
@@ -195,11 +206,7 @@ let WidgetView
     let content =
         match widget with
         | MainComponents.Widget._BuildingBlock -> createBuildingBlockWidget activeTableData onTableMutated
-        | MainComponents.Widget._Template ->
-            Html.div [
-                prop.title "Template"
-                prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
-            ]
+        | MainComponents.Widget._Template -> createTemplateWidget activeTableData onTableMutated
         | MainComponents.Widget._FilePicker ->
             Html.div [
                 prop.title "FilePicker"
