@@ -11,37 +11,10 @@ open LocalStorage.Widgets
 open MainComponents
 open MainComponents.InitExtensions
 
-
-[<RequireQualifiedAccess>]
-    type DropdownPage =
-        | Main
-        | More
-        | IOTypes of CompositeHeaderDiscriminate
-
-        member this.toString =
-            match this with
-            | Main -> "Main Page"
-            | More -> "More"
-            | IOTypes t -> t.ToString()
-
-        member this.toTooltip =
-            match this with
-            | More -> "More"
-            | IOTypes t -> $"Per table only one {t} is allowed. The value of this column must be a unique identifier."
-            | _ -> ""
-
-type BuildingBlockUIState = {
-    DropdownIsActive: bool
-    DropdownPage: DropdownPage
-} with
-
-    static member init() = {
-        DropdownIsActive = false
-        DropdownPage = DropdownPage.Main
-    }
+open Renderer.components.BuildingBlockWidget
 
 let addWidget widgets setWidgets (widget: MainComponents.Widget) =
-    let add (widget) widgets =
+    let add widget widgets =
         widget :: widgets |> List.rev |> setWidgets
 
     if widgets |> List.contains widget then
@@ -51,7 +24,12 @@ let addWidget widgets setWidgets (widget: MainComponents.Widget) =
         add widget widgets
 
 [<ReactComponent>]
-let BaseWidget (prefix: string) (content: ReactElement) (onRemove: Browser.Types.MouseEvent -> unit) =
+let BaseWidget
+    (prefix: string)
+    (content: ReactElement)
+    (onRemove: Browser.Types.MouseEvent -> unit)
+    (allowContentOverflowVisible: bool)
+    =
     let position, setPosition = React.useState (fun _ -> Rect.initPositionFromPrefix prefix)
     let size, setSize = React.useState (fun _ -> Rect.initSizeFromPrefix prefix)
 
@@ -159,13 +137,19 @@ let BaseWidget (prefix: string) (content: ReactElement) (onRemove: Browser.Types
                     Html.span [ prop.className "swt:text-sm"; prop.text prefix ]
                     Html.button [
                         prop.className "swt:btn swt:btn-ghost swt:btn-xs"
-                        prop.text "×"
+                        prop.text "x"
                         prop.onClick onRemove
                     ]
                 ]
             ]
             Html.div [
-                prop.className "swt:flex-1 swt:overflow-auto swt:p-2"
+                prop.className [
+                    "swt:flex-1 swt:p-2"
+                    if allowContentOverflowVisible then
+                        "swt:overflow-visible"
+                    else
+                        "swt:overflow-auto"
+                ]
                 prop.children [ content ]
             ]
             Html.div [
@@ -191,48 +175,26 @@ let prefixOf (w: MainComponents.Widget) =
     | MainComponents.Widget._BuildingBlock -> WidgetLiterals.BuildingBlock
 
 [<ReactComponent>]
-let searchComponent model dispatch tableName : ReactElement =
-    let state_bb, setState_bb = React.useState (BuildingBlockUIState.init)
-
-    let ctx =
-        React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
-
-    let xIndex =
-        ctx.state
-        |> Map.tryFind tableName
-        |> Option.bind (fun x -> x.SelectedCells)
-        |> Option.map (fun cells -> cells.xEnd)
-        |> Option.map (fun x -> x - 2)
-
-    let callback =
-        fun () -> SearchComponentHelper.addBuildingBlock xIndex model dispatch
-
+let createBuildingBlockWidget (activeTableData: ActiveTableData option) (onTableMutated: unit -> unit) =
     Html.div [
-        Html.form [
-            prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-2"
-            prop.onSubmit (fun ev -> ev.preventDefault ()
-            )
-            prop.children [
-                SearchComponent.SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)
-                if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then
-                    SearchComponent.SearchBuildingBlockBodyElement(model, dispatch)
-                SearchComponent.AddBuildingBlockButton(model, callback)
-                Html.input [ prop.type'.submit; prop.style [ style.display.none ] ]
-            ]
+        prop.title "Building Block"
+        prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-visible"
+        prop.children [
+            BuildingBlockWidget.Main(activeTableData, onTableMutated)
         ]
     ]
 
-let createBuildingBlockWidget () =
-    Html.div [
-        prop.title "Building Block"
-        prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
-    ]
-
 [<ReactComponent>]
-let WidgetView (widget: MainComponents.Widget) (onRemove: Browser.Types.MouseEvent -> unit) (onBringToFront: unit -> unit) =
+let WidgetView
+    (widget: MainComponents.Widget)
+    (onRemove: Browser.Types.MouseEvent -> unit)
+    (onBringToFront: unit -> unit)
+    (activeTableData: ActiveTableData option)
+    (onTableMutated: unit -> unit)
+    =
     let content =
         match widget with
-        | MainComponents.Widget._BuildingBlock -> createBuildingBlockWidget()
+        | MainComponents.Widget._BuildingBlock -> createBuildingBlockWidget activeTableData onTableMutated
         | MainComponents.Widget._Template ->
             Html.div [
                 prop.title "Template"
@@ -252,12 +214,17 @@ let WidgetView (widget: MainComponents.Widget) (onRemove: Browser.Types.MouseEve
     Html.div [
         prop.onMouseDown (fun _ -> onBringToFront())
         prop.children [
-            BaseWidget (prefixOf widget) content onRemove
+            BaseWidget (prefixOf widget) content onRemove (widget = MainComponents.Widget._BuildingBlock)
         ]
     ]
 
 [<ReactComponent>]
-let FloatingWidgetLayer (widgets: MainComponents.Widget list) (setWidgets: MainComponents.Widget list -> unit) =
+let FloatingWidgetLayer
+    (widgets: MainComponents.Widget list)
+    (setWidgets: MainComponents.Widget list -> unit)
+    (activeTableData: ActiveTableData option)
+    (onTableMutated: unit -> unit)
+    =
 
     let rmvWidget w = widgets |> List.except [w] |> setWidgets
     let bringToFront w =
@@ -272,6 +239,8 @@ let FloatingWidgetLayer (widgets: MainComponents.Widget list) (setWidgets: MainC
                         w
                         (fun e -> e.stopPropagation(); rmvWidget w)
                         (fun () -> bringToFront w)
+                        activeTableData
+                        onTableMutated
                 ]
             ]
     ]

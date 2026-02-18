@@ -16,7 +16,7 @@ open ARCtrl.Json
 
 open components.MainElement
 open components.ExperimentLanding
-
+open Renderer.components.BuildingBlockWidget
 
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
@@ -112,9 +112,10 @@ let SerializeArcFileForSave (arcFile: ArcFiles) : SaveArcFileRequest option =
 [<ReactComponent>]
 let Main () =
 
-    let widgets, setWidgets = React.useState ([])
-    let recentARCs, setRecentARCs = React.useState ([||])
-    let fileExplorer, setFileExplorer = React.useState (None)
+    let widgets, setWidgets = React.useState []
+    let tableMutationTick, setTableMutationTick = React.useStateWithUpdater 0
+    let recentARCs, setRecentARCs = React.useState [||]
+    let fileExplorer, setFileExplorer = React.useState None
     let didSelectFile, setDidSelectFile = React.useState false
     let appState, setAppState = React.useState (AppState.Init)
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
@@ -548,39 +549,6 @@ let Main () =
     //        let dm, setDm = React.useState datamap
     //        DataMapTable.DataMapTable(dm, setDm)
 
-    let updateAssay (assay: ArcAssay) =
-
-        let json = assay.ToJsonString()
-
-        Api.arcVaultApi.updateAssay(json)
-
-    let updateStudies (study: ArcStudy) =
-
-        let json = study.ToJsonString()
-
-        Api.arcVaultApi.updateStudy(json)
-
-    let updateWorkflow (workflow: ArcWorkflow) =
-
-        let json = workflow.ToJsonString()
-
-        Api.arcVaultApi.updateWorkflows(json)
-
-    let updateARC (arcFiles: ArcFiles option) (onClick) =
-        let result =
-            match arcFiles with
-            | Some (ArcFiles.Assay assay) ->
-                updateAssay assay
-            | Some (ArcFiles.Study (study, _)) ->
-                updateStudies study
-            | Some (ArcFiles.Workflow workflow) ->
-                updateWorkflow workflow
-            | _ -> failwith "Not implemented yet"
-
-        match result with
-        | Ok _ -> Api.arcVaultApi.updateARC()
-        | Error error -> failwith error.Message
-
     let computeARCContent (path: string) =
         if landingDraftActive && showLandingDraft then
             ExperimentLandingView(landingDraft, setLandingDraft, landingUiState, setLandingUiState, createFromLanding)
@@ -656,6 +624,26 @@ let Main () =
                 }
                 |> Promise.start
 
+    let activeTableData : ActiveTableData option =
+        match arcFileState, activeView with
+        | Some arcFile, PreviewActiveView.Table tableIndex ->
+            let tables = arcFile.Tables()
+
+            if tableIndex >= 0 && tableIndex < tables.Count then
+                let table = tables.[tableIndex]
+
+                Some {
+                    ArcFile = arcFile
+                    Table = table
+                    TableName = table.Name
+                }
+            else
+                None
+        | _ -> None
+
+    let onTableMutated () =
+        setTableMutationTick (fun latest -> latest + 1)
+
     let children =
         React.useMemo (
             (fun _ ->
@@ -664,12 +652,13 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
                         prop.children [
+                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex-none" 
-                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (updateARC arcFileState) ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
                                     ]
                                     Html.div [
                                         prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
@@ -683,12 +672,13 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
                         prop.children [
+                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex-none"
-                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (updateARC arcFileState) ]
+                                        prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
                                     ]
                                     Html.div [
                                         prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
@@ -702,7 +692,7 @@ let Main () =
                     ]
             ),
             [|
-                appState
+                box appState
                 box previewData
                 box activeView
                 box arcFileState
@@ -711,6 +701,8 @@ let Main () =
                 box landingUiState
                 box landingDraftActive
                 box showLandingDraft
+                box widgets
+                box tableMutationTick
             |]
         )
 
