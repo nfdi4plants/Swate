@@ -230,7 +230,12 @@ let Main () =
 
         let openPreview (item: FileItem) =
             promise {
-               if item.Path.IsSome && not item.IsDirectory then
+               let isDirectoryByPath =
+                    match item.Path with
+                    | Some p when fileTree.ContainsKey(p) -> fileTree.[p].isDirectory
+                    | _ -> item.IsDirectory
+
+               if item.Path.IsSome && not isDirectoryByPath then
                     console.log ($"[Renderer] Opening file: {item.Path.Value}")
                     setShowLandingDraft false
                     let! result = Api.openFile item.Path.Value
@@ -247,6 +252,9 @@ let Main () =
                         setPreviewData (None)
                         setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
                         setDidSelectFile true
+               elif item.Path.IsSome && isDirectoryByPath then
+                    // Folders are not preview targets.
+                    setPreviewError None
                 else
                     setPreviewError (Some $"File '{item.Name}' has no path.")
             }
@@ -268,13 +276,24 @@ let Main () =
 
             let child =
                 match node.children.TryGetValue(part) with
+                | true, existing when ((not isLast) || entry.isDirectory) && not existing.isDirectory ->
+                    // A node may first appear via a file path segment; upgrade it to a directory when needed.
+                    let upgraded = { existing with IsDirectory = true }
+                    node.children.[part] <- upgraded
+                    upgraded
                 | true, existing -> existing
                 | false, _ ->
                     let newPath = parts.[0..index] |> String.concat "/"
+                    let isDirectory =
+                        if isLast then
+                            entry.isDirectory
+                        else
+                            true
+
                     let newNode =
                         FileItemDTO.create(
                             part,
-                            entry.isDirectory,
+                            isDirectory,
                             newPath,
                             System.Collections.Generic.Dictionary()
                         )
@@ -296,7 +315,16 @@ let Main () =
             |> Array.last
             |> String.concat "/"
 
-        let adaptedFileEntires = fileEntries |> Array.filter (fun fileEntry -> fileEntry.path <> rootPath)
+        let adaptedFileEntires =
+            fileEntries
+            |> Array.filter (fun fileEntry -> fileEntry.path <> rootPath)
+            // Deterministic order avoids creating parents from file entries before their directory entries.
+            |> Array.sortBy (fun fileEntry ->
+                let depth =
+                    fileEntry.path.Split('/', System.StringSplitOptions.RemoveEmptyEntries).Length
+
+                depth, (if fileEntry.isDirectory then 0 else 1), fileEntry.path
+            )
 
         let rootElement =
             let tmp =
@@ -633,13 +661,17 @@ let Main () =
                          prop.className "swt:p-4"
                          prop.children [|
                             match appState with
-                            | AppState.ARC _ when landingDraftActive ->
+                            | AppState.ARC _ ->
                                 Html.button [
                                     prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
                                     prop.text "Landing Page"
                                     prop.onClick (fun _ ->
                                         setPreviewError None
-                                        setShowLandingDraft true
+
+                                        if landingDraftActive then
+                                            setShowLandingDraft true
+                                        else
+                                            resetLandingDraft ()
                                     )
                                 ]
                             | _ -> Html.none
