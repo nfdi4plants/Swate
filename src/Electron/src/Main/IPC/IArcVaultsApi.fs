@@ -34,13 +34,27 @@ let private sanitizeIdentifierCandidate (candidate: string) =
     else
         collapsed
 
+let private generateSafeIdentifierFromTitle (title: string) =
+    let sanitized =
+        title
+        |> sanitizeIdentifierCandidate
+        |> fun value -> Regex.Replace(value, @"\s+", "_").Trim([| '_'; '-' |])
+
+    let candidate =
+        if String.IsNullOrWhiteSpace sanitized then
+            "Experiment"
+        else
+            sanitized
+
+    if ARCtrl.Helper.Identifier.tryCheckValidCharacters candidate then
+        candidate
+    else
+        "Experiment"
+
 let private resolveIdentifier (metadata: ExperimentMetadata) =
     match toNonEmptyOption metadata.Identifier with
     | Some id -> id
-    | None ->
-        let titlePart =
-            sanitizeIdentifierCandidate metadata.Title
-        $"{titlePart} {DateTime.UtcNow:yyyyMMddHHmmss}"
+    | None -> generateSafeIdentifierFromTitle metadata.Title
 
 let private parsePersons (values: string []) =
     values
@@ -164,6 +178,27 @@ let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : R
             Error(exn "Saving DataMap preview is not supported yet in Electron.")
     with e ->
         Error e
+
+let private persistArcChangesAndRefreshVault
+    (vault: ArcVault)
+    (arc: ARC)
+    (arcPath: string)
+    (afterArcPersist: unit -> unit)
+    =
+    promise {
+        vault.isBusyWriting <- true
+
+        try
+            // Persist only changed ISA contracts (not full filesystem rewrite).
+            do! arc.UpdateAsync(arcPath)
+            afterArcPersist ()
+            do! vault.LoadArc()
+
+            let fileTree = getFileEntries arcPath |> createFileEntryTree
+            vault.SetFileTree(fileTree)
+        finally
+            vault.isBusyWriting <- false
+    }
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -346,7 +381,7 @@ let api: IArcVaultsApi = {
                                 return
                                     Error(
                                         exn
-                                            "Identifier contains forbidden characters. Allowed: letters, digits, underscore (_), dash (-), and whitespace."
+                                            $"Identifier '{identifier}' contains forbidden characters. Allowed: letters, digits, underscore (_), dash (-), and whitespace."
                                     )
                             elif request.Target = ExperimentTarget.Study && arc.TryGetStudy(identifier).IsSome then
                                 return Error(exn $"Study with identifier '{identifier}' already exists.")
@@ -354,6 +389,7 @@ let api: IArcVaultsApi = {
                                 return Error(exn $"Assay with identifier '{identifier}' already exists.")
                             else
                                 let mutable previewData: PreviewData option = None
+                                let mutable protocolPath: string option = None
 
                                 match request.Target with
                                 | ExperimentTarget.Study ->
@@ -392,28 +428,25 @@ let api: IArcVaultsApi = {
 
                                     previewData <- Some(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
 
-                                vault.isBusyWriting <- true
+                                do!
+                                    persistArcChangesAndRefreshVault
+                                        vault
+                                        arc
+                                        arcPath
+                                        (fun () ->
+                                            protocolPath <-
+                                                createProtocolFile arcPath request.Target identifier request.Metadata.MainText
+                                        )
 
-                                try
-                                    do! arc.WriteAsync(arcPath)
-                                    let protocolPath =
-                                        createProtocolFile arcPath request.Target identifier request.Metadata.MainText
-                                    do! vault.LoadArc()
+                                let response = {
+                                    PreviewData =
+                                        previewData
+                                        |> Option.defaultWith (fun () -> Text "")
+                                    CreatedIdentifier = identifier
+                                    ProtocolPath = protocolPath
+                                }
 
-                                    let fileTree = getFileEntries arcPath |> createFileEntryTree
-                                    vault.SetFileTree(fileTree)
-
-                                    let response = {
-                                        PreviewData =
-                                            previewData
-                                            |> Option.defaultWith (fun () -> Text "")
-                                        CreatedIdentifier = identifier
-                                        ProtocolPath = protocolPath
-                                    }
-
-                                    return Ok response
-                                finally
-                                    vault.isBusyWriting <- false
+                                return Ok response
                     | _ -> return Error(exn "ARC is not loaded.")
             with e ->
                 return Error e
@@ -431,18 +464,14 @@ let api: IArcVaultsApi = {
                         match applyArcFileSaveRequest arc request with
                         | Error saveError -> return Error saveError
                         | Ok previewData ->
-                            vault.isBusyWriting <- true
+                            do!
+                                persistArcChangesAndRefreshVault
+                                    vault
+                                    arc
+                                    arcPath
+                                    (fun () -> ())
 
-                            try
-                                do! arc.WriteAsync(arcPath)
-                                do! vault.LoadArc()
-
-                                let fileTree = getFileEntries arcPath |> createFileEntryTree
-                                vault.SetFileTree(fileTree)
-
-                                return Ok previewData
-                            finally
-                                vault.isBusyWriting <- false
+                            return Ok previewData
                     | _ -> return Error(exn "ARC is not loaded.")
             with e ->
                 return Error e
