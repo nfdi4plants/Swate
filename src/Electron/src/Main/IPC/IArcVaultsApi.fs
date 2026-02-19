@@ -42,48 +42,34 @@ let private resolveIdentifier (metadata: ExperimentMetadata) =
             sanitizeIdentifierCandidate metadata.Title
         $"{titlePart} {DateTime.UtcNow:yyyyMMddHHmmss}"
 
-let private createPersonFromDisplayName (displayName: string) =
-    let tokens =
-        displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-
-    match tokens with
-    | [||] -> Person()
-    | [| single |] -> Person(firstName = single)
-    | _ ->
-        let first = tokens.[0]
-        let last = String.concat " " tokens.[1..]
-        Person(firstName = first, lastName = last)
-
-let private mapInvolvedPeople (values: string []) =
+let private parsePersons (values: string []) =
     values
     |> normalizeStringArray
-    |> Array.map createPersonFromDisplayName
+    |> Array.map Person.fromJsonString
     |> ResizeArray
 
-let private mapComments (values: string []) =
+let private parseComments (values: string []) =
     values
     |> normalizeStringArray
-    |> Array.mapi (fun index value ->
-        Comment(name = $"Comment {index + 1}", value = value)
-    )
+    |> Array.map Comment.fromJsonString
     |> ResizeArray
 
-let private mapPublications (values: string []) =
+let private parsePublications (values: string []) =
     values
     |> normalizeStringArray
-    |> Array.map (fun value -> Publication(title = value))
+    |> Array.map Publication.fromJsonString
     |> ResizeArray
 
-let private mapOntologyAnnotations (values: string []) =
+let private parseOntologyAnnotations (values: string []) =
     values
     |> normalizeStringArray
-    |> Array.map (fun value -> OntologyAnnotation(name = value))
+    |> Array.map OntologyAnnotation.fromJsonString
     |> ResizeArray
 
-let private toOntologyOption (value: string option) =
+let private parseOntologyOption (value: string option) =
     value
     |> toNonEmptyOption
-    |> Option.map (fun v -> OntologyAnnotation(name = v))
+    |> Option.map OntologyAnnotation.fromJsonString
 
 let private fillInputColumnIfFilesExist (table: ArcTable) (files: string []) =
     let normalizedFiles = normalizeStringArray files
@@ -377,12 +363,12 @@ let api: IArcVaultsApi = {
 
                                     study.Title <- Some request.Metadata.Title
                                     study.Description <- Some request.Metadata.Description
-                                    study.Contacts <- mapInvolvedPeople request.Metadata.InvolvedPeople
-                                    study.Comments <- mapComments request.Metadata.Comments
-                                    study.Publications <- mapPublications request.Metadata.Publications
+                                    study.Contacts <- parsePersons request.Metadata.InvolvedPeople
+                                    study.Comments <- parseComments request.Metadata.Comments
+                                    study.Publications <- parsePublications request.Metadata.Publications
                                     study.SubmissionDate <- toNonEmptyOption request.Metadata.SubmissionDate
                                     study.PublicReleaseDate <- toNonEmptyOption request.Metadata.PublicReleaseDate
-                                    study.StudyDesignDescriptors <- mapOntologyAnnotations request.Metadata.StudyDesignDescriptors
+                                    study.StudyDesignDescriptors <- parseOntologyAnnotations request.Metadata.StudyDesignDescriptors
 
                                     let firstTable = study.Tables.[0]
                                     fillInputColumnIfFilesExist firstTable request.Metadata.Files
@@ -395,11 +381,11 @@ let api: IArcVaultsApi = {
 
                                     assay.Title <- Some request.Metadata.Title
                                     assay.Description <- Some request.Metadata.Description
-                                    assay.Performers <- mapInvolvedPeople request.Metadata.InvolvedPeople
-                                    assay.Comments <- mapComments request.Metadata.Comments
-                                    assay.MeasurementType <- toOntologyOption request.Metadata.MeasurementType
-                                    assay.TechnologyType <- toOntologyOption request.Metadata.TechnologyType
-                                    assay.TechnologyPlatform <- toOntologyOption request.Metadata.TechnologyPlatform
+                                    assay.Performers <- parsePersons request.Metadata.InvolvedPeople
+                                    assay.Comments <- parseComments request.Metadata.Comments
+                                    assay.MeasurementType <- parseOntologyOption request.Metadata.MeasurementType
+                                    assay.TechnologyType <- parseOntologyOption request.Metadata.TechnologyType
+                                    assay.TechnologyPlatform <- parseOntologyOption request.Metadata.TechnologyPlatform
 
                                     let firstTable = assay.Tables.[0]
                                     fillInputColumnIfFilesExist firstTable request.Metadata.Files

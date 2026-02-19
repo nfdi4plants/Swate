@@ -2,40 +2,44 @@ module Renderer.components.ExperimentLanding
 
 open System
 open Feliz
+open ARCtrl
+open ARCtrl.Json
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
+open Components.Forms
+open Renderer.MetadataForms
 
 type LandingDraft = {
     Identifier: string
     Title: string
     Description: string
-    InvolvedPeople: string
-    Comments: string
+    InvolvedPeople: ResizeArray<Person>
+    Comments: ResizeArray<Comment>
     MainText: string
     Files: string list
-    Publications: string
+    Publications: ResizeArray<Publication>
     SubmissionDate: string
     PublicReleaseDate: string
-    StudyDesignDescriptors: string
-    MeasurementType: string
-    TechnologyType: string
-    TechnologyPlatform: string
+    StudyDesignDescriptors: ResizeArray<OntologyAnnotation>
+    MeasurementType: OntologyAnnotation option
+    TechnologyType: OntologyAnnotation option
+    TechnologyPlatform: OntologyAnnotation option
 } with
     static member init = {
         Identifier = ""
         Title = ""
         Description = ""
-        InvolvedPeople = ""
-        Comments = ""
+        InvolvedPeople = ResizeArray()
+        Comments = ResizeArray()
         MainText = ""
         Files = []
-        Publications = ""
+        Publications = ResizeArray()
         SubmissionDate = ""
         PublicReleaseDate = ""
-        StudyDesignDescriptors = ""
-        MeasurementType = ""
-        TechnologyType = ""
-        TechnologyPlatform = ""
+        StudyDesignDescriptors = ResizeArray()
+        MeasurementType = None
+        TechnologyType = None
+        TechnologyPlatform = None
     }
 
 type LandingUiState = {
@@ -51,11 +55,6 @@ type LandingUiState = {
         IsSubmitting = false
     }
 
-let private splitMultiline (value: string) =
-    value.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
-    |> Array.map (fun s -> s.Trim())
-    |> Array.filter (String.IsNullOrWhiteSpace >> not)
-
 let private toOptionalString (value: string) =
     let trimmed = value.Trim()
     if String.IsNullOrWhiteSpace trimmed then None else Some trimmed
@@ -65,45 +64,47 @@ let toCreateRequest (draft: LandingDraft) (target: ExperimentTarget) : CreateExp
         Identifier = toOptionalString draft.Identifier
         Title = draft.Title.Trim()
         Description = draft.Description.Trim()
-        InvolvedPeople = splitMultiline draft.InvolvedPeople
-        Comments = splitMultiline draft.Comments
+        InvolvedPeople = draft.InvolvedPeople |> Seq.map (Person.toJsonString 0) |> Seq.toArray
+        Comments = draft.Comments |> Seq.map (Comment.toJsonString 0) |> Seq.toArray
         MainText = toOptionalString draft.MainText
         Files = draft.Files |> List.toArray
-        Publications = splitMultiline draft.Publications
+        Publications = draft.Publications |> Seq.map (Publication.toJsonString 0) |> Seq.toArray
         SubmissionDate = toOptionalString draft.SubmissionDate
         PublicReleaseDate = toOptionalString draft.PublicReleaseDate
-        StudyDesignDescriptors = splitMultiline draft.StudyDesignDescriptors
-        MeasurementType = toOptionalString draft.MeasurementType
-        TechnologyType = toOptionalString draft.TechnologyType
-        TechnologyPlatform = toOptionalString draft.TechnologyPlatform
+        StudyDesignDescriptors =
+            draft.StudyDesignDescriptors
+            |> Seq.map (OntologyAnnotation.toJsonString 0)
+            |> Seq.toArray
+        MeasurementType = draft.MeasurementType |> Option.map (OntologyAnnotation.toJsonString 0)
+        TechnologyType = draft.TechnologyType |> Option.map (OntologyAnnotation.toJsonString 0)
+        TechnologyPlatform = draft.TechnologyPlatform |> Option.map (OntologyAnnotation.toJsonString 0)
     }
     Target = target
 }
 
-let private fieldTitle (title: string) =
-    Html.legend [
-        prop.className "swt:fieldset-legend"
-        prop.text title
-    ]
-
-let private textInput (value: string) (setValue: string -> unit) (placeholder: string) =
-    Html.input [
-        prop.className "swt:input swt:input-bordered swt:w-full"
-        prop.value value
-        prop.placeholder placeholder
-        prop.onChange setValue
-    ]
-
-let private textArea (value: string) (setValue: string -> unit) (placeholder: string) =
-    Html.textarea [
-        prop.className "swt:textarea swt:textarea-bordered swt:w-full swt:min-h-24"
-        prop.value value
-        prop.placeholder placeholder
-        prop.onChange setValue
-    ]
-
 let private isRequiredDataValid (draft: LandingDraft) =
     not (String.IsNullOrWhiteSpace draft.Title) && not (String.IsNullOrWhiteSpace draft.Description)
+
+let private boxedHelperField (title: string) (content: ReactElement) =
+    Html.fieldSet [
+        prop.className "swt:fieldset"
+        prop.children [
+            Html.legend [
+                prop.className "swt:fieldset-legend"
+                prop.text title
+            ]
+            Html.div [
+                prop.className "swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+                prop.children [ content ]
+            ]
+        ]
+    ]
+
+let private boxedHelperContent (content: ReactElement) =
+    Html.div [
+        prop.className "swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+        prop.children [ content ]
+    ]
 
 [<ReactComponent>]
 let ExperimentLandingView
@@ -171,55 +172,51 @@ let ExperimentLandingView
                         prop.className "swt:opacity-70"
                         prop.text "Only Title and Description are required. All other fields are optional."
                     ]
+                    FormHelpers.TextInput(
+                        draft.Identifier,
+                        (fun v -> setDraft { draft with Identifier = v }),
+                        label = "Identifier (Optional)",
+                        placeholder = "Auto-generated if empty"
+                    )
+                    FormHelpers.TextInput(
+                        draft.Title,
+                        (fun v -> setDraft { draft with Title = v }),
+                        label = "Title (Required)",
+                        placeholder = "Experiment title"
+                    )
+                    FormHelpers.TextInput(
+                        draft.Description,
+                        (fun v -> setDraft { draft with Description = v }),
+                        label = "Description (Required)",
+                        isArea = true,
+                        placeholder = "Experiment description"
+                    )
+                    boxedHelperField "Involved People" (
+                        FormComponents.PersonsInput(
+                            draft.InvolvedPeople,
+                            (fun persons -> setDraft { draft with InvolvedPeople = persons })
+                        )
+                    )
+                    boxedHelperField "Comments" (
+                        FormComponents.CommentsInput(
+                            draft.Comments,
+                            (fun comments -> setDraft { draft with Comments = comments })
+                        )
+                    )
+                    FormHelpers.TextInput(
+                        draft.MainText,
+                        (fun v -> setDraft { draft with MainText = v }),
+                        label = "Main Text",
+                        isArea = true,
+                        placeholder = "Will be saved as protocol markdown"
+                    )
                     Html.fieldSet [
                         prop.className "swt:fieldset"
                         prop.children [
-                            fieldTitle "Identifier (Optional)"
-                            textInput draft.Identifier (fun v -> setDraft { draft with Identifier = v }) "Auto-generated if empty"
-                        ]
-                    ]
-                    Html.fieldSet [
-                        prop.className "swt:fieldset"
-                        prop.children [
-                            fieldTitle "Title (Required)"
-                            textInput draft.Title (fun v -> setDraft { draft with Title = v }) "Experiment title"
-                        ]
-                    ]
-                    Html.fieldSet [
-                        prop.className "swt:fieldset"
-                        prop.children [
-                            fieldTitle "Description (Required)"
-                            textArea draft.Description (fun v -> setDraft { draft with Description = v }) "Experiment description"
-                        ]
-                    ]
-                    Html.fieldSet [
-                        prop.className "swt:fieldset"
-                        prop.children [
-                            fieldTitle "Involved People"
-                            textArea
-                                draft.InvolvedPeople
-                                (fun v -> setDraft { draft with InvolvedPeople = v })
-                                "One person per line"
-                        ]
-                    ]
-                    Html.fieldSet [
-                        prop.className "swt:fieldset"
-                        prop.children [
-                            fieldTitle "Comments"
-                            textArea draft.Comments (fun v -> setDraft { draft with Comments = v }) "One comment per line"
-                        ]
-                    ]
-                    Html.fieldSet [
-                        prop.className "swt:fieldset"
-                        prop.children [
-                            fieldTitle "Main Text"
-                            textArea draft.MainText (fun v -> setDraft { draft with MainText = v }) "Will be saved as protocol markdown"
-                        ]
-                    ]
-                    Html.fieldSet [
-                        prop.className "swt:fieldset"
-                        prop.children [
-                            fieldTitle "Files"
+                            Html.legend [
+                                prop.className "swt:fieldset-legend"
+                                prop.text "Files"
+                            ]
                             Html.div [
                                 prop.className "swt:border swt:border-dashed swt:border-base-content/30 swt:rounded-box swt:p-4 swt:bg-base-100"
                                 prop.children [
@@ -268,82 +265,51 @@ let ExperimentLandingView
                                     Html.div [
                                         prop.className "swt:space-y-3"
                                         prop.children [
-                                            Html.fieldSet [
-                                                prop.className "swt:fieldset"
-                                                prop.children [
-                                                    fieldTitle "Publications"
-                                                    textArea
-                                                        draft.Publications
-                                                        (fun v -> setDraft { draft with Publications = v })
-                                                        "One publication per line"
-                                                ]
-                                            ]
-                                            Html.fieldSet [
-                                                prop.className "swt:fieldset"
-                                                prop.children [
-                                                    fieldTitle "Submission Date"
-                                                    textInput
-                                                        draft.SubmissionDate
-                                                        (fun v -> setDraft { draft with SubmissionDate = v })
-                                                        "YYYY-MM-DD or free text"
-                                                ]
-                                            ]
-                                            Html.fieldSet [
-                                                prop.className "swt:fieldset"
-                                                prop.children [
-                                                    fieldTitle "Public Release Date"
-                                                    textInput
-                                                        draft.PublicReleaseDate
-                                                        (fun v -> setDraft { draft with PublicReleaseDate = v })
-                                                        "YYYY-MM-DD or free text"
-                                                ]
-                                            ]
-                                            Html.fieldSet [
-                                                prop.className "swt:fieldset"
-                                                prop.children [
-                                                    fieldTitle "Study Design Descriptors"
-                                                    textArea
-                                                        draft.StudyDesignDescriptors
-                                                        (fun v -> setDraft { draft with StudyDesignDescriptors = v })
-                                                        "One descriptor per line"
-                                                ]
-                                            ]
+                                            boxedHelperContent (
+                                                FormComponents.PublicationsInput(
+                                                    draft.Publications,
+                                                    (fun pubs -> setDraft { draft with Publications = pubs }),
+                                                    label = "Publications"
+                                                )
+                                            )
+                                            FormComponents.DateTimeInput(
+                                                draft.SubmissionDate,
+                                                (fun dateText -> setDraft { draft with SubmissionDate = dateText }),
+                                                label = "Submission Date"
+                                            )
+                                            FormComponents.DateTimeInput(
+                                                draft.PublicReleaseDate,
+                                                (fun dateText -> setDraft { draft with PublicReleaseDate = dateText }),
+                                                label = "Public Release Date"
+                                            )
+                                            boxedHelperContent (
+                                                FormComponents.OntologyAnnotationsInput(
+                                                    draft.StudyDesignDescriptors,
+                                                    (fun descriptors -> setDraft { draft with StudyDesignDescriptors = descriptors }),
+                                                    label = "Study Design Descriptors"
+                                                )
+                                            )
                                         ]
                                     ]
                                 | Some ExperimentTarget.Assay ->
                                     Html.div [
                                         prop.className "swt:space-y-3"
                                         prop.children [
-                                            Html.fieldSet [
-                                                prop.className "swt:fieldset"
-                                                prop.children [
-                                                    fieldTitle "Measurement Type"
-                                                    textInput
-                                                        draft.MeasurementType
-                                                        (fun v -> setDraft { draft with MeasurementType = v })
-                                                        "Optional"
-                                                ]
-                                            ]
-                                            Html.fieldSet [
-                                                prop.className "swt:fieldset"
-                                                prop.children [
-                                                    fieldTitle "Technology Type"
-                                                    textInput
-                                                        draft.TechnologyType
-                                                        (fun v -> setDraft { draft with TechnologyType = v })
-                                                        "Optional"
-                                                ]
-                                            ]
-                                            Html.fieldSet [
-                                                prop.className "swt:fieldset"
-                                                prop.children [
-                                                    fieldTitle "Technology Platform"
-                                                    textInput
-                                                        draft.TechnologyPlatform
-                                                        (fun v -> setDraft { draft with TechnologyPlatform = v })
-                                                        "Optional"
-                                                ]
-                                            ]
+                                            FormComponents.OntologyAnnotationInput(
+                                                draft.MeasurementType,
+                                                (fun oa -> setDraft { draft with MeasurementType = oa }),
+                                                label = "Measurement Type"
+                                            )
+                                            FormComponents.OntologyAnnotationInput(
+                                                draft.TechnologyType,
+                                                (fun oa -> setDraft { draft with TechnologyType = oa }),
+                                                label = "Technology Type"
+                                            )
+                                            FormComponents.OntologyAnnotationInput(
+                                                draft.TechnologyPlatform,
+                                                (fun oa -> setDraft { draft with TechnologyPlatform = oa }),
+                                                label = "Technology Platform"
+                                            )
                                         ]
                                     ]
                                 | None -> Html.none
