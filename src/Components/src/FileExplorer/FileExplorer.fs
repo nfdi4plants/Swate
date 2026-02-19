@@ -50,7 +50,12 @@ type FileExplorer =
 
     [<ReactComponent>]
     static member FileExplorer
-        (?initialItems: FileItem list, ?onItemClick: FileItem -> unit, ?onContextMenu: FileItem -> ContextMenuItem list)
+        (
+            ?initialItems: FileItem list,
+            ?onItemClick: FileItem -> unit,
+            ?onContextMenu: FileItem -> ContextMenuItem list,
+            ?selectedItemId: string
+        )
         =
         let reducer model msg = FileExplorerLogic.update msg model
 
@@ -61,6 +66,16 @@ type FileExplorer =
         React.useEffect (
             (fun () -> dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems []))),
             [| box initialItems |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                match selectedItemId with
+                | Some itemId ->
+                    dispatch (FileExplorerLogic.EnsurePathVisible itemId)
+                    dispatch (FileExplorerLogic.SelectItem itemId)
+                | None -> ()),
+            [| box selectedItemId; box model.Items |]
         )
 
         let handleItemClick item =

@@ -253,6 +253,30 @@ type ContextMenuItem = {
 }
 
 module FileExplorerLogic =
+    let rec private collectExpandedIds acc items =
+        items
+        |> List.fold
+            (fun accIds item ->
+                let newAcc = if item.IsExpanded then Set.add item.Id accIds else accIds
+
+                match item.Children with
+                | Some children -> collectExpandedIds newAcc children
+                | None -> newAcc
+            )
+            acc
+
+    let rec private collectIds acc items =
+        items
+        |> List.fold
+            (fun accIds item ->
+                let next = Set.add item.Id accIds
+
+                match item.Children with
+                | Some children -> collectIds next children
+                | None -> next
+            )
+            acc
+
     type Model = {
         Items: FileItem list
         SelectedId: string option
@@ -268,6 +292,7 @@ module FileExplorerLogic =
         | ToggleExpanded of string
         | SelectItem of string
         | NavigateTo of string
+        | EnsurePathVisible of string
         | ShowContextMenu of float * float * ContextMenuItem list
         | HideContextMenu
         | UpdateItems of FileItem list
@@ -277,19 +302,6 @@ module FileExplorerLogic =
         | ToggleLFSDownload of string
 
     let init items =
-        // Collect IDs of items that have IsExpanded = true
-        let rec collectExpandedIds acc items =
-            items
-            |> List.fold
-                (fun accIds item ->
-                    let newAcc = if item.IsExpanded then Set.add item.Id accIds else accIds
-
-                    match item.Children with
-                    | Some children -> collectExpandedIds newAcc children
-                    | None -> newAcc
-                )
-                acc
-
         {
             Items = items
             SelectedId = None
@@ -340,6 +352,20 @@ module FileExplorerLogic =
             else
                 update (SelectItem itemId) model
 
+        | EnsurePathVisible itemId ->
+            let expandedFromPath =
+                match FileTree.getPath itemId model.Items [] with
+                | Some pathItems ->
+                    pathItems
+                    |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
+                    |> Set.ofList
+                | None -> Set.empty
+
+            {
+                model with
+                    ExpandedIds = Set.union model.ExpandedIds expandedFromPath
+            }
+
         | ShowContextMenu(x, y, menuItems) -> {
             model with
                 ContextMenuVisible = true
@@ -353,7 +379,19 @@ module FileExplorerLogic =
                 ContextMenuVisible = false
           }
 
-        | UpdateItems items -> { model with Items = items }
+        | UpdateItems items ->
+            let validIds = collectIds Set.empty items
+            let expandedFromItems = collectExpandedIds Set.empty items
+
+            let persistedExpanded =
+                model.ExpandedIds
+                |> Set.filter (fun id -> validIds.Contains id)
+
+            {
+                model with
+                    Items = items
+                    ExpandedIds = Set.union persistedExpanded expandedFromItems
+            }
 
         | AddChild(parentId, child) ->
             let newItems = FileTree.addChild parentId child model.Items

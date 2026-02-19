@@ -122,6 +122,7 @@ let Main () =
     let (previewError: string option), setPreviewError = React.useState (None)
     let (previewData: PreviewData option), setPreviewData = React.useState (None)
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState (None)
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
     let landingDraftActive, setLandingDraftActive = React.useState false
@@ -134,6 +135,7 @@ let Main () =
         setShowLandingDraft true
         setPreviewData None
         setPreviewError None
+        setSelectedTreeItemPath None
         setDidSelectFile false
         setArcFileState None
 
@@ -165,6 +167,7 @@ let Main () =
             | None ->
                 setLandingDraftActive false
                 setShowLandingDraft false
+                setSelectedTreeItemPath None
                 setAppState AppState.Init
         )
         |> Promise.start
@@ -204,6 +207,18 @@ let Main () =
     //    |> WidgetOrderContainer bringWidgetToFront
 
     let createFileTree (parent: FileItemDTO option) =
+        let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+
+        let isFocusedPathOrAncestor (nodePath: string) =
+            match selectedTreeItemPath with
+            | Some focusedPath ->
+                let normalizedNode = normalizePath nodePath
+                let normalizedFocused = normalizePath focusedPath
+
+                normalizedFocused = normalizedNode
+                || normalizedFocused.StartsWith(normalizedNode + "/", System.StringComparison.OrdinalIgnoreCase)
+            | None -> false
+
         let rec loop (parent: FileItemDTO option) =
             if parent.IsSome then
                 match parent.Value.isDirectory with
@@ -218,11 +233,18 @@ let Main () =
 
                     let result = {
                         FileTree.createFolder parent.Value.name (Some parent.Value.path) "swt:fluent--folder-24-regular" with
+                            Id = parent.Value.path
+                            IsExpanded = isFocusedPathOrAncestor parent.Value.path
                             Children = Some tmp
                     }
                     Some result
                 | false ->
-                    Some(FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular")
+                    Some(
+                        {
+                            FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular" with
+                                Id = parent.Value.path
+                        }
+                    )
             else
                 None
 
@@ -237,6 +259,7 @@ let Main () =
 
                if item.Path.IsSome && not isDirectoryByPath then
                     console.log ($"[Renderer] Opening file: {item.Path.Value}")
+                    setSelectedTreeItemPath item.Path
                     setShowLandingDraft false
                     let! result = Api.openFile item.Path.Value
 
@@ -261,7 +284,13 @@ let Main () =
             |> Promise.start
 
         if fileItem.IsSome then
-            Some(FileExplorer.FileExplorer([fileItem.Value], openPreview))
+            Some(
+                FileExplorer.FileExplorer(
+                    initialItems = [ fileItem.Value ],
+                    onItemClick = openPreview,
+                    ?selectedItemId = selectedTreeItemPath
+                )
+            )
         else
             None
 
@@ -278,7 +307,7 @@ let Main () =
                 match node.children.TryGetValue(part) with
                 | true, existing when ((not isLast) || entry.isDirectory) && not existing.isDirectory ->
                     // A node may first appear via a file path segment; upgrade it to a directory when needed.
-                    let upgraded = { existing with IsDirectory = true }
+                    let upgraded = { existing with isDirectory = true }
                     node.children.[part] <- upgraded
                     upgraded
                 | true, existing -> existing
@@ -350,7 +379,7 @@ let Main () =
 
             createFileTree fileTree |> setFileExplorer |> ignore
         ), 
-        [| box fileTree |]
+        [| box fileTree; box selectedTreeItemPath |]
     )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
@@ -364,6 +393,7 @@ let Main () =
                 | None ->
                     setLandingDraftActive false
                     setShowLandingDraft false
+                    setSelectedTreeItemPath None
                     setAppState AppState.Init
         recentARCsUpdate =
             fun arcs ->
@@ -459,6 +489,16 @@ let Main () =
 
     let selector = Selector.Main(recentARCElements, actionbar, onOpenSelector = onOpenSelector)
 
+    let tryGetCreatedFilePath (target: ExperimentTarget) (identifier: string) =
+        match appState with
+        | AppState.ARC arcPath ->
+            let root = arcPath.Replace("\\", "/").TrimEnd('/')
+
+            match target with
+            | ExperimentTarget.Study -> Some $"{root}/studies/{identifier}/isa.study.xlsx"
+            | ExperimentTarget.Assay -> Some $"{root}/assays/{identifier}/isa.assay.xlsx"
+        | AppState.Init -> None
+
     let createFromLanding (target: ExperimentTarget) =
         promise {
             setLandingUiState {
@@ -472,6 +512,9 @@ let Main () =
 
             match result with
             | Ok response ->
+                response.CreatedIdentifier
+                |> tryGetCreatedFilePath target
+                |> setSelectedTreeItemPath
                 setPreviewData (Some response.PreviewData)
                 setPreviewError None
                 setDidSelectFile true
