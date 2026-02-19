@@ -125,6 +125,60 @@ let private createProtocolFile
 
         Some relativePath
 
+let private copyInvestigationMetadata (source: ArcInvestigation) (target: ARC) =
+    target.Title <- source.Title
+    target.Description <- source.Description
+    target.Contacts <- source.Contacts
+    target.Publications <- source.Publications
+    target.SubmissionDate <- source.SubmissionDate
+    target.PublicReleaseDate <- source.PublicReleaseDate
+    target.OntologySourceReferences <- source.OntologySourceReferences
+    target.Comments <- source.Comments
+
+let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
+    try
+        match request.FileType with
+        | ArcFileType.Investigation ->
+            let investigation = ArcInvestigation.fromJsonString request.Json
+            copyInvestigationMetadata investigation arc
+            Ok(ArcFileData(ArcFileType.Investigation, ArcInvestigation.toJsonString 0 arc))
+        | ArcFileType.Study ->
+            let study = ArcStudy.fromJsonString request.Json
+
+            if arc.TryGetStudy(study.Identifier).IsNone then
+                Error(exn $"Study '{study.Identifier}' not found in ARC.")
+            else
+                arc.SetStudy(study.Identifier, study)
+                Ok(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
+        | ArcFileType.Assay ->
+            let assay = ArcAssay.fromJsonString request.Json
+
+            if arc.TryGetAssay(assay.Identifier).IsNone then
+                Error(exn $"Assay '{assay.Identifier}' not found in ARC.")
+            else
+                arc.SetAssay(assay.Identifier, assay)
+                Ok(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
+        | ArcFileType.Run ->
+            let run = ArcRun.fromJsonString request.Json
+
+            if arc.TryGetRun(run.Identifier).IsNone then
+                Error(exn $"Run '{run.Identifier}' not found in ARC.")
+            else
+                arc.SetRun(run.Identifier, run)
+                Ok(ArcFileData(ArcFileType.Run, ArcRun.toJsonString 0 run))
+        | ArcFileType.Workflow ->
+            let workflow = ArcWorkflow.fromJsonString request.Json
+
+            if arc.TryGetWorkflow(workflow.Identifier).IsNone then
+                Error(exn $"Workflow '{workflow.Identifier}' not found in ARC.")
+            else
+                arc.SetWorkflow(workflow.Identifier, workflow)
+                Ok(ArcFileData(ArcFileType.Workflow, ArcWorkflow.toJsonString 0 workflow))
+        | ArcFileType.DataMap ->
+            Error(exn "Saving DataMap preview is not supported yet in Electron.")
+    with e ->
+        Error e
+
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IArcVaultsApi = {
@@ -374,6 +428,35 @@ let api: IArcVaultsApi = {
                                     return Ok response
                                 finally
                                     vault.isBusyWriting <- false
+                    | _ -> return Error(exn "ARC is not loaded.")
+            with e ->
+                return Error e
+        }
+    saveArcFile =
+        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path, vault.arc with
+                    | Some arcPath, Some arc ->
+                        match applyArcFileSaveRequest arc request with
+                        | Error saveError -> return Error saveError
+                        | Ok previewData ->
+                            vault.isBusyWriting <- true
+
+                            try
+                                do! arc.WriteAsync(arcPath)
+                                do! vault.LoadArc()
+
+                                let fileTree = getFileEntries arcPath |> createFileEntryTree
+                                vault.SetFileTree(fileTree)
+
+                                return Ok previewData
+                            finally
+                                vault.isBusyWriting <- false
                     | _ -> return Error(exn "ARC is not loaded.")
             with e ->
                 return Error e

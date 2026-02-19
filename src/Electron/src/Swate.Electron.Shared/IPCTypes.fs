@@ -57,6 +57,12 @@ type CreateExperimentResponse =
         ProtocolPath: string option
     }
 
+type SaveArcFileRequest =
+    {
+        FileType: ArcFileType
+        Json: string
+    }
+
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Will open ARC in same window
@@ -73,6 +79,7 @@ type IArcVaultsApi = {
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
     createExperimentFromLanding:
         IpcMainEvent -> CreateExperimentRequest -> JS.Promise<Result<CreateExperimentResponse, exn>>
+    saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
 }
 
 type FileEntry =

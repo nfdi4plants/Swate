@@ -24,3 +24,6 @@ let createExperimentFromLanding
     (request: CreateExperimentRequest)
     : JS.Promise<Result<CreateExperimentResponse, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.createExperimentFromLanding($1)"
+
+let saveArcFile (request: SaveArcFileRequest) : JS.Promise<Result<PreviewData, exn>> =
+    emitJsExpr (arcVaultApi, request) "$0.saveArcFile($1)"

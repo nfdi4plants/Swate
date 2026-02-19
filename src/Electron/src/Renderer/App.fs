@@ -77,6 +77,38 @@ let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
+let SerializeArcFileForSave (arcFile: ArcFiles) : SaveArcFileRequest option =
+    match arcFile with
+    | ArcFiles.Investigation investigation ->
+        Some {
+            FileType = ArcFileType.Investigation
+            Json = ArcInvestigation.toJsonString 0 investigation
+        }
+    | ArcFiles.Study(study, _) ->
+        Some {
+            FileType = ArcFileType.Study
+            Json = ArcStudy.toJsonString 0 study
+        }
+    | ArcFiles.Assay assay ->
+        Some {
+            FileType = ArcFileType.Assay
+            Json = ArcAssay.toJsonString 0 assay
+        }
+    | ArcFiles.Run run ->
+        Some {
+            FileType = ArcFileType.Run
+            Json = ArcRun.toJsonString 0 run
+        }
+    | ArcFiles.Workflow workflow ->
+        Some {
+            FileType = ArcFileType.Workflow
+            Json = ArcWorkflow.toJsonString 0 workflow
+        }
+    | ArcFiles.DataMap _ ->
+        None
+    | ArcFiles.Template _ ->
+        None
+
 [<ReactComponent>]
 let Main () =
 
@@ -499,8 +531,26 @@ let Main () =
                             "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
                     ]
 
-    let onClick test =
-        ()
+    let onClick _ =
+        match arcFileState with
+        | None -> ()
+        | Some arcFile ->
+            match SerializeArcFileForSave arcFile with
+            | None ->
+                setPreviewError (Some "Saving this file type is not supported in Electron yet.")
+            | Some request ->
+                promise {
+                    let! result = Api.saveArcFile request
+
+                    match result with
+                    | Ok updatedPreview ->
+                        setPreviewData (Some updatedPreview)
+                        setPreviewError None
+                        setDidSelectFile true
+                    | Error exn ->
+                        setPreviewError (Some $"Save failed: {exn.Message}")
+                }
+                |> Promise.start
 
     let children =
         React.useMemo (
