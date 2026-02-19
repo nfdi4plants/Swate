@@ -15,6 +15,7 @@ open ARCtrl
 open ARCtrl.Json
 
 open components.MainElement
+open components.ExperimentLanding
 
 
 [<ReactComponent>]
@@ -89,6 +90,20 @@ let Main () =
     let (previewError: string option), setPreviewError = React.useState (None)
     let (previewData: PreviewData option), setPreviewData = React.useState (None)
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+    let landingDraft, setLandingDraft = React.useState LandingDraft.init
+    let landingUiState, setLandingUiState = React.useState LandingUiState.init
+    let landingDraftActive, setLandingDraftActive = React.useState false
+    let showLandingDraft, setShowLandingDraft = React.useState false
+
+    let resetLandingDraft () =
+        setLandingDraft LandingDraft.init
+        setLandingUiState LandingUiState.init
+        setLandingDraftActive true
+        setShowLandingDraft true
+        setPreviewData None
+        setPreviewError None
+        setDidSelectFile false
+        setArcFileState None
 
     React.useEffect (
         (fun () ->
@@ -109,11 +124,16 @@ let Main () =
     )
 
     React.useLayoutEffectOnce (fun _ ->
-        Api.arcVaultApi.getOpenPath JS.undefined
+        Api.getOpenPath()
         |> Promise.map (fun pathOption ->
             match pathOption with
-            | Some p -> AppState.ARC p |> setAppState
-            | None -> setAppState AppState.Init
+            | Some p ->
+                resetLandingDraft ()
+                AppState.ARC p |> setAppState
+            | None ->
+                setLandingDraftActive false
+                setShowLandingDraft false
+                setAppState AppState.Init
         )
         |> Promise.start
     )
@@ -180,7 +200,8 @@ let Main () =
             promise {
                if item.Path.IsSome && not item.IsDirectory then
                     console.log ($"[Renderer] Opening file: {item.Path.Value}")
-                    let! result = Api.arcVaultApi.openFile item.Path.Value
+                    setShowLandingDraft false
+                    let! result = Api.openFile item.Path.Value
 
                     match result with
                     | Ok data ->
@@ -277,8 +298,13 @@ let Main () =
             fun pathOption ->
                 console.log ("[Swate] CHANGE PATH!")
                 match pathOption with
-                | Some p -> AppState.ARC p |> setAppState
-                | None -> setAppState AppState.Init
+                | Some p ->
+                    resetLandingDraft ()
+                    AppState.ARC p |> setAppState
+                | None ->
+                    setLandingDraftActive false
+                    setShowLandingDraft false
+                    setAppState AppState.Init
         recentARCsUpdate =
             fun arcs ->
                 console.log ("[Swate] CHANGE RECENTARCS!")
@@ -303,7 +329,7 @@ let Main () =
     let openCurrentWindow =
         fun _ ->
             promise {
-                let! r = Api.arcVaultApi.openARC Fable.Core.JS.undefined
+                let! r = Api.openARC()
 
                 match r with
                 | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -373,6 +399,35 @@ let Main () =
 
     let selector = Selector.Main(recentARCElements, actionbar, onOpenSelector = onOpenSelector)
 
+    let createFromLanding (target: ExperimentTarget) =
+        promise {
+            setLandingUiState {
+                landingUiState with
+                    IsSubmitting = true
+                    Error = None
+            }
+
+            let request = toCreateRequest landingDraft target
+            let! result = Api.createExperimentFromLanding request
+
+            match result with
+            | Ok response ->
+                setPreviewData (Some response.PreviewData)
+                setPreviewError None
+                setDidSelectFile true
+                setShowLandingDraft false
+                setLandingDraftActive false
+                setLandingDraft LandingDraft.init
+                setLandingUiState LandingUiState.init
+            | Error exn ->
+                setLandingUiState {
+                    landingUiState with
+                        IsSubmitting = false
+                        Error = Some exn.Message
+                }
+        }
+        |> Promise.start
+
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     //let changedArcFile arcFileState arcFile =
@@ -391,55 +446,58 @@ let Main () =
     //        DataMapTable.DataMapTable(dm, setDm)
 
     let computeARCContent (path: string) =
-        match previewData with
-        | Some data ->
-            match data with
-            | ArcFileData _ ->
-                match arcFileState with
-                | Some arcFile ->
-                    CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
-                | None ->
+        if landingDraftActive && showLandingDraft then
+            ExperimentLandingView(landingDraft, setLandingDraft, landingUiState, setLandingUiState, createFromLanding)
+        else
+            match previewData with
+            | Some data ->
+                match data with
+                | ArcFileData _ ->
+                    match arcFileState with
+                    | Some arcFile ->
+                        CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
+                    | None ->
+                        Html.div [
+                            prop.className "swt:p-4 swt:text-error"
+                            prop.text "Failed to parse ArcFile data"
+                        ]
+                | Text content ->
                     Html.div [
-                        prop.className "swt:p-4 swt:text-error"
-                        prop.text "Failed to parse ArcFile data"
+                        prop.className "swt:size-full swt:p-4 swt:overflow-auto swt:bg-base-100"
+                        prop.children [|
+                            Html.pre [
+                                prop.className "swt:text-sm swt:font-mono"
+                                prop.text content
+                            ]
+                        |]
                     ]
-            | Text content ->
-                Html.div [
-                    prop.className "swt:size-full swt:p-4 swt:overflow-auto swt:bg-base-100"
-                    prop.children [|
-                        Html.pre [
-                            prop.className "swt:text-sm swt:font-mono"
-                            prop.text content
-                        ]
-                    |]
-                ]
-            | Unknown ->
-                Html.div [
-                    prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
-                    prop.children [| Html.h1 "Unknown file type" |]
-                ]
-        | None ->
-            match previewError with
-            | Some errMsg ->
-                Html.div [
-                    prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
-                    prop.children [|
-                        Html.h2 [
-                            prop.className "swt:text-error swt:font-bold"
-                            prop.text "Preview Error"
-                        ]
-                        Html.span [
-                            prop.className "swt:text-base-content swt:opacity-70"
-                            prop.text errMsg
-                        ]
-                    |]
-                ]
+                | Unknown ->
+                    Html.div [
+                        prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
+                        prop.children [| Html.h1 "Unknown file type" |]
+                    ]
             | None ->
-                Html.h1 [
-                    prop.text path
-                    prop.className
-                        "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
-                ]
+                match previewError with
+                | Some errMsg ->
+                    Html.div [
+                        prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
+                        prop.children [|
+                            Html.h2 [
+                                prop.className "swt:text-error swt:font-bold"
+                                prop.text "Preview Error"
+                            ]
+                            Html.span [
+                                prop.className "swt:text-base-content swt:opacity-70"
+                                prop.text errMsg
+                            ]
+                        |]
+                    ]
+                | None ->
+                    Html.h1 [
+                        prop.text path
+                        prop.className
+                            "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
+                    ]
 
     let onClick test =
         ()
@@ -491,7 +549,17 @@ let Main () =
                         ]
                     ]
             ),
-            [| appState; box previewData; box activeView; box arcFileState |]
+            [|
+                appState
+                box previewData
+                box activeView
+                box arcFileState
+                box previewError
+                box landingDraft
+                box landingUiState
+                box landingDraftActive
+                box showLandingDraft
+            |]
         )
 
     let navbar = Navbar.Main(selector)
@@ -514,6 +582,17 @@ let Main () =
                      Html.div [
                          prop.className "swt:p-4"
                          prop.children [|
+                            match appState with
+                            | AppState.ARC _ when landingDraftActive ->
+                                Html.button [
+                                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                                    prop.text "Landing Page"
+                                    prop.onClick (fun _ ->
+                                        setPreviewError None
+                                        setShowLandingDraft true
+                                    )
+                                ]
+                            | _ -> Html.none
                             Html.h2 [
                                 prop.text "ARC-Tree"
                             ]

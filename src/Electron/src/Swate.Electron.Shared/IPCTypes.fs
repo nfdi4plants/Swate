@@ -21,6 +21,42 @@ type PreviewData =
     | Text of string
     | Unknown
 
+[<RequireQualifiedAccess>]
+type ExperimentTarget =
+    | Study
+    | Assay
+
+type ExperimentMetadata =
+    {
+        Identifier: string option
+        Title: string
+        Description: string
+        InvolvedPeople: string []
+        Comments: string []
+        MainText: string option
+        Files: string []
+        Publications: string []
+        SubmissionDate: string option
+        PublicReleaseDate: string option
+        StudyDesignDescriptors: string []
+        MeasurementType: string option
+        TechnologyType: string option
+        TechnologyPlatform: string option
+    }
+
+type CreateExperimentRequest =
+    {
+        Metadata: ExperimentMetadata
+        Target: ExperimentTarget
+    }
+
+type CreateExperimentResponse =
+    {
+        PreviewData: PreviewData
+        CreatedIdentifier: string
+        ProtocolPath: string option
+    }
+
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Will open ARC in same window
@@ -34,7 +70,9 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
     checkForARC: string -> JS.Promise<bool>
-    openFile: string -> JS.Promise<Result<PreviewData, exn>>
+    openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
+    createExperimentFromLanding:
+        IpcMainEvent -> CreateExperimentRequest -> JS.Promise<Result<CreateExperimentResponse, exn>>
 }
 
 type FileEntry =
