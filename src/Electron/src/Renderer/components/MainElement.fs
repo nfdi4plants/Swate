@@ -119,19 +119,60 @@ let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onCli
         //]
     ]
 
+[<Literal>]
+let private NewTablePrefix = "NewTable"
+
+let private canCreateTables (arcFile: ArcFiles) =
+    match arcFile with
+    | ArcFiles.Assay _
+    | ArcFiles.Study _
+    | ArcFiles.Run _ -> true
+    | _ -> false
+
+let private createNewTableName (tables: ResizeArray<ArcTable>) =
+    let existingNames = tables |> Seq.map (fun t -> t.Name)
+
+    let rec loop ind =
+        let name = NewTablePrefix + string ind
+
+        if Seq.contains name existingNames then
+            loop (ind + 1)
+        else
+            name
+
+    loop 0
+
 [<ReactComponent>]
-let CreateARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) =
+let CreateARCitectFooter
+    (arcFile: ArcFiles)
+    (activeView: PreviewActiveView)
+    (setActiveView: PreviewActiveView -> unit)
+    (setArcFile: ArcFiles -> unit)
+    =
     let tables = arcFile.Tables()
+    let canAddTable = canCreateTables arcFile
+
+    let addNewTable () =
+        if canAddTable then
+            let nextName = createNewTableName tables
+            let nextTable = ArcTable.init nextName
+
+            tables.Add(nextTable)
+            setArcFile arcFile
+            setActiveView (PreviewActiveView.Table (tables.Count - 1))
+
+    let footerTabBaseClasses =
+        "swt:btn swt:btn-sm swt:border swt:!border-white swt:hover:!border-white swt:rounded-none"
 
     Html.div [
-        prop.className "swt:flex swt:gap-1 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300 swt:overflow-x-auto"
+        prop.className "swt:flex swt:gap-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300 swt:overflow-x-auto"
         prop.children [|
             // Metadata tab
             Html.button [
                 prop.className [
-                    "swt:btn swt:btn-sm"
+                    footerTabBaseClasses
                     if activeView = PreviewActiveView.Metadata then
-                        "swt:btn-primary"
+                        "swt:btn-primary swt:border-2 swt:!border-white"
                     else
                         "swt:btn-ghost"
                 ]
@@ -150,9 +191,9 @@ let CreateARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
                 Html.button [
                     prop.key (string i)
                     prop.className [
-                        "swt:btn swt:btn-sm"
+                        footerTabBaseClasses
                         if activeView = PreviewActiveView.Table i then
-                            "swt:btn-primary"
+                            "swt:btn-primary swt:border-2 swt:!border-white"
                         else
                             "swt:btn-ghost"
                     ]
@@ -162,14 +203,26 @@ let CreateARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
                         Html.span [ prop.text table.Name ]
                     |]
                 ]
+            if canAddTable then
+                Html.button [
+                    prop.key "new-table-button"
+                    prop.title "+"
+                    prop.className
+                        "swt:btn swt:btn-sm swt:btn-outline swt:items-center swt:border swt:!border-white swt:hover:!border-white swt:rounded-none"
+                    prop.onClick (fun _ -> addNewTable ())
+                    prop.children [|
+                        //Html.span [ prop.className "swt:i-fluent--add-square-24-regular" ]
+                        Html.span [ prop.text "+" ]
+                    |]
+                ]
             // DataMap tab
             match arcFile with
             | ArcFiles.Assay a when a.DataMap.IsSome ->
                 Html.button [
                     prop.className [
-                        "swt:btn swt:btn-sm"
+                        footerTabBaseClasses
                         if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
+                            "swt:btn-primary swt:border-2 swt:!border-white"
                         else
                             "swt:btn-ghost"
                     ]
@@ -182,9 +235,9 @@ let CreateARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
             | ArcFiles.Study(s, _) when s.DataMap.IsSome ->
                 Html.button [
                     prop.className [
-                        "swt:btn swt:btn-sm"
+                        footerTabBaseClasses
                         if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
+                            "swt:btn-primary swt:border-2 swt:!border-white"
                         else
                             "swt:btn-ghost"
                     ]
@@ -197,9 +250,9 @@ let CreateARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
             | ArcFiles.Run r when r.DataMap.IsSome ->
                 Html.button [
                     prop.className [
-                        "swt:btn swt:btn-sm"
+                        footerTabBaseClasses
                         if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
+                            "swt:btn-primary swt:border-2 swt:!border-white"
                         else
                             "swt:btn-ghost"
                     ]
@@ -212,9 +265,9 @@ let CreateARCitectFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (se
             | ArcFiles.DataMap _ ->
                 Html.button [
                     prop.className [
-                        "swt:btn swt:btn-sm"
+                        footerTabBaseClasses
                         if activeView = PreviewActiveView.DataMap then
-                            "swt:btn-primary"
+                            "swt:btn-primary swt:border-2 swt:!border-white"
                         else
                             "swt:btn-ghost"
                     ]

@@ -15,6 +15,11 @@ type ActiveTableData = {
     TableIndex: int
 }
 
+type ActiveDataMapData = {
+    ArcFile: ArcFiles
+    DataMap: DataMap
+}
+
 [<RequireQualifiedAccess>]
 type private DropdownPage =
     | Main

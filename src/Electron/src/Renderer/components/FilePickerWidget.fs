@@ -24,11 +24,6 @@ type private InsertStart = {
     RowIndex: int
 }
 
-type ActiveDataMapData = {
-    ArcFile: ArcFiles
-    DataMap: DataMap
-}
-
 module private FilePickerState =
 
     let private swap (left: int) (right: int) (fileNames: string list) =

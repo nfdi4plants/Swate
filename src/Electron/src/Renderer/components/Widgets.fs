@@ -14,6 +14,7 @@ open MainComponents.InitExtensions
 open Renderer.components.BuildingBlockWidget
 open Renderer.components.TemplateWidget
 open Renderer.components.FilePickerWidget
+open Renderer.components.DataAnnotatorWidget
 
 let addWidget widgets setWidgets (widget: MainComponents.Widget) =
     let add widget widgets =
@@ -228,6 +229,9 @@ let WidgetView
             Html.div [
                 prop.title "DataAnnotator"
                 prop.className "swt:flex swt:flex-col swt:gap-2 swt:overflow-y-hidden"
+                prop.children [
+                    DataAnnotatorWidget.Main(activeTableData, activeDataMapData, onTableMutated)
+                ]
             ]
 
     Html.div [

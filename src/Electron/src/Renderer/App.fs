@@ -17,7 +17,6 @@ open ARCtrl.Json
 open components.MainElement
 open components.ExperimentLanding
 open Renderer.components.BuildingBlockWidget
-open Renderer.components.FilePickerWidget
 
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
@@ -49,7 +48,7 @@ let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
                     CreateTableView activeView arcFile setArcFile
                 ]
             ]
-            CreateARCitectFooter arcFile activeView setActiveView
+            CreateARCitectFooter arcFile activeView setActiveView setArcFile
         |]
     ]
 
