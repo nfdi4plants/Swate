@@ -244,7 +244,7 @@ type TemplateWidget =
                                                         prop.children [
                                                             Html.input [
                                                                 prop.type'.checkbox
-                                                                prop.custom ("readOnly", true)
+                                                                prop.readOnly true
                                                                 prop.isChecked isSelected
                                                                 prop.className "swt:checkbox"
                                                             ]
@@ -397,7 +397,7 @@ type TemplateWidget =
                                                     prop.isChecked isSelected
                                                     if importMode = TemplateImportMode.Skip then
                                                         prop.disabled true
-                                                    prop.onClick (fun _ -> toggleColumnSelected template.Id columnIndex)
+                                                    prop.onChange (fun (_: Browser.Types.Event) -> toggleColumnSelected template.Id columnIndex)
                                                 ]
                                                 Html.span [
                                                     prop.className "swt:text-sm swt:font-medium swt:line-clamp-2"
@@ -440,7 +440,7 @@ type TemplateWidget =
                     prop.type'.checkbox
                     prop.className "swt:min-h-0 swt:h-5"
                     prop.isChecked isRowExtended
-                    prop.onClick (fun _ -> setIsRowExtended (not isRowExtended))
+                    prop.onChange (fun (_: Browser.Types.Event) -> setIsRowExtended (not isRowExtended))
                 ]
                 Html.div [
                     prop.className
@@ -561,7 +561,7 @@ type TemplateWidget =
                         prop.className "swt:radio swt:radio-sm"
                         prop.name "template-import-detail"
                         prop.isChecked isSelected
-                        prop.onClick (fun _ -> setImportType option)
+                        prop.onChange (fun (_: Browser.Types.Event) -> setImportType option)
                     ]
                     Html.span [
                         prop.className "swt:text-sm"
@@ -717,7 +717,7 @@ type TemplateWidget =
                                                                 prop.className "swt:radio swt:radio-sm"
                                                                 prop.name radioName
                                                                 prop.isChecked isSelected
-                                                                prop.onClick (fun _ -> setTemplateImportMode template.Id mode)
+                                                                prop.onChange (fun (_: Browser.Types.Event) -> setTemplateImportMode template.Id mode)
                                                             ]
                                                             Html.span [
                                                                 prop.className "swt:text-sm"
