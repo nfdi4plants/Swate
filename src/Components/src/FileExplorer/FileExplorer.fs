@@ -73,7 +73,8 @@ type FileExplorer =
                 match selectedItemId with
                 | Some itemId ->
                     dispatch (FileExplorerLogic.EnsurePathVisible itemId)
-                    dispatch (FileExplorerLogic.SelectItem itemId)
+                    if model.SelectedId <> Some itemId then
+                        dispatch (FileExplorerLogic.SelectItem itemId)
                 | None -> ()),
             [| box selectedItemId; box model.Items |]
         )
