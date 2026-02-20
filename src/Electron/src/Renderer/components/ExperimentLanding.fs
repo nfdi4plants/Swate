@@ -234,7 +234,7 @@ let ExperimentLandingView
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary"
                                 prop.onClick (fun _ -> continueToQuestions ())
-                                prop.text "Save"
+                                prop.text "Continue"
                             ]
                             match uiState.Error with
                             | Some err ->
