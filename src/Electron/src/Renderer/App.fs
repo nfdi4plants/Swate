@@ -15,6 +15,7 @@ open ARCtrl
 open ARCtrl.Json
 
 open components.MainElement
+open components.ExperimentLanding
 
 
 [<ReactComponent>]
@@ -76,6 +77,38 @@ let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
+let SerializeArcFileForSave (arcFile: ArcFiles) : SaveArcFileRequest option =
+    match arcFile with
+    | ArcFiles.Investigation investigation ->
+        Some {
+            FileType = ArcFileType.Investigation
+            Json = ArcInvestigation.toJsonString 0 investigation
+        }
+    | ArcFiles.Study(study, _) ->
+        Some {
+            FileType = ArcFileType.Study
+            Json = ArcStudy.toJsonString 0 study
+        }
+    | ArcFiles.Assay assay ->
+        Some {
+            FileType = ArcFileType.Assay
+            Json = ArcAssay.toJsonString 0 assay
+        }
+    | ArcFiles.Run run ->
+        Some {
+            FileType = ArcFileType.Run
+            Json = ArcRun.toJsonString 0 run
+        }
+    | ArcFiles.Workflow workflow ->
+        Some {
+            FileType = ArcFileType.Workflow
+            Json = ArcWorkflow.toJsonString 0 workflow
+        }
+    | ArcFiles.DataMap _ ->
+        None
+    | ArcFiles.Template _ ->
+        None
+
 [<ReactComponent>]
 let Main () =
 
@@ -89,6 +122,22 @@ let Main () =
     let (previewError: string option), setPreviewError = React.useState (None)
     let (previewData: PreviewData option), setPreviewData = React.useState (None)
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState (None)
+    let landingDraft, setLandingDraft = React.useState LandingDraft.init
+    let landingUiState, setLandingUiState = React.useState LandingUiState.init
+    let landingDraftActive, setLandingDraftActive = React.useState false
+    let showLandingDraft, setShowLandingDraft = React.useState false
+
+    let resetLandingDraft () =
+        setLandingDraft LandingDraft.init
+        setLandingUiState LandingUiState.init
+        setLandingDraftActive true
+        setShowLandingDraft true
+        setPreviewData None
+        setPreviewError None
+        setSelectedTreeItemPath None
+        setDidSelectFile false
+        setArcFileState None
 
     React.useEffect (
         (fun () ->
@@ -109,11 +158,17 @@ let Main () =
     )
 
     React.useLayoutEffectOnce (fun _ ->
-        Api.arcVaultApi.getOpenPath JS.undefined
+        Api.getOpenPath()
         |> Promise.map (fun pathOption ->
             match pathOption with
-            | Some p -> AppState.ARC p |> setAppState
-            | None -> setAppState AppState.Init
+            | Some p ->
+                resetLandingDraft ()
+                AppState.ARC p |> setAppState
+            | None ->
+                setLandingDraftActive false
+                setShowLandingDraft false
+                setSelectedTreeItemPath None
+                setAppState AppState.Init
         )
         |> Promise.start
     )
@@ -152,6 +207,18 @@ let Main () =
     //    |> WidgetOrderContainer bringWidgetToFront
 
     let createFileTree (parent: FileItemDTO option) =
+        let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+
+        let isFocusedPathOrAncestor (nodePath: string) =
+            match selectedTreeItemPath with
+            | Some focusedPath ->
+                let normalizedNode = normalizePath nodePath
+                let normalizedFocused = normalizePath focusedPath
+
+                normalizedFocused = normalizedNode
+                || normalizedFocused.StartsWith(normalizedNode + "/", System.StringComparison.OrdinalIgnoreCase)
+            | None -> false
+
         let rec loop (parent: FileItemDTO option) =
             if parent.IsSome then
                 match parent.Value.isDirectory with
@@ -166,11 +233,18 @@ let Main () =
 
                     let result = {
                         FileTree.createFolder parent.Value.name (Some parent.Value.path) "swt:fluent--folder-24-regular" with
+                            Id = parent.Value.path
+                            IsExpanded = isFocusedPathOrAncestor parent.Value.path
                             Children = Some tmp
                     }
                     Some result
                 | false ->
-                    Some(FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular")
+                    Some(
+                        {
+                            FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular" with
+                                Id = parent.Value.path
+                        }
+                    )
             else
                 None
 
@@ -178,9 +252,16 @@ let Main () =
 
         let openPreview (item: FileItem) =
             promise {
-               if item.Path.IsSome && not item.IsDirectory then
+               let isDirectoryByPath =
+                    match item.Path with
+                    | Some p when fileTree.ContainsKey(p) -> fileTree.[p].isDirectory
+                    | _ -> item.IsDirectory
+
+               if item.Path.IsSome && not isDirectoryByPath then
                     console.log ($"[Renderer] Opening file: {item.Path.Value}")
-                    let! result = Api.arcVaultApi.openFile item.Path.Value
+                    setSelectedTreeItemPath item.Path
+                    setShowLandingDraft false
+                    let! result = Api.openFile item.Path.Value
 
                     match result with
                     | Ok data ->
@@ -194,13 +275,22 @@ let Main () =
                         setPreviewData (None)
                         setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
                         setDidSelectFile true
+               elif item.Path.IsSome && isDirectoryByPath then
+                    // Folders are not preview targets.
+                    setPreviewError None
                 else
                     setPreviewError (Some $"File '{item.Name}' has no path.")
             }
             |> Promise.start
 
         if fileItem.IsSome then
-            Some(FileExplorer.FileExplorer([fileItem.Value], openPreview))
+            Some(
+                FileExplorer.FileExplorer(
+                    initialItems = [ fileItem.Value ],
+                    onItemClick = openPreview,
+                    ?selectedItemId = selectedTreeItemPath
+                )
+            )
         else
             None
 
@@ -215,13 +305,24 @@ let Main () =
 
             let child =
                 match node.children.TryGetValue(part) with
+                | true, existing when ((not isLast) || entry.isDirectory) && not existing.isDirectory ->
+                    // A node may first appear via a file path segment; upgrade it to a directory when needed.
+                    let upgraded = { existing with isDirectory = true }
+                    node.children.[part] <- upgraded
+                    upgraded
                 | true, existing -> existing
                 | false, _ ->
                     let newPath = parts.[0..index] |> String.concat "/"
+                    let isDirectory =
+                        if isLast then
+                            entry.isDirectory
+                        else
+                            true
+
                     let newNode =
                         FileItemDTO.create(
                             part,
-                            entry.isDirectory,
+                            isDirectory,
                             newPath,
                             System.Collections.Generic.Dictionary()
                         )
@@ -243,7 +344,16 @@ let Main () =
             |> Array.last
             |> String.concat "/"
 
-        let adaptedFileEntires = fileEntries |> Array.filter (fun fileEntry -> fileEntry.path <> rootPath)
+        let adaptedFileEntires =
+            fileEntries
+            |> Array.filter (fun fileEntry -> fileEntry.path <> rootPath)
+            // Deterministic order avoids creating parents from file entries before their directory entries.
+            |> Array.sortBy (fun fileEntry ->
+                let depth =
+                    fileEntry.path.Split('/', System.StringSplitOptions.RemoveEmptyEntries).Length
+
+                depth, (if fileEntry.isDirectory then 0 else 1), fileEntry.path
+            )
 
         let rootElement =
             let tmp =
@@ -269,7 +379,7 @@ let Main () =
 
             createFileTree fileTree |> setFileExplorer |> ignore
         ), 
-        [| box fileTree |]
+        [| box fileTree; box selectedTreeItemPath |]
     )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
@@ -277,8 +387,14 @@ let Main () =
             fun pathOption ->
                 console.log ("[Swate] CHANGE PATH!")
                 match pathOption with
-                | Some p -> AppState.ARC p |> setAppState
-                | None -> setAppState AppState.Init
+                | Some p ->
+                    resetLandingDraft ()
+                    AppState.ARC p |> setAppState
+                | None ->
+                    setLandingDraftActive false
+                    setShowLandingDraft false
+                    setSelectedTreeItemPath None
+                    setAppState AppState.Init
         recentARCsUpdate =
             fun arcs ->
                 console.log ("[Swate] CHANGE RECENTARCS!")
@@ -303,7 +419,7 @@ let Main () =
     let openCurrentWindow =
         fun _ ->
             promise {
-                let! r = Api.arcVaultApi.openARC Fable.Core.JS.undefined
+                let! r = Api.openARC()
 
                 match r with
                 | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -373,6 +489,48 @@ let Main () =
 
     let selector = Selector.Main(recentARCElements, actionbar, onOpenSelector = onOpenSelector)
 
+    let tryGetCreatedFilePath (target: ExperimentTarget) (identifier: string) =
+        match appState with
+        | AppState.ARC arcPath ->
+            let root = arcPath.Replace("\\", "/").TrimEnd('/')
+
+            match target with
+            | ExperimentTarget.Study -> Some $"{root}/studies/{identifier}/isa.study.xlsx"
+            | ExperimentTarget.Assay -> Some $"{root}/assays/{identifier}/isa.assay.xlsx"
+        | AppState.Init -> None
+
+    let createFromLanding (target: ExperimentTarget) =
+        promise {
+            setLandingUiState {
+                landingUiState with
+                    IsSubmitting = true
+                    Error = None
+            }
+
+            let request = toCreateRequest landingDraft target
+            let! result = Api.createExperimentFromLanding request
+
+            match result with
+            | Ok response ->
+                response.CreatedIdentifier
+                |> tryGetCreatedFilePath target
+                |> setSelectedTreeItemPath
+                setPreviewData (Some response.PreviewData)
+                setPreviewError None
+                setDidSelectFile true
+                setShowLandingDraft false
+                setLandingDraftActive false
+                setLandingDraft LandingDraft.init
+                setLandingUiState LandingUiState.init
+            | Error exn ->
+                setLandingUiState {
+                    landingUiState with
+                        IsSubmitting = false
+                        Error = Some exn.Message
+                }
+        }
+        |> Promise.start
+
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     //let changedArcFile arcFileState arcFile =
@@ -391,58 +549,79 @@ let Main () =
     //        DataMapTable.DataMapTable(dm, setDm)
 
     let computeARCContent (path: string) =
-        match previewData with
-        | Some data ->
-            match data with
-            | ArcFileData _ ->
-                match arcFileState with
-                | Some arcFile ->
-                    CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
-                | None ->
+        if landingDraftActive && showLandingDraft then
+            ExperimentLandingView(landingDraft, setLandingDraft, landingUiState, setLandingUiState, createFromLanding)
+        else
+            match previewData with
+            | Some data ->
+                match data with
+                | ArcFileData _ ->
+                    match arcFileState with
+                    | Some arcFile ->
+                        CreateARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
+                    | None ->
+                        Html.div [
+                            prop.className "swt:p-4 swt:text-error"
+                            prop.text "Failed to parse ArcFile data"
+                        ]
+                | Text content ->
                     Html.div [
-                        prop.className "swt:p-4 swt:text-error"
-                        prop.text "Failed to parse ArcFile data"
+                        prop.className "swt:size-full swt:p-4 swt:overflow-auto swt:bg-base-100"
+                        prop.children [|
+                            Html.pre [
+                                prop.className "swt:text-sm swt:font-mono"
+                                prop.text content
+                            ]
+                        |]
                     ]
-            | Text content ->
-                Html.div [
-                    prop.className "swt:size-full swt:p-4 swt:overflow-auto swt:bg-base-100"
-                    prop.children [|
-                        Html.pre [
-                            prop.className "swt:text-sm swt:font-mono"
-                            prop.text content
-                        ]
-                    |]
-                ]
-            | Unknown ->
-                Html.div [
-                    prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
-                    prop.children [| Html.h1 "Unknown file type" |]
-                ]
-        | None ->
-            match previewError with
-            | Some errMsg ->
-                Html.div [
-                    prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
-                    prop.children [|
-                        Html.h2 [
-                            prop.className "swt:text-error swt:font-bold"
-                            prop.text "Preview Error"
-                        ]
-                        Html.span [
-                            prop.className "swt:text-base-content swt:opacity-70"
-                            prop.text errMsg
-                        ]
-                    |]
-                ]
+                | Unknown ->
+                    Html.div [
+                        prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
+                        prop.children [| Html.h1 "Unknown file type" |]
+                    ]
             | None ->
-                Html.h1 [
-                    prop.text path
-                    prop.className
-                        "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
-                ]
+                match previewError with
+                | Some errMsg ->
+                    Html.div [
+                        prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
+                        prop.children [|
+                            Html.h2 [
+                                prop.className "swt:text-error swt:font-bold"
+                                prop.text "Preview Error"
+                            ]
+                            Html.span [
+                                prop.className "swt:text-base-content swt:opacity-70"
+                                prop.text errMsg
+                            ]
+                        |]
+                    ]
+                | None ->
+                    Html.h1 [
+                        prop.text path
+                        prop.className
+                            "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
+                    ]
 
-    let onClick test =
-        ()
+    let onClick _ =
+        match arcFileState with
+        | None -> ()
+        | Some arcFile ->
+            match SerializeArcFileForSave arcFile with
+            | None ->
+                setPreviewError (Some "Saving this file type is not supported in Electron yet.")
+            | Some request ->
+                promise {
+                    let! result = Api.saveArcFile request
+
+                    match result with
+                    | Ok updatedPreview ->
+                        setPreviewData (Some updatedPreview)
+                        setPreviewError None
+                        setDidSelectFile true
+                    | Error exn ->
+                        setPreviewError (Some $"Save failed: {exn.Message}")
+                }
+                |> Promise.start
 
     let children =
         React.useMemo (
@@ -491,7 +670,17 @@ let Main () =
                         ]
                     ]
             ),
-            [| appState; box previewData; box activeView; box arcFileState |]
+            [|
+                appState
+                box previewData
+                box activeView
+                box arcFileState
+                box previewError
+                box landingDraft
+                box landingUiState
+                box landingDraftActive
+                box showLandingDraft
+            |]
         )
 
     let navbar = Navbar.Main(selector)
@@ -514,6 +703,21 @@ let Main () =
                      Html.div [
                          prop.className "swt:p-4"
                          prop.children [|
+                            match appState with
+                            | AppState.ARC _ ->
+                                Html.button [
+                                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                                    prop.text "Landing Page"
+                                    prop.onClick (fun _ ->
+                                        setPreviewError None
+
+                                        if landingDraftActive then
+                                            setShowLandingDraft true
+                                        else
+                                            resetLandingDraft ()
+                                    )
+                                ]
+                            | _ -> Html.none
                             Html.h2 [
                                 prop.text "ARC-Tree"
                             ]

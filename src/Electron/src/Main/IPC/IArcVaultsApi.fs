@@ -9,6 +9,196 @@ open Main
 open Node.Api
 open ARCtrl
 open ARCtrl.Json
+open System
+open System.Text.RegularExpressions
+
+let private fsDynamic: obj = importAll "fs"
+
+let private toNonEmptyOption (value: string option) =
+    value
+    |> Option.bind (fun s ->
+        let trimmed = s.Trim()
+        if String.IsNullOrWhiteSpace trimmed then None else Some trimmed
+    )
+
+let private normalizeStringArray (values: string []) =
+    values
+    |> Array.map (fun s -> s.Trim())
+    |> Array.filter (String.IsNullOrWhiteSpace >> not)
+
+let private sanitizeIdentifierCandidate (candidate: string) =
+    let cleaned = Regex.Replace(candidate, @"[^a-zA-Z0-9_\- ]", " ").Trim()
+    let collapsed = Regex.Replace(cleaned, @"\s+", " ").Trim()
+    if String.IsNullOrWhiteSpace collapsed then
+        "Experiment"
+    else
+        collapsed
+
+let private generateSafeIdentifierFromTitle (title: string) =
+    let sanitized =
+        title
+        |> sanitizeIdentifierCandidate
+        |> fun value -> Regex.Replace(value, @"\s+", "_").Trim([| '_'; '-' |])
+
+    let candidate =
+        if String.IsNullOrWhiteSpace sanitized then
+            "Experiment"
+        else
+            sanitized
+
+    if ARCtrl.Helper.Identifier.tryCheckValidCharacters candidate then
+        candidate
+    else
+        "Experiment"
+
+let private resolveIdentifier (metadata: ExperimentMetadata) =
+    match toNonEmptyOption metadata.Identifier with
+    | Some id -> id
+    | None -> generateSafeIdentifierFromTitle metadata.Title
+
+let private parsePersons (values: string []) =
+    values
+    |> normalizeStringArray
+    |> Array.map Person.fromJsonString
+    |> ResizeArray
+
+let private parseComments (values: string []) =
+    values
+    |> normalizeStringArray
+    |> Array.map Comment.fromJsonString
+    |> ResizeArray
+
+let private parsePublications (values: string []) =
+    values
+    |> normalizeStringArray
+    |> Array.map Publication.fromJsonString
+    |> ResizeArray
+
+let private parseOntologyAnnotations (values: string []) =
+    values
+    |> normalizeStringArray
+    |> Array.map OntologyAnnotation.fromJsonString
+    |> ResizeArray
+
+let private parseOntologyOption (value: string option) =
+    value
+    |> toNonEmptyOption
+    |> Option.map OntologyAnnotation.fromJsonString
+
+let private fillInputColumnIfFilesExist (table: ArcTable) (files: string []) =
+    let normalizedFiles = normalizeStringArray files
+
+    if normalizedFiles.Length > 0 then
+        if table.TryGetInputColumn().IsNone then
+            table.AddColumn(CompositeHeader.Input IOType.Data)
+
+        let rows =
+            normalizedFiles
+            |> Array.map (fun fileName ->
+                ResizeArray [ CompositeCell.createDataFromString(fileName) ]
+            )
+            |> ResizeArray
+
+        table.AddRows(rows)
+
+let private createProtocolFile
+    (arcRootPath: string)
+    (target: ExperimentTarget)
+    (identifier: string)
+    (mainText: string option)
+    =
+    match toNonEmptyOption mainText with
+    | None -> None
+    | Some content ->
+        let entityFolder =
+            match target with
+            | ExperimentTarget.Study -> "studies"
+            | ExperimentTarget.Assay -> "assays"
+
+        let relativePath = $"{entityFolder}/{identifier}/protocols/{identifier}_protocol.md"
+        let entityPath = path.join (path.join (arcRootPath, entityFolder), identifier)
+        let protocolDir = path.join (entityPath, "protocols")
+        let absolutePath = path.join (protocolDir, $"{identifier}_protocol.md")
+
+        fsDynamic?mkdirSync(protocolDir, createObj [ "recursive" ==> true ]) |> ignore
+        fsDynamic?writeFileSync(absolutePath, content, "utf8") |> ignore
+
+        Some relativePath
+
+let private copyInvestigationMetadata (source: ArcInvestigation) (target: ARC) =
+    target.Title <- source.Title
+    target.Description <- source.Description
+    target.Contacts <- source.Contacts
+    target.Publications <- source.Publications
+    target.SubmissionDate <- source.SubmissionDate
+    target.PublicReleaseDate <- source.PublicReleaseDate
+    target.OntologySourceReferences <- source.OntologySourceReferences
+    target.Comments <- source.Comments
+
+let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
+    try
+        match request.FileType with
+        | ArcFileType.Investigation ->
+            let investigation = ArcInvestigation.fromJsonString request.Json
+            copyInvestigationMetadata investigation arc
+            Ok(ArcFileData(ArcFileType.Investigation, ArcInvestigation.toJsonString 0 arc))
+        | ArcFileType.Study ->
+            let study = ArcStudy.fromJsonString request.Json
+
+            if arc.TryGetStudy(study.Identifier).IsNone then
+                Error(exn $"Study '{study.Identifier}' not found in ARC.")
+            else
+                arc.SetStudy(study.Identifier, study)
+                Ok(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
+        | ArcFileType.Assay ->
+            let assay = ArcAssay.fromJsonString request.Json
+
+            if arc.TryGetAssay(assay.Identifier).IsNone then
+                Error(exn $"Assay '{assay.Identifier}' not found in ARC.")
+            else
+                arc.SetAssay(assay.Identifier, assay)
+                Ok(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
+        | ArcFileType.Run ->
+            let run = ArcRun.fromJsonString request.Json
+
+            if arc.TryGetRun(run.Identifier).IsNone then
+                Error(exn $"Run '{run.Identifier}' not found in ARC.")
+            else
+                arc.SetRun(run.Identifier, run)
+                Ok(ArcFileData(ArcFileType.Run, ArcRun.toJsonString 0 run))
+        | ArcFileType.Workflow ->
+            let workflow = ArcWorkflow.fromJsonString request.Json
+
+            if arc.TryGetWorkflow(workflow.Identifier).IsNone then
+                Error(exn $"Workflow '{workflow.Identifier}' not found in ARC.")
+            else
+                arc.SetWorkflow(workflow.Identifier, workflow)
+                Ok(ArcFileData(ArcFileType.Workflow, ArcWorkflow.toJsonString 0 workflow))
+        | ArcFileType.DataMap ->
+            Error(exn "Saving DataMap preview is not supported yet in Electron.")
+    with e ->
+        Error e
+
+let private persistArcChangesAndRefreshVault
+    (vault: ArcVault)
+    (arc: ARC)
+    (arcPath: string)
+    (afterArcPersist: unit -> unit)
+    =
+    promise {
+        vault.isBusyWriting <- true
+
+        try
+            // Persist only changed ISA contracts (not full filesystem rewrite).
+            do! arc.UpdateAsync(arcPath)
+            afterArcPersist ()
+            do! vault.LoadArc()
+
+            let fileTree = getFileEntries arcPath |> createFileEntryTree
+            vault.SetFileTree(fileTree)
+        finally
+            vault.isBusyWriting <- false
+    }
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -169,11 +359,129 @@ let api: IArcVaultsApi = {
         fun path -> promise {
             return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
+    createExperimentFromLanding =
+        fun (event: IpcMainEvent) (request: CreateExperimentRequest) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path, vault.arc with
+                    | Some arcPath, Some arc ->
+
+                        if String.IsNullOrWhiteSpace request.Metadata.Title then
+                            return Error(exn "Title is required.")
+                        elif String.IsNullOrWhiteSpace request.Metadata.Description then
+                            return Error(exn "Description is required.")
+                        else
+                            let identifier = resolveIdentifier request.Metadata
+
+                            if ARCtrl.Helper.Identifier.tryCheckValidCharacters identifier |> not then
+                                return
+                                    Error(
+                                        exn
+                                            $"Identifier '{identifier}' contains forbidden characters. Allowed: letters, digits, underscore (_), dash (-), and whitespace."
+                                    )
+                            elif request.Target = ExperimentTarget.Study && arc.TryGetStudy(identifier).IsSome then
+                                return Error(exn $"Study with identifier '{identifier}' already exists.")
+                            elif request.Target = ExperimentTarget.Assay && arc.TryGetAssay(identifier).IsSome then
+                                return Error(exn $"Assay with identifier '{identifier}' already exists.")
+                            else
+                                let mutable previewData: PreviewData option = None
+                                let mutable protocolPath: string option = None
+
+                                match request.Target with
+                                | ExperimentTarget.Study ->
+                                    let study = arc.InitStudy(identifier)
+                                    arc.RegisterStudy(identifier)
+                                    study.InitTable($"{identifier} Table") |> ignore
+
+                                    study.Title <- Some request.Metadata.Title
+                                    study.Description <- Some request.Metadata.Description
+                                    study.Contacts <- parsePersons request.Metadata.InvolvedPeople
+                                    study.Comments <- parseComments request.Metadata.Comments
+                                    study.Publications <- parsePublications request.Metadata.Publications
+                                    study.SubmissionDate <- toNonEmptyOption request.Metadata.SubmissionDate
+                                    study.PublicReleaseDate <- toNonEmptyOption request.Metadata.PublicReleaseDate
+                                    study.StudyDesignDescriptors <- parseOntologyAnnotations request.Metadata.StudyDesignDescriptors
+
+                                    let firstTable = study.Tables.[0]
+                                    fillInputColumnIfFilesExist firstTable request.Metadata.Files
+
+                                    previewData <- Some(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
+
+                                | ExperimentTarget.Assay ->
+                                    let assay = arc.InitAssay(identifier)
+                                    assay.InitTable($"{identifier} Table") |> ignore
+
+                                    assay.Title <- Some request.Metadata.Title
+                                    assay.Description <- Some request.Metadata.Description
+                                    assay.Performers <- parsePersons request.Metadata.InvolvedPeople
+                                    assay.Comments <- parseComments request.Metadata.Comments
+                                    assay.MeasurementType <- parseOntologyOption request.Metadata.MeasurementType
+                                    assay.TechnologyType <- parseOntologyOption request.Metadata.TechnologyType
+                                    assay.TechnologyPlatform <- parseOntologyOption request.Metadata.TechnologyPlatform
+
+                                    let firstTable = assay.Tables.[0]
+                                    fillInputColumnIfFilesExist firstTable request.Metadata.Files
+
+                                    previewData <- Some(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
+
+                                do!
+                                    persistArcChangesAndRefreshVault
+                                        vault
+                                        arc
+                                        arcPath
+                                        (fun () ->
+                                            protocolPath <-
+                                                createProtocolFile arcPath request.Target identifier request.Metadata.MainText
+                                        )
+
+                                let response = {
+                                    PreviewData =
+                                        previewData
+                                        |> Option.defaultWith (fun () -> Text "")
+                                    CreatedIdentifier = identifier
+                                    ProtocolPath = protocolPath
+                                }
+
+                                return Ok response
+                    | _ -> return Error(exn "ARC is not loaded.")
+            with e ->
+                return Error e
+        }
+    saveArcFile =
+        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path, vault.arc with
+                    | Some arcPath, Some arc ->
+                        match applyArcFileSaveRequest arc request with
+                        | Error saveError -> return Error saveError
+                        | Ok previewData ->
+                            do!
+                                persistArcChangesAndRefreshVault
+                                    vault
+                                    arc
+                                    arcPath
+                                    (fun () -> ())
+
+                            return Ok previewData
+                    | _ -> return Error(exn "ARC is not loaded.")
+            with e ->
+                return Error e
+        }
     openFile =
-        fun (path: string) -> promise {
-            //let windowId = windowIdFromIpcEvent event
-            match ARC_VAULTS.TryGetVault(1) with
-            | None -> return Error(exn $"The ARC for window id {1} should exist")
+        fun (event: IpcMainEvent) (path: string) -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            match ARC_VAULTS.TryGetVault(windowId) with
+            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
             | Some vault ->
                 Swate.Components.console.log ($"openFile path: {path}")
                 let normalizedPath = path.Replace("\\", "/")
