@@ -211,7 +211,6 @@ let CreateARCitectFooter
                         "swt:btn swt:btn-sm swt:btn-outline swt:items-center swt:border swt:!border-white swt:hover:!border-white swt:rounded-none"
                     prop.onClick (fun _ -> addNewTable ())
                     prop.children [|
-                        //Html.span [ prop.className "swt:i-fluent--add-square-24-regular" ]
                         Html.span [ prop.text "+" ]
                     |]
                 ]

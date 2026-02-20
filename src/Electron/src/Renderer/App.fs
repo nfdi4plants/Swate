@@ -16,7 +16,7 @@ open ARCtrl.Json
 
 open components.MainElement
 open components.ExperimentLanding
-open Renderer.components.BuildingBlockWidget
+open Renderer.components.Widgets
 
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
@@ -677,7 +677,7 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
                         prop.children [
-                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
+                            Widget.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
@@ -697,7 +697,7 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
                         prop.children [
-                            components.Widgets.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
+                            Widget.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
