@@ -1,6 +1,7 @@
 namespace Renderer.components.Widgets
 
 open Feliz
+open Fable.Core
 open ARCtrl
 open ARCtrl.Json
 
@@ -124,21 +125,8 @@ type DataAnnotatorDataSource =
         with exn ->
             Error exn.Message
 
-    static member syncArcVault (arcFile: ArcFiles) : Result<unit, string> =
-        try
-            match arcFile with
-            | ArcFiles.Assay assay ->
-                Api.arcVaultApi.updateAssay(assay.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Study(study, _) ->
-                Api.arcVaultApi.updateStudy(study.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Workflow workflow ->
-                Api.arcVaultApi.updateWorkflows(workflow.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | _ -> Ok ()
-        with exn ->
-            Error exn.Message
+    static member syncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
+        Renderer.ArcFilePersistence.saveArcFile arcFile
 
 type DataAnnotatorWidget =
 
@@ -426,26 +414,29 @@ type DataAnnotatorWidget =
                         onTableMutated ()
                         setIsModalOpen false
 
-                        let syncResult =
-                            arcFileOpt
-                            |> Option.map DataAnnotatorDataSource.syncArcVault
-                            |> Option.defaultValue (Ok())
+                        promise {
+                            let! syncResult =
+                                match arcFileOpt with
+                                | Some arcFile -> DataAnnotatorDataSource.syncArcVault arcFile
+                                | None -> promise { return Ok() }
 
-                        match syncResult with
-                        | Ok() ->
-                            setStatus (
-                                Some {
-                                    Kind = StatusKind.Info
-                                    Text = $"Added data annotation with {addedCount} selector(s)."
-                                }
-                            )
-                        | Error syncError ->
-                            setStatus (
-                                Some {
-                                    Kind = StatusKind.Warning
-                                    Text = $"Data annotation added locally, but vault sync failed: {syncError}"
-                                }
-                            )
+                            match syncResult with
+                            | Ok() ->
+                                setStatus (
+                                    Some {
+                                        Kind = StatusKind.Info
+                                        Text = $"Added data annotation with {addedCount} selector(s)."
+                                    }
+                                )
+                            | Error syncError ->
+                                setStatus (
+                                    Some {
+                                        Kind = StatusKind.Warning
+                                        Text = $"Data annotation added locally, but save failed: {syncError}"
+                                    }
+                                )
+                        }
+                        |> Promise.start
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-3 swt:p-2"

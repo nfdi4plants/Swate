@@ -123,28 +123,8 @@ type TemplateDataSource =
         with exn ->
             Error exn.Message
 
-    static member SyncArcVault (arcFile: ArcFiles) : Result<unit, string> =
-        try
-            match arcFile with
-            | ArcFiles.Assay assay ->
-                Api.arcVaultApi.updateAssay(assay.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Study(study, _) ->
-                Api.arcVaultApi.updateStudy(study.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Workflow workflow ->
-                Api.arcVaultApi.updateWorkflows(workflow.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Run _ ->
-                Error "Vault sync for Run files is not implemented in Electron yet."
-            | ArcFiles.Template _ ->
-                Error "Vault sync for Template files is not implemented in Electron yet."
-            | ArcFiles.Investigation _ ->
-                Error "Vault sync for Investigation files is not implemented in Electron yet."
-            | ArcFiles.DataMap _ ->
-                Error "Vault sync for DataMap files is not implemented in Electron yet."
-        with exn ->
-            Error exn.Message
+    static member SyncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
+        Renderer.ArcFilePersistence.saveArcFile arcFile
 
 type TemplateWidget =
 
@@ -640,24 +620,26 @@ type TemplateWidget =
                     | Ok updatedArcFile ->
                         setIsImportDialogOpen false
                         onTableMutated ()
+                        promise {
+                            let! syncResult = TemplateDataSource.SyncArcVault updatedArcFile
 
-                        let syncResult = TemplateDataSource.SyncArcVault updatedArcFile
-
-                        match syncResult with
-                        | Ok() ->
-                            setStatus (
-                                Some {
-                                    Kind = StatusKind.Info
-                                    Text = $"Imported {selectedTemplates.Length} template(s) into \"{tableData.TableName}\"."
-                                }
-                            )
-                        | Error syncError ->
-                            setStatus (
-                                Some {
-                                    Kind = StatusKind.Error
-                                    Text = $"Templates imported locally, but vault sync failed: {syncError}"
-                                }
-                            )
+                            match syncResult with
+                            | Ok() ->
+                                setStatus (
+                                    Some {
+                                        Kind = StatusKind.Info
+                                        Text = $"Imported {selectedTemplates.Length} template(s) into \"{tableData.TableName}\"."
+                                    }
+                                )
+                            | Error syncError ->
+                                setStatus (
+                                    Some {
+                                        Kind = StatusKind.Error
+                                        Text = $"Templates imported locally, but save failed: {syncError}"
+                                    }
+                                )
+                        }
+                        |> Promise.start
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-3 swt:p-2"

@@ -183,21 +183,8 @@ type BuildingBlockDataSource =
             Warning = warning
         }
 
-    static member syncArcVault (arcFile: ArcFiles) : Result<unit, string> =
-        try
-            match arcFile with
-            | ArcFiles.Assay assay ->
-                Api.arcVaultApi.updateAssay(assay.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Study(study, _) ->
-                Api.arcVaultApi.updateStudy(study.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Workflow workflow ->
-                Api.arcVaultApi.updateWorkflows(workflow.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | _ -> Ok ()
-        with exn ->
-            Error exn.Message
+    static member syncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
+        Renderer.ArcFilePersistence.saveArcFile arcFile
 
 type BuildingBlockWidget =
 
@@ -589,35 +576,37 @@ type BasicComponent =
                     let insertResult =
                         BuildingBlockDataSource.InsertColumn selectedColumnIndex column activeTable.Table
 
-                    let syncResult =
-                        BuildingBlockDataSource.syncArcVault activeTable.ArcFile
-
                     onTableMutated ()
+                    promise {
+                        let! syncResult =
+                            BuildingBlockDataSource.syncArcVault activeTable.ArcFile
 
-                    let statusMessage =
-                        match insertResult.Warning, syncResult with
-                        | Some warning, Ok() ->
-                            {
-                                Kind = StatusKind.Warning
-                                Text = warning
-                            }
-                        | None, Ok() ->
-                            {
-                                Kind = StatusKind.Info
-                                Text = $"Added column \"{header.ToString()}\"."
-                            }
-                        | Some warning, Error syncError ->
-                            {
-                                Kind = StatusKind.Warning
-                                Text = $"{warning} Vault sync failed: {syncError}"
-                            }
-                        | None, Error syncError ->
-                            {
-                                Kind = StatusKind.Error
-                                Text = $"Column added locally, but vault sync failed: {syncError}"
-                            }
+                        let statusMessage =
+                            match insertResult.Warning, syncResult with
+                            | Some warning, Ok() ->
+                                {
+                                    Kind = StatusKind.Warning
+                                    Text = warning
+                                }
+                            | None, Ok() ->
+                                {
+                                    Kind = StatusKind.Info
+                                    Text = $"Added column \"{header.ToString()}\"."
+                                }
+                            | Some warning, Error syncError ->
+                                {
+                                    Kind = StatusKind.Warning
+                                    Text = $"{warning} Save failed: {syncError}"
+                                }
+                            | None, Error syncError ->
+                                {
+                                    Kind = StatusKind.Error
+                                    Text = $"Column added locally, but save failed: {syncError}"
+                                }
 
-                    setStatus (Some statusMessage)
+                        setStatus (Some statusMessage)
+                    }
+                    |> Promise.start
 
         let currentHeader = BuildingBlockStateHandler.CreateCompositeHeader state
         let isValid = BuildingBlockStateHandler.IsValidColumn currentHeader

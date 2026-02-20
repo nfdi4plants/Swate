@@ -53,60 +53,10 @@ let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
     ]
 
 let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
-    try
-        match fileType with
-        | ArcFileType.Investigation ->
-            let inv = ArcInvestigation.fromJsonString json
-            Some(ArcFiles.Investigation inv)
-        | ArcFileType.Study ->
-            let study = ArcStudy.fromJsonString json
-            Some(ArcFiles.Study(study, []))
-        | ArcFileType.Assay ->
-            let assay = ArcAssay.fromJsonString json
-            Some(ArcFiles.Assay assay)
-        | ArcFileType.Run ->
-            let run = ArcRun.fromJsonString json
-            Some(ArcFiles.Run run)
-        | ArcFileType.Workflow ->
-            let workflow = ArcWorkflow.fromJsonString json
-            Some(ArcFiles.Workflow workflow)
-        | ArcFileType.DataMap ->
-            let datamap = DataMap.fromJsonString json
-            Some(ArcFiles.DataMap(None, datamap))
-    with e ->
+    match ArcFileSaveMapping.tryParseArcFile fileType json with
+    | Ok arcFile -> Some arcFile
+    | Error e ->
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
-        None
-
-let SerializeArcFileForSave (arcFile: ArcFiles) : SaveArcFileRequest option =
-    match arcFile with
-    | ArcFiles.Investigation investigation ->
-        Some {
-            FileType = ArcFileType.Investigation
-            Json = ArcInvestigation.toJsonString 0 investigation
-        }
-    | ArcFiles.Study(study, _) ->
-        Some {
-            FileType = ArcFileType.Study
-            Json = ArcStudy.toJsonString 0 study
-        }
-    | ArcFiles.Assay assay ->
-        Some {
-            FileType = ArcFileType.Assay
-            Json = ArcAssay.toJsonString 0 assay
-        }
-    | ArcFiles.Run run ->
-        Some {
-            FileType = ArcFileType.Run
-            Json = ArcRun.toJsonString 0 run
-        }
-    | ArcFiles.Workflow workflow ->
-        Some {
-            FileType = ArcFileType.Workflow
-            Json = ArcWorkflow.toJsonString 0 workflow
-        }
-    | ArcFiles.DataMap _ ->
-        None
-    | ArcFiles.Template _ ->
         None
 
 [<ReactComponent>]
@@ -607,22 +557,18 @@ let Main () =
         match arcFileState with
         | None -> ()
         | Some arcFile ->
-            match SerializeArcFileForSave arcFile with
-            | None ->
-                setPreviewError (Some "Saving this file type is not supported in Electron yet.")
-            | Some request ->
-                promise {
-                    let! result = Api.saveArcFile request
+            promise {
+                let! result = Renderer.ArcFilePersistence.saveArcFileWithPreview arcFile
 
-                    match result with
-                    | Ok updatedPreview ->
-                        setPreviewData (Some updatedPreview)
-                        setPreviewError None
-                        setDidSelectFile true
-                    | Error exn ->
-                        setPreviewError (Some $"Save failed: {exn.Message}")
-                }
-                |> Promise.start
+                match result with
+                | Ok updatedPreview ->
+                    setPreviewData (Some updatedPreview)
+                    setPreviewError None
+                    setDidSelectFile true
+                | Error errorMsg ->
+                    setPreviewError (Some $"Save failed: {errorMsg}")
+            }
+            |> Promise.start
 
     let activeTableData : ActiveTableData option =
         match arcFileState, activeView with

@@ -1,6 +1,7 @@
 namespace Renderer.components.Widgets
 
 open Feliz
+open Fable.Core
 open ARCtrl
 open ARCtrl.Json
 
@@ -95,21 +96,8 @@ type FilePickerDataSource =
                 InsertedCount = insertedCount
             }
 
-    static member SyncArcVault (arcFile: ArcFiles) : Result<unit, string> =
-        try
-            match arcFile with
-            | ArcFiles.Assay assay ->
-                Api.arcVaultApi.updateAssay(assay.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Study(study, _) ->
-                Api.arcVaultApi.updateStudy(study.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | ArcFiles.Workflow workflow ->
-                Api.arcVaultApi.updateWorkflows(workflow.ToJsonString())
-                |> Result.mapError (fun err -> err.Message)
-            | _ -> Ok ()
-        with exn ->
-            Error exn.Message
+    static member SyncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
+        Renderer.ArcFilePersistence.saveArcFile arcFile
 
 type FilePickerWidget =
 
@@ -232,37 +220,38 @@ type FilePickerWidget =
                         setErrorStatus "No file names were inserted. Check your selected start cell."
                     else
                         onTableMutated ()
-
-                        let syncResult =
-                            FilePickerDataSource.SyncArcVault tableData.ArcFile
-
                         let isPartialInsert = insertResult.InsertedCount < insertResult.RequestedCount
+                        promise {
+                            let! syncResult =
+                                FilePickerDataSource.SyncArcVault tableData.ArcFile
 
-                        let statusMessage =
-                            match isPartialInsert, syncResult with
-                            | false, Ok() ->
-                                {
-                                    Kind = StatusKind.Info
-                                    Text = $"Inserted {insertResult.InsertedCount} file name(s)."
-                                }
-                            | true, Ok() ->
-                                {
-                                    Kind = StatusKind.Warning
-                                    Text =
-                                        $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s). Reached end of table."
-                                }
-                            | false, Error syncError ->
-                                {
-                                    Kind = StatusKind.Error
-                                    Text = $"File names inserted locally, but vault sync failed: {syncError}"
-                                }
-                            | true, Error syncError ->
-                                {
-                                    Kind = StatusKind.Warning
-                                    Text =
-                                        $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s), but vault sync failed: {syncError}"
-                                }
-                        setStatus (Some statusMessage)
+                            let statusMessage =
+                                match isPartialInsert, syncResult with
+                                | false, Ok() ->
+                                    {
+                                        Kind = StatusKind.Info
+                                        Text = $"Inserted {insertResult.InsertedCount} file name(s)."
+                                    }
+                                | true, Ok() ->
+                                    {
+                                        Kind = StatusKind.Warning
+                                        Text =
+                                            $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s). Reached end of table."
+                                    }
+                                | false, Error syncError ->
+                                    {
+                                        Kind = StatusKind.Error
+                                        Text = $"File names inserted locally, but save failed: {syncError}"
+                                    }
+                                | true, Error syncError ->
+                                    {
+                                        Kind = StatusKind.Warning
+                                        Text =
+                                            $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s), but save failed: {syncError}"
+                                    }
+                            setStatus (Some statusMessage)
+                        }
+                        |> Promise.start
 
             | None, Some dataMapData, Some start ->
                 if fileNames.IsEmpty then
@@ -275,37 +264,38 @@ type FilePickerWidget =
                         setErrorStatus "No file names were inserted. Check your selected start cell."
                     else
                         onTableMutated ()
-
-                        let syncResult =
-                            FilePickerDataSource.SyncArcVault dataMapData.ArcFile
-
                         let isPartialInsert = insertResult.InsertedCount < insertResult.RequestedCount
+                        promise {
+                            let! syncResult =
+                                FilePickerDataSource.SyncArcVault dataMapData.ArcFile
 
-                        let statusMessage =
-                            match isPartialInsert, syncResult with
-                            | false, Ok() ->
-                                {
-                                    Kind = StatusKind.Info
-                                    Text = $"Inserted {insertResult.InsertedCount} file name(s)."
-                                }
-                            | true, Ok() ->
-                                {
-                                    Kind = StatusKind.Warning
-                                    Text =
-                                        $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s). Reached end of datamap."
-                                }
-                            | false, Error syncError ->
-                                {
-                                    Kind = StatusKind.Error
-                                    Text = $"File names inserted locally, but vault sync failed: {syncError}"
-                                }
-                            | true, Error syncError ->
-                                {
-                                    Kind = StatusKind.Warning
-                                    Text =
-                                        $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s), but vault sync failed: {syncError}"
-                                }
-                        setStatus (Some statusMessage)
+                            let statusMessage =
+                                match isPartialInsert, syncResult with
+                                | false, Ok() ->
+                                    {
+                                        Kind = StatusKind.Info
+                                        Text = $"Inserted {insertResult.InsertedCount} file name(s)."
+                                    }
+                                | true, Ok() ->
+                                    {
+                                        Kind = StatusKind.Warning
+                                        Text =
+                                            $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s). Reached end of datamap."
+                                    }
+                                | false, Error syncError ->
+                                    {
+                                        Kind = StatusKind.Error
+                                        Text = $"File names inserted locally, but save failed: {syncError}"
+                                    }
+                                | true, Error syncError ->
+                                    {
+                                        Kind = StatusKind.Warning
+                                        Text =
+                                            $"Inserted {insertResult.InsertedCount} of {insertResult.RequestedCount} file name(s), but save failed: {syncError}"
+                                    }
+                            setStatus (Some statusMessage)
+                        }
+                        |> Promise.start
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-3 swt:p-2"
