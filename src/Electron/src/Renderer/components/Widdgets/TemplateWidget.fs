@@ -47,7 +47,7 @@ type TemplateDataSource =
         }
         |> Promise.start
 
-    static member applyTemplates
+    static member ApplyTemplates
         (activeTableData: ActiveTableData)
         (selectedTemplates: Template[])
         (importType: TableJoinOptions)
@@ -123,7 +123,7 @@ type TemplateDataSource =
         with exn ->
             Error exn.Message
 
-    static member syncArcVault (arcFile: ArcFiles) : Result<unit, string> =
+    static member SyncArcVault (arcFile: ArcFiles) : Result<unit, string> =
         try
             match arcFile with
             | ArcFiles.Assay assay ->
@@ -399,6 +399,102 @@ type TemplateWidget =
             ]
         ]
 
+    static member SelectedColumnPreview ((columns: CompositeColumn []), (isColumnSelected: System.Guid -> int -> bool) , toggleColumnSelected, (template: Template), (importMode: TemplateImportMode)) =
+        Html.div [
+            prop.className "swt:collapse-content swt:overflow-x-auto swt:pt-1"
+            prop.children [
+                if columns.Length = 0 then
+                    Html.div [
+                        prop.className "swt:text-sm swt:opacity-70"
+                        prop.text "No columns available."
+                    ]
+                else
+                    Html.div [
+                        prop.className "swt:flex swt:flex-row swt:gap-2 swt:overflow-x-auto swt:pb-1"
+                        prop.children [
+                            for columnIndex in 0 .. columns.Length - 1 do
+                                let isSelected = isColumnSelected template.Id columnIndex
+                                let previewValues = TemplateWidget.PreviewColumnValues columns.[columnIndex]
+
+                                Html.label [
+                                    prop.key $"{template.Id}-column-{columnIndex}"
+                                    prop.className [
+                                        "swt:flex swt:flex-col swt:items-start swt:cursor-pointer swt:gap-1 swt:min-h-16 swt:min-w-56 swt:max-w-64 swt:border swt:rounded-md swt:px-2 swt:py-2"
+                                        if not isSelected then
+                                            "swt:opacity-70"
+                                    ]
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "swt:flex swt:items-center swt:gap-2 swt:w-full"
+                                            prop.children [
+                                                Html.input [
+                                                    prop.type'.checkbox
+                                                    prop.className "swt:checkbox swt:checkbox-sm"
+                                                    prop.isChecked isSelected
+                                                    if importMode = TemplateImportMode.Skip then
+                                                        prop.disabled true
+                                                    prop.onClick (fun _ -> toggleColumnSelected template.Id columnIndex)
+                                                ]
+                                                Html.span [
+                                                    prop.className "swt:text-sm swt:font-medium swt:line-clamp-2"
+                                                    prop.title (columns.[columnIndex].Header.ToString())
+                                                    prop.text (columns.[columnIndex].Header.ToString())
+                                                ]
+                                            ]
+                                        ]
+                                        Html.div [
+                                            prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:pl-6 swt:w-full"
+                                            prop.children [
+                                                if previewValues.Length = 0 then
+                                                    Html.span [
+                                                        prop.className "swt:text-xs swt:opacity-60"
+                                                        prop.text "No values"
+                                                    ]
+                                                else
+                                                    for previewValue in previewValues do
+                                                        Html.span [
+                                                            prop.key $"{template.Id}-column-{columnIndex}-value-{previewValue}"
+                                                            prop.className
+                                                                "swt:badge swt:badge-xs swt:badge-outline swt:max-w-44 swt:overflow-hidden swt:text-ellipsis"
+                                                            prop.title previewValue
+                                                            prop.text previewValue
+                                                        ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                        ]
+                    ]
+            ]
+        ]
+
+    static member DropdownContent(isRowExtended: bool, setIsRowExtended) =
+        Html.div [
+            prop.className "swt:collapse swt:border swt:rounded-md"
+            prop.children [
+                Html.input [
+                    prop.type'.checkbox
+                    prop.className "swt:min-h-0 swt:h-5"
+                    prop.onClick (fun _ -> setIsRowExtended (not isRowExtended))
+                ]
+                Html.div [
+                    prop.className
+                        "swt:collapse-title swt:font-bold swt:text-sm swt:min-h-0 swt:h-10 swt:flex swt:items-center swt:p-3"
+                    prop.children [
+                        Html.div [
+                            prop.text (
+                                if isRowExtended then
+                                    "Preview Selected Columns"
+                                else
+                                    "Preview Table"
+                            )
+                        ]
+                        Swate.Components.Icons.MagnifyingClass()
+                    ]
+                ]
+            ]
+        ]
+
     [<ReactComponent>]
     static member Main (activeTableData: ActiveTableData option, onTableMutated: unit -> unit) =
         let templates, setTemplates = React.useState [||]
@@ -409,6 +505,7 @@ type TemplateWidget =
         let importType, setImportType = React.useState TableJoinOptions.Headers
         let isImportDialogOpen, setIsImportDialogOpen = React.useState false
         let isLoading, setIsLoading = React.useState false
+        let isRowExtended, setIsRowExtended = React.useState false
         let status, setStatus = React.useState (None: StatusMessage option)
 
         let refreshTemplates () =
@@ -487,6 +584,26 @@ type TemplateWidget =
         let canOpenImportDialog = selectedTemplates.Length > 0 && not isLoading
         let canSubmitImport = activeTableData.IsSome && templatesToImportCount > 0
 
+        let importTypeRadio (option: TableJoinOptions) (label: string) =
+            let isSelected = importType = option
+
+            Html.label [
+                prop.className "swt:flex swt:items-center swt:cursor-pointer swt:gap-2 swt:min-h-8"
+                prop.children [
+                    Html.input [
+                        prop.type'.radio
+                        prop.className "swt:radio swt:radio-sm"
+                        prop.name "template-import-detail"
+                        prop.isChecked isSelected
+                        prop.onClick (fun _ -> setImportType option)
+                    ]
+                    Html.span [
+                        prop.className "swt:text-sm"
+                        prop.text label
+                    ]
+                ]
+            ]
+
         let tryImportTemplates () =
             match activeTableData with
             | None ->
@@ -506,7 +623,7 @@ type TemplateWidget =
                     )
                 else
                     match
-                        TemplateDataSource.applyTemplates
+                        TemplateDataSource.ApplyTemplates
                             tableData
                             selectedTemplates
                             importType
@@ -524,7 +641,7 @@ type TemplateWidget =
                         setIsImportDialogOpen false
                         onTableMutated ()
 
-                        let syncResult = TemplateDataSource.syncArcVault updatedArcFile
+                        let syncResult = TemplateDataSource.SyncArcVault updatedArcFile
 
                         match syncResult with
                         | Ok() ->
@@ -566,25 +683,18 @@ type TemplateWidget =
                         ]
                     ]
                 ]
+
                 Swate.Components.TemplateFilter.TemplateFilterProvider(
-                    Html.div [
-                        prop.className "swt:flex swt:flex-col swt:gap-2"
-                        prop.children [
-                            Html.div [
-                                prop.className "swt:w-full"
-                                prop.children [
-                                    Swate.Components.TemplateFilter.TemplateFilter(
-                                        templates,
-                                        templateSearchClassName = "swt:grow swt:!w-full"
-                                    )
-                                ]
-                            ]
-                            Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
-                                TemplateWidget.TemplateTable(filteredTemplates, selectedTemplateIds, toggleSelectedTemplate, isLoading, refreshTemplates)
-                            )
-                        ]
+                    React.Fragment [
+                        Swate.Components.TemplateFilter.TemplateFilter(
+                            templates,
+                            templateSearchClassName = "swt:grow"
+                        )
+                        Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
+                            TemplateWidget.TemplateTable(filteredTemplates, selectedTemplateIds, toggleSelectedTemplate, isLoading, refreshTemplates))
                     ]
                 )
+
                 Swate.Components.BaseModal.Modal(
                     isOpen = isImportDialogOpen,
                     setIsOpen = setIsImportDialogOpen,
@@ -607,26 +717,6 @@ type TemplateWidget =
                                                         Html.span "Import Type"
                                                     ]
                                                 ]
-                                                let importTypeRadio (option: TableJoinOptions) (label: string) =
-                                                    let isSelected = importType = option
-
-                                                    Html.label [
-                                                        prop.className "swt:flex swt:items-center swt:cursor-pointer swt:gap-2 swt:min-h-8"
-                                                        prop.children [
-                                                            Html.input [
-                                                                prop.type'.radio
-                                                                prop.className "swt:radio swt:radio-sm"
-                                                                prop.name "template-import-detail"
-                                                                prop.isChecked isSelected
-                                                                prop.onClick (fun _ -> setImportType option)
-                                                            ]
-                                                            Html.span [
-                                                                prop.className "swt:text-sm"
-                                                                prop.text label
-                                                            ]
-                                                        ]
-                                                    ]
-
                                                 importTypeRadio TableJoinOptions.Headers "Column Headers"
                                                 importTypeRadio TableJoinOptions.WithUnit "With Units"
                                                 importTypeRadio TableJoinOptions.WithValues "With Values"
@@ -690,98 +780,8 @@ type TemplateWidget =
                                                         Html.div [
                                                             prop.className "swt:flex swt:flex-col swt:gap-2"
                                                             prop.children [
-                                                                Html.div [
-                                                                    prop.className "swt:collapse swt:border swt:rounded-md"
-                                                                    prop.children [
-                                                                        Html.input [ prop.type'.checkbox; prop.className "swt:min-h-0 swt:h-5" ]
-                                                                        Html.div [
-                                                                            prop.className
-                                                                                "swt:collapse-title swt:font-bold swt:text-sm swt:min-h-0 swt:h-10 swt:flex swt:items-center swt:p-3"
-                                                                            prop.children [
-                                                                                Html.div [
-                                                                                    prop.text "Preview Selected Columns"
-                                                                                ]
-                                                                                Swate.Components.Icons.MagnifyingClass()
-                                                                            ]
-                                                                        ]
-                                                                        //Html.span [
-                                                                        //    prop.text (
-                                                                        //        if isActive then
-                                                                        //            "Preview Selected Columns"
-                                                                        //        else
-                                                                        //            "Preview Table"
-                                                                        //        "Preview Selected Columns"
-                                                                        //    )
-                                                                        //]
-                                                                        Html.div [
-                                                                            prop.className "swt:collapse-content swt:overflow-x-auto swt:pt-1"
-                                                                            prop.children [
-                                                                                if columns.Length = 0 then
-                                                                                    Html.div [
-                                                                                        prop.className "swt:text-sm swt:opacity-70"
-                                                                                        prop.text "No columns available."
-                                                                                    ]
-                                                                                else
-                                                                                    Html.div [
-                                                                                        prop.className "swt:flex swt:flex-row swt:gap-2 swt:overflow-x-auto swt:pb-1"
-                                                                                        prop.children [
-                                                                                            for columnIndex in 0 .. columns.Length - 1 do
-                                                                                                let isSelected = isColumnSelected template.Id columnIndex
-                                                                                                let previewValues = TemplateWidget.PreviewColumnValues columns.[columnIndex]
-
-                                                                                                Html.label [
-                                                                                                    prop.key $"{template.Id}-column-{columnIndex}"
-                                                                                                    prop.className [
-                                                                                                        "swt:flex swt:flex-col swt:items-start swt:cursor-pointer swt:gap-1 swt:min-h-16 swt:min-w-56 swt:max-w-64 swt:border swt:rounded-md swt:px-2 swt:py-2"
-                                                                                                        if not isSelected then
-                                                                                                            "swt:opacity-70"
-                                                                                                    ]
-                                                                                                    prop.children [
-                                                                                                        Html.div [
-                                                                                                            prop.className "swt:flex swt:items-center swt:gap-2 swt:w-full"
-                                                                                                            prop.children [
-                                                                                                                Html.input [
-                                                                                                                    prop.type'.checkbox
-                                                                                                                    prop.className "swt:checkbox swt:checkbox-sm"
-                                                                                                                    prop.isChecked isSelected
-                                                                                                                    if importMode = TemplateImportMode.Skip then
-                                                                                                                        prop.disabled true
-                                                                                                                    prop.onClick (fun _ -> toggleColumnSelected template.Id columnIndex)
-                                                                                                                ]
-                                                                                                                Html.span [
-                                                                                                                    prop.className "swt:text-sm swt:font-medium swt:line-clamp-2"
-                                                                                                                    prop.title (columns.[columnIndex].Header.ToString())
-                                                                                                                    prop.text (columns.[columnIndex].Header.ToString())
-                                                                                                                ]
-                                                                                                            ]
-                                                                                                        ]
-                                                                                                        Html.div [
-                                                                                                            prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:pl-6 swt:w-full"
-                                                                                                            prop.children [
-                                                                                                                if previewValues.Length = 0 then
-                                                                                                                    Html.span [
-                                                                                                                        prop.className "swt:text-xs swt:opacity-60"
-                                                                                                                        prop.text "No values"
-                                                                                                                    ]
-                                                                                                                else
-                                                                                                                    for previewValue in previewValues do
-                                                                                                                        Html.span [
-                                                                                                                            prop.key $"{template.Id}-column-{columnIndex}-value-{previewValue}"
-                                                                                                                            prop.className
-                                                                                                                                "swt:badge swt:badge-xs swt:badge-outline swt:max-w-44 swt:overflow-hidden swt:text-ellipsis"
-                                                                                                                            prop.title previewValue
-                                                                                                                            prop.text previewValue
-                                                                                                                        ]
-                                                                                                            ]
-                                                                                                        ]
-                                                                                                    ]
-                                                                                                ]
-                                                                                        ]
-                                                                                    ]
-                                                                            ]
-                                                                        ]
-                                                                    ]
-                                                                ]
+                                                                TemplateWidget.DropdownContent(isRowExtended, setIsRowExtended)
+                                                                TemplateWidget.SelectedColumnPreview(columns, isColumnSelected, toggleColumnSelected, template, importMode)
                                                             ]
                                                         ]
                                                     ]

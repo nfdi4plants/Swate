@@ -329,15 +329,6 @@ type FilePickerWidget =
                         setStatus None
                     )
                 ]
-                //Html.button [
-                //    prop.type'.button
-                //    prop.className "swt:btn swt:btn-primary swt:w-full"
-                //    prop.text "Pick file names"
-                //    prop.onClick (fun _ ->
-                //        fileInputRef.current
-                //        |> Option.iter (fun input -> input.click ())
-                //    )
-                //]
                 if not fileNames.IsEmpty then
                     Html.div [
                         prop.className "swt:join swt:self-start"

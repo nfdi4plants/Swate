@@ -379,10 +379,10 @@ type BasicComponent =
                 ]
             | DropdownPage.IOTypes headerType ->
                 [
+                    DropdownElement.ClickableItem "Data" (fun () -> selectIOType headerType IOType.Data)
                     DropdownElement.ClickableItem "Source" (fun () -> selectIOType headerType IOType.Source)
                     DropdownElement.ClickableItem "Sample" (fun () -> selectIOType headerType IOType.Sample)
                     DropdownElement.ClickableItem "Material" (fun () -> selectIOType headerType IOType.Material)
-                    DropdownElement.ClickableItem "Data" (fun () -> selectIOType headerType IOType.Data)
                     Html.li [
                         prop.onClick (fun e ->
                             e.preventDefault ()
@@ -412,50 +412,50 @@ type BasicComponent =
         )
 
     [<ReactComponent>]
-    static member HeaderInputElement (state: BuildingBlockState, setState: BuildingBlockState -> unit) =
+    static member HeaderInputElement (buildingBlockState: BuildingBlockState, setBuildingBlockState: BuildingBlockState -> unit) =
         Html.div [
             prop.style [ style.position.relative ]
             prop.children [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [
-                        BasicComponent.HeaderTypeDropdown(state, setState)
-                        if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
+                        BasicComponent.HeaderTypeDropdown(buildingBlockState, setBuildingBlockState)
+                        if buildingBlockState.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                             Html.input [
                                 prop.className "swt:input swt:join-item swt:flex-grow"
-                                prop.valueOrDefault state.CommentHeader
+                                prop.valueOrDefault buildingBlockState.CommentHeader
                                 prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
                                 prop.onChange (fun text ->
-                                    setState {
-                                        state with
+                                    setBuildingBlockState {
+                                        buildingBlockState with
                                             CommentHeader = text
                                     }
                                 )
                             ]
-                        elif state.HeaderCellType.HasOA() then
+                        elif buildingBlockState.HeaderCellType.HasOA() then
                             let setter (termOpt: Swate.Components.Types.Term option) =
                                 let nextHeaderArg =
                                     termOpt
                                     |> Option.map (fun term -> term |> (OntologyAnnotation.from >> U2.Case1))
 
-                                setState {
-                                    state with
+                                setBuildingBlockState {
+                                    buildingBlockState with
                                         HeaderArg = nextHeaderArg
                                 }
 
-                            let input = BuildingBlockStateHandler.TryHeaderOA state
+                            let input = BuildingBlockStateHandler.TryHeaderOA buildingBlockState
 
                             Swate.Components.TermSearch.TermSearch(
                                 (input |> Option.map _.ToTerm()),
                                 setter,
                                 classNames = Swate.Components.Types.TermSearchStyle(U2.Case1 "swt:border-current swt:join-item swt:w-full")
                             )
-                        elif state.HeaderCellType.HasIOType() then
+                        elif buildingBlockState.HeaderCellType.HasIOType() then
                             Html.input [
                                 prop.className "swt:input swt:join-item swt:flex-grow"
                                 prop.readOnly true
                                 prop.valueOrDefault (
-                                    BuildingBlockStateHandler.TryHeaderIO state
+                                    BuildingBlockStateHandler.TryHeaderIO buildingBlockState
                                     |> Option.map _.ToString()
                                     |> Option.defaultValue ""
                                 )
@@ -466,10 +466,10 @@ type BasicComponent =
         ]
 
     [<ReactComponent>]
-    static member BodyInputElement (state: BuildingBlockState, setState: BuildingBlockState -> unit) =
+    static member BodyInputElement (buildingBlockState: BuildingBlockState, setBuildingBlockState: BuildingBlockState -> unit) =
         let setBodyCellType (next: CompositeCellDiscriminate) =
-            setState {
-                state with
+            setBuildingBlockState {
+                buildingBlockState with
                     BodyCellType = next
             }
 
@@ -485,14 +485,14 @@ type BasicComponent =
                     prop.className "swt:join swt:w-full"
                     prop.children [
                         Html.button [
-                            let isActive = state.BodyCellType = CompositeCellDiscriminate.Term
+                            let isActive = buildingBlockState.BodyCellType = CompositeCellDiscriminate.Term
                             prop.className (toggleClass isActive)
                             prop.type'.button
                             prop.text "Term"
                             prop.onClick (fun _ -> setBodyCellType CompositeCellDiscriminate.Term)
                         ]
                         Html.button [
-                            let isActive = state.BodyCellType = CompositeCellDiscriminate.Unitized
+                            let isActive = buildingBlockState.BodyCellType = CompositeCellDiscriminate.Unitized
                             prop.className (toggleClass isActive)
                             prop.type'.button
                             prop.text "Unit"
@@ -504,13 +504,13 @@ type BasicComponent =
                                 |> Option.map OntologyAnnotation.from
                                 |> Option.map U2.Case2
 
-                            setState {
-                                state with
+                            setBuildingBlockState {
+                                buildingBlockState with
                                     BodyArg = nextBodyArg
                             }
 
-                        let input = BuildingBlockStateHandler.TryBodyOA state
-                        let parent = BuildingBlockStateHandler.TryHeaderOA state
+                        let input = BuildingBlockStateHandler.TryBodyOA buildingBlockState
+                        let parent = BuildingBlockStateHandler.TryHeaderOA buildingBlockState
 
                         Swate.Components.TermSearch.TermSearch(
                             (input |> Option.map _.ToTerm()),

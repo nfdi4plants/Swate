@@ -2,8 +2,6 @@ namespace Renderer.components.Widgets
 
 open Feliz
 
-open ARCtrl
-
 open Swate.Components
 
 open LocalStorage.Widgets
@@ -32,6 +30,7 @@ type Widget =
         =
         let position, setPosition = React.useState (fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState (fun _ -> Rect.initSizeFromPrefix prefix)
+        let isMovingRef = React.useRef false
 
         let innerWidth, setInnerWidth = React.useState (fun _ -> Browser.Dom.window.innerWidth)
         let innerHeight, setInnerHeight = React.useState (fun _ -> Browser.Dom.window.innerHeight)
@@ -43,8 +42,9 @@ type Widget =
         let debouncedAdaptElement =
             React.useDebouncedCallback (
                 fun () ->
-                    match position, size with
-                    | Some p, Some s ->
+                    match isMovingRef.current, position, size with
+                    | true, _, _ -> ()
+                    | false, Some p, Some s ->
                         ResizeEventListener.adaptElement (int innerWidth) (int innerHeight) s p setSize setPosition
                     | _ -> ()
                 , 100
@@ -65,6 +65,7 @@ type Widget =
         let startMove (e: Browser.Types.MouseEvent) =
             e.preventDefault()
             e.stopPropagation()
+            isMovingRef.current <- true
 
             let startMouse = { X = int e.clientX; Y = int e.clientY }
 
@@ -85,6 +86,7 @@ type Widget =
             let onmouseup : Browser.Types.Event -> unit =
                 fun _ ->
                     Browser.Dom.document.removeEventListener("mousemove", onmousemove)
+                    isMovingRef.current <- false
 
             Browser.Dom.document.addEventListener("mousemove", onmousemove)
             let opts = Fable.Core.JsInterop.createEmpty<Browser.Types.AddEventListenerOptions>
