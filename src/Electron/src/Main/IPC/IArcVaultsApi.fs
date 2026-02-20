@@ -1,6 +1,7 @@
 module Main.IPC.IArcVaultsApi
 
 open Fable.Electron
+open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Fable.Electron.Main
 open Fable.Core
@@ -135,47 +136,47 @@ let private copyInvestigationMetadata (source: ArcInvestigation) (target: ARC) =
     target.OntologySourceReferences <- source.OntologySourceReferences
     target.Comments <- source.Comments
 
+let private toPreviewDataOrUnsupported (arcFile: ArcFiles) =
+    ArcFileSaveMapping.tryCreatePreviewData arcFile
+    |> Option.map Ok
+    |> Option.defaultValue (Error(exn "Saving this file type is not supported yet in Electron."))
+
 let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
     try
-        match request.FileType with
-        | ArcFileType.Investigation ->
-            let investigation = ArcInvestigation.fromJsonString request.Json
+        match ArcFileSaveMapping.tryParseSaveRequest request with
+        | Error parseError ->
+            Error parseError
+        | Ok (ArcFiles.Investigation investigation) ->
             copyInvestigationMetadata investigation arc
             Ok(ArcFileData(ArcFileType.Investigation, ArcInvestigation.toJsonString 0 arc))
-        | ArcFileType.Study ->
-            let study = ArcStudy.fromJsonString request.Json
-
+        | Ok (ArcFiles.Study(study, _)) ->
             if arc.TryGetStudy(study.Identifier).IsNone then
                 Error(exn $"Study '{study.Identifier}' not found in ARC.")
             else
                 arc.SetStudy(study.Identifier, study)
-                Ok(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
-        | ArcFileType.Assay ->
-            let assay = ArcAssay.fromJsonString request.Json
-
+                toPreviewDataOrUnsupported (ArcFiles.Study(study, []))
+        | Ok (ArcFiles.Assay assay) ->
             if arc.TryGetAssay(assay.Identifier).IsNone then
                 Error(exn $"Assay '{assay.Identifier}' not found in ARC.")
             else
                 arc.SetAssay(assay.Identifier, assay)
-                Ok(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
-        | ArcFileType.Run ->
-            let run = ArcRun.fromJsonString request.Json
-
+                toPreviewDataOrUnsupported (ArcFiles.Assay assay)
+        | Ok (ArcFiles.Run run) ->
             if arc.TryGetRun(run.Identifier).IsNone then
                 Error(exn $"Run '{run.Identifier}' not found in ARC.")
             else
                 arc.SetRun(run.Identifier, run)
-                Ok(ArcFileData(ArcFileType.Run, ArcRun.toJsonString 0 run))
-        | ArcFileType.Workflow ->
-            let workflow = ArcWorkflow.fromJsonString request.Json
-
+                toPreviewDataOrUnsupported (ArcFiles.Run run)
+        | Ok (ArcFiles.Workflow workflow) ->
             if arc.TryGetWorkflow(workflow.Identifier).IsNone then
                 Error(exn $"Workflow '{workflow.Identifier}' not found in ARC.")
             else
                 arc.SetWorkflow(workflow.Identifier, workflow)
-                Ok(ArcFileData(ArcFileType.Workflow, ArcWorkflow.toJsonString 0 workflow))
-        | ArcFileType.DataMap ->
+                toPreviewDataOrUnsupported (ArcFiles.Workflow workflow)
+        | Ok (ArcFiles.DataMap _) ->
             Error(exn "Saving DataMap preview is not supported yet in Electron.")
+        | Ok (ArcFiles.Template _) ->
+            Error(exn "Saving Template preview is not supported yet in Electron.")
     with e ->
         Error e
 
