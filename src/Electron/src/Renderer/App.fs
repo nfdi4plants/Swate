@@ -48,6 +48,7 @@ let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
                     CreateTableView activeView arcFile setArcFile
                 ]
             ]
+            CreateAddRowsFooter arcFile activeView setArcFile
             CreateARCitectFooter arcFile activeView setActiveView setArcFile
         |]
     ]

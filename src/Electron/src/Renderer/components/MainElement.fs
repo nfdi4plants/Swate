@@ -142,6 +142,93 @@ let private createNewTableName (tables: ResizeArray<ArcTable>) =
 
     loop 0
 
+let private refreshArcFileRef (arcFile: ArcFiles) =
+    match arcFile with
+    | ArcFiles.Investigation investigation -> ArcFiles.Investigation investigation
+    | ArcFiles.Study(study, assays) -> ArcFiles.Study(study, assays)
+    | ArcFiles.Assay assay -> ArcFiles.Assay assay
+    | ArcFiles.Run run -> ArcFiles.Run run
+    | ArcFiles.Workflow workflow -> ArcFiles.Workflow workflow
+    | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap)
+    | ArcFiles.Template template -> ArcFiles.Template template
+
+[<ReactComponent>]
+let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (setArcFile: ArcFiles -> unit) =
+    let tables = arcFile.Tables()
+    let minRowsToAdd = 1
+    let rowsToAdd, setRowsToAdd = React.useState minRowsToAdd
+    let rowInputRef = React.useInputRef ()
+
+    let clampRowsToAdd rows = max minRowsToAdd rows
+
+    let canAddRows =
+        match activeView with
+        | PreviewActiveView.Table tableIndex -> tableIndex >= 0 && tableIndex < tables.Count
+        | PreviewActiveView.DataMap ->
+            match arcFile with
+            | ArcFiles.Assay assay -> assay.DataMap.IsSome
+            | ArcFiles.Study(study, _) -> study.DataMap.IsSome
+            | ArcFiles.Run run -> run.DataMap.IsSome
+            | ArcFiles.DataMap _ -> true
+            | _ -> false
+        | PreviewActiveView.Metadata -> false
+
+    let addRows () =
+        let rowCount = clampRowsToAdd rowsToAdd
+
+        if canAddRows then
+            match activeView, arcFile with
+            | PreviewActiveView.Table tableIndex, _ when tableIndex >= 0 && tableIndex < tables.Count ->
+                tables.[tableIndex].AddRowsEmpty rowCount
+                setArcFile (refreshArcFileRef arcFile)
+            | PreviewActiveView.DataMap, ArcFiles.Assay assay when assay.DataMap.IsSome ->
+                assay.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
+                setArcFile (refreshArcFileRef arcFile)
+            | PreviewActiveView.DataMap, ArcFiles.Study(study, _) when study.DataMap.IsSome ->
+                study.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
+                setArcFile (refreshArcFileRef arcFile)
+            | PreviewActiveView.DataMap, ArcFiles.Run run when run.DataMap.IsSome ->
+                run.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
+                setArcFile (refreshArcFileRef arcFile)
+            | PreviewActiveView.DataMap, ArcFiles.DataMap(_, dataMap) ->
+                dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
+                setArcFile (refreshArcFileRef arcFile)
+            | _ -> ()
+
+    if canAddRows then
+        Html.div [
+            prop.className "swt:w-full swt:flex swt:justify-center swt:items-center swt:shrink-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300"
+            prop.title "Add Rows"
+            prop.children [
+                Html.div [
+                    prop.className "swt:join"
+                    prop.children [
+                        Html.input [
+                            prop.className "swt:input swt:join-item swt:border-current"
+                            prop.type'.number
+                            prop.ref rowInputRef
+                            prop.min minRowsToAdd
+                            prop.defaultValue minRowsToAdd
+                            prop.onChange (fun (value: int) -> setRowsToAdd (clampRowsToAdd value))
+                            prop.onKeyDown (key.enter, fun _ -> addRows ())
+                            prop.style [ style.width 100 ]
+                        ]
+                        Html.button [
+                            prop.className "swt:btn swt:btn-outline swt:join-item"
+                            prop.onClick (fun _ ->
+                                rowInputRef.current.Value.value <- unbox minRowsToAdd
+                                setRowsToAdd minRowsToAdd
+                                addRows ()
+                            )
+                            prop.children [ Icons.Plus() ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    else
+        Html.none
+
 [<ReactComponent>]
 let CreateARCitectFooter
     (arcFile: ArcFiles)
@@ -158,7 +245,7 @@ let CreateARCitectFooter
             let nextTable = ArcTable.init nextName
 
             tables.Add(nextTable)
-            setArcFile arcFile
+            setArcFile (refreshArcFileRef arcFile)
             setActiveView (PreviewActiveView.Table (tables.Count - 1))
 
     let footerTabBaseClasses =
