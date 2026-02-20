@@ -389,65 +389,66 @@ let api: IArcVaultsApi = {
                             elif request.Target = ExperimentTarget.Assay && arc.TryGetAssay(identifier).IsSome then
                                 return Error(exn $"Assay with identifier '{identifier}' already exists.")
                             else
-                                let mutable previewData: PreviewData option = None
                                 let mutable protocolPath: string option = None
 
-                                match request.Target with
-                                | ExperimentTarget.Study ->
-                                    let study = arc.InitStudy(identifier)
-                                    arc.RegisterStudy(identifier)
-                                    study.InitTable($"{identifier} Table") |> ignore
+                                let previewDataResult =
+                                    match request.Target with
+                                    | ExperimentTarget.Study ->
+                                        let study = arc.InitStudy(identifier)
+                                        arc.RegisterStudy(identifier)
+                                        study.InitTable($"{identifier} Table") |> ignore
 
-                                    study.Title <- Some request.Metadata.Title
-                                    study.Description <- Some request.Metadata.Description
-                                    study.Contacts <- parsePersons request.Metadata.InvolvedPeople
-                                    study.Comments <- parseComments request.Metadata.Comments
-                                    study.Publications <- parsePublications request.Metadata.Publications
-                                    study.SubmissionDate <- toNonEmptyOption request.Metadata.SubmissionDate
-                                    study.PublicReleaseDate <- toNonEmptyOption request.Metadata.PublicReleaseDate
-                                    study.StudyDesignDescriptors <- parseOntologyAnnotations request.Metadata.StudyDesignDescriptors
+                                        study.Title <- Some request.Metadata.Title
+                                        study.Description <- Some request.Metadata.Description
+                                        study.Contacts <- parsePersons request.Metadata.InvolvedPeople
+                                        study.Comments <- parseComments request.Metadata.Comments
+                                        study.Publications <- parsePublications request.Metadata.Publications
+                                        study.SubmissionDate <- toNonEmptyOption request.Metadata.SubmissionDate
+                                        study.PublicReleaseDate <- toNonEmptyOption request.Metadata.PublicReleaseDate
+                                        study.StudyDesignDescriptors <- parseOntologyAnnotations request.Metadata.StudyDesignDescriptors
 
-                                    let firstTable = study.Tables.[0]
-                                    fillInputColumnIfFilesExist firstTable request.Metadata.Files
+                                        let firstTable = study.Tables.[0]
+                                        fillInputColumnIfFilesExist firstTable request.Metadata.Files
 
-                                    previewData <- Some(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
+                                        toPreviewDataOrUnsupported (ArcFiles.Study(study, []))
+                                    | ExperimentTarget.Assay ->
+                                        let assay = arc.InitAssay(identifier)
+                                        assay.InitTable($"{identifier} Table") |> ignore
 
-                                | ExperimentTarget.Assay ->
-                                    let assay = arc.InitAssay(identifier)
-                                    assay.InitTable($"{identifier} Table") |> ignore
+                                        assay.Title <- Some request.Metadata.Title
+                                        assay.Description <- Some request.Metadata.Description
+                                        assay.Performers <- parsePersons request.Metadata.InvolvedPeople
+                                        assay.Comments <- parseComments request.Metadata.Comments
+                                        assay.MeasurementType <- parseOntologyOption request.Metadata.MeasurementType
+                                        assay.TechnologyType <- parseOntologyOption request.Metadata.TechnologyType
+                                        assay.TechnologyPlatform <- parseOntologyOption request.Metadata.TechnologyPlatform
 
-                                    assay.Title <- Some request.Metadata.Title
-                                    assay.Description <- Some request.Metadata.Description
-                                    assay.Performers <- parsePersons request.Metadata.InvolvedPeople
-                                    assay.Comments <- parseComments request.Metadata.Comments
-                                    assay.MeasurementType <- parseOntologyOption request.Metadata.MeasurementType
-                                    assay.TechnologyType <- parseOntologyOption request.Metadata.TechnologyType
-                                    assay.TechnologyPlatform <- parseOntologyOption request.Metadata.TechnologyPlatform
+                                        let firstTable = assay.Tables.[0]
+                                        fillInputColumnIfFilesExist firstTable request.Metadata.Files
 
-                                    let firstTable = assay.Tables.[0]
-                                    fillInputColumnIfFilesExist firstTable request.Metadata.Files
+                                        toPreviewDataOrUnsupported (ArcFiles.Assay assay)
 
-                                    previewData <- Some(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
+                                match previewDataResult with
+                                | Error previewError ->
+                                    return Error previewError
+                                | Ok previewData ->
+                                    do!
+                                        persistArcChangesAndRefreshVault
+                                            vault
+                                            arc
+                                            arcPath
+                                            (fun () ->
+                                                protocolPath <-
+                                                    createProtocolFile arcPath request.Target identifier request.Metadata.MainText
+                                            )
 
-                                do!
-                                    persistArcChangesAndRefreshVault
-                                        vault
-                                        arc
-                                        arcPath
-                                        (fun () ->
-                                            protocolPath <-
-                                                createProtocolFile arcPath request.Target identifier request.Metadata.MainText
-                                        )
+                                    let response = {
+                                        PreviewData = previewData
+                                        CreatedIdentifier = identifier
+                                        ProtocolPath = protocolPath
+                                    }
 
-                                let response = {
-                                    PreviewData =
-                                        previewData
-                                        |> Option.defaultWith (fun () -> Text "")
-                                    CreatedIdentifier = identifier
-                                    ProtocolPath = protocolPath
-                                }
-
-                                return Ok response
+                                    return Ok response
                     | _ -> return Error(exn "ARC is not loaded.")
             with e ->
                 return Error e
@@ -523,9 +524,10 @@ let api: IArcVaultsApi = {
 
                     match vault.arc with
                     | Some arc ->
-                        // ARC inherits from ArcInvestigation, serialize as investigation
-                        let json = ARCtrl.ArcInvestigation.toJsonString 0 arc
-                        return Ok(ArcFileData(ArcFileType.Investigation, json))
+                        // ARC inherits from ArcInvestigation; use shared preview mapping.
+                        return
+                            ArcFiles.Investigation arc
+                            |> toPreviewDataOrUnsupported
                     | None -> return Error(exn "ARC not loaded")
 
                 | "study" ->
@@ -536,9 +538,9 @@ let api: IArcVaultsApi = {
                         Swate.Components.console.log (
                             "Found study: " + s.Identifier + " with " + string s.Tables.Count + " tables"
                         )
-
-                        let json = ARCtrl.ArcStudy.toJsonString 0 s
-                        return Ok(ArcFileData(ArcFileType.Study, json))
+                        return
+                            ArcFiles.Study(s, [])
+                            |> toPreviewDataOrUnsupported
                     | None -> return Error(exn ("Study '" + identifier + "' not found in ARC"))
 
                 | "assay" ->
@@ -549,9 +551,9 @@ let api: IArcVaultsApi = {
                         Swate.Components.console.log (
                             "Found assay: " + a.Identifier + " with " + string a.Tables.Count + " tables"
                         )
-
-                        let json = ARCtrl.ArcAssay.toJsonString 0 a
-                        return Ok(ArcFileData(ArcFileType.Assay, json))
+                        return
+                            ArcFiles.Assay a
+                            |> toPreviewDataOrUnsupported
                     | None -> return Error(exn ("Assay '" + identifier + "' not found in ARC"))
 
                 | "run" ->
@@ -562,9 +564,9 @@ let api: IArcVaultsApi = {
                         Swate.Components.console.log (
                             "Found run: " + r.Identifier + " with " + string r.Tables.Count + " tables"
                         )
-
-                        let json = ARCtrl.ArcRun.toJsonString 0 r
-                        return Ok(ArcFileData(ArcFileType.Run, json))
+                        return
+                            ArcFiles.Run r
+                            |> toPreviewDataOrUnsupported
                     | None -> return Error(exn ("Run '" + identifier + "' not found in ARC"))
 
                 | "workflow" ->
@@ -573,19 +575,49 @@ let api: IArcVaultsApi = {
                     match workflow with
                     | Some w ->
                         Swate.Components.console.log ("Found workflow: " + w.Identifier)
-                        let json = ARCtrl.ArcWorkflow.toJsonString 0 w
-                        return Ok(ArcFileData(ArcFileType.Workflow, json))
+                        return
+                            ArcFiles.Workflow w
+                            |> toPreviewDataOrUnsupported
                     | None -> return Error(exn ("Workflow '" + identifier + "' not found in ARC"))
 
                 | "datamap" ->
-                    // For datamap files, we need to read and parse the file directly
                     Swate.Components.console.log ("Opening datamap file")
-                    // Datamaps need parent context - for now we'll parse just the datamap
-                    try
-                        let json = ARCtrl.DataMap.toJsonString 0 (ARCtrl.DataMap.init ())
-                        return Ok(ArcFileData(ArcFileType.DataMap, json))
-                    with e ->
-                        return Error(exn ("Could not load datamap: " + e.Message))
+                    match vault.arc with
+                    | None -> return Error(exn "ARC not loaded")
+                    | Some arc ->
+                        let parentFolder =
+                            if pathParts.Length >= 3 then
+                                pathParts.[pathParts.Length - 3].ToLowerInvariant()
+                            else
+                                ""
+
+                        let tryResolveDataMap () =
+                            match parentFolder with
+                            | "studies" ->
+                                arc.TryGetStudy(identifier)
+                                |> Option.bind (fun study -> study.DataMap)
+                            | "assays" ->
+                                arc.TryGetAssay(identifier)
+                                |> Option.bind (fun assay -> assay.DataMap)
+                            | "runs" ->
+                                arc.TryGetRun(identifier)
+                                |> Option.bind (fun run -> run.DataMap)
+                            | _ ->
+                                [
+                                    arc.TryGetStudy(identifier)
+                                    |> Option.bind (fun study -> study.DataMap)
+                                    arc.TryGetAssay(identifier)
+                                    |> Option.bind (fun assay -> assay.DataMap)
+                                    arc.TryGetRun(identifier)
+                                    |> Option.bind (fun run -> run.DataMap)
+                                ]
+                                |> List.tryPick id
+
+                        match tryResolveDataMap () with
+                        | Some dataMap ->
+                            return Ok(ArcFileData(ArcFileType.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
+                        | None ->
+                            return Error(exn $"DataMap '{identifier}' not found in ARC.")
 
                 | _ ->
                     // Fallback to text preview for unknown file types
