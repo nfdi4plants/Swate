@@ -27,6 +27,15 @@ let getOpenPath () : JS.Promise<string option> =
 let openFile (path: string) : JS.Promise<Result<PreviewData, exn>> =
     emitJsExpr (arcVaultApi, path) "$0.openFile($1)"
 
+let openARCInNewWindow () : JS.Promise<Result<unit, exn>> =
+    emitJsExpr arcVaultApi "$0.openARCInNewWindow()"
+
+let focusExistingARCWindow (arcPath: string) : JS.Promise<Result<unit, exn>> =
+    emitJsExpr (arcVaultApi, arcPath) "$0.focusExistingARCWindow($1)"
+
+let getRecentARCs () =
+    emitJsExpr arcVaultApi "$0.getRecentARCs()"
+
 let createExperimentFromLanding
     (request: CreateExperimentRequest)
     : JS.Promise<Result<CreateExperimentResponse, exn>> =

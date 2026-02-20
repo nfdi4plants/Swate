@@ -359,7 +359,7 @@ let Main () =
     let openNewWindow =
         fun _ ->
             promise {
-                match! Api.arcVaultApi.openARCInNewWindow () with
+                match! Api.openARCInNewWindow () with
                 | Ok _ -> ()
                 | Error exn -> failwith $"{exn.Message}"
 
@@ -386,7 +386,7 @@ let Main () =
 
     let onARCClick (clickedARC: ARCPointer) =
         promise {
-            match! Api.arcVaultApi.focusExistingARCWindow clickedARC.path with
+            match! Api.focusExistingARCWindow clickedARC.path with
             | Ok _ -> ()
             | Error exn -> failwith $"{exn.Message}"
 
@@ -422,7 +422,7 @@ let Main () =
 
     let onOpenSelector () =
         promise {
-            let! newARCs = Api.arcVaultApi.getRecentARCs()
+            let! newARCs = Api.getRecentARCs()
 
             match appState with
             | AppState.Init -> ()
