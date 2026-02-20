@@ -13,7 +13,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "echo \"No linting configured\""
+    "lint": "echo \"No linting configured\"",
+    "test:e2e": "playwright test"
   },
   "keywords": [],
   "author": {
@@ -35,6 +36,7 @@
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron-forge/plugin-vite": "^7.10.2",
     "@electron/fuses": "^1.8.0",
+    "@playwright/test": "^1.58.2",
     "electron": "39.2.5"
   }
 }
