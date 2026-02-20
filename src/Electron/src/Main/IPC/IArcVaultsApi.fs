@@ -485,7 +485,6 @@ let api: IArcVaultsApi = {
             match ARC_VAULTS.TryGetVault(windowId) with
             | None -> return Error(exn $"The ARC for window id {windowId} should exist")
             | Some vault ->
-                Swate.Components.console.log ($"openFile path: {path}")
                 let normalizedPath = path.Replace("\\", "/")
                 let pathParts = normalizedPath.Split('/')
                 let fileName = pathParts |> Array.last
@@ -503,10 +502,6 @@ let api: IArcVaultsApi = {
                     else
                         fileName
 
-                Swate.Components.console.log (
-                    $"Extracted identifier: {identifier} (isIsaFile={isIsaFile}, hasParentDir={hasParentDir}, fileName={fileName})"
-                )
-
                 // Determine the type based on the filename
                 let fileType =
                     if fileName = "isa.investigation.xlsx" then "investigation"
@@ -519,9 +514,6 @@ let api: IArcVaultsApi = {
 
                 match fileType with
                 | "investigation" ->
-                    // Return the ARC/Investigation as JSON for proper rendering
-                    Swate.Components.console.log ("Opening investigation file")
-
                     match vault.arc with
                     | Some arc ->
                         // ARC inherits from ArcInvestigation; use shared preview mapping.
@@ -535,9 +527,6 @@ let api: IArcVaultsApi = {
 
                     match study with
                     | Some s ->
-                        Swate.Components.console.log (
-                            "Found study: " + s.Identifier + " with " + string s.Tables.Count + " tables"
-                        )
                         return
                             ArcFiles.Study(s, [])
                             |> toPreviewDataOrUnsupported
@@ -548,9 +537,6 @@ let api: IArcVaultsApi = {
 
                     match assay with
                     | Some a ->
-                        Swate.Components.console.log (
-                            "Found assay: " + a.Identifier + " with " + string a.Tables.Count + " tables"
-                        )
                         return
                             ArcFiles.Assay a
                             |> toPreviewDataOrUnsupported
@@ -561,9 +547,6 @@ let api: IArcVaultsApi = {
 
                     match run with
                     | Some r ->
-                        Swate.Components.console.log (
-                            "Found run: " + r.Identifier + " with " + string r.Tables.Count + " tables"
-                        )
                         return
                             ArcFiles.Run r
                             |> toPreviewDataOrUnsupported
@@ -574,14 +557,12 @@ let api: IArcVaultsApi = {
 
                     match workflow with
                     | Some w ->
-                        Swate.Components.console.log ("Found workflow: " + w.Identifier)
                         return
                             ArcFiles.Workflow w
                             |> toPreviewDataOrUnsupported
                     | None -> return Error(exn ("Workflow '" + identifier + "' not found in ARC"))
 
                 | "datamap" ->
-                    Swate.Components.console.log ("Opening datamap file")
                     match vault.arc with
                     | None -> return Error(exn "ARC not loaded")
                     | Some arc ->
@@ -621,8 +602,6 @@ let api: IArcVaultsApi = {
 
                 | _ ->
                     // Fallback to text preview for unknown file types
-                    Swate.Components.console.log ("Unknown ISA file type, falling back to text preview")
-
                     try
                         let content = fs.readFileSync (path, "utf8")
                         return Ok(Text content)
