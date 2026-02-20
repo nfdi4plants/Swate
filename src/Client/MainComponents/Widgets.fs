@@ -15,7 +15,6 @@ module InitExtensions =
     type Rect with
 
         static member initSizeFromPrefix(prefix: string) =
-            console.log($"initSizeFromPrefix: {prefix}")
             match Size.load prefix with
             | Some p -> Some p
             | None -> None

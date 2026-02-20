@@ -35,30 +35,6 @@ module SearchComponentHelper =
         |> InterfaceMsg
         |> dispatch
 
-    let addBuildingBlockARCitect (selectedColumnIndex: int option) (model: Model) dispatch =
-
-        let state = model.AddBuildingBlockState
-        let header = Helper.createCompositeHeaderFromState state
-        let body = Helper.tryCreateCompositeCellFromState state
-
-        let bodyCells =
-            if body.IsSome then // create as many body cells as there are rows in the active table
-                let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
-                Array.init rowCount (fun _ -> body.Value.Copy()) |> ResizeArray
-            else
-                state.HeaderCellType.CreateEmptyDefaultCells model.SpreadsheetModel.ActiveTable.RowCount
-
-        let column = CompositeColumn.create (header, bodyCells)
-
-        let index =
-            Spreadsheet.Controller.BuildingBlocks.SidebarControllerAux.getNextColumnIndex
-                selectedColumnIndex
-                model.SpreadsheetModel
-
-        SpreadsheetInterface.AddAnnotationBlock(Some index, column)
-        |> InterfaceMsg
-        |> dispatch
-
 type SearchComponent =
 
     static member private termOrUnitizedSwitch(model: Model, dispatch) =

@@ -3,13 +3,13 @@ module Electron.Tests.DataAnnotatorWidget
 open Fable.Mocha
 open ARCtrl
 open Swate.Components.Shared
-open Renderer.components.DataAnnotatorWidget
+open Renderer.components.Widgets
 
 let private mkCells (count: int) =
     Array.init count (fun _ -> CompositeCell.FreeText "")
     |> ResizeArray
 
-let private mkAnnotationInput selectors targetColumn : DataAnnotatorDataSource.AnnotationInput = {
+let private mkAnnotationInput selectors targetColumn : AnnotationInput = {
     Selectors = selectors
     FileName = "raw-data.tsv"
     FileType = "text/tab-separated-values"
@@ -48,7 +48,7 @@ let Main =
                 DataAnnotator.DataTarget.Column 1
             ]
 
-            let selectors = DataAnnotatorDataSource.selectorsFromTargets true targets
+            let selectors = DataAnnotatorDataSource.SelectorsFromTargets true targets
 
             Expect.equal
                 selectors
@@ -64,26 +64,26 @@ let Main =
 
         testCase "autodetect chooses output when no input/output exists" <| fun _ ->
             let table = ArcTable.init "T"
-            let header = DataAnnotatorDataSource.tryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectOk "autodetect"
+            let header = DataAnnotatorDataSource.TryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectOk "autodetect"
             Expect.equal header (CompositeHeader.Output IOType.Data) "Autodetect should default to Output on empty table"
 
         testCase "autodetect chooses output when only input exists" <| fun _ ->
             let table = ArcTable.init "T"
             table.AddColumn(CompositeHeader.Input IOType.Data, mkCells 1, forceReplace = true)
-            let header = DataAnnotatorDataSource.tryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectOk "autodetect"
+            let header = DataAnnotatorDataSource.TryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectOk "autodetect"
             Expect.equal header (CompositeHeader.Output IOType.Data) "Autodetect should choose Output when only Input exists"
 
         testCase "autodetect chooses input when only output exists" <| fun _ ->
             let table = ArcTable.init "T"
             table.AddColumn(CompositeHeader.Output IOType.Data, mkCells 1, forceReplace = true)
-            let header = DataAnnotatorDataSource.tryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectOk "autodetect"
+            let header = DataAnnotatorDataSource.TryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectOk "autodetect"
             Expect.equal header (CompositeHeader.Input IOType.Data) "Autodetect should choose Input when only Output exists"
 
         testCase "autodetect fails when input and output both exist" <| fun _ ->
             let table = ArcTable.init "T"
             table.AddColumn(CompositeHeader.Input IOType.Data, mkCells 1, forceReplace = true)
             table.AddColumn(CompositeHeader.Output IOType.Data, mkCells 1, forceReplace = true)
-            let err = DataAnnotatorDataSource.tryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectError "autodetect"
+            let err = DataAnnotatorDataSource.TryGetTargetHeader table DataAnnotator.TargetColumn.Autodetect |> expectError "autodetect"
             Expect.equal
                 err
                 "Both Input and Output columns already exist. Select Input or Output explicitly."
@@ -93,7 +93,7 @@ let Main =
             let table = ArcTable.init "T"
             let selectors = [| "row=2"; "cell=3,2" |]
             let input = mkAnnotationInput selectors DataAnnotator.TargetColumn.Autodetect
-            let count = DataAnnotatorDataSource.applyToTable table input |> expectOk "applyToTable"
+            let count = DataAnnotatorDataSource.ApplyToTable table input |> expectOk "applyToTable"
 
             Expect.equal count selectors.Length "applyToTable should return selector count"
 
@@ -109,7 +109,7 @@ let Main =
             let dataMap = DataMap.init ()
             let selectors = [| "row=2"; "row=3"; "cell=4,2" |]
             let input = mkAnnotationInput selectors DataAnnotator.TargetColumn.Autodetect
-            let count = DataAnnotatorDataSource.applyToDataMap dataMap input |> expectOk "applyToDataMap"
+            let count = DataAnnotatorDataSource.ApplyToDataMap dataMap input |> expectOk "applyToDataMap"
 
             Expect.equal count selectors.Length "applyToDataMap should return selector count"
             Expect.equal dataMap.DataContexts.Count selectors.Length "DataMap should be expanded to selector count"
@@ -123,6 +123,6 @@ let Main =
         testCase "parse uses default separator and still validates empty file data" <| fun _ ->
             let file = DataAnnotator.DataFile.create ("empty.csv", "text/csv", "", 0.0)
 
-            let dataError = DataAnnotatorDataSource.tryParseDataFile " " file |> expectError "empty data validation"
+            let dataError = DataAnnotatorDataSource.TryParseDataFile " " file |> expectError "empty data validation"
             Expect.equal dataError "Parsed file does not contain any data rows." "Empty parsed file should be rejected"
     ]
