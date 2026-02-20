@@ -31,6 +31,9 @@ release.sh
 dist/
 output/
 
+test-results/
+playwright-report/
+
 *storybook.log
 storybook-static/
 nupkgs/
