@@ -96,9 +96,6 @@ type FilePickerDataSource =
                 InsertedCount = insertedCount
             }
 
-    static member SyncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
-        Renderer.ArcFilePersistence.saveArcFile arcFile
-
 type FilePickerWidget =
 
     static member CreateFilePickerButtons (fileInputRef: IRefValue<Browser.Types.HTMLElement option>) setFileNames setStatus canInsert tryInsertFileNames =
@@ -141,19 +138,6 @@ type FilePickerWidget =
                     ]
                 ]
             ]
-        ]
-
-    [<ReactComponent>]
-    static member StatusElement (status: StatusMessage) =
-        let classNames =
-            match status.Kind with
-            | StatusKind.Info -> [ "swt:alert-info"; "swt:text-info-content" ]
-            | StatusKind.Warning -> [ "swt:alert-warning"; "swt:text-warning-content" ]
-            | StatusKind.Error -> [ "swt:alert-error"; "swt:text-error-content" ]
-
-        Html.div [
-            prop.className ([ "swt:alert swt:py-2 swt:text-sm" ] @ classNames)
-            prop.children [ Html.span status.Text ]
         ]
 
     [<ReactComponent>]
@@ -223,7 +207,7 @@ type FilePickerWidget =
                         let isPartialInsert = insertResult.InsertedCount < insertResult.RequestedCount
                         promise {
                             let! syncResult =
-                                FilePickerDataSource.SyncArcVault tableData.ArcFile
+                                Renderer.ArcFilePersistence.saveArcFile tableData.ArcFile
 
                             let statusMessage =
                                 match isPartialInsert, syncResult with
@@ -267,7 +251,7 @@ type FilePickerWidget =
                         let isPartialInsert = insertResult.InsertedCount < insertResult.RequestedCount
                         promise {
                             let! syncResult =
-                                FilePickerDataSource.SyncArcVault dataMapData.ArcFile
+                                Renderer.ArcFilePersistence.saveArcFile dataMapData.ArcFile
 
                             let statusMessage =
                                 match isPartialInsert, syncResult with
@@ -411,10 +395,10 @@ type FilePickerWidget =
                                 ]
                             ]
                         ]
-                    ]
+                ]
                 FilePickerWidget.CreateFilePickerButtons fileInputRef setFileNames setStatus canInsert tryInsertFileNames
                 match status with
-                | Some message -> FilePickerWidget.StatusElement message
+                | Some message -> StatusElement.Create message
                 | None -> Html.none
             ]
         ]

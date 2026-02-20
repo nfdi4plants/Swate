@@ -125,9 +125,6 @@ type DataAnnotatorDataSource =
         with exn ->
             Error exn.Message
 
-    static member syncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
-        Renderer.ArcFilePersistence.saveArcFile arcFile
-
 type DataAnnotatorWidget =
 
     [<ReactComponent>]
@@ -417,7 +414,7 @@ type DataAnnotatorWidget =
                         promise {
                             let! syncResult =
                                 match arcFileOpt with
-                                | Some arcFile -> DataAnnotatorDataSource.syncArcVault arcFile
+                                | Some arcFile -> Renderer.ArcFilePersistence.saveArcFile arcFile
                                 | None -> promise { return Ok() }
 
                             match syncResult with

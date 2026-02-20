@@ -183,9 +183,6 @@ type BuildingBlockDataSource =
             Warning = warning
         }
 
-    static member syncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
-        Renderer.ArcFilePersistence.saveArcFile arcFile
-
 type BuildingBlockWidget =
 
     [<ReactComponent>]
@@ -511,19 +508,6 @@ type BasicComponent =
         ]
 
     [<ReactComponent>]
-    static member StatusElement (status: StatusMessage) =
-        let classNames =
-            match status.Kind with
-            | StatusKind.Info -> [ "swt:alert-info"; "swt:text-info-content" ]
-            | StatusKind.Warning -> [ "swt:alert-warning"; "swt:text-warning-content" ]
-            | StatusKind.Error -> [ "swt:alert-error"; "swt:text-error-content" ]
-
-        Html.div [
-            prop.className ([ "swt:alert swt:py-2 swt:text-sm" ] @ classNames)
-            prop.children [ Html.span status.Text ]
-        ]
-
-    [<ReactComponent>]
     static member Main (activeTableData: ActiveTableData option, onTableMutated: unit -> unit) =
         let state, setState = React.useState BuildingBlockStateHandler.init
         let status, setStatus = React.useState (None: StatusMessage option)
@@ -579,7 +563,7 @@ type BasicComponent =
                     onTableMutated ()
                     promise {
                         let! syncResult =
-                            BuildingBlockDataSource.syncArcVault activeTable.ArcFile
+                            Renderer.ArcFilePersistence.saveArcFile activeTable.ArcFile
 
                         let statusMessage =
                             match insertResult.Warning, syncResult with
@@ -651,7 +635,7 @@ type BasicComponent =
                     ]
                 ]
                 match status with
-                | Some message -> BasicComponent.StatusElement message
+                | Some message -> StatusElement.Create message
                 | None -> Html.none
             ]
         ]

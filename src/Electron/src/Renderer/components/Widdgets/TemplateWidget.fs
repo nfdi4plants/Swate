@@ -123,23 +123,7 @@ type TemplateDataSource =
         with exn ->
             Error exn.Message
 
-    static member SyncArcVault (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
-        Renderer.ArcFilePersistence.saveArcFile arcFile
-
 type TemplateWidget =
-
-    [<ReactComponent>]
-    static member StatusElement (status: StatusMessage) =
-        let classNames =
-            match status.Kind with
-            | StatusKind.Info -> [ "swt:alert-info"; "swt:text-info-content" ]
-            | StatusKind.Warning -> [ "swt:alert-warning"; "swt:text-warning-content" ]
-            | StatusKind.Error -> [ "swt:alert-error"; "swt:text-error-content" ]
-
-        Html.div [
-            prop.className ([ "swt:alert swt:py-2 swt:text-sm" ] @ classNames)
-            prop.children [ Html.span status.Text ]
-        ]
 
     static member PreviewColumnValues (column: CompositeColumn) =
         try
@@ -448,13 +432,14 @@ type TemplateWidget =
             ]
         ]
 
-    static member DropdownContent(isRowExtended: bool, setIsRowExtended) =
+    static member DropdownContent(isRowExtended: bool, setIsRowExtended, content: ReactElement) =
         Html.div [
             prop.className "swt:collapse swt:border swt:rounded-md"
             prop.children [
                 Html.input [
                     prop.type'.checkbox
                     prop.className "swt:min-h-0 swt:h-5"
+                    prop.isChecked isRowExtended
                     prop.onClick (fun _ -> setIsRowExtended (not isRowExtended))
                 ]
                 Html.div [
@@ -472,6 +457,7 @@ type TemplateWidget =
                         Swate.Components.Icons.MagnifyingClass()
                     ]
                 ]
+                content
             ]
         ]
 
@@ -621,7 +607,7 @@ type TemplateWidget =
                         setIsImportDialogOpen false
                         onTableMutated ()
                         promise {
-                            let! syncResult = TemplateDataSource.SyncArcVault updatedArcFile
+                            let! syncResult = Renderer.ArcFilePersistence.saveArcFile updatedArcFile
 
                             match syncResult with
                             | Ok() ->
@@ -762,8 +748,17 @@ type TemplateWidget =
                                                         Html.div [
                                                             prop.className "swt:flex swt:flex-col swt:gap-2"
                                                             prop.children [
-                                                                TemplateWidget.DropdownContent(isRowExtended, setIsRowExtended)
-                                                                TemplateWidget.SelectedColumnPreview(columns, isColumnSelected, toggleColumnSelected, template, importMode)
+                                                                TemplateWidget.DropdownContent(
+                                                                    isRowExtended,
+                                                                    setIsRowExtended,
+                                                                    TemplateWidget.SelectedColumnPreview(
+                                                                        columns,
+                                                                        isColumnSelected,
+                                                                        toggleColumnSelected,
+                                                                        template,
+                                                                        importMode
+                                                                    )
+                                                                )
                                                             ]
                                                         ]
                                                     ]
@@ -798,7 +793,7 @@ type TemplateWidget =
                         ]
                 )
                 match status with
-                | Some message -> TemplateWidget.StatusElement message
+                | Some message -> StatusElement.Create message
                 | None -> Html.none
             ]
         ]
