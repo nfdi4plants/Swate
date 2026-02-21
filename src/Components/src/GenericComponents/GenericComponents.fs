@@ -5,7 +5,6 @@ open Feliz
 type Components =
 
     static member DeleteButton(?children, ?className: string, ?props: IReactProperty list) =
-        //Daisy.button.button [
         Html.button [
             prop.className [
                 "swt:btn swt:btn-square"

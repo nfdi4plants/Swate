@@ -277,6 +277,23 @@ module ArcVaultExtensions =
             | Some run -> Some run
             | None -> None
 
+        member this.GetContracts() =
+            match this.arc with
+            | Some arc -> arc.GetUpdateContracts()
+            | None -> failwith "No arc available"
+
+        member this.UpdateAsync() = promise {
+            match this.arc, this.path with
+            | Some arc, Some arcPath ->
+                do! arc.UpdateAsync(arcPath)
+                do! arc.WriteAsync(arcPath)
+            | Some _, None ->
+                failwith "No path available"
+            | None, _ ->
+                failwith "No arc available"
+        }
+            
+
 type ArcVaults() =
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get

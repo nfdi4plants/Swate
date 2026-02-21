@@ -10,7 +10,7 @@ open Swate.Components
 open ARCtrl
 open BuildingBlock.SearchComponent
 
-module private InitExtensions =
+module InitExtensions =
 
     type Rect with
 
@@ -31,7 +31,7 @@ open Fable.Core.JsInterop
 open Protocol
 open Model
 
-module private MoveEventListener =
+module MoveEventListener =
 
     open Fable.Core.JsInterop
 
@@ -65,7 +65,7 @@ module private MoveEventListener =
             let position = { X = int rect.left; Y = int rect.top }
             Position.write (prefix, position)
 
-module private ResizeEventListener =
+module ResizeEventListener =
 
     open Fable.Core.JsInterop
 

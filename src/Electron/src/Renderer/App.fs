@@ -16,7 +16,7 @@ open ARCtrl.Json
 
 open components.MainElement
 open components.ExperimentLanding
-
+open Renderer.components.Widgets
 
 [<ReactComponent>]
 let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
@@ -48,73 +48,25 @@ let CreateARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
                     CreateTableView activeView arcFile setArcFile
                 ]
             ]
-            CreateARCitectFooter arcFile activeView setActiveView
+            CreateAddRowsFooter arcFile activeView setArcFile
+            CreateARCitectFooter arcFile activeView setActiveView setArcFile
         |]
     ]
 
 let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
-    try
-        match fileType with
-        | ArcFileType.Investigation ->
-            let inv = ArcInvestigation.fromJsonString json
-            Some(ArcFiles.Investigation inv)
-        | ArcFileType.Study ->
-            let study = ArcStudy.fromJsonString json
-            Some(ArcFiles.Study(study, []))
-        | ArcFileType.Assay ->
-            let assay = ArcAssay.fromJsonString json
-            Some(ArcFiles.Assay assay)
-        | ArcFileType.Run ->
-            let run = ArcRun.fromJsonString json
-            Some(ArcFiles.Run run)
-        | ArcFileType.Workflow ->
-            let workflow = ArcWorkflow.fromJsonString json
-            Some(ArcFiles.Workflow workflow)
-        | ArcFileType.DataMap ->
-            let datamap = DataMap.fromJsonString json
-            Some(ArcFiles.DataMap(None, datamap))
-    with e ->
+    match ArcFileSaveMapping.tryParseArcFile fileType json with
+    | Ok arcFile -> Some arcFile
+    | Error e ->
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
-        None
-
-let SerializeArcFileForSave (arcFile: ArcFiles) : SaveArcFileRequest option =
-    match arcFile with
-    | ArcFiles.Investigation investigation ->
-        Some {
-            FileType = ArcFileType.Investigation
-            Json = ArcInvestigation.toJsonString 0 investigation
-        }
-    | ArcFiles.Study(study, _) ->
-        Some {
-            FileType = ArcFileType.Study
-            Json = ArcStudy.toJsonString 0 study
-        }
-    | ArcFiles.Assay assay ->
-        Some {
-            FileType = ArcFileType.Assay
-            Json = ArcAssay.toJsonString 0 assay
-        }
-    | ArcFiles.Run run ->
-        Some {
-            FileType = ArcFileType.Run
-            Json = ArcRun.toJsonString 0 run
-        }
-    | ArcFiles.Workflow workflow ->
-        Some {
-            FileType = ArcFileType.Workflow
-            Json = ArcWorkflow.toJsonString 0 workflow
-        }
-    | ArcFiles.DataMap _ ->
-        None
-    | ArcFiles.Template _ ->
         None
 
 [<ReactComponent>]
 let Main () =
 
-    let widgets, setWidgets = React.useState ([])
-    let recentARCs, setRecentARCs = React.useState ([||])
-    let fileExplorer, setFileExplorer = React.useState (None)
+    let widgets, setWidgets = React.useState []
+    let tableMutationTick, setTableMutationTick = React.useStateWithUpdater 0
+    let recentARCs, setRecentARCs = React.useState [||]
+    let fileExplorer, setFileExplorer = React.useState None
     let didSelectFile, setDidSelectFile = React.useState false
     let appState, setAppState = React.useState (AppState.Init)
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
@@ -408,7 +360,7 @@ let Main () =
     let openNewWindow =
         fun _ ->
             promise {
-                match! Api.arcVaultApi.openARCInNewWindow () with
+                match! Api.openARCInNewWindow () with
                 | Ok _ -> ()
                 | Error exn -> failwith $"{exn.Message}"
 
@@ -435,7 +387,7 @@ let Main () =
 
     let onARCClick (clickedARC: ARCPointer) =
         promise {
-            match! Api.arcVaultApi.focusExistingARCWindow clickedARC.path with
+            match! Api.focusExistingARCWindow clickedARC.path with
             | Ok _ -> ()
             | Error exn -> failwith $"{exn.Message}"
 
@@ -471,7 +423,7 @@ let Main () =
 
     let onOpenSelector () =
         promise {
-            let! newARCs = Api.arcVaultApi.getRecentARCs()
+            let! newARCs = Api.getRecentARCs()
 
             match appState with
             | AppState.Init -> ()
@@ -606,22 +558,63 @@ let Main () =
         match arcFileState with
         | None -> ()
         | Some arcFile ->
-            match SerializeArcFileForSave arcFile with
-            | None ->
-                setPreviewError (Some "Saving this file type is not supported in Electron yet.")
-            | Some request ->
-                promise {
-                    let! result = Api.saveArcFile request
+            promise {
+                let! result = Renderer.ArcFilePersistence.saveArcFileWithPreview arcFile
 
-                    match result with
-                    | Ok updatedPreview ->
-                        setPreviewData (Some updatedPreview)
-                        setPreviewError None
-                        setDidSelectFile true
-                    | Error exn ->
-                        setPreviewError (Some $"Save failed: {exn.Message}")
+                match result with
+                | Ok updatedPreview ->
+                    setPreviewData (Some updatedPreview)
+                    setPreviewError None
+                    setDidSelectFile true
+                | Error errorMsg ->
+                    setPreviewError (Some $"Save failed: {errorMsg}")
+            }
+            |> Promise.start
+
+    let activeTableData : ActiveTableData option =
+        match arcFileState, activeView with
+        | Some arcFile, PreviewActiveView.Table tableIndex ->
+            let tables = arcFile.Tables()
+
+            if tableIndex >= 0 && tableIndex < tables.Count then
+                let table = tables.[tableIndex]
+
+                Some {
+                    ArcFile = arcFile
+                    Table = table
+                    TableName = table.Name
+                    TableIndex = tableIndex
                 }
-                |> Promise.start
+            else
+                None
+        | _ -> None
+
+    let activeDataMapData : ActiveDataMapData option =
+        match arcFileState, activeView with
+        | Some (ArcFiles.Assay assay as arcFile), PreviewActiveView.DataMap when assay.DataMap.IsSome ->
+            Some {
+                ArcFile = arcFile
+                DataMap = assay.DataMap.Value
+            }
+        | Some (ArcFiles.Study(study, _) as arcFile), PreviewActiveView.DataMap when study.DataMap.IsSome ->
+            Some {
+                ArcFile = arcFile
+                DataMap = study.DataMap.Value
+            }
+        | Some (ArcFiles.Run run as arcFile), PreviewActiveView.DataMap when run.DataMap.IsSome ->
+            Some {
+                ArcFile = arcFile
+                DataMap = run.DataMap.Value
+            }
+        | Some (ArcFiles.DataMap(_, datamap) as arcFile), PreviewActiveView.DataMap ->
+            Some {
+                ArcFile = arcFile
+                DataMap = datamap
+            }
+        | _ -> None
+
+    let onTableMutated () =
+        setTableMutationTick (fun latest -> latest + 1)
 
     let children =
         React.useMemo (
@@ -631,6 +624,7 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
                         prop.children [
+                            Widget.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
@@ -650,15 +644,14 @@ let Main () =
                     Html.div [
                         prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
                         prop.children [
+                            Widget.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                             Html.div [
                                 prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                                 prop.children [
-                                    // Navbar
                                     Html.div [
                                         prop.className "swt:flex-none"
                                         prop.children [ CreateARCitectNavbar activeView addWidget arcFileState onClick ]
                                     ]
-                                    // Main content
                                     Html.div [
                                         prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                                         prop.children [
@@ -671,7 +664,7 @@ let Main () =
                     ]
             ),
             [|
-                appState
+                box appState
                 box previewData
                 box activeView
                 box arcFileState
@@ -680,6 +673,8 @@ let Main () =
                 box landingUiState
                 box landingDraftActive
                 box showLandingDraft
+                box widgets
+                box tableMutationTick
             |]
         )
 
