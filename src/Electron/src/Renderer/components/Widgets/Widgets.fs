@@ -27,6 +27,7 @@ type Widget =
         (content: ReactElement)
         (onRemove: Browser.Types.MouseEvent -> unit)
         (allowContentOverflowVisible: bool)
+        (isResizable: bool)
         =
         let position, setPosition = React.useState (fun _ -> Rect.initPositionFromPrefix prefix)
         let size, setSize = React.useState (fun _ -> Rect.initSizeFromPrefix prefix)
@@ -67,6 +68,15 @@ type Widget =
             e.stopPropagation()
             isMovingRef.current <- true
 
+            // Non-resizable widgets (Template) should keep their current dimensions while moving.
+            if not isResizable && size.IsNone then
+                let currentSize : Rect = {
+                    X = int element.current.Value.offsetWidth
+                    Y = int element.current.Value.offsetHeight
+                }
+
+                setSize (Some currentSize)
+
             let startMouse = { X = int e.clientX; Y = int e.clientY }
 
             let startPos =
@@ -94,19 +104,20 @@ type Widget =
             Browser.Dom.document.addEventListener("mouseup", onmouseup, opts)
 
         let startResize (e: Browser.Types.MouseEvent) =
-            e.preventDefault()
-            e.stopPropagation()
+            if isResizable then
+                e.preventDefault()
+                e.stopPropagation()
 
-            let startPosition : Rect = { X = int e.clientX; Y = int e.clientY }
-            let startSize : Rect = { X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight }
+                let startPosition : Rect = { X = int e.clientX; Y = int e.clientY }
+                let startSize : Rect = { X = int element.current.Value.offsetWidth; Y = int element.current.Value.offsetHeight }
 
-            let onmousemove = ResizeEventListener.onmousemove startPosition startSize setSize
-            let onmouseup = fun _ -> ResizeEventListener.onmouseup (prefix, element) onmousemove
+                let onmousemove = ResizeEventListener.onmousemove startPosition startSize setSize
+                let onmouseup = fun _ -> ResizeEventListener.onmouseup (prefix, element) onmousemove
 
-            Browser.Dom.document.addEventListener("mousemove", onmousemove)
-            let opts = Fable.Core.JsInterop.createEmpty<Browser.Types.AddEventListenerOptions>
-            opts.once <- true
-            Browser.Dom.document.addEventListener("mouseup", onmouseup, opts)
+                Browser.Dom.document.addEventListener("mousemove", onmousemove)
+                let opts = Fable.Core.JsInterop.createEmpty<Browser.Types.AddEventListenerOptions>
+                opts.once <- true
+                Browser.Dom.document.addEventListener("mouseup", onmouseup, opts)
 
         Html.div [
             prop.ref element
@@ -151,18 +162,19 @@ type Widget =
                     ]
                     prop.children [ content ]
                 ]
-                Html.div [
-                    prop.className "swt:opacity-60 hover:swt:opacity-100"
-                    prop.style [
-                        style.position.absolute
-                        style.right 6
-                        style.bottom 6
-                        style.width 14
-                        style.height 14
-                        style.cursor.northWestSouthEastResize
+                if isResizable then
+                    Html.div [
+                        prop.className "swt:opacity-60 hover:swt:opacity-100"
+                        prop.style [
+                            style.position.absolute
+                            style.right 6
+                            style.bottom 6
+                            style.width 14
+                            style.height 14
+                            style.cursor.northWestSouthEastResize
+                        ]
+                        prop.onMouseDown startResize
                     ]
-                    prop.onMouseDown startResize
-                ]
             ]
         ]
 
@@ -233,7 +245,12 @@ type Widget =
         Html.div [
             prop.onMouseDown (fun _ -> onBringToFront())
             prop.children [
-                Widget.BaseWidget (Widget.prefixOf widget) content onRemove (widget = MainComponents.Widget._BuildingBlock)
+                Widget.BaseWidget
+                    (Widget.prefixOf widget)
+                    content
+                    onRemove
+                    (widget = MainComponents.Widget._BuildingBlock)
+                    (widget <> MainComponents.Widget._Template)
             ]
         ]
 
@@ -265,3 +282,4 @@ type Widget =
                     ]
                 ]
         ]
+
