@@ -18,8 +18,12 @@ type ArcFileState = {
 }
 
 [<ReactComponent>]
-let CreateTablePreview (table: ARCtrl.ArcTable) =
+let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> unit) =
     let tableState, setTableState = React.useState (table)
+
+    let setTable (nextTable: ArcTable) =
+        setTableState nextTable
+        setTableInArcFile nextTable
 
     React.useEffect (
         (fun () ->
@@ -34,7 +38,7 @@ let CreateTablePreview (table: ARCtrl.ArcTable) =
             //It works but not as clean as we want it
             prop.className "swt:w-screen swt:pb-4"
             prop.children [
-                AnnotationTable.AnnotationTable(tableState, setTableState)
+                AnnotationTable.AnnotationTable(tableState, setTable)
             ]
         ]
     )
@@ -80,43 +84,23 @@ let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: M
         | PreviewActiveView.Metadata -> Html.none
     ]
 
-let CreateARCitectNavbarList (arcFile: ArcFiles option) onClick =
-
-    let openReset, setOpenReset = React.useState false
+let CreateARCitectNavbarList (arcFile: ArcFiles option) onSaveClick =
 
     React.Fragment [
-        //Modals.ResetTable.Main(isOpen = openReset, setIsOpen = setOpenReset, dispatch = dispatch)
         QuickAccessButton.QuickAccessButton(
             "Save",
             Icons.Save(),
-            onClick,
-            //(fun _ ->
-            //    ARCitect.Save model.SpreadsheetModel.ArcFile.Value |> ARCitectMsg |> dispatch
-            //),
+            onSaveClick,
             isDisabled = arcFile.IsNone
         )
-
-        //NavbarBurger.Main(model, dispatch, host = Swatehost.ARCitect)
     ]
 
 [<ReactComponent>]
-let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onClick =
-
-    //let state, setState = React.useState (SidebarComponents.Navbar.NavbarState.init)
-    //let inline toggleMetdadataModal _ =
-    //    {
-    //        state with
-    //            ExcelMetadataModalActive = not state.ExcelMetadataModalActive
-    //    }
-    //    |> setState
+let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onSaveClick =
 
     Components.BaseNavbar.Main [
         CreateARCitectWidgetNavbarList activeView addWidget
-        CreateARCitectNavbarList arcFile onClick
-        //Html.div [
-        //    prop.className "swt:ml-auto"
-        //    prop.children [ CreateARCitectNavbarList arcFile onClick ]
-        //]
+        CreateARCitectNavbarList arcFile onSaveClick
     ]
 
 [<Literal>]
@@ -395,7 +379,11 @@ let CreateTableView activeView arcFileState setArcFileState =
         let tables = arcFileState.Tables()
 
         if index < tables.Count then
-            CreateTablePreview(tables.[index])
+            let setTable (nextTable: ArcTable) =
+                tables.[index] <- nextTable
+                setArcFileState (refreshArcFileRef arcFileState)
+
+            CreateTablePreview tables.[index] setTable
         else
             Html.div [
                 prop.className "swt:p-4 swt:text-error"

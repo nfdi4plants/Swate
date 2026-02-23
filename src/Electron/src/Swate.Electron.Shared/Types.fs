@@ -2,7 +2,6 @@ namespace Swate.Electron.Shared
 
 open ARCtrl
 open ARCtrl.Json
-open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 
 [<RequireQualifiedAccess>]

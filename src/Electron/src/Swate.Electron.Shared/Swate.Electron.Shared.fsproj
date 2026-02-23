@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="IPCTypes.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Api.fs" />
   </ItemGroup>
 
   <ItemGroup>
