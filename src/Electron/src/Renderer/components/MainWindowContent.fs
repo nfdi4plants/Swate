@@ -9,16 +9,8 @@ open ARCtrl
 open MainElement
 open ExperimentLanding
 
-open Feliz
-open Fable.Electron.Remoting.Renderer
-
 open Swate.Components
 open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
-
-open Browser.Dom
-
-open ARCtrl
 
 [<ReactComponent>]
 let createARCPreview
