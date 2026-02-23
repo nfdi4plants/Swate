@@ -255,6 +255,154 @@ type DataAnnotatorWidget =
             ]
         ]
 
+    static member CreateContent(
+        (parsedFile: DataAnnotator.ParsedDataFile option), setParsedFile, clearSelection, isSeparatorDropdownOpen, setIsSeparatorDropdownOpen, (separatorInputRef: IRefValue<Browser.Types.HTMLElement option>), (separatorInput: string), (setSeparatorInput: string -> unit),
+            updateSeparator, (activeTableData: ActiveTableData option), (activeDataMapData: ActiveDataMapData option), targetColumn, setTargetColumn, selectedTargets, setSelectedTargets) =
+
+        let toggleHeader () =
+            match parsedFile with
+            | None -> ()
+            | Some parsed ->
+                setParsedFile (Some(parsed.ToggleHeader()))
+                clearSelection ()
+
+        let applyQuickSeparator (separator: string) =
+            setSeparatorInput separator
+
+        let dropDownContext =
+            [
+                Html.li [
+                    Html.a [
+                        prop.onClick (fun _ ->
+                            applyQuickSeparator "\\t"
+                            setIsSeparatorDropdownOpen false
+                        )
+                        prop.children [ Html.span [ prop.text "Tab (\\t)" ] ]
+                    ]
+                ]
+                Html.li [
+                    Html.a [
+                        prop.onClick (fun _ ->
+                            applyQuickSeparator ","
+                            setIsSeparatorDropdownOpen false
+                        )
+                        prop.children [ Html.span [ prop.text "," ] ]
+                    ]
+                ]
+                Html.li [
+                    Html.a [
+                        prop.onClick (fun _ ->
+                            applyQuickSeparator ";"
+                            setIsSeparatorDropdownOpen false
+                        )
+                        prop.children [ Html.span [ prop.text ";" ] ]
+                    ]
+                ]
+                Html.li [
+                    Html.a [
+                        prop.onClick (fun _ ->
+                            applyQuickSeparator "|"
+                            setIsSeparatorDropdownOpen false
+                        )
+                        prop.children [ Html.span [ prop.text "|" ] ]
+                    ]
+                ]
+            ]
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-3"
+            prop.children [
+                match parsedFile with
+                | None ->
+                    Html.div [
+                        prop.className "swt:text-sm swt:opacity-70"
+                        prop.text "Upload a valid file to preview data."
+                    ]
+                | Some parsed ->
+                    Html.div [
+                        prop.className "swt:flex swt:flex-wrap swt:gap-2"
+                        prop.children [
+                            Html.div [
+                                prop.className "swt:join"
+                                prop.children [
+                                    Components.BaseDropdown.Main(
+                                        isSeparatorDropdownOpen,
+                                        setIsSeparatorDropdownOpen,
+                                        Html.button [
+                                            prop.type'.button
+                                            prop.role.button
+                                            prop.className "swt:btn swt:btn-sm swt:join-item swt:flex-nowrap"
+                                            prop.onClick (fun _ ->
+                                                setIsSeparatorDropdownOpen (not isSeparatorDropdownOpen)
+                                            )
+                                            prop.children [ Icons.AngleDown() ]
+                                        ],
+                                        dropDownContext,
+                                        style =
+                                            Style.init (
+                                                "swt:join-item swt:dropdown",
+                                                Map [ "content", Style.init ("swt:!min-w-28") ]
+                                            )
+                                    )
+                                    Html.input [
+                                        prop.ref separatorInputRef
+                                        prop.className "swt:input swt:input-sm swt:join-item swt:w-32"
+                                        prop.placeholder "Separator"
+                                        prop.value separatorInput
+                                        prop.onChange setSeparatorInput
+                                    ]
+                                    Html.button [
+                                        prop.type'.button
+                                        prop.className "swt:btn swt:btn-sm swt:join-item"
+                                        prop.text "Update"
+                                        prop.onClick (fun _ -> updateSeparator ())
+                                    ]
+                                ]
+                            ]
+                            Html.button [
+                                prop.type'.button
+                                prop.className "swt:btn swt:btn-sm"
+                                prop.onClick (fun _ -> toggleHeader ())
+                                prop.text (
+                                    if parsed.HeaderRow.IsSome then
+                                        "Header: On"
+                                    else
+                                        "Header: Off"
+                                )
+                            ]
+                            if activeTableData.IsSome then
+                                Html.select [
+                                    prop.className "swt:select swt:select-sm"
+                                    prop.valueOrDefault (string targetColumn)
+                                    prop.onChange (fun value ->
+                                        setTargetColumn (DataAnnotator.TargetColumn.fromString value)
+                                    )
+                                    prop.children [
+                                        Html.option [
+                                            prop.value "Autodetect"
+                                            prop.text "Autodetect"
+                                        ]
+                                        Html.option [
+                                            prop.value "Input"
+                                            prop.text "Input"
+                                        ]
+                                        Html.option [
+                                            prop.value "Output"
+                                            prop.text "Output"
+                                        ]
+                                    ]
+                                ]
+                            elif activeDataMapData.IsSome then
+                                Html.span [
+                                    prop.className "swt:text-sm swt:opacity-70 swt:self-center"
+                                    prop.text "DataMap mode: target column selection is not required."
+                                ]
+                        ]
+                    ]
+                    DataAnnotatorWidget.PreviewTable(parsed, selectedTargets, setSelectedTargets)
+            ]
+        ]
+
     [<ReactComponent>]
     static member Main
         (
@@ -360,16 +508,6 @@ type DataAnnotatorWidget =
 
                 parseDataFile false separatorToUse file
 
-        let toggleHeader () =
-            match parsedFile with
-            | None -> ()
-            | Some parsed ->
-                setParsedFile (Some(parsed.ToggleHeader()))
-                clearSelection ()
-
-        let applyQuickSeparator (separator: string) =
-            setSeparatorInput separator
-
         let trySubmitAnnotation () =
             match dataFile, parsedFile with
             | None, _
@@ -410,7 +548,6 @@ type DataAnnotatorWidget =
                     | Ok addedCount ->
                         onTableMutated ()
                         setIsModalOpen false
-
                         promise {
                             let! syncResult =
                                 match arcFileOpt with
@@ -498,136 +635,9 @@ type DataAnnotatorWidget =
                     header = Html.text "Data Annotator",
                     description = Html.text "Select data points and add annotation as Data selectors.",
                     children =
-                        Html.div [
-                            prop.className "swt:flex swt:flex-col swt:gap-3"
-                            prop.children [
-                                match parsedFile with
-                                | None ->
-                                    Html.div [
-                                        prop.className "swt:text-sm swt:opacity-70"
-                                        prop.text "Upload a valid file to preview data."
-                                    ]
-                                | Some parsed ->
-                                    Html.div [
-                                        prop.className "swt:flex swt:flex-wrap swt:gap-2"
-                                        prop.children [
-                                            Html.div [
-                                                prop.className "swt:join"
-                                                prop.children [
-                                                    Components.BaseDropdown.Main(
-                                                        isSeparatorDropdownOpen,
-                                                        setIsSeparatorDropdownOpen,
-                                                        Html.button [
-                                                            prop.type'.button
-                                                            prop.role.button
-                                                            prop.className "swt:btn swt:btn-sm swt:join-item swt:flex-nowrap"
-                                                            prop.onClick (fun _ ->
-                                                                setIsSeparatorDropdownOpen (not isSeparatorDropdownOpen)
-                                                            )
-                                                            prop.children [ Icons.AngleDown() ]
-                                                        ],
-                                                        [
-                                                            Html.li [
-                                                                Html.a [
-                                                                    prop.onClick (fun _ ->
-                                                                        applyQuickSeparator "\\t"
-                                                                        setIsSeparatorDropdownOpen false
-                                                                    )
-                                                                    prop.children [ Html.span [ prop.text "Tab (\\t)" ] ]
-                                                                ]
-                                                            ]
-                                                            Html.li [
-                                                                Html.a [
-                                                                    prop.onClick (fun _ ->
-                                                                        applyQuickSeparator ","
-                                                                        setIsSeparatorDropdownOpen false
-                                                                    )
-                                                                    prop.children [ Html.span [ prop.text "," ] ]
-                                                                ]
-                                                            ]
-                                                            Html.li [
-                                                                Html.a [
-                                                                    prop.onClick (fun _ ->
-                                                                        applyQuickSeparator ";"
-                                                                        setIsSeparatorDropdownOpen false
-                                                                    )
-                                                                    prop.children [ Html.span [ prop.text ";" ] ]
-                                                                ]
-                                                            ]
-                                                            Html.li [
-                                                                Html.a [
-                                                                    prop.onClick (fun _ ->
-                                                                        applyQuickSeparator "|"
-                                                                        setIsSeparatorDropdownOpen false
-                                                                    )
-                                                                    prop.children [ Html.span [ prop.text "|" ] ]
-                                                                ]
-                                                            ]
-                                                        ],
-                                                        style =
-                                                            Style.init (
-                                                                "swt:join-item swt:dropdown",
-                                                                Map [ "content", Style.init ("swt:!min-w-28") ]
-                                                            )
-                                                    )
-                                                    Html.input [
-                                                        prop.ref separatorInputRef
-                                                        prop.className "swt:input swt:input-sm swt:join-item swt:w-32"
-                                                        prop.placeholder "Separator"
-                                                        prop.value separatorInput
-                                                        prop.onChange setSeparatorInput
-                                                    ]
-                                                    Html.button [
-                                                        prop.type'.button
-                                                        prop.className "swt:btn swt:btn-sm swt:join-item"
-                                                        prop.text "Update"
-                                                        prop.onClick (fun _ -> updateSeparator ())
-                                                    ]
-                                                ]
-                                            ]
-                                            Html.button [
-                                                prop.type'.button
-                                                prop.className "swt:btn swt:btn-sm"
-                                                prop.onClick (fun _ -> toggleHeader ())
-                                                prop.text (
-                                                    if parsed.HeaderRow.IsSome then
-                                                        "Header: On"
-                                                    else
-                                                        "Header: Off"
-                                                )
-                                            ]
-                                            if activeTableData.IsSome then
-                                                Html.select [
-                                                    prop.className "swt:select swt:select-sm"
-                                                    prop.valueOrDefault (string targetColumn)
-                                                    prop.onChange (fun value ->
-                                                        setTargetColumn (DataAnnotator.TargetColumn.fromString value)
-                                                    )
-                                                    prop.children [
-                                                        Html.option [
-                                                            prop.value "Autodetect"
-                                                            prop.text "Autodetect"
-                                                        ]
-                                                        Html.option [
-                                                            prop.value "Input"
-                                                            prop.text "Input"
-                                                        ]
-                                                        Html.option [
-                                                            prop.value "Output"
-                                                            prop.text "Output"
-                                                        ]
-                                                    ]
-                                                ]
-                                            elif activeDataMapData.IsSome then
-                                                Html.span [
-                                                    prop.className "swt:text-sm swt:opacity-70 swt:self-center"
-                                                    prop.text "DataMap mode: target column selection is not required."
-                                                ]
-                                        ]
-                                    ]
-                                    DataAnnotatorWidget.PreviewTable(parsed, selectedTargets, setSelectedTargets)
-                            ]
-                        ],
+                        DataAnnotatorWidget.CreateContent(parsedFile, setParsedFile, clearSelection, isSeparatorDropdownOpen, setIsSeparatorDropdownOpen, separatorInputRef, separatorInput, setSeparatorInput,
+                            updateSeparator, activeTableData, activeDataMapData, targetColumn, setTargetColumn, selectedTargets, setSelectedTargets)
+                        ,
                     footer =
                         Html.div [
                             prop.className "swt:justify-end swt:flex swt:gap-2"

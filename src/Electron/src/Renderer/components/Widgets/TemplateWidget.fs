@@ -461,6 +461,18 @@ type TemplateWidget =
             ]
         ]
 
+    static member SelectedTemplates(templates, selectedTemplateIds, toggleSelectedTemplate, refreshTemplates, isLoading) =
+        Swate.Components.TemplateFilter.TemplateFilterProvider(
+            React.Fragment [
+                Swate.Components.TemplateFilter.TemplateFilter(
+                    templates,
+                    templateSearchClassName = "swt:grow"
+                )
+                Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
+                    TemplateWidget.TemplateTable(filteredTemplates, selectedTemplateIds, toggleSelectedTemplate, isLoading, refreshTemplates))
+            ]
+        )
+
     [<ReactComponent>]
     static member Main (activeTableData: ActiveTableData option, onTableMutated: unit -> unit) =
         let templates, setTemplates = React.useState [||]
@@ -652,16 +664,7 @@ type TemplateWidget =
                     ]
                 ]
 
-                Swate.Components.TemplateFilter.TemplateFilterProvider(
-                    React.Fragment [
-                        Swate.Components.TemplateFilter.TemplateFilter(
-                            templates,
-                            templateSearchClassName = "swt:grow"
-                        )
-                        Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
-                            TemplateWidget.TemplateTable(filteredTemplates, selectedTemplateIds, toggleSelectedTemplate, isLoading, refreshTemplates))
-                    ]
-                )
+                TemplateWidget.SelectedTemplates(templates, selectedTemplateIds, toggleSelectedTemplate, refreshTemplates, isLoading)
 
                 Swate.Components.BaseModal.Modal(
                     isOpen = isImportDialogOpen,

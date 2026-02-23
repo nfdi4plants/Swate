@@ -76,7 +76,7 @@ type FileExplorer =
             }
             |> Promise.start
 
-        let defaultContextMenuItems (item: FileItem) : Swate.Components.FileExplorerTypes.ContextMenuItem list =
+        let defaultContextMenuItems (item: FileItem) : ContextMenuItem list =
             [
                 if not item.IsDirectory then
                     {

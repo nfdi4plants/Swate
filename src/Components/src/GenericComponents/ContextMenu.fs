@@ -137,9 +137,6 @@ type ContextMenu =
                             failwith "Context menu must have at least one item"
 
                         children |> setChildren
-                        setActiveIndex None
-                        listItemsRef.current.Clear()
-                        listContentRef.current.Clear()
 
                         listContentRef.current.AddRange(
                             children
@@ -206,9 +203,6 @@ type ContextMenu =
             fun () ->
                 setIsOpen false
                 allowMouseUpCloseRef.current <- true
-                setActiveIndex None
-                listItemsRef.current.Clear()
-                listContentRef.current.Clear()
 
                 timeout.current
                 |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
