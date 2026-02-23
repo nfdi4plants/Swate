@@ -299,6 +299,8 @@ module ArcVaultExtensions =
             | None, _ -> failwith "No arc available"
         }
 
+        member this.SynchArc newArc = this.arc <- newArc
+
 
 type ArcVaults() =
     /// Key is window.id

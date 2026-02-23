@@ -438,8 +438,8 @@ let api: IArcVaultsApi = {
                                             arc
                                             arcPath
                                             (fun () ->
-                                                protocolPath <-
-                                                    createProtocolFile arcPath request.Target identifier request.Metadata.MainText
+                                                let profile = createProtocolFile arcPath request.Target identifier request.Metadata.MainText
+                                                protocolPath <- profile
                                             )
 
                                     let response = {

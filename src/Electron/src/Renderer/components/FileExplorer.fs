@@ -75,6 +75,10 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                         setPreviewData (Some data)
                         setPreviewError None
                         setDidSelectFile true
+                        if selectedTreeItemPath.IsSome && (selectedTreeItemPath.Value <> item.Path.Value) then
+                            match data with
+                            | PreviewData.ArcFileData (_, json) -> console.log($"json: {json}")
+                            | _ -> console.log($"Nope")
 
                     | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")

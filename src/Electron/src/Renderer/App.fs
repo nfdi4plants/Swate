@@ -10,6 +10,7 @@ open Swate.Electron.Shared.IPCTypes
 open Browser.Dom
 
 open ARCtrl
+open ARCtrl.Json
 
 open Renderer.components
 open components.MainElement
@@ -36,7 +37,7 @@ let Main () =
     let (previewError: string option), setPreviewError = React.useState (None)
     let (previewData: PreviewData option), setPreviewData = React.useState (None)
 
-    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree =
+    let (files: System.Collections.Generic.Dictionary<string, FileEntry>), setFiles =
         React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     let (selectedTreeItemPath: string option), setSelectedTreeItemPath =
@@ -94,7 +95,7 @@ let Main () =
 
     React.useEffect (
         (fun _ ->
-            let ra = ResizeArray(fileTree.Values)
+            let ra = ResizeArray(files.Values)
             let fileEntries = ra.ToArray()
 
             let fileTree =
@@ -102,6 +103,14 @@ let Main () =
                     Some(FileExplorer.getFileTree fileEntries)
                 else
                     None
+
+            if arcFileState.IsSome then
+                match arcFileState.Value with
+                | ArcFiles.Assay a ->
+                    let json = a.ToJsonString()
+                    console.log ($"React.useEffect: {json}")
+                | _ -> ()
+
 
             FileExplorer.createFileTree
                 fileTree
@@ -114,7 +123,7 @@ let Main () =
             |> setFileExplorer
             |> ignore
         ),
-        [| box fileTree; box selectedTreeItemPath |]
+        [| box files; box selectedTreeItemPath |]
     )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
@@ -138,7 +147,7 @@ let Main () =
         fileTreeUpdate =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")
-                setFileTree fileExplorer
+                setFiles fileExplorer
     }
 
     let recentARCElements =
