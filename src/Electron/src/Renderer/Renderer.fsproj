@@ -10,6 +10,7 @@
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="components\MainElement.fs" />
     <Compile Include="components\InitState.fs" />
+    <Compile Include="components\ExperimentLanding.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
     <Content Include="tailwind.css" />

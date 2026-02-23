@@ -227,7 +227,13 @@ module ArcVaultExtensions =
                 let arc = ARC(identifier)
                 this.path <- Some path
                 this.arc <- Some arc
-                do! arc.WriteAsync(path)
+                this.isBusyWriting <- true
+
+                try
+                    do! arc.WriteAsync(path)
+                finally
+                    this.isBusyWriting <- false
+
                 do! this.Startup()
                 sendMsg.pathChange (Some path)
         }
