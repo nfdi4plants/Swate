@@ -6,18 +6,23 @@
 
   <ItemGroup>
     <Compile Include="MetadataForm.fs" />
-    <Compile Include="Api.fs" />
     <Compile Include="ArcFilePersistence.fs" />
     <Compile Include="context\AppStateCtx.fs" />
+    <Compile Include="components\ARCHelper.fs" />
+    <Compile Include="components\Selector.fs" />
+    <Compile Include="components\Navbar.fs" />
+    <Compile Include="components\FileExplorer.fs" />
+    <Compile Include="components\ExperimentLanding.fs" />
+    <Compile Include="components\LandingPage.fs" />
+    <Compile Include="components\MainElement.fs" />
     <Compile Include="components\Widgets\WidgetHelper.fs" />
     <Compile Include="components\Widgets\BuildingBlockWidget.fs" />
     <Compile Include="components\Widgets\TemplateWidget.fs" />
     <Compile Include="components\Widgets\FilePickerWidget.fs" />
     <Compile Include="components\Widgets\DataAnnotatorWidget.fs" />
     <Compile Include="components\Widgets\Widgets.fs" />
-    <Compile Include="components\MainElement.fs" />
     <Compile Include="components\InitState.fs" />
-    <Compile Include="components\ExperimentLanding.fs" />
+    <Compile Include="components\MainWindowContent.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
     <Content Include="tailwind.css" />

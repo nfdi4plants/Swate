@@ -1,11 +1,11 @@
 module Swate.Electron.Shared.IPCTypes
 
 open System.Collections.Generic
-open Fable.Core // Promise type
+open Fable.Core
 open Fable.Electron
 
 open Swate.Components
-open ARCtrl
+
 
 [<RequireQualifiedAccess>]
 type ArcFileType =
