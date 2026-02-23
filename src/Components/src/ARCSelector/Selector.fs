@@ -3,6 +3,8 @@ namespace Swate.Components
 open Feliz
 open Fable.Core
 
+open SelectorTypes
+
 [<Erase; Mangle(false); ReactComponent>]
 type Selector =
 
@@ -43,7 +45,7 @@ type Selector =
     [<ReactComponent>]
     static member Main
         (
-            recentARCElements: ReactElement [],
+            recentARCElements: ReactElement[],
             ?actionbar: (unit -> unit) -> ReactElement,
             ?potMaxWidth: int,
             ?onOpenSelector,
@@ -56,8 +58,7 @@ type Selector =
 
         let onOpenSelector shallBeOpen =
             setOpen shallBeOpen
-            onOpenSelector
-            |> Option.iter(fun f -> f())
+            onOpenSelector |> Option.iter (fun f -> f ())
 
         let actionbar =
             actionbar
@@ -68,9 +69,7 @@ type Selector =
             React.useMemo (
                 (fun _ ->
                     Html.button [
-                        prop.onClick (fun _ ->
-                            onOpenSelector (not isOpen)
-                        )
+                        prop.onClick (fun _ -> onOpenSelector (not isOpen))
                         prop.role.button
                         prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
                         if debug then
@@ -116,9 +115,9 @@ type Selector =
 
         let recentARCs, setRecentARCs = React.useState (testRecentARCs)
 
-        let onARCClick (arcPointer:ARCPointer) =
+        let onARCClick (arcPointer: ARCPointer) =
             //For testing in story book, print the name of the arc pointer
-            console.log($"arcPointer: {arcPointer.name}")
+            console.log ($"arcPointer: {arcPointer.name}")
 
         let recentARCElements =
             recentARCs
@@ -146,8 +145,8 @@ type Selector =
 
         let actionbar = fun _ -> Actionbar.Entry(maxNumberActionbar)
 
-        let onARCClick (arcPointer:ARCPointer) =
-            console.log($"arcPointer: {arcPointer.path}")
+        let onARCClick (arcPointer: ARCPointer) =
+            console.log ($"arcPointer: {arcPointer.path}")
 
         let recentARCElements =
             recentARCs
@@ -175,8 +174,8 @@ type Selector =
 
         let actionbar = fun _ -> Actionbar.Entry(maxNumberActionbar, ?debug = debug)
 
-        let onARCClick (arcPointer:ARCPointer) =
-            console.log($"arcPointer: {arcPointer.path}")
+        let onARCClick (arcPointer: ARCPointer) =
+            console.log ($"arcPointer: {arcPointer.path}")
 
         let recentARCElements =
             recentARCs

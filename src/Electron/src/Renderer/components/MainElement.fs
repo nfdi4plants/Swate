@@ -37,71 +37,64 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
         Html.div [
             //It works but not as clean as we want it
             prop.className "swt:w-screen swt:pb-4"
-            prop.children [
-                AnnotationTable.AnnotationTable(tableState, setTable)
-            ]
+            prop.children [ AnnotationTable.AnnotationTable(tableState, setTable) ]
         ]
     )
 
-let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: MainComponents.Widget -> unit) =
-    let addBuildingBlock =
-        QuickAccessButton.QuickAccessButton(
-            "Add Building Block",
-            Icons.BuildingBlock(),
-            (fun _ -> addWidget MainComponents.Widget._BuildingBlock)
-        )
+// let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: MainComponents.Widget -> unit) =
+//     let addBuildingBlock =
+//         QuickAccessButton.QuickAccessButton(
+//             "Add Building Block",
+//             Icons.BuildingBlock(),
+//             (fun _ -> addWidget MainComponents.Widget._BuildingBlock)
+//         )
 
-    let addTemplate =
-        QuickAccessButton.QuickAccessButton(
-            "Add Template",
-            Icons.Templates(),
-            (fun _ -> addWidget MainComponents.Widget._Template)
-        )
+//     let addTemplate =
+//         QuickAccessButton.QuickAccessButton(
+//             "Add Template",
+//             Icons.Templates(),
+//             (fun _ -> addWidget MainComponents.Widget._Template)
+//         )
 
-    let filePicker =
-        QuickAccessButton.QuickAccessButton(
-            "File Picker",
-            Icons.FilePicker(),
-            (fun _ -> addWidget MainComponents.Widget._FilePicker)
-        )
+//     let filePicker =
+//         QuickAccessButton.QuickAccessButton(
+//             "File Picker",
+//             Icons.FilePicker(),
+//             (fun _ -> addWidget MainComponents.Widget._FilePicker)
+//         )
 
-    let dataAnnotator =
-        QuickAccessButton.QuickAccessButton(
-            "Data Annotator",
-            Icons.DataAnnotator(),
-            (fun _ -> addWidget MainComponents.Widget._DataAnnotator),
-            classes = "swt:w-min"
-        )
+//     let dataAnnotator =
+//         QuickAccessButton.QuickAccessButton(
+//             "Data Annotator",
+//             Icons.DataAnnotator(),
+//             (fun _ -> addWidget MainComponents.Widget._DataAnnotator),
+//             classes = "swt:w-min"
+//         )
 
-    React.Fragment [
-        match activeView with
-        | PreviewActiveView.Table _ ->
-            addBuildingBlock
-            addTemplate
-            filePicker
-            dataAnnotator
-        | PreviewActiveView.DataMap -> dataAnnotator
-        | PreviewActiveView.Metadata -> Html.none
-    ]
+//     React.Fragment [
+//         match activeView with
+//         | PreviewActiveView.Table _ ->
+//             addBuildingBlock
+//             addTemplate
+//             filePicker
+//             dataAnnotator
+//         | PreviewActiveView.DataMap -> dataAnnotator
+//         | PreviewActiveView.Metadata -> Html.none
+//     ]
 
 let CreateARCitectNavbarList (arcFile: ArcFiles option) onSaveClick =
 
     React.Fragment [
-        QuickAccessButton.QuickAccessButton(
-            "Save",
-            Icons.Save(),
-            onSaveClick,
-            isDisabled = arcFile.IsNone
-        )
+        QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
     ]
 
-[<ReactComponent>]
-let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onSaveClick =
+// [<ReactComponent>]
+// let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onSaveClick =
 
-    Components.BaseNavbar.Main [
-        CreateARCitectWidgetNavbarList activeView addWidget
-        CreateARCitectNavbarList arcFile onSaveClick
-    ]
+//     Components.BaseNavbar.Main [
+//         CreateARCitectWidgetNavbarList activeView addWidget
+//         CreateARCitectNavbarList arcFile onSaveClick
+//     ]
 
 [<Literal>]
 let private NewTablePrefix = "NewTable"
@@ -181,7 +174,8 @@ let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (set
 
     if canAddRows then
         Html.div [
-            prop.className "swt:w-full swt:flex swt:justify-center swt:items-center swt:shrink-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300"
+            prop.className
+                "swt:w-full swt:flex swt:justify-center swt:items-center swt:shrink-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300"
             prop.title "Add Rows"
             prop.children [
                 Html.div [
@@ -230,7 +224,7 @@ let CreateARCitectFooter
 
             tables.Add(nextTable)
             setArcFile (refreshArcFileRef arcFile)
-            setActiveView (PreviewActiveView.Table (tables.Count - 1))
+            setActiveView (PreviewActiveView.Table(tables.Count - 1))
 
     let footerTabBaseClasses =
         "swt:btn swt:btn-sm swt:border swt:!border-white swt:hover:!border-white swt:rounded-none"
@@ -247,9 +241,7 @@ let CreateARCitectFooter
                     else
                         "swt:btn-ghost"
                 ]
-                prop.onClick (fun _ ->
-                    setActiveView PreviewActiveView.Metadata
-                )
+                prop.onClick (fun _ -> setActiveView PreviewActiveView.Metadata)
                 prop.children [|
                     Html.span [ prop.className "swt:i-fluent--info-24-regular" ]
                     Html.span [ prop.text "Metadata" ]
@@ -281,9 +273,7 @@ let CreateARCitectFooter
                     prop.className
                         "swt:btn swt:btn-sm swt:btn-outline swt:items-center swt:border swt:!border-white swt:hover:!border-white swt:rounded-none"
                     prop.onClick (fun _ -> addNewTable ())
-                    prop.children [|
-                        Html.span [ prop.text "+" ]
-                    |]
+                    prop.children [| Html.span [ prop.text "+" ] |]
                 ]
             // DataMap tab
             match arcFile with

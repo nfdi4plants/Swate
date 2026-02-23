@@ -31,6 +31,12 @@ type DaisyUIColors =
 
 type StateContext<'T> = { state: 'T; setState: 'T -> unit }
 
+module StateContext =
+    let init initialState = {
+        state = initialState
+        setState = fun _ -> ()
+    }
+
 [<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
 type Theme =
     | Auto
@@ -326,16 +332,28 @@ module AnnotationTable =
         | UnknownPasteCase of PasteCases
         | None
 
-[<AutoOpen>]
 module SelectorTypes =
 
-    type ARCPointer =
-        {name: string; path: string; isActive: bool}
+    type ARCPointer = {
+        name: string
+        path: string
+        isActive: bool
+    } with
 
-        static member create (name: string, path: string, isActive: bool) = { name = name; path = path; isActive = isActive }
+        static member create(name: string, path: string, isActive: bool) = {
+            name = name
+            path = path
+            isActive = isActive
+        }
 
-    type ButtonInfo =
-        { icon: string; toolTip: string; onClick: unit -> unit }
+    type ButtonInfo = {
+        icon: string
+        toolTip: string
+        onClick: unit -> unit
+    } with
 
-        static member create (icon: string, toolTip: string, (onClick: unit -> unit)) =
-            { icon = icon; toolTip = toolTip; onClick = onClick }
+        static member create(icon: string, toolTip: string, (onClick: unit -> unit)) = {
+            icon = icon
+            toolTip = toolTip
+            onClick = onClick
+        }

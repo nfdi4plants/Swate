@@ -15,6 +15,7 @@ import { Term } from '../../Shared/Database.fs.ts';
 import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
 import {Entry as Layout} from '../src/Layout/Layout.fs.js'
 import {FileExplorerExample_Example} from '../src/FileExplorer/FileExplorer.fs.ts'
+import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -150,9 +151,16 @@ function FileExplorerContainer() {
   </div>
 }
 
+function WidgetControllerContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Widget Controller</h2>
+    <WidgetController />
+  </div>
+}
+
 const App = () => {
     return (
-        <Layout />
+        <WidgetControllerContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
         //     <h1 className='swt:text-6xl'>Playground</h1>
         //     <AnnoTableContainer />
