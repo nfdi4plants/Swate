@@ -9,6 +9,7 @@ open Fable.Remoting.Client
 open Fable.Electron.Remoting.Renderer
 
 let arcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
+let saveBeforeQuitApi = Remoting.init |> Remoting.buildClient<ISaveBeforeQuitApi>
 
 let templateApi: ITemplateAPIv1 =
     Remoting.createApi ()
@@ -16,8 +17,7 @@ let templateApi: ITemplateAPIv1 =
     |> Remoting.buildProxy<ITemplateAPIv1>
 
 // Event-first IPC methods must be invoked from renderer without sending a placeholder event argument.
-let openARC () : JS.Promise<Result<string, exn>> =
-    emitJsExpr arcVaultApi "$0.openARC()"
+let openARC () : JS.Promise<Result<string, exn>> = emitJsExpr arcVaultApi "$0.openARC()"
 
 let createARC (identifier: string) : JS.Promise<Result<string, exn>> =
     emitJsExpr (arcVaultApi, identifier) "$0.createARC($1)"
@@ -37,10 +37,11 @@ let focusExistingARCWindow (arcPath: string) : JS.Promise<Result<unit, exn>> =
 let getRecentARCs () =
     emitJsExpr arcVaultApi "$0.getRecentARCs()"
 
-let createExperimentFromLanding
-    (request: CreateExperimentRequest)
-    : JS.Promise<Result<CreateExperimentResponse, exn>> =
+let createExperimentFromLanding (request: CreateExperimentRequest) : JS.Promise<Result<CreateExperimentResponse, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.createExperimentFromLanding($1)"
 
 let saveArcFile (request: SaveArcFileRequest) : JS.Promise<Result<PreviewData, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.saveArcFile($1)"
+
+let resolveCloseRequest (decision: SaveBeforeQuitDecision) : JS.Promise<Result<unit, exn>> =
+    emitJsExpr (saveBeforeQuitApi, decision) "$0.resolveCloseRequest($1)"

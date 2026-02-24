@@ -14,6 +14,7 @@ open ARCtrl
 open Renderer.components
 open components.MainElement
 open components.ExperimentLanding
+open components.CloseWindowController
 
 
 let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
@@ -162,44 +163,51 @@ let Main () =
 
     let navbar = Navbar.Main(selector)
 
-    context.AppStateCtx.AppStateCtx.Provider(
-        {
-            state = appState
-            setState = setAppState
-        },
-        Layout.Main(
-            children = children,
-            navbar = navbar,
-            ?leftSidebar =
-                (let sidebarContent =
-                    match fileExplorer with
-                    | Some fe -> fe
-                    | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
-
-                 Some(
-                     Html.div [
-                         prop.className "swt:p-4"
-                         prop.children [|
-                             match appState with
-                             | AppState.ARC _ ->
-                                 Html.button [
-                                     prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                                     prop.text "Landing Page"
-                                     prop.onClick (fun _ ->
-                                         setPreviewError None
-
-                                         if landingDraftActive then
-                                             setShowLandingDraft true
-                                         else
-                                             resetLandingDraft ()
-                                     )
-                                 ]
-                             | _ -> Html.none
-                             Html.h2 [ prop.text "ARC-Tree" ]
-                             sidebarContent
-                         |]
-                     ]
-                 )),
-            leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+    React.Fragment [|
+        CloseWindowController.Subscription(
+            (fun () -> console.log "User chose to save before quitting."),
+            onConfirmClose = (fun () -> console.log "User chose to close without saving."),
+            onCancelClose = (fun () -> console.log "User cancelled the close action.")
         )
-    )
+        context.AppStateCtx.AppStateCtx.Provider(
+            {
+                state = appState
+                setState = setAppState
+            },
+            Layout.Main(
+                children = children,
+                navbar = navbar,
+                ?leftSidebar =
+                    (let sidebarContent =
+                        match fileExplorer with
+                        | Some fe -> fe
+                        | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
+
+                     Some(
+                         Html.div [
+                             prop.className "swt:p-4"
+                             prop.children [|
+                                 match appState with
+                                 | AppState.ARC _ ->
+                                     Html.button [
+                                         prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                                         prop.text "Landing Page"
+                                         prop.onClick (fun _ ->
+                                             setPreviewError None
+
+                                             if landingDraftActive then
+                                                 setShowLandingDraft true
+                                             else
+                                                 resetLandingDraft ()
+                                         )
+                                     ]
+                                 | _ -> Html.none
+                                 Html.h2 [ prop.text "ARC-Tree" ]
+                                 sidebarContent
+                             |]
+                         ]
+                     )),
+                leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+            )
+        )
+    |]

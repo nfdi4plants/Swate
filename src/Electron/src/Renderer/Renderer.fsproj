@@ -13,6 +13,7 @@
     <Compile Include="components\Navbar.fs" />
     <Compile Include="components\FileExplorer.fs" />
     <Compile Include="components\ExperimentLanding.fs" />
+    <Compile Include="components\CloseWindowController.fs" />
     <Compile Include="components\LandingPage.fs" />
     <Compile Include="components\MainElement.fs" />
     <Compile Include="components\InitState.fs" />
