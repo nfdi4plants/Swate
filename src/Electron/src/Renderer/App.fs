@@ -78,7 +78,7 @@ let Main () =
 
     // Used on initializing
     React.useLayoutEffectOnce (fun _ ->
-        Api.arcVaultApi.getOpenPath JS.undefined
+        Api.getOpenPath()
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p ->
@@ -106,7 +106,7 @@ let Main () =
 
             if arcFileState.IsSome then
                 let fileType: SyncARCRequest = { FileType = arcFileState.Value }
-                Api.arcVaultApi.syncARC JS.undefined fileType |> ignore
+                Api.syncARC fileType |> ignore
 
             FileExplorer.createFileTree
                 fileTree

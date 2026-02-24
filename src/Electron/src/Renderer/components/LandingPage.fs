@@ -18,7 +18,7 @@ let createFromLanding
         }
 
         let request = toCreateRequest landingDraft target
-        let! result = Api.arcVaultApi.createExperimentFromLanding JS.undefined request
+        let! result = Api.createExperimentFromLanding request
 
         match result with
         | Ok response ->
