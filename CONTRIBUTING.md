@@ -83,3 +83,6 @@ If you want to contribute to Swate, open an issue with the feature/bug you want 
 Afterwards you can fork the repository and start working on your feature/bug. When you are done, describe your changes in [CHANGELOG.md](CHANGELOG.md) following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and open a pull request.
 
 We are currently still working on a nice project structure. For now ask us if any questions arise in the related GitHub issue!
+
+> [!IMPORTANT]
+> Use VS Code or Rider for development, as they allow autoformatting via Fantomas on file save. This ensures that the code style is consistent across the project and reduces the amount of formatting-related comments in pull requests.
