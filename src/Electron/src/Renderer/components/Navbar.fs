@@ -41,4 +41,3 @@ let onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile _ =
                 setPreviewError (Some $"Save failed: {errorMsg}")
         }
         |> Promise.start
-

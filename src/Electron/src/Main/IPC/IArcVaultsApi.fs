@@ -148,7 +148,7 @@ let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : R
             Error parseError
         | Ok (ArcFiles.Investigation investigation) ->
             copyInvestigationMetadata investigation arc
-            Ok(ArcFileData(ArcFileType.Investigation, ArcInvestigation.toJsonString 0 arc))
+            Ok(ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
         | Ok (ArcFiles.Study(study, _)) ->
             if arc.TryGetStudy(study.Identifier).IsNone then
                 Error(exn $"Study '{study.Identifier}' not found in ARC.")
@@ -596,7 +596,7 @@ let api: IArcVaultsApi = {
 
                         match tryResolveDataMap () with
                         | Some dataMap ->
-                            return Ok(ArcFileData(ArcFileType.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
+                            return Ok(ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
                         | None ->
                             return Error(exn $"DataMap '{identifier}' not found in ARC.")
 
@@ -608,4 +608,22 @@ let api: IArcVaultsApi = {
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }
-}
+    syncARC =
+        fun (event: IpcMainEvent) (request: SyncARCRequest) -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            match ARC_VAULTS.TryGetVault(windowId) with
+            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+            | Some vault ->
+
+                if vault.arc.IsSome then
+                    match request.FileType with
+                    | ArcFiles.Assay a ->
+                        Swate.Components.console.log($"a.Identifier: {a.Identifier}")
+                        vault.arc.Value.SetAssay(a.Identifier, a)
+                        return Ok()
+                    | _ -> return Ok()
+                else
+                    return Error(exn $"No ARC available")
+        }
+    }

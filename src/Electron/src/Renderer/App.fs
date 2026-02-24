@@ -10,14 +10,12 @@ open Swate.Electron.Shared.IPCTypes
 open Browser.Dom
 
 open ARCtrl
-open ARCtrl.Json
 
 open Renderer.components
 open components.MainElement
 open components.ExperimentLanding
 
-
-let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
+let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
     | Ok arcFile -> Some arcFile
     | Error e ->
@@ -105,12 +103,8 @@ let Main () =
                     None
 
             if arcFileState.IsSome then
-                match arcFileState.Value with
-                | ArcFiles.Assay a ->
-                    let json = a.ToJsonString()
-                    console.log ($"React.useEffect: {json}")
-                | _ -> ()
-
+                let fileType: SyncARCRequest = { FileType = arcFileState.Value }
+                Api.syncARC (fileType) |> ignore
 
             FileExplorer.createFileTree
                 fileTree
