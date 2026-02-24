@@ -128,7 +128,7 @@ type WidgetType =
     | DataAnnotator
     | Playground
 
-module Context =
+module WidgetContext =
 
     type WidgetControllerContext = {
         activeWidgets: WidgetType list
@@ -359,7 +359,7 @@ type Widget =
                     widgets @ [ widgetType ]
             )
 
-        let widgetContext: Context.WidgetControllerContext = {
+        let widgetContext: WidgetContext.WidgetControllerContext = {
             activeWidgets = activeWidgets
             isActive = fun widgetType -> activeWidgets |> List.contains widgetType
             openWidget = openWidget
@@ -368,7 +368,7 @@ type Widget =
             focusWidget = focusWidget
         }
 
-        Context.ActiveWidgetContext.Provider(
+        WidgetContext.ActiveWidgetContext.Provider(
             widgetContext,
             [
                 yield! children
@@ -391,7 +391,7 @@ type Widget =
     /// This component is only used for testing and development via playground
     [<ReactComponent>]
     static member private EntryControls(widgetTypes: WidgetType list) =
-        let context = Context.useWidgetController ()
+        let context = WidgetContext.useWidgetController ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType
