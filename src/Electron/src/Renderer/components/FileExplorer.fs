@@ -1,5 +1,7 @@
 module Renderer.components.FileExplorer
 
+open Fable.Core
+
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open Swate.Components.FileExplorerTypes
@@ -67,7 +69,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     console.log ($"[Renderer] Opening file: {item.Path.Value}")
                     setSelectedTreeItemPath item.Path
                     setShowLandingDraft false
-                    let! result = Api.openFile item.Path.Value
+                    let! result = Api.arcVaultApi.openFile JS.undefined item.Path.Value
 
                     match result with
                     | Ok data ->

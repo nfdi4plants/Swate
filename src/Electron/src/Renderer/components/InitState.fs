@@ -1,12 +1,15 @@
 module Renderer.components.InitState
 
 open Feliz
+
+open Fable.Core
+
 open Swate.Components
 
 module private InitStateHelper =
     let openARC =
         fun () -> promise {
-            let! r = Api.openARC()
+            let! r = Api.arcVaultApi.openARC JS.undefined
 
             match r with
             | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -15,7 +18,7 @@ module private InitStateHelper =
 
     let createARC =
         fun identifier -> promise {
-            let! r = Api.createARC identifier
+            let! r = Api.arcVaultApi.createARC JS.undefined identifier
 
             match r with
             | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)

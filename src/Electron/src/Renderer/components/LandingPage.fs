@@ -1,5 +1,7 @@
 module Renderer.components.LandingPage
 
+open Fable.Core
+
 open Swate.Electron.Shared.IPCTypes
 
 open Renderer.components.ExperimentLanding
@@ -16,7 +18,7 @@ let createFromLanding
         }
 
         let request = toCreateRequest landingDraft target
-        let! result = Api.createExperimentFromLanding request
+        let! result = Api.arcVaultApi.createExperimentFromLanding JS.undefined request
 
         match result with
         | Ok response ->

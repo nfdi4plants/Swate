@@ -1,6 +1,7 @@
 module Renderer.App
 
 open Feliz
+open Fable.Core
 open Fable.Electron.Remoting.Renderer
 
 open Swate.Components
@@ -14,6 +15,7 @@ open ARCtrl
 open Renderer.components
 open components.MainElement
 open components.ExperimentLanding
+
 
 let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
@@ -76,7 +78,7 @@ let Main () =
 
     // Used on initializing
     React.useLayoutEffectOnce (fun _ ->
-        Api.getOpenPath ()
+        Api.arcVaultApi.getOpenPath JS.undefined
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p ->
@@ -104,7 +106,7 @@ let Main () =
 
             if arcFileState.IsSome then
                 let fileType: SyncARCRequest = { FileType = arcFileState.Value }
-                Api.syncARC (fileType) |> ignore
+                Api.arcVaultApi.syncARC JS.undefined fileType |> ignore
 
             FileExplorer.createFileTree
                 fileTree

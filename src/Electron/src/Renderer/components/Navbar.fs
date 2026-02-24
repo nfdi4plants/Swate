@@ -1,6 +1,7 @@
 module Renderer.components.Navbar
 
 open Fable.Core
+
 open ARCtrl
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -12,7 +13,7 @@ let saveArcFileWithPreview (arcFile: ArcFiles) : JS.Promise<Result<PreviewData, 
         | None ->
             return Error "Saving this file type is not supported in Electron yet."
         | Some request ->
-            let! saveResult = Api.saveArcFile request
+            let! saveResult = Api.arcVaultApi.saveArcFile JS.undefined request
 
             match saveResult with
             | Ok previewData -> return Ok previewData

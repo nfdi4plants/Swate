@@ -1,5 +1,7 @@
 module Renderer.components.Selector
 
+open Fable.Core
+
 open Swate.Components
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -9,7 +11,7 @@ open Swate.Electron.Shared.IPCTypes
 let openNewWindow =
     fun _ ->
         promise {
-            match! Api.openARCInNewWindow () with
+            match! Api.arcVaultApi.openARCInNewWindow () with
             | Ok _ -> ()
             | Error exn -> failwith $"{exn.Message}"
 
@@ -21,7 +23,7 @@ let openNewWindow =
 let openCurrentWindow =
     fun _ ->
         promise {
-            let! r = Api.openARC ()
+            let! r = Api.arcVaultApi.openARC JS.undefined
 
             match r with
             | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -36,7 +38,7 @@ let openARC (appState: AppState) =
 ///Selector module
 let onARCClick (clickedARC: SelectorTypes.ARCPointer) =
     promise {
-        match! Api.focusExistingARCWindow clickedARC.path with
+        match! Api.arcVaultApi.focusExistingARCWindow clickedARC.path with
         | Ok _ -> ()
         | Error exn -> failwith $"{exn.Message}"
 
@@ -70,7 +72,7 @@ let actionbar (appState: AppState) onClick =
 ///Selector module
 let onOpenSelector (appState: AppState) setRecentARCs () =
     promise {
-        let! newARCs = Api.getRecentARCs ()
+        let! newARCs = Api.arcVaultApi.getRecentARCs ()
 
         match appState with
         | AppState.Init -> ()
