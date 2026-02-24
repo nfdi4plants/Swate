@@ -21,7 +21,7 @@ let openNewWindow =
 let openCurrentWindow =
     fun _ ->
         promise {
-            let! r = Api.openARC()
+            let! r = Api.openARC ()
 
             match r with
             | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -31,13 +31,10 @@ let openCurrentWindow =
 
 ///Selector module
 let openARC (appState: AppState) =
-    if appState.IsInit then
-        openCurrentWindow
-    else
-        openNewWindow
+    if appState.IsInit then openCurrentWindow else openNewWindow
 
 ///Selector module
-let onARCClick (clickedARC: ARCPointer) =
+let onARCClick (clickedARC: SelectorTypes.ARCPointer) =
     promise {
         match! Api.focusExistingARCWindow clickedARC.path with
         | Ok _ -> ()
@@ -50,23 +47,19 @@ let onARCClick (clickedARC: ARCPointer) =
 ///Selector module
 let actionbar (appState: AppState) onClick =
     let createARC =
-        ButtonInfo.create (
-            "swt:fluent--document-add-24-regular swt:size-5",
-            "Create a new ARC",
-            onClick
-        )
+        SelectorTypes.ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", onClick)
 
     let openARCButtonInfo =
-        ButtonInfo.create (
+        SelectorTypes.ButtonInfo.create (
             "swt:fluent--folder-open-24-regular swt:size-5",
             "Open an existing ARC",
             fun _ ->
-                onClick()
+                onClick ()
                 openARC appState ()
         )
 
     let downloadARC =
-        ButtonInfo.create (
+        SelectorTypes.ButtonInfo.create (
             "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
             "Download an existing ARC",
             onClick
@@ -77,14 +70,13 @@ let actionbar (appState: AppState) onClick =
 ///Selector module
 let onOpenSelector (appState: AppState) setRecentARCs () =
     promise {
-        let! newARCs = Api.getRecentARCs()
+        let! newARCs = Api.getRecentARCs ()
 
         match appState with
         | AppState.Init -> ()
         | AppState.ARC path ->
             newARCs
-            |> Array.map (fun arc ->
-                ARCPointer.create(arc.name, arc.path, arc.path = path))
+            |> Array.map (fun arc -> SelectorTypes.ARCPointer.create (arc.name, arc.path, arc.path = path))
             |> setRecentARCs
     }
     |> Promise.start

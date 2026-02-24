@@ -118,7 +118,7 @@ module FileItemDTOExtensions =
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
-    recentARCsUpdate: ARCPointer[] -> unit
+    recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
 }
 

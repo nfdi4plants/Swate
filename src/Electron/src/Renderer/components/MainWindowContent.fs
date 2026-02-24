@@ -153,33 +153,31 @@ let computeARCContent
                 ]
 
 let content
-    (appState: AppState)
-    setArcFileState
-    widgets
-    setWidgets
-    activeTableData
-    activeDataMapData
-    onTableMutated
-    activeView
-    setActiveView
-    addWidget
-    arcFileState
-    previewData
-    setPreviewData
-    previewError
-    setPreviewError
-    didSelectFile
-    setDidSelectFile
-    landingDraft
-    setLandingDraft
-    landingUiState
-    setLandingUiState
-    landingDraftActive
-    setLandingDraftActive
-    showLandingDraft
-    setShowLandingDraft
-    setSelectedTreeItemPath
-    =
+    (
+        appState: AppState,
+        setArcFileState,
+        activeTableData,
+        activeDataMapData,
+        onTableMutated,
+        activeView,
+        setActiveView,
+        arcFileState,
+        previewData,
+        setPreviewData,
+        previewError,
+        setPreviewError,
+        didSelectFile,
+        setDidSelectFile,
+        landingDraft,
+        setLandingDraft,
+        landingUiState,
+        setLandingUiState,
+        landingDraftActive,
+        setLandingDraftActive,
+        showLandingDraft,
+        setShowLandingDraft,
+        setSelectedTreeItemPath
+    ) =
 
     match appState with
     | AppState.Init ->

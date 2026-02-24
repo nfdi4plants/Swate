@@ -115,40 +115,49 @@ module ArcVaultExtensions =
                                     swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
                                     do! this.LoadArc()
                                     sendMsgApi.IsLoadingChanges false
+
                                     let pathUpdater (path: string) =
-                                        $"{this.path.Value}\{path}".Replace(ArcPathHelper.PathSeperatorWindows, ArcPathHelper.PathSeperator)
+                                        $"{this.path.Value}\{path}"
+                                            .Replace(ArcPathHelper.PathSeperatorWindows, ArcPathHelper.PathSeperator)
+
                                     match eventName.ToLower() with
                                     | name when name = Chokidar.Events.Add.ToString() ->
                                         if this.path.IsSome then
                                             let newPath = pathUpdater path
-                                            let! addedFile = getFileEntry(newPath)
+                                            let! addedFile = getFileEntry (newPath)
                                             let newFileTree = this.fileTree
                                             newFileTree.Add(addedFile.path, addedFile)
                                             this.SetFileTree(newFileTree)
                                     | name when name = Chokidar.Events.AddDir.ToString() ->
                                         if this.path.IsSome then
                                             let newPath = pathUpdater path
-                                            let! addedFile = getFileEntry(newPath)
+                                            let! addedFile = getFileEntry (newPath)
                                             let newFileTree = this.fileTree
                                             newFileTree.Add(addedFile.path, addedFile)
                                             this.SetFileTree(newFileTree)
                                     | name when name = Chokidar.Events.Unlink.ToString() ->
                                         let newPath = pathUpdater path
+
                                         if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
                                             let newFileTree = this.fileTree
                                             newFileTree.Remove(newPath) |> ignore
                                             this.SetFileTree(newFileTree)
                                     | name when name = Chokidar.Events.UnlinkDir.ToString() ->
                                         let newPath = pathUpdater path
+
                                         if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
                                             let newFileTree = this.fileTree
+
                                             let affectedPaths =
                                                 this.fileTree.Keys
                                                 |> Array.ofSeq
                                                 |> Array.filter (fun path -> path.Contains(newPath))
+
                                             newFileTree.Remove(newPath) |> ignore
+
                                             affectedPaths
                                             |> Array.iter (fun path -> newFileTree.Remove(path) |> ignore)
+
                                             this.SetFileTree(newFileTree)
                                     | _ ->
                                         if this.path.IsSome then
@@ -158,16 +167,17 @@ module ArcVaultExtensions =
                                 |> Promise.start
                             )
                             500
-                            
+
                     this.fileWatcherReloadArcTimeout <- Some timeoutId
 
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
-            this.fileTree <-  fileTree
+            this.fileTree <- fileTree
 
             let sendMsg =
                 Remoting.init
                 |> Remoting.withWindow this.window
                 |> Remoting.buildClient<IMainUpdateRendererApi>
+
             sendMsg.fileTreeUpdate fileTree
 
         member this.LoadArc() = promise {
@@ -241,9 +251,7 @@ module ArcVaultExtensions =
         member this.OnClose() =
             match this.path with
             | Some path ->
-                let arcs =
-                    recentARCs
-                    |> Array.filter (fun arc -> arc.path <> path)
+                let arcs = recentARCs |> Array.filter (fun arc -> arc.path <> path)
                 setRecentARCs arcs
                 printfn $"[Swate] Removed vault '{this.window.id}'"
                 arcs
@@ -287,12 +295,10 @@ module ArcVaultExtensions =
             | Some arc, Some arcPath ->
                 do! arc.UpdateAsync(arcPath)
                 do! arc.WriteAsync(arcPath)
-            | Some _, None ->
-                failwith "No path available"
-            | None, _ ->
-                failwith "No arc available"
+            | Some _, None -> failwith "No path available"
+            | None, _ -> failwith "No arc available"
         }
-            
+
 
 type ArcVaults() =
     /// Key is window.id
@@ -300,7 +306,7 @@ type ArcVaults() =
 
     member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
-    member this.BroadcastRecentARCs(recentARCs: ARCPointer[]) =
+    member this.BroadcastRecentARCs(recentARCs: SelectorTypes.ARCPointer[]) =
         this.Vaults.Values
         |> Array.ofSeq
         |> Array.iter (fun vault ->
@@ -325,9 +331,7 @@ type ArcVaults() =
             this.BroadcastRecentARCs recentARCs
         )
 
-        window.onClosed (fun () ->
-            this.DisposeVault(id)
-        )
+        window.onClosed (fun () -> this.DisposeVault(id))
 
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
         let! window = ArcVaultHelper.createWindow ()
@@ -392,8 +396,9 @@ type ArcVaults() =
 
     member this.SetFileTree(windowId: int, fileTree: Dictionary<string, FileEntry>) =
         let potVault = this.TryGetVault(windowId)
+
         match potVault with
-        | Some (vault: ArcVault) -> vault.SetFileTree(fileTree)
+        | Some(vault: ArcVault) -> vault.SetFileTree(fileTree)
         | None -> failwith $"Vault with window-id '{windowId}' not found."
 
     member this.TryGetVault(windowId: int) =

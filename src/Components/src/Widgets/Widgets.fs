@@ -323,7 +323,9 @@ type Widget =
     [<ReactComponent>]
     static member WidgetController(widgets: Map<WidgetType, WidgetDefinition>, ?children: ReactElement list) =
 
-        let activeWidgets, setActiveWidgets = React.useStateWithUpdater<WidgetType list> ([])
+        let activeWidgets, setActiveWidgets =
+            React.useStateWithUpdater<WidgetType list> ([])
+
         let children = defaultArg children []
 
         let closeWidget (widgetType: WidgetType) =
@@ -386,6 +388,7 @@ type Widget =
             ]
         )
 
+    /// This component is only used for testing and development via playground
     [<ReactComponent>]
     static member private EntryControls(widgetTypes: WidgetType list) =
         let context = Context.useWidgetController ()
@@ -439,6 +442,7 @@ type Widget =
             ]
         ]
 
+    /// This component is only used for testing and development via playground
     [<ReactComponent>]
     static member Entry() =
         let term, setTerm = React.useState None

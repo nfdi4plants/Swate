@@ -128,7 +128,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
         | _ -> Html.none
     ]
 
-let private WidgetNavbarList (model, addWidget: Widget -> unit) =
+let private WidgetNavbarList (model, addWidget: MainComponents.Widget -> unit) =
     let addBuildingBlock =
         QuickAccessButton.QuickAccessButton(
             "Add Building Block",
@@ -163,7 +163,7 @@ let private WidgetNavbarList (model, addWidget: Widget -> unit) =
 
 [<ReactComponent>]
 let Main (model: Model, dispatch, widgets, setWidgets) =
-    let addWidget (widget: Widget) =
+    let addWidget (widget: MainComponents.Widget) =
         let add (widget) widgets =
             widget :: widgets |> List.rev |> setWidgets
 
