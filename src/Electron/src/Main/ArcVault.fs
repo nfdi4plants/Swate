@@ -86,8 +86,6 @@ type ArcVault(window: BrowserWindow) =
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// This should disable reloads from the file watcher.
     member val isBusyWriting: bool = false with get, set
-    member val isCloseApproved: bool = false with get, set
-    member val isCloseRequestPending: bool = false with get, set
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -330,25 +328,20 @@ type ArcVaults() =
         match this.TryGetVault(windowId) with
         | None -> swatelogfn windowId "Close request ignored. No vault found."
         | Some(vault: ArcVault) ->
-            vault.isCloseRequestPending <- false
-
             match decision with
-            | SaveBeforeQuitDecision.CancelClose -> vault.isCloseApproved <- false
-            | SaveBeforeQuitDecision.CloseWithoutSaving
+            | SaveBeforeQuitDecision.CancelClose -> swatelogfn windowId "Close request cancelled by user."
+            | SaveBeforeQuitDecision.CloseWithoutSaving ->
+                swatelogfn windowId "Close request approved by user. Closing without saving."
+                vault.window.destroy ()
             | SaveBeforeQuitDecision.SaveAndClose ->
-                vault.isCloseApproved <- true
-                vault.window.close ()
+                swatelogfn windowId "Close request approved by user. Saving changes (NOT IMPLEMENTED) and closing."
+                vault.window.destroy ()
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
         window.onClose (fun event ->
-            if vault.isCloseApproved then
-                let recentARCs = vault.OnClose()
-                this.BroadcastRecentARCs recentARCs
-            elif vault.path.IsSome then
+            if vault.path.IsSome then
                 event.preventDefault ()
-
-                vault.isCloseRequestPending <- true
 
                 let sendMsgApi =
                     Remoting.init
