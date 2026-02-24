@@ -12,7 +12,6 @@ open ExperimentLanding
 open Feliz
 open Fable.Electron.Remoting.Renderer
 
-open Renderer.components.Widgets
 open Swate.Components
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -22,7 +21,14 @@ open Browser.Dom
 open ARCtrl
 
 [<ReactComponent>]
-let createARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> unit) (activeView: PreviewActiveView) (setActiveView: PreviewActiveView -> unit) didSelectFile setDidSelectFile =
+let createARCPreview
+    (arcFile: ArcFiles)
+    (setArcFileState: ArcFiles option -> unit)
+    (activeView: PreviewActiveView)
+    (setActiveView: PreviewActiveView -> unit)
+    didSelectFile
+    setDidSelectFile
+    =
 
     let setArcFile arcFile = setArcFileState (Some arcFile)
 
@@ -32,6 +38,7 @@ let createARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
                 setArcFile arcFile
                 let tables = arcFile.Tables()
                 setDidSelectFile false
+
                 if tables.Count > 0 then
                     setActiveView (PreviewActiveView.Table 0)
                 else
@@ -45,18 +52,55 @@ let createARCPreview (arcFile: ArcFiles) (setArcFileState: ArcFiles option -> un
         prop.children [|
             Html.div [
                 prop.className "swt:flex-1 swt:overflow-x-hidden swt:overflow-y-auto"
-                prop.children [
-                    CreateTableView activeView arcFile setArcFile
-                ]
+                prop.children [ CreateTableView activeView arcFile setArcFile ]
             ]
             CreateAddRowsFooter arcFile activeView setArcFile
             CreateARCitectFooter arcFile activeView setActiveView setArcFile
         |]
     ]
 
-let computeARCContent previewData (previewError: string option) arcFileState setArcFileState activeView setActiveView didSelectFile landingDraft setLandingDraft landingUiState setLandingUiState landingDraftActive setLandingDraftActive showLandingDraft setShowLandingDraft appState setSelectedTreeItemPath setPreviewData setPreviewError setDidSelectFile (path: string) =
+let computeARCContent
+    previewData
+    (previewError: string option)
+    arcFileState
+    setArcFileState
+    activeView
+    setActiveView
+    didSelectFile
+    landingDraft
+    setLandingDraft
+    landingUiState
+    setLandingUiState
+    landingDraftActive
+    setLandingDraftActive
+    showLandingDraft
+    setShowLandingDraft
+    appState
+    setSelectedTreeItemPath
+    setPreviewData
+    setPreviewError
+    setDidSelectFile
+    (path: string)
+    =
     if landingDraftActive && showLandingDraft then
-        ExperimentLandingView(landingDraft, setLandingDraft, landingUiState, setLandingUiState, LandingPage.createFromLanding landingUiState setLandingUiState landingDraft setLandingDraft setShowLandingDraft setLandingDraftActive appState setSelectedTreeItemPath setPreviewData setPreviewError setDidSelectFile)
+        ExperimentLandingView(
+            landingDraft,
+            setLandingDraft,
+            landingUiState,
+            setLandingUiState,
+            LandingPage.createFromLanding
+                landingUiState
+                setLandingUiState
+                landingDraft
+                setLandingDraft
+                setShowLandingDraft
+                setLandingDraftActive
+                appState
+                setSelectedTreeItemPath
+                setPreviewData
+                setPreviewError
+                setDidSelectFile
+        )
     else
         match previewData with
         | Some data ->
@@ -108,28 +152,41 @@ let computeARCContent previewData (previewError: string option) arcFileState set
                         "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
                 ]
 
-let content (appState: AppState) setArcFileState widgets setWidgets activeTableData activeDataMapData onTableMutated activeView
-    setActiveView addWidget arcFileState previewData setPreviewData previewError setPreviewError didSelectFile setDidSelectFile landingDraft setLandingDraft landingUiState
-        setLandingUiState landingDraftActive setLandingDraftActive showLandingDraft setShowLandingDraft setSelectedTreeItemPath =
+let content
+    (
+        appState: AppState,
+        setArcFileState,
+        activeTableData,
+        activeDataMapData,
+        onTableMutated,
+        activeView,
+        setActiveView,
+        arcFileState,
+        previewData,
+        setPreviewData,
+        previewError,
+        setPreviewError,
+        didSelectFile,
+        setDidSelectFile,
+        landingDraft,
+        setLandingDraft,
+        landingUiState,
+        setLandingUiState,
+        landingDraftActive,
+        setLandingDraftActive,
+        showLandingDraft,
+        setShowLandingDraft,
+        setSelectedTreeItemPath
+    ) =
 
     match appState with
     | AppState.Init ->
         Html.div [
             prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
             prop.children [
-                Widget.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                 Html.div [
-                    prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
-                    prop.children [
-                        Html.div [
-                            prop.className "swt:flex-none" 
-                            prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
-                        ]
-                        Html.div [
-                            prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
-                            prop.children [ InitState.InitState() ]
-                        ]
-                    ]
+                    prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
+                    prop.children [ InitState.InitState() ]
                 ]
             ]
         ]
@@ -137,18 +194,38 @@ let content (appState: AppState) setArcFileState widgets setWidgets activeTableD
         Html.div [
             prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
             prop.children [
-                Widget.FloatingWidgetLayer widgets setWidgets activeTableData activeDataMapData onTableMutated
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
                     prop.children [
                         Html.div [
                             prop.className "swt:flex-none"
-                            prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
+                        // prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
                         ]
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                             prop.children [
-                                computeARCContent previewData (previewError: string option) arcFileState setArcFileState activeView setActiveView didSelectFile landingDraft setLandingDraft landingUiState setLandingUiState landingDraftActive setLandingDraftActive showLandingDraft setShowLandingDraft appState setSelectedTreeItemPath setPreviewData setPreviewError setDidSelectFile path
+                                computeARCContent
+                                    previewData
+                                    (previewError: string option)
+                                    arcFileState
+                                    setArcFileState
+                                    activeView
+                                    setActiveView
+                                    didSelectFile
+                                    landingDraft
+                                    setLandingDraft
+                                    landingUiState
+                                    setLandingUiState
+                                    landingDraftActive
+                                    setLandingDraftActive
+                                    showLandingDraft
+                                    setShowLandingDraft
+                                    appState
+                                    setSelectedTreeItemPath
+                                    setPreviewData
+                                    setPreviewError
+                                    setDidSelectFile
+                                    path
                             ]
                         ]
                     ]

@@ -15,12 +15,6 @@
     <Compile Include="components\ExperimentLanding.fs" />
     <Compile Include="components\LandingPage.fs" />
     <Compile Include="components\MainElement.fs" />
-    <Compile Include="components\Widgets\WidgetHelper.fs" />
-    <Compile Include="components\Widgets\BuildingBlockWidget.fs" />
-    <Compile Include="components\Widgets\TemplateWidget.fs" />
-    <Compile Include="components\Widgets\FilePickerWidget.fs" />
-    <Compile Include="components\Widgets\DataAnnotatorWidget.fs" />
-    <Compile Include="components\Widgets\Widgets.fs" />
     <Compile Include="components\InitState.fs" />
     <Compile Include="components\MainWindowContent.fs" />
     <Compile Include="App.fs" />

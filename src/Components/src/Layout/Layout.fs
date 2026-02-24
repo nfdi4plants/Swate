@@ -3,7 +3,7 @@ namespace Swate.Components
 open Feliz
 open Fable.Core
 
-module Context =
+module LayoutContext =
 
     type LayoutContextType = StateContext<bool>
 
@@ -17,7 +17,7 @@ module Context =
     let RightSidebarContext =
         React.createContext<LayoutContextType> (LayoutContextType.Empty)
 
-open Context
+open LayoutContext
 
 module private LayoutHelper =
 
@@ -103,9 +103,7 @@ type Layout =
                 Html.button [
                     prop.className "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
                     prop.children [
-                        Html.i [
-                            prop.className ("swt:iconify " + iconClassName)
-                        ]
+                        Html.i [ prop.className ("swt:iconify " + iconClassName) ]
                     ]
                     prop.onClick (fun _ -> onClick ())
                 ]

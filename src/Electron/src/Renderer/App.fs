@@ -15,8 +15,6 @@ open Renderer.components
 open components.MainElement
 open components.ExperimentLanding
 
-open Renderer.components.Widgets
-
 
 let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
@@ -28,7 +26,6 @@ let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
 [<ReactComponent>]
 let Main () =
 
-    let widgets, setWidgets = React.useState []
     let tableMutationTick, setTableMutationTick = React.useStateWithUpdater 0
     let recentARCs, setRecentARCs = React.useState [||]
     let fileExplorer, setFileExplorer = React.useState None
@@ -38,8 +35,13 @@ let Main () =
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
     let (previewError: string option), setPreviewError = React.useState (None)
     let (previewData: PreviewData option), setPreviewData = React.useState (None)
-    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
-    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState (None)
+
+    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree =
+        React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+
+    let (selectedTreeItemPath: string option), setSelectedTreeItemPath =
+        React.useState (None)
+
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
     let landingDraftActive, setLandingDraftActive = React.useState false
@@ -59,13 +61,12 @@ let Main () =
     React.useEffect (
         (fun () ->
             match previewData with
-            | Some (ArcFileData(fileType, json)) ->
+            | Some(ArcFileData(fileType, json)) ->
                 match ParseArcFileFromJson fileType json with
                 | Some arcFile ->
                     match arcFileState with
-                    | None ->
-                        setArcFileState (Some arcFile)
-                    | Some existing when existing.getIdentifier() <> arcFile.getIdentifier() ->
+                    | None -> setArcFileState (Some arcFile)
+                    | Some existing when existing.getIdentifier () <> arcFile.getIdentifier () ->
                         setArcFileState (Some arcFile)
                     | _ -> ()
                 | None -> ()
@@ -74,9 +75,9 @@ let Main () =
         [| box previewData |]
     )
 
-    ///Used on initializing
+    // Used on initializing
     React.useLayoutEffectOnce (fun _ ->
-        Api.getOpenPath()
+        Api.getOpenPath ()
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p ->
@@ -91,16 +92,6 @@ let Main () =
         |> Promise.start
     )
 
-    let addWidget (widget: MainComponents.Widget) =
-        let add (widget) widgets =
-            widget :: widgets |> List.rev |> setWidgets
-
-        if widgets |> List.contains widget then
-            List.filter (fun w -> w <> widget) widgets
-            |> fun filteredWidgets -> add widget filteredWidgets
-        else
-            add widget widgets
-
     React.useEffect (
         (fun _ ->
             let ra = ResizeArray(fileTree.Values)
@@ -113,9 +104,16 @@ let Main () =
                     None
 
             FileExplorer.createFileTree
-                fileTree selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft setPreviewData
-                    setPreviewError setDidSelectFile |> setFileExplorer |> ignore
-        ), 
+                fileTree
+                selectedTreeItemPath
+                setSelectedTreeItemPath
+                setShowLandingDraft
+                setPreviewData
+                setPreviewError
+                setDidSelectFile
+            |> setFileExplorer
+            |> ignore
+        ),
         [| box fileTree; box selectedTreeItemPath |]
     )
 
@@ -123,6 +121,7 @@ let Main () =
         pathChange =
             fun pathOption ->
                 console.log ("[Swate] CHANGE PATH!")
+
                 match pathOption with
                 | Some p ->
                     resetLandingDraft ()
@@ -146,77 +145,20 @@ let Main () =
         recentARCs
         |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, Selector.onARCClick))
 
-    let selector = Selector.Main(recentARCElements, Selector.actionbar appState, onOpenSelector = Selector.onOpenSelector appState setRecentARCs)
+    let selector =
+        Selector.Main(
+            recentARCElements,
+            Selector.actionbar appState,
+            onOpenSelector = Selector.onOpenSelector appState setRecentARCs
+        )
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
-
-    let activeTableData : ActiveTableData option =
-        match arcFileState, activeView with
-        | Some arcFile, PreviewActiveView.Table tableIndex ->
-            let tables = arcFile.Tables()
-
-            if tableIndex >= 0 && tableIndex < tables.Count then
-                let table = tables.[tableIndex]
-
-                Some {
-                    ArcFile = arcFile
-                    Table = table
-                    TableName = table.Name
-                    TableIndex = tableIndex
-                }
-            else
-                None
-        | _ -> None
-
-    let activeDataMapData : ActiveDataMapData option =
-        match arcFileState, activeView with
-        | Some (ArcFiles.Assay assay as arcFile), PreviewActiveView.DataMap when assay.DataMap.IsSome ->
-            Some {
-                ArcFile = arcFile
-                DataMap = assay.DataMap.Value
-            }
-        | Some (ArcFiles.Study(study, _) as arcFile), PreviewActiveView.DataMap when study.DataMap.IsSome ->
-            Some {
-                ArcFile = arcFile
-                DataMap = study.DataMap.Value
-            }
-        | Some (ArcFiles.Run run as arcFile), PreviewActiveView.DataMap when run.DataMap.IsSome ->
-            Some {
-                ArcFile = arcFile
-                DataMap = run.DataMap.Value
-            }
-        | Some (ArcFiles.DataMap(_, datamap) as arcFile), PreviewActiveView.DataMap ->
-            Some {
-                ArcFile = arcFile
-                DataMap = datamap
-            }
-        | _ -> None
 
     let onTableMutated () =
         setTableMutationTick (fun latest -> latest + 1)
 
     ///Main content module
-    let children =
-        React.useMemo (
-            (fun _ ->
-                MainWindowContent.content (appState: AppState) setArcFileState widgets setWidgets activeTableData activeDataMapData onTableMutated activeView
-                    setActiveView addWidget arcFileState previewData setPreviewData previewError setPreviewError didSelectFile setDidSelectFile landingDraft setLandingDraft landingUiState
-                        setLandingUiState landingDraftActive setLandingDraftActive showLandingDraft setShowLandingDraft setSelectedTreeItemPath
-            ),
-            [|
-                box appState
-                box previewData
-                box activeView
-                box arcFileState
-                box previewError
-                box landingDraft
-                box landingUiState
-                box landingDraftActive
-                box showLandingDraft
-                box widgets
-                box tableMutationTick
-            |]
-        )
+    let children = Html.div "placeholder"
 
     let navbar = Navbar.Main(selector)
 
@@ -238,26 +180,24 @@ let Main () =
                      Html.div [
                          prop.className "swt:p-4"
                          prop.children [|
-                            match appState with
-                            | AppState.ARC _ ->
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                                    prop.text "Landing Page"
-                                    prop.onClick (fun _ ->
-                                        setPreviewError None
+                             match appState with
+                             | AppState.ARC _ ->
+                                 Html.button [
+                                     prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                                     prop.text "Landing Page"
+                                     prop.onClick (fun _ ->
+                                         setPreviewError None
 
-                                        if landingDraftActive then
-                                            setShowLandingDraft true
-                                        else
-                                            resetLandingDraft ()
-                                    )
-                                ]
-                            | _ -> Html.none
-                            Html.h2 [
-                                prop.text "ARC-Tree"
-                            ]
-                            sidebarContent
-                        |]
+                                         if landingDraftActive then
+                                             setShowLandingDraft true
+                                         else
+                                             resetLandingDraft ()
+                                     )
+                                 ]
+                             | _ -> Html.none
+                             Html.h2 [ prop.text "ARC-Tree" ]
+                             sidebarContent
+                         |]
                      ]
                  )),
             leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]

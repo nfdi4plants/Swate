@@ -6,18 +6,15 @@ open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 
+open SelectorTypes
+
 [<Erase; Mangle(false)>]
 type Actionbar =
 
     [<ReactComponent>]
     static member Button
-        (
-            icon: string,
-            tooltip: string,
-            (onClick: MouseEvent -> unit),
-            ?toolTipPosition: string,
-            ?debug: bool
-        ) =
+        (icon: string, tooltip: string, (onClick: MouseEvent -> unit), ?toolTipPosition: string, ?debug: bool)
+        =
 
         let debug = defaultArg debug false
 
@@ -32,11 +29,7 @@ type Actionbar =
                 Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
                 Html.button [
                     prop.className [ "swt:btn swt:btn-square swt:btn-ghost swt:p-0" ]
-                    prop.children [
-                        Html.i [
-                            prop.className [ "swt:iconify " + icon ]
-                        ]
-                    ]
+                    prop.children [ Html.i [ prop.className [ "swt:iconify " + icon ] ] ]
                     prop.onClick (fun e -> onClick e)
                 ]
             ]

@@ -95,6 +95,8 @@
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="DataMapTable\DataMapTable.fs" />
+    <Compile Include="Widgets\LocalStorage.fs" />
+    <Compile Include="Widgets\Widgets.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 

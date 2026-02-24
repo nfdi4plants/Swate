@@ -4,8 +4,7 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 
-open Swate.Components
-
+open Swate.Components.Types
 
 [<RequireQualifiedAccess>]
 type ArcFileType =
@@ -26,42 +25,35 @@ type ExperimentTarget =
     | Study
     | Assay
 
-type ExperimentMetadata =
-    {
-        Identifier: string option
-        Title: string
-        Description: string
-        InvolvedPeople: string []
-        Comments: string []
-        MainText: string option
-        Files: string []
-        Publications: string []
-        SubmissionDate: string option
-        PublicReleaseDate: string option
-        StudyDesignDescriptors: string []
-        MeasurementType: string option
-        TechnologyType: string option
-        TechnologyPlatform: string option
-    }
+type ExperimentMetadata = {
+    Identifier: string option
+    Title: string
+    Description: string
+    InvolvedPeople: string[]
+    Comments: string[]
+    MainText: string option
+    Files: string[]
+    Publications: string[]
+    SubmissionDate: string option
+    PublicReleaseDate: string option
+    StudyDesignDescriptors: string[]
+    MeasurementType: string option
+    TechnologyType: string option
+    TechnologyPlatform: string option
+}
 
-type CreateExperimentRequest =
-    {
-        Metadata: ExperimentMetadata
-        Target: ExperimentTarget
-    }
+type CreateExperimentRequest = {
+    Metadata: ExperimentMetadata
+    Target: ExperimentTarget
+}
 
-type CreateExperimentResponse =
-    {
-        PreviewData: PreviewData
-        CreatedIdentifier: string
-        ProtocolPath: string option
-    }
+type CreateExperimentResponse = {
+    PreviewData: PreviewData
+    CreatedIdentifier: string
+    ProtocolPath: string option
+}
 
-type SaveArcFileRequest =
-    {
-        FileType: ArcFileType
-        Json: string
-    }
+type SaveArcFileRequest = { FileType: ArcFileType; Json: string }
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
@@ -74,7 +66,7 @@ type IArcVaultsApi = {
     createARCInNewWindow: string -> JS.Promise<Result<unit, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
-    getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
+    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     checkForARC: string -> JS.Promise<bool>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
     createExperimentFromLanding:
@@ -82,56 +74,51 @@ type IArcVaultsApi = {
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
 }
 
-type FileEntry =
-    {
-        name: string
-        path: string
-        isDirectory: bool
-    }
+type FileEntry = {
+    name: string
+    path: string
+    isDirectory: bool
+}
 
 [<AutoOpen>]
 module FileEntryExtensions =
 
-    let createFileEntryTree(fileEntries: FileEntry []) =
+    let createFileEntryTree (fileEntries: FileEntry[]) =
         let dic = Dictionary<string, FileEntry>()
-        fileEntries
-        |> Array.iter (fun fileEntry -> dic.Add(fileEntry.path, fileEntry))
+        fileEntries |> Array.iter (fun fileEntry -> dic.Add(fileEntry.path, fileEntry))
         dic
 
     type FileEntry with
 
-        static member create (name: string, path: string, isDirectory: bool) =
-            {
-                name = name
-                path = path
-                isDirectory = isDirectory
-            }
+        static member create(name: string, path: string, isDirectory: bool) = {
+            name = name
+            path = path
+            isDirectory = isDirectory
+        }
 
-type FileItemDTO =
-    {
-        name: string
-        isDirectory: bool
-        path: string
-        children: Dictionary<string, FileItemDTO>
-    }
+type FileItemDTO = {
+    name: string
+    isDirectory: bool
+    path: string
+    children: Dictionary<string, FileItemDTO>
+}
 
 [<AutoOpen>]
 module FileItemDTOExtensions =
 
     type FileItemDTO with
 
-        static member create (name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>) =
-            {
-                name = name
-                isDirectory = isDirectory
-                path = path
-                children = children
-            }
+        static member create(name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>) = {
+            name = name
+            isDirectory = isDirectory
+            path = path
+            children = children
+        }
 
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
-    recentARCsUpdate: ARCPointer [] -> unit
+    recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
 }
 

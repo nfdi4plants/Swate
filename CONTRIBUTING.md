@@ -64,6 +64,18 @@ test                                Run all tests
 
 ```
 
+### Components playground
+
+`src/Components` is a reusable React component library that can be published to npm and reused by `src/Client` and `src/Electron/src/Renderer`. It contains Storybook/Vitest-based component tests and usage documentation.
+
+To run the Storybook playground for `src/Components`, run `npm run storybook` in the `src/Components` directory.
+
+To run the playground , run `npm start` in `src/Components`. You can edit `src/Components/playground/App.tsx` to test out components in a live environment. This is useful for testing out new components or UI logic without needing to run the entire Client or Electron app.
+
+### Electron app
+
+The Electron app is still in early development and not fully integrated into the main build process. To run the Electron app, navigate to `src/Electron` and run `npm start`. This will start the Electron application with hot-reloading for the renderer process.
+
 ## Contribute
 
 If you want to contribute to Swate, open an issue with the feature/bug you want to work on. This way you can ensure that your approach is in line with the project goals and you can get feedback from the maintainers.
@@ -71,3 +83,6 @@ If you want to contribute to Swate, open an issue with the feature/bug you want 
 Afterwards you can fork the repository and start working on your feature/bug. When you are done, describe your changes in [CHANGELOG.md](CHANGELOG.md) following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and open a pull request.
 
 We are currently still working on a nice project structure. For now ask us if any questions arise in the related GitHub issue!
+
+> [!IMPORTANT]
+> Use VS Code or Rider for development, as they allow autoformatting via Fantomas on file save. This ensures that the code style is consistent across the project and reduces the amount of formatting-related comments in pull requests.
