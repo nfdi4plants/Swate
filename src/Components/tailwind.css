@@ -255,3 +255,34 @@
         background-color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
     }
 }
+
+@layer swt-components {
+    .wmde-markdown-var,
+    [data-color-mode*='light'] .wmde-markdown-var,
+    [data-color-mode*='dark'] .wmde-markdown-var,
+    .wmde-markdown-var[data-color-mode*='light'],
+    .wmde-markdown-var[data-color-mode*='dark'] {
+        --md-editor-font-family: inherit;
+        --md-editor-background-color: var(--color-base-100);
+        --md-editor-box-shadow-color: color-mix(in oklch, var(--color-base-content) 24%, transparent);
+        --color-fg-default: var(--color-base-content);
+        --color-fg-muted: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+        --color-fg-subtle: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+        --color-canvas-default: var(--color-base-100);
+        --color-canvas-subtle: var(--color-base-200);
+        --color-border-default: color-mix(in oklch, var(--color-base-content) 22%, transparent);
+        --color-border-muted: color-mix(in oklch, var(--color-base-content) 14%, transparent);
+        --color-neutral-muted: color-mix(in oklch, var(--color-base-content) 12%, transparent);
+        --color-accent-fg: var(--color-primary);
+        --color-accent-emphasis: var(--color-primary);
+        --color-danger-fg: var(--color-error);
+        --color-danger-emphasis: var(--color-error);
+        --color-attention-fg: var(--color-warning);
+        --color-attention-emphasis: var(--color-warning);
+        --color-done-fg: var(--color-secondary);
+        --color-done-emphasis: var(--color-secondary);
+        --color-success-fg: var(--color-success);
+        --color-success-emphasis: var(--color-success);
+        --color-copied-active-bg: var(--color-success);
+    }
+}

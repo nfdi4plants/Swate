@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect } from 'react';
+import React, { Fragment } from 'react';
 import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 import {Entry as Table} from '../src/Table/Table.fs.ts';
 import {Entry as AnnotationTable} from '../src/AnnotationTable/AnnotationTable.fs.ts';
@@ -19,6 +19,7 @@ import {Entry as Layout} from '../src/Layout/Layout.fs.js'
 import {FileExplorerExample_Example} from '../src/FileExplorer/FileExplorer.fs.ts'
 import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
 import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.fs.ts'
+import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -177,21 +178,20 @@ function LandingContainer() {
   </div>
 }
 
+function MarkdownTextContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Markdown Editor</h2>
+    <TextInputWithMarkdown />
+  </div>
+}
+
 const App = () => {
     return (
-        <NoteSearch />
-        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
-        //     <h1 className='swt:text-6xl'>Playground</h1>
-        //     <AnnoTableContainer />
-        //     {/* <DataMapTableContainer /> */}
-        //     {/* <TermSearchContainer /> */}
-        //     {/* <BaseModalContainer /> */}
-        //     {/* <ComboBoxContainer /> */}
-        //     {/* <TemplateFilterContainer /> */}
-        //     {/* <SelectContainer /> */}
-        //     {/* <ContextMenuContainer /> */}
-        //     {/* <TableContainer /> */}
-        // </div>
+        <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
+            <NoteSearch />
+            <MarkdownTextContainer />
+            <LandingContainer />
+        </div>
     );
 };
 
