@@ -38,6 +38,7 @@ type IArcVaultsApi = {
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     checkForARC: string -> JS.Promise<bool>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
+    saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
 }

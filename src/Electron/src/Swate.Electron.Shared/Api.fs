@@ -37,6 +37,9 @@ let focusExistingARCWindow (arcPath: string) : JS.Promise<Result<unit, exn>> =
 let getRecentARCs () =
     emitJsExpr arcVaultApi "$0.getRecentARCs()"
 
+let saveArcFile (request: SaveArcFileRequest) : JS.Promise<Result<PreviewData, exn>> =
+    emitJsExpr (arcVaultApi, request) "$0.saveArcFile($1)"
+
 let writeFile (request: WriteFileRequest) : JS.Promise<Result<unit, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.writeFile($1)"
 

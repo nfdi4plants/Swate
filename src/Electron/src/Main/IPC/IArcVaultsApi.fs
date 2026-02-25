@@ -125,6 +125,27 @@ let syncARCFile (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, e
     with e ->
         Error e
 
+let private persistArcChangesAndRefreshVault
+    (vault: ArcVault)
+    (arc: ARC)
+    (arcPath: string)
+    (afterArcPersist: unit -> unit)
+    =
+    promise {
+        vault.isBusyWriting <- true
+
+        try
+            // Persist only changed ISA contracts (not full filesystem rewrite).
+            do! arc.UpdateAsync(arcPath)
+            afterArcPersist ()
+            do! vault.LoadArc()
+
+            let fileTree = getFileEntries arcPath |> createFileEntryTree
+            vault.SetFileTree(fileTree)
+        finally
+            vault.isBusyWriting <- false
+    }
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IArcVaultsApi = {
     openARC =
@@ -282,6 +303,31 @@ let api: IArcVaultsApi = {
     checkForARC =
         fun path -> promise {
             return ARC_VAULTS.TryGetVaultByPath(path).IsSome
+        }
+    saveArcFile =
+        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path, vault.arc with
+                    | Some arcPath, Some arc ->
+                        match syncARCFile arc request with
+                        | Error saveError -> return Error saveError
+                        | Ok previewData ->
+                            do!
+                                persistArcChangesAndRefreshVault
+                                    vault
+                                    arc
+                                    arcPath
+                                    (fun () -> ())
+
+                            return Ok previewData
+                    | _ -> return Error(exn "ARC is not loaded.")
+            with e ->
+                return Error e
         }
     writeFile =
         fun (event: IpcMainEvent) (request: WriteFileRequest) -> promise {
