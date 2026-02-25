@@ -109,15 +109,10 @@
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="DataMapTable\DataMapTable.fs" />
-<<<<<<< Updated upstream
-    <Compile Include="Widgets\LocalStorage.fs" />
-    <Compile Include="Widgets\Widgets.fs" />
-=======
     <Compile Include="Widgets\LocalStorage.fs" />
     <Compile Include="Widgets\Widgets.fs" />
     <Compile Include="Notes\Types.fs" />
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
->>>>>>> Stashed changes
     <Compile Include="Style.fs" />
   </ItemGroup>
 
