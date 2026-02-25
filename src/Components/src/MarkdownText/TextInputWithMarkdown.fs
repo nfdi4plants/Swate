@@ -79,14 +79,14 @@ type TextInputWithMarkdown =
         let activeMode, setActiveMode = React.useState options.Mode
         let debouncedValue = React.useDebounce (tempValue, 300)
         let validationError, setValidationError = React.useState (None: string option)
-        let addStepDialogOpen, setAddStepDialogOpen = React.useState false
-        let addStepText, setAddStepText = React.useState ""
-        let addStepDialogError, setAddStepDialogError = React.useState (None: string option)
+        let activePrompt, setActivePrompt = React.useState (None: MarkdownPromptPlugin option)
+        let promptInput, setPromptInput = React.useState ""
+        let promptError, setPromptError = React.useState (None: string option)
 
         let textareaRef = React.useElementRef ()
-        let addStepInputRef = React.useInputRef ()
+        let promptInputRef = React.useInputRef ()
         let commandOrchestratorRef = React.useRef<TextAreaCommandOrchestrator option> None
-        let addStepSelectionRef = React.useRef (None: (int * int) option)
+        let promptSelectionRef = React.useRef (None: (int * int) option)
 
         React.useEffect (
             (fun () ->
@@ -118,15 +118,15 @@ type TextInputWithMarkdown =
 
         React.useEffect (
             (fun () ->
-                if not addStepDialogOpen then
-                    match addStepSelectionRef.current, textareaRef.current with
+                if activePrompt.IsNone then
+                    match promptSelectionRef.current, textareaRef.current with
                     | Some(startIndex, endIndex), Some element ->
                         let textarea = element :?> HTMLTextAreaElement
                         textarea.focus ()
                         textarea?setSelectionRange (startIndex, endIndex)
-                        addStepSelectionRef.current <- None
+                        promptSelectionRef.current <- None
                     | _ -> ()),
-            [| box addStepDialogOpen; box tempValue |]
+            [| box activePrompt; box tempValue |]
         )
 
         let tryGetTextarea () =
@@ -160,38 +160,42 @@ type TextInputWithMarkdown =
             | Some textarea -> textarea.selectionStart, textarea.selectionEnd
             | None -> tempValue.Length, tempValue.Length
 
-        let openAddStepDialog () =
+        let openPromptDialog (prompt: MarkdownPromptPlugin) =
             let startIndex, endIndex = getSelectionOrEnd ()
-            addStepSelectionRef.current <- Some(startIndex, endIndex)
-            setAddStepText ""
-            setAddStepDialogError None
-            setAddStepDialogOpen true
+            promptSelectionRef.current <- Some(startIndex, endIndex)
+            setPromptInput ""
+            setPromptError None
+            setActivePrompt (Some prompt)
 
-        let insertAddStep () =
-            if String.IsNullOrWhiteSpace addStepText then
-                setAddStepDialogError (Some "Step text is required.")
-            else
-                let startIndex, endIndex =
-                    match addStepSelectionRef.current with
-                    | Some(startIndex, endIndex) -> startIndex, endIndex
-                    | None -> getSelectionOrEnd ()
+        let submitPromptDialog () =
+            match activePrompt with
+            | None -> ()
+            | Some prompt ->
+                match prompt.Validate promptInput with
+                | Error message -> setPromptError (Some message)
+                | Ok() ->
+                    let startIndex, endIndex =
+                        match promptSelectionRef.current with
+                        | Some(startIndex, endIndex) -> startIndex, endIndex
+                        | None -> getSelectionOrEnd ()
 
-                let nextValue, caretIndex =
-                    AddStep.insertAtSelection tempValue startIndex endIndex addStepText
+                    let nextValue, (nextSelectionStart, nextSelectionEnd) =
+                        prompt.Apply tempValue startIndex endIndex promptInput
 
-                setTempValue nextValue
-                startedChange.current <- true
-                addStepSelectionRef.current <- Some(caretIndex, caretIndex)
-                setAddStepDialogOpen false
-                setAddStepText ""
-                setAddStepDialogError None
+                    setTempValue nextValue
+                    startedChange.current <- true
+                    promptSelectionRef.current <- Some(nextSelectionStart, nextSelectionEnd)
+                    setActivePrompt None
+                    setPromptInput ""
+                    setPromptError None
 
-        let closeAddStepDialog (_: bool) =
-            setAddStepDialogOpen false
-            setAddStepDialogError None
-            setAddStepText ""
+        let closePromptDialog (_: bool) =
+            setActivePrompt None
+            setPromptError None
+            setPromptInput ""
 
-        let pluginCommands = PluginRegistry.activeCommands plugins
+        let activePlugins = PluginRegistry.activePlugins plugins
+        let pluginCommands = activePlugins |> List.map (fun plugin -> plugin.Command) |> List.toArray
         let toolbarGroups = MarkdownCommands.toolbarGroupsWithPlugins pluginCommands
         let shortcutCommands = MarkdownCommands.shortcutCommands pluginCommands
 
@@ -208,16 +212,21 @@ type TextInputWithMarkdown =
                 let ariaLabel: obj = command.buttonProps?``aria-label``
                 if isNullOrUndefined ariaLabel then fallback else string ariaLabel
 
+        let runEditorCommand (command: ICommand) =
+            ensureCommandOrchestrator ()
+            |> Option.iter (fun orchestrator ->
+                orchestrator.executeCommand command
+                syncTextFromTextarea ()
+            )
+
         let executeCommand (command: ICommand) =
             fun (_: MouseEvent) ->
-                if command.keyCommand = AddStep.keyCommand then
-                    openAddStepDialog ()
-                else
-                    ensureCommandOrchestrator ()
-                    |> Option.iter (fun orchestrator ->
-                        orchestrator.executeCommand command
-                        syncTextFromTextarea ()
-                    )
+                match activePlugins |> List.tryFind (fun plugin -> plugin.Command.keyCommand = command.keyCommand) with
+                | Some plugin ->
+                    match plugin.Prompt with
+                    | Some prompt -> openPromptDialog prompt
+                    | None -> runEditorCommand command
+                | None -> runEditorCommand command
 
         let handleTextAreaKeyDown =
             fun (e: KeyboardEvent) ->
@@ -262,6 +271,26 @@ type TextInputWithMarkdown =
             if classes.IsSome then
                 classes.Value
         ]
+
+        let promptTitle =
+            activePrompt
+            |> Option.map (fun prompt -> prompt.Title)
+            |> Option.defaultValue "Plugin action"
+
+        let promptDescription =
+            activePrompt
+            |> Option.bind (fun prompt -> prompt.Description)
+            |> Option.map Html.text
+
+        let promptPlaceholder =
+            activePrompt
+            |> Option.map (fun prompt -> prompt.Placeholder)
+            |> Option.defaultValue ""
+
+        let promptSubmitButtonText =
+            activePrompt
+            |> Option.map (fun prompt -> prompt.SubmitButtonText)
+            |> Option.defaultValue "Apply"
 
         Html.div [
             prop.className (
@@ -388,38 +417,38 @@ type TextInputWithMarkdown =
                     ]
 
                 BaseModal.Modal(
-                    isOpen = addStepDialogOpen,
-                    setIsOpen = closeAddStepDialog,
-                    header = Html.text "Add Step",
-                    description = Html.text "Insert a markdown checklist item at the current cursor position.",
+                    isOpen = activePrompt.IsSome,
+                    setIsOpen = closePromptDialog,
+                    header = Html.text promptTitle,
+                    ?description = promptDescription,
                     children =
                         Html.div [
                             prop.className "swt:flex swt:flex-col swt:gap-2"
                             prop.children [
                                 Html.input [
-                                    prop.ref addStepInputRef
+                                    prop.ref promptInputRef
                                     prop.className [
                                         "swt:input swt:input-bordered swt:w-full"
-                                        if addStepDialogError.IsSome then
+                                        if promptError.IsSome then
                                             "swt:input-error"
                                     ]
-                                    prop.placeholder "Step text"
-                                    prop.value addStepText
+                                    prop.placeholder promptPlaceholder
+                                    prop.value promptInput
                                     prop.onChange (fun text ->
-                                        setAddStepText text
-                                        if addStepDialogError.IsSome then
-                                            setAddStepDialogError None
+                                        setPromptInput text
+                                        if promptError.IsSome then
+                                            setPromptError None
                                     )
                                     prop.onKeyDown (fun (e: KeyboardEvent) ->
                                         if e.key = "Enter" then
                                             e.preventDefault ()
-                                            insertAddStep ()
+                                            submitPromptDialog ()
                                     )
                                 ]
-                                if addStepDialogError.IsSome then
+                                if promptError.IsSome then
                                     Html.p [
                                         prop.className "swt:text-error swt:text-sm"
-                                        prop.text addStepDialogError.Value
+                                        prop.text promptError.Value
                                     ]
                             ]
                         ],
@@ -428,15 +457,15 @@ type TextInputWithMarkdown =
                             Html.button [
                                 prop.className "swt:btn"
                                 prop.text "Cancel"
-                                prop.onClick (fun _ -> closeAddStepDialog false)
+                                prop.onClick (fun _ -> closePromptDialog false)
                             ]
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                                prop.text "Add"
-                                prop.onClick (fun _ -> insertAddStep ())
+                                prop.text promptSubmitButtonText
+                                prop.onClick (fun _ -> submitPromptDialog ())
                             ]
                         ],
-                    initialFocusRef = unbox addStepInputRef,
+                    initialFocusRef = unbox promptInputRef,
                     className = "swt:bg-base-100 swt:text-base-content"
                 )
             ]

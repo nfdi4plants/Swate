@@ -13,8 +13,11 @@ module PluginRegistry =
             let nonOverriddenDefaults = defaultPlugins |> List.filter (fun plugin -> customIds.Contains plugin.Id |> not)
             nonOverriddenDefaults @ custom
 
-    let activeCommands (customPlugins: MarkdownToolbarPlugin list option) =
+    let activePlugins (customPlugins: MarkdownToolbarPlugin list option) =
         mergeWithDefaults customPlugins
         |> List.filter (fun plugin -> plugin.Enabled)
+
+    let activeCommands (customPlugins: MarkdownToolbarPlugin list option) =
+        activePlugins customPlugins
         |> List.map (fun plugin -> plugin.Command)
         |> List.toArray
