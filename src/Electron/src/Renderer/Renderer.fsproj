@@ -12,8 +12,6 @@
     <Compile Include="components\Selector.fs" />
     <Compile Include="components\Navbar.fs" />
     <Compile Include="components\FileExplorer.fs" />
-    <Compile Include="components\ExperimentLanding.fs" />
-    <Compile Include="components\LandingPage.fs" />
     <Compile Include="components\MainElement.fs" />
     <Compile Include="components\InitState.fs" />
     <Compile Include="components\MainWindowContent.fs" />
