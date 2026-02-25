@@ -13,6 +13,7 @@ open ARCtrl.Json
 open System
 
 let private fsDynamic: obj = importAll "fs"
+let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
 let private normalizePathForComparison (pathValue: string) =
@@ -44,6 +45,26 @@ let private tryResolveArcRelativeWritePath (arcPath: string) (requestedRelativeP
             Ok absolutePath
         else
             Error(exn "RelativePath resolves outside the ARC root.")
+
+let private mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> =
+    promise {
+        let mkdirPromise =
+            fsPromisesDynamic?mkdir(directoryPath, createObj [ "recursive" ==> true ])
+            |> unbox<JS.Promise<obj>>
+
+        let! _ = mkdirPromise
+        return ()
+    }
+
+let private writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Promise<unit> =
+    promise {
+        let writePromise =
+            fsPromisesDynamic?writeFile(absolutePath, content, "utf8")
+            |> unbox<JS.Promise<obj>>
+
+        let! _ = writePromise
+        return ()
+    }
 
 let private copyInvestigationMetadata (source: ArcInvestigation) (target: ARC) =
     target.Title <- source.Title
@@ -324,13 +345,18 @@ let api: IArcVaultsApi = {
                         | Error pathError ->
                             return Error pathError
                         | Ok absolutePath ->
-                            let directoryPath = path.dirname absolutePath
-                            fsDynamic?mkdirSync(directoryPath, createObj [ "recursive" ==> true ]) |> ignore
-                            fsDynamic?writeFileSync(absolutePath, request.Content, "utf8") |> ignore
+                            vault.isBusyWriting <- true
 
-                            let fileTree = getFileEntries arcPath |> createFileEntryTree
-                            vault.SetFileTree(fileTree)
-                            return Ok()
+                            try
+                                let directoryPath = path.dirname absolutePath
+                                do! mkdirRecursiveAsync directoryPath
+                                do! writeUtf8FileAsync absolutePath request.Content
+
+                                let fileTree = getFileEntries arcPath |> createFileEntryTree
+                                vault.SetFileTree(fileTree)
+                                return Ok()
+                            finally
+                                vault.isBusyWriting <- false
             with e ->
                 return Error e
         }
