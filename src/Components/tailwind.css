@@ -256,33 +256,47 @@
     }
 }
 
-@layer swt-components {
-    .wmde-markdown-var,
-    [data-color-mode*='light'] .wmde-markdown-var,
-    [data-color-mode*='dark'] .wmde-markdown-var,
-    .wmde-markdown-var[data-color-mode*='light'],
-    .wmde-markdown-var[data-color-mode*='dark'] {
-        --md-editor-font-family: inherit;
-        --md-editor-background-color: var(--color-base-100);
-        --md-editor-box-shadow-color: color-mix(in oklch, var(--color-base-content) 24%, transparent);
-        --color-fg-default: var(--color-base-content);
-        --color-fg-muted: color-mix(in oklch, var(--color-base-content) 70%, transparent);
-        --color-fg-subtle: color-mix(in oklch, var(--color-base-content) 55%, transparent);
-        --color-canvas-default: var(--color-base-100);
-        --color-canvas-subtle: var(--color-base-200);
-        --color-border-default: color-mix(in oklch, var(--color-base-content) 22%, transparent);
-        --color-border-muted: color-mix(in oklch, var(--color-base-content) 14%, transparent);
-        --color-neutral-muted: color-mix(in oklch, var(--color-base-content) 12%, transparent);
-        --color-accent-fg: var(--color-primary);
-        --color-accent-emphasis: var(--color-primary);
-        --color-danger-fg: var(--color-error);
-        --color-danger-emphasis: var(--color-error);
-        --color-attention-fg: var(--color-warning);
-        --color-attention-emphasis: var(--color-warning);
-        --color-done-fg: var(--color-secondary);
-        --color-done-emphasis: var(--color-secondary);
-        --color-success-fg: var(--color-success);
-        --color-success-emphasis: var(--color-success);
-        --color-copied-active-bg: var(--color-success);
-    }
+/* Keep markdown overrides unlayered so they can override uiw unlayered CSS. */
+.wmde-markdown-var,
+.wmde-markdown {
+    --md-editor-font-family: inherit !important;
+    --md-editor-background-color: var(--color-base-100) !important;
+    --md-editor-box-shadow-color: color-mix(in oklch, var(--color-base-content) 24%, transparent) !important;
+    --color-fg-default: var(--color-base-content) !important;
+    --color-fg-muted: color-mix(in oklch, var(--color-base-content) 70%, transparent) !important;
+    --color-fg-subtle: color-mix(in oklch, var(--color-base-content) 55%, transparent) !important;
+    --color-canvas-default: var(--color-base-100) !important;
+    --color-canvas-subtle: var(--color-base-200) !important;
+    --color-border-default: color-mix(in oklch, var(--color-base-content) 22%, transparent) !important;
+    --color-border-muted: color-mix(in oklch, var(--color-base-content) 14%, transparent) !important;
+    --color-neutral-muted: color-mix(in oklch, var(--color-base-content) 12%, transparent) !important;
+    --color-accent-fg: var(--color-primary) !important;
+    --color-accent-emphasis: var(--color-primary) !important;
+    --color-danger-fg: var(--color-error) !important;
+    --color-danger-emphasis: var(--color-error) !important;
+    --color-attention-fg: var(--color-warning) !important;
+    --color-attention-emphasis: var(--color-warning) !important;
+    --color-done-fg: var(--color-secondary) !important;
+    --color-done-emphasis: var(--color-secondary) !important;
+    --color-success-fg: var(--color-success) !important;
+    --color-success-emphasis: var(--color-success) !important;
+    --color-copied-active-bg: var(--color-success) !important;
+}
+
+[data-theme='finster'] .wmde-markdown-var,
+[data-theme='finster'] .wmde-markdown,
+[data-theme='planti'] .wmde-markdown-var,
+[data-theme='planti'] .wmde-markdown,
+[data-theme='viola'] .wmde-markdown-var,
+[data-theme='viola'] .wmde-markdown,
+[data-theme='dark'] .wmde-markdown-var,
+[data-theme='dark'] .wmde-markdown {
+    color-scheme: dark !important;
+}
+
+[data-theme='sunrise'] .wmde-markdown-var,
+[data-theme='sunrise'] .wmde-markdown,
+[data-theme='light'] .wmde-markdown-var,
+[data-theme='light'] .wmde-markdown {
+    color-scheme: light !important;
 }

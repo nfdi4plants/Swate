@@ -2,7 +2,6 @@ namespace Swate.Components.MarkdownText
 
 open System
 open Browser.Types
-open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -11,45 +10,6 @@ open Swate.Components
 open Swate.Components.Metadata
 open Swate.Components.MarkdownText.JsBindings
 open Swate.Components.MarkdownText.Plugins
-
-[<RequireQualifiedAccess>]
-module private MarkdownTheme =
-
-    let private normalize (value: string) =
-        let trimmed = value.Trim().ToLowerInvariant()
-        if trimmed = "" then None else Some trimmed
-
-    let private isDarkThemeName = function
-        | "dark" -> true
-        | "finster"
-        | "planti"
-        | "viola" -> true
-        | _ -> false
-
-    let private tryGetThemeElements () =
-        [|
-            document.documentElement |> Option.ofObj
-            document.body |> Option.ofObj
-            document.querySelector ("[data-theme]")
-            |> Option.ofObj
-            |> Option.map (fun element -> element :?> HTMLElement)
-        |]
-        |> Array.choose id
-
-    let private tryGetDataTheme (element: HTMLElement) =
-        element.getAttribute ("data-theme")
-        |> Option.ofObj
-        |> Option.bind normalize
-
-    let resolveColorMode () =
-        let themeElements = tryGetThemeElements ()
-
-        match themeElements |> Array.tryPick tryGetDataTheme with
-        | Some dataTheme when isDarkThemeName dataTheme -> "dark"
-        | Some _ -> "light"
-        | None ->
-            let mediaQuery: obj = window?matchMedia ("(prefers-color-scheme: dark)")
-            if mediaQuery?matches |> unbox<bool> then "dark" else "light"
 
 [<RequireQualifiedAccess>]
 module private MarkdownCommands =
@@ -234,7 +194,6 @@ type TextInputWithMarkdown =
         let pluginCommands = PluginRegistry.activeCommands plugins
         let toolbarGroups = MarkdownCommands.toolbarGroupsWithPlugins pluginCommands
         let shortcutCommands = MarkdownCommands.shortcutCommands pluginCommands
-        let editorColorMode = MarkdownTheme.resolveColorMode ()
 
         let commandAriaLabel (command: ICommand) =
             let fallback =
@@ -289,8 +248,6 @@ type TextInputWithMarkdown =
                 prop.onClick (fun _ -> setActiveMode targetMode)
             ]
 
-        let previewWrapperElement = createObj [ "data-color-mode" ==> editorColorMode ]
-
         let previewClassName =
             match options.PreviewClassName with
             | Some className -> $"swt:p-4 {className}"
@@ -322,7 +279,6 @@ type TextInputWithMarkdown =
                     prop.children [
                         Html.div [
                             prop.className editorWrapperClasses
-                            prop.custom ("data-color-mode", editorColorMode)
                             prop.children [
                                 Html.div [
                                     prop.className
@@ -407,8 +363,7 @@ type TextInputWithMarkdown =
                                                         tempValue,
                                                         className = previewClassName,
                                                         components = Preview.components,
-                                                        rehypePlugins = Preview.rehypePlugins,
-                                                        wrapperElement = previewWrapperElement
+                                                        rehypePlugins = Preview.rehypePlugins
                                                     )
                                                 ]
                                             ]
