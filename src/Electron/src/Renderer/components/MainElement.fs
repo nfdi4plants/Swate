@@ -83,18 +83,10 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
 //     ]
 
 let CreateARCitectNavbarList (arcFile: ArcFiles option) onSaveClick =
-
-    React.Fragment [
+    Components.BaseNavbar.Main [
+        //CreateARCitectWidgetNavbarList activeView addWidget
         QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
     ]
-
-// [<ReactComponent>]
-// let CreateARCitectNavbar (activeView: PreviewActiveView) addWidget arcFile onSaveClick =
-
-//     Components.BaseNavbar.Main [
-//         CreateARCitectWidgetNavbarList activeView addWidget
-//         CreateARCitectNavbarList arcFile onSaveClick
-//     ]
 
 [<Literal>]
 let private NewTablePrefix = "NewTable"

@@ -3,9 +3,11 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Landing.Tests.fs"/>
     <Compile Include="Shared.Tests.fs"/>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Components\src\Swate.Components.fsproj"/>
     <ProjectReference Include="..\..\src\Shared\Swate.Components.Core.fsproj"/>
   </ItemGroup>
   <ItemGroup>

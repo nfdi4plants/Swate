@@ -14,43 +14,15 @@ type PreviewData =
     | Text of string
     | Unknown
 
-[<RequireQualifiedAccess>]
-type ExperimentTarget =
-    | Study
-    | Assay
-
-type ExperimentMetadata = {
-    Identifier: string option
-    Title: string
-    Description: string
-    InvolvedPeople: string[]
-    Comments: string[]
-    MainText: string option
-    Files: string[]
-    Publications: string[]
-    SubmissionDate: string option
-    PublicReleaseDate: string option
-    StudyDesignDescriptors: string[]
-    MeasurementType: string option
-    TechnologyType: string option
-    TechnologyPlatform: string option
-}
-
-type CreateExperimentRequest = {
-    Metadata: ExperimentMetadata
-    Target: ExperimentTarget
-}
-
-type CreateExperimentResponse = {
-    PreviewData: PreviewData
-    CreatedIdentifier: string
-    ProtocolPath: string option
-}
-
 type SaveArcFileRequest = {
-    FileType: ArcFilesDiscriminate
-    Json: string
-}
+        FileType: ArcFilesDiscriminate
+        Json: string
+    }
+
+type WriteFileRequest = {
+        RelativePath: string
+        Content: string
+    }
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
@@ -66,9 +38,7 @@ type IArcVaultsApi = {
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     checkForARC: string -> JS.Promise<bool>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
-    createExperimentFromLanding:
-        IpcMainEvent -> CreateExperimentRequest -> JS.Promise<Result<CreateExperimentResponse, exn>>
-    saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
+    writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
 }
 

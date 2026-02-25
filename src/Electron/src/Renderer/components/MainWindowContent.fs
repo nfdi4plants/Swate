@@ -1,16 +1,75 @@
 module Renderer.components.MainWindowContent
 
-open Feliz
-
-open Swate.Electron.Shared.IPCTypes
-
 open ARCtrl
-
-open MainElement
-open ExperimentLanding
-
-open Swate.Components
+open Feliz
+open Swate.Components.Landing
 open Swate.Electron.Shared
+open Swate.Electron.Shared.IPCTypes
+open MainElement
+
+let createFromLanding
+    landingUiState
+    setLandingUiState
+    setLandingDraft
+    setShowLandingDraft
+    setLandingDraftActive
+    appState
+    setSelectedTreeItemPath
+    setPreviewData
+    setPreviewError
+    setDidSelectFile
+    (payload: SubmitPayload)
+    =
+    let finishSuccess (previewData: PreviewData) =
+        payload.ArcFile
+        |> ARCHelper.tryGetArcFilePath appState
+        |> setSelectedTreeItemPath
+
+        setPreviewData (Some previewData)
+        setPreviewError None
+        setDidSelectFile true
+        setShowLandingDraft false
+        setLandingDraftActive false
+        setLandingDraft LandingDraft.init
+        setLandingUiState LandingUiState.init
+
+    promise {
+        setLandingUiState {
+            landingUiState with
+                IsSubmitting = true
+                Error = None
+        }
+
+        let! saveResult = Navbar.saveArcFileWithPreview payload.ArcFile
+
+        match saveResult with
+        | Error message ->
+            setLandingUiState {
+                landingUiState with
+                    IsSubmitting = false
+                    Error = Some message
+            }
+        | Ok previewData ->
+            match payload.ProtocolIntent with
+            | None -> finishSuccess previewData
+            | Some protocolIntent ->
+                let request = {
+                    RelativePath = protocolIntent.RelativePath
+                    Content = protocolIntent.Content
+                }
+
+                let! writeResult = Api.writeFile request
+
+                match writeResult with
+                | Ok() -> finishSuccess previewData
+                | Error exn ->
+                    setLandingUiState {
+                        landingUiState with
+                            IsSubmitting = false
+                            Error = Some $"Saved ARC metadata but failed to write protocol file: {exn.Message}"
+                    }
+    }
+    |> Promise.start
 
 [<ReactComponent>]
 let createARCPreview
@@ -75,15 +134,14 @@ let computeARCContent
     (path: string)
     =
     if landingDraftActive && showLandingDraft then
-        ExperimentLandingView(
+        Landing.Wizard(
             landingDraft,
             setLandingDraft,
             landingUiState,
             setLandingUiState,
-            LandingPage.createFromLanding
+            createFromLanding
                 landingUiState
                 setLandingUiState
-                landingDraft
                 setLandingDraft
                 setShowLandingDraft
                 setLandingDraftActive
@@ -188,7 +246,7 @@ let content
                     prop.children [
                         Html.div [
                             prop.className "swt:flex-none"
-                        // prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
+                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
                         ]
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
