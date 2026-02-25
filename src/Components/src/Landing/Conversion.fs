@@ -10,6 +10,12 @@ module Conversion =
         |> List.map _.Trim()
         |> List.filter (System.String.IsNullOrWhiteSpace >> not)
 
+    let private isSafePathSegment (value: string) =
+        not (System.String.IsNullOrWhiteSpace value)
+        && not (value.Contains "/")
+        && not (value.Contains "\\")
+        && not (value.Contains "..")
+
     let private fillInputColumnIfFilesExist (table: ArcTable) (files: string list) =
         let normalizedFiles = normalizeFiles files
 
@@ -66,18 +72,21 @@ module Conversion =
         assay
 
     let private toProtocolIntent (draft: LandingDraft) (target: LandingTarget) (identifier: string) =
-        match Validation.toOptionalString draft.MainText with
-        | None -> None
-        | Some content ->
-            let folder =
-                match target with
-                | LandingTarget.Study -> "studies"
-                | LandingTarget.Assay -> "assays"
+        if isSafePathSegment identifier |> not then
+            None
+        else
+            match Validation.toOptionalString draft.MainText with
+            | None -> None
+            | Some content ->
+                let folder =
+                    match target with
+                    | LandingTarget.Study -> "studies"
+                    | LandingTarget.Assay -> "assays"
 
-            Some {
-                RelativePath = $"{folder}/{identifier}/protocols/{identifier}_protocol.md"
-                Content = content
-            }
+                Some {
+                    RelativePath = $"{folder}/{identifier}/protocols/{identifier}_protocol.md"
+                    Content = content
+                }
 
     let toArcFile (draft: LandingDraft) (target: LandingTarget) =
         let identifier = Validation.resolveIdentifier draft

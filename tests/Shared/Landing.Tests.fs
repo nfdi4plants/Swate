@@ -46,6 +46,26 @@ let tests =
             let draft = { mkBaseDraft () with Identifier = "  explicit_id  " }
             Expect.equal (Validation.resolveIdentifier draft) "explicit_id" "Explicit identifier should be used."
 
+        testCase "Validation.resolveIdentifier sanitizes explicit identifier input" <| fun _ ->
+            let draft = { mkBaseDraft () with Identifier = " ../../../etc/passwd " }
+
+            Expect.equal
+                (Validation.resolveIdentifier draft)
+                "etc_passwd"
+                "Unsafe path-like characters should be removed from explicit identifiers."
+
+        testCase "Validation.resolveIdentifier falls back to title when explicit identifier is unusable" <| fun _ ->
+            let draft = {
+                mkBaseDraft () with
+                    Identifier = " ...////... "
+                    Title = "Fallback From Title"
+            }
+
+            Expect.equal
+                (Validation.resolveIdentifier draft)
+                "Fallback_From_Title"
+                "Empty/invalid explicit identifiers should fall back to the title-derived identifier."
+
         testCase "Validation.resolveIdentifier falls back to sanitized title" <| fun _ ->
             let draft = {
                 mkBaseDraft () with
@@ -126,6 +146,29 @@ let tests =
                     "Protocol path should target study protocols."
 
                 Expect.equal protocol.Content "Protocol body" "Protocol content should be trimmed."
+            | None ->
+                failwith "Expected protocol intent to be present."
+
+        testCase "Conversion.toSubmitPayload sanitizes identifier used in protocol path" <| fun _ ->
+            let draft = {
+                mkBaseDraft () with
+                    Identifier = "../../../etc/passwd"
+                    MainText = "Protocol body"
+            }
+
+            let payload = Conversion.toSubmitPayload draft LandingTarget.Study
+
+            Expect.equal payload.Identifier "etc_passwd" "Payload identifier should be sanitized."
+
+            match payload.ProtocolIntent with
+            | Some protocol ->
+                Expect.equal
+                    protocol.RelativePath
+                    "studies/etc_passwd/protocols/etc_passwd_protocol.md"
+                    "Protocol path should use the sanitized identifier."
+
+                Expect.isFalse (protocol.RelativePath.Contains "..") "Protocol path must not contain traversal segments."
+                Expect.isFalse (protocol.RelativePath.Contains "\\") "Protocol path must not contain backslashes."
             | None ->
                 failwith "Expected protocol intent to be present."
 

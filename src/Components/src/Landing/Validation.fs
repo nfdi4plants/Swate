@@ -19,24 +19,28 @@ module Validation =
         let cleaned = Regex.Replace(candidate, @"[^a-zA-Z0-9_\- ]", " ").Trim()
         Regex.Replace(cleaned, @"\s+", " ").Trim()
 
-    let private generateSafeIdentifierFromTitle (title: string) =
+    let private tryNormalizeIdentifier (candidate: string) =
         let sanitized =
-            title
+            candidate
             |> sanitizeIdentifierCandidate
             |> fun value -> Regex.Replace(value, @"\s+", "_").Trim([| '_'; '-' |])
 
-        let candidate =
-            if String.IsNullOrWhiteSpace sanitized then
-                "Experiment"
-            else
-                sanitized
-
-        if ARCtrl.Helper.Identifier.tryCheckValidCharacters candidate then
-            candidate
+        if String.IsNullOrWhiteSpace sanitized then
+            None
+        elif ARCtrl.Helper.Identifier.tryCheckValidCharacters sanitized then
+            Some sanitized
         else
-            "Experiment"
+            None
+
+    let private generateSafeIdentifierFromTitle (title: string) =
+        title
+        |> tryNormalizeIdentifier
+        |> Option.defaultValue "Experiment"
 
     let resolveIdentifier (draft: LandingDraft) =
         match toOptionalString draft.Identifier with
-        | Some identifier -> identifier
+        | Some identifier ->
+            match tryNormalizeIdentifier identifier with
+            | Some safeIdentifier -> safeIdentifier
+            | None -> generateSafeIdentifierFromTitle draft.Title
         | None -> generateSafeIdentifierFromTitle draft.Title
