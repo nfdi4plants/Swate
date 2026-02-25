@@ -148,9 +148,6 @@ let content
     (
         appState: AppState,
         setArcFileState,
-        activeTableData,
-        activeDataMapData,
-        onTableMutated,
         activeView,
         setActiveView,
         arcFileState,
