@@ -117,7 +117,7 @@
   <PropertyGroup>
     <NpmDependencies>
       <NpmPackage Name="@floating-ui/react" Version="gte 0.27.7 lt 1.0.0" ResolutionStrategy="Max" />
-      <NpmPackage Name="@dnd-kit/core" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@dnd-kit/core" Version="gte 6.3.0 lt 7.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@dnd-kit/sortable" Version="gte 10.0.0 lt 11.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@dnd-kit/utilities" Version="gte 3.2.0 lt 4.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max" />
