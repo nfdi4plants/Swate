@@ -13,7 +13,7 @@ open ARCtrl
 
 open Renderer.components
 open components.MainElement
-open components.ExperimentLanding
+open Swate.Components.Landing
 
 
 let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
