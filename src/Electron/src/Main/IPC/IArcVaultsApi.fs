@@ -609,18 +609,34 @@ let api: IArcVaultsApi = {
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }
     syncARC =
-        fun (event: IpcMainEvent) (request: SyncARCRequest) -> promise {
+        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
             let windowId = windowIdFromIpcEvent event
-
+            Swate.Components.console.log("Test")
             match ARC_VAULTS.TryGetVault(windowId) with
             | None -> return Error(exn $"The ARC for window id {windowId} should exist")
             | Some vault ->
 
                 if vault.arc.IsSome then
                     match request.FileType with
-                    | ArcFiles.Assay a ->
-                        Swate.Components.console.log($"a.Identifier: {a.Identifier}")
-                        vault.arc.Value.SetAssay(a.Identifier, a)
+                    | ArcFilesDiscriminate.Assay ->
+                        let assay = ArcAssay.fromJsonString(request.Json)
+                        Swate.Components.console.log($"assay.Identifier: {assay.Identifier}")
+                        vault.arc.Value.SetAssay(assay.Identifier, assay)
+                        return Ok()
+                    | ArcFilesDiscriminate.Run ->
+                        let run = ArcRun.fromJsonString(request.Json)
+                        Swate.Components.console.log($"workflow.Identifier: {run.Identifier}")
+                        vault.arc.Value.SetRun(run.Identifier, run)
+                        return Ok()
+                    | ArcFilesDiscriminate.Workflow ->
+                        let workflow = ArcWorkflow.fromJsonString(request.Json)
+                        Swate.Components.console.log($"workflow.Identifier: {workflow.Identifier}")
+                        vault.arc.Value.SetWorkflow(workflow.Identifier, workflow)
+                        return Ok()
+                    | ArcFilesDiscriminate.Study ->
+                        let study = ArcStudy.fromJsonString(request.Json)
+                        Swate.Components.console.log($"study.Identifier: {study.Identifier}")
+                        vault.arc.Value.SetStudy(study.Identifier, study)
                         return Ok()
                     | _ -> return Ok()
                 else

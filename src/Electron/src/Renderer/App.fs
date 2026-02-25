@@ -11,6 +11,7 @@ open Swate.Electron.Shared.IPCTypes
 open Browser.Dom
 
 open ARCtrl
+open ARCtrl.Json
 
 open Renderer.components
 open components.MainElement
@@ -105,8 +106,39 @@ let Main () =
                     None
 
             if arcFileState.IsSome then
-                let fileType: SyncARCRequest = { FileType = arcFileState.Value }
-                Api.syncARC fileType |> ignore
+                let fileType: SaveArcFileRequest =
+                    match arcFileState.Value with
+                    | ArcFiles.Assay a -> 
+                        {
+                            FileType = ArcFilesDiscriminate.Assay
+                            Json = a.ToJsonString()
+                        }
+                    | ArcFiles.Investigation i ->
+                        {
+                            FileType = ArcFilesDiscriminate.Investigation
+                            Json = i.ToJsonString()
+                        }
+                    | ArcFiles.Run r ->
+                        {
+                            FileType = ArcFilesDiscriminate.Run
+                            Json = r.ToJsonString()
+                        }
+                    | ArcFiles.Study (s, _) ->
+                        {
+                            FileType = ArcFilesDiscriminate.Study
+                            Json = s.ToJsonString()
+                        }
+                    | ArcFiles.Workflow w ->
+                        {
+                            FileType = ArcFilesDiscriminate.Workflow
+                            Json = w.ToJsonString()
+                        }
+                    | _ ->
+                        {
+                            FileType = ArcFilesDiscriminate.Template
+                            Json = ""
+                        }
+                Api.syncARC fileType |> Promise.start
 
             FileExplorer.createFileTree
                 fileTree

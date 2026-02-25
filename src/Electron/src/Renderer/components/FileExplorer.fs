@@ -77,10 +77,27 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                         setPreviewData (Some data)
                         setPreviewError None
                         setDidSelectFile true
-                        if selectedTreeItemPath.IsSome && (selectedTreeItemPath.Value <> item.Path.Value) then
+
+                        let fileType: SaveArcFileRequest option =
                             match data with
-                            | PreviewData.ArcFileData (_, json) -> console.log($"json: {json}")
-                            | _ -> console.log($"Nope")
+                            | PreviewData.ArcFileData (fileType, json)->
+                                Some {
+                                    FileType = fileType
+                                    Json = json
+                                }
+                            | _ -> None
+
+                        if fileType.IsSome then
+                            let! result = Api.syncARC fileType.Value
+                            match result with
+                            | Ok () -> ()
+                            | Error exn -> console.log ($"[Renderer] Error: {exn.Message}")
+
+
+                        //if selectedTreeItemPath.IsSome && (selectedTreeItemPath.Value <> item.Path.Value) then
+                        //    match data with
+                        //    | PreviewData.ArcFileData (_, json) -> console.log($"json: {json}")
+                        //    | _ -> console.log($"Nope")
 
                     | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")

@@ -52,8 +52,6 @@ type SaveArcFileRequest = {
     Json: string
 }
 
-type SyncARCRequest = { FileType: ArcFiles }
-
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Will open ARC in same window
@@ -71,7 +69,7 @@ type IArcVaultsApi = {
     createExperimentFromLanding:
         IpcMainEvent -> CreateExperimentRequest -> JS.Promise<Result<CreateExperimentResponse, exn>>
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
-    syncARC: IpcMainEvent -> SyncARCRequest -> JS.Promise<Result<unit, exn>>
+    syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
 }
 
 type FileEntry = {
