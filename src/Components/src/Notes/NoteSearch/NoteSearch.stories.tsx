@@ -20,12 +20,6 @@ export const Default: Story = {
   play: (async ({ canvasElement }: { canvasElement: HTMLElement }) => {
     const canvas = within(canvasElement);
 
-    const toggleButton = await canvas.findByText("Toggle Search");
-    expect(toggleButton).toBeTruthy();
-
-    // Click toggle to show search
-    await userEvent.click(toggleButton);
-
     // Find search input
     const searchInput = await canvas.findByPlaceholderText("Search Notes...");
     expect(searchInput).toBeTruthy();

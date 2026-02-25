@@ -3,9 +3,9 @@ namespace Swate.Components.NoteTypes
 open Feliz
 open Fable.Core
 
-type NoteSearch= {
+type NoteSearch = {
     Id: int
     Title: string
-    Date: string
+    Date: System.DateTime
     Content: string
 }
