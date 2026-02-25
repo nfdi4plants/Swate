@@ -3,7 +3,10 @@ namespace Swate.Components.MarkdownText.Plugins
 [<RequireQualifiedAccess>]
 module PluginRegistry =
 
-    let defaultPlugins: MarkdownToolbarPlugin list = [ AddStep.plugin ]
+    let defaultPlugins: MarkdownToolbarPlugin list = [
+        AddStep.plugin
+        AddOntologyReference.plugin
+    ]
 
     let mergeWithDefaults (customPlugins: MarkdownToolbarPlugin list option) =
         match customPlugins with
