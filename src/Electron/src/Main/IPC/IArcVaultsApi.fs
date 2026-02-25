@@ -13,6 +13,37 @@ open ARCtrl.Json
 open System
 
 let private fsDynamic: obj = importAll "fs"
+let private pathDynamic: obj = importAll "path"
+
+let private normalizePathForComparison (pathValue: string) =
+    pathValue.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
+
+let private containsTraversalSegments (relativePath: string) =
+    relativePath.Split('/')
+    |> Array.exists (fun segment -> segment = "." || segment = "..")
+
+let private tryResolveArcRelativeWritePath (arcPath: string) (requestedRelativePath: string) =
+    let relativePath =
+        requestedRelativePath.Replace("\\", "/").TrimStart('/').Trim()
+
+    if String.IsNullOrWhiteSpace relativePath then
+        Error(exn "RelativePath must not be empty.")
+    elif containsTraversalSegments relativePath then
+        Error(exn "RelativePath must not contain path traversal segments.")
+    else
+        let arcRoot = pathDynamic?resolve(arcPath) |> unbox<string>
+        let absolutePath = pathDynamic?resolve(arcRoot, relativePath) |> unbox<string>
+
+        let normalizedArcRoot = normalizePathForComparison arcRoot
+        let normalizedAbsolutePath = normalizePathForComparison absolutePath
+        let isWithinArcRoot =
+            normalizedAbsolutePath = normalizedArcRoot
+            || normalizedAbsolutePath.StartsWith(normalizedArcRoot + "/")
+
+        if isWithinArcRoot then
+            Ok absolutePath
+        else
+            Error(exn "RelativePath resolves outside the ARC root.")
 
 let private copyInvestigationMetadata (source: ArcInvestigation) (target: ARC) =
     target.Title <- source.Title
@@ -289,13 +320,10 @@ let api: IArcVaultsApi = {
                     match vault.path with
                     | None -> return Error(exn "ARC is not loaded.")
                     | Some arcPath ->
-                        let relativePath =
-                            request.RelativePath.Replace("\\", "/").TrimStart('/').Trim()
-
-                        if String.IsNullOrWhiteSpace relativePath then
-                            return Error(exn "RelativePath must not be empty.")
-                        else
-                            let absolutePath = path.join (arcPath, relativePath)
+                        match tryResolveArcRelativeWritePath arcPath request.RelativePath with
+                        | Error pathError ->
+                            return Error pathError
+                        | Ok absolutePath ->
                             let directoryPath = path.dirname absolutePath
                             fsDynamic?mkdirSync(directoryPath, createObj [ "recursive" ==> true ]) |> ignore
                             fsDynamic?writeFileSync(absolutePath, request.Content, "utf8") |> ignore
