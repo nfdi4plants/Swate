@@ -13,6 +13,7 @@ open ARCtrl.Json
 open System
 open System.Text.RegularExpressions
 
+
 let private fsDynamic: obj = importAll "fs"
 
 let private toNonEmptyOption (value: string option) =
@@ -141,7 +142,7 @@ let private toPreviewDataOrUnsupported (arcFile: ArcFiles) =
     |> Option.map Ok
     |> Option.defaultValue (Error(exn "Saving this file type is not supported yet in Electron."))
 
-let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
+let syncARCFile (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
     try
         match ArcFileSaveMapping.tryParseSaveRequest request with
         | Error parseError ->
@@ -463,7 +464,7 @@ let api: IArcVaultsApi = {
                 | Some vault ->
                     match vault.path, vault.arc with
                     | Some arcPath, Some arc ->
-                        match applyArcFileSaveRequest arc request with
+                        match syncARCFile arc request with
                         | Error saveError -> return Error saveError
                         | Ok previewData ->
                             do!
@@ -611,35 +612,15 @@ let api: IArcVaultsApi = {
     syncARC =
         fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
             let windowId = windowIdFromIpcEvent event
-            Swate.Components.console.log("Test")
+
             match ARC_VAULTS.TryGetVault(windowId) with
             | None -> return Error(exn $"The ARC for window id {windowId} should exist")
             | Some vault ->
-
-                if vault.arc.IsSome then
-                    match request.FileType with
-                    | ArcFilesDiscriminate.Assay ->
-                        let assay = ArcAssay.fromJsonString(request.Json)
-                        Swate.Components.console.log($"assay.Identifier: {assay.Identifier}")
-                        vault.arc.Value.SetAssay(assay.Identifier, assay)
-                        return Ok()
-                    | ArcFilesDiscriminate.Run ->
-                        let run = ArcRun.fromJsonString(request.Json)
-                        Swate.Components.console.log($"workflow.Identifier: {run.Identifier}")
-                        vault.arc.Value.SetRun(run.Identifier, run)
-                        return Ok()
-                    | ArcFilesDiscriminate.Workflow ->
-                        let workflow = ArcWorkflow.fromJsonString(request.Json)
-                        Swate.Components.console.log($"workflow.Identifier: {workflow.Identifier}")
-                        vault.arc.Value.SetWorkflow(workflow.Identifier, workflow)
-                        return Ok()
-                    | ArcFilesDiscriminate.Study ->
-                        let study = ArcStudy.fromJsonString(request.Json)
-                        Swate.Components.console.log($"study.Identifier: {study.Identifier}")
-                        vault.arc.Value.SetStudy(study.Identifier, study)
-                        return Ok()
-                    | _ -> return Ok()
-                else
-                    return Error(exn $"No ARC available")
+                match vault.path, vault.arc with
+                | Some arcPath, Some arc ->
+                    match syncARCFile arc request with
+                    | Error saveError -> return Error saveError
+                    | Ok _ -> return Ok ()
+                | _ -> return Error(exn "ARC is not loaded.")
         }
     }

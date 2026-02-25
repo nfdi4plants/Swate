@@ -10,6 +10,7 @@ open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open ARCtrl
 
+
 module ArcVaultHelper =
 
     open Fable.Core.JsInterop
