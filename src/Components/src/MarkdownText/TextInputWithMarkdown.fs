@@ -185,7 +185,8 @@ type TextInputWithMarkdown =
             if activePromptAllowsMultipleFiles () then
                 files
             else
-                files |> List.truncate 1
+                // In single-file mode, always keep the most recently selected file.
+                files |> List.rev |> List.truncate 1 |> List.rev
 
         let normalizePath (path: string) = path.Replace("\\", "/")
 
