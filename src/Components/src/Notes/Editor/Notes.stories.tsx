@@ -143,7 +143,7 @@ export const NewRootNoteSubmit: Story = {
     });
 
     const payload = args.onSubmit.mock.calls[0][0];
-    expect(payload.Intent.RelativePath).toBe('Notes/26_02_2026/Watering_plan.md');
+    expect(payload.Intent.RelativePath).toBe('Notes/26_02_2026/Watering_plan/Watering_plan.md');
   },
 };
 
@@ -161,7 +161,7 @@ export const PreviewGeneratedMarkdownAndPath: Story = {
 
     await waitFor(() => {
       expect(canvas.getByTestId('notes-preview-relative-path')).toHaveTextContent(
-        'Notes/26_02_2026/Preview_from_story.md'
+        'Notes/26_02_2026/Preview_from_story/Preview_from_story.md'
       );
     });
 

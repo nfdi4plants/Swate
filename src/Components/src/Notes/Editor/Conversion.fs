@@ -33,7 +33,7 @@ module Conversion =
         let dateFolder = formatDateFolder dateCreated
 
         if isSafePathSegment dateFolder && isSafePathSegment protocolName then
-            Some $"Notes/{dateFolder}/{protocolName}.md"
+            Some $"Notes/{dateFolder}/{protocolName}/{protocolName}.md"
         else
             None
 
