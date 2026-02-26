@@ -1,4 +1,4 @@
-module Main.IPC.IArcVaultsApi
+module Main.IPC.ArcVaultsApi
 
 open System
 open Swate.Electron.Shared
@@ -503,4 +503,10 @@ let api: IArcVaultsApi = {
                     | Ok _ -> return Ok ()
                 | _ -> return Error(exn "ARC is not loaded.")
         }
+    runGitLfs =
+        fun (event: IpcMainEvent) (request: GitLfsRequest) ->
+            GitLfs.registerGitLfsIpc.runChannel event request
+    cancelGitLfs =
+        fun (event: IpcMainEvent) (requestId: string) ->
+            GitLfs.registerGitLfsIpc.cancelChannel event requestId
     }

@@ -9,7 +9,6 @@ open Fable.Remoting.Client
 open Fable.Electron.Remoting.Renderer
 
 let arcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
-let gitLfsApi = Remoting.init |> Remoting.buildClient<IGitLfsApi>
 
 let templateApi: ITemplateAPIv1 =
     Remoting.createApi ()
@@ -48,7 +47,7 @@ let syncARC (request: SaveArcFileRequest) : JS.Promise<Result<unit, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.syncARC($1)"
 
 let runGitLfs (request: GitLfsRequest) : JS.Promise<Result<GitLfsResult, exn>> =
-    emitJsExpr (gitLfsApi, request) "$0.runChannel($1)"
+    emitJsExpr (arcVaultApi, request) "$0.runGitLfs($1)"
 
 let cancelGitLfs (requestId: string) : JS.Promise<Result<string, exn>> =
-    emitJsExpr (gitLfsApi, requestId) "$0.cancelChannel($1)"
+    emitJsExpr (arcVaultApi, requestId) "$0.cancelGitLfs($1)"
