@@ -90,6 +90,15 @@
     <Compile Include="Metadata\TextInput.fs" />
     <Compile Include="Metadata\JsBindings\DndKit.fs" />
     <Compile Include="Metadata\Forms.fs" />
+    <Compile Include="MarkdownText\Types.fs" />
+    <Compile Include="MarkdownText\JsBindings\ReactMDEditor.fs" />
+    <Compile Include="MarkdownText\JsBindings\Mermaid.fs" />
+    <Compile Include="MarkdownText\Plugins\PluginTypes.fs" />
+    <Compile Include="MarkdownText\Plugins\AddStep.fs" />
+    <Compile Include="MarkdownText\Plugins\AddOntologyReference.fs" />
+    <Compile Include="MarkdownText\Plugins\PluginRegistry.fs" />
+    <Compile Include="MarkdownText\Preview.fs" />
+    <Compile Include="MarkdownText\TextInputWithMarkdown.fs" />
     <Compile Include="Landing\Types.fs" />
     <Compile Include="Landing\State.fs" />
     <Compile Include="Landing\Validation.fs" />
@@ -122,6 +131,11 @@
       <NpmPackage Name="@dnd-kit/core" Version="gte 6.3.0 lt 7.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@dnd-kit/sortable" Version="gte 10.0.0 lt 11.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@dnd-kit/utilities" Version="gte 3.2.0 lt 4.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uiw/react-md-editor" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="mermaid" Version="gte 11.0.0 lt 12.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="rehype-rewrite" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="rehype-sanitize" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max" />
     </NpmDependencies>
