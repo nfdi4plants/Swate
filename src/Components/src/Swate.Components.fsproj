@@ -111,6 +111,8 @@
     <Compile Include="DataMapTable\DataMapTable.fs" />
     <Compile Include="Widgets\LocalStorage.fs" />
     <Compile Include="Widgets\Widgets.fs" />
+    <Compile Include="Notes\Types.fs" />
+    <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 
