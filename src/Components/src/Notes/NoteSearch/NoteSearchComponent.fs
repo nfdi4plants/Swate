@@ -72,7 +72,6 @@ module NoteSearchComponent =
                         let value: string = ev.target?value
                         setSearchTerm value
                         setStartSearch true
-                        printf "Searching for: %s" value
                     )
                 ]
                 Html.div [
