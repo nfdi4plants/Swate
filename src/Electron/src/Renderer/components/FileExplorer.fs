@@ -19,9 +19,21 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
         let isAssayDatamapFile =
             lowered.Contains("/assays/") && lowered.EndsWith("/isa.datamap.xlsx")
 
+        let isStudyDatamapFile =
+            lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
+
+        let isRunDatamapFile =
+            lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
+
         if isAssayDatamapFile then
             let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
             $"{folderPath}/isa.assay.xlsx"
+        elif isStudyDatamapFile then
+            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
+            $"{folderPath}/isa.stuidy.xlsx"
+        elif isRunDatamapFile then
+            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
+            $"{folderPath}/isa.run.xlsx"
         else
             normalized
 
