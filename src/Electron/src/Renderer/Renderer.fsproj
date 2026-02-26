@@ -6,7 +6,6 @@
 
   <ItemGroup>
     <Compile Include="MetadataForm.fs" />
-    <Compile Include="ArcFilePersistence.fs" />
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="components\ARCHelper.fs" />
     <Compile Include="components\Selector.fs" />

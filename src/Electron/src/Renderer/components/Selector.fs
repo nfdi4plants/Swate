@@ -1,5 +1,7 @@
 module Renderer.components.Selector
 
+open Fable.Core
+
 open Swate.Components
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -9,7 +11,7 @@ open Swate.Electron.Shared.IPCTypes
 let openNewWindow =
     fun _ ->
         promise {
-            match! Api.openARCInNewWindow () with
+            match! Api.openARCInNewWindow() with
             | Ok _ -> ()
             | Error exn -> failwith $"{exn.Message}"
 
@@ -21,7 +23,7 @@ let openNewWindow =
 let openCurrentWindow =
     fun _ ->
         promise {
-            let! r = Api.openARC ()
+            let! r = Api.openARC()
 
             match r with
             | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)

@@ -10,13 +10,14 @@ open Swate.Electron.Shared.IPCTypes
 open Browser.Dom
 
 open ARCtrl
+open ARCtrl.Json
 
 open Renderer.components
 open components.MainElement
 open Swate.Components.Landing
 
 
-let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles option =
+let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
     | Ok arcFile -> Some arcFile
     | Error e ->
@@ -26,6 +27,7 @@ let ParseArcFileFromJson (fileType: ArcFileType) (json: string) : ArcFiles optio
 [<ReactComponent>]
 let Main () =
 
+    let widgets, setWidgets = React.useState []
     let tableMutationTick, setTableMutationTick = React.useStateWithUpdater 0
     let recentARCs, setRecentARCs = React.useState [||]
     let fileExplorer, setFileExplorer = React.useState None
@@ -35,12 +37,8 @@ let Main () =
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
     let (previewError: string option), setPreviewError = React.useState (None)
     let (previewData: PreviewData option), setPreviewData = React.useState (None)
-
-    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree =
-        React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
-
-    let (selectedTreeItemPath: string option), setSelectedTreeItemPath =
-        React.useState (None)
+    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState (None)
 
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
@@ -61,12 +59,13 @@ let Main () =
     React.useEffect (
         (fun () ->
             match previewData with
-            | Some(ArcFileData(fileType, json)) ->
+            | Some (ArcFileData(fileType, json)) ->
                 match ParseArcFileFromJson fileType json with
                 | Some arcFile ->
                     match arcFileState with
-                    | None -> setArcFileState (Some arcFile)
-                    | Some existing when existing.getIdentifier () <> arcFile.getIdentifier () ->
+                    | None ->
+                        setArcFileState (Some arcFile)
+                    | Some existing when existing.getIdentifier() <> arcFile.getIdentifier() ->
                         setArcFileState (Some arcFile)
                     | _ -> ()
                 | None -> ()
@@ -75,9 +74,9 @@ let Main () =
         [| box previewData |]
     )
 
-    // Used on initializing
+    ///Used on initializing
     React.useLayoutEffectOnce (fun _ ->
-        Api.getOpenPath ()
+        Api.getOpenPath()
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p ->
@@ -103,6 +102,47 @@ let Main () =
                 else
                     None
 
+            if arcFileState.IsSome then
+                let fileType: SaveArcFileRequest =
+                    match arcFileState.Value with
+                    | ArcFiles.Assay a -> 
+                        {
+                            FileType = ArcFilesDiscriminate.Assay
+                            Json = a.ToJsonString()
+                        }
+                    | ArcFiles.Investigation i ->
+                        {
+                            FileType = ArcFilesDiscriminate.Investigation
+                            Json = i.ToJsonString()
+                        }
+                    | ArcFiles.Run r ->
+                        {
+                            FileType = ArcFilesDiscriminate.Run
+                            Json = r.ToJsonString()
+                        }
+                    | ArcFiles.Study (s, _) ->
+                        {
+                            FileType = ArcFilesDiscriminate.Study
+                            Json = s.ToJsonString()
+                        }
+                    | ArcFiles.Workflow w ->
+                        {
+                            FileType = ArcFilesDiscriminate.Workflow
+                            Json = w.ToJsonString()
+                        }
+                    | ArcFiles.Template t ->
+                        {
+                            FileType = ArcFilesDiscriminate.Template
+                            Json = t.toJsonString()
+                        }
+                    | ArcFiles.DataMap d ->
+                        {
+                            FileType = ArcFilesDiscriminate.DataMap
+                            Json = ""
+                        }
+
+                Api.syncARC fileType |> Promise.start
+
             FileExplorer.createFileTree
                 fileTree
                 selectedTreeItemPath
@@ -111,9 +151,10 @@ let Main () =
                 setPreviewData
                 setPreviewError
                 setDidSelectFile
-            |> setFileExplorer
-            |> ignore
-        ),
+                |> setFileExplorer
+                |> ignore
+        ), 
+
         [| box fileTree; box selectedTreeItemPath |]
     )
 
@@ -145,20 +186,50 @@ let Main () =
         recentARCs
         |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, Selector.onARCClick))
 
-    let selector =
-        Selector.Main(
-            recentARCElements,
-            Selector.actionbar appState,
-            onOpenSelector = Selector.onOpenSelector appState setRecentARCs
-        )
+    let selector = Selector.Main(recentARCElements, Selector.actionbar appState, onOpenSelector = Selector.onOpenSelector appState setRecentARCs)
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
-    let onTableMutated () =
-        setTableMutationTick (fun latest -> latest + 1)
-
     ///Main content module
-    let children = Html.div "placeholder"
+    let children =
+        React.useMemo (
+            (fun _ ->
+                MainWindowContent.content(
+                    appState,
+                    setArcFileState,
+                    activeView,
+                    setActiveView,
+                    arcFileState,
+                    previewData,
+                    setPreviewData,
+                    previewError,
+                    setPreviewError,
+                    didSelectFile,
+                    setDidSelectFile,
+                    landingDraft,
+                    setLandingDraft,
+                    landingUiState,
+                    setLandingUiState,
+                    landingDraftActive,
+                    setLandingDraftActive,
+                    showLandingDraft,
+                    setShowLandingDraft,
+                    setSelectedTreeItemPath)
+            ),
+            [|
+                box appState
+                box previewData
+                box activeView
+                box arcFileState
+                box previewError
+                box landingDraft
+                box landingUiState
+                box landingDraftActive
+                box showLandingDraft
+                box widgets
+                box tableMutationTick
+            |]
+        )
 
     let navbar = Navbar.Main(selector)
 
@@ -180,24 +251,26 @@ let Main () =
                      Html.div [
                          prop.className "swt:p-4"
                          prop.children [|
-                             match appState with
-                             | AppState.ARC _ ->
-                                 Html.button [
-                                     prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                                     prop.text "Landing Page"
-                                     prop.onClick (fun _ ->
-                                         setPreviewError None
+                            match appState with
+                            | AppState.ARC _ ->
+                                Html.button [
+                                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                                    prop.text "Landing Page"
+                                    prop.onClick (fun _ ->
+                                        setPreviewError None
 
-                                         if landingDraftActive then
-                                             setShowLandingDraft true
-                                         else
-                                             resetLandingDraft ()
-                                     )
-                                 ]
-                             | _ -> Html.none
-                             Html.h2 [ prop.text "ARC-Tree" ]
-                             sidebarContent
-                         |]
+                                        if landingDraftActive then
+                                            setShowLandingDraft true
+                                        else
+                                            resetLandingDraft ()
+                                    )
+                                ]
+                            | _ -> Html.none
+                            Html.h2 [
+                                prop.text "ARC-Tree"
+                            ]
+                            sidebarContent
+                        |]
                      ]
                  )),
             leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]

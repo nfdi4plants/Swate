@@ -2,7 +2,6 @@ module Renderer.components.MainWindowContent
 
 open ARCtrl
 open Feliz
-open Swate.Components
 open Swate.Components.Landing
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -41,7 +40,7 @@ let createFromLanding
                 Error = None
         }
 
-        let! saveResult = Renderer.ArcFilePersistence.saveArcFileWithPreview payload.ArcFile
+        let! saveResult = Navbar.saveArcFileWithPreview payload.ArcFile
 
         match saveResult with
         | Error message ->
@@ -207,9 +206,6 @@ let content
     (
         appState: AppState,
         setArcFileState,
-        activeTableData,
-        activeDataMapData,
-        onTableMutated,
         activeView,
         setActiveView,
         arcFileState,
@@ -250,7 +246,7 @@ let content
                     prop.children [
                         Html.div [
                             prop.className "swt:flex-none"
-                        // prop.children [ CreateARCitectNavbar activeView addWidget arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
+                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
                         ]
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"

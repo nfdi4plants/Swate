@@ -42,3 +42,6 @@ let saveArcFile (request: SaveArcFileRequest) : JS.Promise<Result<PreviewData, e
 
 let writeFile (request: WriteFileRequest) : JS.Promise<Result<unit, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.writeFile($1)"
+
+let syncARC (request: SaveArcFileRequest) : JS.Promise<Result<unit, exn>> =
+    emitJsExpr (arcVaultApi, request) "$0.syncARC($1)"

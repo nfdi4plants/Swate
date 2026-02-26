@@ -10,6 +10,7 @@ open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open ARCtrl
 
+
 module ArcVaultHelper =
 
     open Fable.Core.JsInterop
@@ -298,6 +299,8 @@ module ArcVaultExtensions =
             | Some _, None -> failwith "No path available"
             | None, _ -> failwith "No arc available"
         }
+
+        member this.SynchArc newArc = this.arc <- newArc
 
 
 type ArcVaults() =
