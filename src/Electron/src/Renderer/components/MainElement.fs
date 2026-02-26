@@ -258,15 +258,6 @@ let CreateARCitectFooter
                         Html.span [ prop.text table.Name ]
                     |]
                 ]
-            if canAddTable then
-                Html.button [
-                    prop.key "new-table-button"
-                    prop.title "+"
-                    prop.className
-                        "swt:btn swt:btn-sm swt:btn-outline swt:items-center swt:border swt:!border-white swt:hover:!border-white swt:rounded-none"
-                    prop.onClick (fun _ -> addNewTable ())
-                    prop.children [| Html.span [ prop.text "+" ] |]
-                ]
             // DataMap tab
             match arcFile with
             | ArcFiles.Assay a when a.DataMap.IsSome ->
@@ -330,6 +321,15 @@ let CreateARCitectFooter
                     |]
                 ]
             | _ -> ()
+            if canAddTable then
+                Html.button [
+                    prop.key "new-table-button"
+                    prop.title "+"
+                    prop.className
+                        "swt:btn swt:btn-sm swt:btn-outline swt:items-center swt:border swt:!border-white swt:hover:!border-white swt:rounded-none"
+                    prop.onClick (fun _ -> addNewTable ())
+                    prop.children [| Html.span [ prop.text "+" ] |]
+                ]
         |]
     ]
 
@@ -354,6 +354,10 @@ let CreateMetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
         ]
     ]
 
+[<ReactComponent>]
+let CreateDataMapPreview (datamap: DataMap, setDatamapInArcFile: DataMap -> unit) =
+    DataMapTable.DataMapTable(datamap, setDatamapInArcFile)
+
 let CreateTableView activeView arcFileState setArcFileState =
     match activeView with
     | PreviewActiveView.Metadata -> CreateMetadataPreview(arcFileState, setArcFileState)
@@ -373,18 +377,28 @@ let CreateTableView activeView arcFileState setArcFileState =
             ]
     | PreviewActiveView.DataMap ->
         match arcFileState with
-        | ArcFiles.Assay a when a.DataMap.IsSome ->
-            let dm, setDm = React.useState a.DataMap.Value
-            DataMapTable.DataMapTable(dm, setDm)
-        | ArcFiles.Study(s, _) when s.DataMap.IsSome ->
-            let dm, setDm = React.useState s.DataMap.Value
-            DataMapTable.DataMapTable(dm, setDm)
-        | ArcFiles.Run r when r.DataMap.IsSome ->
-            let dm, setDm = React.useState r.DataMap.Value
-            DataMapTable.DataMapTable(dm, setDm)
-        | ArcFiles.DataMap(_, datamap) ->
-            let dm, setDm = React.useState datamap
-            DataMapTable.DataMapTable(dm, setDm)
+        | ArcFiles.Assay assay when assay.DataMap.IsSome ->
+            let setDatamap (nextDatamap: DataMap) =
+                assay.DataMap <- Some nextDatamap
+                setArcFileState (refreshArcFileRef arcFileState)
+
+            CreateDataMapPreview(assay.DataMap.Value, setDatamap)
+        | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
+            let setDatamap (nextDatamap: DataMap) =
+                study.DataMap <- Some nextDatamap
+                setArcFileState (ArcFiles.Study(study, assays))
+
+            CreateDataMapPreview(study.DataMap.Value, setDatamap)
+        | ArcFiles.Run run when run.DataMap.IsSome ->
+            let setDatamap (nextDatamap: DataMap) =
+                run.DataMap <- Some nextDatamap
+                setArcFileState (refreshArcFileRef arcFileState)
+
+            CreateDataMapPreview(run.DataMap.Value, setDatamap)
+        | ArcFiles.DataMap(parent, datamap) ->
+            let setDatamap (nextDatamap: DataMap) = setArcFileState (ArcFiles.DataMap(parent, nextDatamap))
+
+            CreateDataMapPreview(datamap, setDatamap)
         | _ ->
             Html.div [
                 prop.className "swt:p-4 swt:text-error"

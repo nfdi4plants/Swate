@@ -12,6 +12,19 @@ open Browser.Dom
 let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile =
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
+    let resolvePreviewPath (path: string) =
+        let normalized = normalizePath path
+        let lowered = normalized.ToLowerInvariant()
+
+        let isAssayDatamapFile =
+            lowered.Contains("/assays/") && lowered.EndsWith("/isa.datamap.xlsx")
+
+        if isAssayDatamapFile then
+            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
+            $"{folderPath}/isa.assay.xlsx"
+        else
+            normalized
+
     let isFocusedPathOrAncestor (nodePath: string) =
         match selectedTreeItemPath with
         | Some focusedPath ->
@@ -66,10 +79,16 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     | _ -> item.IsDirectory
 
                 if item.Path.IsSome && not isDirectoryByPath then
-                    console.log ($"[Renderer] Opening file: {item.Path.Value}")
-                    setSelectedTreeItemPath item.Path
+                    let previewPath = resolvePreviewPath item.Path.Value
+
+                    if previewPath <> normalizePath item.Path.Value then
+                        console.log ($"[Renderer] Redirecting Datamap click to assay file: {previewPath}")
+                    else
+                        console.log ($"[Renderer] Opening file: {previewPath}")
+
+                    setSelectedTreeItemPath (Some previewPath)
                     setShowLandingDraft false
-                    let! result = Api.openFile item.Path.Value
+                    let! result = Api.openFile previewPath
 
                     match result with
                     | Ok data ->

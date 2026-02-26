@@ -144,8 +144,15 @@ let Main () =
                 Api.syncARC fileType |> Promise.start
 
             FileExplorer.createFileTree
-                fileTree selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft setPreviewData
-                    setPreviewError setDidSelectFile |> setFileExplorer |> ignore
+                fileTree
+                selectedTreeItemPath
+                setSelectedTreeItemPath
+                setShowLandingDraft
+                setPreviewData
+                setPreviewError
+                setDidSelectFile
+                |> setFileExplorer
+                |> ignore
         ), 
 
         [| box fileTree; box selectedTreeItemPath |]
