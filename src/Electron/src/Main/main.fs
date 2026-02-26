@@ -16,6 +16,8 @@ app
 
         Remoting.init |> Remoting.buildHandler IPC.IArcVaultsApi.api
 
+        Remoting.init |> Remoting.buildHandler Main.IPC.GitLfs.registerGitLfsIpc
+
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then
                 ARC_VAULTS.RegisterVault() |> ignore

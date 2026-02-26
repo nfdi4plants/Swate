@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Fable.Electron
+open Swate.Electron.Shared.IPCTypes
 
 [<Import("existsSync", "node:fs")>]
 let private existsSync (path: string) : bool = jsNative
@@ -12,26 +13,6 @@ let private existsSync (path: string) : bool = jsNative
 let private pathJoin (parts: string array) : string = jsNative
 
 let private childProcessDynamic: obj = importAll "node:child_process"
-
-type GitLfsCommand =
-    | Pull
-    | Fetch
-    | Install
-
-type GitLfsResult = {
-    Success: bool
-    Output: string
-    Error: string
-}
-
-type GitLfsRequest = {
-    RequestId: string
-    RepoPath: string
-    Command: GitLfsCommand
-    FilePath: string option
-    TimeoutMs: int option
-}
-
 
 type IGitLfs =
     abstract Run:
@@ -43,11 +24,17 @@ type NodeGitLfsAdapter() =
 
     let toArgs (request: GitLfsRequest) =
         match request.Command, request.FilePath with
-        | Pull, None -> [ "lfs"; "pull" ]
-        | Pull, Some file -> [ "lfs"; "pull"; "--include"; file ]
-        | Fetch, None -> [ "lfs"; "fetch" ]
-        | Fetch, Some file -> [ "lfs"; "fetch"; "--include"; file ]
-        | Install, _ -> [ "lfs"; "install" ]
+        | Pull, None -> Ok [ "lfs"; "pull" ]
+        | Pull, Some file -> Ok [ "lfs"; "pull"; "--include"; file ]
+        | Fetch, None -> Ok [ "lfs"; "fetch" ]
+        | Fetch, Some file -> Ok [ "lfs"; "fetch"; "--include"; file ]
+        | Install, _ -> Ok [ "lfs"; "install" ]
+        | Track, Some file -> Ok [ "lfs"; "track"; file ]
+        | Untrack, Some file -> Ok [ "lfs"; "untrack"; file ]
+        | Status, Some file -> Ok [ "lfs"; "ls-files"; "--name-only"; "--"; file ]
+        | Track, None
+        | Untrack, None
+        | Status, None -> Error "FilePath is required for this Git LFS command"
 
     let validateRepoPath repoPath =
         existsSync (pathJoin [| repoPath; ".git" |])
@@ -154,22 +141,31 @@ type NodeGitLfsAdapter() =
                     Error = "Not a git repository"
                 }
             else
-                isRunning <- true
+                match toArgs request with
+                | Error err ->
+                    return {
+                        Success = false
+                        Output = ""
+                        Error = err
+                    }
+                | Ok args ->
+                    isRunning <- true
 
-                let! result = runProcess (toArgs request)
+                    let! result = runProcess args
 
-                if not result.Success then
-                    isRunning <- false
-                    return result
-                else
-                    match request.FilePath with
-                    | Some file ->
-                        let! checkoutResult = runProcess [ "checkout"; "--"; file ]
-                        isRunning <- false
-                        return checkoutResult
-                    | None ->
+                    if not result.Success then
                         isRunning <- false
                         return result
+                    else
+                        match request.Command, request.FilePath with
+                        | Pull, Some file
+                        | Fetch, Some file ->
+                            let! checkoutResult = runProcess [ "checkout"; "--"; file ]
+                            isRunning <- false
+                            return checkoutResult
+                        | _ ->
+                            isRunning <- false
+                            return result
         }
 
     interface IGitLfs with
@@ -216,12 +212,8 @@ let cancellations = System.Collections.Generic.Dictionary<string, bool>()
 // IPC API Contract
 // ==========================
 
-type registerGitLfsIpcApi = {
-    runChannel: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<string, exn>>
-    cancelChannel: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
-}
-
-let registerGitLfsIpc: registerGitLfsIpcApi =
+/// git lfs file IPC call method :/
+let registerGitLfsIpc: IGitLfsApi =
 
     {
         runChannel =
@@ -244,7 +236,7 @@ let registerGitLfsIpc: registerGitLfsIpcApi =
                         cancellations.Remove(request.RequestId) |> ignore
 
                         if result.Success then
-                            return Ok result.Output
+                            return Ok result
                         else
                             return Error(System.Exception result.Error)
 

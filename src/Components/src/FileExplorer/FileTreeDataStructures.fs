@@ -300,6 +300,7 @@ module FileExplorerLogic =
         | RemoveItem of string
         | RenameItem of string * string
         | ToggleLFSDownload of string
+        | SetLFSMarked of string * bool
 
     let init items =
         {
@@ -418,6 +419,18 @@ module FileExplorerLogic =
                           }
                         | _ -> item
                     )
+                    model.Items
+
+            { model with Items = newItems }
+
+        | SetLFSMarked(itemId, isMarked) ->
+            let newItems =
+                FileTree.updateItem
+                    itemId
+                    (fun item -> {
+                        item with
+                            IsLFS = Some isMarked
+                    })
                     model.Items
 
             { model with Items = newItems }

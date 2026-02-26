@@ -15,14 +15,37 @@ type PreviewData =
     | Unknown
 
 type SaveArcFileRequest = {
-        FileType: ArcFilesDiscriminate
-        Json: string
-    }
+    FileType: ArcFilesDiscriminate
+    Json: string
+}
 
 type WriteFileRequest = {
-        RelativePath: string
-        Content: string
-    }
+    RelativePath: string
+    Content: string
+}
+
+// GIT LFS Types
+type GitLfsCommand =
+    | Pull
+    | Fetch
+    | Install
+    | Track
+    | Untrack
+    | Status
+
+type GitLfsRequest = {
+    RequestId: string
+    RepoPath: string
+    Command: GitLfsCommand
+    FilePath: string option
+    TimeoutMs: int option
+}
+
+type GitLfsResult = {
+    Success: bool
+    Output: string
+    Error: string
+}
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
@@ -41,6 +64,11 @@ type IArcVaultsApi = {
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
+}
+
+type IGitLfsApi = {
+    runChannel: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
+    cancelChannel: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
 }
 
 type FileEntry = {

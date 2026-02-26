@@ -36,6 +36,7 @@ type FileExplorer =
             ?initialItems: FileItem list,
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
+            ?onToggleLfsMark: FileItem -> bool -> unit,
             ?selectedItemId: string
         )
         =
@@ -77,6 +78,8 @@ type FileExplorer =
             |> Promise.start
 
         let defaultContextMenuItems (item: FileItem) : ContextMenuItem list =
+            let isLfsMarked = item.IsLFS = Some true
+
             [
                 if not item.IsDirectory then
                     {
@@ -84,6 +87,26 @@ type FileExplorer =
                         Icon = "swt:fluent--open-24-regular"
                         OnClick = fun () -> handleItemClick item
                         Disabled = None
+                    }
+                    {
+                        Label = if isLfsMarked then "Unmark Git LFS" else "Mark as Git LFS"
+                        Icon = if isLfsMarked then "swt:fluent--document-dismiss-24-regular" else "swt:fluent--document-add-24-regular"
+                        OnClick =
+                            fun () ->
+                                let nextMarked = not isLfsMarked
+                                dispatch (FileExplorerLogic.SetLFSMarked(item.Id, nextMarked))
+                                onToggleLfsMark |> Option.iter (fun fn -> fn item nextMarked)
+                        Disabled = Some item.IsDirectory
+                    }
+                    {
+                        Label =
+                            if isLfsMarked then
+                                "Git LFS: marked"
+                            else
+                                "Git LFS: not marked"
+                        Icon = "swt:fluent--tag-24-regular"
+                        OnClick = fun () -> ()
+                        Disabled = Some true
                     }
                 match item.Path with
                 | Some path ->
