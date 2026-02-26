@@ -23,8 +23,14 @@ module State =
             IsSubmitting = false
     }
 
-    let showExistingTargetSelector (state: NotesUiState) = {
+    let toggleExistingTargetSelector (state: NotesUiState) = {
         state with
-            ShowExistingTargetSelector = true
+            ShowExistingTargetSelector = not state.ShowExistingTargetSelector
+            Error = None
+    }
+
+    let setActiveExistingTargetKind (kind: NotesTargetKind) (state: NotesUiState) = {
+        state with
+            ActiveExistingTargetKind = kind
             Error = None
     }

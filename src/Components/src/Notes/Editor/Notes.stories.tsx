@@ -13,7 +13,7 @@ function renderWizard(args: any) {
     const next = createNotesDraft();
     next.Title = 'Watering plan';
     next.MainText = 'My markdown body';
-    next.DateCreated = new Date('2026-02-26T09:30:00');
+    next.DateCreated = new Date(2026, 1, 26);
     return next;
   });
   const [uiState, setUiState] = React.useState(createNotesUiState());
@@ -38,7 +38,7 @@ function createSeededPreviewDraft() {
   const next = createNotesDraft();
   next.Title = 'Preview title';
   next.MainText = 'Preview body content';
-  next.DateCreated = new Date('2026-02-26T09:30:00');
+  next.DateCreated = new Date(2026, 1, 26);
   return next;
 }
 
@@ -118,7 +118,7 @@ export const ExistingTargetSubmit: Story = {
     const targetSelect = canvas.getByTestId('notes-existing-target-select') as HTMLSelectElement;
     await userEvent.selectOptions(targetSelect, 'MyStudy');
 
-    await userEvent.click(canvas.getByTestId('notes-add-existing-button'));
+    await userEvent.click(canvas.getByTestId('notes-create-existing-button'));
 
     await waitFor(() => {
       expect(args.onSubmit).toHaveBeenCalledTimes(1);

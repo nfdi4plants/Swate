@@ -11,18 +11,10 @@ module TargetSelector =
             selectedTarget: ExistingTargetRef option,
             setSelectedTarget: ExistingTargetRef option -> unit,
             availableTargets: ResizeArray<ExistingTargetRef>,
-            isSubmitting: bool
+            isSubmitting: bool,
+            activeKind: NotesTargetKind,
+            setActiveKind: NotesTargetKind -> unit
         ) =
-        let activeKind, setActiveKind =
-            React.useState (selectedTarget |> Option.map _.Kind |> Option.defaultValue NotesTargetKind.Study)
-
-        React.useEffect (
-            (fun () ->
-                selectedTarget
-                |> Option.iter (fun target -> setActiveKind target.Kind)),
-            [| box selectedTarget |]
-        )
-
         let setKind kind =
             setActiveKind kind
 

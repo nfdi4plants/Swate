@@ -46,9 +46,6 @@ module Validation =
                 | true, parsed -> Some parsed
                 | false, _ -> None
 
-    let formatDateFolder (dateCreated: DateTime) =
-        dateCreated.ToString("dd_MM_yyyy")
-
     let private sanitizeProtocolNameCandidate (candidate: string) =
         let cleaned = Regex.Replace(candidate, @"[^a-zA-Z0-9_\- ]", " ").Trim()
         Regex.Replace(cleaned, @"\s+", " ").Trim()

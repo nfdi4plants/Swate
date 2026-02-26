@@ -37,11 +37,13 @@ type NotesUiState = {
     Error: string option
     IsSubmitting: bool
     ShowExistingTargetSelector: bool
+    ActiveExistingTargetKind: NotesTargetKind
 } with
     static member init = {
         Error = None
         IsSubmitting = false
         ShowExistingTargetSelector = false
+        ActiveExistingTargetKind = NotesTargetKind.Study
     }
 
 type NotesProtocolIntent = {
@@ -62,21 +64,14 @@ module Exports =
     let createNotesDraft () = NotesDraft.init
     let createNotesUiState () = NotesUiState.init
 
-    let createExistingTargetRef (name: string) (kind: string) =
-        let normalizedKind = kind.Trim().ToLowerInvariant()
-
-        let targetKind =
-            match normalizedKind with
-            | "assay" -> NotesTargetKind.Assay
-            | _ -> NotesTargetKind.Study
-
-        {
-            Name = name
-            Kind = targetKind
-        }
-
     let createDemoExistingTargets () =
         ResizeArray [
-            createExistingTargetRef "MyStudy" "study"
-            createExistingTargetRef "MyAssay" "assay"
+            {
+                Name = "MyStudy"
+                Kind = NotesTargetKind.Study
+            }
+            {
+                Name = "MyAssay"
+                Kind = NotesTargetKind.Assay
+            }
         ]

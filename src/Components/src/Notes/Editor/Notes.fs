@@ -7,23 +7,6 @@ open Browser.Dom
 [<Erase; Mangle(false)>]
 type Notes =
 
-    static member private StartSubmit
-        (uiState: NotesUiState)
-        (setUiState: NotesUiState -> unit)
-        =
-        uiState
-        |> State.clearError
-        |> State.startSubmitting
-        |> setUiState
-
-    static member private StopSubmit
-        (uiState: NotesUiState)
-        (setUiState: NotesUiState -> unit)
-        =
-        uiState
-        |> State.stopSubmitting
-        |> setUiState
-
     [<ReactComponent>]
     static member Wizard
         (
@@ -56,32 +39,30 @@ type Notes =
                     Tags = draft.Tags |> Seq.toList
                 }
 
-                Notes.StartSubmit uiState setUiState
                 onSubmit payload
-                Notes.StopSubmit uiState setUiState
+
+        let toggleExistingTargetSelector () =
+            uiState
+            |> State.toggleExistingTargetSelector
+            |> setUiState
 
         let submitToExisting () =
-            if not uiState.ShowExistingTargetSelector then
-                uiState
-                |> State.showExistingTargetSelector
-                |> setUiState
+            if Validation.isRequiredDataValid draft |> not then
+                setError (Some "Please enter a Title and a Date Created value before submitting.")
             else
-                if Validation.isRequiredDataValid draft |> not then
-                    setError (Some "Please enter a Title and a Date Created value before submitting.")
-                else
-                    match draft.SelectedExistingTarget with
+                match draft.SelectedExistingTarget with
+                | None ->
+                    setError (Some "Select a Study or Assay target first.")
+                | Some targetRef ->
+                    match Conversion.resolveProtocolName draft with
                     | None ->
-                        setError (Some "Select a Study or Assay target first.")
-                    | Some targetRef ->
-                        match Conversion.resolveProtocolName draft with
+                        setError (Some "Title is invalid for protocol naming. Choose a different title.")
+                    | Some protocolName ->
+                        match Conversion.mkExistingTargetRelativePath targetRef protocolName with
                         | None ->
-                            setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                        | Some protocolName ->
-                            match Conversion.mkExistingTargetRelativePath targetRef protocolName with
-                            | None ->
-                                setError (Some "Could not resolve a safe target path.")
-                            | Some relativePath ->
-                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+                            setError (Some "Could not resolve a safe target path.")
+                        | Some relativePath ->
+                            createPayload (NotesTarget.ExistingTarget targetRef) relativePath
 
         let submitNewRootNote () =
             if Validation.isRequiredDataValid draft |> not then
@@ -112,7 +93,19 @@ type Notes =
                             prop.text "Notes"
                         ]
                         NoteFormFields.Main(draft, setDraft)
+                        Actions.Main(
+                            uiState.IsSubmitting,
+                            uiState.ShowExistingTargetSelector,
+                            toggleExistingTargetSelector,
+                            submitNewRootNote,
+                            uiState.Error
+                        )
                         if uiState.ShowExistingTargetSelector then
+                            let createInExistingText =
+                                match uiState.ActiveExistingTargetKind with
+                                | NotesTargetKind.Study -> "Create in Study"
+                                | NotesTargetKind.Assay -> "Create in Assay"
+
                             Html.div [
                                 prop.className "swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:space-y-3"
                                 prop.children [
@@ -124,11 +117,23 @@ type Notes =
                                         draft.SelectedExistingTarget,
                                         (fun target -> setDraft { draft with SelectedExistingTarget = target }),
                                         availableExistingTargets,
-                                        uiState.IsSubmitting
+                                        uiState.IsSubmitting,
+                                        uiState.ActiveExistingTargetKind,
+                                        (fun kind -> setUiState (State.setActiveExistingTargetKind kind uiState))
                                     )
+                                    Html.button [
+                                        prop.testId "notes-create-existing-button"
+                                        prop.className [
+                                            "swt:btn swt:btn-primary"
+                                            if uiState.IsSubmitting || draft.SelectedExistingTarget.IsNone then
+                                                "swt:btn-disabled"
+                                        ]
+                                        prop.disabled (uiState.IsSubmitting || draft.SelectedExistingTarget.IsNone)
+                                        prop.onClick (fun _ -> submitToExisting ())
+                                        prop.text createInExistingText
+                                    ]
                                 ]
                             ]
-                        Actions.Main(uiState.IsSubmitting, submitToExisting, submitNewRootNote, uiState.Error)
                     ]
                 ]
             ]

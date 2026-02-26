@@ -13,7 +13,7 @@ module Conversion =
         && not (value.Contains "..")
 
     let formatDateFolder (dateCreated: DateTime) =
-        Validation.formatDateFolder dateCreated
+        sprintf "%02d_%02d_%04d" dateCreated.Day dateCreated.Month dateCreated.Year
 
     let resolveProtocolName (draft: NotesDraft) =
         Validation.sanitizeProtocolName draft.Title
