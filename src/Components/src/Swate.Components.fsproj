@@ -122,6 +122,14 @@
     <Compile Include="Widgets\Widgets.fs" />
     <Compile Include="Notes\Types.fs" />
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
+    <Compile Include="Notes\Editor\Types.fs" />
+    <Compile Include="Notes\Editor\State.fs" />
+    <Compile Include="Notes\Editor\Validation.fs" />
+    <Compile Include="Notes\Editor\Conversion.fs" />
+    <Compile Include="Notes\Editor\NoteFormFields.fs" />
+    <Compile Include="Notes\Editor\TargetSelector.fs" />
+    <Compile Include="Notes\Editor\Actions.fs" />
+    <Compile Include="Notes\Editor\Notes.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 
