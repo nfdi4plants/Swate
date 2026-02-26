@@ -1,6 +1,9 @@
 module Renderer.components.InitState
 
 open Feliz
+
+open Fable.Core
+
 open Swate.Components
 
 module private InitStateHelper =

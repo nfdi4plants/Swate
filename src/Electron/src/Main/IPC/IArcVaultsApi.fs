@@ -1,18 +1,18 @@
 module Main.IPC.IArcVaultsApi
 
-open Fable.Electron
+open System
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
-open Fable.Electron.Main
 open Fable.Core
+open Fable.Electron
+open Fable.Electron.Main
 open Fable.Core.JsInterop
 open Main
 open Node.Api
 open ARCtrl
 open ARCtrl.Json
-open System
 
-let private fsDynamic: obj = importAll "fs"
+
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
@@ -81,14 +81,14 @@ let private toPreviewDataOrUnsupported (arcFile: ArcFiles) =
     |> Option.map Ok
     |> Option.defaultValue (Error(exn "Saving this file type is not supported yet in Electron."))
 
-let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
+let syncARCFile (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
     try
         match ArcFileSaveMapping.tryParseSaveRequest request with
         | Error parseError ->
             Error parseError
         | Ok (ArcFiles.Investigation investigation) ->
             copyInvestigationMetadata investigation arc
-            Ok(ArcFileData(ArcFileType.Investigation, ArcInvestigation.toJsonString 0 arc))
+            Ok(ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
         | Ok (ArcFiles.Study(study, _)) ->
             if arc.TryGetStudy(study.Identifier).IsSome then
                 arc.SetStudy(study.Identifier, study)
@@ -145,7 +145,6 @@ let private persistArcChangesAndRefreshVault
         finally
             vault.isBusyWriting <- false
     }
-
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IArcVaultsApi = {
@@ -315,7 +314,7 @@ let api: IArcVaultsApi = {
                 | Some vault ->
                     match vault.path, vault.arc with
                     | Some arcPath, Some arc ->
-                        match applyArcFileSaveRequest arc request with
+                        match syncARCFile arc request with
                         | Error saveError -> return Error saveError
                         | Ok previewData ->
                             do!
@@ -478,7 +477,7 @@ let api: IArcVaultsApi = {
 
                         match tryResolveDataMap () with
                         | Some dataMap ->
-                            return Ok(ArcFileData(ArcFileType.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
+                            return Ok(ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
                         | None ->
                             return Error(exn $"DataMap '{identifier}' not found in ARC.")
 
@@ -490,4 +489,18 @@ let api: IArcVaultsApi = {
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }
-}
+    syncARC =
+        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            match ARC_VAULTS.TryGetVault(windowId) with
+            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+            | Some vault ->
+                match vault.path, vault.arc with
+                | Some arcPath, Some arc ->
+                    match syncARCFile arc request with
+                    | Error saveError -> return Error saveError
+                    | Ok _ -> return Ok ()
+                | _ -> return Error(exn "ARC is not loaded.")
+        }
+    }

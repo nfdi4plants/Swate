@@ -16,59 +16,63 @@ module ArcFileSaveMapping =
         match arcFile with
         | ArcFiles.Investigation investigation ->
             Some {
-                FileType = ArcFileType.Investigation
+                FileType = ArcFilesDiscriminate.Investigation
                 Json = ArcInvestigation.toJsonString 0 investigation
             }
         | ArcFiles.Study(study, _) ->
             Some {
-                FileType = ArcFileType.Study
+                FileType = ArcFilesDiscriminate.Study
                 Json = ArcStudy.toJsonString 0 study
             }
         | ArcFiles.Assay assay ->
             Some {
-                FileType = ArcFileType.Assay
+                FileType = ArcFilesDiscriminate.Assay
                 Json = ArcAssay.toJsonString 0 assay
             }
         | ArcFiles.Run run ->
             Some {
-                FileType = ArcFileType.Run
+                FileType = ArcFilesDiscriminate.Run
                 Json = ArcRun.toJsonString 0 run
             }
         | ArcFiles.Workflow workflow ->
             Some {
-                FileType = ArcFileType.Workflow
+                FileType = ArcFilesDiscriminate.Workflow
                 Json = ArcWorkflow.toJsonString 0 workflow
             }
         | ArcFiles.DataMap _
         | ArcFiles.Template _ ->
             None
 
-    let tryParseArcFile (fileType: ArcFileType) (json: string) : Result<ArcFiles, exn> =
+    let tryParseArcFile (fileType: ArcFilesDiscriminate) (json: string) : Result<ArcFiles, exn> =
         try
             match fileType with
-            | ArcFileType.Investigation ->
+            | ArcFilesDiscriminate.Investigation ->
                 ArcInvestigation.fromJsonString json
                 |> ArcFiles.Investigation
                 |> Ok
-            | ArcFileType.Study ->
+            | ArcFilesDiscriminate.Study ->
                 ArcStudy.fromJsonString json
                 |> fun study -> ArcFiles.Study(study, [])
                 |> Ok
-            | ArcFileType.Assay ->
+            | ArcFilesDiscriminate.Assay ->
                 ArcAssay.fromJsonString json
                 |> ArcFiles.Assay
                 |> Ok
-            | ArcFileType.Run ->
+            | ArcFilesDiscriminate.Run ->
                 ArcRun.fromJsonString json
                 |> ArcFiles.Run
                 |> Ok
-            | ArcFileType.Workflow ->
+            | ArcFilesDiscriminate.Workflow ->
                 ArcWorkflow.fromJsonString json
                 |> ArcFiles.Workflow
                 |> Ok
-            | ArcFileType.DataMap ->
+            | ArcFilesDiscriminate.DataMap ->
                 DataMap.fromJsonString json
                 |> fun datamap -> ArcFiles.DataMap(None, datamap)
+                |> Ok
+            | ArcFilesDiscriminate.Template ->
+                Template.fromJsonString json
+                |> ArcFiles.Template
                 |> Ok
         with e ->
             Error e
@@ -79,15 +83,15 @@ module ArcFileSaveMapping =
     let tryCreatePreviewData (arcFile: ArcFiles) : PreviewData option =
         match arcFile with
         | ArcFiles.Investigation investigation ->
-            Some(ArcFileData(ArcFileType.Investigation, ArcInvestigation.toJsonString 0 investigation))
+            Some(ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 investigation))
         | ArcFiles.Study(study, _) ->
-            Some(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
+            Some(ArcFileData(ArcFilesDiscriminate.Study, ArcStudy.toJsonString 0 study))
         | ArcFiles.Assay assay ->
-            Some(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
+            Some(ArcFileData(ArcFilesDiscriminate.Assay, ArcAssay.toJsonString 0 assay))
         | ArcFiles.Run run ->
-            Some(ArcFileData(ArcFileType.Run, ArcRun.toJsonString 0 run))
+            Some(ArcFileData(ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run))
         | ArcFiles.Workflow workflow ->
-            Some(ArcFileData(ArcFileType.Workflow, ArcWorkflow.toJsonString 0 workflow))
+            Some(ArcFileData(ArcFilesDiscriminate.Workflow, ArcWorkflow.toJsonString 0 workflow))
         | ArcFiles.DataMap _
         | ArcFiles.Template _ ->
             None

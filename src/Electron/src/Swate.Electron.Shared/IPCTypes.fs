@@ -4,24 +4,25 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 
-open Swate.Components.Types
+open Swate.Components
 
-[<RequireQualifiedAccess>]
-type ArcFileType =
-    | Investigation
-    | Study
-    | Assay
-    | Run
-    | Workflow
-    | DataMap
+open ARCtrl.ARCtrlHelper
+
 
 type PreviewData =
-    | ArcFileData of fileType: ArcFileType * json: string
+    | ArcFileData of fileType: ArcFilesDiscriminate * json: string
     | Text of string
     | Unknown
 
-type SaveArcFileRequest = { FileType: ArcFileType; Json: string }
-type WriteFileRequest = { RelativePath: string; Content: string }
+type SaveArcFileRequest = {
+        FileType: ArcFilesDiscriminate
+        Json: string
+    }
+
+type WriteFileRequest = {
+        RelativePath: string
+        Content: string
+    }
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
@@ -39,6 +40,7 @@ type IArcVaultsApi = {
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
+    syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
 }
 
 type FileEntry = {
