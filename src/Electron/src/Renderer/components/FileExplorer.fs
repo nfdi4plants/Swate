@@ -23,14 +23,14 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
             lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
 
         let isRunDatamapFile =
-            lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
+            lowered.Contains("/runs/") && lowered.EndsWith("/isa.datamap.xlsx")
 
         if isAssayDatamapFile then
             let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
             $"{folderPath}/isa.assay.xlsx"
         elif isStudyDatamapFile then
             let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
-            $"{folderPath}/isa.stuidy.xlsx"
+            $"{folderPath}/isa.study.xlsx"
         elif isRunDatamapFile then
             let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
             $"{folderPath}/isa.run.xlsx"
@@ -94,7 +94,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     let previewPath = resolvePreviewPath item.Path.Value
 
                     if previewPath <> normalizePath item.Path.Value then
-                        console.log ($"[Renderer] Redirecting Datamap click to assay file: {previewPath}")
+                        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
                     else
                         console.log ($"[Renderer] Opening file: {previewPath}")
 
