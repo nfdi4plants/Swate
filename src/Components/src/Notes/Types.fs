@@ -1,11 +1,11 @@
 namespace Swate.Components.NoteTypes
 
-open Feliz
-open Fable.Core
+
+open ARCtrl
 
 type NoteSearch = {
-    Id: int
     Title: string
     Date: System.DateTime
+    Tags:ResizeArray<OntologyAnnotation> option
     Content: string
 }
