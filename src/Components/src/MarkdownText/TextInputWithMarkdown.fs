@@ -181,12 +181,75 @@ type TextInputWithMarkdown =
             |> Option.bind (fun prompt -> prompt.AllowMultiple)
             |> Option.defaultValue false
 
+        let activePromptAcceptTypes () =
+            activePrompt
+            |> Option.bind (fun prompt -> prompt.Accept)
+            |> Option.filter (fun accept -> not (String.IsNullOrWhiteSpace accept))
+
         let normalizePromptFiles (files: MarkdownPromptFile list) =
             if activePromptAllowsMultipleFiles () then
                 files
             else
                 // In single-file mode, always keep the most recently selected file.
                 files |> List.rev |> List.truncate 1 |> List.rev
+
+        let acceptedTypeTokens () =
+            activePromptAcceptTypes ()
+            |> Option.defaultValue ""
+            |> fun accept ->
+                accept.Split(',')
+                |> Array.toList
+                |> List.map (fun token -> token.Trim().ToLowerInvariant())
+                |> List.filter (fun token -> not (String.IsNullOrWhiteSpace token))
+
+        let fileMatchesAcceptToken (file: MarkdownPromptFile) (token: string) =
+            let fileNameLower =
+                if String.IsNullOrWhiteSpace file.Name then
+                    ""
+                else
+                    file.Name.ToLowerInvariant()
+
+            let mimeLower =
+                file.MimeType
+                |> Option.defaultValue ""
+                |> fun mime -> mime.ToLowerInvariant()
+
+            if token.StartsWith "." then
+                not (String.IsNullOrWhiteSpace fileNameLower) && fileNameLower.EndsWith token
+            elif token.EndsWith "/*" then
+                let mimePrefix = token.Substring(0, token.Length - 1)
+                not (String.IsNullOrWhiteSpace mimeLower) && mimeLower.StartsWith mimePrefix
+            else
+                not (String.IsNullOrWhiteSpace mimeLower) && mimeLower = token
+
+        let partitionFilesByAccept (files: MarkdownPromptFile list) =
+            let tokens = acceptedTypeTokens ()
+
+            if List.isEmpty tokens then
+                files, []
+            else
+                files
+                |> List.partition (fun file -> tokens |> List.exists (fileMatchesAcceptToken file))
+
+        let rejectedFilesMessage (files: MarkdownPromptFile list) =
+            let rejectedNames =
+                files
+                |> List.map (fun file ->
+                    if String.IsNullOrWhiteSpace file.Name then
+                        "(unnamed file)"
+                    else
+                        file.Name
+                )
+                |> String.concat ", "
+
+            let allowed =
+                activePromptAcceptTypes ()
+                |> Option.defaultValue "configured accepted types"
+
+            if List.length files = 1 then
+                $"File not allowed: {rejectedNames}. Allowed: {allowed}."
+            else
+                $"Files not allowed: {rejectedNames}. Allowed: {allowed}."
 
         let normalizePath (path: string) = path.Replace("\\", "/")
 
@@ -211,6 +274,15 @@ type TextInputWithMarkdown =
                 )
                 if promptError.IsSome then
                     setPromptError None
+
+        let applyPickedPromptFiles (files: MarkdownPromptFile list) =
+            let accepted, rejected = partitionFilesByAccept files
+
+            if not (List.isEmpty accepted) then
+                appendPromptFilesAndClearError accepted
+
+            if not (List.isEmpty rejected) && isMountedRef.current then
+                setPromptError (Some(rejectedFilesMessage rejected))
 
         let removePromptFileAtIndex (indexToRemove: int) =
             setPromptFiles (fun currentFiles ->
@@ -250,7 +322,7 @@ type TextInputWithMarkdown =
                 | Some adapter ->
                     // Preferred substitution point for runtime-specific file pickers.
                     let! files = adapter.PickFiles()
-                    appendPromptFilesAndClearError files
+                    applyPickedPromptFiles files
                 | None ->
                     // Built-in fallback: standard browser file input dialog.
                     promptFileInputRef.current
@@ -265,7 +337,7 @@ type TextInputWithMarkdown =
         let handlePromptFileChange =
             fun (files: File list) ->
                 let selected = files |> List.map toPromptFile
-                appendPromptFilesAndClearError selected
+                applyPickedPromptFiles selected
 
                 // Reset the input value so selecting the same file triggers onChange.
                 promptFileInputRef.current
@@ -293,7 +365,7 @@ type TextInputWithMarkdown =
                 if List.isEmpty files then
                     setPromptError (Some "No files were dropped.")
                 else
-                    appendPromptFilesAndClearError files
+                    applyPickedPromptFiles files
 
         let openPromptDialog (prompt: MarkdownPromptPlugin) =
             let startIndex, endIndex = getSelectionOrEnd ()
@@ -480,8 +552,7 @@ type TextInputWithMarkdown =
         let isFilePrompt = promptInputMode = MarkdownPromptInputMode.File
 
         let promptAcceptedTypes =
-            activePrompt
-            |> Option.bind (fun prompt -> prompt.Accept)
+            activePromptAcceptTypes ()
 
         let promptAllowMultipleFiles = activePromptAllowsMultipleFiles ()
 

@@ -124,3 +124,23 @@ export const AddImagePluginFlow: Story = {
     });
   },
 };
+
+export const AddImageRejectsInvalidSelection: Story = {
+  parameters: { isolated: true },
+  render: () => <TextInputWithMarkdownEntry />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Add Image' }));
+
+    const fileInput = await screen.findByTestId('markdown-plugin-file-input');
+    const invalidFile = new File(['fake-text'], 'notes.txt', { type: 'text/plain' });
+
+    await userEvent.upload(fileInput as HTMLInputElement, invalidFile, { applyAccept: false });
+
+    await waitFor(() => {
+      expect(screen.getByText(/File not allowed: notes\.txt\./)).toBeInTheDocument();
+      expect(screen.getByText(/Allowed: image\/\*/)).toBeInTheDocument();
+      expect(screen.getByText('No files selected.')).toBeInTheDocument();
+    });
+  },
+};
