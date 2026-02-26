@@ -118,38 +118,13 @@ module noteSearchTests =
     ]
 
 module NoteSearchComponent =
-
-    let private containsIgnoreCase (needle: string) (haystack: string) =
-        haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
-
-    let filterNotes (searchTerm: string) (filterOptions: string list) (notes: NoteSearch list) =
-        match filterOptions with
-        | "Title" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Title)
-        | "Content" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Content)
-        | "Tags" ->
-            notes
-            |> List.filter (fun note -> note.Tags |> Array.exists (containsIgnoreCase searchTerm))
-        | _ ->
-            notes
-            |> List.filter (fun note ->
-                containsIgnoreCase searchTerm note.Title
-                || containsIgnoreCase searchTerm note.Content
-                || (note.Tags |> Array.exists (containsIgnoreCase searchTerm))
-            )
-
-    let private createContentPreview (note: NoteSearch) =
-        if note.Content.Length > 45 then
-            note.Content.Substring(0, 45) + "..."
-        else
-            note.Content
-
     let searchInput
         (
             setSearchTerm,
             setStartSearch,
             dropdownOpen: bool,
             setDropdownOpen: bool -> unit,
-            filterOptions: list<string>,
+            filterOptions: string,
             setFilterOptions
         ) =
         Html.div [
@@ -179,9 +154,9 @@ module NoteSearchComponent =
                     prop.className "swt:join-item swt:relative swt:w-20"
                     prop.children [
                         Html.button [
-                            prop.text ("Search in ")
+                            prop.text filterOptions
                             prop.className (
-                                "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current"
+                                "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current swt:w-full"
                                 + if dropdownOpen then " swt:rounded-b-none" else ""
                             )
                             prop.onClick (fun e ->
@@ -200,16 +175,18 @@ module NoteSearchComponent =
                                         prop.text "All"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "all"
+                                            setFilterOptions "All"
                                         )
                                     ]
                                     Html.button [
                                         prop.className
                                             "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Title"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "title"
+                                            setFilterOptions "Title"
                                         )
                                     ]
                                     Html.button [
@@ -218,16 +195,18 @@ module NoteSearchComponent =
                                         prop.text "Tags"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "tags"
+                                            setFilterOptions "Tags"
                                         )
                                     ]
                                     Html.button [
                                         prop.className
                                             "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Content"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "content"
+                                            setFilterOptions "Content"
                                         )
                                     ]
                                 ]
@@ -338,53 +317,24 @@ type SearchComponent =
                                         note.Tags
                                         |> Option.exists (fun tags ->
                                             tags
-                                            |> Seq.exists (fun tag -> tag.NameText.ToLower().Contains(normalizedTerm))
+                                            |> Seq.exists (fun tag ->
+                                                tag.NameText.ToLower().Contains(searchTerm.ToLower())
+                                            )
                                         )
-
-                                    if hasNoFilters then
-                                        // Default behavior: no selected filter means search in all fields.
-                                        if normalizedTerm = "" then
-                                            true
-                                        else
-                                            inTitle || inContent || inTags
-                                    else
-                                        let matchesTitle = List.contains "Title" filterOptions && inTitle
-                                        let matchesContent = List.contains "Content" filterOptions && inContent
-                                        let matchesTags = List.contains "Tags" filterOptions && inTags
-
-                                        matchesTitle || matchesContent || matchesTags
-                                )
-                            // match filterOptions with
-                            // | "Title" ->
-                            //     noteSearchTests.notes
-                            //     |> List.filter (fun note -> note.Title.ToLower().Contains(searchTerm.ToLower()))
-                            // | "Content" ->
-                            //     noteSearchTests.notes
-                            //     |> List.filter (fun note -> note.Content.ToLower().Contains(searchTerm.ToLower()))
-                            // | "Tags" ->
-                            //     noteSearchTests.notes
-                            //     |> List.filter (fun note ->
-                            //         note.Tags
-                            //         |> Option.exists (fun tags ->
-                            //             tags
-                            //             |> Seq.exists (fun tag ->
-                            //                 tag.NameText.ToLower().Contains(searchTerm.ToLower())
-                            //             )
-                            //         )
-                            //     )
-                            // | _ ->
-                            //     noteSearchTests.notes
-                            //     |> List.filter (fun note ->
-                            //         note.Title.ToLower().Contains(searchTerm.ToLower())
-                            //         || note.Content.ToLower().Contains(searchTerm.ToLower())
-                            //         || (note.Tags
-                            //             |> Option.exists (fun tags ->
-                            //                 tags
-                            //                 |> Seq.exists (fun tag ->
-                            //                     tag.NameText.ToLower().Contains(searchTerm.ToLower())
-                            //                 )
-                            //             ))
-                            //     )
+                                    )
+                                | _ ->
+                                    noteSearchTests.notes
+                                    |> List.filter (fun note ->
+                                        note.Title.ToLower().Contains(searchTerm.ToLower())
+                                        || note.Content.ToLower().Contains(searchTerm.ToLower())
+                                        || (note.Tags
+                                            |> Option.exists (fun tags ->
+                                                tags
+                                                |> Seq.exists (fun tag ->
+                                                    tag.NameText.ToLower().Contains(searchTerm.ToLower())
+                                                )
+                                            ))
+                                    )
 
                             if startSearch && not searchResults.IsEmpty then
                                 Html.div [
