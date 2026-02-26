@@ -317,6 +317,12 @@ type TextInputWithMarkdown =
                                             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1"
                                             prop.children [
                                                 for groupIndex, group in toolbarGroups |> Array.indexed do
+                                                    if groupIndex > 0 then
+                                                        Html.div [
+                                                            prop.key $"toolbar-separator-{groupIndex}"
+                                                            prop.className "swt:mx-1 swt:h-5 swt:w-px swt:bg-base-300"
+                                                        ]
+
                                                     Html.div [
                                                         prop.key $"toolbar-group-{groupIndex}"
                                                         prop.className "swt:flex swt:items-center swt:gap-1"

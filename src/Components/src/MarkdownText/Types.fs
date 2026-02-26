@@ -6,14 +6,6 @@ type PreviewMode =
     | Edit
     | Preview
 
-[<RequireQualifiedAccess>]
-module PreviewMode =
-
-    let toEditorValue = function
-        | PreviewMode.Live -> "live"
-        | PreviewMode.Edit -> "edit"
-        | PreviewMode.Preview -> "preview"
-
 type MarkdownOptions =
     {
         Height: int

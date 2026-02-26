@@ -259,9 +259,6 @@
 /* Keep markdown overrides unlayered so they can override uiw unlayered CSS. */
 .wmde-markdown-var,
 .wmde-markdown {
-    --md-editor-font-family: inherit !important;
-    --md-editor-background-color: var(--color-base-100) !important;
-    --md-editor-box-shadow-color: color-mix(in oklch, var(--color-base-content) 24%, transparent) !important;
     --color-fg-default: var(--color-base-content) !important;
     --color-fg-muted: color-mix(in oklch, var(--color-base-content) 70%, transparent) !important;
     --color-fg-subtle: color-mix(in oklch, var(--color-base-content) 55%, transparent) !important;
