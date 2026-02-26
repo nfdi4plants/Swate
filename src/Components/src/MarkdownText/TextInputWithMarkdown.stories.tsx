@@ -88,3 +88,39 @@ export const AddOntologyPluginFlow: Story = {
     });
   },
 };
+
+export const AddImagePluginFlow: Story = {
+  parameters: { isolated: true },
+  render: () => <TextInputWithMarkdownEntry />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const editor = canvas.getByPlaceholderText('Write markdown...') as HTMLTextAreaElement;
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Add Image' }));
+
+    const fileInput = await screen.findByTestId('markdown-plugin-file-input');
+    expect(fileInput).toBeTruthy();
+
+    const firstImage = new File(['fake-image-a'], 'diagram-a.png', { type: 'image/png' });
+    const secondImage = new File(['fake-image-b'], 'diagram-b.png', { type: 'image/png' });
+
+    await userEvent.upload(fileInput as HTMLInputElement, firstImage);
+    await userEvent.upload(fileInput as HTMLInputElement, secondImage);
+
+    expect(screen.getByText('diagram-a.png')).toBeInTheDocument();
+    expect(screen.getByText('diagram-b.png')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove diagram-a.png' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('diagram-a.png')).not.toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Insert' }));
+
+    await waitFor(() => {
+      expect(editor.value).toContain('![diagram-b.png](diagram-b.png)');
+      expect(editor.value).not.toContain('![diagram-a.png](diagram-a.png)');
+    });
+  },
+};

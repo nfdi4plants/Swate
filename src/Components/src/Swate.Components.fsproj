@@ -95,6 +95,7 @@
     <Compile Include="MarkdownText\JsBindings\Mermaid.fs" />
     <Compile Include="MarkdownText\Plugins\PluginTypes.fs" />
     <Compile Include="MarkdownText\Plugins\AddStep.fs" />
+    <Compile Include="MarkdownText\Plugins\AddImage.fs" />
     <Compile Include="MarkdownText\Plugins\AddOntologyReference.fs" />
     <Compile Include="MarkdownText\Plugins\PluginRegistry.fs" />
     <Compile Include="MarkdownText\Preview.fs" />

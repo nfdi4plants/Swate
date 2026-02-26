@@ -97,6 +97,10 @@ module AddOntologyReference =
                         insertAtSelection source selectionStart selectionEnd reference
                     | Error _ ->
                         source, (selectionStart, selectionEnd))
+            InputMode = None
+            Accept = None
+            AllowMultiple = None
+            ApplyFiles = None
         }
 
     let plugin: MarkdownToolbarPlugin =
