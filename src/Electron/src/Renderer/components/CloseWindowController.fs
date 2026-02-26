@@ -1,17 +1,16 @@
 module Renderer.components.CloseWindowController
 
-open Browser.Dom
 open Feliz
+open Fable.Core
 open Fable.Electron.Remoting.Renderer
 open Swate.Components
-open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 
 type CloseWindowController =
 
     [<ReactComponent>]
     static member Subscription
-        (onConfirmSave: unit -> unit, ?onConfirmClose: unit -> unit, ?onCancelClose: unit -> unit)
+        (onConfirmSave: unit -> JS.Promise<Result<unit, string>>, ?onConfirmClose: unit -> unit, ?onCancelClose: unit -> unit)
         =
 
         let modalIsOpen, setModalIsOpen = React.useState false
@@ -35,9 +34,17 @@ type CloseWindowController =
             resolveCloseRequest SaveBeforeQuitDecision.CloseWithoutSaving |> Promise.start
 
         let handleSaveAndClose () =
-            setModalIsOpen false
-            onConfirmSave ()
-            resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose |> Promise.start
+            promise {
+                let! saveResult = onConfirmSave ()
+
+                match saveResult with
+                | Ok() ->
+                    setModalIsOpen false
+                    do! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose
+                | Error msg ->
+                    console.error ($"Save before close failed: {msg}")
+            }
+            |> Promise.start
 
         let saveBeforeQuitHandler: IMainSaveBeforeQuitApi = {
             // This IPC call is triggered by the ArcVaults window close event. It should open the modal to ask user what they want to do.

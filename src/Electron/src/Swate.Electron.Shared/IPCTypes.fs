@@ -4,56 +4,25 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 
-open Swate.Components.Types
+open Swate.Components
 
-[<RequireQualifiedAccess>]
-type ArcFileType =
-    | Investigation
-    | Study
-    | Assay
-    | Run
-    | Workflow
-    | DataMap
+open ARCtrl.ARCtrlHelper
+
 
 type PreviewData =
-    | ArcFileData of fileType: ArcFileType * json: string
+    | ArcFileData of fileType: ArcFilesDiscriminate * json: string
     | Text of string
     | Unknown
 
-[<RequireQualifiedAccess>]
-type ExperimentTarget =
-    | Study
-    | Assay
+type SaveArcFileRequest = {
+        FileType: ArcFilesDiscriminate
+        Json: string
+    }
 
-type ExperimentMetadata = {
-    Identifier: string option
-    Title: string
-    Description: string
-    InvolvedPeople: string[]
-    Comments: string[]
-    MainText: string option
-    Files: string[]
-    Publications: string[]
-    SubmissionDate: string option
-    PublicReleaseDate: string option
-    StudyDesignDescriptors: string[]
-    MeasurementType: string option
-    TechnologyType: string option
-    TechnologyPlatform: string option
-}
-
-type CreateExperimentRequest = {
-    Metadata: ExperimentMetadata
-    Target: ExperimentTarget
-}
-
-type CreateExperimentResponse = {
-    PreviewData: PreviewData
-    CreatedIdentifier: string
-    ProtocolPath: string option
-}
-
-type SaveArcFileRequest = { FileType: ArcFileType; Json: string }
+type WriteFileRequest = {
+        RelativePath: string
+        Content: string
+    }
 
 [<RequireQualifiedAccess>]
 type SaveBeforeQuitDecision =
@@ -75,9 +44,9 @@ type IArcVaultsApi = {
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     checkForARC: string -> JS.Promise<bool>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
-    createExperimentFromLanding:
-        IpcMainEvent -> CreateExperimentRequest -> JS.Promise<Result<CreateExperimentResponse, exn>>
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
+    writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
+    syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
 }
 
 /// Two Way Bridge: Renderer -> Main

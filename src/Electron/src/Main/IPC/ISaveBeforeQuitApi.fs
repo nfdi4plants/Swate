@@ -10,7 +10,7 @@ let api: ISaveBeforeQuitApi = {
         fun (event: IpcMainEvent) (decision: SaveBeforeQuitDecision) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
-                ARC_VAULTS.ResolveCloseRequest(windowId, decision)
+                do! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
                 return Ok()
             with e ->
                 return Error e

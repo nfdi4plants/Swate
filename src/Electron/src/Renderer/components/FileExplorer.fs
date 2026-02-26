@@ -1,5 +1,7 @@
 module Renderer.components.FileExplorer
 
+open Fable.Core
+
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open Swate.Components.FileExplorerTypes
@@ -9,6 +11,31 @@ open Browser.Dom
 
 let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile =
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+
+    let resolvePreviewPath (path: string) =
+        let normalized = normalizePath path
+        let lowered = normalized.ToLowerInvariant()
+
+        let isAssayDatamapFile =
+            lowered.Contains("/assays/") && lowered.EndsWith("/isa.datamap.xlsx")
+
+        let isStudyDatamapFile =
+            lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
+
+        let isRunDatamapFile =
+            lowered.Contains("/runs/") && lowered.EndsWith("/isa.datamap.xlsx")
+
+        if isAssayDatamapFile then
+            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
+            $"{folderPath}/isa.assay.xlsx"
+        elif isStudyDatamapFile then
+            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
+            $"{folderPath}/isa.study.xlsx"
+        elif isRunDatamapFile then
+            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
+            $"{folderPath}/isa.run.xlsx"
+        else
+            normalized
 
     let isFocusedPathOrAncestor (nodePath: string) =
         match selectedTreeItemPath with
@@ -64,10 +91,16 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     | _ -> item.IsDirectory
 
                 if item.Path.IsSome && not isDirectoryByPath then
-                    console.log ($"[Renderer] Opening file: {item.Path.Value}")
-                    setSelectedTreeItemPath item.Path
+                    let previewPath = resolvePreviewPath item.Path.Value
+
+                    if previewPath <> normalizePath item.Path.Value then
+                        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
+                    else
+                        console.log ($"[Renderer] Opening file: {previewPath}")
+
+                    setSelectedTreeItemPath (Some previewPath)
                     setShowLandingDraft false
-                    let! result = Api.openFile item.Path.Value
+                    let! result = Api.openFile previewPath
 
                     match result with
                     | Ok data ->
@@ -75,7 +108,6 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                         setPreviewData (Some data)
                         setPreviewError None
                         setDidSelectFile true
-
                     | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
                         setPreviewData (None)
