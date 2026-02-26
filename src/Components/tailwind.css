@@ -257,29 +257,49 @@
 }
 
 /* Keep markdown overrides unlayered so they can override uiw unlayered CSS. */
-.wmde-markdown-var,
-.wmde-markdown {
-    --color-fg-default: var(--color-base-content) !important;
-    --color-fg-muted: color-mix(in oklch, var(--color-base-content) 70%, transparent) !important;
-    --color-fg-subtle: color-mix(in oklch, var(--color-base-content) 55%, transparent) !important;
-    --color-canvas-default: var(--color-base-100) !important;
-    --color-canvas-subtle: var(--color-base-200) !important;
-    --color-border-default: color-mix(in oklch, var(--color-base-content) 22%, transparent) !important;
-    --color-border-muted: color-mix(in oklch, var(--color-base-content) 14%, transparent) !important;
-    --color-neutral-muted: color-mix(in oklch, var(--color-base-content) 12%, transparent) !important;
-    --color-accent-fg: var(--color-primary) !important;
-    --color-accent-emphasis: var(--color-primary) !important;
-    --color-danger-fg: var(--color-error) !important;
-    --color-danger-emphasis: var(--color-error) !important;
-    --color-attention-fg: var(--color-warning) !important;
-    --color-attention-emphasis: var(--color-warning) !important;
-    --color-done-fg: var(--color-secondary) !important;
-    --color-done-emphasis: var(--color-secondary) !important;
-    --color-success-fg: var(--color-success) !important;
-    --color-success-emphasis: var(--color-success) !important;
-    --color-copied-active-bg: var(--color-success) !important;
+html[data-theme] .wmde-markdown-var,
+html[data-theme] .wmde-markdown,
+body[data-theme] .wmde-markdown-var,
+body[data-theme] .wmde-markdown,
+[data-theme] .wmde-markdown-var,
+[data-theme] .wmde-markdown {
+    --color-fg-default: var(--color-base-content);
+    --color-fg-muted: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+    --color-fg-subtle: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+    --color-canvas-default: var(--color-base-100);
+    --color-canvas-subtle: var(--color-base-200);
+    --color-border-default: color-mix(in oklch, var(--color-base-content) 22%, transparent);
+    --color-border-muted: color-mix(in oklch, var(--color-base-content) 14%, transparent);
+    --color-neutral-muted: color-mix(in oklch, var(--color-base-content) 12%, transparent);
+    --color-accent-fg: var(--color-primary);
+    --color-accent-emphasis: var(--color-primary);
+    --color-danger-fg: var(--color-error);
+    --color-danger-emphasis: var(--color-error);
+    --color-attention-fg: var(--color-warning);
+    --color-attention-emphasis: var(--color-warning);
+    --color-done-fg: var(--color-secondary);
+    --color-done-emphasis: var(--color-secondary);
+    --color-success-fg: var(--color-success);
+    --color-success-emphasis: var(--color-success);
+    --color-copied-active-bg: var(--color-success);
 }
 
+html[data-theme='finster'] .wmde-markdown-var,
+html[data-theme='finster'] .wmde-markdown,
+html[data-theme='planti'] .wmde-markdown-var,
+html[data-theme='planti'] .wmde-markdown,
+html[data-theme='viola'] .wmde-markdown-var,
+html[data-theme='viola'] .wmde-markdown,
+html[data-theme='dark'] .wmde-markdown-var,
+html[data-theme='dark'] .wmde-markdown,
+body[data-theme='finster'] .wmde-markdown-var,
+body[data-theme='finster'] .wmde-markdown,
+body[data-theme='planti'] .wmde-markdown-var,
+body[data-theme='planti'] .wmde-markdown,
+body[data-theme='viola'] .wmde-markdown-var,
+body[data-theme='viola'] .wmde-markdown,
+body[data-theme='dark'] .wmde-markdown-var,
+body[data-theme='dark'] .wmde-markdown,
 [data-theme='finster'] .wmde-markdown-var,
 [data-theme='finster'] .wmde-markdown,
 [data-theme='planti'] .wmde-markdown-var,
@@ -288,12 +308,20 @@
 [data-theme='viola'] .wmde-markdown,
 [data-theme='dark'] .wmde-markdown-var,
 [data-theme='dark'] .wmde-markdown {
-    color-scheme: dark !important;
+    color-scheme: dark;
 }
 
+html[data-theme='sunrise'] .wmde-markdown-var,
+html[data-theme='sunrise'] .wmde-markdown,
+html[data-theme='light'] .wmde-markdown-var,
+html[data-theme='light'] .wmde-markdown,
+body[data-theme='sunrise'] .wmde-markdown-var,
+body[data-theme='sunrise'] .wmde-markdown,
+body[data-theme='light'] .wmde-markdown-var,
+body[data-theme='light'] .wmde-markdown,
 [data-theme='sunrise'] .wmde-markdown-var,
 [data-theme='sunrise'] .wmde-markdown,
 [data-theme='light'] .wmde-markdown-var,
 [data-theme='light'] .wmde-markdown {
-    color-scheme: light !important;
+    color-scheme: light;
 }
