@@ -120,7 +120,8 @@ module NoteSearchComponent =
                             )
                         ]
                         Html.div [
-                            prop.className "swt:absolute swt:right-3 swt:top-1/2 swt:-translate-y-1/2 swt:pointer-events-none"
+                            prop.className
+                                "swt:absolute swt:right-3 swt:top-1/2 swt:-translate-y-1/2 swt:pointer-events-none"
                             prop.children [ Icons.MagnifyingClass() ]
                         ]
                     ]
@@ -135,16 +136,18 @@ module NoteSearchComponent =
                                 + if dropdownOpen then " swt:rounded-b-none" else ""
                             )
                             prop.onClick (fun e ->
-                                e.stopPropagation()
+                                e.stopPropagation ()
                                 setDropdownOpen (not dropdownOpen)
                             )
                         ]
                         if dropdownOpen then
                             Html.div [
-                                prop.className "swt:absolute swt:right-0 swt:top-full swt:bg-base-100 swt:border swt:border-current swt:rounded-b swt:z-10 swt:min-w-full swt:flex swt:flex-col"
+                                prop.className
+                                    "swt:absolute swt:right-0 swt:top-full swt:bg-base-100 swt:border swt:border-current swt:rounded-b swt:z-10 swt:min-w-full swt:flex swt:flex-col"
                                 prop.children [
                                     Html.button [
-                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "All"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
@@ -152,7 +155,8 @@ module NoteSearchComponent =
                                         )
                                     ]
                                     Html.button [
-                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Title"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
@@ -160,7 +164,8 @@ module NoteSearchComponent =
                                         )
                                     ]
                                     Html.button [
-                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Tags"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
@@ -168,7 +173,8 @@ module NoteSearchComponent =
                                         )
                                     ]
                                     Html.button [
-                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Content"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
@@ -246,7 +252,7 @@ type SearchComponent =
             prop.children [
                 Html.div [
                     prop.className "swt:w-full swt:max-w-md"
-                    prop.onClick (fun e -> e.stopPropagation())
+                    prop.onClick (fun e -> e.stopPropagation ())
                     prop.children [
                         NoteSearchComponent.searchInput (
                             setSearchTerm,
