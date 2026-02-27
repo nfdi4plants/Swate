@@ -9,57 +9,63 @@ let fs: obj = importAll "fs"
 let pathMod: obj = importAll "path"
 let childProcessDynamic: obj = importAll "node:child_process"
 
-let private tryGetLfsTrackedPaths (repoPath: string) =
+let private isLfsTracked (repoRoot: string) (absolutePath: string) =
     try
-        let output: string =
-            childProcessDynamic?execSync(
-                "git lfs ls-files --name-only",
-                createObj [ "cwd" ==> repoPath; "encoding" ==> "utf8"; "stdio" ==> "pipe" ]
-            )
+        let relativePath =
+            pathMod?relative (repoRoot, absolutePath)
             |> unbox<string>
+            |> fun p -> p.Replace("\\", "/")
 
-        output.Split([| '\n'; '\r' |], System.StringSplitOptions.RemoveEmptyEntries)
-        |> Array.map (fun relPath ->
-            pathMod?resolve(repoPath, relPath) |> unbox<string>
-        )
-        |> Array.map (fun p -> p.Replace("\\", "/"))
-        |> Set.ofArray
+        if System.String.IsNullOrWhiteSpace relativePath || relativePath = "." then
+            false
+        else
+            let output: string =
+                childProcessDynamic?execFileSync (
+                    "git",
+                    [| "check-attr"; "filter"; "--"; relativePath |],
+                    createObj [
+                        "cwd" ==> repoRoot
+                        "encoding" ==> "utf8"
+                        "stdio" ==> "pipe"
+                        "shell" ==> false
+                    ]
+                )
+                |> unbox<string>
+
+            output.Contains(": filter: lfs")
     with _ ->
-        Set.empty
+        false
 
-let getFileEntry (path: string) =
-    promise {
-        let! stats = fs?promises?stat(path)
-        return
-            IPCTypes.FileEntry.create(
-                pathMod?basename(path),
-                path,
-                stats?isDirectory(),
-                None
-            )
-    }
+let getFileEntry (path: string) = promise {
+    let! stats = fs?promises?stat (path)
+    return IPCTypes.FileEntry.create (pathMod?basename (path), path, stats?isDirectory (), None)
+}
 
-///Finds all files and subfolders of the given filepath
+/// Finds all files and subfolders of the given filepath
 let getFileEntries (path: string) =
-    let lfsTrackedPaths = tryGetLfsTrackedPaths path
+    let repoRoot = path.Replace("\\", "/")
 
-    let rec loop (path: string) =
-        let stat = fs?statSync(path)
-        let isDir = stat?isDirectory()
-        let name = pathMod?basename(path)
+    let rec loop (currentPath: string) =
+        let stat = fs?statSync (currentPath)
+        let isDir = stat?isDirectory ()
+        let name = pathMod?basename (currentPath)
+        let normalizedPath = currentPath.Replace("\\", "/")
 
-        let normalizedPath = path.Replace("\\", "/")
+        let isLfs =
+            if isDir then
+                None
+            else
+                Some(isLfsTracked repoRoot normalizedPath)
 
-        let currentEntry =
-            IPCTypes.FileEntry.create(name, normalizedPath, isDir, Some(lfsTrackedPaths.Contains normalizedPath))
+        let currentEntry = IPCTypes.FileEntry.create (name, normalizedPath, isDir, isLfs)
 
         if isDir then
-            let entries: string[] = fs?readdirSync(normalizedPath)
+            let entries: string[] = fs?readdirSync (normalizedPath)
 
             let children =
                 entries
                 |> Array.collect (fun entry ->
-                    let fullPath = pathMod?join(normalizedPath, entry)
+                    let fullPath = pathMod?join (normalizedPath, entry)
                     loop fullPath
                 )
 
@@ -67,4 +73,4 @@ let getFileEntries (path: string) =
         else
             [| currentEntry |]
 
-    loop path
+    loop repoRoot
