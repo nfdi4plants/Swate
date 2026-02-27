@@ -24,7 +24,13 @@ type WriteFileRequest = {
         Content: string
     }
 
-/// Two Way Bridge: Renderer <-> Main
+[<RequireQualifiedAccess>]
+type SaveBeforeQuitDecision =
+    | SaveAndClose
+    | CloseWithoutSaving
+    | CancelClose
+
+/// Two Way Bridge: Renderer -> Main -> Renderer
 type IArcVaultsApi = {
     /// Will open ARC in same window
     openARC: IpcMainEvent -> JS.Promise<Result<string, exn>>
@@ -41,6 +47,11 @@ type IArcVaultsApi = {
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
+}
+
+/// Two Way Bridge: Renderer -> Main
+type ISaveBeforeQuitApi = {
+    resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
 }
 
 type FileEntry = {
@@ -97,3 +108,6 @@ type IArcFileWatcherApi = {
     /// This function is called when ARC is reloaded due to local file changes.
     IsLoadingChanges: bool -> unit
 }
+
+/// One Way Bridge: Main -> Renderer
+type IMainSaveBeforeQuitApi = { requestSaveBeforeQuit: unit -> unit }
