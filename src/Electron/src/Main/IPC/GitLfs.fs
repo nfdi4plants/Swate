@@ -9,14 +9,18 @@ open Swate.Electron.Shared.IPCTypes
 [<Import("existsSync", "node:fs")>]
 let private existsSync (path: string) : bool = jsNative
 
-[<Import("join", "node:path")>]
-let private pathJoin (parts: string array) : string = jsNative
-
 let private childProcessDynamic: obj = importAll "node:child_process"
+let private pathDynamic: obj = importAll "node:path"
+
+let private pathJoin (part1: string) (part2: string) : string =
+    pathDynamic?join(part1, part2) |> unbox<string>
 
 type IGitLfs =
     abstract Run:
         request: GitLfsRequest -> onProgress: (string -> unit) -> cancel: (unit -> bool) -> Promise<GitLfsResult>
+
+    abstract IsTrackedByAttributes:
+        repoRoot: string -> relativePath: string -> bool
 
 
 type NodeGitLfsAdapter() =
@@ -37,7 +41,7 @@ type NodeGitLfsAdapter() =
         | Status, None -> Error "FilePath is required for this Git LFS command"
 
     let validateRepoPath repoPath =
-        existsSync (pathJoin [| repoPath; ".git" |])
+        existsSync (pathJoin repoPath ".git")
 
     let runGitLfs
         (request: GitLfsRequest)
@@ -168,8 +172,31 @@ type NodeGitLfsAdapter() =
                             return result
         }
 
+    let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
+        if not (validateRepoPath repoRoot) || System.String.IsNullOrWhiteSpace relativePath then
+            false
+        else
+            try
+                let output: string =
+                    childProcessDynamic?execFileSync (
+                        "git",
+                        [| "check-attr"; "filter"; "--"; relativePath |],
+                        createObj [
+                            "cwd" ==> repoRoot
+                            "encoding" ==> "utf8"
+                            "stdio" ==> "pipe"
+                            "shell" ==> false
+                        ]
+                    )
+                    |> unbox<string>
+
+                output.Contains(": filter: lfs")
+            with _ ->
+                false
+
     interface IGitLfs with
         member _.Run request onProgress cancel = runGitLfs request onProgress cancel
+        member _.IsTrackedByAttributes repoRoot relativePath = isTrackedByAttributes repoRoot relativePath
 
 
 let gitLfsAdapter () : IGitLfs = NodeGitLfsAdapter() :> IGitLfs

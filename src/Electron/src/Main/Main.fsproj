@@ -5,14 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="FileTreeCreator.fs" />
     <None Include="SimpleGitTest.fsx" />
     <None Include="ChokidarTest.fsx" />
+    <Compile Include="IPC\GitLfs.fs" />
+    <Compile Include="FileTreeCreator.fs" />
     <Compile Include="ArcHolder.fs" />
     <Compile Include="Bindings\Chokidar.fs" />
     <Compile Include="ArcVault.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
-    <Compile Include="IPC\GitLfs.fs" />
     <Compile Include="IPC\IArcVaultsApi.fs" />
     <Compile Include="main.fs" />
   </ItemGroup>

@@ -7,34 +7,18 @@ open Swate.Electron.Shared.IPCTypes
 
 let fs: obj = importAll "fs"
 let pathMod: obj = importAll "path"
-let childProcessDynamic: obj = importAll "node:child_process"
+let gitLfs: IPC.GitLfs.IGitLfs = IPC.GitLfs.gitLfs
 
 let private isLfsTracked (repoRoot: string) (absolutePath: string) =
-    try
-        let relativePath =
-            pathMod?relative (repoRoot, absolutePath)
-            |> unbox<string>
-            |> fun p -> p.Replace("\\", "/")
+    let relativePath =
+        pathMod?relative (repoRoot, absolutePath)
+        |> unbox<string>
+        |> fun p -> p.Replace("\\", "/")
 
-        if System.String.IsNullOrWhiteSpace relativePath || relativePath = "." then
-            false
-        else
-            let output: string =
-                childProcessDynamic?execFileSync (
-                    "git",
-                    [| "check-attr"; "filter"; "--"; relativePath |],
-                    createObj [
-                        "cwd" ==> repoRoot
-                        "encoding" ==> "utf8"
-                        "stdio" ==> "pipe"
-                        "shell" ==> false
-                    ]
-                )
-                |> unbox<string>
-
-            output.Contains(": filter: lfs")
-    with _ ->
+    if System.String.IsNullOrWhiteSpace relativePath || relativePath = "." then
         false
+    else
+        gitLfs.IsTrackedByAttributes repoRoot relativePath
 
 let getFileEntry (path: string) = promise {
     let! stats = fs?promises?stat (path)
