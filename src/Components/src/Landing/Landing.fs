@@ -9,6 +9,10 @@ open Browser.Dom
 [<Erase; Mangle(false)>]
 type Landing =
 
+    static member ResetLandingDraft (setPreviewData, setSelectedTreeItemPath) =
+        setPreviewData None
+        setSelectedTreeItemPath None
+
     [<ReactComponent>]
     static member Wizard
         (

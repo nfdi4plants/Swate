@@ -15,6 +15,7 @@
     <Compile Include="components\MainElement.fs" />
     <Compile Include="components\InitState.fs" />
     <Compile Include="components\MainWindowContent.fs" />
+    <Compile Include="state\AppShellState.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
     <Content Include="tailwind.css" />

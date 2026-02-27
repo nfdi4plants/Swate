@@ -13,6 +13,6 @@ let api: ISaveBeforeQuitApi = {
                 do! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
                 return Ok()
             with e ->
-                return Error e
+                return Microsoft.FSharp.Core.Error e
         }
 }

@@ -13,7 +13,7 @@ let openNewWindow =
         promise {
             match! Api.openARCInNewWindow() with
             | Ok _ -> ()
-            | Error exn -> failwith $"{exn.Message}"
+            | Microsoft.FSharp.Core.Error exn -> failwith $"{exn.Message}"
 
             return ()
         }
@@ -26,7 +26,7 @@ let openCurrentWindow =
             let! r = Api.openARC()
 
             match r with
-            | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
+            | Microsoft.FSharp.Core.Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
             | Ok _ -> ()
         }
         |> Promise.start
@@ -40,7 +40,7 @@ let onARCClick (clickedARC: SelectorTypes.ARCPointer) =
     promise {
         match! Api.focusExistingARCWindow clickedARC.path with
         | Ok _ -> ()
-        | Error exn ->
+        | Microsoft.FSharp.Core.Error exn ->
             console.warn ($"Could not focus ARC window for path '{clickedARC.path}': {exn.Message}")
 
         return ()

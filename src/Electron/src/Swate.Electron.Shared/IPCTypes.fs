@@ -12,6 +12,7 @@ open ARCtrl.ARCtrlHelper
 type PreviewData =
     | ArcFileData of fileType: ArcFilesDiscriminate * json: string
     | Text of string
+    | Error of string
     | Unknown
 
 type SaveArcFileRequest = {

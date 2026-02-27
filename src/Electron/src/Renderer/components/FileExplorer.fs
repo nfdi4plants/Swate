@@ -1,15 +1,16 @@
 module Renderer.components.FileExplorer
 
-open Fable.Core
+open Feliz
+
+open Browser.Dom
 
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open Swate.Components.FileExplorerTypes
 
-open Browser.Dom
 
+let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setPreviewData =
 
-let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile =
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
     let resolvePreviewPath (path: string) =
@@ -78,7 +79,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
 
     let fileItem = loop parent
 
-    let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile (item: FileItem) =
+    let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setPreviewData (item: FileItem) =
         promise {
 
             if parent.IsSome then
@@ -99,25 +100,19 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                         console.log ($"[Renderer] Opening file: {previewPath}")
 
                     setSelectedTreeItemPath (Some previewPath)
-                    setShowLandingDraft false
                     let! result = Api.openFile previewPath
 
                     match result with
                     | Ok data ->
                         console.log ("[Renderer] Received data, processing...")
                         setPreviewData (Some data)
-                        setPreviewError None
-                        setDidSelectFile true
-                    | Error exn ->
+                    | Microsoft.FSharp.Core.Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
                         setPreviewData (None)
-                        setPreviewError (Some $"Could not open preview for '{item.Name}': {exn.Message}")
-                        setDidSelectFile true
                 elif item.Path.IsSome && isDirectoryByPath then
-                    // Folders are not preview targets.
-                    setPreviewError None
+                    ()
                 else
-                    setPreviewError (Some $"File '{item.Name}' has no path.")
+                    ()
         }
         |> Promise.start
 
@@ -125,7 +120,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
         Some(
             FileExplorer.FileExplorer(
                 initialItems = [ fileItem.Value ],
-                onItemClick = openPreview parent setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile,
+                onItemClick = openPreview parent setSelectedTreeItemPath setPreviewData,
                 ?selectedItemId = selectedTreeItemPath
             )
         )

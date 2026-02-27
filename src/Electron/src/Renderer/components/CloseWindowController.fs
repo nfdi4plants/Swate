@@ -20,7 +20,7 @@ type CloseWindowController =
             |> Promise.map (
                 function
                 | Ok _ -> ()
-                | Error exn -> console.error ($"Failed to resolve close request: {exn.Message}")
+                | Microsoft.FSharp.Core.Error exn -> console.error ($"Failed to resolve close request: {exn.Message}")
             )
 
         let handleCancel () =
@@ -41,7 +41,7 @@ type CloseWindowController =
                 | Ok() ->
                     setModalIsOpen false
                     do! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose
-                | Error msg ->
+                | Microsoft.FSharp.Core.Error msg ->
                     console.error ($"Save before close failed: {msg}")
             }
             |> Promise.start

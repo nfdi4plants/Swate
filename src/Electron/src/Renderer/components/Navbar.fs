@@ -11,13 +11,13 @@ let saveArcFileWithPreview (arcFile: ArcFiles) : JS.Promise<Result<PreviewData, 
     promise {
         match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
         | None ->
-            return Error "Saving this file type is not supported in Electron yet."
+            return Microsoft.FSharp.Core.Error "Saving this file type is not supported in Electron yet."
         | Some request ->
             let! saveResult = Api.saveArcFile request
 
             match saveResult with
             | Ok previewData -> return Ok previewData
-            | Error exn -> return Error exn.Message
+            | Microsoft.FSharp.Core.Error exn -> return Microsoft.FSharp.Core.Error exn.Message
     }
 
 let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
@@ -26,7 +26,7 @@ let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
         return saveResult |> Result.map ignore
     }
 
-let onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile _ =
+let onSaveClick arcFileState setPreviewData _ =
     match arcFileState with
     | None -> ()
     | Some arcFile ->
@@ -36,9 +36,7 @@ let onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile _ =
             match result with
             | Ok updatedPreview ->
                 setPreviewData (Some updatedPreview)
-                setPreviewError None
-                setDidSelectFile true
-            | Error errorMsg ->
-                setPreviewError (Some $"Save failed: {errorMsg}")
+            | Microsoft.FSharp.Core.Error errorMsg ->
+                setPreviewData (Some (Error $"Save failed: {errorMsg}"))
         }
         |> Promise.start

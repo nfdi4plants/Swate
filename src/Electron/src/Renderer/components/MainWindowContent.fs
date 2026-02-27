@@ -7,6 +7,17 @@ open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open MainElement
 
+type ContentModel = {
+    AppState: AppState
+    SetArcFileState: ArcFiles option -> unit
+    ActiveView: PreviewActiveView
+    SetActiveView: PreviewActiveView -> unit
+    ArcFileState: ArcFiles option
+    PreviewData: PreviewData option
+    SetPreviewData: PreviewData option -> unit
+    SetSelectedTreeItemPath: string option -> unit
+}
+
 let createFromLanding
     landingUiState
     setLandingUiState
@@ -43,7 +54,7 @@ let createFromLanding
         let! saveResult = Navbar.saveArcFileWithPreview payload.ArcFile
 
         match saveResult with
-        | Error message ->
+        | Microsoft.FSharp.Core.Error message ->
             setLandingUiState {
                 landingUiState with
                     IsSubmitting = false
@@ -62,7 +73,7 @@ let createFromLanding
 
                 match writeResult with
                 | Ok() -> finishSuccess previewData
-                | Error exn ->
+                | Microsoft.FSharp.Core.Error exn ->
                     setLandingUiState {
                         landingUiState with
                             IsSubmitting = false
@@ -110,29 +121,27 @@ let createARCPreview
         |]
     ]
 
+[<ReactComponent>]
 let computeARCContent
     previewData
-    (previewError: string option)
     arcFileState
     setArcFileState
     activeView
     setActiveView
     didSelectFile
-    landingDraft
-    setLandingDraft
-    landingUiState
-    setLandingUiState
-    landingDraftActive
-    setLandingDraftActive
-    showLandingDraft
-    setShowLandingDraft
     appState
     setSelectedTreeItemPath
     setPreviewData
-    setPreviewError
     setDidSelectFile
     (path: string)
     =
+
+    let (previewError: string option), setPreviewError = React.useState (None)
+    let landingDraft, setLandingDraft = React.useState LandingDraft.init
+    let landingUiState, setLandingUiState = React.useState LandingUiState.init
+    let landingDraftActive, setLandingDraftActive = React.useState false
+    let showLandingDraft, setShowLandingDraft = React.useState false
+
     if landingDraftActive && showLandingDraft then
         Landing.Wizard(
             landingDraft,
@@ -179,6 +188,20 @@ let computeARCContent
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
                     prop.children [| Html.h1 "Unknown file type" |]
                 ]
+            | Error errMsg ->
+                Html.div [
+                    prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
+                    prop.children [|
+                        Html.h2 [
+                            prop.className "swt:text-error swt:font-bold"
+                            prop.text "Preview Error"
+                        ]
+                        Html.span [
+                            prop.className "swt:text-base-content swt:opacity-70"
+                            prop.text errMsg
+                        ]
+                    |]
+                ]
         | None ->
             match previewError with
             | Some errMsg ->
@@ -202,31 +225,12 @@ let computeARCContent
                         "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
                 ]
 
-let content
-    (
-        appState: AppState,
-        setArcFileState,
-        activeView,
-        setActiveView,
-        arcFileState,
-        previewData,
-        setPreviewData,
-        previewError,
-        setPreviewError,
-        didSelectFile,
-        setDidSelectFile,
-        landingDraft,
-        setLandingDraft,
-        landingUiState,
-        setLandingUiState,
-        landingDraftActive,
-        setLandingDraftActive,
-        showLandingDraft,
-        setShowLandingDraft,
-        setSelectedTreeItemPath
-    ) =
+[<ReactComponent>]
+let content (model: ContentModel) =
 
-    match appState with
+    let didSelectFile, setDidSelectFile = React.useState false
+
+    match model.AppState with
     | AppState.Init ->
         Html.div [
             prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex swt:justify-center swt:items-center"
@@ -246,31 +250,21 @@ let content
                     prop.children [
                         Html.div [
                             prop.className "swt:flex-none"
-                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
+                            prop.children [ MainElement.CreateARCitectNavbarList model.ArcFileState (Navbar.onSaveClick model.ArcFileState model.SetPreviewData) ]
                         ]
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                             prop.children [
                                 computeARCContent
-                                    previewData
-                                    (previewError: string option)
-                                    arcFileState
-                                    setArcFileState
-                                    activeView
-                                    setActiveView
+                                    model.PreviewData
+                                    model.ArcFileState
+                                    model.SetArcFileState
+                                    model.ActiveView
+                                    model.SetActiveView
                                     didSelectFile
-                                    landingDraft
-                                    setLandingDraft
-                                    landingUiState
-                                    setLandingUiState
-                                    landingDraftActive
-                                    setLandingDraftActive
-                                    showLandingDraft
-                                    setShowLandingDraft
-                                    appState
-                                    setSelectedTreeItemPath
-                                    setPreviewData
-                                    setPreviewError
+                                    model.AppState
+                                    model.SetSelectedTreeItemPath
+                                    model.SetPreviewData
                                     setDidSelectFile
                                     path
                             ]
