@@ -78,6 +78,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     FileTree.createFolder parent.Value.name (Some parent.Value.path) "swt:fluent--folder-24-regular" with
                         Id = parent.Value.path
                         IsExpanded = isFocusedPathOrAncestor parent.Value.path
+                        IsLFS = parent.Value.isLfs
                         Children = Some tmp
                 }
                 Some result
@@ -86,6 +87,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     {
                         FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular" with
                             Id = parent.Value.path
+                            IsLFS = parent.Value.isLfs
                     }
                 )
         else
@@ -121,6 +123,35 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                         setPreviewError (Some $"Git LFS update failed for '{item.Name}': {exn.Message}")
         }
         |> Promise.start
+
+    let contextMenuItems (item: FileItem) =
+        if item.IsDirectory then
+            []
+        else
+            let isMarked = item.IsLFS = Some true
+
+            [
+                {
+                    Label = if isMarked then "Unmark Git LFS" else "Mark as Git LFS"
+                    Icon =
+                        if isMarked then
+                            "swt:fluent--document-dismiss-24-regular"
+                        else
+                            "swt:fluent--document-add-24-regular"
+                    OnClick = fun () -> toggleLfsMark item (not isMarked)
+                    Disabled = None
+                }
+                {
+                    Label =
+                        if isMarked then
+                            "Git LFS: marked"
+                        else
+                            "Git LFS: not marked"
+                    Icon = "swt:fluent--tag-24-regular"
+                    OnClick = fun () -> ()
+                    Disabled = Some true
+                }
+            ]
 
     let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile (item: FileItem) =
         promise {
@@ -170,7 +201,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
             FileExplorer.FileExplorer(
                 initialItems = [ fileItem.Value ],
                 onItemClick = openPreview parent setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile,
-                onToggleLfsMark = toggleLfsMark,
+                onContextMenu = contextMenuItems,
                 ?selectedItemId = selectedTreeItemPath
             )
         )
@@ -207,7 +238,8 @@ let insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry) =
                         part,
                         isDirectory,
                         newPath,
-                        System.Collections.Generic.Dictionary()
+                        System.Collections.Generic.Dictionary(),
+                        entry.isLfs
                     )
                 node.children.Add(part, newNode)
                 newNode
@@ -242,7 +274,7 @@ let getFileTree (fileEntries: FileEntry []) =
         let tmp =
             fileEntries
             |> Array.find(fun fileEntry -> fileEntry.path = rootPath)
-        FileItemDTO.create(tmp.name, tmp.isDirectory, tmp.path, System.Collections.Generic.Dictionary())
+        FileItemDTO.create(tmp.name, tmp.isDirectory, tmp.path, System.Collections.Generic.Dictionary(), tmp.isLfs)
 
     adaptedFileEntires
     |> Array.iter (fun fileEntry -> insertEntry rootElement rootPath fileEntry)

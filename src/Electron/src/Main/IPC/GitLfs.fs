@@ -29,8 +29,8 @@ type NodeGitLfsAdapter() =
         | Fetch, None -> Ok [ "lfs"; "fetch" ]
         | Fetch, Some file -> Ok [ "lfs"; "fetch"; "--include"; file ]
         | Install, _ -> Ok [ "lfs"; "install" ]
-        | Track, Some file -> Ok [ "lfs"; "track"; file ]
-        | Untrack, Some file -> Ok [ "lfs"; "untrack"; file ]
+        | Track, Some file -> Ok [ "lfs"; "track"; "--"; file ]
+        | Untrack, Some file -> Ok [ "lfs"; "untrack"; "--"; file ]
         | Status, Some file -> Ok [ "lfs"; "ls-files"; "--name-only"; "--"; file ]
         | Track, None
         | Untrack, None

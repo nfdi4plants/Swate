@@ -36,7 +36,6 @@ type FileExplorer =
             ?initialItems: FileItem list,
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
-            ?onToggleLfsMark: FileItem -> bool -> unit,
             ?selectedItemId: string
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
@@ -68,10 +67,6 @@ type FileExplorer =
             dispatch (FileExplorerLogic.SelectItem item.Id)
             onItemClick |> Option.iter (fun fn -> fn item)
 
-        let toggleLfsMark item isMarked =
-            dispatch (FileExplorerLogic.SetLFSMarked(item.Id, isMarked))
-            onToggleLfsMark |> Option.iter (fun fn -> fn item isMarked)
-
         let copyPathToClipboard (path: string) =
             promise {
                 try
@@ -83,9 +78,6 @@ type FileExplorer =
             |> Promise.start
 
         let defaultContextMenuItems (item: FileItem) : ContextMenuItem list =
-            let isLfsMarked = item.IsLFS = Some true
-            let nextMarked = not isLfsMarked
-
             [
                 if not item.IsDirectory then
                     {
@@ -93,28 +85,6 @@ type FileExplorer =
                         Icon = "swt:fluent--open-24-regular"
                         OnClick = fun () -> handleItemClick item
                         Disabled = None
-                    }
-
-                    {
-                        Label = if isLfsMarked then "Unmark Git LFS" else "Mark as Git LFS"
-                        Icon =
-                            if isLfsMarked then
-                                "swt:fluent--document-dismiss-24-regular"
-                            else
-                                "swt:fluent--document-add-24-regular"
-                        OnClick = fun () -> toggleLfsMark item nextMarked
-                        Disabled = Some item.IsDirectory
-                    }
-
-                    {
-                        Label =
-                            if isLfsMarked then
-                                "Git LFS: marked"
-                            else
-                                "Git LFS: not marked"
-                        Icon = "swt:fluent--tag-24-regular"
-                        OnClick = fun () -> ()
-                        Disabled = Some true
                     }
                 match item.Path with
                 | Some path -> {
