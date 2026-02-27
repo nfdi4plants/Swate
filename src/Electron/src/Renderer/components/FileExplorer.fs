@@ -13,20 +13,6 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
     let rootRepoPath = parent |> Option.map (fun p -> normalizePath p.path)
 
-    let tryToRepoRelativePath (filePath: string) =
-        match rootRepoPath with
-        | None -> None
-        | Some repoPath ->
-            let normalizedFilePath = normalizePath filePath
-            let prefix = repoPath + "/"
-
-            if normalizedFilePath = repoPath then
-                Some(repoPath, "")
-            elif normalizedFilePath.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase) then
-                Some(repoPath, normalizedFilePath.Substring(prefix.Length))
-            else
-                None
-
     let resolvePreviewPath (path: string) =
         let normalized = normalizePath path
         let lowered = normalized.ToLowerInvariant()
@@ -95,63 +81,33 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
 
     let fileItem = loop parent
 
-    let toggleLfsMark (item: FileItem) (markAsLfs: bool) =
+    let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) =
         promise {
-            match item.Path with
-            | None -> ()
-            | Some itemPath ->
-                match tryToRepoRelativePath itemPath with
-                | None ->
-                    setPreviewError (Some $"Could not resolve repository-relative path for '{item.Name}'.")
-                | Some(_, relativePath) when System.String.IsNullOrWhiteSpace relativePath ->
-                    setPreviewError (Some "Cannot mark ARC root as a Git LFS file.")
-                | Some(repoPath, relativePath) ->
-                    let request: GitLfsRequest = {
-                        RequestId = System.Guid.NewGuid().ToString()
-                        RepoPath = repoPath
-                        Command = if markAsLfs then GitLfsCommand.Track else GitLfsCommand.Untrack
-                        FilePath = Some relativePath
-                        TimeoutMs = Some 10000
-                    }
+            let request: GitLfsRequest = {
+                RequestId = System.Guid.NewGuid().ToString()
+                RepoPath = repoPath
+                Command = if markAsLfs then GitLfsCommand.Track else GitLfsCommand.Untrack
+                FilePath = Some relativePath
+                TimeoutMs = Some 10000
+            }
 
-                    let! result = Api.runGitLfs request
+            let! result = Api.runGitLfs request
 
-                    match result with
-                    | Ok _ ->
-                        setPreviewError None
-                    | Error exn ->
-                        setPreviewError (Some $"Git LFS update failed for '{item.Name}': {exn.Message}")
+            return
+                match result with
+                | Ok _ -> Ok ()
+                | Error exn -> Error exn.Message
         }
-        |> Promise.start
+
+    let toggleLfsMark =
+        FileExplorerGitLfsHelper.ToggleLfsMark(
+            rootRepoPath,
+            setPreviewError,
+            runToggleLfsMark
+        )
 
     let contextMenuItems (item: FileItem) =
-        if item.IsDirectory then
-            []
-        else
-            let isMarked = item.IsLFS = Some true
-
-            [
-                {
-                    Label = if isMarked then "Unmark Git LFS" else "Mark as Git LFS"
-                    Icon =
-                        if isMarked then
-                            "swt:fluent--document-dismiss-24-regular"
-                        else
-                            "swt:fluent--document-add-24-regular"
-                    OnClick = fun () -> toggleLfsMark item (not isMarked)
-                    Disabled = None
-                }
-                {
-                    Label =
-                        if isMarked then
-                            "Git LFS: marked"
-                        else
-                            "Git LFS: not marked"
-                    Icon = "swt:fluent--tag-24-regular"
-                    OnClick = fun () -> ()
-                    Disabled = Some true
-                }
-            ]
+        FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
 
     let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile (item: FileItem) =
         promise {
