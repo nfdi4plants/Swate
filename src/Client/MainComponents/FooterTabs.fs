@@ -228,8 +228,8 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
             prop.onDragOver drag_preventdefault
             prop.onDrop <| drop_handler (order, state, setState, dispatch)
             prop.title "New Table"
-            prop.onClick (fun _ ->
-                SpreadsheetInterface.CreateAnnotationTable false
+            prop.onClick (fun e ->
+                SpreadsheetInterface.CreateAnnotationTable e.ctrlKey
                 |> Messages.InterfaceMsg
                 |> dispatch
             )

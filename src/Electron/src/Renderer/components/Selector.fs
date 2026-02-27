@@ -40,7 +40,8 @@ let onARCClick (clickedARC: SelectorTypes.ARCPointer) =
     promise {
         match! Api.focusExistingARCWindow clickedARC.path with
         | Ok _ -> ()
-        | Error exn -> failwith $"{exn.Message}"
+        | Error exn ->
+            console.warn ($"Could not focus ARC window for path '{clickedARC.path}': {exn.Message}")
 
         return ()
     }

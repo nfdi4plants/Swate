@@ -78,6 +78,10 @@ module AddStep =
 
                 nextValue, (caretIndex, caretIndex)
             )
+        InputMode = None
+        Accept = None
+        AllowMultiple = None
+        ApplyFiles = None
     }
 
     let plugin: MarkdownToolbarPlugin = {

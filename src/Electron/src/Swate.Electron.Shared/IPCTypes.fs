@@ -47,7 +47,13 @@ type GitLfsResult = {
     Error: string
 }
 
-/// Two Way Bridge: Renderer <-> Main
+[<RequireQualifiedAccess>]
+type SaveBeforeQuitDecision =
+    | SaveAndClose
+    | CloseWithoutSaving
+    | CancelClose
+
+/// Two Way Bridge: Renderer -> Main -> Renderer
 type IArcVaultsApi = {
     /// Will open ARC in same window
     openARC: IpcMainEvent -> JS.Promise<Result<string, exn>>
@@ -71,6 +77,11 @@ type IArcVaultsApi = {
 type IGitLfsApi = {
     runChannel: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelChannel: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+}
+
+/// Two Way Bridge: Renderer -> Main
+type ISaveBeforeQuitApi = {
+    resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
 }
 
 type FileEntry = {
@@ -131,3 +142,6 @@ type IArcFileWatcherApi = {
     /// This function is called when ARC is reloaded due to local file changes.
     IsLoadingChanges: bool -> unit
 }
+
+/// One Way Bridge: Main -> Renderer
+type IMainSaveBeforeQuitApi = { requestSaveBeforeQuit: unit -> unit }
