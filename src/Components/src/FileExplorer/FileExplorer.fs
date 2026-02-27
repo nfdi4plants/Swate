@@ -38,8 +38,7 @@ type FileExplorer =
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
             ?onToggleLfsMark: FileItem -> bool -> unit,
             ?selectedItemId: string
-        )
-        =
+        ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
         let initialModel = FileExplorerLogic.init (defaultArg initialItems [])
@@ -57,9 +56,11 @@ type FileExplorer =
                 match selectedItemId with
                 | Some itemId ->
                     dispatch (FileExplorerLogic.EnsurePathVisible itemId)
+
                     if model.SelectedId <> Some itemId then
                         dispatch (FileExplorerLogic.SelectItem itemId)
-                | None -> ()),
+                | None -> ()
+            ),
             [| box selectedItemId; box model.Items |]
         )
 
@@ -67,11 +68,15 @@ type FileExplorer =
             dispatch (FileExplorerLogic.SelectItem item.Id)
             onItemClick |> Option.iter (fun fn -> fn item)
 
+        let toggleLfsMark item isMarked =
+            dispatch (FileExplorerLogic.SetLFSMarked(item.Id, isMarked))
+            onToggleLfsMark |> Option.iter (fun fn -> fn item isMarked)
+
         let copyPathToClipboard (path: string) =
             promise {
                 try
                     let windowObj: obj = Browser.Dom.window
-                    do! windowObj?navigator?clipboard?writeText(path)
+                    do! windowObj?navigator?clipboard?writeText (path)
                 with ex ->
                     Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
             }
@@ -79,6 +84,7 @@ type FileExplorer =
 
         let defaultContextMenuItems (item: FileItem) : ContextMenuItem list =
             let isLfsMarked = item.IsLFS = Some true
+            let nextMarked = not isLfsMarked
 
             [
                 if not item.IsDirectory then
@@ -88,16 +94,18 @@ type FileExplorer =
                         OnClick = fun () -> handleItemClick item
                         Disabled = None
                     }
+
                     {
                         Label = if isLfsMarked then "Unmark Git LFS" else "Mark as Git LFS"
-                        Icon = if isLfsMarked then "swt:fluent--document-dismiss-24-regular" else "swt:fluent--document-add-24-regular"
-                        OnClick =
-                            fun () ->
-                                let nextMarked = not isLfsMarked
-                                dispatch (FileExplorerLogic.SetLFSMarked(item.Id, nextMarked))
-                                onToggleLfsMark |> Option.iter (fun fn -> fn item nextMarked)
+                        Icon =
+                            if isLfsMarked then
+                                "swt:fluent--document-dismiss-24-regular"
+                            else
+                                "swt:fluent--document-add-24-regular"
+                        OnClick = fun () -> toggleLfsMark item nextMarked
                         Disabled = Some item.IsDirectory
                     }
+
                     {
                         Label =
                             if isLfsMarked then
@@ -109,13 +117,12 @@ type FileExplorer =
                         Disabled = Some true
                     }
                 match item.Path with
-                | Some path ->
-                    {
-                        Label = "Copy Path"
-                        Icon = "swt:fluent--copy-24-regular"
-                        OnClick = fun () -> copyPathToClipboard path
-                        Disabled = None
-                    }
+                | Some path -> {
+                    Label = "Copy Path"
+                    Icon = "swt:fluent--copy-24-regular"
+                    OnClick = fun () -> copyPathToClipboard path
+                    Disabled = None
+                  }
                 | None -> ()
                 if item.IsDirectory then
                     let isExpanded = model.ExpandedIds.Contains item.Id
@@ -133,7 +140,9 @@ type FileExplorer =
             ]
 
         let getContextMenuItems (item: FileItem) =
-            let customItems = onContextMenu |> Option.map (fun fn -> fn item) |> Option.defaultValue []
+            let customItems =
+                onContextMenu |> Option.map (fun fn -> fn item) |> Option.defaultValue []
+
             defaultContextMenuItems item @ customItems
 
         let toComponentMenuItem (item: Swate.Components.FileExplorerTypes.ContextMenuItem) =
@@ -141,11 +150,7 @@ type FileExplorer =
             let className = if isDisabled then "swt:opacity-50" else ""
 
             Swate.Components.ContextMenuItem(
-                text =
-                    Html.span [
-                        prop.className className
-                        prop.text item.Label
-                    ],
+                text = Html.span [ prop.className className; prop.text item.Label ],
                 icon =
                     Html.i [
                         prop.className [
@@ -157,7 +162,8 @@ type FileExplorer =
                 onClick =
                     (fun _ ->
                         if not isDisabled then
-                            item.OnClick())
+                            item.OnClick()
+                    )
             )
 
         let contextMenu =
