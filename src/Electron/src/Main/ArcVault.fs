@@ -87,6 +87,10 @@ type ArcVault(window: BrowserWindow) =
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// This should disable reloads from the file watcher.
     member val isBusyWriting: bool = false with get, set
+    /// Indicates whether a close confirmation dialog is currently open.
+    member val isCloseRequestPending: bool = false with get, set
+    /// Allows a confirmed close to pass through the onClose handler exactly once.
+    member val isCloseApproved: bool = false with get, set
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -327,14 +331,49 @@ type ArcVaults() =
             this.Vaults.Remove(id) |> ignore
             swatelogfn id $"Removed vault."
 
+    member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
+        match this.TryGetVault(windowId) with
+        | None -> swatelogfn windowId "Close request ignored. No vault found."
+        | Some(vault: ArcVault) ->
+            vault.isCloseRequestPending <- false
+
+            match decision with
+            | SaveBeforeQuitDecision.CancelClose -> swatelogfn windowId "Close request cancelled by user."
+            | SaveBeforeQuitDecision.CloseWithoutSaving ->
+                swatelogfn windowId "Close request approved by user. Closing without saving."
+                vault.isCloseApproved <- true
+                vault.window.close ()
+            | SaveBeforeQuitDecision.SaveAndClose ->
+                swatelogfn windowId "Close request approved by user. Closing after renderer save."
+                vault.isCloseApproved <- true
+                vault.window.close ()
+    }
+
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
-        window.onClose (fun _ ->
-            let recentARCs = vault.OnClose()
-            this.BroadcastRecentARCs recentARCs
+        window.onClose (fun closeEvent ->
+            if vault.isCloseApproved || vault.path.IsNone then
+                let recentARCs = vault.OnClose()
+                this.BroadcastRecentARCs recentARCs
+            else
+                closeEvent.preventDefault ()
+
+                if not vault.isCloseRequestPending then
+                    vault.isCloseRequestPending <- true
+
+                    let saveBeforeQuitClient =
+                        Remoting.init
+                        |> Remoting.withWindow vault.window
+                        |> Remoting.buildClient<IMainSaveBeforeQuitApi>
+
+                    saveBeforeQuitClient.requestSaveBeforeQuit ()
         )
 
-        window.onClosed (fun () -> this.DisposeVault(id))
+        window.onClosed (fun () ->
+            vault.isCloseRequestPending <- false
+            vault.isCloseApproved <- false
+            this.DisposeVault(id)
+        )
 
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
         let! window = ArcVaultHelper.createWindow ()

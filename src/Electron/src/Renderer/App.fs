@@ -2,6 +2,7 @@ module Renderer.App
 
 open Feliz
 open Fable.Electron.Remoting.Renderer
+open Fable.Core
 
 open Swate.Components
 open Swate.Electron.Shared
@@ -35,10 +36,10 @@ let Main () =
     let appState, setAppState = React.useState (AppState.Init)
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
-    let (previewError: string option), setPreviewError = React.useState (None)
-    let (previewData: PreviewData option), setPreviewData = React.useState (None)
+    let (previewError: string option), setPreviewError = React.useState None
+    let (previewData: PreviewData option), setPreviewData = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
-    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState (None)
+    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
 
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
@@ -233,13 +234,36 @@ let Main () =
 
     let navbar = Navbar.Main(selector)
 
+    let saveBeforeClose () : JS.Promise<Result<unit, string>> =
+        promise {
+            match arcFileState with
+            | None -> return Ok()
+            | Some arcFile ->
+                let! result = Navbar.saveArcFileWithPreview arcFile
+
+                match result with
+                | Ok updatedPreview ->
+                    setPreviewData (Some updatedPreview)
+                    setPreviewError None
+                    setDidSelectFile true
+                    return Ok()
+                | Error errorMsg ->
+                    let msg = $"Save failed: {errorMsg}"
+                    setPreviewError (Some msg)
+                    return Error msg
+        }
+
     context.AppStateCtx.AppStateCtx.Provider(
         {
             state = appState
             setState = setAppState
         },
         Layout.Main(
-            children = children,
+            children =
+                React.Fragment [|
+                    children
+                    CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                |],
             navbar = navbar,
             ?leftSidebar =
                 (let sidebarContent =
