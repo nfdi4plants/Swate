@@ -102,9 +102,10 @@ type Notes =
                         )
                         if uiState.ShowExistingTargetSelector then
                             let createInExistingText =
-                                match uiState.ActiveExistingTargetKind with
-                                | NotesTargetKind.Study -> "Create in Study"
-                                | NotesTargetKind.Assay -> "Create in Assay"
+                                match draft.SelectedExistingTarget |> Option.map _.Kind with
+                                | Some NotesTargetKind.Study -> "Create in Study"
+                                | Some NotesTargetKind.Assay -> "Create in Assay"
+                                | None -> "Create in Existing Target"
 
                             Html.div [
                                 prop.className "swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:space-y-3"
@@ -117,9 +118,7 @@ type Notes =
                                         draft.SelectedExistingTarget,
                                         (fun target -> setDraft { draft with SelectedExistingTarget = target }),
                                         availableExistingTargets,
-                                        uiState.IsSubmitting,
-                                        uiState.ActiveExistingTargetKind,
-                                        (fun kind -> setUiState (State.setActiveExistingTargetKind kind uiState))
+                                        uiState.IsSubmitting
                                     )
                                     Html.button [
                                         prop.testId "notes-create-existing-button"

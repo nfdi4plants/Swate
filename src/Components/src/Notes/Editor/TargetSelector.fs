@@ -1,5 +1,6 @@
 namespace Swate.Components.Notes.Editor
 
+open System
 open Feliz
 
 [<RequireQualifiedAccess>]
@@ -11,76 +12,76 @@ module TargetSelector =
             selectedTarget: ExistingTargetRef option,
             setSelectedTarget: ExistingTargetRef option -> unit,
             availableTargets: ResizeArray<ExistingTargetRef>,
-            isSubmitting: bool,
-            activeKind: NotesTargetKind,
-            setActiveKind: NotesTargetKind -> unit
+            isSubmitting: bool
         ) =
-        let setKind kind =
-            setActiveKind kind
-
-            match selectedTarget with
-            | Some target when target.Kind <> kind -> setSelectedTarget None
-            | _ -> ()
-
-        let filteredTargets =
+        let studyTargets =
             availableTargets
-            |> Seq.filter (fun target -> target.Kind = activeKind)
+            |> Seq.filter (fun target -> target.Kind = NotesTargetKind.Study)
+            |> Seq.sortBy _.Name
             |> Seq.toArray
+
+        let assayTargets =
+            availableTargets
+            |> Seq.filter (fun target -> target.Kind = NotesTargetKind.Assay)
+            |> Seq.sortBy _.Name
+            |> Seq.toArray
+
+        let hasTargets = studyTargets.Length > 0 || assayTargets.Length > 0
 
         let selectedValue =
             selectedTarget
-            |> Option.filter (fun target -> target.Kind = activeKind)
             |> Option.map _.Name
             |> Option.defaultValue ""
-
-        let kindButton (label: string) (kind: NotesTargetKind) =
-            Html.button [
-                prop.className [
-                    "swt:btn swt:flex-1"
-                    if activeKind = kind then
-                        "swt:btn-primary"
-                    else
-                        "swt:btn-outline"
-                ]
-                prop.disabled isSubmitting
-                prop.onClick (fun _ -> setKind kind)
-                prop.text label
-            ]
 
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
-                Html.div [
-                    prop.className "swt:flex swt:gap-3"
-                    prop.children [
-                        kindButton "Study" NotesTargetKind.Study
-                        kindButton "Assay" NotesTargetKind.Assay
-                    ]
-                ]
                 Html.select [
                     prop.testId "notes-existing-target-select"
                     prop.className "swt:select swt:select-bordered swt:w-full"
-                    prop.disabled (isSubmitting || filteredTargets.Length = 0)
+                    prop.disabled (isSubmitting || not hasTargets)
                     prop.valueOrDefault selectedValue
                     prop.onChange (fun (value: string) ->
-                        filteredTargets
-                        |> Array.tryFind (fun target -> target.Name = value)
-                        |> setSelectedTarget)
+                        if String.IsNullOrWhiteSpace value then
+                            setSelectedTarget None
+                        else
+                            availableTargets
+                            |> Seq.toArray
+                            |> Array.tryFind (fun target -> target.Name = value)
+                            |> setSelectedTarget)
                     prop.children [
                         Html.option [
                             prop.value ""
                             prop.text (
-                                if filteredTargets.Length = 0 then
+                                if not hasTargets then
                                     "No targets available"
                                 else
-                                    "Select target"
+                                    "Select Study or Assay target"
                             )
                         ]
-                        for target in filteredTargets do
-                            Html.option [
-                                prop.key $"{target.Kind}-{target.Name}"
-                                prop.value target.Name
-                                prop.text target.Name
+                        if studyTargets.Length > 0 then
+                            Html.optgroup [
+                                prop.label "Study"
+                                prop.children [
+                                    for target in studyTargets do
+                                        Html.option [
+                                            prop.key $"{target.Kind}-{target.Name}"
+                                            prop.value target.Name
+                                            prop.text target.Name
+                                        ]
+                                ]
+                            ]
+                        if assayTargets.Length > 0 then
+                            Html.optgroup [
+                                prop.label "Assay"
+                                prop.children [
+                                    for target in assayTargets do
+                                        Html.option [
+                                            prop.key $"{target.Kind}-{target.Name}"
+                                            prop.value target.Name
+                                            prop.text target.Name
+                                        ]
+                                ]
                             ]
                     ]
                 ]
