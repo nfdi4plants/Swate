@@ -36,10 +36,10 @@ let Main () =
     let appState, setAppState = React.useState (AppState.Init)
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
-    let (previewError: string option), setPreviewError = React.useState (None)
-    let (previewData: PreviewData option), setPreviewData = React.useState (None)
+    let (previewError: string option), setPreviewError = React.useState None
+    let (previewData: PreviewData option), setPreviewData = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
-    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState (None)
+    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
 
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
