@@ -2,6 +2,7 @@ module Renderer.App
 
 open Feliz
 open Fable.Electron.Remoting.Renderer
+open Fable.Core
 
 open Swate.Components
 open Swate.Electron.Shared
@@ -233,13 +234,36 @@ let Main () =
 
     let navbar = Navbar.Main(selector)
 
+    let saveBeforeClose () : JS.Promise<Result<unit, string>> =
+        promise {
+            match arcFileState with
+            | None -> return Ok()
+            | Some arcFile ->
+                let! result = Navbar.saveArcFileWithPreview arcFile
+
+                match result with
+                | Ok updatedPreview ->
+                    setPreviewData (Some updatedPreview)
+                    setPreviewError None
+                    setDidSelectFile true
+                    return Ok()
+                | Error errorMsg ->
+                    let msg = $"Save failed: {errorMsg}"
+                    setPreviewError (Some msg)
+                    return Error msg
+        }
+
     context.AppStateCtx.AppStateCtx.Provider(
         {
             state = appState
             setState = setAppState
         },
         Layout.Main(
-            children = children,
+            children =
+                React.Fragment [|
+                    children
+                    CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                |],
             navbar = navbar,
             ?leftSidebar =
                 (let sidebarContent =
