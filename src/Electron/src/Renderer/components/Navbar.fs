@@ -25,7 +25,7 @@ let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
         return saveResult |> Result.map ignore
     }
 
-let onSaveClick arcFileState setPreviewData setDidSelectFile _ =
+let onSaveClick arcFileState setPreviewData _ =
     match arcFileState with
     | None -> ()
     | Some arcFile ->
@@ -35,7 +35,6 @@ let onSaveClick arcFileState setPreviewData setDidSelectFile _ =
             match result with
             | Ok updatedPreview ->
                 setPreviewData (Some updatedPreview)
-                setDidSelectFile true
             | Error errorMsg ->
                 setPreviewData (Some (IPCTypes.PreviewData.Error $"Save failed: {errorMsg}"))
         }

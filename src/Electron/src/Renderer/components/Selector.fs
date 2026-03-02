@@ -32,7 +32,10 @@ let openCurrentWindow =
 
 ///Selector module
 let openARC (appState: AppState) =
-    if appState.IsInit then openCurrentWindow else openNewWindow
+    if appState.IsInit then
+        openCurrentWindow
+    else
+        openNewWindow
 
 ///Selector module
 let onARCClick (clickedARC: SelectorTypes.ARCPointer) =

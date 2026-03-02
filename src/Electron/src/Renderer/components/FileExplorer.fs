@@ -7,8 +7,11 @@ open Swate.Components.FileExplorerTypes
 
 open Browser.Dom
 
+open Feliz
 
-let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft setPreviewData =
+
+[<ReactComponent>]
+let CreateFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft (setPreviewData: PreviewData option -> unit) =
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
     let resolvePreviewPath (path: string) =
@@ -77,9 +80,8 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
 
     let fileItem = loop parent
 
-    let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setShowLandingDraft setPreviewData (item: FileItem) =
+    let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setShowLandingDraft (setPreviewData: PreviewData option -> unit) (item: FileItem) =
         promise {
-
             if parent.IsSome then
 
                 let fileTree = parent.Value
@@ -105,28 +107,26 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     | Ok data ->
                         console.log ("[Renderer] Received data, processing...")
                         setPreviewData (Some data)
-                    | Microsoft.FSharp.Core.Error exn ->
+                    | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
                         setPreviewData None
-                        setPreviewData (Some (Error $"Could not open preview for '{item.Name}': {exn.Message}"))
+                        setPreviewData (Some (PreviewData.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
                 elif item.Path.IsSome && isDirectoryByPath then
                     // Folders are not preview targets.
                     setPreviewData None
                 else
-                    setPreviewData (Some (Error $"File '{item.Name}' has no path."))
+                    setPreviewData (Some (PreviewData.Error $"File '{item.Name}' has no path."))
         }
         |> Promise.start
 
     if fileItem.IsSome then
-        Some(
-            FileExplorer.FileExplorer(
-                initialItems = [ fileItem.Value ],
-                onItemClick = openPreview parent setSelectedTreeItemPath setShowLandingDraft setPreviewData,
-                ?selectedItemId = selectedTreeItemPath
-            )
+        FileExplorer.FileExplorer(
+            initialItems = [ fileItem.Value ],
+            onItemClick = openPreview parent setSelectedTreeItemPath setShowLandingDraft setPreviewData,
+            ?selectedItemId = selectedTreeItemPath
         )
     else
-        None
+        failwith "Fileitem should exist."
 
 let insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry) =
     let parts = entry.path.Split('/', System.StringSplitOptions.RemoveEmptyEntries)

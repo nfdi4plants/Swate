@@ -16,7 +16,6 @@ let createFromLanding
     appState
     setSelectedTreeItemPath
     setPreviewData
-    setDidSelectFile
     (payload: SubmitPayload)
     =
     let finishSuccess (previewData: PreviewData) =
@@ -25,7 +24,6 @@ let createFromLanding
         |> setSelectedTreeItemPath
 
         setPreviewData (Some previewData)
-        setDidSelectFile true
         setShowLandingDraft false
         setLandingDraftActive false
         setLandingDraft LandingDraft.init
@@ -41,7 +39,7 @@ let createFromLanding
         let! saveResult = Navbar.saveArcFileWithPreview payload.ArcFile
 
         match saveResult with
-        | Microsoft.FSharp.Core.Error message ->
+        | Error message ->
             setLandingUiState {
                 landingUiState with
                     IsSubmitting = false
@@ -60,7 +58,7 @@ let createFromLanding
 
                 match writeResult with
                 | Ok() -> finishSuccess previewData
-                | Microsoft.FSharp.Core.Error exn ->
+                | Error exn ->
                     setLandingUiState {
                         landingUiState with
                             IsSubmitting = false
@@ -75,25 +73,39 @@ let createARCPreview
     (setArcFileState: ArcFiles option -> unit)
     (activeView: PreviewActiveView)
     (setActiveView: PreviewActiveView -> unit)
-    didSelectFile
-    setDidSelectFile
     =
 
     let setArcFile arcFile = setArcFileState (Some arcFile)
 
+    let canRenderDataMapView =
+        match arcFile with
+        | ArcFiles.Assay assay -> assay.DataMap.IsSome
+        | ArcFiles.Study(study, _) -> study.DataMap.IsSome
+        | ArcFiles.Run run -> run.DataMap.IsSome
+        | ArcFiles.DataMap _ -> true
+        | _ -> false
+
     React.useEffect (
         (fun () ->
-            if didSelectFile then
-                setArcFile arcFile
-                let tables = arcFile.Tables()
-                setDidSelectFile false
+            let tables = arcFile.Tables()
 
-                if tables.Count > 0 then
-                    setActiveView (PreviewActiveView.Table 0)
-                else
-                    setActiveView PreviewActiveView.Metadata
+            let nextActiveView =
+                match activeView with
+                | PreviewActiveView.Table tableIndex when tableIndex >= 0 && tableIndex < tables.Count ->
+                    activeView
+                | PreviewActiveView.DataMap when canRenderDataMapView ->
+                    activeView
+                | PreviewActiveView.Metadata -> activeView
+                | _ ->
+                    if tables.Count > 0 then
+                        PreviewActiveView.Table 0
+                    else
+                        PreviewActiveView.Metadata
+
+            if nextActiveView <> activeView then
+                setActiveView nextActiveView
         ),
-        [| box arcFile |]
+        [| box arcFile; box activeView |]
     )
 
     Html.div [
@@ -114,7 +126,6 @@ let computeARCContent
     setArcFileState
     activeView
     setActiveView
-    didSelectFile
     landingDraft
     setLandingDraft
     landingUiState
@@ -126,7 +137,6 @@ let computeARCContent
     appState
     setSelectedTreeItemPath
     setPreviewData
-    setDidSelectFile
     (path: string)
     =
     if landingDraftActive && showLandingDraft then
@@ -144,22 +154,21 @@ let computeARCContent
                 appState
                 setSelectedTreeItemPath
                 setPreviewData
-                setDidSelectFile
         )
     else
         match previewData with
         | Some data ->
             match data with
-            | ArcFileData _ ->
+            | PreviewData.ArcFileData _ ->
                 match arcFileState with
                 | Some arcFile ->
-                    createARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
+                    createARCPreview arcFile setArcFileState activeView setActiveView
                 | None ->
                     Html.div [
                         prop.className "swt:p-4 swt:text-error"
                         prop.text "Failed to parse ArcFile data"
                     ]
-            | Text content ->
+            | PreviewData.Text content ->
                 Html.div [
                     prop.className "swt:size-full swt:p-4 swt:overflow-auto swt:bg-base-100"
                     prop.children [|
@@ -169,12 +178,12 @@ let computeARCContent
                         ]
                     |]
                 ]
-            | Unknown ->
+            | PreviewData.Unknown ->
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
                     prop.children [| Html.h1 "Unknown file type" |]
                 ]
-            | Error errMsg ->
+            | PreviewData.Error errMsg ->
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
                     prop.children [|
@@ -209,8 +218,6 @@ let content
         setSelectedTreeItemPath
     ) =
 
-
-    let didSelectFile, setDidSelectFile = React.useState false
     let landingDraftActive, setLandingDraftActive = React.useState false
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
@@ -222,7 +229,6 @@ let content
         setLandingDraftActive true
         setShowLandingDraft true
         setSelectedTreeItemPath None
-        setDidSelectFile false
         setArcFileState None
 
     React.useLayoutEffect(
@@ -264,7 +270,7 @@ let content
                     prop.children [
                         Html.div [
                             prop.className "swt:flex-none"
-                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData setDidSelectFile) ]
+                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData) ]
                         ]
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
@@ -275,7 +281,6 @@ let content
                                     setArcFileState
                                     activeView
                                     setActiveView
-                                    didSelectFile
                                     landingDraft
                                     setLandingDraft
                                     landingUiState
@@ -287,7 +292,6 @@ let content
                                     appState
                                     setSelectedTreeItemPath
                                     setPreviewData
-                                    setDidSelectFile
                                     path
                             ]
                         ]

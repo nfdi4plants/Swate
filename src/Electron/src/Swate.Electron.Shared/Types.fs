@@ -75,7 +75,7 @@ module ArcFileSaveMapping =
                 |> ArcFiles.Template
                 |> Ok
         with e ->
-            Microsoft.FSharp.Core.Error e
+            Error e
 
     let tryParseSaveRequest (request: SaveArcFileRequest) : Result<ArcFiles, exn> =
         tryParseArcFile request.FileType request.Json
@@ -83,15 +83,15 @@ module ArcFileSaveMapping =
     let tryCreatePreviewData (arcFile: ArcFiles) : PreviewData option =
         match arcFile with
         | ArcFiles.Investigation investigation ->
-            Some(ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 investigation))
+            Some(PreviewData.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 investigation))
         | ArcFiles.Study(study, _) ->
-            Some(ArcFileData(ArcFilesDiscriminate.Study, ArcStudy.toJsonString 0 study))
+            Some(PreviewData.ArcFileData(ArcFilesDiscriminate.Study, ArcStudy.toJsonString 0 study))
         | ArcFiles.Assay assay ->
-            Some(ArcFileData(ArcFilesDiscriminate.Assay, ArcAssay.toJsonString 0 assay))
+            Some(PreviewData.ArcFileData(ArcFilesDiscriminate.Assay, ArcAssay.toJsonString 0 assay))
         | ArcFiles.Run run ->
-            Some(ArcFileData(ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run))
+            Some(PreviewData.ArcFileData(ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run))
         | ArcFiles.Workflow workflow ->
-            Some(ArcFileData(ArcFilesDiscriminate.Workflow, ArcWorkflow.toJsonString 0 workflow))
+            Some(PreviewData.ArcFileData(ArcFilesDiscriminate.Workflow, ArcWorkflow.toJsonString 0 workflow))
         | ArcFiles.DataMap _
         | ArcFiles.Template _ ->
             None

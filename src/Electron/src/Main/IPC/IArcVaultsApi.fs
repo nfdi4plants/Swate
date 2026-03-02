@@ -2,6 +2,7 @@ module Main.IPC.IArcVaultsApi
 
 open System
 open Swate.Electron.Shared
+open Swate.Electron.Shared.IPCTypes
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -87,7 +88,7 @@ let syncARCFile (arc: ARC) (request: IPCTypes.SaveArcFileRequest) : Result<IPCTy
             Error parseError
         | Ok (ArcFiles.Investigation investigation) ->
             copyInvestigationMetadata investigation arc
-            Ok(IPCTypes.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
+            Ok(PreviewData.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
         | Ok (ArcFiles.Study(study, _)) ->
             if arc.TryGetStudy(study.Identifier).IsSome then
                 arc.SetStudy(study.Identifier, study)
@@ -476,7 +477,7 @@ let api: IPCTypes.IArcVaultsApi = {
 
                         match tryResolveDataMap () with
                         | Some dataMap ->
-                            return Ok(IPCTypes.ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
+                            return Ok(PreviewData.ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
                         | None ->
                             return Error(exn $"DataMap '{identifier}' not found in ARC.")
 
@@ -484,7 +485,7 @@ let api: IPCTypes.IArcVaultsApi = {
                     // Fallback to text preview for unknown file types
                     try
                         let content = fs.readFileSync (path, "utf8")
-                        return Ok(IPCTypes.Text content)
+                        return Ok(PreviewData.Text content)
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }

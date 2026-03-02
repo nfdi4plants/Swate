@@ -9,6 +9,7 @@ open Swate.Components
 open ARCtrl.ARCtrlHelper
 
 
+[<RequireQualifiedAccess>]
 type PreviewData =
     | ArcFileData of fileType: ArcFilesDiscriminate * json: string
     | Text of string

@@ -13,13 +13,12 @@ open ARCtrl
 open ARCtrl.Json
 
 open Renderer.components
-open components.MainElement
 
 
 let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
     | Ok arcFile -> Some arcFile
-    | Microsoft.FSharp.Core.Error e ->
+    | Error e ->
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
@@ -27,34 +26,40 @@ let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFi
 let Main () =
 
     let recentARCs, setRecentARCs = React.useState [||]
-    let fileExplorer, setFileExplorer = React.useState None
     let appState, setAppState = React.useState AppState.Init
     let showLandingDraft, setShowLandingDraft = React.useState false
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
-    let (previewData: PreviewData option), setPreviewData = React.useState None
+    let (previewData: PreviewData option), (setPreviewData: PreviewData option -> unit) = React.useState None
     let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     React.useEffect (
         (fun () ->
             match previewData with
-            | Some (ArcFileData(fileType, json)) ->
+            | Some (PreviewData.ArcFileData(fileType, json)) ->
                 match ParseArcFileFromJson fileType json with
-                | Some arcFile ->
-                    match arcFileState with
-                    | None ->
-                        setArcFileState (Some arcFile)
-                    | Some existing when existing.getIdentifier() <> arcFile.getIdentifier() ->
-                        setArcFileState (Some arcFile)
-                    | _ -> ()
-                | None -> ()
-            | _ -> ()
+                | Some arcFile -> setArcFileState (Some arcFile)
+                | None -> setArcFileState None
+            | _ -> setArcFileState None
         ),
         [| box previewData |]
     )
 
+    React.useEffect (
+        (fun () ->
+            match arcFileState with
+            | Some arcFile ->
+                match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
+                | Some request ->
+                    Api.syncARC request |> Promise.start
+                | None -> ()
+            | None -> ()
+        ),
+        [| box arcFileState |]
+    )
+
     ///Used on initializing
-    React.useLayoutEffectOnce (fun _ ->
+    React.useEffectOnce (fun _ ->
         Api.getOpenPath()
         |> Promise.map (fun pathOption ->
             match pathOption with
@@ -67,68 +72,31 @@ let Main () =
         |> Promise.start
     )
 
-    React.useEffect (
-        (fun _ ->
-            let ra = ResizeArray(fileTree.Values)
-            let fileEntries = ra.ToArray()
+    let fileExplorer =
+        React.useMemo (
+            (fun _ ->
+                let ra = ResizeArray(fileTree.Values)
+                let fileEntries = ra.ToArray()
 
-            let fileTree =
-                if fileEntries.Length > 0 then
-                    Some(FileExplorer.getFileTree fileEntries)
+                let fileTree =
+                    if fileEntries.Length > 0 then
+                        Some(FileExplorer.getFileTree fileEntries)
+                    else
+                        None
+
+                if fileTree.IsSome then
+                    Some (
+                        FileExplorer.CreateFileTree
+                            fileTree
+                            selectedTreeItemPath
+                            setSelectedTreeItemPath
+                            setShowLandingDraft
+                            setPreviewData
+                    )
                 else
                     None
-
-            if arcFileState.IsSome then
-                let fileType: SaveArcFileRequest =
-                    match arcFileState.Value with
-                    | ArcFiles.Assay a -> 
-                        {
-                            FileType = ArcFilesDiscriminate.Assay
-                            Json = a.ToJsonString()
-                        }
-                    | ArcFiles.Investigation i ->
-                        {
-                            FileType = ArcFilesDiscriminate.Investigation
-                            Json = i.ToJsonString()
-                        }
-                    | ArcFiles.Run r ->
-                        {
-                            FileType = ArcFilesDiscriminate.Run
-                            Json = r.ToJsonString()
-                        }
-                    | ArcFiles.Study (s, _) ->
-                        {
-                            FileType = ArcFilesDiscriminate.Study
-                            Json = s.ToJsonString()
-                        }
-                    | ArcFiles.Workflow w ->
-                        {
-                            FileType = ArcFilesDiscriminate.Workflow
-                            Json = w.ToJsonString()
-                        }
-                    | ArcFiles.Template t ->
-                        {
-                            FileType = ArcFilesDiscriminate.Template
-                            Json = t.toJsonString()
-                        }
-                    | ArcFiles.DataMap d ->
-                        {
-                            FileType = ArcFilesDiscriminate.DataMap
-                            Json = ""
-                        }
-
-                Api.syncARC fileType |> Promise.start
-
-            FileExplorer.createFileTree
-                fileTree
-                selectedTreeItemPath
-                setSelectedTreeItemPath
-                setShowLandingDraft
-                setPreviewData
-                |> setFileExplorer
-                |> ignore
-        ),
-        [| box fileTree; box selectedTreeItemPath |]
+            ),
+            [|  fileTree; selectedTreeItemPath |]
     )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
@@ -139,6 +107,7 @@ let Main () =
                 match pathOption with
                 | Some p ->
                     AppState.ARC p |> setAppState
+                    setSelectedTreeItemPath pathOption
                 | None ->
                     setShowLandingDraft false
                     setSelectedTreeItemPath None
@@ -181,7 +150,7 @@ let Main () =
         )
 
     let navbar = Navbar.Main(selector)
-
+    console.log ($"fileExplorer: {fileExplorer.IsSome}")
     context.AppStateCtx.AppStateCtx.Provider(
         {
             state = appState
@@ -191,31 +160,31 @@ let Main () =
             children = children,
             navbar = navbar,
             ?leftSidebar =
-                (let sidebarContent =
+                (
                     match fileExplorer with
-                    | Some fe -> fe
-                    | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
-
-                 Some(
-                     Html.div [
-                         prop.className "swt:p-4"
-                         prop.children [|
-                            match appState with
-                            | AppState.ARC _ ->
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                                    prop.text "Landing Page"
-                                    prop.onClick (fun _ -> setShowLandingDraft (not showLandingDraft)
-                                    )
-                                ]
-                            | _ -> Html.none
-                            Html.h2 [
-                                prop.text "ARC-Tree"
+                    | Some fe ->
+                        Some(
+                            Html.div [
+                                prop.className "swt:p-4"
+                                prop.children [|
+                                    match appState with
+                                    | AppState.ARC _ ->
+                                        Html.button [
+                                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                                            prop.text "Landing Page"
+                                            prop.onClick (fun _ -> setShowLandingDraft (not showLandingDraft)
+                                            )
+                                        ]
+                                    | _ -> Html.none
+                                    Html.h2 [
+                                        prop.text "ARC-Tree"
+                                    ]
+                                    fe
+                                |]
                             ]
-                            sidebarContent
-                        |]
-                     ]
-                 )),
+                        )
+                    | None -> None
+                 ),
             leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
         )
     )

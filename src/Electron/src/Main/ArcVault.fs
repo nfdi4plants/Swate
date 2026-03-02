@@ -184,7 +184,7 @@ module ArcVaultExtensions =
         member this.LoadArc() = promise {
             if this.path.IsSome then
                 match! ARC.tryLoadAsync (this.path.Value) with
-                | Microsoft.FSharp.Core.Error e -> swatefailfn this.window.id $"Unable to load ARC: {e}"
+                | Error e -> swatefailfn this.window.id $"Unable to load ARC: {e}"
                 | Ok arc -> this.arc <- Some arc
             else
                 swatefailfn this.window.id $"No path set for StartFileWatcher."
