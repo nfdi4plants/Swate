@@ -29,13 +29,11 @@ let Main () =
     let recentARCs, setRecentARCs = React.useState [||]
     let fileExplorer, setFileExplorer = React.useState None
     let appState, setAppState = React.useState AppState.Init
-    let activeView, setActiveView = React.useState PreviewActiveView.Metadata
+    let showLandingDraft, setShowLandingDraft = React.useState false
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let (previewData: PreviewData option), setPreviewData = React.useState None
     let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
-
-    let showLandingDraft, setShowLandingDraft = React.useState false
 
     React.useEffect (
         (fun () ->
@@ -167,8 +165,6 @@ let Main () =
                     appState,
                     setAppState,
                     setArcFileState,
-                    activeView,
-                    setActiveView,
                     arcFileState,
                     previewData,
                     setPreviewData,
@@ -179,7 +175,6 @@ let Main () =
             [|
                 box appState
                 box previewData
-                box activeView
                 box arcFileState
                 box showLandingDraft
             |]

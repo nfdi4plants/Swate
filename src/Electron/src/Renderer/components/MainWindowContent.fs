@@ -201,8 +201,6 @@ let content
         appState: AppState,
         setAppState,
         setArcFileState,
-        activeView,
-        setActiveView,
         arcFileState,
         previewData,
         setPreviewData,
@@ -211,10 +209,12 @@ let content
         setSelectedTreeItemPath
     ) =
 
+
     let didSelectFile, setDidSelectFile = React.useState false
-    let landingDraft, setLandingDraft = React.useState LandingDraft.init
-    let landingUiState, setLandingUiState = React.useState LandingUiState.init
     let landingDraftActive, setLandingDraftActive = React.useState false
+    let landingDraft, setLandingDraft = React.useState LandingDraft.init
+    let activeView, setActiveView = React.useState PreviewActiveView.Metadata
+    let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
     let resetLandingDraft () =
         setLandingDraft LandingDraft.init
