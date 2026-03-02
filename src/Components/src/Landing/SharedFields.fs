@@ -8,7 +8,8 @@ open Swate.Components.Metadata
 [<RequireQualifiedAccess>]
 module SharedFields =
 
-    let boxedHelperField (title: string) (content: ReactElement) =
+    [<ReactComponent>]
+    let BoxedHelperField (title: string) (content: ReactElement) =
         Html.fieldSet [
             prop.className "swt:fieldset"
             prop.children [
@@ -50,14 +51,14 @@ module SharedFields =
                 isarea = true,
                 placeholder = "Experiment description"
             )
-            boxedHelperField "Involved People" (
+            BoxedHelperField "Involved People" (
                 FormComponents.PersonsInput(
                     draft.InvolvedPeople,
                     (fun persons -> setDraft { draft with InvolvedPeople = persons }),
                     ?onImportPersons = onImportPersons
                 )
             )
-            boxedHelperField "Comments" (
+            BoxedHelperField "Comments" (
                 FormComponents.CommentsInput(
                     draft.Comments,
                     (fun comments -> setDraft { draft with Comments = comments })
