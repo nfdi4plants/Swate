@@ -29,8 +29,8 @@ let Main () =
     let appState, setAppState = React.useState AppState.Init
     let showLandingDraft, setShowLandingDraft = React.useState false
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
-    let (previewData: PreviewData option), (setPreviewData: PreviewData option -> unit) = React.useState None
     let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
+    let (previewData: PreviewData option), (setPreviewData: PreviewData option -> unit) = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     React.useEffect (
@@ -66,8 +66,8 @@ let Main () =
             | Some p ->
                 AppState.ARC p |> setAppState
             | None ->
-                setSelectedTreeItemPath None
                 setAppState AppState.Init
+                setSelectedTreeItemPath None
         )
         |> Promise.start
     )
@@ -130,7 +130,7 @@ let Main () =
     let children =
         React.useMemo (
             (fun _ ->
-                MainWindowContent.content(
+                MainWindowContent.Content(
                     appState,
                     setAppState,
                     setArcFileState,
@@ -150,7 +150,7 @@ let Main () =
         )
 
     let navbar = Navbar.Main(selector)
-    console.log ($"fileExplorer: {fileExplorer.IsSome}")
+
     context.AppStateCtx.AppStateCtx.Provider(
         {
             state = appState
@@ -172,8 +172,7 @@ let Main () =
                                         Html.button [
                                             prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
                                             prop.text "Landing Page"
-                                            prop.onClick (fun _ -> setShowLandingDraft (not showLandingDraft)
-                                            )
+                                            prop.onClick (fun _ -> setShowLandingDraft (not showLandingDraft))
                                         ]
                                     | _ -> Html.none
                                     Html.h2 [

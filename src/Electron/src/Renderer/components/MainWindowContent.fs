@@ -205,7 +205,7 @@ let computeARCContent
             ]
 
 [<ReactComponent>]
-let content
+let Content
     (
         appState: AppState,
         setAppState,
