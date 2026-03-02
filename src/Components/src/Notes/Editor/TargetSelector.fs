@@ -28,9 +28,16 @@ module TargetSelector =
 
         let hasTargets = studyTargets.Length > 0 || assayTargets.Length > 0
 
+        let kindToken (kind: NotesTargetKind) =
+            match kind with
+            | NotesTargetKind.Study -> "study"
+            | NotesTargetKind.Assay -> "assay"
+
+        let optionValue (target: ExistingTargetRef) = $"{kindToken target.Kind}::{target.Name}"
+
         let selectedValue =
             selectedTarget
-            |> Option.map _.Name
+            |> Option.map optionValue
             |> Option.defaultValue ""
 
         Html.div [
@@ -45,10 +52,24 @@ module TargetSelector =
                         if String.IsNullOrWhiteSpace value then
                             setSelectedTarget None
                         else
-                            availableTargets
-                            |> Seq.toArray
-                            |> Array.tryFind (fun target -> target.Name = value)
-                            |> setSelectedTarget)
+                            let selectedParts = value.Split([| "::" |], 2, StringSplitOptions.None)
+
+                            if selectedParts.Length <> 2 then
+                                setSelectedTarget None
+                            else
+                                let selectedKind =
+                                    match selectedParts.[0] with
+                                    | "study" -> Some NotesTargetKind.Study
+                                    | "assay" -> Some NotesTargetKind.Assay
+                                    | _ -> None
+
+                                match selectedKind with
+                                | None -> setSelectedTarget None
+                                | Some kind ->
+                                    availableTargets
+                                    |> Seq.toArray
+                                    |> Array.tryFind (fun target -> target.Kind = kind && target.Name = selectedParts.[1])
+                                    |> setSelectedTarget)
                     prop.children [
                         Html.option [
                             prop.value ""
@@ -66,7 +87,7 @@ module TargetSelector =
                                     for target in studyTargets do
                                         Html.option [
                                             prop.key $"{target.Kind}-{target.Name}"
-                                            prop.value target.Name
+                                            prop.value (optionValue target)
                                             prop.text target.Name
                                         ]
                                 ]
@@ -78,7 +99,7 @@ module TargetSelector =
                                     for target in assayTargets do
                                         Html.option [
                                             prop.key $"{target.Kind}-{target.Name}"
-                                            prop.value target.Name
+                                            prop.value (optionValue target)
                                             prop.text target.Name
                                         ]
                                 ]
