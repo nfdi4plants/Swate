@@ -8,31 +8,55 @@ open Swate.Components
 [<RequireQualifiedAccess>]
 module MarkdownPluginPromptModal =
 
+    type ViewProps = {
+        IsOpen: bool
+        SetIsOpen: bool -> unit
+        PromptViewModel: PluginTextInputHelpers.PromptViewModel
+        PromptInput: string
+        PromptError: string option
+        PromptFiles: MarkdownPromptFile list
+        PromptFileDropActive: bool
+        PromptInputRef: IRefValue<option<HTMLInputElement>>
+        PromptFileInputRef: IRefValue<option<HTMLInputElement>>
+        SetPromptFileDropActive: bool -> unit
+        OnPromptInputChange: string -> unit
+        OnPromptFileChange: File list -> unit
+        OnTriggerPromptFileSelection: unit -> unit
+        OnPromptDrop: DragEvent -> unit
+        OnRemovePromptFileAtIndex: int -> unit
+        OnSubmitPromptDialog: unit -> unit
+    }
+
     [<ReactComponent>]
     let View
-        (
-            isOpen: bool,
-            setIsOpen: bool -> unit,
-            promptViewModel: PluginTextInputHelpers.PromptViewModel,
-            promptInput: string,
-            promptError: string option,
-            promptFiles: MarkdownPromptFile list,
-            promptFileDropActive: bool,
-            promptInputRef: IRefValue<option<HTMLInputElement>>,
-            promptFileInputRef: IRefValue<option<HTMLInputElement>>,
-            setPromptFileDropActive: bool -> unit,
-            onPromptInputChange: string -> unit,
-            onPromptFileChange: File list -> unit,
-            onTriggerPromptFileSelection: unit -> unit,
-            onPromptDrop: DragEvent -> unit,
-            onRemovePromptFileAtIndex: int -> unit,
-            onSubmitPromptDialog: unit -> unit
-        ) =
+        (props: ViewProps) =
+        let isOpen = props.IsOpen
+        let setIsOpen = props.SetIsOpen
+        let promptViewModel = props.PromptViewModel
+        let promptInput = props.PromptInput
+        let promptError = props.PromptError
+        let promptFiles = props.PromptFiles
+        let promptFileDropActive = props.PromptFileDropActive
+        let promptInputRef = props.PromptInputRef
+        let promptFileInputRef = props.PromptFileInputRef
+        let setPromptFileDropActive = props.SetPromptFileDropActive
+        let onPromptInputChange = props.OnPromptInputChange
+        let onPromptFileChange = props.OnPromptFileChange
+        let onTriggerPromptFileSelection = props.OnTriggerPromptFileSelection
+        let onPromptDrop = props.OnPromptDrop
+        let onRemovePromptFileAtIndex = props.OnRemovePromptFileAtIndex
+        let onSubmitPromptDialog = props.OnSubmitPromptDialog
+
         let isFilePrompt = promptViewModel.InputMode = MarkdownPromptInputMode.File
 
         let promptDescription =
             promptViewModel.Description
             |> Option.map Html.text
+
+        let promptFileKey (file: MarkdownPromptFile) =
+            let hostPath = file.HostPath |> Option.defaultValue ""
+            let mimeType = file.MimeType |> Option.defaultValue ""
+            $"{hostPath}|{file.Name}|{mimeType}"
 
         BaseModal.Modal(
             isOpen = isOpen,
@@ -97,7 +121,7 @@ module MarkdownPluginPromptModal =
                                     prop.children [
                                         for index, file in promptFiles |> List.indexed do
                                             Html.li [
-                                                prop.key $"prompt-file-{index}-{file.Name}"
+                                                prop.key $"prompt-file-{promptFileKey file}"
                                                 prop.className "swt:flex swt:items-center swt:gap-2"
                                                 prop.children [
                                                     Html.span [

@@ -556,22 +556,24 @@ type TextInputWithMarkdown =
                     ]
 
                 MarkdownPluginPromptModal.View(
-                    activePrompt.IsSome,
-                    closePromptDialog,
-                    promptViewModel,
-                    promptInput,
-                    promptError,
-                    promptFiles,
-                    promptFileDropActive,
-                    promptInputRef,
-                    promptFileInputRef,
-                    setPromptFileDropActive,
-                    handlePromptInputChange,
-                    handlePromptFileChange,
-                    triggerPromptFileSelection,
-                    handlePromptDrop,
-                    removePromptFileAtIndex,
-                    submitPromptDialog
+                    {
+                        IsOpen = activePrompt.IsSome
+                        SetIsOpen = closePromptDialog
+                        PromptViewModel = promptViewModel
+                        PromptInput = promptInput
+                        PromptError = promptError
+                        PromptFiles = promptFiles
+                        PromptFileDropActive = promptFileDropActive
+                        PromptInputRef = promptInputRef
+                        PromptFileInputRef = promptFileInputRef
+                        SetPromptFileDropActive = setPromptFileDropActive
+                        OnPromptInputChange = handlePromptInputChange
+                        OnPromptFileChange = handlePromptFileChange
+                        OnTriggerPromptFileSelection = triggerPromptFileSelection
+                        OnPromptDrop = handlePromptDrop
+                        OnRemovePromptFileAtIndex = removePromptFileAtIndex
+                        OnSubmitPromptDialog = submitPromptDialog
+                    }
                 )
             ]
         ]

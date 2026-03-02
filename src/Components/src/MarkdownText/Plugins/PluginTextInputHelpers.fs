@@ -40,7 +40,9 @@ module PluginTextInputHelpers =
             files
         else
             // In single-file mode, always keep the most recently selected file.
-            files |> List.rev |> List.truncate 1 |> List.rev
+            match List.tryLast files with
+            | Some lastFile -> [ lastFile ]
+            | None -> []
 
     let private acceptedTypeTokens (activePrompt: MarkdownPromptPlugin option) =
         activePromptAcceptTypes activePrompt
