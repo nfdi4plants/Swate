@@ -11,6 +11,7 @@ type PreviewActiveView =
     | Metadata
     | Table of int
     | DataMap
+    | Error of string option
 
 type ArcFileState = {
     ArcFile: ArcFiles

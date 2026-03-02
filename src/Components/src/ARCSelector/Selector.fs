@@ -45,12 +45,17 @@ type Selector =
     [<ReactComponent>]
     static member Main
         (
-            recentARCElements: ReactElement[],
+            recentARCs: ARCPointer[],
+            onClick: ARCPointer -> unit,
             ?actionbar: (unit -> unit) -> ReactElement,
             ?potMaxWidth: int,
             ?onOpenSelector,
             ?debug: bool
         ) =
+
+        let recentARCElements =
+            recentARCs
+            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onClick))
 
         let debug = defaultArg debug false
 
@@ -115,15 +120,10 @@ type Selector =
 
         let recentARCs, setRecentARCs = React.useState (testRecentARCs)
 
-        let onARCClick (arcPointer: ARCPointer) =
-            //For testing in story book, print the name of the arc pointer
-            console.log ($"arcPointer: {arcPointer.name}")
+        let onClick (arcPointer: ARCPointer) =
+            console.log ($"Clicked on: {arcPointer.path}")
 
-        let recentARCElements =
-            recentARCs
-            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
-
-        Selector.Main(recentARCElements, potMaxWidth = 48, ?debug = debug)
+        Selector.Main(recentARCs, onClick, potMaxWidth = 48, ?debug = debug)
 
     [<ReactComponent>]
     static member ActionbarInSelectorEntry(?maxNumberActionbar, ?debug: bool) =
@@ -145,17 +145,13 @@ type Selector =
 
         let actionbar = fun _ -> Actionbar.Entry(maxNumberActionbar)
 
-        let onARCClick (arcPointer: ARCPointer) =
-            console.log ($"arcPointer: {arcPointer.path}")
+        let onClick (arcPointer: ARCPointer) =
+            console.log ($"Clicked on: {arcPointer.path}")
 
-        let recentARCElements =
-            recentARCs
-            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
-
-        Selector.Main(recentARCElements, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
+        Selector.Main(recentARCs, onClick, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
     [<ReactComponent>]
-    static member NavbarSelectorEntry(?maxNumberActionbar, ?debug: bool) =
+    static member NavbarSelectorEntry(onClick, ?maxNumberActionbar, ?debug: bool) =
 
         let maxNumberActionbar = defaultArg maxNumberActionbar 3
 
@@ -174,14 +170,7 @@ type Selector =
 
         let actionbar = fun _ -> Actionbar.Entry(maxNumberActionbar, ?debug = debug)
 
-        let onARCClick (arcPointer: ARCPointer) =
-            console.log ($"arcPointer: {arcPointer.path}")
-
-        let recentARCElements =
-            recentARCs
-            |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, onARCClick))
-
         let selector =
-            Selector.Main(recentARCElements, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
+            Selector.Main(recentARCs, onClick, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
 
         Navbar.Main(selector, ?debug = debug)

@@ -16,7 +16,6 @@ let createFromLanding
     appState
     setSelectedTreeItemPath
     setPreviewData
-    setPreviewError
     setDidSelectFile
     (payload: SubmitPayload)
     =
@@ -26,7 +25,6 @@ let createFromLanding
         |> setSelectedTreeItemPath
 
         setPreviewData (Some previewData)
-        setPreviewError None
         setDidSelectFile true
         setShowLandingDraft false
         setLandingDraftActive false
@@ -43,7 +41,7 @@ let createFromLanding
         let! saveResult = Navbar.saveArcFileWithPreview payload.ArcFile
 
         match saveResult with
-        | Error message ->
+        | Microsoft.FSharp.Core.Error message ->
             setLandingUiState {
                 landingUiState with
                     IsSubmitting = false
@@ -62,7 +60,7 @@ let createFromLanding
 
                 match writeResult with
                 | Ok() -> finishSuccess previewData
-                | Error exn ->
+                | Microsoft.FSharp.Core.Error exn ->
                     setLandingUiState {
                         landingUiState with
                             IsSubmitting = false
@@ -112,7 +110,6 @@ let createARCPreview
 
 let computeARCContent
     previewData
-    (previewError: string option)
     arcFileState
     setArcFileState
     activeView
@@ -129,7 +126,6 @@ let computeARCContent
     appState
     setSelectedTreeItemPath
     setPreviewData
-    setPreviewError
     setDidSelectFile
     (path: string)
     =
@@ -148,7 +144,6 @@ let computeARCContent
                 appState
                 setSelectedTreeItemPath
                 setPreviewData
-                setPreviewError
                 setDidSelectFile
         )
     else
@@ -179,9 +174,7 @@ let computeARCContent
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
                     prop.children [| Html.h1 "Unknown file type" |]
                 ]
-        | None ->
-            match previewError with
-            | Some errMsg ->
+            | Error errMsg ->
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
                     prop.children [|
@@ -195,36 +188,61 @@ let computeARCContent
                         ]
                     |]
                 ]
-            | None ->
-                Html.h1 [
-                    prop.text path
-                    prop.className
-                        "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
-                ]
+        | None ->
+            Html.h1 [
+                prop.text path
+                prop.className
+                    "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
+            ]
 
+[<ReactComponent>]
 let content
     (
         appState: AppState,
+        setAppState,
         setArcFileState,
         activeView,
         setActiveView,
         arcFileState,
         previewData,
         setPreviewData,
-        previewError,
-        setPreviewError,
-        didSelectFile,
-        setDidSelectFile,
-        landingDraft,
-        setLandingDraft,
-        landingUiState,
-        setLandingUiState,
-        landingDraftActive,
-        setLandingDraftActive,
         showLandingDraft,
         setShowLandingDraft,
         setSelectedTreeItemPath
     ) =
+
+    let didSelectFile, setDidSelectFile = React.useState false
+    let landingDraft, setLandingDraft = React.useState LandingDraft.init
+    let landingUiState, setLandingUiState = React.useState LandingUiState.init
+    let landingDraftActive, setLandingDraftActive = React.useState false
+
+    let resetLandingDraft () =
+        setLandingDraft LandingDraft.init
+        setLandingUiState LandingUiState.init
+        setLandingDraftActive true
+        setShowLandingDraft true
+        setSelectedTreeItemPath None
+        setDidSelectFile false
+        setArcFileState None
+
+    React.useLayoutEffect(
+        (fun () ->
+            Api.getOpenPath()
+            |> Promise.map (fun pathOption ->
+                if showLandingDraft then
+                    match pathOption with
+                    | Some _ ->
+                        resetLandingDraft()
+                    | None ->
+                        setLandingDraftActive false
+                        setShowLandingDraft false
+                        setSelectedTreeItemPath None
+                        setAppState AppState.Init
+            )
+            |> Promise.start
+        ),
+        [| box showLandingDraft |]
+    )
 
     match appState with
     | AppState.Init ->
@@ -246,14 +264,13 @@ let content
                     prop.children [
                         Html.div [
                             prop.className "swt:flex-none"
-                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
+                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData setDidSelectFile) ]
                         ]
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                             prop.children [
                                 computeARCContent
                                     previewData
-                                    (previewError: string option)
                                     arcFileState
                                     setArcFileState
                                     activeView
@@ -270,7 +287,6 @@ let content
                                     appState
                                     setSelectedTreeItemPath
                                     setPreviewData
-                                    setPreviewError
                                     setDidSelectFile
                                     path
                             ]

@@ -14,47 +14,28 @@ open ARCtrl.Json
 
 open Renderer.components
 open components.MainElement
-open Swate.Components.Landing
 
 
 let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
     | Ok arcFile -> Some arcFile
-    | Error e ->
+    | Microsoft.FSharp.Core.Error e ->
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
 [<ReactComponent>]
 let Main () =
 
-    let widgets, setWidgets = React.useState []
-    let tableMutationTick, setTableMutationTick = React.useStateWithUpdater 0
     let recentARCs, setRecentARCs = React.useState [||]
     let fileExplorer, setFileExplorer = React.useState None
-    let didSelectFile, setDidSelectFile = React.useState false
-    let appState, setAppState = React.useState (AppState.Init)
-    let (arcFileState: ArcFiles option), setArcFileState = React.useState None
+    let appState, setAppState = React.useState AppState.Init
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
-    let (previewError: string option), setPreviewError = React.useState (None)
-    let (previewData: PreviewData option), setPreviewData = React.useState (None)
+    let (arcFileState: ArcFiles option), setArcFileState = React.useState None
+    let (previewData: PreviewData option), setPreviewData = React.useState None
+    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
-    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState (None)
 
-    let landingDraft, setLandingDraft = React.useState LandingDraft.init
-    let landingUiState, setLandingUiState = React.useState LandingUiState.init
-    let landingDraftActive, setLandingDraftActive = React.useState false
     let showLandingDraft, setShowLandingDraft = React.useState false
-
-    let resetLandingDraft () =
-        setLandingDraft LandingDraft.init
-        setLandingUiState LandingUiState.init
-        setLandingDraftActive true
-        setShowLandingDraft true
-        setPreviewData None
-        setPreviewError None
-        setSelectedTreeItemPath None
-        setDidSelectFile false
-        setArcFileState None
 
     React.useEffect (
         (fun () ->
@@ -80,11 +61,8 @@ let Main () =
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p ->
-                resetLandingDraft ()
                 AppState.ARC p |> setAppState
             | None ->
-                setLandingDraftActive false
-                setShowLandingDraft false
                 setSelectedTreeItemPath None
                 setAppState AppState.Init
         )
@@ -149,12 +127,9 @@ let Main () =
                 setSelectedTreeItemPath
                 setShowLandingDraft
                 setPreviewData
-                setPreviewError
-                setDidSelectFile
                 |> setFileExplorer
                 |> ignore
-        ), 
-
+        ),
         [| box fileTree; box selectedTreeItemPath |]
     )
 
@@ -165,10 +140,8 @@ let Main () =
 
                 match pathOption with
                 | Some p ->
-                    resetLandingDraft ()
                     AppState.ARC p |> setAppState
                 | None ->
-                    setLandingDraftActive false
                     setShowLandingDraft false
                     setSelectedTreeItemPath None
                     setAppState AppState.Init
@@ -182,11 +155,7 @@ let Main () =
                 setFileTree fileExplorer
     }
 
-    let recentARCElements =
-        recentARCs
-        |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, Selector.onARCClick))
-
-    let selector = Selector.Main(recentARCElements, Selector.actionbar appState, onOpenSelector = Selector.onOpenSelector appState setRecentARCs)
+    let selector = Selector.Main(recentARCs, Selector.onARCClick, Selector.actionbar appState, onOpenSelector = Selector.onOpenSelector appState setRecentARCs)
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
@@ -196,22 +165,13 @@ let Main () =
             (fun _ ->
                 MainWindowContent.content(
                     appState,
+                    setAppState,
                     setArcFileState,
                     activeView,
                     setActiveView,
                     arcFileState,
                     previewData,
                     setPreviewData,
-                    previewError,
-                    setPreviewError,
-                    didSelectFile,
-                    setDidSelectFile,
-                    landingDraft,
-                    setLandingDraft,
-                    landingUiState,
-                    setLandingUiState,
-                    landingDraftActive,
-                    setLandingDraftActive,
                     showLandingDraft,
                     setShowLandingDraft,
                     setSelectedTreeItemPath)
@@ -221,13 +181,7 @@ let Main () =
                 box previewData
                 box activeView
                 box arcFileState
-                box previewError
-                box landingDraft
-                box landingUiState
-                box landingDraftActive
                 box showLandingDraft
-                box widgets
-                box tableMutationTick
             |]
         )
 
@@ -256,13 +210,7 @@ let Main () =
                                 Html.button [
                                     prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
                                     prop.text "Landing Page"
-                                    prop.onClick (fun _ ->
-                                        setPreviewError None
-
-                                        if landingDraftActive then
-                                            setShowLandingDraft true
-                                        else
-                                            resetLandingDraft ()
+                                    prop.onClick (fun _ -> setShowLandingDraft (not showLandingDraft)
                                     )
                                 ]
                             | _ -> Html.none

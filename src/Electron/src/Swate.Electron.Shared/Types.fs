@@ -75,7 +75,7 @@ module ArcFileSaveMapping =
                 |> ArcFiles.Template
                 |> Ok
         with e ->
-            Error e
+            Microsoft.FSharp.Core.Error e
 
     let tryParseSaveRequest (request: SaveArcFileRequest) : Result<ArcFiles, exn> =
         tryParseArcFile request.FileType request.Json

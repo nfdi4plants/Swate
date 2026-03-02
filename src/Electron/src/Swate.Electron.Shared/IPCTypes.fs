@@ -13,6 +13,7 @@ type PreviewData =
     | ArcFileData of fileType: ArcFilesDiscriminate * json: string
     | Text of string
     | Unknown
+    | Error of string
 
 type SaveArcFileRequest = {
         FileType: ArcFilesDiscriminate

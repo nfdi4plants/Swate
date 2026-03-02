@@ -2,7 +2,6 @@ module Main.IPC.IArcVaultsApi
 
 open System
 open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -81,14 +80,14 @@ let private toPreviewDataOrUnsupported (arcFile: ArcFiles) =
     |> Option.map Ok
     |> Option.defaultValue (Error(exn "Saving this file type is not supported yet in Electron."))
 
-let syncARCFile (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
+let syncARCFile (arc: ARC) (request: IPCTypes.SaveArcFileRequest) : Result<IPCTypes.PreviewData, exn> =
     try
         match ArcFileSaveMapping.tryParseSaveRequest request with
         | Error parseError ->
             Error parseError
         | Ok (ArcFiles.Investigation investigation) ->
             copyInvestigationMetadata investigation arc
-            Ok(ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
+            Ok(IPCTypes.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
         | Ok (ArcFiles.Study(study, _)) ->
             if arc.TryGetStudy(study.Identifier).IsSome then
                 arc.SetStudy(study.Identifier, study)
@@ -140,14 +139,14 @@ let private persistArcChangesAndRefreshVault
             afterArcPersist ()
             do! vault.LoadArc()
 
-            let fileTree = getFileEntries arcPath |> createFileEntryTree
+            let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
             vault.SetFileTree(fileTree)
         finally
             vault.isBusyWriting <- false
     }
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
-let api: IArcVaultsApi = {
+let api: IPCTypes.IArcVaultsApi = {
     openARC =
         fun event -> promise {
             let! r =
@@ -170,7 +169,7 @@ let api: IArcVaultsApi = {
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                let fileTree = getFileEntries arcPath |> createFileEntryTree
+                let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
 
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
 
@@ -198,7 +197,7 @@ let api: IArcVaultsApi = {
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                let fileTree = getFileEntries arcPath |> createFileEntryTree
+                let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
 
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
                 return Ok arcPath
@@ -252,7 +251,7 @@ let api: IArcVaultsApi = {
                     let! windowId = ARC_VAULTS.RegisterVaultWithArc(arcPath)
                     ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                    let fileTree = getFileEntries arcPath |> createFileEntryTree
+                    let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
                     ARC_VAULTS.SetFileTree(windowId, fileTree)
 
                     return Ok()
@@ -305,7 +304,7 @@ let api: IArcVaultsApi = {
             return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
     saveArcFile =
-        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
+        fun (event: IpcMainEvent) (request: IPCTypes.SaveArcFileRequest) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -330,7 +329,7 @@ let api: IArcVaultsApi = {
                 return Error e
         }
     writeFile =
-        fun (event: IpcMainEvent) (request: WriteFileRequest) -> promise {
+        fun (event: IpcMainEvent) (request: IPCTypes.WriteFileRequest) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -351,7 +350,7 @@ let api: IArcVaultsApi = {
                                 do! mkdirRecursiveAsync directoryPath
                                 do! writeUtf8FileAsync absolutePath request.Content
 
-                                let fileTree = getFileEntries arcPath |> createFileEntryTree
+                                let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
                                 vault.SetFileTree(fileTree)
                                 return Ok()
                             finally
@@ -477,7 +476,7 @@ let api: IArcVaultsApi = {
 
                         match tryResolveDataMap () with
                         | Some dataMap ->
-                            return Ok(ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
+                            return Ok(IPCTypes.ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
                         | None ->
                             return Error(exn $"DataMap '{identifier}' not found in ARC.")
 
@@ -485,12 +484,12 @@ let api: IArcVaultsApi = {
                     // Fallback to text preview for unknown file types
                     try
                         let content = fs.readFileSync (path, "utf8")
-                        return Ok(Text content)
+                        return Ok(IPCTypes.Text content)
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }
     syncARC =
-        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
+        fun (event: IpcMainEvent) (request: IPCTypes.SaveArcFileRequest) -> promise {
             let windowId = windowIdFromIpcEvent event
 
             match ARC_VAULTS.TryGetVault(windowId) with
