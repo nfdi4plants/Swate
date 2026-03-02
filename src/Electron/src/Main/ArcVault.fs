@@ -327,6 +327,21 @@ type ArcVaults() =
             this.Vaults.Remove(id) |> ignore
             swatelogfn id $"Removed vault."
 
+    member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
+        match this.TryGetVault(windowId) with
+        | None -> swatelogfn windowId "Close request ignored. No vault found."
+        | Some(vault: ArcVault) ->
+            match decision with
+            | SaveBeforeQuitDecision.CancelClose -> swatelogfn windowId "Close request cancelled by user."
+            | SaveBeforeQuitDecision.CloseWithoutSaving ->
+                swatelogfn windowId "Close request approved by user. Closing without saving."
+                vault.window.destroy ()
+            | SaveBeforeQuitDecision.SaveAndClose ->
+                swatelogfn windowId "Close request approved by user. Saving changes and closing."
+                do! vault.UpdateAsync()
+                vault.window.destroy ()
+    }
+
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
         window.onClose (fun _ ->

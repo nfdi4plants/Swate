@@ -10,6 +10,7 @@
     <Compile Include="components\ARCHelper.fs" />
     <Compile Include="components\Selector.fs" />
     <Compile Include="components\Navbar.fs" />
+    <Compile Include="components\CloseWindowController.fs" />
     <Compile Include="components\FileExplorer.fs" />
     <Compile Include="components\MainElement.fs" />
     <Compile Include="components\InitState.fs" />
