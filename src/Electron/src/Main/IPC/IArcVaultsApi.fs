@@ -279,16 +279,7 @@ let api: IArcVaultsApi = {
     focusExistingARCWindow =
         fun arcPath -> promise {
             match ARC_VAULTS.TryGetVaultByPath arcPath with
-            | None ->
-                let refreshedRecentARCs =
-                    recentARCs
-                    |> Array.filter (fun arc -> arc.path <> arcPath)
-
-                if refreshedRecentARCs.Length <> recentARCs.Length then
-                    setRecentARCs refreshedRecentARCs
-                    ARC_VAULTS.BroadcastRecentARCs(refreshedRecentARCs)
-
-                return Error(exn $"No open ARC window found for path {arcPath}.")
+            | None -> return Error(exn $"The ARC for path {arcPath} should exist")
             | Some vault ->
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 vault.window.focus()

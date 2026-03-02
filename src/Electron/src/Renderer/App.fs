@@ -1,7 +1,6 @@
 module Renderer.App
 
 open Feliz
-open Fable.Core
 open Fable.Electron.Remoting.Renderer
 
 open Swate.Components
@@ -234,42 +233,19 @@ let Main () =
 
     let navbar = Navbar.Main(selector)
 
-    React.Fragment [|
-        CloseWindowController.CloseWindowController.Subscription(
-            (fun () ->
-                promise {
-                    match arcFileState with
-                    | None -> return Ok()
-                    | Some arcFile ->
-                        let! saveResult = Navbar.saveArcFileWithPreview arcFile
-
-                        match saveResult with
-                        | Ok updatedPreview ->
-                            setPreviewData (Some updatedPreview)
-                            setPreviewError None
-                            setDidSelectFile true
-                            return Ok()
-                        | Error errorMsg ->
-                            let message = $"Save failed: {errorMsg}"
-                            setPreviewError (Some message)
-                            return Error message
-                }),
-            onConfirmClose = (fun () -> console.log "User chose to close without saving."),
-            onCancelClose = (fun () -> console.log "User cancelled the close action.")
-        )
-        context.AppStateCtx.AppStateCtx.Provider(
-            {
-                state = appState
-                setState = setAppState
-            },
-            Layout.Main(
-                children = children,
-                navbar = navbar,
-                ?leftSidebar =
-                    (let sidebarContent =
-                        match fileExplorer with
-                        | Some fe -> fe
-                        | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
+    context.AppStateCtx.AppStateCtx.Provider(
+        {
+            state = appState
+            setState = setAppState
+        },
+        Layout.Main(
+            children = children,
+            navbar = navbar,
+            ?leftSidebar =
+                (let sidebarContent =
+                    match fileExplorer with
+                    | Some fe -> fe
+                    | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
 
                  Some(
                      Html.div [
@@ -297,7 +273,6 @@ let Main () =
                         |]
                      ]
                  )),
-                leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
-            )
+            leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
         )
-    |]
+    )

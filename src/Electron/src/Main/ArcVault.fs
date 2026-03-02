@@ -87,12 +87,6 @@ type ArcVault(window: BrowserWindow) =
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// This should disable reloads from the file watcher.
     member val isBusyWriting: bool = false with get, set
-    /// Guards the close handler so user-confirmed closes can pass through cleanup exactly once.
-    member val isCloseApproved: bool = false with get, set
-    /// Prevents duplicate close requests while waiting for a renderer response.
-    member val isCloseRequestPending: bool = false with get, set
-    /// Timeout for close-request handshake with renderer.
-    member val closeRequestTimeoutId: int option = None with get, set
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -310,68 +304,10 @@ module ArcVaultExtensions =
 
 
 type ArcVaults() =
-    let closeRequestTimeoutMs = 10_000
-
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
 
     member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
-
-    member private _.ClearCloseRequestTimeout(vault: ArcVault) =
-        match vault.closeRequestTimeoutId with
-        | Some timeoutId ->
-            Fable.Core.JS.clearTimeout timeoutId
-            vault.closeRequestTimeoutId <- None
-        | None -> ()
-
-    member private this.ShowCloseRequestFallbackDialog(vault: ArcVault, windowId: int) = promise {
-        if vault.isCloseRequestPending && not vault.isCloseApproved then
-            swatelogfn windowId "Close confirmation timed out. Showing fallback dialog."
-
-            let options =
-                Fable.Electron.Main.Dialog.ShowMessageBox.Options(
-                    message = "Close this ARC window without saving?",
-                    ``type`` = Fable.Electron.Main.Enums.Dialog.ShowMessageBox.Options.Type.Warning,
-                    buttons = [| "Close anyway"; "Cancel" |],
-                    defaultId = 1,
-                    cancelId = 1,
-                    title = "Close Window",
-                    detail = "The save-before-close dialog is unavailable. You can close without saving or cancel."
-                )
-
-            try
-                let! result = Fable.Electron.Main.dialog.showMessageBox(options = options)
-
-                if int result.response = 0 then
-                    swatelogfn windowId "Fallback close confirmed by user. Closing without saving."
-                    vault.isCloseRequestPending <- false
-                    vault.isCloseApproved <- true
-                    vault.window.close ()
-                else
-                    swatelogfn windowId "Fallback close cancelled by user."
-                    vault.isCloseRequestPending <- false
-                    vault.isCloseApproved <- false
-            with e ->
-                swatelogfn windowId $"Fallback close dialog failed: {e.Message}"
-                vault.isCloseRequestPending <- false
-                vault.isCloseApproved <- false
-    }
-
-    member private this.StartCloseRequestTimeout(vault: ArcVault, windowId: int) =
-        this.ClearCloseRequestTimeout(vault)
-
-        let timeoutId =
-            Fable.Core.JS.setTimeout
-                (fun () ->
-                    vault.closeRequestTimeoutId <- None
-
-                    if vault.isCloseRequestPending && not vault.isCloseApproved then
-                        this.ShowCloseRequestFallbackDialog(vault, windowId) |> Promise.start
-                )
-                closeRequestTimeoutMs
-
-        vault.closeRequestTimeoutId <- Some timeoutId
-        swatelogfn windowId "Close request pending. Timeout started (%d ms)." closeRequestTimeoutMs
 
     member this.BroadcastRecentARCs(recentARCs: SelectorTypes.ARCPointer[]) =
         this.Vaults.Values
@@ -391,70 +327,14 @@ type ArcVaults() =
             this.Vaults.Remove(id) |> ignore
             swatelogfn id $"Removed vault."
 
-    member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
-        match this.TryGetVault(windowId) with
-        | None -> swatelogfn windowId "Close request ignored. No vault found."
-        | Some(vault: ArcVault) ->
-            this.ClearCloseRequestTimeout(vault)
-            vault.isCloseRequestPending <- false
-
-            match decision with
-            | SaveBeforeQuitDecision.CancelClose ->
-                vault.isCloseApproved <- false
-                swatelogfn windowId "Close request cancelled by user."
-            | SaveBeforeQuitDecision.CloseWithoutSaving ->
-                swatelogfn windowId "Close request approved by user. Closing without saving."
-                vault.isCloseApproved <- true
-                vault.window.close ()
-            | SaveBeforeQuitDecision.SaveAndClose ->
-                swatelogfn windowId "Close request approved by user. Saving changes and closing."
-                do! vault.UpdateAsync()
-                vault.isCloseApproved <- true
-                vault.window.close ()
-    }
-
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
-        window.onClose (fun event ->
-            if vault.isCloseApproved then
-                this.ClearCloseRequestTimeout(vault)
-                vault.isCloseRequestPending <- false
-
-                let recentARCs = vault.OnClose()
-                this.BroadcastRecentARCs recentARCs
-            elif vault.path.IsSome then
-                event.preventDefault ()
-
-                if vault.isCloseRequestPending then
-                    swatelogfn id "Close request already pending. Ignoring duplicate close event."
-                else
-                    vault.isCloseRequestPending <- true
-                    vault.isCloseApproved <- false
-                    swatelogfn id "Close requested. Asking renderer for save-before-close decision."
-
-                    let sendMsgApi =
-                        Remoting.init
-                        |> Remoting.withWindow vault.window
-                        |> Remoting.buildClient<IMainSaveBeforeQuitApi>
-
-                    try
-                        sendMsgApi.requestSaveBeforeQuit ()
-                        this.StartCloseRequestTimeout(vault, id)
-                    with e ->
-                        swatelogfn id $"Failed to request renderer close confirmation: {e.Message}"
-                        this.ShowCloseRequestFallbackDialog(vault, id) |> Promise.start
-            else
-                this.ClearCloseRequestTimeout(vault)
-                vault.isCloseRequestPending <- false
-
-                let recentARCs = vault.OnClose()
-                this.BroadcastRecentARCs recentARCs
+        window.onClose (fun _ ->
+            let recentARCs = vault.OnClose()
+            this.BroadcastRecentARCs recentARCs
         )
 
-        window.onClosed (fun () ->
-            this.ClearCloseRequestTimeout(vault)
-            this.DisposeVault(id)
-        )
+        window.onClosed (fun () -> this.DisposeVault(id))
 
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
         let! window = ArcVaultHelper.createWindow ()
