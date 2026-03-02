@@ -98,6 +98,8 @@
     <Compile Include="MarkdownText\Plugins\AddImage.fs" />
     <Compile Include="MarkdownText\Plugins\AddOntologyReference.fs" />
     <Compile Include="MarkdownText\Plugins\PluginRegistry.fs" />
+    <Compile Include="MarkdownText\Plugins\PluginTextInputHelpers.fs" />
+    <Compile Include="MarkdownText\Plugins\MarkdownPluginPromptModal.fs" />
     <Compile Include="MarkdownText\Preview.fs" />
     <Compile Include="MarkdownText\TextInputWithMarkdown.fs" />
     <Compile Include="Landing\Types.fs" />
