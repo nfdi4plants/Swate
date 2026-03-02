@@ -60,24 +60,68 @@ module noteSearchTests =
     ]
 
 module NoteSearchComponent =
-    let searchInput (searchTerm, setSearchTerm, setStartSearch) =
+    let searchInput (setSearchTerm, setStartSearch, dropdownOpen: bool, setDropdownOpen: bool -> unit, filterOptions, setFilterOptions) =
         Html.div [
-            prop.className "swt:w-full swt:mt-4 swt:relative"
+            prop.className "swt:w-full swt:mt-4 swt:join"
             prop.children [
-                Html.input [
-                    prop.className "swt:input swt:border-current swt:w-full swt:pr-12"
-                    prop.placeholder "Search Notes..."
-                    prop.onClick (fun _ -> setStartSearch true)
-                    prop.onChange (fun (ev: Browser.Types.Event) ->
-                        let value: string = ev.target?value
-                        setSearchTerm value
-                        setStartSearch true
-                    )
-                ]
                 Html.div [
-                    prop.className "swt:absolute swt:right-3 swt:top-1/2 swt:-translate-y-1/2"
+                    prop.className "swt:relative swt:flex-1 swt:join-item"
+                    prop.children [
+                        Html.input [
+                            prop.className "swt:input swt:border-current swt:w-full swt:pr-9 swt:join-item"
+                            prop.placeholder "Search Notes..."
+                            prop.onClick (fun _ -> setStartSearch true)
+                            prop.onChange (fun (ev: Browser.Types.Event) ->
+                                let value: string = ev.target?value
+                                setSearchTerm value
+                                setStartSearch true
+                            )
+                        ]
+                        Html.div [
+                            prop.className "swt:absolute swt:right-3 swt:top-1/2 swt:-translate-y-1/2 swt:pointer-events-none"
+                            prop.children [ Icons.MagnifyingClass() ]
+                        ]
+                    ]
+                ]
 
-                    prop.children [ Icons.MagnifyingClass() ]
+                Html.div [
+                    prop.className "swt:join-item swt:relative"
+                    prop.children [
+                        Html.button [
+                            prop.text ("Search in " + filterOptions)
+                            prop.className ("swt:btn swt:btn-primary swt:join-item swt:border swt:border-current" + if dropdownOpen then " swt:rounded-b-none" else "")
+                            prop.onClick (fun e ->
+                                e.stopPropagation()
+                                setDropdownOpen (not dropdownOpen)
+                            )
+                        ]
+                        if dropdownOpen then
+                            Html.div [
+                                prop.className "swt:absolute swt:right-0 swt:top-full swt:bg-base-100 swt:border swt:border-current swt:rounded-b swt:z-10 swt:min-w-full swt:flex swt:flex-col"
+                                prop.children [
+                                    Html.button [
+                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "All"
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "all")
+                                    ]
+                                    Html.button [
+                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "Title"
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "title")
+                                    ]
+                                    Html.button [
+                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "Tags"
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "tags")
+                                    ]
+                                    Html.button [
+                                        prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "Content"
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "content")
+                                    ]
+                                ]
+                            ]
+                    ]
                 ]
             ]
         ]
@@ -142,21 +186,51 @@ type SearchComponent =
 
         let startSearch, setStartSearch = React.useState (false)
         let searchTerm, setSearchTerm = React.useState ("")
+        let dropdownOpen, setDropdownOpen = React.useState (false)
+        let filterOptions, setFilterOptions = React.useState ("...")
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:items-center swt:pt-8 swt:min-h-screen"
+            prop.onClick (fun _ ->
+                setStartSearch false
+                setDropdownOpen false
+            )
             prop.children [
                 Html.div [
                     prop.className "swt:w-full swt:max-w-md"
+                    prop.onClick (fun e -> e.stopPropagation())
                     prop.children [
-                        NoteSearchComponent.searchInput (searchTerm, setSearchTerm, setStartSearch)
+                        NoteSearchComponent.searchInput (setSearchTerm, setStartSearch, dropdownOpen, setDropdownOpen, filterOptions, setFilterOptions)
                         if startSearch then
                             let searchResults =
-                                noteSearchTests.notes
-                                |> List.filter (fun note ->
-                                    note.Title.ToLower().Contains(searchTerm.ToLower())
-                                    || note.Content.ToLower().Contains(searchTerm.ToLower())
-                                )
+                                match filterOptions with
+                                | "title" ->
+                                    noteSearchTests.notes
+                                    |> List.filter (fun note -> note.Title.ToLower().Contains(searchTerm.ToLower()))
+                                | "content" ->
+                                    noteSearchTests.notes
+                                    |> List.filter (fun note -> note.Content.ToLower().Contains(searchTerm.ToLower()))
+                                | "tags" ->
+                                    noteSearchTests.notes
+                                    |> List.filter (fun note ->
+                                        note.Tags
+                                        |> Option.exists (fun tags ->
+                                            tags
+                                            |> Seq.exists (fun tag -> tag.NameText.ToLower().Contains(searchTerm.ToLower()))
+                                        )
+                                    )
+                                | _ ->
+                                    noteSearchTests.notes
+                                    |> List.filter (fun note ->
+                                        note.Title.ToLower().Contains(searchTerm.ToLower())
+                                        || note.Content.ToLower().Contains(searchTerm.ToLower())
+                                        || (note.Tags
+                                            |> Option.exists (fun tags ->
+                                                tags
+                                                |> Seq.exists (fun tag -> tag.NameText.ToLower().Contains(searchTerm.ToLower()))
+                                            )
+                                        )
+                                    )
 
                             if startSearch && not searchResults.IsEmpty then
                                 Html.div [
@@ -172,6 +246,11 @@ type SearchComponent =
 
                                             NoteSearchComponent.searchSuggestion (note, contentPreview)
                                     ]
+                                ]
+                            else
+                                Html.div [
+                                    prop.className "swt:mt-2 swt:text-center"
+                                    prop.text "no results found"
                                 ]
                     ]
                 ]
