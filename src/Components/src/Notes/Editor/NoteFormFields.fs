@@ -1,5 +1,7 @@
 namespace Swate.Components.Notes.Editor
 
+open System
+open ARCtrl
 open Feliz
 open Swate.Components
 open Swate.Components.Metadata
@@ -14,6 +16,55 @@ module NoteFormFields =
             draft.DateCreated
             |> Option.map (fun dateValue -> dateValue.ToString("yyyy-MM-dd"))
             |> Option.defaultValue ""
+
+        let currentTagTerm, setCurrentTagTerm = React.useState (None: Term option)
+        let currentTagTermRef = React.useRef currentTagTerm
+
+        let setCurrentTagTermAndRef (nextTerm: Term option) =
+            currentTagTermRef.current <- nextTerm
+            setCurrentTagTerm nextTerm
+
+        let tryCreateTagFromTerm (termOption: Term option) =
+            termOption
+            |> Option.bind (fun term ->
+                term.name
+                |> Option.bind (fun name ->
+                    if String.IsNullOrWhiteSpace name then
+                        None
+                    else
+                        Some(OntologyAnnotation.from term)
+                )
+            )
+
+        let addTagFromTerm (termOption: Term option) =
+            match tryCreateTagFromTerm termOption with
+            | Some tag ->
+                let alreadyExists =
+                    draft.Tags
+                    |> Seq.exists (fun existing ->
+                        existing.Name = tag.Name
+                        && existing.TermSourceREF = tag.TermSourceREF
+                        && existing.TermAccessionNumber = tag.TermAccessionNumber
+                    )
+
+                if not alreadyExists then
+                    let nextTags = ResizeArray draft.Tags
+                    nextTags.Add tag
+                    setDraft { draft with Tags = nextTags }
+
+                setCurrentTagTermAndRef None
+            | _ -> ()
+
+        let removeTagAtIndex (indexToRemove: int) =
+            if indexToRemove >= 0 && indexToRemove < draft.Tags.Count then
+                let nextTags = ResizeArray draft.Tags
+                nextTags.RemoveAt indexToRemove
+                setDraft { draft with Tags = nextTags }
+
+        let tagLabel (tag: OntologyAnnotation) =
+            tag.Name
+            |> Option.filter (fun name -> not (String.IsNullOrWhiteSpace name))
+            |> Option.defaultValue "Tag"
 
         React.Fragment [
             Html.div [
@@ -47,12 +98,56 @@ module NoteFormFields =
             ]
             Html.div [
                 prop.testId "notes-tags-field"
+                prop.className "swt:fieldset swt:space-y-2"
                 prop.children [
-                    FormComponents.OntologyAnnotationsInput(
-                        draft.Tags,
-                        (fun tags -> setDraft { draft with Tags = tags }),
-                        label = "Tags (Optional)"
-                    )
+                    Generic.FieldTitle "Tags (Optional)"
+                    Html.div [
+                        prop.className "swt:w-full swt:relative"
+                        prop.children [
+                            TermSearch.TermSearch(
+                                currentTagTerm,
+                                setCurrentTagTermAndRef,
+                                onTermSelect = (fun selectedTerm -> addTagFromTerm (Some selectedTerm)),
+                                onKeyDown =
+                                    (fun keyboardEvent ->
+                                        if keyboardEvent.code = kbdEventCode.enter then
+                                            keyboardEvent.preventDefault ()
+                                            keyboardEvent.stopPropagation ()
+                                            addTagFromTerm currentTagTermRef.current
+                                    ),
+                                classNames = TermSearchStyle(Fable.Core.U2.Case1 "swt:w-full")
+                            )
+                        ]
+                    ]
+                    if draft.Tags.Count = 0 then
+                        Html.p [
+                            prop.className "swt:text-xs swt:opacity-70"
+                            prop.text "No tags added."
+                        ]
+                    else
+                        Html.ul [
+                            prop.className "swt:flex swt:flex-col swt:gap-1"
+                            prop.children [
+                                for index, tag in draft.Tags |> Seq.indexed do
+                                    Html.li [
+                                        prop.key $"note-tag-{index}"
+                                        prop.className "swt:flex swt:items-center swt:gap-2 swt:rounded-box swt:border swt:border-base-300 swt:px-2 swt:py-1"
+                                        prop.children [
+                                            Html.span [
+                                                prop.className "swt:grow swt:text-sm swt:break-all"
+                                                prop.text (tagLabel tag)
+                                            ]
+                                            Html.button [
+                                                prop.type'.button
+                                                prop.className "swt:btn swt:btn-xs swt:btn-ghost"
+                                                prop.ariaLabel $"Remove tag {tagLabel tag}"
+                                                prop.text "x"
+                                                prop.onClick (fun _ -> removeTagAtIndex index)
+                                            ]
+                                        ]
+                                    ]
+                            ]
+                        ]
                 ]
             ]
             Html.div [
