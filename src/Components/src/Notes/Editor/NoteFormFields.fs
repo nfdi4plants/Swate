@@ -55,6 +55,22 @@ module NoteFormFields =
                 setCurrentTagTermAndRef None
             | _ -> ()
 
+        let addTagFromKeyboardEvent (keyboardEvent: Browser.Types.KeyboardEvent) =
+            let termFromInput =
+                match keyboardEvent.target with
+                | :? Browser.Types.HTMLInputElement as inputElement when not (String.IsNullOrWhiteSpace inputElement.value)
+                    ->
+                    Some(Term(inputElement.value.Trim()))
+                | _ -> None
+
+            let termToAdd =
+                match currentTagTermRef.current with
+                | Some term when term.name |> Option.exists (fun value -> not (String.IsNullOrWhiteSpace value)) ->
+                    Some term
+                | _ -> termFromInput
+
+            addTagFromTerm termToAdd
+
         let removeTagAtIndex (indexToRemove: int) =
             if indexToRemove >= 0 && indexToRemove < draft.Tags.Count then
                 let nextTags = ResizeArray draft.Tags
@@ -65,6 +81,12 @@ module NoteFormFields =
             tag.Name
             |> Option.filter (fun name -> not (String.IsNullOrWhiteSpace name))
             |> Option.defaultValue "Tag"
+
+        let tagKey (tag: OntologyAnnotation) =
+            let name = tag.Name |> Option.defaultValue ""
+            let source = tag.TermSourceREF |> Option.defaultValue ""
+            let accession = tag.TermAccessionNumber |> Option.defaultValue ""
+            $"{source}|{accession}|{name}"
 
         React.Fragment [
             Html.div [
@@ -113,7 +135,7 @@ module NoteFormFields =
                                         if keyboardEvent.code = kbdEventCode.enter then
                                             keyboardEvent.preventDefault ()
                                             keyboardEvent.stopPropagation ()
-                                            addTagFromTerm currentTagTermRef.current
+                                            addTagFromKeyboardEvent keyboardEvent
                                     ),
                                 classNames = TermSearchStyle(Fable.Core.U2.Case1 "swt:w-full")
                             )
@@ -130,7 +152,7 @@ module NoteFormFields =
                             prop.children [
                                 for index, tag in draft.Tags |> Seq.indexed do
                                     Html.li [
-                                        prop.key $"note-tag-{index}"
+                                        prop.key $"note-tag-{tagKey tag}"
                                         prop.className "swt:flex swt:items-center swt:gap-2 swt:rounded-box swt:border swt:border-base-300 swt:px-2 swt:py-1"
                                         prop.children [
                                             Html.span [
