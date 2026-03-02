@@ -55,22 +55,19 @@ module MarkdownPluginPromptModal =
                                 prop.onChange onPromptFileChange
                             ]
 
+                            let fileDropButtonText = "Drop files here or click to upload"
+
                             Html.button [
                                 prop.type'.button
-                                prop.className "swt:btn swt:btn-outline swt:w-full"
-                                prop.text "Choose file"
-                                prop.onClick (fun _ -> onTriggerPromptFileSelection ())
-                            ]
-
-                            Html.div [
                                 prop.testId "markdown-plugin-file-dropzone"
                                 prop.className [
-                                    "swt:border-2 swt:border-dashed swt:rounded-box swt:p-3 swt:text-sm swt:text-center"
+                                    "swt:btn swt:btn-outline swt:w-full swt:h-auto swt:min-h-0 swt:py-3 swt:border-2 swt:border-dashed swt:rounded-box swt:text-sm swt:text-center swt:normal-case"
                                     if promptFileDropActive then
                                         "swt:border-primary swt:bg-primary/10"
                                     else
                                         "swt:border-base-300"
                                 ]
+                                prop.onClick (fun _ -> onTriggerPromptFileSelection ())
                                 prop.onDragEnter (fun (e: DragEvent) ->
                                     e.preventDefault ()
                                     e.stopPropagation ()
@@ -86,7 +83,7 @@ module MarkdownPluginPromptModal =
                                     e.stopPropagation ()
                                 )
                                 prop.onDrop onPromptDrop
-                                prop.text "Drop files here"
+                                prop.text fileDropButtonText
                             ]
 
                             if List.isEmpty promptFiles then
