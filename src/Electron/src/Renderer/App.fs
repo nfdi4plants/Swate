@@ -32,8 +32,20 @@ let Main () =
     let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
     let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+    let landingDraft, setLandingDraft = React.useState LandingDraft.init
+    let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
-    let landingStateCtxValue: Renderer.context.LandingStateCtx.LandingStateContext = Renderer.context.LandingStateCtx.LandingStateContext.init()
+
+    let landingStateCtxValue: Renderer.context.LandingStateCtx.LandingStateContext =
+        React.useMemo (
+            (fun _ -> {
+                Draft = landingDraft
+                SetDraft = setLandingDraft
+                UiState = landingUiState
+                SetUiState = setLandingUiState
+            }),
+            [| box landingDraft; box landingUiState |]
+        )
 
     React.useEffect (
         (fun () ->
@@ -158,8 +170,8 @@ let Main () =
                             prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
                             prop.text "Landing Page"
                             prop.onClick (fun _ ->
-                                landingStateCtxValue.SetDraft LandingDraft.init
-                                landingStateCtxValue.SetUiState LandingUiState.init
+                                setLandingDraft LandingDraft.init
+                                setLandingUiState LandingUiState.init
                                 setSelectedTreeItemPath None
                                 setArcFileState None
                                 setPageState (Some PageState.LandingDraft)

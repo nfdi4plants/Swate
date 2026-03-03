@@ -8,7 +8,6 @@ type LandingStateContext = {
     SetDraft: LandingDraft -> unit
     UiState: LandingUiState
     SetUiState: LandingUiState -> unit
-    Reset: unit -> unit
 } with
 
     static member init () = {
@@ -16,7 +15,6 @@ type LandingStateContext = {
         SetDraft = ignore
         UiState = LandingUiState.init
         SetUiState = ignore
-        Reset = ignore
     }
 
 let LandingStateCtx =
