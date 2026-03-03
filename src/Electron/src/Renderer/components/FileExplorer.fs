@@ -80,48 +80,52 @@ let CreateFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
 
     let fileItem = loop parent
 
-    let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath (setPreviewData: PageState option -> unit) (item: FileItem) =
-        promise {
-            if parent.IsSome then
+    let openPreview =
+        React.useCallback (
+            (fun (item: FileItem) ->
+                promise {
+                    if parent.IsSome then
 
-                let fileTree = parent.Value
+                        let fileTree = parent.Value
 
-                let isDirectoryByPath =
-                    match item.Path with
-                    | Some p when fileTree.children.ContainsKey(p) -> fileTree.children.[p].isDirectory
-                    | _ -> item.IsDirectory
+                        let isDirectoryByPath =
+                            match item.Path with
+                            | Some p when fileTree.children.ContainsKey(p) -> fileTree.children.[p].isDirectory
+                            | _ -> item.IsDirectory
 
-                if item.Path.IsSome && not isDirectoryByPath then
-                    let previewPath = resolvePreviewPath item.Path.Value
+                        if item.Path.IsSome && not isDirectoryByPath then
+                            let previewPath = resolvePreviewPath item.Path.Value
 
-                    if previewPath <> normalizePath item.Path.Value then
-                        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
-                    else
-                        console.log ($"[Renderer] Opening file: {previewPath}")
+                            if previewPath <> normalizePath item.Path.Value then
+                                console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
+                            else
+                                console.log ($"[Renderer] Opening file: {previewPath}")
 
-                    setSelectedTreeItemPath (Some previewPath)
-                    let! result = Api.openFile previewPath
+                            setSelectedTreeItemPath (Some previewPath)
+                            let! result = Api.openFile previewPath
 
-                    match result with
-                    | Ok data ->
-                        console.log ("[Renderer] Received data, processing...")
-                        setPreviewData (Some data)
-                    | Result.Error exn ->
-                        console.log ($"[Renderer] Error: {exn.Message}")
-                        setPreviewData None
-                        setPreviewData (Some (PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
-                elif item.Path.IsSome && isDirectoryByPath then
-                    // Folders are not preview targets.
-                    setPreviewData None
-                else
-                    setPreviewData (Some (PageState.Error $"File '{item.Name}' has no path."))
-        }
-        |> Promise.start
+                            match result with
+                            | Ok data ->
+                                console.log ("[Renderer] Received data, processing...")
+                                setPreviewData (Some data)
+                            | Result.Error exn ->
+                                console.log ($"[Renderer] Error: {exn.Message}")
+                                setPreviewData None
+                                setPreviewData (Some (PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
+                        elif item.Path.IsSome && isDirectoryByPath then
+                            // Folders are not preview targets.
+                            setPreviewData None
+                        else
+                            setPreviewData (Some (PageState.Error $"File '{item.Name}' has no path."))
+                }
+                |> Promise.start),
+            [| box parent |]
+        )
 
     if fileItem.IsSome then
         FileExplorer.FileExplorer(
             initialItems = [ fileItem.Value ],
-            onItemClick = openPreview parent setSelectedTreeItemPath setPreviewData,
+            onItemClick = openPreview,
             ?selectedItemId = selectedTreeItemPath
         )
     else
