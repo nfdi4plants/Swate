@@ -26,6 +26,12 @@ type WriteFileRequest = {
         Content: string
     }
 
+[<RequireQualifiedAccess>]
+type SaveBeforeQuitDecision =
+    | SaveAndClose
+    | CloseWithoutSaving
+    | CancelClose
+
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Will open ARC in same window
@@ -37,8 +43,9 @@ type IArcVaultsApi = {
     createARCInNewWindow: string -> JS.Promise<Result<unit, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
-    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
+    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer []>
     checkForARC: string -> JS.Promise<bool>
+
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
@@ -66,6 +73,10 @@ module FileEntryExtensions =
             path = path
             isDirectory = isDirectory
         }
+
+type ISaveBeforeQuitApi = {
+    resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
+}
 
 type FileItemDTO = {
     name: string
@@ -99,3 +110,5 @@ type IArcFileWatcherApi = {
     /// This function is called when ARC is reloaded due to local file changes.
     IsLoadingChanges: bool -> unit
 }
+
+type IMainSaveBeforeQuitApi = { requestSaveBeforeQuit: unit -> unit }

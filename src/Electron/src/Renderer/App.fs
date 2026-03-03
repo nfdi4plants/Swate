@@ -2,6 +2,7 @@ module Renderer.App
 
 open Feliz
 open Fable.Electron.Remoting.Renderer
+open Fable.Core
 
 open Swate.Components
 open Swate.Electron.Shared
@@ -10,7 +11,6 @@ open Swate.Electron.Shared.IPCTypes
 open Browser.Dom
 
 open ARCtrl
-open ARCtrl.Json
 
 open Renderer.components
 
@@ -18,7 +18,7 @@ open Renderer.components
 let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
     | Ok arcFile -> Some arcFile
-    | Error e ->
+    | Result.Error e ->
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
@@ -151,13 +151,33 @@ let Main () =
 
     let navbar = Navbar.Main(selector)
 
+    let saveBeforeClose () : JS.Promise<Result<unit, string>> =
+        promise {
+            match arcFileState with
+            | None -> return Ok()
+            | Some arcFile ->
+                let! result = Navbar.saveArcFileWithPreview arcFile
+
+                match result with
+                | Ok updatedPreview ->
+                    setPreviewData (Some updatedPreview)
+                    return Ok()
+                | Result.Error errorMsg ->
+                    let msg = $"Save failed: {errorMsg}"
+                    return Result.Error msg
+        }
+
     context.AppStateCtx.AppStateCtx.Provider(
         {
             state = appState
             setState = setAppState
         },
         Layout.Main(
-            children = children,
+            children =
+                React.Fragment [|
+                    children
+                    CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                |],
             navbar = navbar,
             ?leftSidebar =
                 (
