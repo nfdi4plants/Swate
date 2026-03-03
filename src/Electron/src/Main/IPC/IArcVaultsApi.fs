@@ -6,8 +6,10 @@ open Swate.Electron.Shared.IPCTypes
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
+open Fable.Electron.Remoting.Main
 open Fable.Core.JsInterop
 open Main
+open Main.Git
 open Node.Api
 open ARCtrl
 open ARCtrl.Json
@@ -145,6 +147,90 @@ let private persistArcChangesAndRefreshVault
         finally
             vault.isBusyWriting <- false
     }
+
+let private tryGetVaultAndArcPath (event: IpcMainEvent) =
+    let windowId = windowIdFromIpcEvent event
+
+    match ARC_VAULTS.TryGetVault(windowId) with
+    | None -> Error(exn $"The ARC for window id {windowId} should exist")
+    | Some vault ->
+        match vault.path with
+        | Some arcPath -> Ok(vault, arcPath)
+        | None -> Error(exn "ARC is not loaded.")
+
+let private withBusyWriting (vault: ArcVault) (operation: unit -> JS.Promise<Result<'T, exn>>) : JS.Promise<Result<'T, exn>> =
+    promise {
+        vault.isBusyWriting <- true
+
+        try
+            return! operation ()
+        finally
+            vault.isBusyWriting <- false
+    }
+
+let private toSharedGitFailureKind (kind: GitService.GitFailureKind) =
+    match kind with
+    | GitService.GitFailureKind.Unauthorized -> GitFailureKind.Unauthorized
+    | GitService.GitFailureKind.Forbidden -> GitFailureKind.Forbidden
+    | GitService.GitFailureKind.Network -> GitFailureKind.Network
+    | GitService.GitFailureKind.Timeout -> GitFailureKind.Timeout
+    | GitService.GitFailureKind.Canceled -> GitFailureKind.Canceled
+    | GitService.GitFailureKind.Unknown -> GitFailureKind.Unknown
+
+let private toGitOperationResult
+    (successMessage: 'T -> string option)
+    (result: GitService.GitResult<'T>)
+    : Result<GitOperationResult, exn> =
+    match result with
+    | Ok payload ->
+        Ok {
+            Success = true
+            Message = successMessage payload
+            FailureKind = None
+        }
+    | Error failure ->
+        Ok {
+            Success = false
+            Message = Some failure.Message
+            FailureKind = Some(toSharedGitFailureKind failure.Kind)
+        }
+
+let private toStatusDto (status: GitService.GitStatusDto) : GitStatusDto = {
+    Current = status.Current
+    Tracking = status.Tracking
+    Ahead = status.Ahead
+    Behind = status.Behind
+    IsClean = status.IsClean
+    Files =
+        status.Files
+        |> Array.map (fun file -> {
+            Path = file.Path
+            Index = file.Index
+            WorkingDir = file.WorkingDir
+            OriginalPath = file.OriginalPath
+        })
+}
+
+let private toDiffSummaryDto (diff: GitService.GitDiffSummaryDto) : GitDiffSummaryDto = {
+    Changed = diff.Changed
+    Insertions = diff.Insertions
+    Deletions = diff.Deletions
+}
+
+let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgressCallback =
+    let rendererApi =
+        Remoting.init
+        |> Remoting.withWindow vault.window
+        |> Remoting.buildClient<IMainUpdateRendererApi>
+
+    fun progressEvent ->
+        rendererApi.gitProgressUpdate {
+            Method = Some progressEvent.method
+            Stage = Some progressEvent.stage
+            Progress = Some progressEvent.progress
+            Processed = Some progressEvent.processed
+            Total = Some progressEvent.total
+        }
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IArcVaultsApi = {
@@ -511,5 +597,117 @@ let api: IArcVaultsApi = {
                     | Error saveError -> return Error saveError
                     | Ok _ -> return Ok ()
                 | _ -> return Error(exn "ARC is not loaded.")
+        }
+    getGitStatus =
+        fun (event: IpcMainEvent) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (_, arcPath) ->
+                let! result = GitService.getStatus arcPath
+
+                match result with
+                | Ok statusDto -> return Ok(toStatusDto statusDto)
+                | Error failure ->
+                    return Error(exn $"git status failed ({failure.Kind}): {failure.Message}")
+        }
+    getGitDiffSummary =
+        fun (event: IpcMainEvent) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (_, arcPath) ->
+                let! result = GitService.getDiffSummary arcPath
+
+                match result with
+                | Ok diffDto -> return Ok(toDiffSummaryDto diffDto)
+                | Error failure ->
+                    return Error(exn $"git diff summary failed ({failure.Kind}): {failure.Message}")
+        }
+    gitFetch =
+        fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+
+                let! result = GitService.fetch arcPath request.Remote request.Branch (Some progressReporter)
+                return toGitOperationResult (fun () -> Some "Fetch completed.") result
+        }
+    gitPull =
+        fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+
+                return!
+                    withBusyWriting vault (fun () -> promise {
+                        let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
+                        return toGitOperationResult (fun () -> Some "Pull completed.") result
+                    })
+        }
+    gitPush =
+        fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+
+                let! result = GitService.push arcPath request.Remote request.Branch (Some progressReporter)
+                return toGitOperationResult (fun () -> Some "Push completed.") result
+        }
+    gitStagePaths =
+        fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                return!
+                    withBusyWriting vault (fun () -> promise {
+                        let! result = GitService.stagePaths arcPath request.Pathspecs
+                        return toGitOperationResult (fun () -> Some "Files staged.") result
+                    })
+        }
+    gitUnstagePaths =
+        fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                return!
+                    withBusyWriting vault (fun () -> promise {
+                        let! result = GitService.unstagePaths arcPath request.Pathspecs
+                        return toGitOperationResult (fun () -> Some "Files unstaged.") result
+                    })
+        }
+    gitCommit =
+        fun (event: IpcMainEvent) (request: GitCommitRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                return!
+                    withBusyWriting vault (fun () -> promise {
+                        let! result = GitService.commit arcPath request.Message
+                        return toGitOperationResult (fun commitHash -> Some $"Commit completed ({commitHash}).") result
+                    })
+        }
+    createBranch =
+        fun (event: IpcMainEvent) (request: GitCreateBranchRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                return!
+                    withBusyWriting vault (fun () -> promise {
+                        let! result = GitService.createBranch arcPath request.Name request.StartPoint
+                        return toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") result
+                    })
+        }
+    checkoutBranch =
+        fun (event: IpcMainEvent) (request: GitCheckoutBranchRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok (vault, arcPath) ->
+                return!
+                    withBusyWriting vault (fun () -> promise {
+                        let! result = GitService.checkoutBranch arcPath request.Name
+                        return toGitOperationResult (fun () -> Some $"Checked out branch '{request.Name}'.") result
+                    })
         }
     }

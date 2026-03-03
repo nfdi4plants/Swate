@@ -25,6 +25,73 @@ type WriteFileRequest = {
     }
 
 [<RequireQualifiedAccess>]
+type GitFailureKind =
+    | Unauthorized
+    | Forbidden
+    | Network
+    | Timeout
+    | Canceled
+    | Unknown
+
+type GitFileStatusDto = {
+    Path: string
+    Index: string
+    WorkingDir: string
+    OriginalPath: string option
+}
+
+type GitStatusDto = {
+    Current: string option
+    Tracking: string option
+    Ahead: int
+    Behind: int
+    IsClean: bool
+    Files: GitFileStatusDto[]
+}
+
+type GitDiffSummaryDto = {
+    Changed: int
+    Insertions: int
+    Deletions: int
+}
+
+type GitOperationResult = {
+    Success: bool
+    Message: string option
+    FailureKind: GitFailureKind option
+}
+
+type GitProgressDto = {
+    Method: string option
+    Stage: string option
+    Progress: float option
+    Processed: float option
+    Total: float option
+}
+
+type GitRemoteOperationRequest = {
+    Remote: string option
+    Branch: string option
+}
+
+type GitPathspecRequest = {
+    Pathspecs: string[]
+}
+
+type GitCommitRequest = {
+    Message: string
+}
+
+type GitCreateBranchRequest = {
+    Name: string
+    StartPoint: string option
+}
+
+type GitCheckoutBranchRequest = {
+    Name: string
+}
+
+[<RequireQualifiedAccess>]
 type SaveBeforeQuitDecision =
     | SaveAndClose
     | CloseWithoutSaving
@@ -48,6 +115,17 @@ type IArcVaultsApi = {
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
+
+    getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
+    getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
+    gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitStagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitUnstagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    createBranch: IpcMainEvent -> GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
 }
 
 type FileEntry = {
@@ -100,6 +178,7 @@ type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
+    gitProgressUpdate: GitProgressDto -> unit
 }
 
 // Todo: What should filewatcher do when detecting changes?
