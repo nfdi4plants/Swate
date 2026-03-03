@@ -11,7 +11,9 @@
     <Compile Include="Bindings\SimpleGit.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />
     <Compile Include="Git\GitAuthAdapter.fs" />
+    <Compile Include="Git\GitInternals.fs" />
     <Compile Include="Git\GitService.fs" />
+    <Compile Include="Git\GitProvisioningService.fs" />
     <Compile Include="ArcVault.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
     <Compile Include="IPC\ISaveBeforeQuitApi.fs" />

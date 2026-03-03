@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Main.Bindings.SimpleGit
 open Main.Git.GitTokenProvider
 open Main.Git.GitAuthAdapter
+open Main.Git.GitInternals
 
 type GitFailureKind =
     | Unauthorized
@@ -45,7 +46,7 @@ type GitDiffSummaryDto = {
     Deletions: int
 }
 
-type GitProgressCallback = SimpleGitProgressEvent -> unit
+type GitProgressCallback = GitInternals.GitProgressCallback
 
 let private disallowedRemotePrefixes = [| "file://"; "ext::"; "fd::" |]
 let private protocolOverridePattern =
@@ -79,66 +80,19 @@ let classifyFailureKind (message: string) =
     else
         Unknown
 
-let private toFailure (error: exn) =
-    let message =
-        error.Message
-        |> Option.ofObj
-        |> Option.filter (fun m -> not (String.IsNullOrWhiteSpace m))
-        |> Option.defaultValue (string error)
-        |> redactToken
+let private createFailure kind message : GitFailure = {
+    Kind = kind
+    Message = message
+}
 
-    {
-        Kind = classifyFailureKind message
-        Message = message
-    }
+let private toFailure (error: exn) : GitFailure =
+    GitInternals.toFailure classifyFailureKind createFailure error
 
-let private errorResult (error: exn) : GitResult<'T> = Error(toFailure error)
+let private errorResult (error: exn) : GitResult<'T> =
+    GitInternals.errorResult classifyFailureKind createFailure error
 
 let private valueOrEmptyArray (items: 'T[]) =
     if isNull items then [||] else items
-
-let private unsafeOptions =
-    SimpleGitUnsafeOptions(
-        allowUnsafeCustomBinary = false,
-        allowUnsafeProtocolOverride = false,
-        allowUnsafePack = false
-    )
-
-let private standardTimeout =
-    SimpleGitTimeoutOptions(
-        block = 30000,
-        stdOut = true,
-        stdErr = true
-    )
-
-let private syncTimeout =
-    SimpleGitTimeoutOptions(
-        block = 120000,
-        stdOut = false,
-        stdErr = false
-    )
-
-let private createOptions
-    (arcPath: string)
-    (timeout: SimpleGitTimeoutOptions)
-    (progressCallback: GitProgressCallback option)
-    =
-    let options =
-        SimpleGitOptions(
-            baseDir = arcPath,
-            binary = U3.Case1 "git",
-            maxConcurrentProcesses = 1,
-            timeout = timeout,
-            ``unsafe`` = unsafeOptions
-        )
-
-    progressCallback
-    |> Option.iter (fun progress -> options.progress <- Some progress)
-
-    options
-
-let private createGit (options: SimpleGitOptions) : ISimpleGit =
-    SimpleGit.create options |> applyNonInteractiveEnv
 
 let ensureValidBranchLikeName (label: string) (value: string) =
     let trimmed = value.Trim()
@@ -231,13 +185,7 @@ let private validateOptionalBranchName (branchName: string option) =
         |> Result.map Some
 
 let private runSimpleGit (operation: ISimpleGit -> JS.Promise<'T>) (git: ISimpleGit) : JS.Promise<GitResult<'T>> =
-    promise {
-        try
-            let! result = operation git
-            return Ok result
-        with error ->
-            return errorResult error
-    }
+    GitInternals.runSimpleGit toFailure operation git
 
 let private createAuthenticatedGit
     (arcPath: string)
