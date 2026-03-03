@@ -11,6 +11,8 @@ type CleanMode = string
 type ResetMode = string
 type GitGrepQuery = obj
 type LogOptions = obj
+type SimpleGitBinary = U3<string, string[], (string * string)>
+type SimpleGitErrorsHandler = obj option -> obj -> obj option
 
 [<AllowNullLiteral>]
 type IAbortSignal =
@@ -208,9 +210,9 @@ type DiffResultBinaryFile =
 [<AllowNullLiteral>]
 type DiffResultNameStatusFile =
     inherit DiffResultTextFile
-    abstract member status: string
+    abstract member status: string option
     abstract member ``from``: string option
-    abstract member similarity: float option
+    abstract member similarity: float
 
 [<AllowNullLiteral>]
 type DiffResult =
@@ -277,6 +279,25 @@ type PullDetailSummary =
     abstract member insertions: int
     abstract member deletions: int
 
+[<AllowNullLiteral>]
+type RemoteMessagesObjectTotal =
+    abstract member count: int
+    abstract member delta: int
+
+[<AllowNullLiteral>]
+type RemoteMessagesObjectEnumeration =
+    abstract member enumerating: int
+    abstract member counting: int
+    abstract member compressing: int
+    abstract member total: RemoteMessagesObjectTotal
+    abstract member reused: RemoteMessagesObjectTotal
+    abstract member packReused: int
+
+[<AllowNullLiteral>]
+type RemoteMessages =
+    abstract member all: string[]
+    abstract member objects: RemoteMessagesObjectEnumeration option
+
 type PullDetailFileChanges = System.Collections.Generic.Dictionary<string, int>
 
 [<AllowNullLiteral>]
@@ -287,7 +308,7 @@ type PullResult =
     abstract member summary: PullDetailSummary
     abstract member created: string[]
     abstract member deleted: string[]
-    abstract member remoteMessages: obj option
+    abstract member remoteMessages: RemoteMessages
 
 [<AllowNullLiteral>]
 type TagResult =
@@ -369,25 +390,6 @@ type PushResultBranchUpdate =
     abstract member hash: PushResultBranchHash
 
 [<AllowNullLiteral>]
-type RemoteMessagesObjectTotal =
-    abstract member count: int
-    abstract member delta: int
-
-[<AllowNullLiteral>]
-type RemoteMessagesObjectEnumeration =
-    abstract member enumerating: int
-    abstract member counting: int
-    abstract member compressing: int
-    abstract member total: RemoteMessagesObjectTotal
-    abstract member reused: RemoteMessagesObjectTotal
-    abstract member packReused: int
-
-[<AllowNullLiteral>]
-type RemoteMessages =
-    abstract member all: string[]
-    abstract member objects: RemoteMessagesObjectEnumeration option
-
-[<AllowNullLiteral>]
 type PushResultRemoteVulnerabilities =
     abstract member count: int
     abstract member summary: string
@@ -452,24 +454,26 @@ type SimpleGitOptions
     [<ParamObject>]
     (
         ?baseDir: string,
-        ?binary: string,
+        ?binary: SimpleGitBinary,
         ?maxConcurrentProcesses: int,
         ?trimmed: bool,
         ?config: string[],
         ?abort: IAbortSignal,
         ?progress: SimpleGitProgressHandler,
+        ?errors: SimpleGitErrorsHandler,
         ?completion: SimpleGitCompletionOptions,
         ?timeout: SimpleGitTimeoutOptions,
         ?spawnOptions: SimpleGitSpawnOptions,
         ?``unsafe``: SimpleGitUnsafeOptions
     ) =
     member val baseDir: string option = baseDir with get, set
-    member val binary: string option = binary with get, set
+    member val binary: SimpleGitBinary option = binary with get, set
     member val maxConcurrentProcesses: int option = maxConcurrentProcesses with get, set
     member val trimmed: bool option = trimmed with get, set
     member val config: string[] option = config with get, set
     member val abort: IAbortSignal option = abort with get, set
     member val progress: SimpleGitProgressHandler option = progress with get, set
+    member val errors: SimpleGitErrorsHandler option = errors with get, set
     member val completion: SimpleGitCompletionOptions option = completion with get, set
     member val timeout: SimpleGitTimeoutOptions option = timeout with get, set
     member val spawnOptions: SimpleGitSpawnOptions option = spawnOptions with get, set

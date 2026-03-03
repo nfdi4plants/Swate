@@ -56,6 +56,18 @@ let classifyFailureKindTests =
                 (GitService.classifyFailureKind "timeout while authentication failed")
                 GitService.GitFailureKind.Timeout
                 "Timeout should win when timeout and authentication indicators are both present."
+
+        testCase "maps permission denied publickey to unauthorized" <| fun _ ->
+            Expect.equal
+                (GitService.classifyFailureKind "Permission denied (publickey).")
+                GitService.GitFailureKind.Unauthorized
+                "SSH authentication failures should classify as unauthorized."
+
+        testCase "keeps forbidden precedence when 403 and auth text are mixed" <| fun _ ->
+            Expect.equal
+                (GitService.classifyFailureKind "403 Forbidden: could not read username")
+                GitService.GitFailureKind.Forbidden
+                "403 should classify as forbidden even when auth text is present."
     ]
 
 let branchValidationTests =
@@ -107,6 +119,10 @@ let branchValidationTests =
         testCase "rejects backslash character explicitly" <| fun _ ->
             GitService.ensureValidBranchLikeName "Branch name" "feature\\test"
             |> expectError <| "Backslash should be rejected."
+
+        testCase "rejects control characters" <| fun _ ->
+            GitService.ensureValidBranchLikeName "Branch name" "feature\u0007test"
+            |> expectError <| "ASCII control characters should be rejected."
     ]
 
 let pathspecValidationTests =
@@ -136,8 +152,8 @@ let pathspecValidationTests =
             |> expectError <| "Dot segments should be rejected."
 
         testCase "accepts unicode pathspec" <| fun _ ->
-            GitService.ensureValidPathspec "src/über-β.txt"
-            |> expectOk "src/über-β.txt" <| "Unicode pathspec should be accepted."
+            GitService.ensureValidPathspec "src/\u00FCber-\u03B2.txt"
+            |> expectOk "src/\u00FCber-\u03B2.txt" <| "Unicode pathspec should be accepted."
 
         testCase "accepts very long pathspec" <| fun _ ->
             let longSegment = String.replicate 280 "a"
@@ -149,6 +165,10 @@ let pathspecValidationTests =
         testCase "normalizes windows backslashes" <| fun _ ->
             GitService.ensureValidPathspec "src\\file.txt"
             |> expectOk "src/file.txt" <| "Backslashes should be normalized to forward slashes."
+
+        testCase "rejects pathspec with null character at index 0" <| fun _ ->
+            GitService.ensureValidPathspec "\u0000src/file.txt"
+            |> expectError <| "Null bytes should be rejected regardless of position."
     ]
 
 let remoteUrlValidationTests =
@@ -244,6 +264,11 @@ let redactionTests =
 
             let redacted = GitAuthAdapter.redactToken input
             Expect.equal redacted expected "Tokens should be redacted on each line."
+
+        testCase "does not redact partial authorization field names" <| fun _ ->
+            let input = "Authorizatio: Bearer token123"
+            let redacted = GitAuthAdapter.redactToken input
+            Expect.equal redacted input "Only valid Authorization field names should be redacted."
     ]
 
 let hostExtractionTests =
@@ -417,6 +442,7 @@ let bindingSurfaceParityTests =
                     "config"
                     "abort"
                     "progress"
+                    "errors"
                     "completion"
                     "timeout"
                     "spawnOptions"
@@ -434,6 +460,13 @@ let bindingSurfaceParityTests =
         testCase "SimpleGitOptions abort uses AbortSignal type" <| fun _ ->
             let abortProperty = typeof<SimpleGitOptions>.GetProperty("abort")
             Expect.equal abortProperty.PropertyType typeof<IAbortSignal option> "Abort option should be typed as AbortSignal."
+
+        testCase "SimpleGitOptions binary and errors plugin options are typed" <| fun _ ->
+            let binaryProperty = typeof<SimpleGitOptions>.GetProperty("binary")
+            let errorsProperty = typeof<SimpleGitOptions>.GetProperty("errors")
+
+            Expect.equal binaryProperty.PropertyType typeof<SimpleGitBinary option> "Binary option should support string and tuple forms."
+            Expect.equal errorsProperty.PropertyType typeof<SimpleGitErrorsHandler option> "Errors plugin callback should be exposed."
 
         testCase "SimpleGitOptions completion and spawn options are typed" <| fun _ ->
             let completionProperty = typeof<SimpleGitOptions>.GetProperty("completion")
@@ -476,10 +509,20 @@ let bindingSurfaceParityTests =
             let summaryProperty = pullResultType.GetProperty("summary")
             let createdProperty = pullResultType.GetProperty("created")
             let deletedProperty = pullResultType.GetProperty("deleted")
+            let remoteMessagesProperty = pullResultType.GetProperty("remoteMessages")
 
             Expect.equal summaryProperty.PropertyType typeof<PullDetailSummary> "Pull summary should be required."
             Expect.equal createdProperty.PropertyType typeof<string[]> "PullResult.created should be available."
             Expect.equal deletedProperty.PropertyType typeof<string[]> "PullResult.deleted should be available."
+            Expect.equal remoteMessagesProperty.PropertyType typeof<RemoteMessages> "PullResult.remoteMessages should be typed as RemoteMessages."
+
+        testCase "DiffResultNameStatusFile optionality matches upstream" <| fun _ ->
+            let nameStatusType = typeof<DiffResultNameStatusFile>
+            let statusProperty = nameStatusType.GetProperty("status")
+            let similarityProperty = nameStatusType.GetProperty("similarity")
+
+            Expect.equal statusProperty.PropertyType typeof<string option> "DiffResultNameStatusFile.status should be optional."
+            Expect.equal similarityProperty.PropertyType typeof<float> "DiffResultNameStatusFile.similarity should be required."
 
         testCase "High-impact result fields are non-optional" <| fun _ ->
             let commitResultType = typeof<CommitResult>
@@ -631,3 +674,4 @@ let tests =
         remoteNameValidationTests
         bindingSurfaceParityTests
     ]
+

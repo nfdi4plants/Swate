@@ -60,9 +60,18 @@ let classifyFailureKind (message: string) =
         Canceled
     elif containsAny [| "timed out"; "timeout"; "time out" |] then
         Timeout
-    elif containsAny [| "forbidden"; "403"; "permission denied" |] then
+    elif containsAny [| "forbidden"; "403" |] then
         Forbidden
-    elif containsAny [| "unauthorized"; "authentication failed"; "401"; "could not read username"; "no access token available" |] then
+    elif
+        containsAny [|
+            "unauthorized"
+            "authentication failed"
+            "401"
+            "could not read username"
+            "no access token available"
+            "permission denied"
+        |]
+    then
         Unauthorized
     elif containsAny [| "network"; "could not resolve host"; "failed to connect"; "connection reset"; "connection refused"; "unable to access" |] then
         Network
@@ -116,7 +125,7 @@ let private createOptions
     let options =
         SimpleGitOptions(
             baseDir = arcPath,
-            binary = "git",
+            binary = U3.Case1 "git",
             maxConcurrentProcesses = 1,
             timeout = timeout,
             ``unsafe`` = unsafeOptions
@@ -132,9 +141,12 @@ let private createGit (options: SimpleGitOptions) : ISimpleGit =
 
 let ensureValidBranchLikeName (label: string) (value: string) =
     let trimmed = value.Trim()
+    let containsControlCharacter = trimmed |> Seq.exists Char.IsControl
 
     if String.IsNullOrWhiteSpace trimmed then
         Error(exn $"{label} must not be empty.")
+    elif containsControlCharacter then
+        Error(exn $"{label} contains control characters.")
     elif trimmed.StartsWith("-") then
         Error(exn $"{label} must not start with '-'.")
     elif trimmed.StartsWith("/") then
