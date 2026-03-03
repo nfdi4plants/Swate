@@ -3,8 +3,11 @@ module GitValidationTests
 open System
 open Expecto
 open Fable.Core
+open Fable.Electron
+open Microsoft.FSharp.Reflection
 open Main.Git
 open Main.Bindings.SimpleGit
+open Swate.Electron.Shared.IPCTypes
 
 let private expectOk expected (result: Result<'a, exn>) message =
     match result with
@@ -15,6 +18,16 @@ let private expectError (result: Result<'a, exn>) message =
     match result with
     | Ok value -> failtest $"Expected Error but got Ok: {value}"
     | Error _ -> ()
+
+let private flattenFunctionSignature (functionType: Type) =
+    let rec collect (arguments: Type list) (current: Type) =
+        if FSharpType.IsFunction current then
+            let domainType, rangeType = FSharpType.GetFunctionElements current
+            collect (domainType :: arguments) rangeType
+        else
+            List.rev arguments, current
+
+    collect [] functionType
 
 let classifyFailureKindTests =
     testList "classifyFailureKind" [
@@ -335,6 +348,114 @@ let remoteNameValidationTests =
         testCase "accepts mixed punctuation pattern" <| fun _ ->
             GitService.validateRemoteName "a/b.c-d_e"
             |> expectOk "a/b.c-d_e" <| "Allowed punctuation should be accepted."
+    ]
+
+let provisioningPathValidationTests =
+    testList "provisioning path validation" [
+        testCase "rejects empty target path" <| fun _ ->
+            GitProvisioningService.validateAndNormalizeTargetPathWithResolver id ""
+            |> expectError <| "Empty target path should be rejected."
+
+        testCase "rejects target path containing null byte" <| fun _ ->
+            GitProvisioningService.validateAndNormalizeTargetPathWithResolver id "repo\u0000name"
+            |> expectError <| "Target path with null byte should be rejected."
+
+        testCase "normalizes target path via resolver" <| fun _ ->
+            let fakeResolver (value: string) = $"ABS::{value.Replace('\\', '/')}"
+
+            GitProvisioningService.validateAndNormalizeTargetPathWithResolver fakeResolver "  repo\\nested  "
+            |> expectOk "ABS::repo/nested" <| "Resolver output should be returned for valid path input."
+    ]
+
+let cloneTargetEmptinessTests =
+    testList "clone target emptiness" [
+        testCase "fails when existing directory is non-empty" <| fun _ ->
+            let state = GitProvisioningService.classifyCloneTargetState true 1
+            GitProvisioningService.ensureCloneTargetIsEmpty state
+            |> expectError <| "Existing directory with entries should be rejected."
+
+        testCase "allows missing directory target" <| fun _ ->
+            let state = GitProvisioningService.classifyCloneTargetState false 0
+            GitProvisioningService.ensureCloneTargetIsEmpty state
+            |> expectOk () <| "Missing target directory should be allowed."
+    ]
+
+let cloneRetryDecisionTests =
+    testList "clone retry decision" [
+        testCase "retries without auth for unauthorized" <| fun _ ->
+            Expect.isTrue
+                (GitProvisioningService.shouldRetryWithoutAuth GitService.GitFailureKind.Unauthorized)
+                "Unauthorized clone failures should trigger one unauthenticated retry."
+
+        testCase "retries without auth for forbidden" <| fun _ ->
+            Expect.isTrue
+                (GitProvisioningService.shouldRetryWithoutAuth GitService.GitFailureKind.Forbidden)
+                "Forbidden clone failures should trigger one unauthenticated retry."
+
+        testCase "does not retry without auth for non-auth failures" <| fun _ ->
+            let kinds = [
+                GitService.GitFailureKind.Network
+                GitService.GitFailureKind.Timeout
+                GitService.GitFailureKind.Canceled
+                GitService.GitFailureKind.Unknown
+            ]
+
+            for kind in kinds do
+                Expect.isFalse
+                    (GitProvisioningService.shouldRetryWithoutAuth kind)
+                    $"Failure kind {kind} should not trigger unauthenticated retry."
+    ]
+
+let cloneBranchOptionAssemblyTests =
+    testList "clone branch option assembly" [
+        testCase "returns empty options when branch is missing" <| fun _ ->
+            let options = GitProvisioningService.buildCloneBranchOptions None
+            Expect.equal options [||] "No branch should produce no clone options."
+
+        testCase "includes --branch option pair when branch is provided" <| fun _ ->
+            let options = GitProvisioningService.buildCloneBranchOptions (Some "feature/clone-flow")
+            Expect.equal options [| "--branch"; "feature/clone-flow" |] "Branch should produce --branch option pair."
+    ]
+
+let ipcProvisioningContractReflectionTests =
+    testList "IPC provisioning contract reflection" [
+        testCase "GitOperationResult exposes Path as string option" <| fun _ ->
+            let pathProperty = typeof<GitOperationResult>.GetProperty("Path")
+            Expect.isNotNull pathProperty "GitOperationResult should expose a Path property."
+            Expect.equal pathProperty.PropertyType typeof<string option> "Path should be typed as string option."
+
+        testCase "IArcVaultsApi.gitInitRepository uses target path string argument" <| fun _ ->
+            let initProperty = typeof<IArcVaultsApi>.GetProperty("gitInitRepository")
+            Expect.isNotNull initProperty "IArcVaultsApi should expose gitInitRepository."
+
+            let argumentTypes, _ = flattenFunctionSignature initProperty.PropertyType
+            Expect.equal argumentTypes.Length 2 "gitInitRepository should accept IPC event and target path."
+            Expect.equal argumentTypes.[0] typeof<IpcMainEvent> "First gitInitRepository argument should be IpcMainEvent."
+            Expect.equal argumentTypes.[1] typeof<string> "Second gitInitRepository argument should be string target path."
+
+        testCase "IArcVaultsApi.gitCloneRepository uses GitCloneRepositoryRequest argument" <| fun _ ->
+            let cloneProperty = typeof<IArcVaultsApi>.GetProperty("gitCloneRepository")
+            Expect.isNotNull cloneProperty "IArcVaultsApi should expose gitCloneRepository."
+
+            let argumentTypes, _ = flattenFunctionSignature cloneProperty.PropertyType
+            Expect.equal argumentTypes.Length 2 "gitCloneRepository should accept IPC event and clone request."
+            Expect.equal argumentTypes.[0] typeof<IpcMainEvent> "First gitCloneRepository argument should be IpcMainEvent."
+            Expect.equal argumentTypes.[1] typeof<GitCloneRepositoryRequest> "Second gitCloneRepository argument should be GitCloneRepositoryRequest."
+
+        testCase "GitCloneRepositoryRequest fields match expected schema" <| fun _ ->
+            let properties = typeof<GitCloneRepositoryRequest>.GetProperties()
+            let propertyNames = properties |> Array.map _.Name |> Set.ofArray
+            let expectedNames = Set.ofList [ "RemoteUrl"; "TargetPath"; "Branch" ]
+
+            Expect.equal propertyNames expectedNames "GitCloneRepositoryRequest should expose RemoteUrl, TargetPath, Branch."
+
+            let remoteUrlProperty = typeof<GitCloneRepositoryRequest>.GetProperty("RemoteUrl")
+            let targetPathProperty = typeof<GitCloneRepositoryRequest>.GetProperty("TargetPath")
+            let branchProperty = typeof<GitCloneRepositoryRequest>.GetProperty("Branch")
+
+            Expect.equal remoteUrlProperty.PropertyType typeof<string> "RemoteUrl should be string."
+            Expect.equal targetPathProperty.PropertyType typeof<string> "TargetPath should be string."
+            Expect.equal branchProperty.PropertyType typeof<string option> "Branch should be string option."
     ]
 
 let bindingSurfaceParityTests =
@@ -672,6 +793,11 @@ let tests =
         hostExtractionTests
         authConfigTests
         remoteNameValidationTests
+        provisioningPathValidationTests
+        cloneTargetEmptinessTests
+        cloneRetryDecisionTests
+        cloneBranchOptionAssemblyTests
+        ipcProvisioningContractReflectionTests
         bindingSurfaceParityTests
     ]
 
