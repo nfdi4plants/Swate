@@ -10,10 +10,11 @@ open ARCtrl.ARCtrlHelper
 
 
 [<RequireQualifiedAccess>]
-type PreviewData =
+type PageState =
     | ArcFileData of fileType: ArcFilesDiscriminate * json: string
     | Text of string
     | Unknown
+    | LandingDraft
     | Error of string
 
 type SaveArcFileRequest = {
@@ -46,8 +47,8 @@ type IArcVaultsApi = {
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer []>
     checkForARC: string -> JS.Promise<bool>
 
-    openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
-    saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
+    openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>
+    saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PageState, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
 }

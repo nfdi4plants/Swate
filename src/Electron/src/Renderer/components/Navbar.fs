@@ -6,7 +6,7 @@ open ARCtrl
 open Swate.Electron.Shared
 
 
-let saveArcFileWithPreview (arcFile: ArcFiles) : JS.Promise<Result<IPCTypes.PreviewData, string>> =
+let saveArcFileWithPreview (arcFile: ArcFiles) : JS.Promise<Result<IPCTypes.PageState, string>> =
     promise {
         match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
         | None ->
@@ -36,6 +36,6 @@ let onSaveClick arcFileState setPreviewData _ =
             | Ok updatedPreview ->
                 setPreviewData (Some updatedPreview)
             | Error errorMsg ->
-                setPreviewData (Some (IPCTypes.PreviewData.Error $"Save failed: {errorMsg}"))
+                setPreviewData (Some (IPCTypes.PageState.Error $"Save failed: {errorMsg}"))
         }
         |> Promise.start

@@ -11,21 +11,17 @@ let createFromLanding
     landingUiState
     setLandingUiState
     setLandingDraft
-    setShowLandingDraft
-    setLandingDraftActive
     appState
     setSelectedTreeItemPath
     setPreviewData
     (payload: SubmitPayload)
     =
-    let finishSuccess (previewData: PreviewData) =
+    let finishSuccess (previewData: PageState) =
         payload.ArcFile
         |> ARCHelper.tryGetArcFilePath appState
         |> setSelectedTreeItemPath
 
         setPreviewData (Some previewData)
-        setShowLandingDraft false
-        setLandingDraftActive false
         setLandingDraft LandingDraft.init
         setLandingUiState LandingUiState.init
 
@@ -39,7 +35,7 @@ let createFromLanding
         let! saveResult = Navbar.saveArcFileWithPreview payload.ArcFile
 
         match saveResult with
-        | Error message ->
+        | Result.Error message ->
             setLandingUiState {
                 landingUiState with
                     IsSubmitting = false
@@ -58,7 +54,7 @@ let createFromLanding
 
                 match writeResult with
                 | Ok() -> finishSuccess previewData
-                | Error exn ->
+                | Result.Error exn ->
                     setLandingUiState {
                         landingUiState with
                             IsSubmitting = false
@@ -68,7 +64,7 @@ let createFromLanding
     |> Promise.start
 
 [<ReactComponent>]
-let createARCPreview
+let CreateARCPreview
     (arcFile: ArcFiles)
     (setArcFileState: ArcFiles option -> unit)
     (activeView: PreviewActiveView)
@@ -120,7 +116,7 @@ let createARCPreview
         |]
     ]
 
-let computeARCContent
+let ComputeARCContent
     previewData
     arcFileState
     setArcFileState
@@ -130,45 +126,25 @@ let computeARCContent
     setLandingDraft
     landingUiState
     setLandingUiState
-    landingDraftActive
-    setLandingDraftActive
-    showLandingDraft
-    setShowLandingDraft
     appState
     setSelectedTreeItemPath
     setPreviewData
     (path: string)
     =
-    if landingDraftActive && showLandingDraft then
-        Landing.Wizard(
-            landingDraft,
-            setLandingDraft,
-            landingUiState,
-            setLandingUiState,
-            createFromLanding
-                landingUiState
-                setLandingUiState
-                setLandingDraft
-                setShowLandingDraft
-                setLandingDraftActive
-                appState
-                setSelectedTreeItemPath
-                setPreviewData
-        )
-    else
+
         match previewData with
         | Some data ->
             match data with
-            | PreviewData.ArcFileData _ ->
+            | PageState.ArcFileData _ ->
                 match arcFileState with
                 | Some arcFile ->
-                    createARCPreview arcFile setArcFileState activeView setActiveView
+                    CreateARCPreview arcFile setArcFileState activeView setActiveView
                 | None ->
                     Html.div [
                         prop.className "swt:p-4 swt:text-error"
                         prop.text "Failed to parse ArcFile data"
                     ]
-            | PreviewData.Text content ->
+            | PageState.Text content ->
                 Html.div [
                     prop.className "swt:size-full swt:p-4 swt:overflow-auto swt:bg-base-100"
                     prop.children [|
@@ -178,12 +154,12 @@ let computeARCContent
                         ]
                     |]
                 ]
-            | PreviewData.Unknown ->
+            | PageState.Unknown ->
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
                     prop.children [| Html.h1 "Unknown file type" |]
                 ]
-            | PreviewData.Error errMsg ->
+            | PageState.Error errMsg ->
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
                     prop.children [|
@@ -197,6 +173,20 @@ let computeARCContent
                         ]
                     |]
                 ]
+            | PageState.LandingDraft ->
+                Landing.Wizard(
+                    landingDraft,
+                    setLandingDraft,
+                    landingUiState,
+                    setLandingUiState,
+                    createFromLanding
+                        landingUiState
+                        setLandingUiState
+                        setLandingDraft
+                        appState
+                        setSelectedTreeItemPath
+                        setPreviewData
+                )
         | None ->
             Html.h1 [
                 prop.text path
@@ -211,14 +201,11 @@ let Content
         setAppState,
         setArcFileState,
         arcFileState,
-        previewData,
+        pageState,
         setPreviewData,
-        showLandingDraft,
-        setShowLandingDraft,
         setSelectedTreeItemPath
     ) =
 
-    let landingDraftActive, setLandingDraftActive = React.useState false
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
@@ -226,8 +213,6 @@ let Content
     let resetLandingDraft () =
         setLandingDraft LandingDraft.init
         setLandingUiState LandingUiState.init
-        setLandingDraftActive true
-        setShowLandingDraft true
         setSelectedTreeItemPath None
         setArcFileState None
 
@@ -235,19 +220,18 @@ let Content
         (fun () ->
             Api.getOpenPath()
             |> Promise.map (fun pathOption ->
-                if showLandingDraft then
+                match pageState with
+                | Some PageState.LandingDraft ->
                     match pathOption with
                     | Some _ ->
                         resetLandingDraft()
                     | None ->
-                        setLandingDraftActive false
-                        setShowLandingDraft false
-                        setSelectedTreeItemPath None
                         setAppState AppState.Init
+                | _ -> ()
             )
             |> Promise.start
         ),
-        [| box showLandingDraft |]
+        [| box pageState |]
     )
 
     match appState with
@@ -275,8 +259,8 @@ let Content
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                             prop.children [
-                                computeARCContent
-                                    previewData
+                                ComputeARCContent
+                                    pageState
                                     arcFileState
                                     setArcFileState
                                     activeView
@@ -285,10 +269,6 @@ let Content
                                     setLandingDraft
                                     landingUiState
                                     setLandingUiState
-                                    landingDraftActive
-                                    setLandingDraftActive
-                                    showLandingDraft
-                                    setShowLandingDraft
                                     appState
                                     setSelectedTreeItemPath
                                     setPreviewData

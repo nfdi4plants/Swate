@@ -27,7 +27,7 @@ let createARC (identifier: string) : JS.Promise<Result<string, exn>> =
 let getOpenPath () : JS.Promise<string option> =
     emitJsExpr arcVaultApi "$0.getOpenPath()"
 
-let openFile (path: string) : JS.Promise<Result<PreviewData, exn>> =
+let openFile (path: string) : JS.Promise<Result<PageState, exn>> =
     emitJsExpr (arcVaultApi, path) "$0.openFile($1)"
 
 let openARCInNewWindow () : JS.Promise<Result<unit, exn>> =
@@ -39,7 +39,7 @@ let focusExistingARCWindow (arcPath: string) : JS.Promise<Result<unit, exn>> =
 let getRecentARCs () =
     emitJsExpr arcVaultApi "$0.getRecentARCs()"
 
-let saveArcFile (request: SaveArcFileRequest) : JS.Promise<Result<PreviewData, exn>> =
+let saveArcFile (request: SaveArcFileRequest) : JS.Promise<Result<PageState, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.saveArcFile($1)"
 
 let resolveCloseRequest (decision: SaveBeforeQuitDecision) : JS.Promise<Result<unit, exn>> =

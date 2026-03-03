@@ -81,14 +81,14 @@ let private toPreviewDataOrUnsupported (arcFile: ArcFiles) =
     |> Option.map Ok
     |> Option.defaultValue (Error(exn "Saving this file type is not supported yet in Electron."))
 
-let syncARCFile (arc: ARC) (request: IPCTypes.SaveArcFileRequest) : Result<IPCTypes.PreviewData, exn> =
+let syncARCFile (arc: ARC) (request: IPCTypes.SaveArcFileRequest) : Result<IPCTypes.PageState, exn> =
     try
         match ArcFileSaveMapping.tryParseSaveRequest request with
         | Error parseError ->
             Error parseError
         | Ok (ArcFiles.Investigation investigation) ->
             copyInvestigationMetadata investigation arc
-            Ok(PreviewData.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
+            Ok(PageState.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 arc))
         | Ok (ArcFiles.Study(study, _)) ->
             if arc.TryGetStudy(study.Identifier).IsSome then
                 arc.SetStudy(study.Identifier, study)
@@ -486,7 +486,7 @@ let api: IPCTypes.IArcVaultsApi = {
 
                         match tryResolveDataMap () with
                         | Some dataMap ->
-                            return Ok(PreviewData.ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
+                            return Ok(PageState.ArcFileData(ArcFilesDiscriminate.DataMap, ARCtrl.DataMap.toJsonString 0 dataMap))
                         | None ->
                             return Error(exn $"DataMap '{identifier}' not found in ARC.")
 
@@ -494,7 +494,7 @@ let api: IPCTypes.IArcVaultsApi = {
                     // Fallback to text preview for unknown file types
                     try
                         let content = fs.readFileSync (path, "utf8")
-                        return Ok(PreviewData.Text content)
+                        return Ok(PageState.Text content)
                     with e ->
                         return Error(exn $"Could not read file {fileName}: {e.Message}")
         }

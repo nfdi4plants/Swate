@@ -11,7 +11,7 @@ open Feliz
 
 
 [<ReactComponent>]
-let CreateFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft (setPreviewData: PreviewData option -> unit) =
+let CreateFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath (setPreviewData: PageState option -> unit) =
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
     let resolvePreviewPath (path: string) =
@@ -80,7 +80,7 @@ let CreateFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
 
     let fileItem = loop parent
 
-    let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setShowLandingDraft (setPreviewData: PreviewData option -> unit) (item: FileItem) =
+    let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath (setPreviewData: PageState option -> unit) (item: FileItem) =
         promise {
             if parent.IsSome then
 
@@ -100,29 +100,28 @@ let CreateFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                         console.log ($"[Renderer] Opening file: {previewPath}")
 
                     setSelectedTreeItemPath (Some previewPath)
-                    setShowLandingDraft false
                     let! result = Api.openFile previewPath
 
                     match result with
                     | Ok data ->
                         console.log ("[Renderer] Received data, processing...")
                         setPreviewData (Some data)
-                    | Error exn ->
+                    | Result.Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
                         setPreviewData None
-                        setPreviewData (Some (PreviewData.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
+                        setPreviewData (Some (PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
                 elif item.Path.IsSome && isDirectoryByPath then
                     // Folders are not preview targets.
                     setPreviewData None
                 else
-                    setPreviewData (Some (PreviewData.Error $"File '{item.Name}' has no path."))
+                    setPreviewData (Some (PageState.Error $"File '{item.Name}' has no path."))
         }
         |> Promise.start
 
     if fileItem.IsSome then
         FileExplorer.FileExplorer(
             initialItems = [ fileItem.Value ],
-            onItemClick = openPreview parent setSelectedTreeItemPath setShowLandingDraft setPreviewData,
+            onItemClick = openPreview parent setSelectedTreeItemPath setPreviewData,
             ?selectedItemId = selectedTreeItemPath
         )
     else

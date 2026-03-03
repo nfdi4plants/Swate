@@ -27,22 +27,21 @@ let Main () =
 
     let recentARCs, setRecentARCs = React.useState [||]
     let appState, setAppState = React.useState AppState.Init
-    let showLandingDraft, setShowLandingDraft = React.useState false
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
-    let (previewData: PreviewData option), (setPreviewData: PreviewData option -> unit) = React.useState None
+    let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
 
     React.useEffect (
         (fun () ->
-            match previewData with
-            | Some (PreviewData.ArcFileData(fileType, json)) ->
+            match pageState with
+            | Some (PageState.ArcFileData(fileType, json)) ->
                 match ParseArcFileFromJson fileType json with
                 | Some arcFile -> setArcFileState (Some arcFile)
                 | None -> setArcFileState None
             | _ -> setArcFileState None
         ),
-        [| box previewData |]
+        [| box pageState |]
     )
 
     React.useEffect (
@@ -73,7 +72,7 @@ let Main () =
     )
 
     let fileExplorer =
-        React.useMemo (
+       React.useMemo (
             (fun _ ->
                 let ra = ResizeArray(fileTree.Values)
                 let fileEntries = ra.ToArray()
@@ -90,14 +89,13 @@ let Main () =
                             fileTree
                             selectedTreeItemPath
                             setSelectedTreeItemPath
-                            setShowLandingDraft
-                            setPreviewData
+                            setPageState
                     )
                 else
                     None
             ),
             [|  fileTree; selectedTreeItemPath |]
-    )
+        )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
         pathChange =
@@ -109,7 +107,6 @@ let Main () =
                     AppState.ARC p |> setAppState
                     setSelectedTreeItemPath pathOption
                 | None ->
-                    setShowLandingDraft false
                     setSelectedTreeItemPath None
                     setAppState AppState.Init
         recentARCsUpdate =
@@ -135,21 +132,39 @@ let Main () =
                     setAppState,
                     setArcFileState,
                     arcFileState,
-                    previewData,
-                    setPreviewData,
-                    showLandingDraft,
-                    setShowLandingDraft,
+                    pageState,
+                    setPageState,
                     setSelectedTreeItemPath)
             ),
             [|
                 box appState
-                box previewData
+                box pageState
                 box arcFileState
-                box showLandingDraft
             |]
         )
 
     let navbar = Navbar.Main(selector)
+
+    let leftSidebar appState (fe: ReactElement) =
+        Some(
+            Html.div [
+                prop.className "swt:p-4"
+                prop.children [|
+                    match appState with
+                    | AppState.ARC _ ->
+                        Html.button [
+                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                            prop.text "Landing Page"
+                            prop.onClick (fun _ -> setPageState (Some PageState.LandingDraft))
+                        ]
+                    | _ -> Html.none
+                    Html.h2 [
+                        prop.text "ARC-Tree"
+                    ]
+                    fe
+                |]
+            ]
+        )
 
     let saveBeforeClose () : JS.Promise<Result<unit, string>> =
         promise {
@@ -160,7 +175,7 @@ let Main () =
 
                 match result with
                 | Ok updatedPreview ->
-                    setPreviewData (Some updatedPreview)
+                    setPageState (Some updatedPreview)
                     return Ok()
                 | Result.Error errorMsg ->
                     let msg = $"Save failed: {errorMsg}"
@@ -182,26 +197,7 @@ let Main () =
             ?leftSidebar =
                 (
                     match fileExplorer with
-                    | Some fe ->
-                        Some(
-                            Html.div [
-                                prop.className "swt:p-4"
-                                prop.children [|
-                                    match appState with
-                                    | AppState.ARC _ ->
-                                        Html.button [
-                                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                                            prop.text "Landing Page"
-                                            prop.onClick (fun _ -> setShowLandingDraft (not showLandingDraft))
-                                        ]
-                                    | _ -> Html.none
-                                    Html.h2 [
-                                        prop.text "ARC-Tree"
-                                    ]
-                                    fe
-                                |]
-                            ]
-                        )
+                    | Some fe -> leftSidebar appState fe
                     | None -> None
                  ),
             leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
