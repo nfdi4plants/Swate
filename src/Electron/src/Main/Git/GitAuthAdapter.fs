@@ -8,8 +8,8 @@ open Main.Bindings.SimpleGit
 
 type GitFactory = SimpleGitOptions -> ISimpleGit
 
-let private redactPattern = Regex("(?i)(Authorization:\\s*Bearer\\s+)[^\\s'\\\"]+")
-let private credentialUrlPattern = Regex("(?i)(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)")
+let private redactPattern = Regex("(Authorization:\\s*Bearer\\s+)[^\\s'\\\"]+", RegexOptions.IgnoreCase)
+let private credentialUrlPattern = Regex("(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)", RegexOptions.IgnoreCase)
 
 let private baseConfigEntries (options: SimpleGitOptions) =
     options.config |> Option.defaultValue [||]

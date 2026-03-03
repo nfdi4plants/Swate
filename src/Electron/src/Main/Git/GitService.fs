@@ -48,7 +48,8 @@ type GitDiffSummaryDto = {
 type GitProgressCallback = SimpleGitProgressEvent -> unit
 
 let private disallowedRemotePrefixes = [| "file://"; "ext::"; "fd::" |]
-let private protocolOverridePattern = Regex("(?i)protocol\\.[^\\s=]+\\.(allow|deny)|(^|\\s)-c\\s+protocol\\.")
+let private protocolOverridePattern =
+    Regex("protocol\\.[^\\s=]+\\.(allow|deny)|(^|\\s)-c\\s+protocol\\.", RegexOptions.IgnoreCase)
 let private remoteNamePattern = Regex("^[A-Za-z0-9._/-]+$")
 let private invalidBranchCharactersPattern = Regex("[\\~\\^:\\?\\*\\[\\\\\\s]")
 
