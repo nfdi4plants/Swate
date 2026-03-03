@@ -179,20 +179,27 @@ let private toSharedGitFailureKind (kind: GitService.GitFailureKind) =
 
 let private toGitOperationResult
     (successMessage: 'T -> string option)
+    (successPath: ('T -> string option) option)
     (result: GitService.GitResult<'T>)
     : Result<GitOperationResult, exn> =
     match result with
     | Ok payload ->
+        let path =
+            successPath
+            |> Option.bind (fun projectPath -> projectPath payload)
+
         Ok {
             Success = true
             Message = successMessage payload
             FailureKind = None
+            Path = path
         }
     | Error failure ->
         Ok {
             Success = false
             Message = Some failure.Message
             FailureKind = Some(toSharedGitFailureKind failure.Kind)
+            Path = None
         }
 
 let private toStatusDto (status: GitService.GitStatusDto) : GitStatusDto = {
@@ -630,7 +637,7 @@ let api: IArcVaultsApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.fetch arcPath request.Remote request.Branch (Some progressReporter)
-                return toGitOperationResult (fun () -> Some "Fetch completed.") result
+                return toGitOperationResult (fun () -> Some "Fetch completed.") None result
         }
     gitPull =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
@@ -642,7 +649,7 @@ let api: IArcVaultsApi = {
                 return!
                     withBusyWriting vault (fun () -> promise {
                         let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
-                        return toGitOperationResult (fun () -> Some "Pull completed.") result
+                        return toGitOperationResult (fun () -> Some "Pull completed.") None result
                     })
         }
     gitPush =
@@ -653,7 +660,28 @@ let api: IArcVaultsApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.push arcPath request.Remote request.Branch (Some progressReporter)
-                return toGitOperationResult (fun () -> Some "Push completed.") result
+                return toGitOperationResult (fun () -> Some "Push completed.") None result
+        }
+    gitInitRepository =
+        fun (_event: IpcMainEvent) (targetPath: string) -> promise {
+            // Init provisioning is path-driven only; no vault/window context is required.
+            let! result = GitProvisioningService.initRepository targetPath
+            return toGitOperationResult (fun _ -> Some "Repository initialized.") (Some(fun normalizedPath -> Some normalizedPath)) result
+        }
+    gitCloneRepository =
+        fun (event: IpcMainEvent) (request: GitCloneRepositoryRequest) -> promise {
+            let progressReporter =
+                ARC_VAULTS.TryGetVault(windowIdFromIpcEvent event)
+                |> Option.map createGitProgressReporter
+
+            let! result =
+                GitProvisioningService.cloneRepository
+                    request.RemoteUrl
+                    request.TargetPath
+                    request.Branch
+                    progressReporter
+
+            return toGitOperationResult (fun _ -> Some "Clone completed.") (Some(fun normalizedPath -> Some normalizedPath)) result
         }
     gitStagePaths =
         fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
@@ -663,7 +691,7 @@ let api: IArcVaultsApi = {
                 return!
                     withBusyWriting vault (fun () -> promise {
                         let! result = GitService.stagePaths arcPath request.Pathspecs
-                        return toGitOperationResult (fun () -> Some "Files staged.") result
+                        return toGitOperationResult (fun () -> Some "Files staged.") None result
                     })
         }
     gitUnstagePaths =
@@ -674,7 +702,7 @@ let api: IArcVaultsApi = {
                 return!
                     withBusyWriting vault (fun () -> promise {
                         let! result = GitService.unstagePaths arcPath request.Pathspecs
-                        return toGitOperationResult (fun () -> Some "Files unstaged.") result
+                        return toGitOperationResult (fun () -> Some "Files unstaged.") None result
                     })
         }
     gitCommit =
@@ -685,7 +713,7 @@ let api: IArcVaultsApi = {
                 return!
                     withBusyWriting vault (fun () -> promise {
                         let! result = GitService.commit arcPath request.Message
-                        return toGitOperationResult (fun commitHash -> Some $"Commit completed ({commitHash}).") result
+                        return toGitOperationResult (fun commitHash -> Some $"Commit completed ({commitHash}).") None result
                     })
         }
     createBranch =
@@ -696,7 +724,7 @@ let api: IArcVaultsApi = {
                 return!
                     withBusyWriting vault (fun () -> promise {
                         let! result = GitService.createBranch arcPath request.Name request.StartPoint
-                        return toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") result
+                        return toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None result
                     })
         }
     checkoutBranch =
@@ -707,7 +735,7 @@ let api: IArcVaultsApi = {
                 return!
                     withBusyWriting vault (fun () -> promise {
                         let! result = GitService.checkoutBranch arcPath request.Name
-                        return toGitOperationResult (fun () -> Some $"Checked out branch '{request.Name}'.") result
+                        return toGitOperationResult (fun () -> Some $"Checked out branch '{request.Name}'.") None result
                     })
         }
     }

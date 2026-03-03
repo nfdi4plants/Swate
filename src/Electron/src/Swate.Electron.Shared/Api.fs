@@ -66,6 +66,12 @@ let gitPull (request: GitRemoteOperationRequest) : JS.Promise<Result<GitOperatio
 let gitPush (request: GitRemoteOperationRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.gitPush($1)"
 
+let gitInitRepository (targetPath: string) : JS.Promise<Result<GitOperationResult, exn>> =
+    emitJsExpr (arcVaultApi, targetPath) "$0.gitInitRepository($1)"
+
+let gitCloneRepository (request: GitCloneRepositoryRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    emitJsExpr (arcVaultApi, request) "$0.gitCloneRepository($1)"
+
 let gitStagePaths (request: GitPathspecRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.gitStagePaths($1)"
 

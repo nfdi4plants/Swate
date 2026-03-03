@@ -59,6 +59,7 @@ type GitOperationResult = {
     Success: bool
     Message: string option
     FailureKind: GitFailureKind option
+    Path: string option
 }
 
 type GitProgressDto = {
@@ -71,6 +72,12 @@ type GitProgressDto = {
 
 type GitRemoteOperationRequest = {
     Remote: string option
+    Branch: string option
+}
+
+type GitCloneRepositoryRequest = {
+    RemoteUrl: string
+    TargetPath: string
     Branch: string option
 }
 
@@ -121,6 +128,8 @@ type IArcVaultsApi = {
     gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitInitRepository: IpcMainEvent -> string -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCloneRepository: IpcMainEvent -> GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitStagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitUnstagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
