@@ -9,6 +9,7 @@ open Fable.Remoting.Client
 open Fable.Electron.Remoting.Renderer
 
 let arcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
+
 let saveBeforeQuitApi = Remoting.init |> Remoting.buildClient<ISaveBeforeQuitApi>
 
 let templateApi: ITemplateAPIv1 =
@@ -40,6 +41,9 @@ let getRecentARCs () =
 let saveArcFile (request: SaveArcFileRequest) : JS.Promise<Result<PreviewData, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.saveArcFile($1)"
 
+let resolveCloseRequest (decision: SaveBeforeQuitDecision) : JS.Promise<Result<unit, exn>> =
+    emitJsExpr (saveBeforeQuitApi, decision) "$0.resolveCloseRequest($1)"
+
 let writeFile (request: WriteFileRequest) : JS.Promise<Result<unit, exn>> =
     emitJsExpr (arcVaultApi, request) "$0.writeFile($1)"
 
@@ -51,6 +55,3 @@ let runGitLfs (request: GitLfsRequest) : JS.Promise<Result<GitLfsResult, exn>> =
 
 let cancelGitLfs (requestId: string) : JS.Promise<Result<string, exn>> =
     emitJsExpr (arcVaultApi, requestId) "$0.cancelGitLfs($1)"
-
-let resolveCloseRequest (decision: SaveBeforeQuitDecision) : JS.Promise<Result<unit, exn>> =
-    emitJsExpr (saveBeforeQuitApi, decision) "$0.resolveCloseRequest($1)"

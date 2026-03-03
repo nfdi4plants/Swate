@@ -5,6 +5,7 @@ open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
 open Main
 
+
 let api: ISaveBeforeQuitApi = {
     resolveCloseRequest =
         fun (event: IpcMainEvent) (decision: SaveBeforeQuitDecision) -> promise {
