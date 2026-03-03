@@ -7,6 +7,7 @@
   <ItemGroup>
     <Compile Include="MetadataForm.fs" />
     <Compile Include="context\AppStateCtx.fs" />
+    <Compile Include="context\LandingStateCtx.fs" />
     <Compile Include="components\ARCHelper.fs" />
     <Compile Include="components\Selector.fs" />
     <Compile Include="components\Navbar.fs" />

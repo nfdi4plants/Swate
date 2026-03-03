@@ -5,6 +5,7 @@ open Fable.Electron.Remoting.Renderer
 open Fable.Core
 
 open Swate.Components
+open Swate.Components.Landing
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 
@@ -31,6 +32,8 @@ let Main () =
     let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
     let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
     let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
+
+    let landingStateCtxValue: Renderer.context.LandingStateCtx.LandingStateContext = Renderer.context.LandingStateCtx.LandingStateContext.init()
 
     React.useEffect (
         (fun () ->
@@ -129,7 +132,6 @@ let Main () =
             (fun _ ->
                 MainWindowContent.Content(
                     appState,
-                    setAppState,
                     setArcFileState,
                     arcFileState,
                     pageState,
@@ -155,7 +157,13 @@ let Main () =
                         Html.button [
                             prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
                             prop.text "Landing Page"
-                            prop.onClick (fun _ -> setPageState (Some PageState.LandingDraft))
+                            prop.onClick (fun _ ->
+                                landingStateCtxValue.SetDraft LandingDraft.init
+                                landingStateCtxValue.SetUiState LandingUiState.init
+                                setSelectedTreeItemPath None
+                                setArcFileState None
+                                setPageState (Some PageState.LandingDraft)
+                            )
                         ]
                     | _ -> Html.none
                     Html.h2 [
@@ -187,19 +195,22 @@ let Main () =
             state = appState
             setState = setAppState
         },
-        Layout.Main(
-            children =
-                React.Fragment [|
-                    children
-                    CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
-                |],
-            navbar = navbar,
-            ?leftSidebar =
-                (
-                    match fileExplorer with
-                    | Some fe -> leftSidebar appState fe
-                    | None -> None
-                 ),
-            leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+        Renderer.context.LandingStateCtx.LandingStateCtx.Provider(
+            landingStateCtxValue,
+            Layout.Main(
+                children =
+                    React.Fragment [|
+                        children
+                        CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                    |],
+                navbar = navbar,
+                ?leftSidebar =
+                    (
+                        match fileExplorer with
+                        | Some fe -> leftSidebar appState fe
+                        | None -> None
+                     ),
+                leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+            )
         )
     )

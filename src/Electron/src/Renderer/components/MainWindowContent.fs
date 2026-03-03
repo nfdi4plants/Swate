@@ -198,7 +198,6 @@ let ComputeARCContent
 let Content
     (
         appState: AppState,
-        setAppState,
         setArcFileState,
         arcFileState,
         pageState,
@@ -206,33 +205,10 @@ let Content
         setSelectedTreeItemPath
     ) =
 
-    let landingDraft, setLandingDraft = React.useState LandingDraft.init
+    let landingCtx: Renderer.context.LandingStateCtx.LandingStateContext =
+        React.useContext Renderer.context.LandingStateCtx.LandingStateCtx
+
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
-    let landingUiState, setLandingUiState = React.useState LandingUiState.init
-
-    let resetLandingDraft () =
-        setLandingDraft LandingDraft.init
-        setLandingUiState LandingUiState.init
-        setSelectedTreeItemPath None
-        setArcFileState None
-
-    React.useLayoutEffect(
-        (fun () ->
-            Api.getOpenPath()
-            |> Promise.map (fun pathOption ->
-                match pageState with
-                | Some PageState.LandingDraft ->
-                    match pathOption with
-                    | Some _ ->
-                        resetLandingDraft()
-                    | None ->
-                        setAppState AppState.Init
-                | _ -> ()
-            )
-            |> Promise.start
-        ),
-        [| box pageState |]
-    )
 
     match appState with
     | AppState.Init ->
@@ -265,10 +241,10 @@ let Content
                                     setArcFileState
                                     activeView
                                     setActiveView
-                                    landingDraft
-                                    setLandingDraft
-                                    landingUiState
-                                    setLandingUiState
+                                    landingCtx.Draft
+                                    landingCtx.SetDraft
+                                    landingCtx.UiState
+                                    landingCtx.SetUiState
                                     appState
                                     setSelectedTreeItemPath
                                     setPreviewData
