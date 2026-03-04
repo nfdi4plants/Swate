@@ -201,12 +201,13 @@ let Content
         setArcFileState,
         arcFileState,
         pageState,
-        setPreviewData,
-        setSelectedTreeItemPath
+        setPreviewData
     ) =
 
     let landingCtx: Renderer.context.LandingStateCtx.LandingStateContext =
         React.useContext Renderer.context.LandingStateCtx.LandingStateCtx
+    let workspaceCtx: Renderer.context.WorkspaceStateCtx.WorkspaceStateContext =
+        React.useContext Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx
 
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
 
@@ -246,7 +247,7 @@ let Content
                                     landingCtx.UiState
                                     landingCtx.SetUiState
                                     appState
-                                    setSelectedTreeItemPath
+                                    workspaceCtx.SetSelectedTreeItemPath
                                     setPreviewData
                                     path
                             ]
