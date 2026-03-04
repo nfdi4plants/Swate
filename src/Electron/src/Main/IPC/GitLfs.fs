@@ -6,14 +6,7 @@ open Fable.Core.JS
 open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
 
-[<Import("existsSync", "node:fs")>]
-let private existsSync (path: string) : bool = jsNative
-
 let private childProcessDynamic: obj = importAll "node:child_process"
-let private pathDynamic: obj = importAll "node:path"
-
-let private pathJoin (part1: string) (part2: string) : string =
-    pathDynamic?join(part1, part2) |> unbox<string>
 
 type IGitLfs =
     abstract Run:
@@ -40,8 +33,24 @@ type NodeGitLfsAdapter() =
         | Untrack, None
         | Status, None -> Error "FilePath is required for this Git LFS command"
 
-    let validateRepoPath repoPath =
-        existsSync (pathJoin repoPath ".git")
+    let validateRepoPath (repoPath: string) =
+        try
+            let output: string =
+                childProcessDynamic?execFileSync (
+                    "git",
+                    [| "rev-parse"; "--is-inside-work-tree" |],
+                    createObj [
+                        "cwd" ==> repoPath
+                        "encoding" ==> "utf8"
+                        "stdio" ==> "pipe"
+                        "shell" ==> false
+                    ]
+                )
+                |> unbox<string>
+
+            output.Trim().Equals("true", System.StringComparison.OrdinalIgnoreCase)
+        with _ ->
+            false
 
     let runGitLfs
         (request: GitLfsRequest)

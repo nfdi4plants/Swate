@@ -108,18 +108,16 @@ let Main () =
 
                 let fileTree =
                     if fileEntries.Length > 0 then
-                        Some(FileExplorer.getFileTree fileEntries)
+                        Some(Renderer.components.FileExplorerHelper.getFileTree fileEntries)
                     else
                         None
 
                 if fileTree.IsSome then
-                    Some (
-                        FileExplorer.CreateFileTree
-                            fileTree
-                            workspaceCtx.state.SelectedTreeItemPath
-                            setSelectedTreeItemPath
-                            setPageState
-                    )
+                    Renderer.components.FileExplorerHelper.createFileTree
+                        fileTree
+                        workspaceCtx.state.SelectedTreeItemPath
+                        setSelectedTreeItemPath
+                        setPageState
                 else
                     None
             ),

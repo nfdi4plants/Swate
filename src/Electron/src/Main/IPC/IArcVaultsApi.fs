@@ -527,9 +527,10 @@ let api: IPCTypes.IArcVaultsApi = {
                     // Always enforce the active ARC root to avoid running against arbitrary repos.
                     let enforcedRequest = { request with RepoPath = arcPath }
                     let! result = GitLfs.registerGitLfsIpc.runChannel event enforcedRequest
-
                     match result with
-                    | Error e -> return Error e
+                    | Error e ->
+                        Swate.Components.console.log($"Error: {e.Message}")
+                        return Error e
                     | Ok successResult ->
                         match enforcedRequest.Command with
                         | Track
