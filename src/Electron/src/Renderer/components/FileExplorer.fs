@@ -11,6 +11,7 @@ open Browser.Dom
 
 let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile =
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+    let rootRepoPath = parent |> Option.map (fun p -> normalizePath p.path)
 
     let resolvePreviewPath (path: string) =
         let normalized = normalizePath path
@@ -63,6 +64,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     FileTree.createFolder parent.Value.name (Some parent.Value.path) "swt:fluent--folder-24-regular" with
                         Id = parent.Value.path
                         IsExpanded = isFocusedPathOrAncestor parent.Value.path
+                        IsLFS = parent.Value.isLfs
                         Children = Some tmp
                 }
                 Some result
@@ -71,12 +73,41 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
                     {
                         FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular" with
                             Id = parent.Value.path
+                            IsLFS = parent.Value.isLfs
                     }
                 )
         else
             None
 
     let fileItem = loop parent
+
+    let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) =
+        promise {
+            let request: GitLfsRequest = {
+                RequestId = System.Guid.NewGuid().ToString()
+                RepoPath = repoPath
+                Command = if markAsLfs then GitLfsCommand.Track else GitLfsCommand.Untrack
+                FilePath = Some relativePath
+                TimeoutMs = Some 10000
+            }
+
+            let! result = Api.runGitLfs request
+
+            return
+                match result with
+                | Ok _ -> Ok ()
+                | Error exn -> Error exn.Message
+        }
+
+    let toggleLfsMark =
+        FileExplorerGitLfsHelper.ToggleLfsMark(
+            rootRepoPath,
+            setPreviewError,
+            runToggleLfsMark
+        )
+
+    let contextMenuItems (item: FileItem) =
+        FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
 
     let openPreview (parent: FileItemDTO option) setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile (item: FileItem) =
         promise {
@@ -126,6 +157,7 @@ let createFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelected
             FileExplorer.FileExplorer(
                 initialItems = [ fileItem.Value ],
                 onItemClick = openPreview parent setSelectedTreeItemPath setShowLandingDraft setPreviewData setPreviewError setDidSelectFile,
+                onContextMenu = contextMenuItems,
                 ?selectedItemId = selectedTreeItemPath
             )
         )
@@ -162,7 +194,8 @@ let insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry) =
                         part,
                         isDirectory,
                         newPath,
-                        System.Collections.Generic.Dictionary()
+                        System.Collections.Generic.Dictionary(),
+                        entry.isLfs
                     )
                 node.children.Add(part, newNode)
                 newNode
@@ -197,7 +230,7 @@ let getFileTree (fileEntries: FileEntry []) =
         let tmp =
             fileEntries
             |> Array.find(fun fileEntry -> fileEntry.path = rootPath)
-        FileItemDTO.create(tmp.name, tmp.isDirectory, tmp.path, System.Collections.Generic.Dictionary())
+        FileItemDTO.create(tmp.name, tmp.isDirectory, tmp.path, System.Collections.Generic.Dictionary(), tmp.isLfs)
 
     adaptedFileEntires
     |> Array.iter (fun fileEntry -> insertEntry rootElement rootPath fileEntry)

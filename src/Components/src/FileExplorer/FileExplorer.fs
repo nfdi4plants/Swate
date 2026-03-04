@@ -37,8 +37,7 @@ type FileExplorer =
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
             ?selectedItemId: string
-        )
-        =
+        ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
         let initialModel = FileExplorerLogic.init (defaultArg initialItems [])
@@ -56,9 +55,11 @@ type FileExplorer =
                 match selectedItemId with
                 | Some itemId ->
                     dispatch (FileExplorerLogic.EnsurePathVisible itemId)
+
                     if model.SelectedId <> Some itemId then
                         dispatch (FileExplorerLogic.SelectItem itemId)
-                | None -> ()),
+                | None -> ()
+            ),
             [| box selectedItemId; box model.Items |]
         )
 
@@ -70,7 +71,7 @@ type FileExplorer =
             promise {
                 try
                     let windowObj: obj = Browser.Dom.window
-                    do! windowObj?navigator?clipboard?writeText(path)
+                    do! windowObj?navigator?clipboard?writeText (path)
                 with ex ->
                     Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
             }
@@ -86,13 +87,12 @@ type FileExplorer =
                         Disabled = None
                     }
                 match item.Path with
-                | Some path ->
-                    {
-                        Label = "Copy Path"
-                        Icon = "swt:fluent--copy-24-regular"
-                        OnClick = fun () -> copyPathToClipboard path
-                        Disabled = None
-                    }
+                | Some path -> {
+                    Label = "Copy Path"
+                    Icon = "swt:fluent--copy-24-regular"
+                    OnClick = fun () -> copyPathToClipboard path
+                    Disabled = None
+                  }
                 | None -> ()
                 if item.IsDirectory then
                     let isExpanded = model.ExpandedIds.Contains item.Id
@@ -110,7 +110,9 @@ type FileExplorer =
             ]
 
         let getContextMenuItems (item: FileItem) =
-            let customItems = onContextMenu |> Option.map (fun fn -> fn item) |> Option.defaultValue []
+            let customItems =
+                onContextMenu |> Option.map (fun fn -> fn item) |> Option.defaultValue []
+
             defaultContextMenuItems item @ customItems
 
         let toComponentMenuItem (item: Swate.Components.FileExplorerTypes.ContextMenuItem) =
@@ -118,11 +120,7 @@ type FileExplorer =
             let className = if isDisabled then "swt:opacity-50" else ""
 
             Swate.Components.ContextMenuItem(
-                text =
-                    Html.span [
-                        prop.className className
-                        prop.text item.Label
-                    ],
+                text = Html.span [ prop.className className; prop.text item.Label ],
                 icon =
                     Html.i [
                         prop.className [
@@ -134,7 +132,8 @@ type FileExplorer =
                 onClick =
                     (fun _ ->
                         if not isDisabled then
-                            item.OnClick())
+                            item.OnClick()
+                    )
             )
 
         let contextMenu =

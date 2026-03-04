@@ -15,14 +15,37 @@ type PreviewData =
     | Unknown
 
 type SaveArcFileRequest = {
-        FileType: ArcFilesDiscriminate
-        Json: string
-    }
+    FileType: ArcFilesDiscriminate
+    Json: string
+}
 
 type WriteFileRequest = {
-        RelativePath: string
-        Content: string
-    }
+    RelativePath: string
+    Content: string
+}
+
+// GIT LFS Types
+type GitLfsCommand =
+    | Pull
+    | Fetch
+    | Install
+    | Track
+    | Untrack
+    | Status
+
+type GitLfsRequest = {
+    RequestId: string
+    RepoPath: string
+    Command: GitLfsCommand
+    FilePath: string option
+    TimeoutMs: int option
+}
+
+type GitLfsResult = {
+    Success: bool
+    Output: string
+    Error: string
+}
 
 [<RequireQualifiedAccess>]
 type SaveBeforeQuitDecision =
@@ -48,12 +71,20 @@ type IArcVaultsApi = {
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
+    runGitLfs: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
+    cancelGitLfs: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+}
+
+type IGitLfsApi = {
+    runChannel: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
+    cancelChannel: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
 }
 
 type FileEntry = {
     name: string
     path: string
     isDirectory: bool
+    isLfs: bool option
 }
 
 [<AutoOpen>]
@@ -66,10 +97,11 @@ module FileEntryExtensions =
 
     type FileEntry with
 
-        static member create(name: string, path: string, isDirectory: bool) = {
+        static member create(name: string, path: string, isDirectory: bool, ?isLfs: bool option) = {
             name = name
             path = path
             isDirectory = isDirectory
+            isLfs = defaultArg isLfs None
         }
 
 type ISaveBeforeQuitApi = {
@@ -80,6 +112,7 @@ type FileItemDTO = {
     name: string
     isDirectory: bool
     path: string
+    isLfs: bool option
     children: Dictionary<string, FileItemDTO>
 }
 
@@ -88,10 +121,11 @@ module FileItemDTOExtensions =
 
     type FileItemDTO with
 
-        static member create(name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>) = {
+        static member create(name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>, ?isLfs: bool option) = {
             name = name
             isDirectory = isDirectory
             path = path
+            isLfs = defaultArg isLfs None
             children = children
         }
 

@@ -79,6 +79,7 @@
     <Compile Include="ARCSelector\Selector.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
+    <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
     <Compile Include="FileExplorer\FileExplorerBreadcrumbs.fs" />
     <Compile Include="FileExplorer\FileExplorer.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
