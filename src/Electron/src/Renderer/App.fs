@@ -30,11 +30,36 @@ let Main () =
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
     let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
 
-    let landingStateCtxValue = Renderer.context.LandingStateCtx.LandingStateCtx
-    let workspaceStateCtxValue = Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx
-    let landingPageCtx = React.useContext landingStateCtxValue
-    let workspaceCtx = React.useContext workspaceStateCtxValue
-    
+    let landingState, setLandingState = React.useState (Renderer.context.LandingStateCtx.LandingState.init ())
+    let workspaceState, setWorkspaceState = React.useState (Renderer.context.WorkspaceStateCtx.WorkspaceState.init ())
+
+    let landingCtx: StateContext<Renderer.context.LandingStateCtx.LandingState> = {
+        state = landingState
+        setState = setLandingState
+    }
+
+    let workspaceCtx: StateContext<Renderer.context.WorkspaceStateCtx.WorkspaceState> = {
+        state = workspaceState
+        setState = setWorkspaceState
+    }
+
+    let setSelectedTreeItemPath (path: string option) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                SelectedTreeItemPath = path
+        }
+
+    let setRecentARCs (arcs: SelectorTypes.ARCPointer []) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                RecentARCs = arcs
+        }
+
+    let setFileTree (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                FileTree = fileTree
+        }
 
     React.useEffect (
         (fun () ->
@@ -70,7 +95,7 @@ let Main () =
                 AppState.ARC p |> setAppState
             | None ->
                 setAppState AppState.Init
-                workspaceCtx.SetSelectedTreeItemPath None
+                setSelectedTreeItemPath None
         )
         |> Promise.start
     )
@@ -78,7 +103,7 @@ let Main () =
     let fileExplorer =
        React.useMemo (
             (fun _ ->
-                let ra = ResizeArray(workspaceCtx.FileTree.Values)
+                let ra = ResizeArray(workspaceCtx.state.FileTree.Values)
                 let fileEntries = ra.ToArray()
 
                 let fileTree =
@@ -91,14 +116,14 @@ let Main () =
                     Some (
                         FileExplorer.CreateFileTree
                             fileTree
-                            workspaceCtx.SelectedTreeItemPath
-                            workspaceCtx.SetSelectedTreeItemPath
+                            workspaceCtx.state.SelectedTreeItemPath
+                            setSelectedTreeItemPath
                             setPageState
                     )
                 else
                     None
             ),
-            [|  workspaceCtx.FileTree; workspaceCtx.SelectedTreeItemPath |]
+            [|  workspaceCtx.state.FileTree; workspaceCtx.state.SelectedTreeItemPath |]
         )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
@@ -109,21 +134,27 @@ let Main () =
                 match pathOption with
                 | Some p ->
                     AppState.ARC p |> setAppState
-                    workspaceCtx.SetSelectedTreeItemPath pathOption
+                    setSelectedTreeItemPath pathOption
                 | None ->
-                    workspaceCtx.SetSelectedTreeItemPath None
+                    setSelectedTreeItemPath None
                     setAppState AppState.Init
         recentARCsUpdate =
             fun arcs ->
                 console.log ("[Swate] CHANGE RECENTARCS!")
-                workspaceCtx.SetRecentARCs arcs
+                setRecentARCs arcs
         fileTreeUpdate =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")
-                workspaceCtx.SetFileTree fileExplorer
+                setFileTree fileExplorer
     }
 
-    let selector = Selector.Main(workspaceCtx.RecentARCs, Selector.onARCClick, Selector.actionbar appState, onOpenSelector = Selector.onOpenSelector appState workspaceCtx.SetRecentARCs)
+    let selector =
+        Selector.Main(
+            workspaceCtx.state.RecentARCs,
+            Selector.onARCClick,
+            Selector.actionbar appState,
+            onOpenSelector = Selector.onOpenSelector appState setRecentARCs
+        )
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
@@ -158,9 +189,12 @@ let Main () =
                             prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
                             prop.text "Landing Page"
                             prop.onClick (fun _ ->
-                                landingPageCtx.SetDraft LandingDraft.init
-                                landingPageCtx.SetUiState LandingUiState.init
-                                workspaceCtx.SetSelectedTreeItemPath None
+                                landingCtx.setState {
+                                    landingCtx.state with
+                                        Draft = LandingDraft.init
+                                        UiState = LandingUiState.init
+                                }
+                                setSelectedTreeItemPath None
                                 setArcFileState None
                                 setPageState (Some PageState.LandingDraft)
                             )
@@ -198,7 +232,7 @@ let Main () =
         Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx.Provider(
             workspaceCtx,
             Renderer.context.LandingStateCtx.LandingStateCtx.Provider(
-                landingPageCtx,
+                landingCtx,
                 Layout.Main(
                     children =
                         React.Fragment [|

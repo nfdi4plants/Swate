@@ -5,23 +5,17 @@ open Feliz
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 
-type WorkspaceStateContext = {
+type WorkspaceState = {
     RecentARCs: SelectorTypes.ARCPointer []
-    SetRecentARCs: SelectorTypes.ARCPointer [] -> unit
     FileTree: Dictionary<string, FileEntry>
-    SetFileTree: Dictionary<string, FileEntry> -> unit
     SelectedTreeItemPath: string option
-    SetSelectedTreeItemPath: string option -> unit
 } with
 
     static member init () = {
         RecentARCs = [||]
-        SetRecentARCs = ignore
         FileTree = Dictionary<string, FileEntry>()
-        SetFileTree = ignore
         SelectedTreeItemPath = None
-        SetSelectedTreeItemPath = ignore
     }
 
 let WorkspaceStateCtx =
-    React.createContext<WorkspaceStateContext> (WorkspaceStateContext.init ())
+    React.createContext<StateContext<WorkspaceState>> (StateContext.init (WorkspaceState.init ()))

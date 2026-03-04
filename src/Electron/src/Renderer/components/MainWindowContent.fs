@@ -204,10 +204,8 @@ let Content
         setPreviewData
     ) =
 
-    let landingCtx: Renderer.context.LandingStateCtx.LandingStateContext =
-        React.useContext Renderer.context.LandingStateCtx.LandingStateCtx
-    let workspaceCtx: Renderer.context.WorkspaceStateCtx.WorkspaceStateContext =
-        React.useContext Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx
+    let landingCtx = React.useContext Renderer.context.LandingStateCtx.LandingStateCtx
+    let workspaceCtx = React.useContext Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx
 
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
 
@@ -242,12 +240,27 @@ let Content
                                     setArcFileState
                                     activeView
                                     setActiveView
-                                    landingCtx.Draft
-                                    landingCtx.SetDraft
-                                    landingCtx.UiState
-                                    landingCtx.SetUiState
+                                    landingCtx.state.Draft
+                                    (fun draft ->
+                                        landingCtx.setState {
+                                            landingCtx.state with
+                                                Draft = draft
+                                        }
+                                    )
+                                    landingCtx.state.UiState
+                                    (fun uiState ->
+                                        landingCtx.setState {
+                                            landingCtx.state with
+                                                UiState = uiState
+                                        }
+                                    )
                                     appState
-                                    workspaceCtx.SetSelectedTreeItemPath
+                                    (fun path ->
+                                        workspaceCtx.setState {
+                                            workspaceCtx.state with
+                                                SelectedTreeItemPath = path
+                                        }
+                                    )
                                     setPreviewData
                                     path
                             ]

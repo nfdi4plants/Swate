@@ -2,20 +2,17 @@ module Renderer.context.LandingStateCtx
 
 open Swate.Components.Landing
 open Feliz
+open Swate.Components
 
-type LandingStateContext = {
+type LandingState = {
     Draft: LandingDraft
-    SetDraft: LandingDraft -> unit
     UiState: LandingUiState
-    SetUiState: LandingUiState -> unit
 } with
 
     static member init () = {
         Draft = LandingDraft.init
-        SetDraft = ignore
         UiState = LandingUiState.init
-        SetUiState = ignore
     }
 
 let LandingStateCtx =
-    React.createContext<LandingStateContext> (LandingStateContext.init ())
+    React.createContext<StateContext<LandingState>> (StateContext.init (LandingState.init ()))
