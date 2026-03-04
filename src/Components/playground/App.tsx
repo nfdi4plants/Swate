@@ -20,6 +20,7 @@ import {FileExplorerExample_Example} from '../src/FileExplorer/FileExplorer.fs.t
 import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
 import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.fs.ts'
 import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
+import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -185,13 +186,21 @@ function MarkdownTextContainer() {
   </div>
 }
 
+function AuthButtonContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Authentication Button</h2>
+    <AuthButton />
+  </div>
+}
+
 const App = () => {
     return (
-        <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
-            <NoteSearch />
-            <MarkdownTextContainer />
-            <LandingContainer />
-        </div>
+        <AuthButtonContainer />
+        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
+        //     <NoteSearch />
+        //     <MarkdownTextContainer />
+        //     <LandingContainer />
+        // </div>
     );
 };
 
