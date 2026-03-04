@@ -9,26 +9,6 @@ open Fable.Electron.Remoting.Main
 open Main
 open Main.Git
 
-let private tryGetVaultAndArcPath (event: IpcMainEvent) =
-    let windowId = windowIdFromIpcEvent event
-
-    match ARC_VAULTS.TryGetVault(windowId) with
-    | None -> Error(exn $"The ARC for window id {windowId} should exist")
-    | Some vault ->
-        match vault.path with
-        | Some arcPath -> Ok(vault, arcPath)
-        | None -> Error(exn "ARC is not loaded.")
-
-let private withBusyWriting (vault: ArcVault) (operation: unit -> JS.Promise<Result<'T, exn>>) : JS.Promise<Result<'T, exn>> =
-    promise {
-        vault.isBusyWriting <- true
-
-        try
-            return! operation ()
-        finally
-            vault.isBusyWriting <- false
-    }
-
 let private toSharedGitFailureKind (kind: GitService.GitFailureKind) =
     match kind with
     | GitService.GitFailureKind.Unauthorized -> GitFailureKind.Unauthorized
@@ -240,4 +220,3 @@ let api: IGitApi = {
                     })
         }
 }
-
