@@ -14,7 +14,7 @@ app
     .``then`` (fun () ->
         ARC_VAULTS.RegisterVault() |> ignore
 
-        Remoting.init |> Remoting.buildHandler IPC.IArcVaultsApi.api
+        Remoting.init |> Remoting.buildHandler IPC.ArcVaultsApi.api
         Remoting.init |> Remoting.buildHandler IPC.ISaveBeforeQuitApi.api
 
         app.onActivate (fun _ ->

@@ -171,118 +171,24 @@ type TextInputWithMarkdown =
             | Some textarea -> textarea.selectionStart, textarea.selectionEnd
             | None -> tempValue.Length, tempValue.Length
 
-        let activePromptInputMode () =
-            activePrompt
-            |> Option.bind (fun prompt -> prompt.InputMode)
-            |> Option.defaultValue MarkdownPromptInputMode.Text
-
-        let activePromptAllowsMultipleFiles () =
-            activePrompt
-            |> Option.bind (fun prompt -> prompt.AllowMultiple)
-            |> Option.defaultValue false
-
-        let activePromptAcceptTypes () =
-            activePrompt
-            |> Option.bind (fun prompt -> prompt.Accept)
-            |> Option.filter (fun accept -> not (String.IsNullOrWhiteSpace accept))
-
-        let normalizePromptFiles (files: MarkdownPromptFile list) =
-            if activePromptAllowsMultipleFiles () then
-                files
-            else
-                // In single-file mode, always keep the most recently selected file.
-                files |> List.rev |> List.truncate 1 |> List.rev
-
-        let acceptedTypeTokens () =
-            activePromptAcceptTypes ()
-            |> Option.defaultValue ""
-            |> fun accept ->
-                accept.Split(',')
-                |> Array.toList
-                |> List.map (fun token -> token.Trim().ToLowerInvariant())
-                |> List.filter (fun token -> not (String.IsNullOrWhiteSpace token))
-
-        let fileMatchesAcceptToken (file: MarkdownPromptFile) (token: string) =
-            let fileNameLower =
-                if String.IsNullOrWhiteSpace file.Name then
-                    ""
-                else
-                    file.Name.ToLowerInvariant()
-
-            let mimeLower =
-                file.MimeType
-                |> Option.defaultValue ""
-                |> fun mime -> mime.ToLowerInvariant()
-
-            if token.StartsWith "." then
-                not (String.IsNullOrWhiteSpace fileNameLower) && fileNameLower.EndsWith token
-            elif token.EndsWith "/*" then
-                let mimePrefix = token.Substring(0, token.Length - 1)
-                not (String.IsNullOrWhiteSpace mimeLower) && mimeLower.StartsWith mimePrefix
-            else
-                not (String.IsNullOrWhiteSpace mimeLower) && mimeLower = token
-
-        let partitionFilesByAccept (files: MarkdownPromptFile list) =
-            let tokens = acceptedTypeTokens ()
-
-            if List.isEmpty tokens then
-                files, []
-            else
-                files
-                |> List.partition (fun file -> tokens |> List.exists (fileMatchesAcceptToken file))
-
-        let rejectedFilesMessage (files: MarkdownPromptFile list) =
-            let rejectedNames =
-                files
-                |> List.map (fun file ->
-                    if String.IsNullOrWhiteSpace file.Name then
-                        "(unnamed file)"
-                    else
-                        file.Name
-                )
-                |> String.concat ", "
-
-            let allowed =
-                activePromptAcceptTypes ()
-                |> Option.defaultValue "configured accepted types"
-
-            if List.length files = 1 then
-                $"File not allowed: {rejectedNames}. Allowed: {allowed}."
-            else
-                $"Files not allowed: {rejectedNames}. Allowed: {allowed}."
-
-        let normalizePath (path: string) = path.Replace("\\", "/")
-
-        let toPromptFile (file: File) : MarkdownPromptFile =
-            {
-                Name = file.name
-                MimeType =
-                    if String.IsNullOrWhiteSpace file.``type`` then
-                        None
-                    else
-                        Some file.``type``
-                // Browser fallback cannot reliably resolve host filesystem paths.
-                HostPath = None
-                BrowserFile = Some file
-            }
-
         let appendPromptFilesAndClearError (files: MarkdownPromptFile list) =
             if isMountedRef.current then
                 setPromptFiles (fun currentFiles ->
                     let combined = currentFiles @ files
-                    normalizePromptFiles combined
+                    PluginTextInputHelpers.normalizePromptFiles activePrompt combined
                 )
                 if promptError.IsSome then
                     setPromptError None
 
         let applyPickedPromptFiles (files: MarkdownPromptFile list) =
-            let accepted, rejected = partitionFilesByAccept files
+            let accepted, rejected =
+                PluginTextInputHelpers.partitionFilesByAccept activePrompt files
 
             if not (List.isEmpty accepted) then
                 appendPromptFilesAndClearError accepted
 
             if not (List.isEmpty rejected) && isMountedRef.current then
-                setPromptError (Some(rejectedFilesMessage rejected))
+                setPromptError (Some(PluginTextInputHelpers.rejectedFilesMessage activePrompt rejected))
 
         let removePromptFileAtIndex (indexToRemove: int) =
             setPromptFiles (fun currentFiles ->
@@ -295,26 +201,6 @@ type TextInputWithMarkdown =
                         Some file
                 )
             )
-
-        let resolvePromptFilePath (file: MarkdownPromptFile) =
-            promise {
-                // Fallback path strategy when no host resolver is provided.
-                let fallbackPath =
-                    match file.HostPath with
-                    | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> normalizePath hostPath
-                    | _ -> file.Name
-
-                match filePickerAdapter with
-                | Some adapter ->
-                    // Preferred substitution point for runtime-specific link/path mapping.
-                    let! resolvedPath = adapter.ResolveMarkdownPath file
-
-                    if String.IsNullOrWhiteSpace resolvedPath then
-                        return fallbackPath
-                    else
-                        return normalizePath resolvedPath
-                | None -> return fallbackPath
-            }
 
         let triggerPromptFileSelection () =
             promise {
@@ -336,7 +222,7 @@ type TextInputWithMarkdown =
 
         let handlePromptFileChange =
             fun (files: File list) ->
-                let selected = files |> List.map toPromptFile
+                let selected = files |> List.map PluginTextInputHelpers.toPromptFile
                 applyPickedPromptFiles selected
 
                 // Reset the input value so selecting the same file triggers onChange.
@@ -359,7 +245,7 @@ type TextInputWithMarkdown =
                                 let file = e.dataTransfer.files.item i
 
                                 if not (isNull file) then
-                                    yield toPromptFile file
+                                    yield PluginTextInputHelpers.toPromptFile file
                         ]
 
                 if List.isEmpty files then
@@ -391,7 +277,7 @@ type TextInputWithMarkdown =
                         setPromptFiles (fun _ -> [])
                         setPromptFileDropActive false
 
-                match activePromptInputMode () with
+                match PluginTextInputHelpers.activePromptInputMode activePrompt with
                 | MarkdownPromptInputMode.Text ->
                     match prompt.Validate promptInput with
                     | Error message -> setPromptError (Some message)
@@ -407,7 +293,9 @@ type TextInputWithMarkdown =
                         applyPromptResult nextValue selection
 
                 | MarkdownPromptInputMode.File ->
-                    let selectedFiles = promptFiles |> normalizePromptFiles
+                    let selectedFiles =
+                        promptFiles
+                        |> PluginTextInputHelpers.normalizePromptFiles activePrompt
 
                     if List.isEmpty selectedFiles then
                         setPromptError (Some "Select at least one file.")
@@ -420,7 +308,8 @@ type TextInputWithMarkdown =
                                 let mutable resolvedFiles: (MarkdownPromptFile * string) list = []
 
                                 for file in selectedFiles do
-                                    let! resolvedPath = resolvePromptFilePath file
+                                    let! resolvedPath =
+                                        PluginTextInputHelpers.resolvePromptFilePath filePickerAdapter file
                                     resolvedFiles <- (file, resolvedPath) :: resolvedFiles
 
                                 return List.rev resolvedFiles
@@ -451,7 +340,7 @@ type TextInputWithMarkdown =
             setPromptFileDropActive false
 
         let activePlugins = PluginRegistry.activePlugins plugins
-        let pluginCommands = activePlugins |> List.map (fun plugin -> plugin.Command) |> List.toArray
+        let pluginCommands = PluginRegistry.activeCommands plugins
         let toolbarGroups = MarkdownCommands.toolbarGroupsWithPlugins pluginCommands
         let shortcutCommands = MarkdownCommands.shortcutCommands pluginCommands
 
@@ -477,7 +366,7 @@ type TextInputWithMarkdown =
 
         let executeCommand (command: ICommand) =
             fun (_: MouseEvent) ->
-                match activePlugins |> List.tryFind (fun plugin -> plugin.Command.keyCommand = command.keyCommand) with
+                match PluginTextInputHelpers.tryFindPluginForCommand activePlugins command with
                 | Some plugin ->
                     match plugin.Prompt with
                     | Some prompt -> openPromptDialog prompt
@@ -528,33 +417,13 @@ type TextInputWithMarkdown =
                 classes.Value
         ]
 
-        let promptTitle =
-            activePrompt
-            |> Option.map (fun prompt -> prompt.Title)
-            |> Option.defaultValue "Plugin action"
+        let promptViewModel = PluginTextInputHelpers.promptViewModel activePrompt
 
-        let promptDescription =
-            activePrompt
-            |> Option.bind (fun prompt -> prompt.Description)
-            |> Option.map Html.text
-
-        let promptPlaceholder =
-            activePrompt
-            |> Option.map (fun prompt -> prompt.Placeholder)
-            |> Option.defaultValue ""
-
-        let promptSubmitButtonText =
-            activePrompt
-            |> Option.map (fun prompt -> prompt.SubmitButtonText)
-            |> Option.defaultValue "Apply"
-
-        let promptInputMode = activePromptInputMode ()
-        let isFilePrompt = promptInputMode = MarkdownPromptInputMode.File
-
-        let promptAcceptedTypes =
-            activePromptAcceptTypes ()
-
-        let promptAllowMultipleFiles = activePromptAllowsMultipleFiles ()
+        let handlePromptInputChange =
+            fun (text: string) ->
+                setPromptInput text
+                if promptError.IsSome then
+                    setPromptError None
 
         Html.div [
             prop.className (
@@ -686,135 +555,25 @@ type TextInputWithMarkdown =
                         prop.text validationError.Value
                     ]
 
-                BaseModal.Modal(
-                    isOpen = activePrompt.IsSome,
-                    setIsOpen = closePromptDialog,
-                    header = Html.text promptTitle,
-                    ?description = promptDescription,
-                    children =
-                        Html.div [
-                            prop.className "swt:flex swt:flex-col swt:gap-2"
-                            prop.children [
-                                if isFilePrompt then
-                                    Html.input [
-                                        prop.testId "markdown-plugin-file-input"
-                                        prop.ref promptFileInputRef
-                                        prop.type'.file
-                                        prop.className "swt:hidden"
-                                        prop.multiple promptAllowMultipleFiles
-                                        if promptAcceptedTypes.IsSome then
-                                            prop.accept promptAcceptedTypes.Value
-                                        prop.onChange handlePromptFileChange
-                                    ]
-
-                                    Html.button [
-                                        prop.type'.button
-                                        prop.className "swt:btn swt:btn-outline swt:w-full"
-                                        prop.text "Choose file"
-                                        prop.onClick (fun _ -> triggerPromptFileSelection ())
-                                    ]
-
-                                    Html.div [
-                                        prop.testId "markdown-plugin-file-dropzone"
-                                        prop.className [
-                                            "swt:border-2 swt:border-dashed swt:rounded-box swt:p-3 swt:text-sm swt:text-center"
-                                            if promptFileDropActive then
-                                                "swt:border-primary swt:bg-primary/10"
-                                            else
-                                                "swt:border-base-300"
-                                        ]
-                                        prop.onDragEnter (fun (e: DragEvent) ->
-                                            e.preventDefault ()
-                                            e.stopPropagation ()
-                                            setPromptFileDropActive true
-                                        )
-                                        prop.onDragLeave (fun (e: DragEvent) ->
-                                            e.preventDefault ()
-                                            e.stopPropagation ()
-                                            setPromptFileDropActive false
-                                        )
-                                        prop.onDragOver (fun (e: DragEvent) ->
-                                            e.preventDefault ()
-                                            e.stopPropagation ()
-                                        )
-                                        prop.onDrop handlePromptDrop
-                                        prop.text "Drop files here"
-                                    ]
-
-                                    if List.isEmpty promptFiles then
-                                        Html.div [
-                                            prop.className "swt:text-xs swt:opacity-70"
-                                            prop.text "No files selected."
-                                        ]
-                                    else
-                                        Html.ul [
-                                            prop.className "swt:flex swt:flex-col swt:gap-1"
-                                            prop.children [
-                                                for index, file in promptFiles |> List.indexed do
-                                                    Html.li [
-                                                        prop.key $"prompt-file-{index}-{file.Name}"
-                                                        prop.className "swt:flex swt:items-center swt:gap-2"
-                                                        prop.children [
-                                                            Html.span [
-                                                                prop.className
-                                                                    "swt:grow swt:text-sm swt:truncate swt:text-left"
-                                                                prop.title file.Name
-                                                                prop.text file.Name
-                                                            ]
-                                                            Html.button [
-                                                                prop.type'.button
-                                                                prop.className "swt:btn swt:btn-xs swt:btn-ghost"
-                                                                prop.ariaLabel $"Remove {file.Name}"
-                                                                prop.text "x"
-                                                                prop.onClick (fun _ -> removePromptFileAtIndex index)
-                                                            ]
-                                                        ]
-                                                    ]
-                                            ]
-                                        ]
-                                else
-                                    Html.input [
-                                        prop.ref promptInputRef
-                                        prop.className [
-                                            "swt:input swt:input-bordered swt:w-full"
-                                            if promptError.IsSome then
-                                                "swt:input-error"
-                                        ]
-                                        prop.placeholder promptPlaceholder
-                                        prop.value promptInput
-                                        prop.onChange (fun text ->
-                                            setPromptInput text
-                                            if promptError.IsSome then
-                                                setPromptError None
-                                        )
-                                        prop.onKeyDown (fun (e: KeyboardEvent) ->
-                                            if e.key = "Enter" then
-                                                e.preventDefault ()
-                                                submitPromptDialog ()
-                                        )
-                                    ]
-                                if promptError.IsSome then
-                                    Html.p [
-                                        prop.className "swt:text-error swt:text-sm"
-                                        prop.text promptError.Value
-                                    ]
-                            ]
-                        ],
-                    footer =
-                        React.Fragment [
-                            Html.button [
-                                prop.className "swt:btn"
-                                prop.text "Cancel"
-                                prop.onClick (fun _ -> closePromptDialog false)
-                            ]
-                            Html.button [
-                                prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                                prop.text promptSubmitButtonText
-                                prop.onClick (fun _ -> submitPromptDialog ())
-                            ]
-                        ],
-                    initialFocusRef = unbox promptInputRef,
-                    className = "swt:bg-base-100 swt:text-base-content"
+                MarkdownPluginPromptModal.View(
+                    {
+                        IsOpen = activePrompt.IsSome
+                        SetIsOpen = closePromptDialog
+                        PromptViewModel = promptViewModel
+                        PromptInput = promptInput
+                        PromptError = promptError
+                        PromptFiles = promptFiles
+                        PromptFileDropActive = promptFileDropActive
+                        PromptInputRef = promptInputRef
+                        PromptFileInputRef = promptFileInputRef
+                        SetPromptFileDropActive = setPromptFileDropActive
+                        OnPromptInputChange = handlePromptInputChange
+                        OnPromptFileChange = handlePromptFileChange
+                        OnTriggerPromptFileSelection = triggerPromptFileSelection
+                        OnPromptDrop = handlePromptDrop
+                        OnRemovePromptFileAtIndex = removePromptFileAtIndex
+                        OnSubmitPromptDialog = submitPromptDialog
+                    }
                 )
             ]
         ]

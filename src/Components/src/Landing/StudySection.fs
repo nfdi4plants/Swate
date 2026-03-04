@@ -6,7 +6,8 @@ open Swate.Components.Metadata
 [<RequireQualifiedAccess>]
 module StudySection =
 
-    let private boxedHelperContent (content: ReactElement) =
+    [<ReactComponent>]
+    let private BoxedHelperContent (content: ReactElement) =
         Html.div [
             prop.className "swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
             prop.children [ content ]
@@ -17,7 +18,7 @@ module StudySection =
         Html.div [
             prop.className "swt:space-y-3"
             prop.children [
-                boxedHelperContent (
+                BoxedHelperContent (
                     FormComponents.PublicationsInput(
                         draft.Publications,
                         (fun pubs -> setDraft { draft with Publications = pubs }),
@@ -34,7 +35,7 @@ module StudySection =
                     (fun dateText -> setDraft { draft with PublicReleaseDate = dateText }),
                     label = "Public Release Date"
                 )
-                boxedHelperContent (
+                BoxedHelperContent (
                     FormComponents.OntologyAnnotationsInput(
                         draft.StudyDesignDescriptors,
                         (fun descriptors -> setDraft { draft with StudyDesignDescriptors = descriptors }),

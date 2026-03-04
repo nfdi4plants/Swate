@@ -1,204 +1,253 @@
-module Renderer.components.FileExplorer
+module Renderer.App
 
+open Feliz
+open Fable.Electron.Remoting.Renderer
+open Fable.Core
 
 open Swate.Components
+open Swate.Components.Landing
+open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
-open Swate.Components.FileExplorerTypes
 
 open Browser.Dom
 
-open Feliz
+open ARCtrl
 
+open Renderer.components
+
+
+let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
+    match ArcFileSaveMapping.tryParseArcFile fileType json with
+    | Ok arcFile -> Some arcFile
+    | Result.Error e ->
+        console.error ("Failed to parse ArcFile JSON: " + e.Message)
+        None
 
 [<ReactComponent>]
-let CreateFileTree (parent: FileItemDTO option) selectedTreeItemPath setSelectedTreeItemPath (setPreviewData: PageState option -> unit) =
-    let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+let Main () =
 
-    let resolvePreviewPath (path: string) =
-        let normalized = normalizePath path
-        let lowered = normalized.ToLowerInvariant()
+    let appState, setAppState = React.useState AppState.Init
+    let (arcFileState: ArcFiles option), setArcFileState = React.useState None
+    let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
 
-        let isAssayDatamapFile =
-            lowered.Contains("/assays/") && lowered.EndsWith("/isa.datamap.xlsx")
+    let landingState, setLandingState = React.useState (Renderer.context.LandingStateCtx.LandingState.init ())
+    let workspaceState, setWorkspaceState = React.useState (Renderer.context.WorkspaceStateCtx.WorkspaceState.init ())
 
-        let isStudyDatamapFile =
-            lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
+    let landingCtx: StateContext<Renderer.context.LandingStateCtx.LandingState> = {
+        state = landingState
+        setState = setLandingState
+    }
 
-        let isRunDatamapFile =
-            lowered.Contains("/runs/") && lowered.EndsWith("/isa.datamap.xlsx")
+    let workspaceCtx: StateContext<Renderer.context.WorkspaceStateCtx.WorkspaceState> = {
+        state = workspaceState
+        setState = setWorkspaceState
+    }
 
-        if isAssayDatamapFile then
-            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
-            $"{folderPath}/isa.assay.xlsx"
-        elif isStudyDatamapFile then
-            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
-            $"{folderPath}/isa.study.xlsx"
-        elif isRunDatamapFile then
-            let folderPath = normalized.Substring(0, normalized.LastIndexOf("/"))
-            $"{folderPath}/isa.run.xlsx"
-        else
-            normalized
+    let setSelectedTreeItemPath (path: string option) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                SelectedTreeItemPath = path
+        }
 
-    let isFocusedPathOrAncestor (nodePath: string) =
-        match selectedTreeItemPath with
-        | Some focusedPath ->
-            let normalizedNode = normalizePath nodePath
-            let normalizedFocused = normalizePath focusedPath
+    let setRecentARCs (arcs: SelectorTypes.ARCPointer []) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                RecentARCs = arcs
+        }
 
-            normalizedFocused = normalizedNode
-            || normalizedFocused.StartsWith(normalizedNode + "/", System.StringComparison.OrdinalIgnoreCase)
-        | None -> false
+    let setFileTree (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                FileTree = fileTree
+        }
 
-    let rec loop (parent: FileItemDTO option) =
-        if parent.IsSome then
-            match parent.Value.isDirectory with
-            | true ->
-                let tmp =
-                    let ra = ResizeArray(parent.Value.children.Values)
+    React.useEffect (
+        (fun () ->
+            match pageState with
+            | Some (PageState.ArcFileData(fileType, json)) ->
+                match ParseArcFileFromJson fileType json with
+                | Some arcFile -> setArcFileState (Some arcFile)
+                | None -> setArcFileState None
+            | _ -> setArcFileState None
+        ),
+        [| box pageState |]
+    )
 
-                    ra.ToArray()
-                    |> Array.map (fun entry -> loop (Some entry))
-                    |> Array.choose id
-                    |> List.ofArray
+    React.useEffect (
+        (fun () ->
+            match arcFileState with
+            | Some arcFile ->
+                match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
+                | Some request ->
+                    Api.syncARC request |> Promise.start
+                | None -> ()
+            | None -> ()
+        ),
+        [| box arcFileState |]
+    )
 
-                let result = {
-                    FileTree.createFolder parent.Value.name (Some parent.Value.path) "swt:fluent--folder-24-regular" with
-                        Id = parent.Value.path
-                        IsExpanded = isFocusedPathOrAncestor parent.Value.path
-                        Children = Some tmp
-                }
-                Some result
-            | false ->
-                Some(
-                    {
-                        FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular" with
-                            Id = parent.Value.path
-                    }
-                )
-        else
-            None
-
-    let fileItem = loop parent
-
-    let openPreview =
-        React.useCallback (
-            (fun (item: FileItem) ->
-                promise {
-                    if parent.IsSome then
-
-                        let fileTree = parent.Value
-
-                        let isDirectoryByPath =
-                            match item.Path with
-                            | Some p when fileTree.children.ContainsKey(p) -> fileTree.children.[p].isDirectory
-                            | _ -> item.IsDirectory
-
-                        if item.Path.IsSome && not isDirectoryByPath then
-                            let previewPath = resolvePreviewPath item.Path.Value
-
-                            if previewPath <> normalizePath item.Path.Value then
-                                console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
-                            else
-                                console.log ($"[Renderer] Opening file: {previewPath}")
-
-                            setSelectedTreeItemPath (Some previewPath)
-                            let! result = Api.openFile previewPath
-
-                            match result with
-                            | Ok data ->
-                                console.log ("[Renderer] Received data, processing...")
-                                setPreviewData (Some data)
-                            | Result.Error exn ->
-                                console.log ($"[Renderer] Error: {exn.Message}")
-                                setPreviewData None
-                                setPreviewData (Some (PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
-                        elif item.Path.IsSome && isDirectoryByPath then
-                            // Folders are not preview targets.
-                            setPreviewData None
-                        else
-                            setPreviewData (Some (PageState.Error $"File '{item.Name}' has no path."))
-                }
-                |> Promise.start),
-            [| box parent |]
+    ///Used on initializing
+    React.useEffectOnce (fun _ ->
+        Api.getOpenPath()
+        |> Promise.map (fun pathOption ->
+            match pathOption with
+            | Some p ->
+                AppState.ARC p |> setAppState
+            | None ->
+                setAppState AppState.Init
+                setSelectedTreeItemPath None
         )
+        |> Promise.start
+    )
 
-    if fileItem.IsSome then
-        FileExplorer.FileExplorer(
-            initialItems = [ fileItem.Value ],
-            onItemClick = openPreview,
-            ?selectedItemId = selectedTreeItemPath
-        )
-    else
-        failwith "Fileitem should exist."
+    let fileExplorer =
+       React.useMemo (
+            (fun _ ->
+                let ra = ResizeArray(workspaceCtx.state.FileTree.Values)
+                let fileEntries = ra.ToArray()
 
-let insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry) =
-    let parts = entry.path.Split('/', System.StringSplitOptions.RemoveEmptyEntries)
-
-    let splittedRootPath = rootPath.Split('/', System.StringSplitOptions.RemoveEmptyEntries)
-
-    let rec loop (node: FileItemDTO) index =
-        let part = parts[index]
-        let isLast = index = parts.Length - 1
-
-        let child =
-            match node.children.TryGetValue(part) with
-            | true, existing when ((not isLast) || entry.isDirectory) && not existing.isDirectory ->
-                // A node may first appear via a file path segment; upgrade it to a directory when needed.
-                let upgraded = { existing with isDirectory = true }
-                node.children.[part] <- upgraded
-                upgraded
-            | true, existing -> existing
-            | false, _ ->
-                let newPath = parts.[0..index] |> String.concat "/"
-                let isDirectory =
-                    if isLast then
-                        entry.isDirectory
+                let fileTree =
+                    if fileEntries.Length > 0 then
+                        Some(FileExplorer.getFileTree fileEntries)
                     else
-                        true
+                        None
 
-                let newNode =
-                    FileItemDTO.create(
-                        part,
-                        isDirectory,
-                        newPath,
-                        System.Collections.Generic.Dictionary()
+                if fileTree.IsSome then
+                    Some (
+                        FileExplorer.CreateFileTree
+                            fileTree
+                            workspaceCtx.state.SelectedTreeItemPath
+                            setSelectedTreeItemPath
+                            setPageState
                     )
-                node.children.Add(part, newNode)
-                newNode
-
-        if not isLast then
-            loop child (index + 1)
-
-    loop root splittedRootPath.Length
-
-let getFileTree (fileEntries: FileEntry []) =
-
-    let rootPath =
-        fileEntries
-        |> Array.map (fun fileEntry -> fileEntry.path)
-        |> Array.map (fun path -> path.Split("/"))
-        |> Array.sortByDescending (fun path -> path.Length)
-        |> Array.last
-        |> String.concat "/"
-
-    let adaptedFileEntires =
-        fileEntries
-        |> Array.filter (fun fileEntry -> fileEntry.path <> rootPath)
-        // Deterministic order avoids creating parents from file entries before their directory entries.
-        |> Array.sortBy (fun fileEntry ->
-            let depth =
-                fileEntry.path.Split('/', System.StringSplitOptions.RemoveEmptyEntries).Length
-
-            depth, (if fileEntry.isDirectory then 0 else 1), fileEntry.path
+                else
+                    None
+            ),
+            [|  workspaceCtx.state.FileTree; workspaceCtx.state.SelectedTreeItemPath |]
         )
 
-    let rootElement =
-        let tmp =
-            fileEntries
-            |> Array.find(fun fileEntry -> fileEntry.path = rootPath)
-        FileItemDTO.create(tmp.name, tmp.isDirectory, tmp.path, System.Collections.Generic.Dictionary())
+    let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
+        pathChange =
+            fun pathOption ->
+                console.log ("[Swate] CHANGE PATH!")
 
-    adaptedFileEntires
-    |> Array.iter (fun fileEntry -> insertEntry rootElement rootPath fileEntry)
+                match pathOption with
+                | Some p ->
+                    AppState.ARC p |> setAppState
+                    setSelectedTreeItemPath pathOption
+                | None ->
+                    setSelectedTreeItemPath None
+                    setAppState AppState.Init
+        recentARCsUpdate =
+            fun arcs ->
+                console.log ("[Swate] CHANGE RECENTARCS!")
+                setRecentARCs arcs
+        fileTreeUpdate =
+            fun fileExplorer ->
+                console.log ("[Swate] FILETREE Create!")
+                setFileTree fileExplorer
+    }
 
-    rootElement
+    let selector =
+        Selector.Main(
+            workspaceCtx.state.RecentARCs,
+            Selector.onARCClick,
+            Selector.actionbar appState,
+            onOpenSelector = Selector.onOpenSelector appState setRecentARCs
+        )
+
+    React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
+
+    ///Main content module
+    let children =
+        React.useMemo (
+            (fun _ ->
+                MainWindowContent.Content(
+                    appState,
+                    setArcFileState,
+                    arcFileState,
+                    pageState,
+                    setPageState)
+            ),
+            [|
+                box appState
+                box pageState
+                box arcFileState
+            |]
+        )
+
+    let navbar = Navbar.Main(selector)
+
+    let leftSidebar appState (fe: ReactElement) =
+        Some(
+            Html.div [
+                prop.className "swt:p-4"
+                prop.children [|
+                    match appState with
+                    | AppState.ARC _ ->
+                        Html.button [
+                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                            prop.text "Landing Page"
+                            prop.onClick (fun _ ->
+                                landingCtx.setState {
+                                    landingCtx.state with
+                                        Draft = LandingDraft.init
+                                        UiState = LandingUiState.init
+                                }
+                                setSelectedTreeItemPath None
+                                setArcFileState None
+                                setPageState (Some PageState.LandingDraft)
+                            )
+                        ]
+                    | _ -> Html.none
+                    Html.h2 [
+                        prop.text "ARC-Tree"
+                    ]
+                    fe
+                |]
+            ]
+        )
+
+    let saveBeforeClose () : JS.Promise<Result<unit, string>> =
+        promise {
+            match arcFileState with
+            | None -> return Ok()
+            | Some arcFile ->
+                let! result = Navbar.saveArcFileWithPreview arcFile
+
+                match result with
+                | Ok updatedPreview ->
+                    setPageState (Some updatedPreview)
+                    return Ok()
+                | Result.Error errorMsg ->
+                    let msg = $"Save failed: {errorMsg}"
+                    return Result.Error msg
+        }
+
+    context.AppStateCtx.AppStateCtx.Provider(
+        {
+            state = appState
+            setState = setAppState
+        },
+        Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx.Provider(
+            workspaceCtx,
+            Renderer.context.LandingStateCtx.LandingStateCtx.Provider(
+                landingCtx,
+                Layout.Main(
+                    children =
+                        React.Fragment [|
+                            children
+                            CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                        |],
+                    navbar = navbar,
+                    ?leftSidebar =
+                        (
+                            match fileExplorer with
+                            | Some fe -> leftSidebar appState fe
+                            | None -> None
+                         ),
+                    leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+                )
+            )
+        )
+    )

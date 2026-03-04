@@ -37,13 +37,11 @@ type NotesUiState = {
     Error: string option
     IsSubmitting: bool
     ShowExistingTargetSelector: bool
-    ActiveExistingTargetKind: NotesTargetKind
 } with
     static member init = {
         Error = None
         IsSubmitting = false
         ShowExistingTargetSelector = false
-        ActiveExistingTargetKind = NotesTargetKind.Study
     }
 
 type NotesProtocolIntent = {

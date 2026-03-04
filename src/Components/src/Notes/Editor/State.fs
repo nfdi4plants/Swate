@@ -28,9 +28,3 @@ module State =
             ShowExistingTargetSelector = not state.ShowExistingTargetSelector
             Error = None
     }
-
-    let setActiveExistingTargetKind (kind: NotesTargetKind) (state: NotesUiState) = {
-        state with
-            ActiveExistingTargetKind = kind
-            Error = None
-    }

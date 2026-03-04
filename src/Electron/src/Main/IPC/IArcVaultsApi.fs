@@ -1,4 +1,4 @@
-module Main.IPC.IArcVaultsApi
+module Main.IPC.ArcVaultsApi
 
 open System
 open Swate.Electron.Shared
@@ -512,4 +512,35 @@ let api: IPCTypes.IArcVaultsApi = {
                     | Ok _ -> return Ok ()
                 | _ -> return Error(exn "ARC is not loaded.")
         }
+    runGitLfs =
+        fun (event: IpcMainEvent) (request: GitLfsRequest) -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            match ARC_VAULTS.TryGetVault(windowId) with
+            | None ->
+                return Error(exn $"The ARC for window id {windowId} should exist")
+            | Some vault ->
+                match vault.path with
+                | None ->
+                    return Error(exn "ARC is not loaded.")
+                | Some arcPath ->
+                    // Always enforce the active ARC root to avoid running against arbitrary repos.
+                    let enforcedRequest = { request with RepoPath = arcPath }
+                    let! result = GitLfs.registerGitLfsIpc.runChannel event enforcedRequest
+
+                    match result with
+                    | Error e -> return Error e
+                    | Ok successResult ->
+                        match enforcedRequest.Command with
+                        | Track
+                        | Untrack ->
+                            let fileTree = getFileEntries arcPath |> createFileEntryTree
+                            vault.SetFileTree(fileTree)
+                        | _ -> ()
+
+                        return Ok successResult
+        }
+    cancelGitLfs =
+        fun (event: IpcMainEvent) (requestId: string) ->
+            GitLfs.registerGitLfsIpc.cancelChannel event requestId
     }
