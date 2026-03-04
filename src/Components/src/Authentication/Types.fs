@@ -13,8 +13,8 @@ type GitLabIdentity = {
 }
 
 type GitLabScimIdentity = obj
-// Empty array in sample; replace with proper type if structure becomes known
 
+/// https://docs.gitlab.com/api/users/#as-an-administrator-2
 type GitLabUser = {
     id: int
     username: string

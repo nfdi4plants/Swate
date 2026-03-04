@@ -84,7 +84,6 @@ module private AuthenticationHelper =
         let gitlabBaseUrl = gitlabBaseUrl.TrimEnd('/')
 
         let scopes = [
-            "api"
             "read_user"
             "read_repository"
             "read_api"
@@ -107,7 +106,7 @@ module private AuthenticationHelper =
     let Default_DataHub_Url = "https://git.nfdi4plants.org/"
 
     let Default_DataHub = {
-        Name = "PLANTdataHUB (offical)"
+        Name = "PLANTdataHUB (official)"
         Url = Default_DataHub_Url
         Description = Some "The official PLANTdataHUB instance, hosted by the nfdi4plants. Recommended for most users."
     }
@@ -236,6 +235,7 @@ type Authentication =
                         Html.a [
                             prop.href dataHub.Url
                             prop.target "_blank"
+                            prop.rel "noopener noreferrer"
                             prop.className "swt:link swt:link-info"
                             prop.text dataHub.Url
                         ]
@@ -315,6 +315,7 @@ type Authentication =
                     prop.text "Click here to generate a new GitLab Personal Access Token"
                     prop.href (AuthenticationHelper.prefillGitLabPATScopes datahubUrl.Url)
                     prop.target.blank
+                    prop.rel "noopener noreferrer"
                 ]
                 Html.button [
                     prop.testId "SignInButton"
@@ -402,7 +403,7 @@ type Authentication =
                     | _, Some userInformation -> Authentication.UserAvatarIcon(userInformation)
                     | _, None -> Authentication.AvatarPlaceholder()
                 ),
-                [| box userInformation; box isLoading |]
+                [| box userInformation; box isLoading; box error |]
             )
 
         let content =
@@ -412,7 +413,7 @@ type Authentication =
                     | Some userInformation -> Authentication.UserInfo(userInformation, onLogout)
                     | None -> Authentication.NotAuthenticatedView(onSignIn, setError)
                 ),
-                [| box userInformation |]
+                [| box userInformation; box error |]
             )
 
         React.Fragment [
