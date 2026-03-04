@@ -49,15 +49,16 @@ module ArcVaultHelper =
         let ignoreFn =
             fun (path: string) ->
                 let normalizedPath = path.Replace("\\", "/")
+                let segments =
+                    normalizedPath.Trim('/').Split('/', System.StringSplitOptions.RemoveEmptyEntries)
 
                 let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-                let dotFolders = """(^|\/)\.[^/]+\/.+"""
 
                 // skip temporary Excel files (created when editing an xlsx file)
                 if System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern) then
                     true
-                // skip dot-folders (e.g., .git/, .vscode/, .idea/, etc.). This will also match if a subfolder is a dot-folder
-                elif System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, dotFolders) then
+                // skip git folder itself (and its contents) to avoid expensive scans
+                elif segments |> Array.exists (fun segment -> segment = ".git") then
                     true
                 else
                     false
@@ -166,7 +167,8 @@ module ArcVaultExtensions =
                                             this.SetFileTree(newFileTree)
                                     | _ ->
                                         if this.path.IsSome then
-                                            let fileTree = getFileEntries this.path.Value |> createFileEntryTree
+                                            let! fileEntries = getFileEntries this.path.Value
+                                            let fileTree = createFileEntryTree fileEntries
                                             this.SetFileTree(fileTree)
                                 }
                                 |> Promise.start

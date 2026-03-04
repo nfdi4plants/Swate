@@ -140,7 +140,8 @@ let private persistArcChangesAndRefreshVault
             afterArcPersist ()
             do! vault.LoadArc()
 
-            let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
+            let! fileEntries = getFileEntries arcPath
+            let fileTree = createFileEntryTree fileEntries
             vault.SetFileTree(fileTree)
         finally
             vault.isBusyWriting <- false
@@ -170,7 +171,8 @@ let api: IPCTypes.IArcVaultsApi = {
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
+                let! fileEntries = getFileEntries arcPath
+                let fileTree = createFileEntryTree fileEntries
 
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
 
@@ -198,7 +200,8 @@ let api: IPCTypes.IArcVaultsApi = {
                 let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
                 ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
+                let! fileEntries = getFileEntries arcPath
+                let fileTree = createFileEntryTree fileEntries
 
                 ARC_VAULTS.SetFileTree(windowId, fileTree)
                 return Ok arcPath
@@ -252,7 +255,8 @@ let api: IPCTypes.IArcVaultsApi = {
                     let! windowId = ARC_VAULTS.RegisterVaultWithArc(arcPath)
                     ARC_VAULTS.BroadcastRecentARCs(recentARCs)
 
-                    let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
+                    let! fileEntries = getFileEntries arcPath
+                    let fileTree = createFileEntryTree fileEntries
                     ARC_VAULTS.SetFileTree(windowId, fileTree)
 
                     return Ok()
@@ -360,7 +364,8 @@ let api: IPCTypes.IArcVaultsApi = {
                                 do! mkdirRecursiveAsync directoryPath
                                 do! writeUtf8FileAsync absolutePath request.Content
 
-                                let fileTree = getFileEntries arcPath |> IPCTypes.FileEntryExtensions.createFileEntryTree
+                                let! fileEntries = getFileEntries arcPath
+                                let fileTree = createFileEntryTree fileEntries
                                 vault.SetFileTree(fileTree)
                                 return Ok()
                             finally
@@ -535,7 +540,8 @@ let api: IPCTypes.IArcVaultsApi = {
                         match enforcedRequest.Command with
                         | Track
                         | Untrack ->
-                            let fileTree = getFileEntries arcPath |> createFileEntryTree
+                            let! fileEntries = getFileEntries arcPath
+                            let fileTree = createFileEntryTree fileEntries
                             vault.SetFileTree(fileTree)
                         | _ -> ()
 
