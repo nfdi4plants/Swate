@@ -6,11 +6,18 @@ This guide is about the implemented Git functionality in Swate Electron: how to 
 
 ### Where to call from
 
-Use Git wrappers from:
+Renderer code calls Git via the `IGitApi` IPC bridge:
 
-- `src/Electron/src/Swate.Electron.Shared/Api.fs`
+- Contract: `src/Electron/src/Swate.Electron.Shared/IPCTypes.fs` (`type IGitApi`)
+- Renderer client binding: `src/Electron/src/Swate.Electron.Shared/Api.fs` (`gitApi`)
 
-### Git wrappers
+Note: `Api.fs` only exposes the raw `IGitApi` client binding (`gitApi`) and no per-endpoint Git helper functions.
+
+All `IGitApi` methods are `IpcMainEvent -> ...`, where the `IpcMainEvent` is supplied by Electron/Main. Renderer code must **not** pass a placeholder event argument (it would get sent over IPC and shift the real arguments). Instead, coerce each endpoint once to a signature **without** the event parameter using `unbox` (see examples).
+
+Avoid calling endpoints as `gitApi.someMethod null ...` / `gitApi.someMethod Unchecked.defaultof<IpcMainEvent> ...` — this shifts arguments for methods that take parameters.
+
+### `IGitApi` endpoints
 
 - `getGitStatus`
 - `getGitDiffSummary`
@@ -91,6 +98,12 @@ open Fable.Core
 open Swate.Electron.Shared.IPCTypes
 open Api
 
+let getGitStatus : unit -> JS.Promise<Result<GitStatusDto, exn>> =
+    unbox gitApi.getGitStatus
+
+let getGitDiffSummary : unit -> JS.Promise<Result<GitDiffSummaryDto, exn>> =
+    unbox gitApi.getGitDiffSummary
+
 let checkStatus () =
     promise {
         let! statusRes = getGitStatus ()
@@ -119,6 +132,9 @@ open Fable.Core
 open Swate.Electron.Shared.IPCTypes
 open Api
 
+let gitInitRepository : string -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.gitInitRepository
+
 let initRepo (targetPath: string) =
     promise {
         let! response = gitInitRepository targetPath
@@ -138,6 +154,9 @@ let initRepo (targetPath: string) =
 open Fable.Core
 open Swate.Electron.Shared.IPCTypes
 open Api
+
+let gitCloneRepository : GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.gitCloneRepository
 
 let cloneRepo () =
     promise {
@@ -164,6 +183,15 @@ let cloneRepo () =
 open Fable.Core
 open Swate.Electron.Shared.IPCTypes
 open Api
+
+let gitFetch : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.gitFetch
+
+let gitPull : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.gitPull
+
+let gitPush : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.gitPush
 
 let syncRemote () =
     promise {
@@ -192,6 +220,12 @@ open Fable.Core
 open Swate.Electron.Shared.IPCTypes
 open Api
 
+let gitStagePaths : GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.gitStagePaths
+
+let gitCommit : GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.gitCommit
+
 let commitFlow () =
     promise {
         let! stageRes = gitStagePaths { Pathspecs = [| "README.md" |] }
@@ -217,6 +251,12 @@ let commitFlow () =
 open Fable.Core
 open Swate.Electron.Shared.IPCTypes
 open Api
+
+let createBranch : GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.createBranch
+
+let checkoutBranch : GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>> =
+    unbox gitApi.checkoutBranch
 
 // Create a new branch and switch to it in one step:
 let createAndSwitch () =
@@ -388,7 +428,9 @@ Flow:
 
 1. validate target path (non-empty, no null byte)
 2. normalize absolute path
-3. if exists, fail when already git repo
+3. if target exists:
+   - reject non-directory targets (files, symlinks/junctions)
+   - reject when already a git repository
 4. if missing, create directory recursively
 5. run `git init`
 6. return normalized path
@@ -401,16 +443,18 @@ Flow:
 2. extract host
 3. validate/normalize target path
 4. validate optional branch
-5. ensure parent directory exists
-6. enforce strict target emptiness
-7. set clone git `baseDir = targetParent`
-8. run token-first auth strategy
+5. ensure parent path exists and is a directory (create if missing; reject non-directory/symlink)
+6. reject non-directory clone target (files, symlinks/junctions)
+7. enforce strict target emptiness (missing or empty directory only)
+8. set clone git `baseDir = targetParent`
+9. run token-first auth strategy
 
 ### 6.3 Clone auth/fallback behavior
 
 - token present:
   - try authenticated clone
-  - on `Unauthorized`/`Forbidden`: retry once unauthenticated
+  - on `Forbidden`: retry once unauthenticated
+  - on `Unauthorized`: retry once unauthenticated **only** for common auth failures (HTTP 401/auth prompts/SSH publickey); otherwise no retry
 - token missing:
   - unauthenticated clone directly
 - token provider throws:
@@ -418,15 +462,25 @@ Flow:
 
 ### 6.4 Retry cleanup behavior
 
-Before unauthenticated retry, service cleans target artifacts to avoid retrying against dirty partially-cloned state.
+Before the unauthenticated retry (after an auth failure), the service performs a guarded cleanup to avoid retrying against a dirty partially-cloned state.
+
+Current guard rules:
+
+- if target path is missing: nothing to clean
+- if target path is an empty directory: nothing to clean (keep it)
+- if target directory contains **only** a `.git` entry (case-insensitive): delete `.git` **only**
+- otherwise: refuse cleanup and fail the retry (unexpected files, symlinks/junctions, `.git` not a directory, concurrent directory changes)
 
 ---
 
-## 7. IPC integration (`IArcVaultsApi.fs`)
+## 7. IPC integration (`IGitApi`)
 
-File:
+Files:
 
-- `src/Electron/src/Main/IPC/IArcVaultsApi.fs`
+- `src/Electron/src/Swate.Electron.Shared/IPCTypes.fs` (shared contract)
+- `src/Electron/src/Main/IPC/IGitApi.fs`
+- `src/Electron/src/Main/main.fs` (Main registration)
+- `src/Electron/src/Preload/preload.fs` (Preload bridge)
 
 ### 7.1 Added provisioning endpoints
 
@@ -458,7 +512,7 @@ Operations wrapped with `withBusyWriting`:
 - `checkoutBranch`
 
 Operations **not** wrapped:
-- `gitFetch`, `gitPush` (remote-only, no local write)
+- `gitFetch`, `gitPush` (no working tree edits; remote sync / `.git` metadata only)
 - `getGitStatus`, `getGitDiffSummary` (read-only)
 - `gitInitRepository`, `gitCloneRepository` (provisioning, no active ARC vault)
 
@@ -479,6 +533,7 @@ Check:
 Possible reasons:
 
 - cleanup before fallback retry failed
+- `Unauthorized` did not match an auth-failure signal -> no fallback retry
 - non-auth failure kind (network/timeout/canceled/unknown) -> no fallback retry
 - remote blocked by URL policy
 
