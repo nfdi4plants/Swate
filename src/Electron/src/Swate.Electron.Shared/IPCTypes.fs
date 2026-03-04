@@ -122,7 +122,10 @@ type IArcVaultsApi = {
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
+}
 
+/// Two Way Bridge: Renderer <-> Main
+type IGitApi = {
     getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
     getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
     gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>

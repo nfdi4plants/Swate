@@ -474,18 +474,18 @@ let ipcProvisioningContractReflectionTests =
             Expect.isNotNull pathProperty "GitOperationResult should expose a Path property."
             Expect.equal pathProperty.PropertyType typeof<string option> "Path should be typed as string option."
 
-        testCase "IArcVaultsApi.gitInitRepository uses target path string argument" <| fun _ ->
-            let initProperty = typeof<IArcVaultsApi>.GetProperty("gitInitRepository")
-            Expect.isNotNull initProperty "IArcVaultsApi should expose gitInitRepository."
+        testCase "IGitApi.gitInitRepository uses target path string argument" <| fun _ ->
+            let initProperty = typeof<IGitApi>.GetProperty("gitInitRepository")
+            Expect.isNotNull initProperty "IGitApi should expose gitInitRepository."
 
             let argumentTypes, _ = flattenFunctionSignature initProperty.PropertyType
             Expect.equal argumentTypes.Length 2 "gitInitRepository should accept IPC event and target path."
             Expect.equal argumentTypes.[0] typeof<IpcMainEvent> "First gitInitRepository argument should be IpcMainEvent."
             Expect.equal argumentTypes.[1] typeof<string> "Second gitInitRepository argument should be string target path."
 
-        testCase "IArcVaultsApi.gitCloneRepository uses GitCloneRepositoryRequest argument" <| fun _ ->
-            let cloneProperty = typeof<IArcVaultsApi>.GetProperty("gitCloneRepository")
-            Expect.isNotNull cloneProperty "IArcVaultsApi should expose gitCloneRepository."
+        testCase "IGitApi.gitCloneRepository uses GitCloneRepositoryRequest argument" <| fun _ ->
+            let cloneProperty = typeof<IGitApi>.GetProperty("gitCloneRepository")
+            Expect.isNotNull cloneProperty "IGitApi should expose gitCloneRepository."
 
             let argumentTypes, _ = flattenFunctionSignature cloneProperty.PropertyType
             Expect.equal argumentTypes.Length 2 "gitCloneRepository should accept IPC event and clone request."

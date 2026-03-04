@@ -10,6 +10,8 @@ open Fable.Electron.Remoting.Renderer
 
 let arcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
 
+let gitApi = Remoting.init |> Remoting.buildClient<IGitApi>
+
 let saveBeforeQuitApi = Remoting.init |> Remoting.buildClient<ISaveBeforeQuitApi>
 
 let templateApi: ITemplateAPIv1 =
