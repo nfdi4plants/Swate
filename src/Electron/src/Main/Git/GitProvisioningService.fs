@@ -8,14 +8,86 @@ open Main.Git.GitAuthAdapter
 open Main.Git.GitInternals
 open Main.Git.GitTokenProvider
 
-let private fsDynamic: obj = importAll "fs"
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
+
+type ExistingPathKind =
+    | Directory
+    | File
+    | Symlink
+    | Other
 
 type CloneTargetState =
     | Missing
     | ExistingEmpty
     | ExistingNonEmpty
+
+let private tryGetNodeErrorCode (error: exn) : string option =
+    try
+        error?code |> unbox<string> |> Option.ofObj
+    with _ ->
+        None
+
+let private createPathAccessError (pathValue: string) (error: exn) =
+    let code =
+        match tryGetNodeErrorCode error with
+        | Some codeValue -> codeValue
+        | None -> "UNKNOWN"
+
+    exn $"Path '{pathValue}' could not be accessed ({code}): {error.Message}"
+
+let private classifyStatsObject (stats: obj) : ExistingPathKind =
+    try
+        if stats?isSymbolicLink() |> unbox<bool> then
+            ExistingPathKind.Symlink
+        elif stats?isDirectory() |> unbox<bool> then
+            ExistingPathKind.Directory
+        elif stats?isFile() |> unbox<bool> then
+            ExistingPathKind.File
+        else
+            ExistingPathKind.Other
+    with _ ->
+        ExistingPathKind.Other
+
+let private statAsync (pathValue: string) : JS.Promise<obj> =
+    fsPromisesDynamic?stat(pathValue) |> unbox<JS.Promise<obj>>
+
+let private lstatAsync (pathValue: string) : JS.Promise<obj> =
+    fsPromisesDynamic?lstat(pathValue) |> unbox<JS.Promise<obj>>
+
+let private tryGetExistingPathKindWithStats
+    (getStatsAsync: string -> JS.Promise<obj>)
+    (pathValue: string)
+    : JS.Promise<Result<ExistingPathKind option, exn>> =
+    promise {
+        try
+            let! stats = getStatsAsync pathValue
+            return Ok(Some(classifyStatsObject stats))
+        with error ->
+            match tryGetNodeErrorCode error with
+            | Some "ENOENT" -> return Ok None
+            | _ -> return Error(createPathAccessError pathValue error)
+    }
+
+let private tryGetExistingPathKind (pathValue: string) : JS.Promise<Result<ExistingPathKind option, exn>> =
+    promise {
+        let! statResult = tryGetExistingPathKindWithStats statAsync pathValue
+
+        match statResult with
+        | Ok None ->
+            // `stat` follows symbolic links; for broken links this yields ENOENT even though the entry exists.
+            // Probe with `lstat` to correctly detect a link at the path.
+            let! lstatResult = tryGetExistingPathKindWithStats lstatAsync pathValue
+
+            match lstatResult with
+            | Ok (Some ExistingPathKind.Symlink) -> return Ok(Some ExistingPathKind.Symlink)
+            | _ -> return lstatResult
+        | _ ->
+            return statResult
+    }
+
+let private tryGetExistingPathKindNoFollow (pathValue: string) : JS.Promise<Result<ExistingPathKind option, exn>> =
+    tryGetExistingPathKindWithStats lstatAsync pathValue
 
 let validateAndNormalizeTargetPathWithResolver
     (resolvePath: string -> string)
@@ -53,14 +125,34 @@ let ensureCloneTargetIsEmpty (state: CloneTargetState) : Result<unit, exn> =
     | CloneTargetState.Missing ->
         Ok ()
 
-let shouldRetryWithoutAuth (failureKind: GitService.GitFailureKind) =
-    match failureKind with
-    | GitService.GitFailureKind.Unauthorized
-    | GitService.GitFailureKind.Forbidden -> true
+let shouldRetryWithoutAuth (failure: GitService.GitFailure) =
+    let message = failure.Message |> Option.ofObj |> Option.defaultValue String.Empty
+
+    let contains (term: string) =
+        message.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0
+
+    match failure.Kind with
+    | GitService.GitFailureKind.Forbidden ->
+        true
+    | GitService.GitFailureKind.Unauthorized ->
+        // Treat generic local filesystem permission errors conservatively (no cleanup+retry).
+        // Allow SSH publickey failures, and common HTTP 401 auth signals.
+        let hasHttpAuthSignal =
+            contains "unauthorized"
+            || contains "authentication failed"
+            || contains "401"
+            || contains "could not read username"
+            || contains "no access token available"
+
+        let isSshPublicKeyFailure =
+            contains "permission denied" && contains "publickey"
+
+        hasHttpAuthSignal || isSshPublicKeyFailure
     | GitService.GitFailureKind.Network
     | GitService.GitFailureKind.Timeout
     | GitService.GitFailureKind.Canceled
-    | GitService.GitFailureKind.Unknown -> false
+    | GitService.GitFailureKind.Unknown ->
+        false
 
 let buildCloneBranchOptions (branch: string option) : string[] =
     match branch with
@@ -107,45 +199,107 @@ let private removeRecursiveAsync (targetPath: string) : JS.Promise<unit> =
         return ()
     }
 
-let private clearDirectoryContentsAsync (directoryPath: string) : JS.Promise<unit> =
-    promise {
-        let! entries = fsPromisesDynamic?readdir(directoryPath) |> unbox<JS.Promise<string[]>>
-        let safeEntries = if isNull entries then [||] else entries
+let validateCloneRetryCleanupEntries (entries: string[]) : Result<string option, exn> =
+    let safeEntries = if isNull entries then [||] else entries
 
-        for entry in safeEntries do
-            let entryPath = pathDynamic?join(directoryPath, entry) |> unbox<string>
-            do! removeRecursiveAsync entryPath
-    }
+    if safeEntries.Length = 0 then
+        Ok None
+    else
+        let gitEntries =
+            safeEntries
+            |> Array.filter (fun entry -> entry.Equals(".git", StringComparison.OrdinalIgnoreCase))
+
+        if gitEntries.Length = 0 then
+            Error(
+                exn
+                    "Refusing to clean clone target for auth-fallback retry because it contains unexpected files (no .git directory detected)."
+            )
+        elif safeEntries.Length = 1 then
+            Ok(Some gitEntries.[0])
+        else
+            Error(
+                exn
+                    "Refusing to clean clone target for auth-fallback retry because it contains unexpected files in addition to the .git directory."
+            )
 
 let private cleanupCloneTargetForRetry
-    (initialTargetState: CloneTargetState)
     (targetPath: string)
     : JS.Promise<Result<unit, exn>> =
     promise {
         try
-            match initialTargetState with
-            | CloneTargetState.Missing ->
-                do! removeRecursiveAsync targetPath
-            | CloneTargetState.ExistingEmpty ->
-                do! clearDirectoryContentsAsync targetPath
-            | CloneTargetState.ExistingNonEmpty ->
-                ()
+            // Safety guard:
+            // This cleanup is only used to enable a single unauthenticated clone retry after an auth failure.
+            // It is intentionally conservative to avoid deleting unrelated user data if the target path is
+            // concurrently modified by another process between attempts.
+            let! kindResult = tryGetExistingPathKindNoFollow targetPath
 
-            return Ok ()
+            match kindResult with
+            | Error statError ->
+                return Error statError
+            | Ok None ->
+                // Target is missing; nothing to clean.
+                return Ok ()
+            | Ok (Some ExistingPathKind.Directory) ->
+                let! entries = fsPromisesDynamic?readdir(targetPath) |> unbox<JS.Promise<string[]>>
+
+                match validateCloneRetryCleanupEntries entries with
+                | Error entryError ->
+                    return Error entryError
+                | Ok None ->
+                    // An empty directory is a valid clone destination; avoid deleting it unnecessarily.
+                    return Ok ()
+                | Ok (Some gitEntryName) ->
+                    // Only remove the git metadata, and only when the directory contains nothing else.
+                    // This avoids deleting concurrently-created unrelated files and reduces TOCTOU impact.
+                    let gitDirPath = pathDynamic?join(targetPath, gitEntryName) |> unbox<string>
+                    let! gitKindResult = tryGetExistingPathKindNoFollow gitDirPath
+
+                    match gitKindResult with
+                    | Error gitKindError ->
+                        return Error gitKindError
+                    | Ok (Some ExistingPathKind.Directory) ->
+                        do! removeRecursiveAsync gitDirPath
+                        return Ok ()
+                    | Ok (Some ExistingPathKind.Symlink) ->
+                        return Error(exn "Refusing to clean clone target for retry because .git is a symbolic link/junction.")
+                    | Ok (Some ExistingPathKind.File)
+                    | Ok (Some ExistingPathKind.Other) ->
+                        return Error(exn "Refusing to clean clone target for retry because .git is not a directory.")
+                    | Ok None ->
+                        // Directory contents indicated .git, but it is missing now; treat as race and refuse.
+                        return
+                            Error(
+                                exn
+                                    "Refusing to clean clone target for retry because .git could not be found (directory contents changed concurrently)."
+                            )
+            | Ok (Some ExistingPathKind.Symlink) ->
+                return Error(exn "Refusing to clean clone target for retry because target path is a symbolic link/junction.")
+            | Ok (Some ExistingPathKind.File)
+            | Ok (Some ExistingPathKind.Other) ->
+                return Error(exn "Refusing to clean clone target for retry because target path is not a directory.")
+
         with error ->
             return Error(exn $"Failed to clean clone target before retry: {error.Message}")
     }
 
-let private getCloneTargetState (targetPath: string) : JS.Promise<CloneTargetState> =
+let private getCloneTargetState (targetPath: string) : JS.Promise<Result<CloneTargetState, exn>> =
     promise {
-        let targetExists = fsDynamic?existsSync(targetPath) |> unbox<bool>
+        let! kindResult = tryGetExistingPathKind targetPath
 
-        if targetExists then
+        match kindResult with
+        | Error statError ->
+            return Error statError
+        | Ok None ->
+            return Ok CloneTargetState.Missing
+        | Ok (Some ExistingPathKind.Directory) ->
             let! entries = fsPromisesDynamic?readdir(targetPath) |> unbox<JS.Promise<obj[]>>
             let entryCount = if isNull entries then 0 else entries.Length
-            return classifyCloneTargetState true entryCount
-        else
-            return CloneTargetState.Missing
+            return Ok(classifyCloneTargetState true entryCount)
+        | Ok (Some ExistingPathKind.Symlink) ->
+            return Error(exn "Target path exists and is a symbolic link/junction (not a directory).")
+        | Ok (Some ExistingPathKind.File)
+        | Ok (Some ExistingPathKind.Other) ->
+            return Error(exn "Target path exists and is not a directory.")
     }
 
 let private validateOptionalBranch (branch: string option) : Result<string option, exn> =
@@ -196,11 +350,14 @@ let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string
             return errorResult validationError
         | Ok normalizedTargetPath ->
             try
-                let targetExists = fsDynamic?existsSync(normalizedTargetPath) |> unbox<bool>
-
                 let! preInitResult =
-                    if targetExists then
-                        promise {
+                    promise {
+                        let! kindResult = tryGetExistingPathKind normalizedTargetPath
+
+                        match kindResult with
+                        | Error statError ->
+                            return errorResult statError
+                        | Ok (Some ExistingPathKind.Directory) ->
                             let existingGit =
                                 createOptions normalizedTargetPath standardTimeout None
                                 |> createGit
@@ -214,12 +371,15 @@ let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string
                                 return createExistingRepositoryFailure ()
                             | Ok false ->
                                 return Ok ()
-                        }
-                    else
-                        promise {
+                        | Ok (Some ExistingPathKind.Symlink) ->
+                            return errorResult (exn "Target path exists and is a symbolic link/junction (not a directory).")
+                        | Ok (Some ExistingPathKind.File)
+                        | Ok (Some ExistingPathKind.Other) ->
+                            return errorResult (exn "Target path exists and is not a directory.")
+                        | Ok None ->
                             do! mkdirRecursiveAsync normalizedTargetPath
                             return Ok ()
-                        }
+                    }
 
                 match preInitResult with
                 | Error failure ->
@@ -269,62 +429,87 @@ let cloneRepository
                     | Ok safeBranch ->
                         try
                             let targetParent = dirname normalizedTargetPath
-                            do! mkdirRecursiveAsync targetParent
+                            let! parentEnsureResult =
+                                promise {
+                                    let! parentKindResult = tryGetExistingPathKind targetParent
 
-                            let! cloneTargetState = getCloneTargetState normalizedTargetPath
+                                    match parentKindResult with
+                                    | Error parentError ->
+                                        return Error parentError
+                                    | Ok (Some ExistingPathKind.Directory) ->
+                                        return Ok ()
+                                    | Ok (Some ExistingPathKind.Symlink) ->
+                                        return Error(exn "Target parent path exists and is a symbolic link/junction (not a directory).")
+                                    | Ok (Some ExistingPathKind.File)
+                                    | Ok (Some ExistingPathKind.Other) ->
+                                        return Error(exn "Target parent path exists and is not a directory.")
+                                    | Ok None ->
+                                        do! mkdirRecursiveAsync targetParent
+                                        return Ok ()
+                                }
 
-                            match ensureCloneTargetIsEmpty cloneTargetState with
-                            | Error _ ->
-                                return createNonEmptyTargetFailure ()
+                            match parentEnsureResult with
+                            | Error parentError ->
+                                return errorResult parentError
                             | Ok () ->
-                                let cloneOptions = createOptions targetParent syncTimeout progress
+                                let! cloneTargetStateResult = getCloneTargetState normalizedTargetPath
 
-                                let! tokenResult =
-                                    promise {
-                                        try
-                                            let! tokenOption = tryGetAccessToken host
-                                            return Ok tokenOption
-                                        with tokenError ->
-                                            return Error tokenError
-                                    }
+                                match cloneTargetStateResult with
+                                | Error cloneTargetError ->
+                                    return errorResult cloneTargetError
+                                | Ok cloneTargetState ->
+                                    match ensureCloneTargetIsEmpty cloneTargetState with
+                                    | Error _ ->
+                                        return createNonEmptyTargetFailure ()
+                                    | Ok () ->
+                                        let cloneOptions = createOptions targetParent syncTimeout progress
 
-                                match tokenResult with
-                                | Error tokenError ->
-                                    return errorResult tokenError
-                                | Ok tokenOption ->
-                                    match tokenOption |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token)) with
-                                    | Some token ->
-                                        let authenticatedGitResult =
-                                            try
-                                                Ok(applyAuth createGit cloneOptions host token)
-                                            with authError ->
-                                                Error authError
+                                        let! tokenResult =
+                                            promise {
+                                                try
+                                                    let! tokenOption = tryGetAccessToken host
+                                                    return Ok tokenOption
+                                                with tokenError ->
+                                                    return Error tokenError
+                                            }
 
-                                        match authenticatedGitResult with
-                                        | Error authError ->
-                                            return errorResult authError
-                                        | Ok authenticatedGit ->
-                                            let! authenticatedCloneResult =
-                                                cloneWithGit authenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
+                                        match tokenResult with
+                                        | Error tokenError ->
+                                            return errorResult tokenError
+                                        | Ok tokenOption ->
+                                            match tokenOption |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token)) with
+                                            | Some token ->
+                                                let authenticatedGitResult =
+                                                    try
+                                                        Ok(applyAuth createGit cloneOptions host token)
+                                                    with authError ->
+                                                        Error authError
 
-                                            match authenticatedCloneResult with
-                                            | Ok _ ->
-                                                return authenticatedCloneResult
-                                            | Error failure when shouldRetryWithoutAuth failure.Kind ->
-                                                let! cleanupResult =
-                                                    cleanupCloneTargetForRetry cloneTargetState normalizedTargetPath
+                                                match authenticatedGitResult with
+                                                | Error authError ->
+                                                    return errorResult authError
+                                                | Ok authenticatedGit ->
+                                                    let! authenticatedCloneResult =
+                                                        cloneWithGit authenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
 
-                                                match cleanupResult with
-                                                | Error cleanupError ->
-                                                    return errorResult cleanupError
-                                                | Ok () ->
-                                                    let unauthenticatedGit = createGit cloneOptions
-                                                    return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
-                                            | Error _ ->
-                                                return authenticatedCloneResult
-                                    | None ->
-                                        let unauthenticatedGit = createGit cloneOptions
-                                        return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
+                                                    match authenticatedCloneResult with
+                                                    | Ok _ ->
+                                                        return authenticatedCloneResult
+                                                    | Error failure when shouldRetryWithoutAuth failure ->
+                                                        let! cleanupResult =
+                                                            cleanupCloneTargetForRetry normalizedTargetPath
+
+                                                        match cleanupResult with
+                                                        | Error cleanupError ->
+                                                            return errorResult cleanupError
+                                                        | Ok () ->
+                                                            let unauthenticatedGit = createGit cloneOptions
+                                                            return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
+                                                    | Error _ ->
+                                                        return authenticatedCloneResult
+                                            | None ->
+                                                let unauthenticatedGit = createGit cloneOptions
+                                                return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
                         with error ->
                             return errorResult error
     }

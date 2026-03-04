@@ -374,6 +374,11 @@ let cloneTargetEmptinessTests =
             GitProvisioningService.ensureCloneTargetIsEmpty state
             |> expectError <| "Existing directory with entries should be rejected."
 
+        testCase "allows existing empty directory target" <| fun _ ->
+            let state = GitProvisioningService.classifyCloneTargetState true 0
+            GitProvisioningService.ensureCloneTargetIsEmpty state
+            |> expectOk () <| "Existing empty target directory should be allowed."
+
         testCase "allows missing directory target" <| fun _ ->
             let state = GitProvisioningService.classifyCloneTargetState false 0
             GitProvisioningService.ensureCloneTargetIsEmpty state
@@ -382,15 +387,37 @@ let cloneTargetEmptinessTests =
 
 let cloneRetryDecisionTests =
     testList "clone retry decision" [
-        testCase "retries without auth for unauthorized" <| fun _ ->
+        testCase "retries without auth for unauthorized with HTTP auth signal" <| fun _ ->
             Expect.isTrue
-                (GitProvisioningService.shouldRetryWithoutAuth GitService.GitFailureKind.Unauthorized)
+                (GitProvisioningService.shouldRetryWithoutAuth {
+                    Kind = GitService.GitFailureKind.Unauthorized
+                    Message = "authentication failed for remote"
+                })
                 "Unauthorized clone failures should trigger one unauthenticated retry."
 
         testCase "retries without auth for forbidden" <| fun _ ->
             Expect.isTrue
-                (GitProvisioningService.shouldRetryWithoutAuth GitService.GitFailureKind.Forbidden)
+                (GitProvisioningService.shouldRetryWithoutAuth {
+                    Kind = GitService.GitFailureKind.Forbidden
+                    Message = "403 Forbidden"
+                })
                 "Forbidden clone failures should trigger one unauthenticated retry."
+
+        testCase "does not retry without auth for generic permission denied" <| fun _ ->
+            Expect.isFalse
+                (GitProvisioningService.shouldRetryWithoutAuth {
+                    Kind = GitService.GitFailureKind.Unauthorized
+                    Message = "fatal: cannot create directory 'repo': Permission denied"
+                })
+                "Local filesystem permission failures should not trigger unauthenticated retry cleanup."
+
+        testCase "retries without auth for ssh publickey permission denied" <| fun _ ->
+            Expect.isTrue
+                (GitProvisioningService.shouldRetryWithoutAuth {
+                    Kind = GitService.GitFailureKind.Unauthorized
+                    Message = "Permission denied (publickey)."
+                })
+                "SSH publickey auth failures should trigger unauthenticated retry cleanup."
 
         testCase "does not retry without auth for non-auth failures" <| fun _ ->
             let kinds = [
@@ -402,8 +429,31 @@ let cloneRetryDecisionTests =
 
             for kind in kinds do
                 Expect.isFalse
-                    (GitProvisioningService.shouldRetryWithoutAuth kind)
+                    (GitProvisioningService.shouldRetryWithoutAuth { Kind = kind; Message = "not auth" })
                     $"Failure kind {kind} should not trigger unauthenticated retry."
+    ]
+
+let cloneRetryCleanupEntryGuardTests =
+    testList "clone retry cleanup entry guard" [
+        testCase "allows empty directory (no cleanup required)" <| fun _ ->
+            GitProvisioningService.validateCloneRetryCleanupEntries [||]
+            |> expectOk None <| "Empty directory should not require cleanup."
+
+        testCase "allows single .git entry" <| fun _ ->
+            GitProvisioningService.validateCloneRetryCleanupEntries [| ".git" |]
+            |> expectOk (Some ".git") <| "Single .git entry should allow safe cleanup."
+
+        testCase "treats .GIT as .git (case-insensitive) and preserves entry name" <| fun _ ->
+            GitProvisioningService.validateCloneRetryCleanupEntries [| ".GIT" |]
+            |> expectOk (Some ".GIT") <| "Entry matching .git case-insensitively should be accepted."
+
+        testCase "refuses cleanup when non-git files exist and no .git is present" <| fun _ ->
+            GitProvisioningService.validateCloneRetryCleanupEntries [| "README.md" |]
+            |> expectError <| "Non-git artifacts should block cleanup."
+
+        testCase "refuses cleanup when files exist in addition to .git" <| fun _ ->
+            GitProvisioningService.validateCloneRetryCleanupEntries [| ".git"; "README.md" |]
+            |> expectError <| "Unexpected files alongside .git should block cleanup."
     ]
 
 let cloneBranchOptionAssemblyTests =
@@ -796,6 +846,7 @@ let tests =
         provisioningPathValidationTests
         cloneTargetEmptinessTests
         cloneRetryDecisionTests
+        cloneRetryCleanupEntryGuardTests
         cloneBranchOptionAssemblyTests
         ipcProvisioningContractReflectionTests
         bindingSurfaceParityTests
