@@ -550,4 +550,13 @@ let api: IPCTypes.IArcVaultsApi = {
     cancelGitLfs =
         fun (event: IpcMainEvent) (requestId: string) ->
             GitLfs.registerGitLfsIpc.cancelChannel event requestId
+    resolveCloseRequest =
+        fun (event: IpcMainEvent) (decision: SaveBeforeQuitDecision) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+                do! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
+                return Ok()
+            with e ->
+                return Error e
+        }
     }
