@@ -39,7 +39,7 @@ type Selector =
                     prop.onClick (fun _ -> onClick (arcPointer))
                 ]
             ),
-            [| arcPointer.name, arcPointer.path |]
+            [| arcPointer.name, arcPointer.path, arcPointer.isActive |]
         )
 
     [<ReactComponent>]
@@ -71,22 +71,17 @@ type Selector =
             |> Option.defaultValue Html.none
 
         let dropDownSwitch =
-            React.useMemo (
-                (fun _ ->
-                    Html.button [
-                        prop.onClick (fun _ -> onOpenSelector (not isOpen))
-                        prop.role.button
-                        prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
-                        if debug then
-                            prop.testId "selector-test"
-                        prop.children [
-                            Html.div [ prop.text "Select an ARC" ]
-                            Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5"
-                        ]
-                    ]
-                ),
-                [| isOpen |]
-            )
+            Html.button [
+                prop.onClick (fun _ -> onOpenSelector (not isOpen))
+                prop.role.button
+                prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
+                if debug then
+                    prop.testId "selector-test"
+                prop.children [
+                    Html.div [ prop.text "Select an ARC" ]
+                    Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5"
+                ]
+            ]
 
         let children =
             React.Fragment [

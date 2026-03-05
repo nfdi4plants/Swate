@@ -1,19 +1,18 @@
 module Renderer.context.WorkspaceStateCtx
 
-open System.Collections.Generic
 open Feliz
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 
 type WorkspaceState = {
     RecentARCs: SelectorTypes.ARCPointer []
-    FileTree: Dictionary<string, FileEntry>
+    FileTree: FileEntry list
     SelectedTreeItemPath: string option
 } with
 
     static member init () = {
         RecentARCs = [||]
-        FileTree = Dictionary<string, FileEntry>()
+        FileTree = []
         SelectedTreeItemPath = None
     }
 

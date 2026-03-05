@@ -33,15 +33,38 @@ let Main () =
     let landingState, setLandingState = React.useState (Renderer.context.LandingStateCtx.LandingState.init ())
     let workspaceState, setWorkspaceState = React.useState (Renderer.context.WorkspaceStateCtx.WorkspaceState.init ())
 
-    let landingCtx: StateContext<Renderer.context.LandingStateCtx.LandingState> = {
-        state = landingState
-        setState = setLandingState
-    }
+    let syncArcTimeoutRef = React.useRef<int option> None
+    let lastSyncedRequestKeyRef = React.useRef<(string * ArcFilesDiscriminate * string) option> None
 
-    let workspaceCtx: StateContext<Renderer.context.WorkspaceStateCtx.WorkspaceState> = {
-        state = workspaceState
-        setState = setWorkspaceState
-    }
+    let appCtx: StateContext<AppState> =
+        React.useMemo (
+            (fun _ ->
+                {
+                    state = appState
+                    setState = setAppState
+                }),
+            [| box appState |]
+        )
+
+    let landingCtx: StateContext<Renderer.context.LandingStateCtx.LandingState> =
+        React.useMemo (
+            (fun _ ->
+                {
+                    state = landingState
+                    setState = setLandingState
+                }),
+            [| box landingState |]
+        )
+
+    let workspaceCtx: StateContext<Renderer.context.WorkspaceStateCtx.WorkspaceState> =
+        React.useMemo (
+            (fun _ ->
+                {
+                    state = workspaceState
+                    setState = setWorkspaceState
+                }),
+            [| box workspaceState |]
+        )
 
     let setSelectedTreeItemPath (path: string option) =
         workspaceCtx.setState {
@@ -56,34 +79,66 @@ let Main () =
         }
 
     let setFileTree (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>) =
+        let immutableFileTree =
+            fileTree.Values
+            |> Seq.toArray
+            |> Array.sortBy (fun entry -> entry.path)
+            |> Array.toList
+
         workspaceCtx.setState {
             workspaceCtx.state with
-                FileTree = fileTree
+                FileTree = immutableFileTree
         }
 
     React.useEffect (
         (fun () ->
-            match pageState with
-            | Some (PageState.ArcFileData(fileType, json)) ->
-                match ParseArcFileFromJson fileType json with
-                | Some arcFile -> setArcFileState (Some arcFile)
-                | None -> setArcFileState None
-            | _ -> setArcFileState None
+                match pageState with
+                | Some (PageState.ArcFileData(fileType, json)) ->
+                    match ParseArcFileFromJson fileType json with
+                    | Some arcFile -> setArcFileState (Some arcFile)
+                    | None -> setArcFileState None
+                | _ -> ()
         ),
         [| box pageState |]
     )
 
     React.useEffect (
         (fun () ->
-            match arcFileState with
-            | Some arcFile ->
+            let clearPendingSync () =
+                match syncArcTimeoutRef.current with
+                | Some timeoutId ->
+                    Fable.Core.JS.clearTimeout timeoutId
+                    syncArcTimeoutRef.current <- None
+                | None -> ()
+
+            clearPendingSync ()
+
+            match appState, arcFileState with
+            | AppState.ARC arcPath, Some arcFile ->
                 match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
                 | Some request ->
-                    Api.syncARC request |> Promise.start
-                | None -> ()
-            | None -> ()
+                    let requestKey = (arcPath, request.FileType, request.Json)
+
+                    let timeoutId =
+                        Fable.Core.JS.setTimeout
+                            (fun () ->
+                                if lastSyncedRequestKeyRef.current <> Some requestKey then
+                                    Api.syncARC request |> Promise.start
+                                    lastSyncedRequestKeyRef.current <- Some requestKey
+
+                                syncArcTimeoutRef.current <- None
+                            )
+                            250
+
+                    syncArcTimeoutRef.current <- Some timeoutId
+                | None ->
+                    lastSyncedRequestKeyRef.current <- None
+            | _ ->
+                lastSyncedRequestKeyRef.current <- None
+
+            FsReact.createDisposable (fun () -> clearPendingSync ())
         ),
-        [| box arcFileState |]
+        [| box appState; box arcFileState |]
     )
 
     ///Used on initializing
@@ -103,17 +158,16 @@ let Main () =
     let fileExplorer =
        React.useMemo (
             (fun _ ->
-                let ra = ResizeArray(workspaceCtx.state.FileTree.Values)
-                let fileEntries = ra.ToArray()
+                let fileEntries = workspaceCtx.state.FileTree |> List.toArray
 
                 let fileTree =
                     if fileEntries.Length > 0 then
-                        Some(Renderer.components.FileExplorerHelper.getFileTree fileEntries)
+                        Some(Renderer.components.FileExplorer.getFileTree fileEntries)
                     else
                         None
 
                 if fileTree.IsSome then
-                    Renderer.components.FileExplorerHelper.createFileTree
+                    Renderer.components.FileExplorer.createFileTree
                         fileTree
                         workspaceCtx.state.SelectedTreeItemPath
                         setSelectedTreeItemPath
@@ -223,10 +277,7 @@ let Main () =
         }
 
     context.AppStateCtx.AppStateCtx.Provider(
-        {
-            state = appState
-            setState = setAppState
-        },
+        appCtx,
         Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx.Provider(
             workspaceCtx,
             Renderer.context.LandingStateCtx.LandingStateCtx.Provider(

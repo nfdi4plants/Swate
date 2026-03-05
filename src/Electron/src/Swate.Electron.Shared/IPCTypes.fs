@@ -108,10 +108,6 @@ module FileEntryExtensions =
             isLfs = defaultArg isLfs None
         }
 
-type ISaveBeforeQuitApi = {
-    resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
-}
-
 type FileItemDTO = {
     name: string
     isDirectory: bool

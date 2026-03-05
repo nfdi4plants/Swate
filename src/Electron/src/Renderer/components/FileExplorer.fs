@@ -1,4 +1,4 @@
-module Renderer.components.FileExplorerHelper
+module Renderer.components.FileExplorer
 
 open System
 open Browser.Dom
