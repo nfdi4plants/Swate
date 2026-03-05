@@ -60,7 +60,7 @@ module noteSearchTests =
     ]
 
 module NoteSearchComponent =
-    let searchInput (setSearchTerm, setStartSearch, dropdownOpen: bool, setDropdownOpen: bool -> unit, filterOptions, setFilterOptions) =
+    let searchInput (setSearchTerm, setStartSearch, dropdownOpen: bool, setDropdownOpen: bool -> unit, filterOptions: string, setFilterOptions) =
         Html.div [
             prop.className "swt:w-full swt:mt-4 swt:join"
             prop.children [
@@ -85,11 +85,11 @@ module NoteSearchComponent =
                 ]
 
                 Html.div [
-                    prop.className "swt:join-item swt:relative"
+                    prop.className "swt:join-item swt:relative swt:w-20"
                     prop.children [
                         Html.button [
-                            prop.text ("Search in " + filterOptions)
-                            prop.className ("swt:btn swt:btn-primary swt:join-item swt:border swt:border-current" + if dropdownOpen then " swt:rounded-b-none" else "")
+                            prop.text filterOptions
+                            prop.className ("swt:btn swt:btn-primary swt:join-item swt:border swt:border-current swt:w-full" + if dropdownOpen then " swt:rounded-b-none" else "")
                             prop.onClick (fun e ->
                                 e.stopPropagation()
                                 setDropdownOpen (not dropdownOpen)
@@ -102,22 +102,22 @@ module NoteSearchComponent =
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "All"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "all")
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "All")
                                     ]
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Title"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "title")
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "Title")
                                     ]
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Tags"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "tags")
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "Tags")
                                     ]
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Content"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "content")
+                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "Content")
                                     ]
                                 ]
                             ]
@@ -187,7 +187,7 @@ type SearchComponent =
         let startSearch, setStartSearch = React.useState (false)
         let searchTerm, setSearchTerm = React.useState ("")
         let dropdownOpen, setDropdownOpen = React.useState (false)
-        let filterOptions, setFilterOptions = React.useState ("...")
+        let filterOptions, setFilterOptions = React.useState ("All")
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:items-center swt:pt-8 swt:min-h-screen"
@@ -204,13 +204,13 @@ type SearchComponent =
                         if startSearch then
                             let searchResults =
                                 match filterOptions with
-                                | "title" ->
+                                | "Title" ->
                                     noteSearchTests.notes
                                     |> List.filter (fun note -> note.Title.ToLower().Contains(searchTerm.ToLower()))
-                                | "content" ->
+                                | "Content" ->
                                     noteSearchTests.notes
                                     |> List.filter (fun note -> note.Content.ToLower().Contains(searchTerm.ToLower()))
-                                | "tags" ->
+                                | "Tags" ->
                                     noteSearchTests.notes
                                     |> List.filter (fun note ->
                                         note.Tags
