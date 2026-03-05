@@ -176,7 +176,7 @@ module NoteSearchComponent =
             setStartSearch,
             dropdownOpen: bool,
             setDropdownOpen: bool -> unit,
-            filterOptions: list<string>,
+            filterOptions,
             setFilterOptions
         ) =
         Html.div [
@@ -202,16 +202,13 @@ module NoteSearchComponent =
                         ]
                     ]
                 ]
-<<<<<<< HEAD
-                filterDropdown (dropdownOpen, setDropdownOpen, filterOptions, setFilterOptions)
-=======
                 Html.div [
                     prop.className "swt:join-item swt:relative swt:w-20"
                     prop.children [
                         Html.button [
-                            prop.text filterOptions
+                            prop.text ("Search in " + filterOptions)
                             prop.className (
-                                "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current swt:w-full"
+                                "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current"
                                 + if dropdownOpen then " swt:rounded-b-none" else ""
                             )
                             prop.onClick (fun e ->
@@ -230,7 +227,7 @@ module NoteSearchComponent =
                                         prop.text "All"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "All"
+                                            setFilterOptions "all"
                                         )
                                     ]
                                     Html.button [
@@ -239,7 +236,7 @@ module NoteSearchComponent =
                                         prop.text "Title"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "Title"
+                                            setFilterOptions "title"
                                         )
                                     ]
                                     Html.button [
@@ -248,7 +245,7 @@ module NoteSearchComponent =
                                         prop.text "Tags"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "Tags"
+                                            setFilterOptions "tags"
                                         )
                                     ]
                                     Html.button [
@@ -257,14 +254,13 @@ module NoteSearchComponent =
                                         prop.text "Content"
                                         prop.onClick (fun _ ->
                                             setDropdownOpen false
-                                            setFilterOptions "Content"
+                                            setFilterOptions "content"
                                         )
                                     ]
                                 ]
                             ]
                     ]
                 ]
->>>>>>> 047de8ef (copilot fix on PR #993)
             ]
         ]
 
