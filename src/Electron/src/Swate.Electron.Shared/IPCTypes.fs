@@ -76,6 +76,7 @@ type IArcVaultsApi = {
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
     runGitLfs: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
 }
 
 type IGitLfsApi = {
