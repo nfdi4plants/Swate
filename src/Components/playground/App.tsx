@@ -21,6 +21,7 @@ import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
 import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.fs.ts'
 import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
 import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
+import {Entry as DataHubSidebarEntry} from '../src/DataHubSidebar/DataHubSidebar.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -193,9 +194,17 @@ function AuthButtonContainer() {
   </div>
 }
 
+function DataHubSidebarContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Sidebar</h2>
+    <DataHubSidebarEntry />
+  </div>
+}
+
 const App = () => {
     return (
-        <AuthButtonContainer />
+        <DataHubSidebarContainer />
+        // <AuthButtonContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
         //     <NoteSearch />
         //     <MarkdownTextContainer />
