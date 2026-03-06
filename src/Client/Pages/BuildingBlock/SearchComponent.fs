@@ -9,6 +9,7 @@ open ARCtrl
 open Swate.Components.Shared
 open Fable.Core
 
+
 module SearchComponentHelper =
 
     let addBuildingBlock (selectedColumnIndex: int option) (model: Model) dispatch =

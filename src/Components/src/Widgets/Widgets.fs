@@ -5,7 +5,6 @@ open Browser.Types
 open WidgetsLocalStorage
 open Swate
 open Swate.Components
-open ARCtrl
 
 module InitExtensions =
 
@@ -127,6 +126,15 @@ type WidgetType =
     | FilePicker
     | DataAnnotator
     | Playground
+
+type WidgetBlock =
+    {
+        prefix: string
+        content: ReactElement
+    }
+
+    static member CreateWidgetBlock prefix content : WidgetBlock =
+        { prefix = prefix; content = content }
 
 module WidgetContext =
 

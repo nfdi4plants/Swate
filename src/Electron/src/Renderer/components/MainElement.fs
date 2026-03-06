@@ -5,6 +5,7 @@ open Swate.Components
 open Browser.Dom
 open ARCtrl
 open Renderer.MetadataForms
+open Widgets
 
 [<RequireQualifiedAccess>]
 type PreviewActiveView =
@@ -29,58 +30,22 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
         [| box table |]
     )
 
-    AnnotationTableContextProvider.AnnotationTableContextProvider(
-        Html.div [
-            //It works but not as clean as we want it
-            prop.className "swt:w-screen swt:pb-4"
-            prop.children [ AnnotationTable.AnnotationTable(tableState, setTable) ]
-        ]
-    )
+    Html.div [
+        //It works but not as clean as we want it
+        prop.className "swt:w-screen swt:pb-4"
+        prop.children [ AnnotationTable.AnnotationTable(tableState, setTable) ]
+    ]
 
-// let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: MainComponents.Widget -> unit) =
-//     let addBuildingBlock =
-//         QuickAccessButton.QuickAccessButton(
-//             "Add Building Block",
-//             Icons.BuildingBlock(),
-//             (fun _ -> addWidget MainComponents.Widget._BuildingBlock)
-//         )
+let CreateARCitectNavbar
+    (arcFile: ArcFiles option)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    onSaveClick
+    =
+    let widgets = createWidgets arcFile activeTableIndex setArcFileState
 
-//     let addTemplate =
-//         QuickAccessButton.QuickAccessButton(
-//             "Add Template",
-//             Icons.Templates(),
-//             (fun _ -> addWidget MainComponents.Widget._Template)
-//         )
-
-//     let filePicker =
-//         QuickAccessButton.QuickAccessButton(
-//             "File Picker",
-//             Icons.FilePicker(),
-//             (fun _ -> addWidget MainComponents.Widget._FilePicker)
-//         )
-
-//     let dataAnnotator =
-//         QuickAccessButton.QuickAccessButton(
-//             "Data Annotator",
-//             Icons.DataAnnotator(),
-//             (fun _ -> addWidget MainComponents.Widget._DataAnnotator),
-//             classes = "swt:w-min"
-//         )
-
-//     React.Fragment [
-//         match activeView with
-//         | PreviewActiveView.Table _ ->
-//             addBuildingBlock
-//             addTemplate
-//             filePicker
-//             dataAnnotator
-//         | PreviewActiveView.DataMap -> dataAnnotator
-//         | PreviewActiveView.Metadata -> Html.none
-//     ]
-
-let CreateARCitectNavbarList (arcFile: ArcFiles option) onSaveClick =
     Components.BaseNavbar.Main [
-        //CreateARCitectWidgetNavbarList activeView addWidget
+        CreateNavbarButtonsForAllWidgets widgets [ NavbarButtons(widgetTypes) ]
         QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
     ]
 

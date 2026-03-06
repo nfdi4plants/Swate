@@ -2,10 +2,13 @@ module Renderer.components.MainWindowContent
 
 open ARCtrl
 open Feliz
-open Swate.Components.Landing
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
+open Widgets
 open MainElement
+open Swate.Components
+open Swate.Electron.Shared
+open Swate.Components.Landing
+open Swate.Electron.Shared.IPCTypes
+
 
 let createFromLanding
     landingUiState
@@ -221,51 +224,64 @@ let Content
             ]
         ]
     | AppState.ARC path ->
-        Html.div [
-            prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
-            prop.children [
-                Html.div [
-                    prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
-                    prop.children [
-                        Html.div [
-                            prop.className "swt:flex-none"
-                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData) ]
-                        ]
-                        Html.div [
-                            prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
-                            prop.children [
-                                ComputeARCContent
-                                    pageState
-                                    arcFileState
-                                    setArcFileState
-                                    activeView
-                                    setActiveView
-                                    landingCtx.state.Draft
-                                    (fun draft ->
-                                        landingCtx.setState {
-                                            landingCtx.state with
-                                                Draft = draft
-                                        }
-                                    )
-                                    landingCtx.state.UiState
-                                    (fun uiState ->
-                                        landingCtx.setState {
-                                            landingCtx.state with
-                                                UiState = uiState
-                                        }
-                                    )
-                                    appState
-                                    (fun path ->
-                                        workspaceCtx.setState {
-                                            workspaceCtx.state with
-                                                SelectedTreeItemPath = path
-                                        }
-                                    )
-                                    setPreviewData
-                                    path
+        let activeTableIndex =
+            match activeView with
+            | PreviewActiveView.Table tableIndex -> Some tableIndex
+            | _ -> None
+
+        AnnotationTableContextProvider.AnnotationTableContextProvider(
+            Html.div [
+                prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
+                        prop.children [
+                            Html.div [
+                                prop.className "swt:flex-none"
+                                prop.children [
+                                    MainElement.CreateARCitectNavbar
+                                        arcFileState
+                                        activeTableIndex
+                                        setArcFileState
+                                        (Navbar.onSaveClick arcFileState setPreviewData)
+                                ]
+                            ]
+                            Html.div [
+                                prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
+                                prop.children [
+                                    ComputeARCContent
+                                        pageState
+                                        arcFileState
+                                        setArcFileState
+                                        activeView
+                                        setActiveView
+                                        landingCtx.state.Draft
+                                        (fun draft ->
+                                            landingCtx.setState {
+                                                landingCtx.state with
+                                                    Draft = draft
+                                            }
+                                        )
+                                        landingCtx.state.UiState
+                                        (fun uiState ->
+                                            landingCtx.setState {
+                                                landingCtx.state with
+                                                    UiState = uiState
+                                            }
+                                        )
+                                        appState
+                                        (fun path ->
+                                            workspaceCtx.setState {
+                                                workspaceCtx.state with
+                                                    SelectedTreeItemPath = path
+                                            }
+                                        )
+                                        setPreviewData
+                                        path
+                                ]
                             ]
                         ]
                     ]
                 ]
             ]
-        ]
+        )
