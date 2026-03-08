@@ -14,7 +14,6 @@ type FileExplorerGitLfsHelper =
             let normalizedRepoPath = FileExplorerGitLfsHelper.NormalizePath repoPath
             let normalizedFilePath = FileExplorerGitLfsHelper.NormalizePath filePath
             let prefix = normalizedRepoPath + "/"
-
             if normalizedFilePath = normalizedRepoPath then
                 Some(normalizedRepoPath, "")
             elif normalizedFilePath.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase) then

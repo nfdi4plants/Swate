@@ -13,7 +13,6 @@
     <Compile Include="Bindings\Chokidar.fs" />
     <Compile Include="ArcVault.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
-    <Compile Include="IPC\ISaveBeforeQuitApi.fs" />
     <Compile Include="IPC\IArcVaultsApi.fs" />
     <Compile Include="main.fs" />
   </ItemGroup>

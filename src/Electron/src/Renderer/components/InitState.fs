@@ -58,7 +58,6 @@ let CreateNewArcModalContent (close: unit -> unit) =
                             prop.onKeyDown (
                                 key.enter,
                                 fun _ -> handleSubmit ()
-
                             )
                             prop.onChange (fun (v: string) ->
                                 if System.String.IsNullOrEmpty v then

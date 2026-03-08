@@ -5,159 +5,178 @@ open Fable.Electron.Remoting.Renderer
 open Fable.Core
 
 open Swate.Components
+open Swate.Components.Landing
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 
 open Browser.Dom
 
 open ARCtrl
-open ARCtrl.Json
 
 open Renderer.components
-open components.MainElement
-open Swate.Components.Landing
 
 
 let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
     | Ok arcFile -> Some arcFile
-    | Error e ->
+    | Result.Error e ->
         console.error ("Failed to parse ArcFile JSON: " + e.Message)
         None
 
 [<ReactComponent>]
 let Main () =
 
-    let widgets, setWidgets = React.useState []
-    let tableMutationTick, setTableMutationTick = React.useStateWithUpdater 0
-    let recentARCs, setRecentARCs = React.useState [||]
-    let fileExplorer, setFileExplorer = React.useState None
-    let didSelectFile, setDidSelectFile = React.useState false
-    let appState, setAppState = React.useState (AppState.Init)
+    let appState, setAppState = React.useState AppState.Init
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
-    let activeView, setActiveView = React.useState PreviewActiveView.Metadata
-    let (previewError: string option), setPreviewError = React.useState None
-    let (previewData: PreviewData option), setPreviewData = React.useState None
-    let (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>), setFileTree = React.useState (System.Collections.Generic.Dictionary<string, FileEntry>())
-    let (selectedTreeItemPath: string option), setSelectedTreeItemPath = React.useState None
+    let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
 
-    let landingDraft, setLandingDraft = React.useState LandingDraft.init
-    let landingUiState, setLandingUiState = React.useState LandingUiState.init
-    let landingDraftActive, setLandingDraftActive = React.useState false
-    let showLandingDraft, setShowLandingDraft = React.useState false
+    let landingState, setLandingState = React.useState (Renderer.context.LandingStateCtx.LandingState.init ())
+    let workspaceState, setWorkspaceState = React.useState (Renderer.context.WorkspaceStateCtx.WorkspaceState.init ())
 
-    let resetLandingDraft () =
-        setLandingDraft LandingDraft.init
-        setLandingUiState LandingUiState.init
-        setLandingDraftActive true
-        setShowLandingDraft true
-        setPreviewData None
-        setPreviewError None
-        setSelectedTreeItemPath None
-        setDidSelectFile false
-        setArcFileState None
+    let syncArcTimeoutRef = React.useRef<int option> None
+    let lastSyncedRequestKeyRef = React.useRef<(string * ArcFilesDiscriminate * string) option> None
+
+    let appCtx: StateContext<AppState> =
+        React.useMemo (
+            (fun _ ->
+                {
+                    state = appState
+                    setState = setAppState
+                }),
+            [| box appState |]
+        )
+
+    let landingCtx: StateContext<Renderer.context.LandingStateCtx.LandingState> =
+        React.useMemo (
+            (fun _ ->
+                {
+                    state = landingState
+                    setState = setLandingState
+                }),
+            [| box landingState |]
+        )
+
+    let workspaceCtx: StateContext<Renderer.context.WorkspaceStateCtx.WorkspaceState> =
+        React.useMemo (
+            (fun _ ->
+                {
+                    state = workspaceState
+                    setState = setWorkspaceState
+                }),
+            [| box workspaceState |]
+        )
+
+    let setSelectedTreeItemPath (path: string option) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                SelectedTreeItemPath = path
+        }
+
+    let setRecentARCs (arcs: SelectorTypes.ARCPointer []) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                RecentARCs = arcs
+        }
+
+    let setFileTree (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>) =
+        let immutableFileTree =
+            fileTree.Values
+            |> Seq.toArray
+            |> Array.sortBy (fun entry -> entry.path)
+            |> Array.toList
+
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                FileTree = immutableFileTree
+        }
 
     React.useEffect (
         (fun () ->
-            match previewData with
-            | Some (ArcFileData(fileType, json)) ->
-                match ParseArcFileFromJson fileType json with
-                | Some arcFile ->
-                    match arcFileState with
-                    | None ->
-                        setArcFileState (Some arcFile)
-                    | Some existing when existing.getIdentifier() <> arcFile.getIdentifier() ->
-                        setArcFileState (Some arcFile)
-                    | _ -> ()
-                | None -> ()
-            | _ -> ()
+                match pageState with
+                | Some (PageState.ArcFileData(fileType, json)) ->
+                    match ParseArcFileFromJson fileType json with
+                    | Some arcFile -> setArcFileState (Some arcFile)
+                    | None -> setArcFileState None
+                | _ -> ()
         ),
-        [| box previewData |]
+        [| box pageState |]
+    )
+
+    React.useEffect (
+        (fun () ->
+            let clearPendingSync () =
+                match syncArcTimeoutRef.current with
+                | Some timeoutId ->
+                    Fable.Core.JS.clearTimeout timeoutId
+                    syncArcTimeoutRef.current <- None
+                | None -> ()
+
+            clearPendingSync ()
+
+            match appState, arcFileState with
+            | AppState.ARC arcPath, Some arcFile ->
+                match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
+                | Some request ->
+                    let requestKey = (arcPath, request.FileType, request.Json)
+
+                    let timeoutId =
+                        Fable.Core.JS.setTimeout
+                            (fun () ->
+                                if lastSyncedRequestKeyRef.current <> Some requestKey then
+                                    Api.syncARC request |> Promise.start
+                                    lastSyncedRequestKeyRef.current <- Some requestKey
+
+                                syncArcTimeoutRef.current <- None
+                            )
+                            250
+
+                    syncArcTimeoutRef.current <- Some timeoutId
+                | None ->
+                    lastSyncedRequestKeyRef.current <- None
+            | _ ->
+                lastSyncedRequestKeyRef.current <- None
+
+            FsReact.createDisposable (fun () -> clearPendingSync ())
+        ),
+        [| box appState; box arcFileState |]
     )
 
     ///Used on initializing
-    React.useLayoutEffectOnce (fun _ ->
+    React.useEffectOnce (fun _ ->
         Api.getOpenPath()
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p ->
-                resetLandingDraft ()
                 AppState.ARC p |> setAppState
             | None ->
-                setLandingDraftActive false
-                setShowLandingDraft false
-                setSelectedTreeItemPath None
                 setAppState AppState.Init
+                setSelectedTreeItemPath None
         )
         |> Promise.start
     )
 
-    React.useEffect (
-        (fun _ ->
-            let ra = ResizeArray(fileTree.Values)
-            let fileEntries = ra.ToArray()
+    let fileExplorer =
+       React.useMemo (
+            (fun _ ->
+                let fileEntries = workspaceCtx.state.FileTree |> List.toArray
 
-            let fileTree =
-                if fileEntries.Length > 0 then
-                    Some(FileExplorer.getFileTree fileEntries)
+                let fileTree =
+                    if fileEntries.Length > 0 then
+                        Some(Renderer.components.FileExplorer.getFileTree fileEntries)
+                    else
+                        None
+
+                if fileTree.IsSome then
+                    Renderer.components.FileExplorer.createFileTree
+                        fileTree
+                        workspaceCtx.state.SelectedTreeItemPath
+                        setSelectedTreeItemPath
+                        setPageState
                 else
                     None
-
-            if arcFileState.IsSome then
-                let fileType: SaveArcFileRequest =
-                    match arcFileState.Value with
-                    | ArcFiles.Assay a -> 
-                        {
-                            FileType = ArcFilesDiscriminate.Assay
-                            Json = a.ToJsonString()
-                        }
-                    | ArcFiles.Investigation i ->
-                        {
-                            FileType = ArcFilesDiscriminate.Investigation
-                            Json = i.ToJsonString()
-                        }
-                    | ArcFiles.Run r ->
-                        {
-                            FileType = ArcFilesDiscriminate.Run
-                            Json = r.ToJsonString()
-                        }
-                    | ArcFiles.Study (s, _) ->
-                        {
-                            FileType = ArcFilesDiscriminate.Study
-                            Json = s.ToJsonString()
-                        }
-                    | ArcFiles.Workflow w ->
-                        {
-                            FileType = ArcFilesDiscriminate.Workflow
-                            Json = w.ToJsonString()
-                        }
-                    | ArcFiles.Template t ->
-                        {
-                            FileType = ArcFilesDiscriminate.Template
-                            Json = t.toJsonString()
-                        }
-                    | ArcFiles.DataMap d ->
-                        {
-                            FileType = ArcFilesDiscriminate.DataMap
-                            Json = ""
-                        }
-
-                Api.syncARC fileType |> Promise.start
-
-            FileExplorer.createFileTree
-                fileTree
-                selectedTreeItemPath
-                setSelectedTreeItemPath
-                setShowLandingDraft
-                setPreviewData
-                setPreviewError
-                setDidSelectFile
-                |> setFileExplorer
-                |> ignore
-        ), 
-
-        [| box fileTree; box selectedTreeItemPath |]
-    )
+            ),
+            [|  workspaceCtx.state.FileTree; workspaceCtx.state.SelectedTreeItemPath |]
+        )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
         pathChange =
@@ -166,11 +185,9 @@ let Main () =
 
                 match pathOption with
                 | Some p ->
-                    resetLandingDraft ()
                     AppState.ARC p |> setAppState
+                    setSelectedTreeItemPath pathOption
                 | None ->
-                    setLandingDraftActive false
-                    setShowLandingDraft false
                     setSelectedTreeItemPath None
                     setAppState AppState.Init
         recentARCsUpdate =
@@ -183,11 +200,13 @@ let Main () =
                 setFileTree fileExplorer
     }
 
-    let recentARCElements =
-        recentARCs
-        |> Array.map (fun arcPointer -> Selector.SelectorItem(arcPointer, Selector.onARCClick))
-
-    let selector = Selector.Main(recentARCElements, Selector.actionbar appState, onOpenSelector = Selector.onOpenSelector appState setRecentARCs)
+    let selector =
+        Selector.Main(
+            workspaceCtx.state.RecentARCs,
+            Selector.onARCClick,
+            Selector.actionbar appState,
+            onOpenSelector = Selector.onOpenSelector appState setRecentARCs
+        )
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
@@ -195,44 +214,51 @@ let Main () =
     let children =
         React.useMemo (
             (fun _ ->
-                MainWindowContent.content(
+                MainWindowContent.Content(
                     appState,
                     setArcFileState,
-                    activeView,
-                    setActiveView,
                     arcFileState,
-                    previewData,
-                    setPreviewData,
-                    previewError,
-                    setPreviewError,
-                    didSelectFile,
-                    setDidSelectFile,
-                    landingDraft,
-                    setLandingDraft,
-                    landingUiState,
-                    setLandingUiState,
-                    landingDraftActive,
-                    setLandingDraftActive,
-                    showLandingDraft,
-                    setShowLandingDraft,
-                    setSelectedTreeItemPath)
+                    pageState,
+                    setPageState)
             ),
             [|
                 box appState
-                box previewData
-                box activeView
+                box pageState
                 box arcFileState
-                box previewError
-                box landingDraft
-                box landingUiState
-                box landingDraftActive
-                box showLandingDraft
-                box widgets
-                box tableMutationTick
             |]
         )
 
     let navbar = Navbar.Main(selector)
+
+    let leftSidebar appState (fe: ReactElement) =
+        Some(
+            Html.div [
+                prop.className "swt:p-4"
+                prop.children [|
+                    match appState with
+                    | AppState.ARC _ ->
+                        Html.button [
+                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
+                            prop.text "Landing Page"
+                            prop.onClick (fun _ ->
+                                landingCtx.setState {
+                                    landingCtx.state with
+                                        Draft = LandingDraft.init
+                                        UiState = LandingUiState.init
+                                }
+                                setSelectedTreeItemPath None
+                                setArcFileState None
+                                setPageState (Some PageState.LandingDraft)
+                            )
+                        ]
+                    | _ -> Html.none
+                    Html.h2 [
+                        prop.text "ARC-Tree"
+                    ]
+                    fe
+                |]
+            ]
+        )
 
     let saveBeforeClose () : JS.Promise<Result<unit, string>> =
         promise {
@@ -243,60 +269,34 @@ let Main () =
 
                 match result with
                 | Ok updatedPreview ->
-                    setPreviewData (Some updatedPreview)
-                    setPreviewError None
-                    setDidSelectFile true
+                    setPageState (Some updatedPreview)
                     return Ok()
-                | Error errorMsg ->
+                | Result.Error errorMsg ->
                     let msg = $"Save failed: {errorMsg}"
-                    setPreviewError (Some msg)
-                    return Error msg
+                    return Result.Error msg
         }
 
     context.AppStateCtx.AppStateCtx.Provider(
-        {
-            state = appState
-            setState = setAppState
-        },
-        Layout.Main(
-            children =
-                React.Fragment [|
-                    children
-                    CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
-                |],
-            navbar = navbar,
-            ?leftSidebar =
-                (let sidebarContent =
-                    match fileExplorer with
-                    | Some fe -> fe
-                    | None -> Html.span [ prop.className "swt:opacity-50"; prop.text "No files" ]
-
-                 Some(
-                     Html.div [
-                         prop.className "swt:p-4"
-                         prop.children [|
-                            match appState with
-                            | AppState.ARC _ ->
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                                    prop.text "Landing Page"
-                                    prop.onClick (fun _ ->
-                                        setPreviewError None
-
-                                        if landingDraftActive then
-                                            setShowLandingDraft true
-                                        else
-                                            resetLandingDraft ()
-                                    )
-                                ]
-                            | _ -> Html.none
-                            Html.h2 [
-                                prop.text "ARC-Tree"
-                            ]
-                            sidebarContent
-                        |]
-                     ]
-                 )),
-            leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+        appCtx,
+        Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx.Provider(
+            workspaceCtx,
+            Renderer.context.LandingStateCtx.LandingStateCtx.Provider(
+                landingCtx,
+                Layout.Main(
+                    children =
+                        React.Fragment [|
+                            children
+                            CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                        |],
+                    navbar = navbar,
+                    ?leftSidebar =
+                        (
+                            match fileExplorer with
+                            | Some fe -> leftSidebar appState fe
+                            | None -> None
+                         ),
+                    leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+                )
+            )
         )
     )
