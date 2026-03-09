@@ -8,6 +8,8 @@ open Main
 open Main.Bindings
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
 
@@ -49,6 +51,7 @@ module ArcVaultHelper =
         let ignoreFn =
             fun (path: string) ->
                 let normalizedPath = path.Replace("\\", "/")
+
                 let segments =
                     normalizedPath.Trim('/').Split('/', System.StringSplitOptions.RemoveEmptyEntries)
 
@@ -255,15 +258,6 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some path)
         }
 
-        member this.OnClose() =
-            match this.path with
-            | Some path ->
-                let arcs = recentARCs |> Array.filter (fun arc -> arc.path <> path)
-                setRecentARCs arcs
-                printfn $"[Swate] Removed vault '{this.window.id}'"
-                arcs
-            | None -> [||]
-
         member this.OpenAssay(identifier: string) =
             let assay = this.arc.Value.TryGetAssay(identifier)
 
@@ -315,15 +309,20 @@ type ArcVaults() =
 
     member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
-    member this.BroadcastRecentARCs(recentARCs: SelectorTypes.ARCPointer[]) =
+    member this.BroadcastRecentARCs() =
+        let recentARCs = RECENT_ARCS.Get()
+
         this.Vaults.Values
         |> Array.ofSeq
-        |> Array.iter (fun vault ->
-            Remoting.init
-            |> Remoting.withWindow vault.window
-            |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
-            |> fun client -> client.recentARCsUpdate recentARCs
-        )
+        |> fun arr ->
+            if arr.Length > 0 then
+                arr
+                |> Array.iter (fun vault ->
+                    Remoting.init
+                    |> Remoting.withWindow vault.window
+                    |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+                    |> fun client -> client.recentARCsUpdate recentARCs
+                )
 
     member this.DisposeVault(id: int) =
         match this.Vaults.TryGetValue(id) with
@@ -331,7 +330,10 @@ type ArcVaults() =
         | true, vault ->
             vault.watcher |> Option.iter (fun watcher -> watcher.close () |> Promise.start)
             this.Vaults.Remove(id) |> ignore
-            swatelogfn id $"Removed vault."
+            RECENT_ARCS.Inactivate(vault.path.Value) |> ignore
+            //broadcast updated recent ARCs to all vaults after making the current one inactive
+            this.BroadcastRecentARCs()
+            printfn $"[Swate] Removed vault '{id}'"
 
     member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
         match this.TryGetVault(windowId) with
@@ -354,10 +356,8 @@ type ArcVaults() =
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
         window.onClose (fun closeEvent ->
-            if vault.isCloseApproved || vault.path.IsNone then
-                let recentARCs = vault.OnClose()
-                this.BroadcastRecentARCs recentARCs
-            else
+            if not vault.isCloseApproved then
+
                 closeEvent.preventDefault ()
 
                 if not vault.isCloseRequestPending then

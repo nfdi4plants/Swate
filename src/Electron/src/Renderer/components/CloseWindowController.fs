@@ -1,17 +1,21 @@
-module Renderer.components.CloseWindowController
+module Renderer.Components.CloseWindowController
 
 open Feliz
 open Fable.Core
 open Fable.Electron.Remoting.Renderer
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
 type CloseWindowController =
 
     [<ReactComponent>]
     static member Subscription
-        (onConfirmSave: unit -> JS.Promise<Result<unit, string>>, ?onConfirmClose: unit -> unit, ?onCancelClose: unit -> unit)
-        =
+        (
+            onConfirmSave: unit -> JS.Promise<Result<unit, string>>,
+            ?onConfirmClose: unit -> unit,
+            ?onCancelClose: unit -> unit
+        ) =
 
         let modalIsOpen, setModalIsOpen = React.useState false
 
@@ -41,8 +45,7 @@ type CloseWindowController =
                 | Ok() ->
                     setModalIsOpen false
                     do! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose
-                | Error msg ->
-                    console.error ($"Save before close failed: {msg}")
+                | Error msg -> console.error ($"Save before close failed: {msg}")
             }
             |> Promise.start
 

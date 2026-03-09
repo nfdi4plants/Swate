@@ -1,16 +1,16 @@
-module Renderer.context.WorkspaceStateCtx
+module Renderer.Context.WorkspaceStateCtx
 
 open Feliz
 open Swate.Components
-open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.FileIOTypes
 
 type WorkspaceState = {
-    RecentARCs: SelectorTypes.ARCPointer []
+    RecentARCs: SelectorTypes.ARCPointer[]
     FileTree: FileEntry list
     SelectedTreeItemPath: string option
 } with
 
-    static member init () = {
+    static member init() = {
         RecentARCs = [||]
         FileTree = []
         SelectedTreeItemPath = None

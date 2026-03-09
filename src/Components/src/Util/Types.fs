@@ -332,19 +332,7 @@ module AnnotationTable =
         | UnknownPasteCase of PasteCases
         | None
 
-module SelectorTypes =
-
-    type ARCPointer = {
-        name: string
-        path: string
-        isActive: bool
-    } with
-
-        static member create(name: string, path: string, isActive: bool) = {
-            name = name
-            path = path
-            isActive = isActive
-        }
+module Actionbar =
 
     type ButtonInfo = {
         icon: string

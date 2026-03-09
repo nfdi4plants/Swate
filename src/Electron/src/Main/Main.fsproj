@@ -9,7 +9,8 @@
     <None Include="ChokidarTest.fsx" />
     <Compile Include="IPC\GitLfs.fs" />
     <Compile Include="FileTreeCreator.fs" />
-    <Compile Include="ArcHolder.fs" />
+    <Compile Include="SettingsStore.fs" />
+    <Compile Include="RecentArcStore.fs" />
     <Compile Include="Bindings\Chokidar.fs" />
     <Compile Include="Bindings\SimpleGit.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />

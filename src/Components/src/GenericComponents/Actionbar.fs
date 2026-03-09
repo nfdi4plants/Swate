@@ -6,15 +6,21 @@ open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 
-open SelectorTypes
+open Swate.Components.Types.Actionbar
 
 [<Erase; Mangle(false)>]
 type Actionbar =
 
     [<ReactComponent>]
     static member Button
-        (icon: string, tooltip: string, (onClick: MouseEvent -> unit), ?toolTipPosition: string, ?debug: bool)
-        =
+        (
+            icon: string,
+            tooltip: string,
+            (onClick: MouseEvent -> unit),
+            ?toolTipPosition: string,
+            ?debug: bool,
+            ?buttonTestId: string
+        ) =
 
         let debug = defaultArg debug false
 
@@ -23,12 +29,16 @@ type Actionbar =
         Html.div [
             prop.className $"swt:tooltip {toolTipPosition}"
             prop.ariaLabel tooltip
-            if debug then
-                prop.testId "button-test"
             prop.children [
                 Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
                 Html.button [
-                    prop.className [ "swt:btn swt:btn-square swt:btn-ghost swt:p-0" ]
+                    if debug then
+                        prop.testId "button-test"
+                    prop.className [
+                        "swt:btn swt:btn-primary swt:btn-square swt:btn-ghost swt:p-0 swt:btn-xs"
+                    ]
+                    if buttonTestId.IsSome then
+                        prop.testId buttonTestId.Value
                     prop.children [ Html.i [ prop.className [ "swt:iconify " + icon ] ] ]
                     prop.onClick (fun e -> onClick e)
                 ]
@@ -98,19 +108,20 @@ type Actionbar =
                     prop.testId "actionbar-test"
                 prop.children [
                     Actionbar.Button(
-                        "swt:fluent--line-horizontal-1-dot-24-regular swt:size-5",
+                        "swt:fluent--line-horizontal-1-dot-20-regular swt:size-5",
                         "Show more options",
                         (fun e ->
                             match containerRef.current with
                             | Some container -> fireOpenContextEvent container e.clientX e.clientY
                             | None -> ()
                         ),
-                        debug = debug
+                        debug = debug,
+                        buttonTestId = "actionbar-rest-button"
                     )
 
                     let restButtons = buttons.[maxNumber..] |> Array.map (fun button -> button)
 
-                    Actionbar.ContextMenu(containerRef, restButtons)
+                    Actionbar.ContextMenu(containerRef, restButtons, debug = debug)
                 ]
             ]
 
@@ -127,10 +138,14 @@ type Actionbar =
 
                     if buttons.Length > 0 && buttons.Length > maxNumber + 1 then
                         Array.take maxNumber buttons
-                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, (onClick button)))
+                        |> Array.map (fun button ->
+                            Actionbar.Button(button.icon, button.toolTip, (onClick button), debug = debug)
+                        )
                     else
                         buttons
-                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, (onClick button)))
+                        |> Array.map (fun button ->
+                            Actionbar.Button(button.icon, button.toolTip, (onClick button), debug = debug)
+                        )
                 ),
                 [| buttons |]
             )
@@ -141,7 +156,7 @@ type Actionbar =
         let selectedElement = React.Fragment selectedElements
 
         Html.div [
-            prop.className $"swt:flex swt:items-center swt:border swt:border-neutral swt:rounded-lg swt:w-max swt:p-1"
+            prop.className $"swt:flex swt:items-center swt:w-max swt:p-1"
             prop.children [ selectedElement; restElements ]
         ]
 

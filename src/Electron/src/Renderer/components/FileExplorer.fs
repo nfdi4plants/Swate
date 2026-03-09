@@ -1,12 +1,13 @@
-module Renderer.components.FileExplorer
+module Renderer.Components.FileExplorer
 
 open System
 open Browser.Dom
 open Swate.Components.FileExplorerTypes
-open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.GitTypes
 
-let private normalizePath (path: string) =
-    path.Replace("\\", "/").TrimEnd('/')
+let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
 let private splitPath (path: string) =
     normalizePath path
@@ -85,23 +86,26 @@ let createFileTree
 
     let fileItem = loop parent
 
-    let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) =
-        promise {
-            let request: GitLfsRequest = {
-                RequestId = Guid.NewGuid().ToString()
-                RepoPath = repoPath
-                Command = if markAsLfs then GitLfsCommand.Track else GitLfsCommand.Untrack
-                FilePath = Some relativePath
-                TimeoutMs = Some 10000
-            }
-
-            let! result = Api.runGitLfs request
-
-            return
-                match result with
-                | Ok _ -> Ok ()
-                | Error exn -> Error exn.Message
+    let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) = promise {
+        let request: GitLfsRequest = {
+            RequestId = Guid.NewGuid().ToString()
+            RepoPath = repoPath
+            Command =
+                if markAsLfs then
+                    GitLfsCommand.Track
+                else
+                    GitLfsCommand.Untrack
+            FilePath = Some relativePath
+            TimeoutMs = Some 10000
         }
+
+        let! result = Api.runGitLfs request
+
+        return
+            match result with
+            | Ok _ -> Ok()
+            | Error exn -> Error exn.Message
+    }
 
     let setError (errorMsg: string option) =
         match errorMsg with
@@ -109,11 +113,7 @@ let createFileTree
         | None -> setPageState None
 
     let toggleLfsMark =
-        FileExplorerGitLfsHelper.ToggleLfsMark(
-            rootRepoPath,
-            setError,
-            runToggleLfsMark
-        )
+        FileExplorerGitLfsHelper.ToggleLfsMark(rootRepoPath, setError, runToggleLfsMark)
 
     let contextMenuItems (item: FileItem) =
         FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
@@ -121,10 +121,8 @@ let createFileTree
     let openPreview (item: FileItem) =
         promise {
             match item.Path with
-            | None ->
-                setPageState (Some(PageState.Error $"File '{item.Name}' has no path."))
-            | Some path when item.IsDirectory ->
-                setPageState None
+            | None -> setPageState (Some(PageState.Error $"File '{item.Name}' has no path."))
+            | Some path when item.IsDirectory -> setPageState None
             | Some path ->
                 let previewPath = resolvePreviewPath path
 
@@ -179,7 +177,7 @@ let private insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry
                     let newPath = parts.[0..index] |> String.concat "/"
 
                     let newNode =
-                        FileItemDTO.create(
+                        FileItemDTO.create (
                             part,
                             (if isLast then entry.isDirectory else true),
                             newPath,
@@ -195,14 +193,13 @@ let private insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry
 
         loop root rootParts.Length
 
-let getFileTree (fileEntries: FileEntry []) =
+let getFileTree (fileEntries: FileEntry[]) =
 
     if fileEntries.Length = 0 then
         invalidArg "fileEntries" "fileEntries must not be empty."
 
     let normalizedPaths =
-        fileEntries
-        |> Array.map (fun fileEntry -> normalizePath fileEntry.path)
+        fileEntries |> Array.map (fun fileEntry -> normalizePath fileEntry.path)
 
     let rootPath =
         normalizedPaths
@@ -224,7 +221,7 @@ let getFileTree (fileEntries: FileEntry []) =
             fileEntries
             |> Array.find (fun fileEntry -> normalizePath fileEntry.path = rootPath)
 
-        FileItemDTO.create(
+        FileItemDTO.create (
             rootEntry.name,
             rootEntry.isDirectory,
             rootPath,

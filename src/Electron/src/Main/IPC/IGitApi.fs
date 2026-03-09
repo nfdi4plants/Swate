@@ -2,6 +2,7 @@ module Main.IPC.IGitApi
 
 open System
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.GitTypes
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -25,9 +26,7 @@ let private toGitOperationResult
     : Result<GitOperationResult, exn> =
     match result with
     | Ok payload ->
-        let path =
-            successPath
-            |> Option.bind (fun projectPath -> projectPath payload)
+        let path = successPath |> Option.bind (fun projectPath -> projectPath payload)
 
         Ok {
             Success = true
@@ -85,31 +84,29 @@ let api: IGitApi = {
         fun (event: IpcMainEvent) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (_, arcPath) ->
+            | Ok(_, arcPath) ->
                 let! result = GitService.getStatus arcPath
 
                 match result with
                 | Ok statusDto -> return Ok(toStatusDto statusDto)
-                | Error failure ->
-                    return Error(exn $"git status failed ({failure.Kind}): {failure.Message}")
+                | Error failure -> return Error(exn $"git status failed ({failure.Kind}): {failure.Message}")
         }
     getGitDiffSummary =
         fun (event: IpcMainEvent) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (_, arcPath) ->
+            | Ok(_, arcPath) ->
                 let! result = GitService.getDiffSummary arcPath
 
                 match result with
                 | Ok diffDto -> return Ok(toDiffSummaryDto diffDto)
-                | Error failure ->
-                    return Error(exn $"git diff summary failed ({failure.Kind}): {failure.Message}")
+                | Error failure -> return Error(exn $"git diff summary failed ({failure.Kind}): {failure.Message}")
         }
     gitFetch =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.fetch arcPath request.Remote request.Branch (Some progressReporter)
@@ -119,20 +116,22 @@ let api: IGitApi = {
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 let progressReporter = createGitProgressReporter vault
 
                 return!
-                    withBusyWriting vault (fun () -> promise {
-                        let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
-                        return toGitOperationResult (fun () -> Some "Pull completed.") None result
-                    })
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
+                            return toGitOperationResult (fun () -> Some "Pull completed.") None result
+                        })
         }
     gitPush =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.push arcPath request.Remote request.Branch (Some progressReporter)
@@ -162,61 +161,87 @@ let api: IGitApi = {
                     request.Branch
                     progressReporter
 
-            return toGitOperationResult (fun _ -> Some "Clone completed.") (Some(fun normalizedPath -> Some normalizedPath)) result
+            return
+                toGitOperationResult
+                    (fun _ -> Some "Clone completed.")
+                    (Some(fun normalizedPath -> Some normalizedPath))
+                    result
         }
     gitStagePaths =
         fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting vault (fun () -> promise {
-                        let! result = GitService.stagePaths arcPath request.Pathspecs
-                        return toGitOperationResult (fun () -> Some "Files staged.") None result
-                    })
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.stagePaths arcPath request.Pathspecs
+                            return toGitOperationResult (fun () -> Some "Files staged.") None result
+                        })
         }
     gitUnstagePaths =
         fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting vault (fun () -> promise {
-                        let! result = GitService.unstagePaths arcPath request.Pathspecs
-                        return toGitOperationResult (fun () -> Some "Files unstaged.") None result
-                    })
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.unstagePaths arcPath request.Pathspecs
+                            return toGitOperationResult (fun () -> Some "Files unstaged.") None result
+                        })
         }
     gitCommit =
         fun (event: IpcMainEvent) (request: GitCommitRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting vault (fun () -> promise {
-                        let! result = GitService.commit arcPath request.Message
-                        return toGitOperationResult (fun commitHash -> Some $"Commit completed ({commitHash}).") None result
-                    })
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.commit arcPath request.Message
+
+                            return
+                                toGitOperationResult
+                                    (fun commitHash -> Some $"Commit completed ({commitHash}).")
+                                    None
+                                    result
+                        })
         }
     createBranch =
         fun (event: IpcMainEvent) (request: GitCreateBranchRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting vault (fun () -> promise {
-                        let! result = GitService.createBranch arcPath request.Name request.StartPoint
-                        return toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None result
-                    })
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.createBranch arcPath request.Name request.StartPoint
+
+                            return
+                                toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None result
+                        })
         }
     checkoutBranch =
         fun (event: IpcMainEvent) (request: GitCheckoutBranchRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok (vault, arcPath) ->
+            | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting vault (fun () -> promise {
-                        let! result = GitService.checkoutBranch arcPath request.Name
-                        return toGitOperationResult (fun () -> Some $"Checked out branch '{request.Name}'.") None result
-                    })
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.checkoutBranch arcPath request.Name
+
+                            return
+                                toGitOperationResult
+                                    (fun () -> Some $"Checked out branch '{request.Name}'.")
+                                    None
+                                    result
+                        })
         }
 }

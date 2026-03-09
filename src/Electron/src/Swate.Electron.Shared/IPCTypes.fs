@@ -1,3 +1,4 @@
+/// This module SHOULD only contain the exact IPC communication types.
 module Swate.Electron.Shared.IPCTypes
 
 open System.Collections.Generic
@@ -7,128 +8,27 @@ open Fable.Electron
 open Swate.Components
 
 open ARCtrl.ARCtrlHelper
+open GitTypes
+open FileIOTypes
 
+module IPCTypesHelper =
 
-[<RequireQualifiedAccess>]
-type PageState =
-    | ArcFileData of fileType: ArcFilesDiscriminate * json: string
-    | Text of string
-    | Unknown
-    | LandingDraft
-    | Error of string
+    /// TODO: This is a pure UI type and should only be used in the renderer process. It is not meant to be sent over IPC, but rather to represent the state of the page after receiving data from the main process.
+    [<RequireQualifiedAccess>]
+    type PageState =
+        | ArcFileData of fileType: ArcFilesDiscriminate * json: string
+        | Text of string
+        | Unknown
+        | LandingDraft
+        | Error of string
 
-type SaveArcFileRequest = {
-    FileType: ArcFilesDiscriminate
-    Json: string
-}
+    [<RequireQualifiedAccess>]
+    type SaveBeforeQuitDecision =
+        | SaveAndClose
+        | CloseWithoutSaving
+        | CancelClose
 
-type WriteFileRequest = {
-    RelativePath: string
-    Content: string
-}
-
-// GIT LFS Types
-type GitLfsCommand =
-    | Pull
-    | Fetch
-    | Install
-    | Track
-    | Untrack
-    | Status
-
-type GitLfsRequest = {
-    RequestId: string
-    RepoPath: string
-    Command: GitLfsCommand
-    FilePath: string option
-    TimeoutMs: int option
-}
-
-type GitLfsResult = {
-    Success: bool
-    Output: string
-    Error: string
-}
-
-[<RequireQualifiedAccess>]
-type GitFailureKind =
-    | Unauthorized
-    | Forbidden
-    | Network
-    | Timeout
-    | Canceled
-    | Unknown
-
-type GitFileStatusDto = {
-    Path: string
-    Index: string
-    WorkingDir: string
-    OriginalPath: string option
-}
-
-type GitStatusDto = {
-    Current: string option
-    Tracking: string option
-    Ahead: int
-    Behind: int
-    IsClean: bool
-    Files: GitFileStatusDto[]
-}
-
-type GitDiffSummaryDto = {
-    Changed: int
-    Insertions: int
-    Deletions: int
-}
-
-type GitOperationResult = {
-    Success: bool
-    Message: string option
-    FailureKind: GitFailureKind option
-    Path: string option
-}
-
-type GitProgressDto = {
-    Method: string option
-    Stage: string option
-    Progress: float option
-    Processed: float option
-    Total: float option
-}
-
-type GitRemoteOperationRequest = {
-    Remote: string option
-    Branch: string option
-}
-
-type GitCloneRepositoryRequest = {
-    RemoteUrl: string
-    TargetPath: string
-    Branch: string option
-}
-
-type GitPathspecRequest = {
-    Pathspecs: string[]
-}
-
-type GitCommitRequest = {
-    Message: string
-}
-
-type GitCreateBranchRequest = {
-    Name: string
-    StartPoint: string option
-}
-
-type GitCheckoutBranchRequest = {
-    Name: string
-}
-
-[<RequireQualifiedAccess>]
-type SaveBeforeQuitDecision =
-    | SaveAndClose
-    | CloseWithoutSaving
-    | CancelClose
+open IPCTypesHelper
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
@@ -141,7 +41,7 @@ type IArcVaultsApi = {
     createARCInNewWindow: string -> JS.Promise<Result<unit, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
-    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer []>
+    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     checkForARC: string -> JS.Promise<bool>
 
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>
@@ -174,51 +74,6 @@ type IGitApi = {
     checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
 }
 
-type FileEntry = {
-    name: string
-    path: string
-    isDirectory: bool
-    isLfs: bool option
-}
-
-[<AutoOpen>]
-module FileEntryExtensions =
-
-    let createFileEntryTree (fileEntries: FileEntry[]) =
-        let dic = Dictionary<string, FileEntry>()
-        fileEntries |> Array.iter (fun fileEntry -> dic.Add(fileEntry.path, fileEntry))
-        dic
-
-    type FileEntry with
-
-        static member create(name: string, path: string, isDirectory: bool, ?isLfs: bool option) = {
-            name = name
-            path = path
-            isDirectory = isDirectory
-            isLfs = defaultArg isLfs None
-        }
-
-type FileItemDTO = {
-    name: string
-    isDirectory: bool
-    path: string
-    isLfs: bool option
-    children: Dictionary<string, FileItemDTO>
-}
-
-[<AutoOpen>]
-module FileItemDTOExtensions =
-
-    type FileItemDTO with
-
-        static member create(name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>, ?isLfs: bool option) = {
-            name = name
-            isDirectory = isDirectory
-            path = path
-            isLfs = defaultArg isLfs None
-            children = children
-        }
-
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
@@ -227,7 +82,7 @@ type IMainUpdateRendererApi = {
     gitProgressUpdate: GitProgressDto -> unit
 }
 
-// Todo: What should filewatcher do when detecting changes?
+// TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer
 type IArcFileWatcherApi = {
     /// This function is called when ARC is reloaded due to local file changes.

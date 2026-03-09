@@ -2,7 +2,10 @@ namespace Swate.Electron.Shared
 
 open ARCtrl
 open ARCtrl.Json
-open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.FileIOTypes
+
+// TODO: This file contains Renderer logic and should not be placed in shared project, you can easily verify this by checking that all functions here are only used in Renderer!
 
 [<RequireQualifiedAccess>]
 type AppState =
@@ -40,40 +43,22 @@ module ArcFileSaveMapping =
                 Json = ArcWorkflow.toJsonString 0 workflow
             }
         | ArcFiles.DataMap _
-        | ArcFiles.Template _ ->
-            None
+        | ArcFiles.Template _ -> None
 
     let tryParseArcFile (fileType: ArcFilesDiscriminate) (json: string) : Result<ArcFiles, exn> =
         try
             match fileType with
-            | ArcFilesDiscriminate.Investigation ->
-                ArcInvestigation.fromJsonString json
-                |> ArcFiles.Investigation
-                |> Ok
+            | ArcFilesDiscriminate.Investigation -> ArcInvestigation.fromJsonString json |> ArcFiles.Investigation |> Ok
             | ArcFilesDiscriminate.Study ->
-                ArcStudy.fromJsonString json
-                |> fun study -> ArcFiles.Study(study, [])
-                |> Ok
-            | ArcFilesDiscriminate.Assay ->
-                ArcAssay.fromJsonString json
-                |> ArcFiles.Assay
-                |> Ok
-            | ArcFilesDiscriminate.Run ->
-                ArcRun.fromJsonString json
-                |> ArcFiles.Run
-                |> Ok
-            | ArcFilesDiscriminate.Workflow ->
-                ArcWorkflow.fromJsonString json
-                |> ArcFiles.Workflow
-                |> Ok
+                ArcStudy.fromJsonString json |> (fun study -> ArcFiles.Study(study, [])) |> Ok
+            | ArcFilesDiscriminate.Assay -> ArcAssay.fromJsonString json |> ArcFiles.Assay |> Ok
+            | ArcFilesDiscriminate.Run -> ArcRun.fromJsonString json |> ArcFiles.Run |> Ok
+            | ArcFilesDiscriminate.Workflow -> ArcWorkflow.fromJsonString json |> ArcFiles.Workflow |> Ok
             | ArcFilesDiscriminate.DataMap ->
                 DataMap.fromJsonString json
                 |> fun datamap -> ArcFiles.DataMap(None, datamap)
                 |> Ok
-            | ArcFilesDiscriminate.Template ->
-                Template.fromJsonString json
-                |> ArcFiles.Template
-                |> Ok
+            | ArcFilesDiscriminate.Template -> Template.fromJsonString json |> ArcFiles.Template |> Ok
         with e ->
             Microsoft.FSharp.Core.Error e
 
@@ -83,15 +68,14 @@ module ArcFileSaveMapping =
     let tryCreatePreviewData (arcFile: ArcFiles) : PageState option =
         match arcFile with
         | ArcFiles.Investigation investigation ->
-            Some(PageState.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 investigation))
+            Some(
+                PageState.ArcFileData(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 investigation)
+            )
         | ArcFiles.Study(study, _) ->
             Some(PageState.ArcFileData(ArcFilesDiscriminate.Study, ArcStudy.toJsonString 0 study))
-        | ArcFiles.Assay assay ->
-            Some(PageState.ArcFileData(ArcFilesDiscriminate.Assay, ArcAssay.toJsonString 0 assay))
-        | ArcFiles.Run run ->
-            Some(PageState.ArcFileData(ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run))
+        | ArcFiles.Assay assay -> Some(PageState.ArcFileData(ArcFilesDiscriminate.Assay, ArcAssay.toJsonString 0 assay))
+        | ArcFiles.Run run -> Some(PageState.ArcFileData(ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run))
         | ArcFiles.Workflow workflow ->
             Some(PageState.ArcFileData(ArcFilesDiscriminate.Workflow, ArcWorkflow.toJsonString 0 workflow))
         | ArcFiles.DataMap _
-        | ArcFiles.Template _ ->
-            None
+        | ArcFiles.Template _ -> None

@@ -22,6 +22,7 @@ import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.f
 import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
 import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
 import {Entry as DataHubSidebarEntry} from '../src/DataHubSidebar/DataHubSidebar.fs.ts';
+import {ActionbarInSelectorEntry as ARCSelectorEntry} from '../src/ARCSelector/Selector.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -201,9 +202,16 @@ function DataHubSidebarContainer() {
   </div>
 }
 
+function ARCSelectorContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>ARC Selector</h2>
+    <ARCSelectorEntry />
+  </div>
+}
+
 const App = () => {
     return (
-        <DataHubSidebarContainer />
+        <ARCSelectorContainer />
         // <AuthButtonContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
         //     <NoteSearch />
