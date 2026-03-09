@@ -306,11 +306,7 @@ type SelectiveImportModal =
                     Icons.Cog(),
                     model.ProtocolState.ImportConfig.ImportType,
                     "importType",
-                    [|
-                        ARCtrl.TableJoinOptions.Headers, " Column Headers"
-                        ARCtrl.TableJoinOptions.WithUnit, " ..With Units"
-                        ARCtrl.TableJoinOptions.WithValues, " ..With Values"
-                    |],
+                    FileImport.TemplateImportMode.radioOptions,
                     fun importType ->
                         {
                             model.ProtocolState.ImportConfig with
@@ -380,11 +376,7 @@ type SelectiveImportModal =
                     Icons.Cog(),
                     model.ProtocolState.ImportConfig.ImportType,
                     "importType",
-                    [|
-                        ARCtrl.TableJoinOptions.Headers, " Column Headers"
-                        ARCtrl.TableJoinOptions.WithUnit, " ..With Units"
-                        ARCtrl.TableJoinOptions.WithValues, " ..With Values"
-                    |],
+                    FileImport.TemplateImportMode.radioOptions,
                     fun importType ->
                         {
                             model.ProtocolState.ImportConfig with

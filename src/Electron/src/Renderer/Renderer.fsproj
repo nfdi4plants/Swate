@@ -17,6 +17,7 @@
     <Compile Include="components\InitState.fs" />
     <Compile Include="components\Widgets\SearchComponents.fs" />
     <Compile Include="components\Widgets\AddBuildingBlockWidget.fs" />
+    <Compile Include="components\Widgets\AddTemplateWidget.fs" />
     <Compile Include="components\Widgets.fs" />
     <Compile Include="components\MainElement.fs" />
     <Compile Include="components\MainWindowContent.fs" />

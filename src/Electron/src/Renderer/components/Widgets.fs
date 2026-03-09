@@ -19,31 +19,18 @@ let buildingBlockWidget
     WidgetType.BuildingBlock,
     {|
         prefix = "ADD_BUILDINGBLOCK"
-        content = AddBuildingBlockWidget.Main(arcFileState, activeTableIndex, setArcFileState)
+        content = Widgets.AddBuildingBlockWidget.Main(arcFileState, activeTableIndex, setArcFileState)
     |}
 
-let templateWidget: WidgetType * WidgetDefinition =
+let templateWidget
+    (arcFileState: ArcFiles option)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    : WidgetType * WidgetDefinition =
     WidgetType.Template,
     {|
         prefix = "ADD_TEMPLATE"
-        content =
-            Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-80"
-                prop.children [
-                    Html.h3 [
-                        prop.className "swt:font-bold"
-                        prop.text "Add Template"
-                    ]
-                    //TermSearch.TermSearch(term, setTerm)
-                    Html.span [
-                        prop.className "swt:text-xs swt:opacity-70"
-                        prop.textf
-                            "Selected term: %s"
-                            //(term |> Option.map (fun t -> t.ToString()) |> Option.defaultValue "None")
-                            "Test"
-                    ]
-                ]
-            ]
+        content = Widgets.AddTemplateWidget.Main(arcFileState, activeTableIndex, setArcFileState)
     |}
 
 let filePickerWidget: WidgetType * WidgetDefinition =
@@ -115,7 +102,7 @@ let createWidgets
     : Map<WidgetType, WidgetDefinition> =
     [
         buildingBlockWidget arcFileState activeTableIndex setArcFileState
-        templateWidget
+        templateWidget arcFileState activeTableIndex setArcFileState
         filePickerWidget
         dataAnnotatorWidget
     ]

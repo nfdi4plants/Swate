@@ -47,6 +47,23 @@ module FileImport =
                         Set.add (tableIndex, columnIndex) this.DeselectedColumns
         }
 
+    [<RequireQualifiedAccess>]
+    module TemplateImportMode =
+
+        let options: (ARCtrl.TableJoinOptions * string * string)[] = [|
+            ARCtrl.TableJoinOptions.Headers, "Headers", "Column Headers"
+            ARCtrl.TableJoinOptions.WithUnit, "WithUnit", "With Units"
+            ARCtrl.TableJoinOptions.WithValues, "WithValues", "With Values"
+        |]
+
+        let radioOptions: (ARCtrl.TableJoinOptions * string)[] =
+            options |> Array.map (fun (importType, _, label) -> importType, label)
+
+        let tryFromSelectValue (value: string) : ARCtrl.TableJoinOptions option =
+            options
+            |> Array.tryFind (fun (_, selectValue, _) -> selectValue = value)
+            |> Option.map (fun (importType, _, _) -> importType)
+
 open Fable.Core
 
 type Style = {

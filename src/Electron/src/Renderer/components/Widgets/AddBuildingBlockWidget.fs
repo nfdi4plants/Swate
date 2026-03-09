@@ -1,4 +1,4 @@
-module Renderer.components.AddBuildingBlockWidget
+module Renderer.components.Widgets.AddBuildingBlockWidget
 
 open Feliz
 open ARCtrl
@@ -240,7 +240,7 @@ let Main
                             addBuildingBlock ()
                     )
                     prop.children [
-                        Widgets.SearchComponents.SearchBuildingBockHeaderElement
+                        Renderer.components.Widgets.SearchComponents.SearchBuildingBockHeaderElement
                             state
                             setState
                             headerOptions
