@@ -317,6 +317,21 @@ let api: IPCTypes.IArcVaultsApi = {
         fun path -> promise {
             return ARC_VAULTS.TryGetVaultByPath(path).IsSome
         }
+    pickPaths =
+        fun _ -> promise {
+            let properties =
+                [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                |]
+
+            let! result = dialog.showOpenDialog (properties = properties)
+
+            if result.canceled then
+                return Error(exn "Cancelled")
+            else
+                return Ok result.filePaths
+        }
     saveArcFile =
         fun (event: IpcMainEvent) (request: IPCTypes.SaveArcFileRequest) -> promise {
             try

@@ -33,29 +33,15 @@ let templateWidget
         content = Widgets.AddTemplateWidget.Main(arcFileState, activeTableIndex, setArcFileState)
     |}
 
-let filePickerWidget: WidgetType * WidgetDefinition =
+let filePickerWidget
+    (arcFileState: ArcFiles option)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    : WidgetType * WidgetDefinition =
     WidgetType.FilePicker,
         {|
             prefix = "FILEPICKER"
-            content =
-                Html.div [
-                    prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-72"
-                    prop.children [
-                        Html.h3 [
-                            prop.className "swt:font-bold"
-                            prop.text "File Picker"
-                        ]
-                        Html.input [
-                            prop.className "swt:input swt:input-sm swt:input-bordered"
-                            //prop.value fileName
-                            //prop.onChange setFileName
-                        ]
-                        Html.span [
-                            prop.className "swt:text-xs swt:opacity-70"
-                            //prop.textf "Current: %s" fileName
-                        ]
-                    ]
-                ]
+            content = Widgets.AddFilePickerWidget.Main(arcFileState, activeTableIndex, setArcFileState)
         |}
 
 let dataAnnotatorWidget: WidgetType * WidgetDefinition =
@@ -103,7 +89,7 @@ let createWidgets
     [
         buildingBlockWidget arcFileState activeTableIndex setArcFileState
         templateWidget arcFileState activeTableIndex setArcFileState
-        filePickerWidget
+        filePickerWidget arcFileState activeTableIndex setArcFileState
         dataAnnotatorWidget
     ]
     |> Map.ofList
