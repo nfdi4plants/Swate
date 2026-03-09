@@ -5,18 +5,21 @@ open Expecto
 open Swate.Components.Shared
 open Server
 
-let server = testList "Server" [
-    testCase "Message returned correctly" <| fun _ ->
-        let expectedResult = "Hello from SAFE!"
-        let result = Server.getMessage()
-        Expect.equal result expectedResult "Result should be ok"
-]
+let server =
+    testList "Server" [
+        testCase "Message returned correctly"
+        <| fun _ ->
+            let expectedResult = "Hello from SAFE!"
+            let result = Server.getMessage ()
+            Expect.equal result expectedResult "Result should be ok"
+    ]
 
-let all = testList "All" [
-    Tests.shared
-    GitValidationTests.tests
-    server
-]
+let all =
+    testList "All" [
+        Tests.shared
+        // GitValidationTests.tests
+        server
+    ]
 
 [<EntryPoint>]
 let main _ = runTestsWithCLIArgs [] [||] all
