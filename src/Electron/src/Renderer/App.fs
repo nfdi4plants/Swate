@@ -198,6 +198,9 @@ let Main () =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")
                 setFileTree fileExplorer
+        gitProgressUpdate =
+            fun progress ->
+                console.log ($"[Swate] Git progress {progress.Method} {progress.Stage} {progress.Progress}")
     }
 
     let selector =
