@@ -4,7 +4,9 @@ open Feliz
 open ARCtrl
 open Model.BuildingBlock
 
+[<ReactComponent>]
 let CreateDropdown (state: Model) headerOptions ioTypeOptions setHeaderIOType setHeaderCellType =
+
     Html.div [
         prop.className "swt:join swt:w-full"
         prop.children [
@@ -65,7 +67,51 @@ let CreateDropdown (state: Model) headerOptions ioTypeOptions setHeaderIOType se
             ]
         ]
 
+[<ReactComponent>]
+let HeaderComponent (state: Model) setState setHeaderTerm setHeaderIOType =
+
+    if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
+        Html.input [
+            prop.className "swt:input swt:border-current"
+            prop.valueOrDefault state.CommentHeader
+            prop.placeholder "Comment header"
+            prop.onChange (fun (value: string) ->
+                setState { state with CommentHeader = value }
+            )
+        ]
+    elif state.HeaderCellType.HasOA() then
+        Swate.Components.TermSearch.TermSearch(
+            (state.TryHeaderOA() |> Option.map (fun oa -> oa.ToTerm())),
+            setHeaderTerm,
+            classNames =
+                Swate.Components.Types.TermSearchStyle(
+                    Fable.Core.U2.Case1 "swt:border-current swt:join-item swt:w-full"
+                )
+        )
+    elif state.HeaderCellType.HasIOType() then
+        match state.TryHeaderIO() with
+        | Some(IOType.FreeText freeText) ->
+            Html.input [
+                prop.className "swt:input swt:border-current"
+                prop.valueOrDefault freeText
+                prop.placeholder "Input/Output text"
+                prop.onChange (fun (value: string) ->
+                    setHeaderIOType state.HeaderCellType (IOType.FreeText value)
+                )
+            ]
+        | Some ioType ->
+            Html.input [
+                prop.className "swt:input swt:border-current"
+                prop.readOnly true
+                prop.valueOrDefault (ioType.ToString())
+            ]
+        | None -> Html.none
+    else
+            Html.none
+
+[<ReactComponent>]
 let SearchBuildingBockHeaderElement (state: Model) setState headerOptions ioTypeOptions setHeaderIOType setHeaderCellType setHeaderTerm =
+
     Html.div [
         prop.style [ style.position.relative ]
         prop.children [
@@ -79,42 +125,7 @@ let SearchBuildingBockHeaderElement (state: Model) setState headerOptions ioType
                         setHeaderIOType
                         setHeaderCellType
 
-                    if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
-                        Html.input [
-                            prop.className "swt:input swt:border-current"
-                            prop.valueOrDefault state.CommentHeader
-                            prop.placeholder "Comment header"
-                            prop.onChange (fun (value: string) ->
-                                setState { state with CommentHeader = value }
-                            )
-                        ]
-                    elif state.HeaderCellType.HasOA() then
-                        Swate.Components.TermSearch.TermSearch(
-                            (state.TryHeaderOA() |> Option.map (fun oa -> oa.ToTerm())),
-                            setHeaderTerm,
-                            classNames =
-                                Swate.Components.Types.TermSearchStyle(
-                                    Fable.Core.U2.Case1 "swt:border-current swt:join-item swt:w-full"
-                                )
-                        )
-                    elif state.HeaderCellType.HasIOType() then
-                        match state.TryHeaderIO() with
-                        | Some(IOType.FreeText freeText) ->
-                            Html.input [
-                                prop.className "swt:input swt:border-current"
-                                prop.valueOrDefault freeText
-                                prop.placeholder "Input/Output text"
-                                prop.onChange (fun (value: string) ->
-                                    setHeaderIOType state.HeaderCellType (IOType.FreeText value)
-                                )
-                            ]
-                        | Some ioType ->
-                            Html.input [
-                                prop.className "swt:input swt:border-current"
-                                prop.readOnly true
-                                prop.valueOrDefault (ioType.ToString())
-                            ]
-                        | None -> Html.none
+                    HeaderComponent state setState setHeaderTerm setHeaderIOType
                 ]
             ]
         ]

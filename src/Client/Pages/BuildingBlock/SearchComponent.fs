@@ -19,7 +19,7 @@ module SearchComponentHelper =
         let body = Helper.tryCreateCompositeCellFromState state
 
         let bodyCells =
-            if body.IsSome then // create as many body cells as there are rows in the active table
+            if body.IsSome then
                 let rowCount = System.Math.Max(1, model.SpreadsheetModel.ActiveTable.RowCount)
                 Array.init rowCount (fun _ -> body.Value.Copy()) |> ResizeArray
             else
@@ -114,15 +114,13 @@ type SearchComponent =
         let element = React.useElementRef ()
 
         Html.div [
-            prop.ref element // The ref must be place here, otherwise the portalled term select area will trigger daisy join syntax
+            prop.ref element
             prop.style [ style.position.relative ]
             prop.children [
                 Html.div [
                     prop.className "swt:join swt:w-full"
                     prop.children [
-                        // Choose building block type dropdown element
                         Dropdown.Main(ui, setUi, model, dispatch)
-                        // Term search field
                         if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                             Html.input [
                                 prop.className "swt:input swt:join-item swt:flex-grow"
@@ -140,7 +138,6 @@ type SearchComponent =
                                     |> Option.map (fun term -> term |> (OntologyAnnotation.from >> U2.Case1))
 
                                 BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
-                            //selectHeader ui setUi h |> dispatch
                             let input = model.AddBuildingBlockState.TryHeaderOA()
 
                             Swate.Components.TermSearch.TermSearch(

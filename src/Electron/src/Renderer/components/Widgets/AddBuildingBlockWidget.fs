@@ -61,6 +61,64 @@ let private disabledState (message: string) =
     ]
 
 [<ReactComponent>]
+let TermSearchComponent state setState setBodyTerm =
+    if state.HeaderCellType.IsTermColumn() then
+        Html.div [
+            prop.children [
+                Html.div [
+                    prop.className "swt:join swt:w-full"
+                    prop.style [ style.position.relative ]
+                    prop.children [
+                        Html.button [
+                            prop.type'.button
+                            prop.className [
+                                "swt:btn swt:join-item swt:border swt:!border-base-content"
+                                if state.BodyCellType = CompositeCellDiscriminate.Term then
+                                    "swt:btn-primary"
+                                else
+                                    "swt:btn-neutral/50"
+                            ]
+                            prop.text "Term"
+                            prop.onClick (fun _ ->
+                                setState {
+                                    state with
+                                        BodyCellType = CompositeCellDiscriminate.Term
+                                }
+                            )
+                        ]
+                        Html.button [
+                            prop.type'.button
+                            prop.className [
+                                "swt:btn swt:join-item swt:border swt:!border-base-content"
+                                if state.BodyCellType = CompositeCellDiscriminate.Unitized then
+                                    "swt:btn-primary"
+                                else
+                                    "swt:btn-neutral/50"
+                            ]
+                            prop.text "Unit"
+                            prop.onClick (fun _ ->
+                                setState {
+                                    state with
+                                        BodyCellType = CompositeCellDiscriminate.Unitized
+                                }
+                            )
+                        ]
+                        TermSearch.TermSearch(
+                            (state.TryBodyOA() |> Option.map (fun oa -> oa.ToTerm())),
+                            setBodyTerm,
+                            classNames =
+                                Types.TermSearchStyle(U2.Case1 "swt:border-current swt:w-full"),
+                            ?parentId =
+                                (state.TryHeaderOA() |> Option.map (fun oa -> oa.TermAccessionShort))
+                        )
+                    ]
+                ]
+            ]
+        ]
+    else
+        Html.div []
+
+[<ReactComponent>]
 let Main
     (
         arcFileState: ArcFiles option,
@@ -191,59 +249,7 @@ let Main
                             setHeaderCellType
                             setHeaderTerm
 
-                        if state.HeaderCellType.IsTermColumn() then
-                            Html.div [
-                                prop.className "swt:flex swt:flex-col swt:gap-2"
-                                prop.children [
-                                    Html.div [
-                                        prop.className "swt:join swt:w-full"
-                                        prop.children [
-                                            Html.button [
-                                                prop.type'.button
-                                                prop.className [
-                                                    "swt:btn swt:join-item swt:border swt:!border-base-content"
-                                                    if state.BodyCellType = CompositeCellDiscriminate.Term then
-                                                        "swt:btn-primary"
-                                                    else
-                                                        "swt:btn-neutral/50"
-                                                ]
-                                                prop.text "Term"
-                                                prop.onClick (fun _ ->
-                                                    setState {
-                                                        state with
-                                                            BodyCellType = CompositeCellDiscriminate.Term
-                                                    }
-                                                )
-                                            ]
-                                            Html.button [
-                                                prop.type'.button
-                                                prop.className [
-                                                    "swt:btn swt:join-item swt:border swt:!border-base-content"
-                                                    if state.BodyCellType = CompositeCellDiscriminate.Unitized then
-                                                        "swt:btn-primary"
-                                                    else
-                                                        "swt:btn-neutral/50"
-                                                ]
-                                                prop.text "Unit"
-                                                prop.onClick (fun _ ->
-                                                    setState {
-                                                        state with
-                                                            BodyCellType = CompositeCellDiscriminate.Unitized
-                                                    }
-                                                )
-                                            ]
-                                        ]
-                                    ]
-                                    TermSearch.TermSearch(
-                                        (state.TryBodyOA() |> Option.map (fun oa -> oa.ToTerm())),
-                                        setBodyTerm,
-                                        classNames =
-                                            Types.TermSearchStyle(U2.Case1 "swt:border-current swt:w-full"),
-                                        ?parentId =
-                                            (state.TryHeaderOA() |> Option.map (fun oa -> oa.TermAccessionShort))
-                                    )
-                                ]
-                            ]
+                        TermSearchComponent state setState setBodyTerm
 
                         Html.div [
                             prop.className "swt:flex swt:justify-center"
@@ -252,7 +258,10 @@ let Main
                                     prop.type'.submit
                                     prop.className [
                                         "swt:btn swt:btn-wide"
-                                        if isValid then "swt:btn-primary" else "swt:btn-error"
+                                        if isValid then
+                                            "swt:btn-primary"
+                                        else
+                                            "swt:btn-error"
                                     ]
                                     prop.disabled (not isValid)
                                     prop.text "Add Column"
