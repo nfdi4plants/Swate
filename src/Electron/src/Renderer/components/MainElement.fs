@@ -11,11 +11,7 @@ type PreviewActiveView =
     | Metadata
     | Table of int
     | DataMap
-
-type ArcFileState = {
-    ArcFile: ArcFiles
-    ActiveView: PreviewActiveView
-}
+    | Error of string option
 
 [<ReactComponent>]
 let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> unit) =
@@ -141,6 +137,7 @@ let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (set
             | ArcFiles.DataMap _ -> true
             | _ -> false
         | PreviewActiveView.Metadata -> false
+        | PreviewActiveView.Error _ -> false
 
     let addRows () =
         let rowCount = clampRowsToAdd rowsToAdd
@@ -404,3 +401,8 @@ let CreateTableView activeView arcFileState setArcFileState =
                 prop.className "swt:p-4 swt:text-error"
                 prop.text "No DataMap available"
             ]
+    | PreviewActiveView.Error msg ->
+        Html.div [
+            prop.className "swt:p-4 swt:text-error"
+            prop.text $"The following error occured: {msg}"
+        ]

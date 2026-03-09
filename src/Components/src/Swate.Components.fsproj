@@ -79,6 +79,7 @@
     <Compile Include="ARCSelector\Selector.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
+    <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
     <Compile Include="FileExplorer\FileExplorerBreadcrumbs.fs" />
     <Compile Include="FileExplorer\FileExplorer.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
@@ -98,6 +99,8 @@
     <Compile Include="MarkdownText\Plugins\AddImage.fs" />
     <Compile Include="MarkdownText\Plugins\AddOntologyReference.fs" />
     <Compile Include="MarkdownText\Plugins\PluginRegistry.fs" />
+    <Compile Include="MarkdownText\Plugins\PluginTextInputHelpers.fs" />
+    <Compile Include="MarkdownText\Plugins\MarkdownPluginPromptModal.fs" />
     <Compile Include="MarkdownText\Preview.fs" />
     <Compile Include="MarkdownText\TextInputWithMarkdown.fs" />
     <Compile Include="Landing\Types.fs" />

@@ -11,25 +11,17 @@ let createFromLanding
     landingUiState
     setLandingUiState
     setLandingDraft
-    setShowLandingDraft
-    setLandingDraftActive
     appState
     setSelectedTreeItemPath
     setPreviewData
-    setPreviewError
-    setDidSelectFile
     (payload: SubmitPayload)
     =
-    let finishSuccess (previewData: PreviewData) =
+    let finishSuccess (previewData: PageState) =
         payload.ArcFile
         |> ARCHelper.tryGetArcFilePath appState
         |> setSelectedTreeItemPath
 
         setPreviewData (Some previewData)
-        setPreviewError None
-        setDidSelectFile true
-        setShowLandingDraft false
-        setLandingDraftActive false
         setLandingDraft LandingDraft.init
         setLandingUiState LandingUiState.init
 
@@ -43,7 +35,7 @@ let createFromLanding
         let! saveResult = Navbar.saveArcFileWithPreview payload.ArcFile
 
         match saveResult with
-        | Error message ->
+        | Result.Error message ->
             setLandingUiState {
                 landingUiState with
                     IsSubmitting = false
@@ -62,7 +54,7 @@ let createFromLanding
 
                 match writeResult with
                 | Ok() -> finishSuccess previewData
-                | Error exn ->
+                | Result.Error exn ->
                     setLandingUiState {
                         landingUiState with
                             IsSubmitting = false
@@ -72,30 +64,44 @@ let createFromLanding
     |> Promise.start
 
 [<ReactComponent>]
-let createARCPreview
+let CreateARCPreview
     (arcFile: ArcFiles)
     (setArcFileState: ArcFiles option -> unit)
     (activeView: PreviewActiveView)
     (setActiveView: PreviewActiveView -> unit)
-    didSelectFile
-    setDidSelectFile
     =
 
     let setArcFile arcFile = setArcFileState (Some arcFile)
 
+    let canRenderDataMapView =
+        match arcFile with
+        | ArcFiles.Assay assay -> assay.DataMap.IsSome
+        | ArcFiles.Study(study, _) -> study.DataMap.IsSome
+        | ArcFiles.Run run -> run.DataMap.IsSome
+        | ArcFiles.DataMap _ -> true
+        | _ -> false
+
     React.useEffect (
         (fun () ->
-            if didSelectFile then
-                setArcFile arcFile
-                let tables = arcFile.Tables()
-                setDidSelectFile false
+            let tables = arcFile.Tables()
 
-                if tables.Count > 0 then
-                    setActiveView (PreviewActiveView.Table 0)
-                else
-                    setActiveView PreviewActiveView.Metadata
+            let nextActiveView =
+                match activeView with
+                | PreviewActiveView.Table tableIndex when tableIndex >= 0 && tableIndex < tables.Count ->
+                    activeView
+                | PreviewActiveView.DataMap when canRenderDataMapView ->
+                    activeView
+                | PreviewActiveView.Metadata -> activeView
+                | _ ->
+                    if tables.Count > 0 then
+                        PreviewActiveView.Table 0
+                    else
+                        PreviewActiveView.Metadata
+
+            if nextActiveView <> activeView then
+                setActiveView nextActiveView
         ),
-        [| box arcFile |]
+        [| box arcFile; box activeView |]
     )
 
     Html.div [
@@ -110,61 +116,35 @@ let createARCPreview
         |]
     ]
 
-let computeARCContent
+let ComputeARCContent
     previewData
-    (previewError: string option)
     arcFileState
     setArcFileState
     activeView
     setActiveView
-    didSelectFile
     landingDraft
     setLandingDraft
     landingUiState
     setLandingUiState
-    landingDraftActive
-    setLandingDraftActive
-    showLandingDraft
-    setShowLandingDraft
     appState
     setSelectedTreeItemPath
     setPreviewData
-    setPreviewError
-    setDidSelectFile
     (path: string)
     =
-    if landingDraftActive && showLandingDraft then
-        Landing.Wizard(
-            landingDraft,
-            setLandingDraft,
-            landingUiState,
-            setLandingUiState,
-            createFromLanding
-                landingUiState
-                setLandingUiState
-                setLandingDraft
-                setShowLandingDraft
-                setLandingDraftActive
-                appState
-                setSelectedTreeItemPath
-                setPreviewData
-                setPreviewError
-                setDidSelectFile
-        )
-    else
+
         match previewData with
         | Some data ->
             match data with
-            | ArcFileData _ ->
+            | PageState.ArcFileData _ ->
                 match arcFileState with
                 | Some arcFile ->
-                    createARCPreview arcFile setArcFileState activeView setActiveView didSelectFile setDidSelectFile
+                    CreateARCPreview arcFile setArcFileState activeView setActiveView
                 | None ->
                     Html.div [
                         prop.className "swt:p-4 swt:text-error"
                         prop.text "Failed to parse ArcFile data"
                     ]
-            | Text content ->
+            | PageState.Text content ->
                 Html.div [
                     prop.className "swt:size-full swt:p-4 swt:overflow-auto swt:bg-base-100"
                     prop.children [|
@@ -174,14 +154,12 @@ let computeARCContent
                         ]
                     |]
                 ]
-            | Unknown ->
+            | PageState.Unknown ->
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center"
                     prop.children [| Html.h1 "Unknown file type" |]
                 ]
-        | None ->
-            match previewError with
-            | Some errMsg ->
+            | PageState.Error errMsg ->
                 Html.div [
                     prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:flex-col swt:gap-2"
                     prop.children [|
@@ -195,36 +173,41 @@ let computeARCContent
                         ]
                     |]
                 ]
-            | None ->
-                Html.h1 [
-                    prop.text path
-                    prop.className
-                        "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
-                ]
+            | PageState.LandingDraft ->
+                Landing.Wizard(
+                    landingDraft,
+                    setLandingDraft,
+                    landingUiState,
+                    setLandingUiState,
+                    createFromLanding
+                        landingUiState
+                        setLandingUiState
+                        setLandingDraft
+                        appState
+                        setSelectedTreeItemPath
+                        setPreviewData
+                )
+        | None ->
+            Html.h1 [
+                prop.text path
+                prop.className
+                    "swt:text-xl swt:uppercase swt:inline-block swt:text-transparent swt:bg-clip-text swt:bg-linear-to-r swt:from-primary swt:to-secondary"
+            ]
 
-let content
+[<ReactComponent>]
+let Content
     (
         appState: AppState,
         setArcFileState,
-        activeView,
-        setActiveView,
         arcFileState,
-        previewData,
-        setPreviewData,
-        previewError,
-        setPreviewError,
-        didSelectFile,
-        setDidSelectFile,
-        landingDraft,
-        setLandingDraft,
-        landingUiState,
-        setLandingUiState,
-        landingDraftActive,
-        setLandingDraftActive,
-        showLandingDraft,
-        setShowLandingDraft,
-        setSelectedTreeItemPath
+        pageState,
+        setPreviewData
     ) =
+
+    let landingCtx = React.useContext Renderer.context.LandingStateCtx.LandingStateCtx
+    let workspaceCtx = React.useContext Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx
+
+    let activeView, setActiveView = React.useState PreviewActiveView.Metadata
 
     match appState with
     | AppState.Init ->
@@ -246,32 +229,39 @@ let content
                     prop.children [
                         Html.div [
                             prop.className "swt:flex-none"
-                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile) ]
+                            prop.children [ MainElement.CreateARCitectNavbarList arcFileState (Navbar.onSaveClick arcFileState setPreviewData) ]
                         ]
                         Html.div [
                             prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                             prop.children [
-                                computeARCContent
-                                    previewData
-                                    (previewError: string option)
+                                ComputeARCContent
+                                    pageState
                                     arcFileState
                                     setArcFileState
                                     activeView
                                     setActiveView
-                                    didSelectFile
-                                    landingDraft
-                                    setLandingDraft
-                                    landingUiState
-                                    setLandingUiState
-                                    landingDraftActive
-                                    setLandingDraftActive
-                                    showLandingDraft
-                                    setShowLandingDraft
+                                    landingCtx.state.Draft
+                                    (fun draft ->
+                                        landingCtx.setState {
+                                            landingCtx.state with
+                                                Draft = draft
+                                        }
+                                    )
+                                    landingCtx.state.UiState
+                                    (fun uiState ->
+                                        landingCtx.setState {
+                                            landingCtx.state with
+                                                UiState = uiState
+                                        }
+                                    )
                                     appState
-                                    setSelectedTreeItemPath
+                                    (fun path ->
+                                        workspaceCtx.setState {
+                                            workspaceCtx.state with
+                                                SelectedTreeItemPath = path
+                                        }
+                                    )
                                     setPreviewData
-                                    setPreviewError
-                                    setDidSelectFile
                                     path
                             ]
                         ]

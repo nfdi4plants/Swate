@@ -17,7 +17,7 @@ type MarkdownPromptFile = {
 }
 
 // Host/runtime extension point for dialog picking and markdown path resolution.
-// When provided, "Choose file" uses the adapter, while built-in drag/drop input remains available.
+// When provided, file selection uses the adapter, while built-in drag/drop input remains available.
 type MarkdownFilePickerAdapter = {
     PickFiles: unit -> JS.Promise<MarkdownPromptFile list>
     ResolveMarkdownPath: MarkdownPromptFile -> JS.Promise<string>

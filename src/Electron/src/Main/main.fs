@@ -14,9 +14,8 @@ app
     .``then`` (fun () ->
         ARC_VAULTS.RegisterVault() |> ignore
 
-        Remoting.init |> Remoting.buildHandler IPC.IArcVaultsApi.api
         Remoting.init |> Remoting.buildHandler IPC.IGitApi.api
-        Remoting.init |> Remoting.buildHandler IPC.ISaveBeforeQuitApi.api
+        Remoting.init |> Remoting.buildHandler IPC.ArcVaultsApi.api
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then

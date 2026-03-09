@@ -503,9 +503,12 @@ type Layout =
 
         let btnActive, setBtnActive = React.useState false
 
+        let onClick (arcPointer: SelectorTypes.ARCPointer) =
+            console.log ($"Clicked on: {arcPointer.path}")
+
         Layout.Main(
             children = Layout.Wrapper "Main Content" "swt:bg-base-300 swt:h-full",
-            navbar = Selector.NavbarSelectorEntry(),
+            navbar = Selector.NavbarSelectorEntry(onClick),
             leftSidebar =
                 Html.ul [
                     prop.className "swt:menu swt:w-full swt:p-2 swt:rounded-box swt:h-full swt:flex-nowrap"

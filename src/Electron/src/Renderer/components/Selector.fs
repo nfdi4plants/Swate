@@ -4,7 +4,6 @@ open Fable.Core
 
 open Swate.Components
 open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
 
 
 ///Selector module
@@ -33,7 +32,10 @@ let openCurrentWindow =
 
 ///Selector module
 let openARC (appState: AppState) =
-    if appState.IsInit then openCurrentWindow else openNewWindow
+    if appState.IsInit then
+        openCurrentWindow
+    else
+        openNewWindow
 
 ///Selector module
 let onARCClick (clickedARC: SelectorTypes.ARCPointer) =
@@ -72,7 +74,7 @@ let actionbar (appState: AppState) onClick =
 ///Selector module
 let onOpenSelector (appState: AppState) setRecentARCs () =
     promise {
-        let! newARCs = Api.getRecentARCs ()
+        let! (newARCs: IPCTypes.FileItemDTO []) = Api.getRecentARCs ()
 
         match appState with
         | AppState.Init -> ()

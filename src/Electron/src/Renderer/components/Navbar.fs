@@ -4,10 +4,9 @@ open Fable.Core
 
 open ARCtrl
 open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
 
 
-let saveArcFileWithPreview (arcFile: ArcFiles) : JS.Promise<Result<PreviewData, string>> =
+let saveArcFileWithPreview (arcFile: ArcFiles) : JS.Promise<Result<IPCTypes.PageState, string>> =
     promise {
         match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
         | None ->
@@ -26,7 +25,7 @@ let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, string>> =
         return saveResult |> Result.map ignore
     }
 
-let onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile _ =
+let onSaveClick arcFileState setPreviewData _ =
     match arcFileState with
     | None -> ()
     | Some arcFile ->
@@ -36,9 +35,7 @@ let onSaveClick arcFileState setPreviewData setPreviewError setDidSelectFile _ =
             match result with
             | Ok updatedPreview ->
                 setPreviewData (Some updatedPreview)
-                setPreviewError None
-                setDidSelectFile true
             | Error errorMsg ->
-                setPreviewError (Some $"Save failed: {errorMsg}")
+                setPreviewData (Some (IPCTypes.PageState.Error $"Save failed: {errorMsg}"))
         }
         |> Promise.start
