@@ -49,14 +49,17 @@ type GitDiffSummaryDto = {
 type GitProgressCallback = GitInternals.GitProgressCallback
 
 let private disallowedRemotePrefixes = [| "file://"; "ext::"; "fd::" |]
+
 let private protocolOverridePattern =
     Regex("protocol\\.[^\\s=]+\\.(allow|deny)|(^|\\s)-c\\s+protocol\\.", RegexOptions.IgnoreCase)
+
 let private remoteNamePattern = Regex("^[A-Za-z0-9._/-]+$")
-let private invalidBranchCharactersPattern = Regex("[\\~\\^:\\?\\*\\[\\\\\\s]")
+let private invalidBranchCharactersPattern = Regex(@"[~^:?*\[\\\s]")
 
 let classifyFailureKind (message: string) =
     let containsAny (terms: string[]) =
-        terms |> Array.exists (fun term -> message.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+        terms
+        |> Array.exists (fun term -> message.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
 
     if containsAny [| "abort"; "cancelled"; "canceled"; "aborterror" |] then
         Canceled
@@ -75,15 +78,21 @@ let classifyFailureKind (message: string) =
         |]
     then
         Unauthorized
-    elif containsAny [| "network"; "could not resolve host"; "failed to connect"; "connection reset"; "connection refused"; "unable to access" |] then
+    elif
+        containsAny [|
+            "network"
+            "could not resolve host"
+            "failed to connect"
+            "connection reset"
+            "connection refused"
+            "unable to access"
+        |]
+    then
         Network
     else
         Unknown
 
-let private createFailure kind message : GitFailure = {
-    Kind = kind
-    Message = message
-}
+let private createFailure kind message : GitFailure = { Kind = kind; Message = message }
 
 let private toFailure (error: exn) : GitFailure =
     GitInternals.toFailure classifyFailureKind createFailure error
@@ -91,8 +100,7 @@ let private toFailure (error: exn) : GitFailure =
 let private errorResult (error: exn) : GitResult<'T> =
     GitInternals.errorResult classifyFailureKind createFailure error
 
-let private valueOrEmptyArray (items: 'T[]) =
-    if isNull items then [||] else items
+let private valueOrEmptyArray (items: 'T[]) = if isNull items then [||] else items
 
 let ensureValidBranchLikeName (label: string) (value: string) =
     let trimmed = value.Trim()
@@ -106,9 +114,17 @@ let ensureValidBranchLikeName (label: string) (value: string) =
         Error(exn $"{label} must not start with '-'.")
     elif trimmed.StartsWith("/") then
         Error(exn $"{label} must not start with '/'.")
-    elif trimmed.Split('/') |> Array.exists (fun segment -> segment.EndsWith(".lock", StringComparison.OrdinalIgnoreCase)) then
+    elif
+        trimmed.Split('/')
+        |> Array.exists (fun segment -> segment.EndsWith(".lock", StringComparison.OrdinalIgnoreCase))
+    then
         Error(exn $"{label} must not contain '.lock' path segments.")
-    elif trimmed.Contains("..") || trimmed.EndsWith(".") || trimmed.Contains("@{") || trimmed.EndsWith("/") then
+    elif
+        trimmed.Contains("..")
+        || trimmed.EndsWith(".")
+        || trimmed.Contains("@{")
+        || trimmed.EndsWith("/")
+    then
         Error(exn $"{label} contains invalid git ref segments.")
     elif invalidBranchCharactersPattern.IsMatch(trimmed) then
         Error(exn $"{label} contains invalid characters.")
@@ -124,7 +140,10 @@ let ensureValidPathspec (pathSpec: string) =
         Error(exn "Absolute pathspecs are not allowed.")
     elif Regex.IsMatch(normalized, "^[A-Za-z]:/") then
         Error(exn "Absolute pathspecs are not allowed.")
-    elif normalized.Split('/') |> Array.exists (fun segment -> segment = "." || segment = "..") then
+    elif
+        normalized.Split('/')
+        |> Array.exists (fun segment -> segment = "." || segment = "..")
+    then
         Error(exn "Pathspec must not contain traversal segments.")
     elif normalized.Contains("\000") then
         Error(exn "Pathspec contains invalid null characters.")
@@ -142,7 +161,8 @@ let validatePathspecs (pathSpecs: string[]) =
                 match state, next with
                 | Error e, _ -> Error e
                 | _, Error e -> Error e
-                | Ok acc, Ok value -> Ok(Array.append acc [| value |]))
+                | Ok acc, Ok value -> Ok(Array.append acc [| value |])
+            )
             (Ok [||])
 
 let validateRemoteName (remoteName: string) =
@@ -180,9 +200,7 @@ let ensureAllowedRemoteUrl (remoteUrl: string) =
 let private validateOptionalBranchName (branchName: string option) =
     match branchName with
     | None -> Ok None
-    | Some branchName ->
-        ensureValidBranchLikeName "Branch name" branchName
-        |> Result.map Some
+    | Some branchName -> ensureValidBranchLikeName "Branch name" branchName |> Result.map Some
 
 let private runSimpleGit (operation: ISimpleGit -> JS.Promise<'T>) (git: ISimpleGit) : JS.Promise<GitResult<'T>> =
     GitInternals.runSimpleGit toFailure operation git
@@ -205,16 +223,13 @@ let private createAuthenticatedGit
                 probeGit
 
         match remoteResult with
-        | Error failure ->
-            return Error failure
+        | Error failure -> return Error failure
         | Ok remoteUrl ->
             match ensureAllowedRemoteUrl remoteUrl with
-            | Error validationError ->
-                return errorResult validationError
+            | Error validationError -> return errorResult validationError
             | Ok allowedRemoteUrl ->
                 match tryExtractHostFromRemoteUrl allowedRemoteUrl with
-                | Error hostError ->
-                    return errorResult hostError
+                | Error hostError -> return errorResult hostError
                 | Ok host ->
                     let! tokenOption = tryGetAccessToken host
 
@@ -234,29 +249,25 @@ let private createAuthenticatedGit
                             }
     }
 
-let private ensureRepo (git: ISimpleGit) =
-    promise {
-        let! isRepo = git.checkIsRepo()
+let private ensureRepo (git: ISimpleGit) = promise {
+    let! isRepo = git.checkIsRepo ()
 
-        if isRepo then
-            return Ok ()
-        else
-            return Error(exn "The selected ARC path is not a git repository.")
-    }
+    if isRepo then
+        return Ok()
+    else
+        return Error(exn "The selected ARC path is not a git repository.")
+}
 
-let private withLocalGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<'T>) : JS.Promise<GitResult<'T>> =
-    promise {
-        let options = createOptions arcPath standardTimeout None
-        let git = createGit options
+let private withLocalGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<'T>) : JS.Promise<GitResult<'T>> = promise {
+    let options = createOptions arcPath standardTimeout None
+    let git = createGit options
 
-        let! repoCheckResult = ensureRepo git
+    let! repoCheckResult = ensureRepo git
 
-        match repoCheckResult with
-        | Error repoError ->
-            return errorResult repoError
-        | Ok () ->
-            return! runSimpleGit operation git
-    }
+    match repoCheckResult with
+    | Error repoError -> return errorResult repoError
+    | Ok() -> return! runSimpleGit operation git
+}
 
 let private withAuthenticatedGit
     (arcPath: string)
@@ -268,45 +279,47 @@ let private withAuthenticatedGit
         let! gitResult = createAuthenticatedGit arcPath remoteName progressCallback
 
         match gitResult with
-        | Error failure ->
-            return Error failure
-        | Ok git ->
-            return! runSimpleGit operation git
+        | Error failure -> return Error failure
+        | Ok git -> return! runSimpleGit operation git
     }
 
 let getStatus (arcPath: string) : JS.Promise<GitResult<GitStatusDto>> =
-    withLocalGit arcPath (fun git -> promise {
-        let! status = git.status()
+    withLocalGit
+        arcPath
+        (fun git -> promise {
+            let! status = git.status ()
 
-        let fileStatuses =
-            valueOrEmptyArray status.files
-            |> Array.map (fun fileStatus -> {
-                Path = fileStatus.path
-                Index = fileStatus.index
-                WorkingDir = fileStatus.working_dir
-                OriginalPath = fileStatus.``from``
-            })
+            let fileStatuses =
+                valueOrEmptyArray status.files
+                |> Array.map (fun fileStatus -> {
+                    Path = fileStatus.path
+                    Index = fileStatus.index
+                    WorkingDir = fileStatus.working_dir
+                    OriginalPath = fileStatus.``from``
+                })
 
-        return {
-            Current = status.current
-            Tracking = status.tracking
-            Ahead = status.ahead
-            Behind = status.behind
-            IsClean = status.isClean ()
-            Files = fileStatuses
-        }
-    })
+            return {
+                Current = status.current
+                Tracking = status.tracking
+                Ahead = status.ahead
+                Behind = status.behind
+                IsClean = status.isClean ()
+                Files = fileStatuses
+            }
+        })
 
 let getDiffSummary (arcPath: string) : JS.Promise<GitResult<GitDiffSummaryDto>> =
-    withLocalGit arcPath (fun git -> promise {
-        let! diff = git.diffSummary()
+    withLocalGit
+        arcPath
+        (fun git -> promise {
+            let! diff = git.diffSummary ()
 
-        return {
-            Changed = diff.changed
-            Insertions = diff.insertions
-            Deletions = diff.deletions
-        }
-    })
+            return {
+                Changed = diff.changed
+                Insertions = diff.insertions
+                Deletions = diff.deletions
+            }
+        })
 
 let fetch
     (arcPath: string)
@@ -319,19 +332,22 @@ let fetch
         | Error remoteError -> return errorResult remoteError
         | Ok safeRemoteName ->
             match validateOptionalBranchName branchName with
-            | Error branchError ->
-                return errorResult branchError
+            | Error branchError -> return errorResult branchError
             | Ok safeBranchName ->
                 let! result =
-                    withAuthenticatedGit arcPath safeRemoteName progressCallback (fun git -> promise {
-                        match safeBranchName with
-                        | None ->
-                            let! _ = git.fetch(safeRemoteName)
-                            return ()
-                        | Some safeBranch ->
-                            let! _ = git.fetch(safeRemoteName, safeBranch)
-                            return ()
-                    })
+                    withAuthenticatedGit
+                        arcPath
+                        safeRemoteName
+                        progressCallback
+                        (fun git -> promise {
+                            match safeBranchName with
+                            | None ->
+                                let! _ = git.fetch (safeRemoteName)
+                                return ()
+                            | Some safeBranch ->
+                                let! _ = git.fetch (safeRemoteName, safeBranch)
+                                return ()
+                        })
 
                 return result
     }
@@ -347,19 +363,22 @@ let pull
         | Error remoteError -> return errorResult remoteError
         | Ok safeRemoteName ->
             match validateOptionalBranchName branchName with
-            | Error branchError ->
-                return errorResult branchError
+            | Error branchError -> return errorResult branchError
             | Ok safeBranchName ->
                 let! result =
-                    withAuthenticatedGit arcPath safeRemoteName progressCallback (fun git -> promise {
-                        match safeBranchName with
-                        | None ->
-                            let! _ = git.pull(safeRemoteName)
-                            return ()
-                        | Some safeBranch ->
-                            let! _ = git.pull(safeRemoteName, safeBranch)
-                            return ()
-                    })
+                    withAuthenticatedGit
+                        arcPath
+                        safeRemoteName
+                        progressCallback
+                        (fun git -> promise {
+                            match safeBranchName with
+                            | None ->
+                                let! _ = git.pull (safeRemoteName)
+                                return ()
+                            | Some safeBranch ->
+                                let! _ = git.pull (safeRemoteName, safeBranch)
+                                return ()
+                        })
 
                 return result
     }
@@ -375,63 +394,65 @@ let push
         | Error remoteError -> return errorResult remoteError
         | Ok safeRemoteName ->
             match validateOptionalBranchName branchName with
-            | Error branchError ->
-                return errorResult branchError
+            | Error branchError -> return errorResult branchError
             | Ok safeBranchName ->
                 let! result =
-                    withAuthenticatedGit arcPath safeRemoteName progressCallback (fun git -> promise {
-                        match safeBranchName with
-                        | None ->
-                            let! _ = git.push(safeRemoteName, "HEAD")
-                            return ()
-                        | Some safeBranch ->
-                            let! _ = git.push(safeRemoteName, safeBranch)
-                            return ()
-                    })
+                    withAuthenticatedGit
+                        arcPath
+                        safeRemoteName
+                        progressCallback
+                        (fun git -> promise {
+                            match safeBranchName with
+                            | None ->
+                                let! _ = git.push (safeRemoteName, "HEAD")
+                                return ()
+                            | Some safeBranch ->
+                                let! _ = git.push (safeRemoteName, safeBranch)
+                                return ()
+                        })
 
                 return result
     }
 
-let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> =
-    promise {
-        match validatePathspecs pathSpecs with
-        | Error validationError -> return errorResult validationError
-        | Ok safePathSpecs ->
-            return!
-                withLocalGit arcPath (fun git -> promise {
+let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
+    match validatePathspecs pathSpecs with
+    | Error validationError -> return errorResult validationError
+    | Ok safePathSpecs ->
+        return!
+            withLocalGit
+                arcPath
+                (fun git -> promise {
                     let! _ = git.add safePathSpecs
                     return ()
                 })
-    }
+}
 
-let unstagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> =
-    promise {
-        match validatePathspecs pathSpecs with
-        | Error validationError -> return errorResult validationError
-        | Ok safePathSpecs ->
-            return!
-                withLocalGit arcPath (fun git -> promise {
-                    let resetOptions =
-                        [|
-                            yield "--"
-                            yield! safePathSpecs
-                        |]
+let unstagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
+    match validatePathspecs pathSpecs with
+    | Error validationError -> return errorResult validationError
+    | Ok safePathSpecs ->
+        return!
+            withLocalGit
+                arcPath
+                (fun git -> promise {
+                    let resetOptions = [| yield "--"; yield! safePathSpecs |]
 
-                    let! _ = git.reset("mixed", !^resetOptions)
+                    let! _ = git.reset ("mixed", !^resetOptions)
                     return ()
                 })
-    }
+}
 
-let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> =
-    promise {
-        let normalizedMessage = message.Trim()
+let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> = promise {
+    let normalizedMessage = message.Trim()
 
-        if String.IsNullOrWhiteSpace normalizedMessage then
-            return errorResult (exn "Commit message must not be empty.")
-        else
-            return!
-                withLocalGit arcPath (fun git -> promise {
-                    let! result = git.commit(normalizedMessage)
+    if String.IsNullOrWhiteSpace normalizedMessage then
+        return errorResult (exn "Commit message must not be empty.")
+    else
+        return!
+            withLocalGit
+                arcPath
+                (fun git -> promise {
+                    let! result = git.commit (normalizedMessage)
 
                     return
                         if String.IsNullOrWhiteSpace result.commit then
@@ -439,52 +460,55 @@ let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> =
                         else
                             result.commit
                 })
-    }
+}
 
-let createBranch (arcPath: string) (branchName: string) (startPoint: string option) : JS.Promise<GitResult<unit>> =
-    promise {
-        match ensureValidBranchLikeName "Branch name" branchName with
-        | Error branchError ->
-            return errorResult branchError
-        | Ok safeBranchName ->
-            match startPoint with
-            | None ->
-                return!
-                    withLocalGit arcPath (fun git -> promise {
-                        let! _ = git.checkoutLocalBranch(safeBranchName)
+let createBranch (arcPath: string) (branchName: string) (startPoint: string option) : JS.Promise<GitResult<unit>> = promise {
+    match ensureValidBranchLikeName "Branch name" branchName with
+    | Error branchError -> return errorResult branchError
+    | Ok safeBranchName ->
+        match startPoint with
+        | None ->
+            return!
+                withLocalGit
+                    arcPath
+                    (fun git -> promise {
+                        let! _ = git.checkoutLocalBranch (safeBranchName)
                         return ()
                     })
-            | Some value ->
-                match ensureValidBranchLikeName "Start point" value with
-                | Error startPointError ->
-                    return errorResult startPointError
-                | Ok safeStartPoint ->
-                    return!
-                        withLocalGit arcPath (fun git -> promise {
-                            let! _ = git.checkoutBranch(safeBranchName, safeStartPoint)
+        | Some value ->
+            match ensureValidBranchLikeName "Start point" value with
+            | Error startPointError -> return errorResult startPointError
+            | Ok safeStartPoint ->
+                return!
+                    withLocalGit
+                        arcPath
+                        (fun git -> promise {
+                            let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
                             return ()
                         })
-    }
+}
 
-let checkoutBranch (arcPath: string) (branchName: string) : JS.Promise<GitResult<unit>> =
-    promise {
-        match ensureValidBranchLikeName "Branch name" branchName with
-        | Error branchError ->
-            return errorResult branchError
-        | Ok safeBranchName ->
-            return!
-                withLocalGit arcPath (fun git -> promise {
-                    let! localBranches = git.branchLocal()
+let checkoutBranch (arcPath: string) (branchName: string) : JS.Promise<GitResult<unit>> = promise {
+    match ensureValidBranchLikeName "Branch name" branchName with
+    | Error branchError -> return errorResult branchError
+    | Ok safeBranchName ->
+        return!
+            withLocalGit
+                arcPath
+                (fun git -> promise {
+                    let! localBranches = git.branchLocal ()
                     let branches = valueOrEmptyArray localBranches.all
 
                     let exists =
                         branches
-                        |> Array.exists (fun existing -> String.Equals(existing, safeBranchName, StringComparison.Ordinal))
+                        |> Array.exists (fun existing ->
+                            String.Equals(existing, safeBranchName, StringComparison.Ordinal)
+                        )
 
                     if not exists then
                         return raise (exn $"Branch '{safeBranchName}' does not exist in the local repository.")
 
-                    let! _ = git.checkout(safeBranchName)
+                    let! _ = git.checkout (safeBranchName)
                     return ()
                 })
-    }
+}

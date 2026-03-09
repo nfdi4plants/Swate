@@ -8,8 +8,11 @@ open Main.Bindings.SimpleGit
 
 type GitFactory = SimpleGitOptions -> ISimpleGit
 
-let private redactPattern = Regex("(Authorization:\\s*Bearer\\s+)[^\\s'\\\"]+", RegexOptions.IgnoreCase)
-let private credentialUrlPattern = Regex("(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)", RegexOptions.IgnoreCase)
+let private redactPattern =
+    Regex(@"(Authorization:\s*Bearer\s+)[^\s'""]+", RegexOptions.IgnoreCase)
+
+let private credentialUrlPattern =
+    Regex("(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)", RegexOptions.IgnoreCase)
 
 let private baseConfigEntries (options: SimpleGitOptions) =
     options.config |> Option.defaultValue [||]
@@ -28,21 +31,21 @@ let createNonInteractiveEnv () : obj =
     // Keep all existing environment variables and disable git interactive prompts.
     emitJsExpr () "{ ...process.env, GIT_TERMINAL_PROMPT: '0' }"
 
-let applyNonInteractiveEnv (git: ISimpleGit) =
-    git.env (createNonInteractiveEnv ())
+let applyNonInteractiveEnv (git: ISimpleGit) = git.env (createNonInteractiveEnv ())
 
-let buildAuthArgs (_host: string) (token: string) : string[] =
-    [| "-c"; $"http.extraHeader=Authorization: Bearer {token}" |]
+let buildAuthArgs (_host: string) (token: string) : string[] = [|
+    "-c"
+    $"http.extraHeader=Authorization: Bearer {token}"
+|]
 
 let applyAuth (gitFactory: GitFactory) (baseOptions: SimpleGitOptions) (host: string) (token: string) : ISimpleGit =
     let authArgs = buildAuthArgs host token
     let authConfig = toConfigEntries authArgs
 
-    let mergedConfig =
-        [|
-            yield! baseConfigEntries baseOptions
-            yield! authConfig
-        |]
+    let mergedConfig = [|
+        yield! baseConfigEntries baseOptions
+        yield! authConfig
+    |]
 
     let scopedOptions: SimpleGitOptions =
         emitJsExpr (baseOptions, mergedConfig) "{ ...$0, config: $1 }"
@@ -57,5 +60,4 @@ let redactToken (text: string) : string =
         |> fun t -> redactPattern.Replace(t, "$1[REDACTED]")
         |> fun t -> credentialUrlPattern.Replace(t, "$1[REDACTED]@")
 
-let redactArgs (args: string[]) : string[] =
-    args |> Array.map redactToken
+let redactArgs (args: string[]) : string[] = args |> Array.map redactToken
