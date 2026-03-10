@@ -127,6 +127,8 @@ let Main
     ) =
 
     let state, setState = React.useState (Model.BuildingBlock.Model.init ())
+    let ctx =
+        React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
 
     match arcFileState, activeTableIndex with
     | None, _ -> disabledState "Open an ARC first."
@@ -139,9 +141,6 @@ let Main
         else
             let spreadsheetModel =
                 Spreadsheet.Model.init (arcFile, Spreadsheet.ActiveView.Table tableIndex)
-
-            let ctx =
-                React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
 
             let selectedColumnIndex =
                 ctx.state

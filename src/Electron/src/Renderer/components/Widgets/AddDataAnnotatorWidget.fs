@@ -101,6 +101,123 @@ let private inferDisabledMessage (arcFileState: ArcFiles option) (activeView: Ho
                 Some "No DataMap available for this ARC file."
 
 [<ReactComponent>]
+let Table parsedFile (selectedTargets: Set<DataTarget>) columnCount toggleTarget =
+    Html.table [
+        prop.className "swt:table swt:table-xs swt:table-pin-rows"
+        prop.children [
+            Html.thead [
+                Html.tr [
+                    Html.th [
+                        prop.className "swt:w-24"
+                        prop.text "#"
+                    ]
+                    for ci in 0 .. columnCount - 1 do
+                        let target = DataTarget.Column ci
+                        let isSelected = selectedTargets.Contains target
+
+                        let label =
+                            parsedFile.HeaderRow
+                            |> Option.bind (fun row -> row |> Array.tryItem ci)
+                            |> Option.defaultValue $"C{ci + 1}"
+
+                        Html.th [
+                            prop.key (target.ToReactKey())
+                            prop.className [
+                                "swt:cursor-pointer swt:max-w-48 swt:truncate"
+                                if isSelected then
+                                    "swt:bg-primary swt:text-primary-content"
+                            ]
+                            prop.title "Toggle entire column selector"
+                            prop.onClick (fun _ -> toggleTarget target)
+                            prop.text label
+                        ]
+                ]
+            ]
+            Html.tbody [
+                for ri in 0 .. parsedFile.BodyRows.Length - 1 do
+                    let row = parsedFile.BodyRows.[ri]
+                    let rowTarget = DataTarget.Row ri
+                    let isRowSelected = selectedTargets.Contains rowTarget
+
+                    Html.tr [
+                        prop.key (rowTarget.ToReactKey())
+                        prop.children [
+                            Html.th [
+                                prop.className [
+                                    "swt:cursor-pointer swt:font-mono"
+                                    if isRowSelected then
+                                        "swt:bg-primary swt:text-primary-content"
+                                ]
+                                prop.title "Toggle entire row selector"
+                                prop.onClick (fun _ -> toggleTarget rowTarget)
+                                prop.text (string (ri + 1))
+                            ]
+                            for ci in 0 .. columnCount - 1 do
+                                let cellTarget = DataTarget.Cell(ci, ri)
+                                let isDirectSelection = selectedTargets.Contains cellTarget
+
+                                let isInheritedSelection =
+                                    selectedTargets.Contains(DataTarget.Column ci)
+                                    || selectedTargets.Contains(DataTarget.Row ri)
+
+                                let isSelected = isDirectSelection || isInheritedSelection
+
+                                let value =
+                                    if ci < row.Length then row.[ci] else ""
+
+                                Html.td [
+                                    prop.key (cellTarget.ToReactKey())
+                                    prop.className [
+                                        "swt:cursor-pointer swt:max-w-64 swt:truncate"
+                                        if isSelected then
+                                            "swt:bg-primary/70 swt:text-primary-content"
+                                    ]
+                                    prop.title "Toggle cell selector"
+                                    prop.onClick (fun _ -> toggleTarget cellTarget)
+                                    prop.text (
+                                        if String.IsNullOrWhiteSpace value then
+                                            " "
+                                        else
+                                            value
+                                    )
+                                ]
+                        ]
+                    ]
+            ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private FileControllerElements pickFile loading selectedPath (dataFile: DataFile option) reset =
+    Html.div [
+        prop.className "swt:flex swt:flex-wrap swt:gap-2"
+        prop.children [
+            Html.button [
+                prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                prop.disabled loading
+                prop.text "Choose File"
+                prop.onClick (fun _ -> pickFile () |> Promise.start)
+            ]
+            Html.input [
+                prop.className "swt:input swt:input-sm swt:grow"
+                prop.readOnly true
+                prop.placeholder "No file selected"
+                prop.value (
+                    selectedPath
+                    |> Option.map fileNameFromPath
+                    |> Option.defaultValue ""
+                )
+            ]
+            Html.button [
+                prop.className "swt:btn swt:btn-outline swt:btn-sm"
+                prop.disabled dataFile.IsNone
+                prop.text "Reset"
+                prop.onClick (fun _ -> reset ())
+            ]
+        ]
+    ]
+
+[<ReactComponent>]
 let Main
     (
         arcFileState: ArcFiles option,
@@ -313,90 +430,7 @@ let Main
                             prop.text "Parsed file contains no data rows."
                         ]
                     else
-                        Html.table [
-                            prop.className "swt:table swt:table-xs swt:table-pin-rows"
-                            prop.children [
-                                Html.thead [
-                                    Html.tr [
-                                        Html.th [
-                                            prop.className "swt:w-24"
-                                            prop.text "#"
-                                        ]
-                                        for ci in 0 .. columnCount - 1 do
-                                            let target = DataTarget.Column ci
-                                            let isSelected = selectedTargets.Contains target
-
-                                            let label =
-                                                parsedFile.HeaderRow
-                                                |> Option.bind (fun row -> row |> Array.tryItem ci)
-                                                |> Option.defaultValue $"C{ci + 1}"
-
-                                            Html.th [
-                                                prop.key (target.ToReactKey())
-                                                prop.className [
-                                                    "swt:cursor-pointer swt:max-w-48 swt:truncate"
-                                                    if isSelected then
-                                                        "swt:bg-primary swt:text-primary-content"
-                                                ]
-                                                prop.title "Toggle entire column selector"
-                                                prop.onClick (fun _ -> toggleTarget target)
-                                                prop.text label
-                                            ]
-                                    ]
-                                ]
-                                Html.tbody [
-                                    for ri in 0 .. parsedFile.BodyRows.Length - 1 do
-                                        let row = parsedFile.BodyRows.[ri]
-                                        let rowTarget = DataTarget.Row ri
-                                        let isRowSelected = selectedTargets.Contains rowTarget
-
-                                        Html.tr [
-                                            prop.key (rowTarget.ToReactKey())
-                                            prop.children [
-                                                Html.th [
-                                                    prop.className [
-                                                        "swt:cursor-pointer swt:font-mono"
-                                                        if isRowSelected then
-                                                            "swt:bg-primary swt:text-primary-content"
-                                                    ]
-                                                    prop.title "Toggle entire row selector"
-                                                    prop.onClick (fun _ -> toggleTarget rowTarget)
-                                                    prop.text (string (ri + 1))
-                                                ]
-                                                for ci in 0 .. columnCount - 1 do
-                                                    let cellTarget = DataTarget.Cell(ci, ri)
-                                                    let isDirectSelection = selectedTargets.Contains cellTarget
-
-                                                    let isInheritedSelection =
-                                                        selectedTargets.Contains(DataTarget.Column ci)
-                                                        || selectedTargets.Contains(DataTarget.Row ri)
-
-                                                    let isSelected = isDirectSelection || isInheritedSelection
-
-                                                    let value =
-                                                        if ci < row.Length then row.[ci] else ""
-
-                                                    Html.td [
-                                                        prop.key (cellTarget.ToReactKey())
-                                                        prop.className [
-                                                            "swt:cursor-pointer swt:max-w-64 swt:truncate"
-                                                            if isSelected then
-                                                                "swt:bg-primary/70 swt:text-primary-content"
-                                                        ]
-                                                        prop.title "Toggle cell selector"
-                                                        prop.onClick (fun _ -> toggleTarget cellTarget)
-                                                        prop.text (
-                                                            if String.IsNullOrWhiteSpace value then
-                                                                " "
-                                                            else
-                                                                value
-                                                        )
-                                                    ]
-                                            ]
-                                        ]
-                                ]
-                            ]
-                        ]
+                        Table parsedFile selectedTargets columnCount toggleTarget
                 ]
             ]
 
@@ -434,33 +468,7 @@ let Main
                         ]
                     ]
                 ]
-                Html.div [
-                    prop.className "swt:flex swt:flex-wrap swt:gap-2"
-                    prop.children [
-                        Html.button [
-                            prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                            prop.disabled loading
-                            prop.text "Choose File"
-                            prop.onClick (fun _ -> pickFile () |> Promise.start)
-                        ]
-                        Html.input [
-                            prop.className "swt:input swt:input-sm swt:grow"
-                            prop.readOnly true
-                            prop.placeholder "No file selected"
-                            prop.value (
-                                selectedPath
-                                |> Option.map fileNameFromPath
-                                |> Option.defaultValue ""
-                            )
-                        ]
-                        Html.button [
-                            prop.className "swt:btn swt:btn-outline swt:btn-sm"
-                            prop.disabled dataFile.IsNone
-                            prop.text "Reset"
-                            prop.onClick (fun _ -> reset ())
-                        ]
-                    ]
-                ]
+                FileControllerElements pickFile loading selectedPath dataFile reset
                 if dataFile.IsSome then
                     Html.div [
                         prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:items-center"

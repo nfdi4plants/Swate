@@ -1,10 +1,8 @@
 module Renderer.components.Widgets.AddFilePickerWidget
 
 open Feliz
-open Fable.Core
 open ARCtrl
 open Swate.Components
-open Swate.Electron.Shared
 
 let private widgetContainerClass =
     "swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:min-w-80 swt:max-w-[95vw]"
@@ -33,6 +31,83 @@ let private disabledState (message: string) =
             Html.span [
                 prop.className "swt:text-xs swt:opacity-70"
                 prop.text message
+            ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private Table (pathEntries:seq<int * string>) movePath removePath =
+    Html.table [
+        prop.className "swt:table swt:table-sm swt:table-zebra swt:table-fixed swt:min-w-full"
+        prop.children [
+            Html.tbody [
+                for id, path in pathEntries do
+                    Html.tr [
+                        prop.key $"{id}_{path}"
+                        prop.children [
+                            Html.td [
+                                prop.className "swt:w-12 swt:font-mono"
+                                prop.text id
+                            ]
+                            Html.td [
+                                prop.className "swt:max-w-[28rem] swt:truncate"
+                                prop.title path
+                                prop.text path
+                            ]
+                            Html.td [
+                                prop.className "swt:w-28"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:join"
+                                        prop.children [
+                                            Html.button [
+                                                prop.className "swt:btn swt:btn-xs swt:join-item"
+                                                prop.onClick (fun _ -> movePath id path -1.5)
+                                                prop.children [ Icons.ArrowUp() ]
+                                            ]
+                                            Html.button [
+                                                prop.className "swt:btn swt:btn-xs swt:join-item"
+                                                prop.onClick (fun _ -> movePath id path 1.5)
+                                                prop.children [ Icons.ArrowDown() ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                            Html.td [
+                                prop.className "swt:w-20 swt:text-right"
+                                prop.children [
+                                    Html.button [
+                                        prop.className "swt:btn swt:btn-xs swt:btn-error swt:btn-outline"
+                                        prop.onClick (fun _ -> removePath (id, path))
+                                        prop.children [ Icons.Delete() ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+    ]
+
+[<ReactComponent>]
+let FilePickerButtons clearPaths insertPaths canInsert (widgetCtx:WidgetContext.WidgetControllerContext) =
+    Html.div [
+        prop.className "swt:flex swt:gap-2"
+        prop.children [
+            Html.button [
+                prop.className "swt:btn swt:btn-outline"
+                prop.text "Cancel"
+                prop.onClick (fun _ ->
+                    clearPaths ()
+                    widgetCtx.closeWidget WidgetType.FilePicker
+                )
+            ]
+            Html.button [
+                prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                prop.disabled (not canInsert)
+                prop.text "Insert file names"
+                prop.onClick (fun _ -> insertPaths ())
             ]
         ]
     ]
@@ -261,79 +336,10 @@ let Main
                             prop.className
                                 "swt:overflow-y-auto swt:overflow-x-auto swt:max-h-[45vh] swt:border swt:border-base-300 swt:rounded-box"
                             prop.children [
-                                Html.table [
-                                    prop.className "swt:table swt:table-sm swt:table-zebra swt:table-fixed swt:min-w-full"
-                                    prop.children [
-                                        Html.tbody [
-                                            for id, path in pathEntries do
-                                                Html.tr [
-                                                    prop.key $"{id}_{path}"
-                                                    prop.children [
-                                                        Html.td [
-                                                            prop.className "swt:w-12 swt:font-mono"
-                                                            prop.text id
-                                                        ]
-                                                        Html.td [
-                                                            prop.className "swt:max-w-[28rem] swt:truncate"
-                                                            prop.title path
-                                                            prop.text path
-                                                        ]
-                                                        Html.td [
-                                                            prop.className "swt:w-28"
-                                                            prop.children [
-                                                                Html.div [
-                                                                    prop.className "swt:join"
-                                                                    prop.children [
-                                                                        Html.button [
-                                                                            prop.className "swt:btn swt:btn-xs swt:join-item"
-                                                                            prop.onClick (fun _ -> movePath id path -1.5)
-                                                                            prop.children [ Icons.ArrowUp() ]
-                                                                        ]
-                                                                        Html.button [
-                                                                            prop.className "swt:btn swt:btn-xs swt:join-item"
-                                                                            prop.onClick (fun _ -> movePath id path 1.5)
-                                                                            prop.children [ Icons.ArrowDown() ]
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                        ]
-                                                        Html.td [
-                                                            prop.className "swt:w-20 swt:text-right"
-                                                            prop.children [
-                                                                Html.button [
-                                                                    prop.className "swt:btn swt:btn-xs swt:btn-error swt:btn-outline"
-                                                                    prop.onClick (fun _ -> removePath (id, path))
-                                                                    prop.children [ Icons.Delete() ]
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ]
-                                        ]
-                                    ]
-                                ]
+                                Table pathEntries movePath removePath
                             ]
                         ]
                     ]
-                Html.div [
-                    prop.className "swt:flex swt:gap-2"
-                    prop.children [
-                        Html.button [
-                            prop.className "swt:btn swt:btn-outline"
-                            prop.text "Cancel"
-                            prop.onClick (fun _ ->
-                                clearPaths ()
-                                widgetCtx.closeWidget WidgetType.FilePicker
-                            )
-                        ]
-                        Html.button [
-                            prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                            prop.disabled (not canInsert)
-                            prop.text "Insert file names"
-                            prop.onClick (fun _ -> insertPaths ())
-                        ]
-                    ]
-                ]
+                FilePickerButtons clearPaths insertPaths canInsert widgetCtx
             ]
         ]

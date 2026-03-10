@@ -31,7 +31,11 @@ let Main () =
     let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
 
     let landingState, setLandingState = React.useState (Renderer.context.LandingStateCtx.LandingState.init ())
-    let workspaceState, setWorkspaceState = React.useState (Renderer.context.WorkspaceStateCtx.WorkspaceState.init ())
+    let workspaceState, setWorkspaceStateWithUpdater =
+        React.useStateWithUpdater (Renderer.context.WorkspaceStateCtx.WorkspaceState.init ())
+
+    let setWorkspaceState (nextState: Renderer.context.WorkspaceStateCtx.WorkspaceState) =
+        setWorkspaceStateWithUpdater (fun _ -> nextState)
 
     let syncArcTimeoutRef = React.useRef<int option> None
     let lastSyncedRequestKeyRef = React.useRef<(string * ArcFilesDiscriminate * string) option> None
@@ -67,16 +71,16 @@ let Main () =
         )
 
     let setSelectedTreeItemPath (path: string option) =
-        workspaceCtx.setState {
-            workspaceCtx.state with
+        setWorkspaceStateWithUpdater (fun state -> {
+            state with
                 SelectedTreeItemPath = path
-        }
+        })
 
     let setRecentARCs (arcs: SelectorTypes.ARCPointer []) =
-        workspaceCtx.setState {
-            workspaceCtx.state with
+        setWorkspaceStateWithUpdater (fun state -> {
+            state with
                 RecentARCs = arcs
-        }
+        })
 
     let setFileTree (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>) =
         let immutableFileTree =
@@ -85,10 +89,10 @@ let Main () =
             |> Array.sortBy (fun entry -> entry.path)
             |> Array.toList
 
-        workspaceCtx.setState {
-            workspaceCtx.state with
+        setWorkspaceStateWithUpdater (fun state -> {
+            state with
                 FileTree = immutableFileTree
-        }
+        })
 
     React.useEffect (
         (fun () ->
