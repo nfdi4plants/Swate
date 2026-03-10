@@ -57,7 +57,7 @@ type Selector =
                                 match rmvRecentArc with
                                 | Some rmvRecentArc ->
 
-                                    Html.div [
+                                    Html.button [
                                         prop.className [
                                             "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs"
                                             "swt:hover:btn-error"

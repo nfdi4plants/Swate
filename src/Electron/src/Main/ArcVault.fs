@@ -407,7 +407,6 @@ type ArcVaults() =
         window.onClosed (fun () ->
             vault.isCloseRequestPending <- false
             vault.isCloseApproved <- false
-            RECENT_ARCS.Inactivate(vault.path.Value) |> ignore
             this.DisposeVault(id)
         )
 

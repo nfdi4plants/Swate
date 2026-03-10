@@ -5,8 +5,7 @@ open ARCtrl.Json
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.FileIOTypes
 
-// TODO: This file contains Renderer logic and should not be placed in shared project, you can easily verify this by checking that all functions here are only used in Renderer!
-
+/// TODO: This type contains Renderer logic and should not be placed in shared project.
 [<RequireQualifiedAccess>]
 type AppState =
     | Init

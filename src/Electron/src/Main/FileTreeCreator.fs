@@ -5,7 +5,6 @@ open Swate.Electron.Shared
 open System.Collections.Generic
 open Fable.Core.JsInterop
 open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOTypes
 
 let fs: obj = importAll "fs"
 let pathMod: obj = importAll "path"

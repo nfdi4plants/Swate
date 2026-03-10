@@ -182,9 +182,6 @@ let api: IPCTypes.IArcVaultsApi = {
         }
     createARC =
         fun (event: IpcMainEvent) (identifier: string) -> promise {
-            printfn "EVENT: %A" event
-            printfn "IDENTIFIER: %s" identifier
-
             let! r =
                 dialog.showOpenDialog (
                     properties = [|

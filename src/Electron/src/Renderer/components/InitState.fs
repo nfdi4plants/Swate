@@ -18,7 +18,6 @@ module private InitStateHelper =
 
     let createARC =
         fun identifier -> promise {
-            printfn "Creating ARC with identifier: %s" identifier
             let! r = Api.ipcArcVaultApi.createARC (unbox null) identifier
 
             match r with
