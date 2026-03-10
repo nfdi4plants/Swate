@@ -49,7 +49,7 @@ type Selector =
                             prop.title arcPointer.path
                         ]
                         Html.div [
-                            prop.className "swt:ml-auto swt:flex"
+                            prop.className "swt:ml-auto swt:flex swt:items-center"
                             prop.children [
                                 Html.div [
                                     prop.className "swt:divider swt:divider-horizontal swt:mx-0!"
@@ -73,13 +73,14 @@ type Selector =
                                         ]
                                     ]
                                 | None -> Html.none
-                                match isCurrentlyOpenArcPath with
-                                | Some true ->
-                                    Html.i [
-                                        prop.className
-                                            "swt:iconify swt:fluent--checkmark-24-regular swt:size-5 swt:flex-none"
+                                Html.i [
+                                    prop.className [
+                                        "swt:iconify swt:fluent--checkmark-24-regular swt:size-4"
+                                        match isCurrentlyOpenArcPath with
+                                        | Some true -> ""
+                                        | _ -> "swt:invisible"
                                     ]
-                                | _ -> Html.none
+                                ]
                             ]
                         ]
                     ]
@@ -159,7 +160,7 @@ type Selector =
             match isLoading with
             | Some true ->
                 Html.button [
-                    prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap swt:cursor-not-allowed"
+                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:flex-nowrap swt:cursor-not-allowed"
                     prop.disabled true
                     prop.children [
                         Html.span [
@@ -172,7 +173,7 @@ type Selector =
                 Html.button [
                     prop.onClick (fun _ -> setIsOpen (not isOpen))
                     prop.role.button
-                    prop.className "swt:btn swt:btn-xs swt:btn-outline swt:flex-nowrap"
+                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:flex-nowrap"
                     if debug then
                         prop.testId "selector-test"
                     prop.children [
@@ -190,7 +191,15 @@ type Selector =
                 Html.div [
                     if debug then
                         prop.testId "selector-dropdown-content"
-                    prop.children [ React.Fragment RecentARCItems ]
+                    match RecentARCItems with
+                    | [||] ->
+                        prop.children [
+                            Html.li [
+                                prop.className "swt:text-sm swt:text-base-content/80 swt:px-8 swt:py-2 swt:text-center"
+                                prop.text "No recent ARCs"
+                            ]
+                        ]
+                    | _ -> prop.children RecentARCItems
                 ]
                 match actionbar with
                 | Some actionbar ->

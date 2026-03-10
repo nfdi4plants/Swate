@@ -1,6 +1,7 @@
 module Main.Bindings.Path
 
 open Fable.Core
+open Fable.Core.JsInterop
 
 [<Import("join", "path")>]
-let join: path1: string * path2: string -> string = jsNative
+let join ([<ParamSeq>] paths: string[]) = jsNative

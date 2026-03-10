@@ -33,6 +33,14 @@ module NavbarHelper =
             }
             |> Promise.start
 
+        let rmvRecentArc (pointer: SelectorTypes.ARCPointer) =
+            promise {
+                match! Api.ipcArcVaultApi.removeRecentARC pointer with
+                | Ok _ -> ()
+                | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
+            }
+            |> Promise.start
+
 
 type private Selector =
 
@@ -75,15 +83,9 @@ type private Selector =
 
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
 
-
         let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
             pathChange = setCurrentlyOpenArcPath
-            recentARCsUpdate =
-                fun arcs ->
-                    console.log ("[Swate] CHANGE RECENTARCS!")
-                    console.log arcs
-                    console.log currentlyOpenArcPath
-                    setRecentArc arcs
+            recentARCsUpdate = fun arcs -> setRecentArc arcs
             fileTreeUpdate = ignore
             gitProgressUpdate = ignore
         }
@@ -93,7 +95,6 @@ type private Selector =
             promise {
                 let! arcs = Api.ipcArcVaultApi.getRecentARCs ()
                 let! currentlyOpenArcPath = Api.ipcArcVaultApi.getOpenPath (unbox null)
-
                 setCurrentlyOpenArcPath currentlyOpenArcPath
                 setRecentArc arcs
                 setIsLoading false
@@ -120,6 +121,7 @@ type private Selector =
             Swate.Components.Selector.Main(
                 recentArc,
                 NavbarHelper.Selector.openArcByPath,
+                rmvRecentArc = NavbarHelper.Selector.rmvRecentArc,
                 onOpenChange = onOpen,
                 actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle),
                 isLoading = isLoading,

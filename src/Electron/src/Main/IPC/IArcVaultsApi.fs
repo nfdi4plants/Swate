@@ -229,6 +229,15 @@ let api: IPCTypes.IArcVaultsApi = {
             return vault |> Option.bind (fun v -> v.path)
         }
     getRecentARCs = fun _ -> promise { return RECENT_ARCS.Get() }
+    removeRecentARC =
+        fun arcpointer -> promise {
+            try
+                RECENT_ARCS.Remove(arcpointer.path) |> ignore
+                ARC_VAULTS.BroadcastRecentARCs()
+                return Ok()
+            with e ->
+                return Error e
+        }
     checkForARC = fun path -> promise { return ARC_VAULTS.TryGetVaultByPath(path).IsSome }
     saveArcFile =
         fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {

@@ -15,8 +15,6 @@ module private Helpers =
     let toPointer (name: string) (path: string) (isActive: bool) =
         SelectorTypes.ARCPointer.create (name, path, isActive)
 
-    let toInactivePointer (arc: SelectorTypes.ARCPointer) = toPointer arc.name arc.path false
-
     let sanitize (arcs: SelectorTypes.ARCPointer[]) =
         arcs
         |> Array.filter (fun arc -> not (String.IsNullOrWhiteSpace arc.path))
