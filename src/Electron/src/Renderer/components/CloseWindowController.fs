@@ -20,7 +20,7 @@ type CloseWindowController =
         let modalIsOpen, setModalIsOpen = React.useState false
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
-            Api.resolveCloseRequest decision
+            Api.ipcArcVaultApi.resolveCloseRequest (unbox null) decision
             |> Promise.map (
                 function
                 | Ok _ -> ()

@@ -5,16 +5,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Api.fs" />
     <Compile Include="MetadataForm.fs" />
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="context\LandingStateCtx.fs" />
     <Compile Include="context\WorkspaceStateCtx.fs" />
     <Compile Include="components\ARCHelper.fs" />
+    <Compile Include="components\InitState.fs" />
     <Compile Include="components\Navbar.fs" />
     <Compile Include="components\CloseWindowController.fs" />
     <Compile Include="components\FileExplorer.fs" />
     <Compile Include="components\MainElement.fs" />
-    <Compile Include="components\InitState.fs" />
     <Compile Include="components\MainWindowContent.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />

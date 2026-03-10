@@ -99,7 +99,7 @@ let createFileTree
             TimeoutMs = Some 10000
         }
 
-        let! result = Api.runGitLfs request
+        let! result = Api.ipcArcVaultApi.runGitLfs (unbox null) request
 
         return
             match result with
@@ -132,7 +132,7 @@ let createFileTree
                     console.log ($"[Renderer] Opening file: {previewPath}")
 
                 setSelectedTreeItemPath (Some previewPath)
-                let! result = Api.openFile previewPath
+                let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
 
                 match result with
                 | Ok data ->

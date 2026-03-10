@@ -3,10 +3,9 @@ module Main.SettingsStore
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
+open Main.Bindings.Filesystem
+open Main.Bindings.Path
 
-[<Literal>]
-let appFolderName = "Swate"
 
 [<Literal>]
 let appSettingsFolderName = "Settings"
@@ -16,35 +15,31 @@ let recentArcsSettingsFileName = "recent-arcs.json"
 
 // If appSettingsFolderName is changed in a future release, migrate or delete the old
 // folder inside app.getPath("userData") to avoid stale or split settings.
-let private fs: obj = importAll "fs"
-let private pathModule: obj = importAll "path"
-let private electron: obj = importAll "electron"
+
+open Fable.Electron.Main
 
 let getSettingsRootPath () =
-    let userDataPath = electron?app?getPath ("userData") |> unbox<string>
+    let userDataPath = app.getPath Enums.App.GetPath.Name.UserData
 
-    let settingsRootPath =
-        pathModule?join (userDataPath, appFolderName, appSettingsFolderName)
-        |> unbox<string>
+    /// Something like: C:\Users\Kevin\AppData\Roaming\Swate\Settings
+    let settingsRootPath = join (userDataPath, appSettingsFolderName)
 
-    printfn "Settings root path: %s" settingsRootPath
-
-    fs?mkdirSync (settingsRootPath, createObj [ "recursive" ==> true ]) |> ignore
+    mkdirSync (settingsRootPath, MkdirOptions(recursive = true))
     settingsRootPath
 
 let getSettingsFilePath (fileName: string) =
     let settingsRootPath = getSettingsRootPath ()
-    pathModule?join (settingsRootPath, fileName) |> unbox<string>
+    join (settingsRootPath, fileName)
 
 let tryReadSettingsFile (fileName: string) =
     try
         let filePath = getSettingsFilePath fileName
-        let exists = fs?existsSync (filePath) |> unbox<bool>
+        let exists = existsSync filePath
 
         if not exists then
             None
         else
-            Some(fs?readFileSync (filePath, "utf8") |> unbox<string>)
+            Some(readFileSync (filePath, TextEncoding.Utf8))
     with _ ->
         None
 
@@ -52,7 +47,7 @@ let writeSettingsFileAtomic (fileName: string) (content: string) =
     try
         let filePath = getSettingsFilePath fileName
         let tempPath = filePath + ".tmp"
-        fs?writeFileSync (tempPath, content, "utf8") |> ignore
-        fs?renameSync (tempPath, filePath) |> ignore
+        writeFileSync (tempPath, content, TextEncoding.Utf8)
+        renameSync (tempPath, filePath)
     with _ ->
         ()

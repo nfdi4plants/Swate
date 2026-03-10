@@ -135,7 +135,7 @@ let Main () =
                         Fable.Core.JS.setTimeout
                             (fun () ->
                                 if lastSyncedRequestKeyRef.current <> Some requestKey then
-                                    Api.syncARC request |> Promise.start
+                                    Api.ipcArcVaultApi.syncARC (unbox null) request |> Promise.start
                                     lastSyncedRequestKeyRef.current <- Some requestKey
 
                                 syncArcTimeoutRef.current <- None
@@ -153,7 +153,7 @@ let Main () =
 
     // Used on initializing
     React.useEffectOnce (fun _ ->
-        Api.getOpenPath ()
+        Api.ipcArcVaultApi.getOpenPath (unbox null)
         |> Promise.map (fun pathOption ->
             match pathOption with
             | Some p -> AppState.ARC p |> setAppState
@@ -202,7 +202,7 @@ let Main () =
                 | None ->
                     setSelectedTreeItemPath None
                     setAppState AppState.Init
-        recentARCsUpdate = fun arcs -> console.log ("[Swate] CHANGE RECENTARCS!")
+        recentARCsUpdate = ignore
         fileTreeUpdate =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")

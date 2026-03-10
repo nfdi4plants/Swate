@@ -5,24 +5,12 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components
+open Swate.Electron.Shared.FileIOHelper
 
 [<Literal>]
 let maxNumberRecentArcs = 5
 
 module private Helpers =
-
-    let getNameFromPath (path: string) =
-        path
-        |> (fun p -> p.Replace("\\", "/"))
-        |> (fun p -> p.TrimEnd('/'))
-        |> (fun p -> p.Split("/"))
-        |> Array.last
-
-    let normalizePath (path: string) =
-        path.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
-
-    let pathsEqual (left: string) (right: string) =
-        normalizePath left = normalizePath right
 
     let toPointer (name: string) (path: string) (isActive: bool) =
         SelectorTypes.ARCPointer.create (name, path, isActive)
@@ -53,10 +41,11 @@ module private Helpers =
                         entry?name |> unbox<string>
 
                 let isActive =
-                    if isNull entry?isActive then
-                        false
-                    else
-                        entry?isActive |> unbox<bool>
+                    // if isNull entry?isActive then
+                    //     false
+                    // else
+                    //     entry?isActive |> unbox<bool>
+                    false // For safety, we do not trust the persisted value and will always initialize as inactive. The active ARC will be determined at runtime based on the currently open ARC.
 
                 let name =
                     if String.IsNullOrWhiteSpace nameValue then
@@ -75,7 +64,7 @@ module private Helpers =
                 createObj [
                     "name" ==> arc.name
                     "path" ==> arc.path
-                    "isActive" ==> arc.isActive
+                    "isActive" ==> false
                 ]
             )
 
@@ -100,27 +89,17 @@ type RecentARCStore() =
 
     member this.Get() = this.RecentArcsState
 
+    /// This function will add a new ARC to the recent ARCs list or update an existing one to be active and be moved to the front of the list.
     member this.Add(path: string) =
         if String.IsNullOrWhiteSpace path then
             this.RecentArcsState
         else
-            let maybeExisting =
-                this.RecentArcsState
-                |> Array.tryFind (fun arc -> Helpers.pathsEqual arc.path path)
+            let arc = Helpers.toPointer (getNameFromPath path) path true
 
-            let activeName =
-                maybeExisting
-                |> Option.map _.name
-                |> Option.defaultValue (Helpers.getNameFromPath path)
+            let remainingArcs =
+                this.RecentArcsState |> Array.filter (fun arc -> not (pathsEqual arc.path path))
 
-            let activeArc = Helpers.toPointer activeName path true
-
-            let remainingInactiveArcs =
-                this.RecentArcsState
-                |> Array.filter (fun arc -> not (Helpers.pathsEqual arc.path path))
-                |> Array.map Helpers.toInactivePointer
-
-            let next = Array.append [| activeArc |] remainingInactiveArcs
+            let next = Array.append [| arc |] remainingArcs
             this.SetState next
             this.RecentArcsState
 
@@ -129,7 +108,7 @@ type RecentARCStore() =
             this.RecentArcsState
         else
             this.RecentArcsState
-            |> Array.filter (fun arc -> not (Helpers.pathsEqual arc.path path))
+            |> Array.filter (fun arc -> not (pathsEqual arc.path path))
             |> this.SetState
 
             this.RecentArcsState
@@ -140,7 +119,7 @@ type RecentARCStore() =
         else
             this.RecentArcsState
             |> Array.map (fun arc ->
-                if Helpers.pathsEqual arc.path path then
+                if pathsEqual arc.path path then
                     Helpers.toPointer arc.name arc.path false
                 else
                     arc

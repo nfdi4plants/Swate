@@ -32,13 +32,12 @@ open IPCTypesHelper
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
-    /// Will open ARC in same window
+    /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
     openARC: IpcMainEvent -> JS.Promise<Result<string, exn>>
+    /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
+    openARCByPath: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    /// Create ARC via folder dialog. Main decides disposition.
     createARC: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
-    focusExistingARCWindow: string -> JS.Promise<Result<unit, exn>>
-    /// Will open ARC in a new window
-    openARCInNewWindow: unit -> JS.Promise<Result<unit, exn>>
-    createARCInNewWindow: string -> JS.Promise<Result<unit, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>

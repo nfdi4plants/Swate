@@ -3,7 +3,6 @@ namespace Renderer.Components
 open Fable.Core
 open Feliz
 
-open ARCtrl
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Components
@@ -13,23 +12,11 @@ module NavbarHelper =
 
     module Selector =
 
-        ///Selector module
-        let openNewWindow =
+        /// Unified open: main process decides current window / new window / focus existing.
+        let openARC =
             fun _ ->
                 promise {
-                    match! Api.arcVaultApi.openARCInNewWindow () with
-                    | Ok _ -> ()
-                    | Error exn -> failwith $"{exn.Message}"
-
-                    return ()
-                }
-                |> Promise.start
-
-        ///Selector module
-        let openCurrentWindow =
-            fun _ ->
-                promise {
-                    let! r = Api.arcVaultApi.openARC (unbox null)
+                    let! r = Api.ipcArcVaultApi.openARC (unbox null)
 
                     match r with
                     | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -37,18 +24,12 @@ module NavbarHelper =
                 }
                 |> Promise.start
 
-        ///Selector module
-        let openARC (appState: AppState) =
-            if appState.IsInit then openCurrentWindow else openNewWindow
-
-        ///Selector module
-        let onARCClick (clickedARC: SelectorTypes.ARCPointer) =
+        /// Click on a recent ARC: main process decides open-or-focus.
+        let openArcByPath (clickedARC: SelectorTypes.ARCPointer) =
             promise {
-                match! Api.arcVaultApi.focusExistingARCWindow clickedARC.path with
+                match! Api.ipcArcVaultApi.openARCByPath (unbox null) clickedARC.path with
                 | Ok _ -> ()
-                | Error exn -> failwith $"{exn.Message}"
-
-                return ()
+                | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
             }
             |> Promise.start
 
@@ -56,19 +37,23 @@ module NavbarHelper =
 type private Selector =
 
     [<ReactComponent>]
-    static member private Actionbar(toggleSelector: unit -> unit) =
+    static member private Actionbar(setNewArcModalIsOpen, toggleSelector: unit -> unit) =
 
-        let appStateCtx = React.useContext Renderer.Context.AppStateCtx.AppStateCtx
-
-        // let createARC =
-        //     Actionbar.ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", onClick)
+        let createARC =
+            Actionbar.ButtonInfo.create (
+                "swt:fluent--document-add-24-regular swt:size-5",
+                "Create a new ARC",
+                fun _ ->
+                    setNewArcModalIsOpen true
+                    toggleSelector ()
+            )
 
         let openARCButtonInfo =
             Actionbar.ButtonInfo.create (
                 "swt:fluent--folder-open-24-regular swt:size-5",
                 "Open an existing ARC",
                 fun _ ->
-                    NavbarHelper.Selector.openARC appStateCtx.state ()
+                    NavbarHelper.Selector.openARC ()
                     toggleSelector ()
             )
 
@@ -78,19 +63,26 @@ type private Selector =
         //         "Download an existing ARC",
         //         onClick
         //     )
-
-        Actionbar.Main([| openARCButtonInfo |], 4)
+        Actionbar.Main([| createARC; openARCButtonInfo |], 4)
 
     [<ReactComponent>]
     static member Main() =
         let recentArc, setRecentArc = React.useState ([||]: SelectorTypes.ARCPointer[])
         let isLoading, setIsLoading = React.useState true
 
+        let currentlyOpenArcPath, setCurrentlyOpenArcPath =
+            React.useState (None: string option)
+
+        let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
+
+
         let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-            pathChange = ignore
+            pathChange = setCurrentlyOpenArcPath
             recentARCsUpdate =
                 fun arcs ->
                     console.log ("[Swate] CHANGE RECENTARCS!")
+                    console.log arcs
+                    console.log currentlyOpenArcPath
                     setRecentArc arcs
             fileTreeUpdate = ignore
             gitProgressUpdate = ignore
@@ -99,8 +91,10 @@ type private Selector =
         // Get remote recent ARCs on first load before rendering the selector
         React.useLayoutEffectOnce (fun _ ->
             promise {
-                let! arcs = Api.arcVaultApi.getRecentARCs ()
+                let! arcs = Api.ipcArcVaultApi.getRecentARCs ()
+                let! currentlyOpenArcPath = Api.ipcArcVaultApi.getOpenPath (unbox null)
 
+                setCurrentlyOpenArcPath currentlyOpenArcPath
                 setRecentArc arcs
                 setIsLoading false
             }
@@ -115,20 +109,26 @@ type private Selector =
         let onOpen =
             fun (b: bool) ->
                 if b then
-                    Api.arcVaultApi.getRecentARCs () |> Promise.map setRecentArc |> Promise.start
+                    Api.ipcArcVaultApi.getRecentARCs () |> Promise.map setRecentArc |> Promise.start
 
-        Swate.Components.Selector.Main(
-            recentArc,
-            NavbarHelper.Selector.onARCClick,
-            onOpenChange = onOpen,
-            actionbar = Selector.Actionbar(selectorControlRef.current.toggle),
-            isLoading = isLoading,
-            controlRef = selectorControlRef
-        )
-
+        React.Fragment [
+            BaseModal.BaseModal(
+                newArcModalIsOpen,
+                setNewArcModalIsOpen,
+                Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
+            )
+            Swate.Components.Selector.Main(
+                recentArc,
+                NavbarHelper.Selector.openArcByPath,
+                onOpenChange = onOpen,
+                actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle),
+                isLoading = isLoading,
+                controlRef = selectorControlRef,
+                ?currentlyOpenArcPath = currentlyOpenArcPath
+            )
+        ]
 
 type Navbar =
-
 
     [<ReactComponent>]
     static member Main() =

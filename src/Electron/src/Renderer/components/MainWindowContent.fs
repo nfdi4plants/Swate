@@ -15,7 +15,7 @@ module MainWindowContentHelper =
         match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
         | None -> return Error "Saving this file type is not supported in Electron yet."
         | Some request ->
-            let! saveResult = Api.saveArcFile request
+            let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
 
             match saveResult with
             | Ok previewData -> return Ok previewData
@@ -83,7 +83,7 @@ module MainWindowContentHelper =
                         Content = protocolIntent.Content
                     }
 
-                    let! writeResult = Api.writeFile request
+                    let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
 
                     match writeResult with
                     | Ok() -> finishSuccess previewData

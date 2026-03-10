@@ -168,22 +168,22 @@ let api: IPCTypes.IArcVaultsApi = {
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let windowId = windowIdFromIpcEvent event
-
-                do! ARC_VAULTS.OpenARCInVault(windowId, arcPath)
-
-                let recentARCs = RECENT_ARCS.Add(arcPath)
-                ARC_VAULTS.BroadcastRecentARCs()
-
-
-                let! fileEntries = getFileEntries arcPath
-                let fileTree = createFileEntryTree fileEntries
-
-                ARC_VAULTS.SetFileTree(windowId, fileTree)
-
-                return Ok arcPath
+                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+                return Ok(ArcOpenDisposition.path disposition)
+        }
+    openARCByPath =
+        fun event (arcPath: string) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+                return Ok(ArcOpenDisposition.path disposition)
+            with e ->
+                return Error e
         }
     createARC =
         fun (event: IpcMainEvent) (identifier: string) -> promise {
+            printfn "EVENT: %A" event
+            printfn "IDENTIFIER: %s" identifier
 
             let! r =
                 dialog.showOpenDialog (
@@ -197,78 +197,11 @@ let api: IPCTypes.IArcVaultsApi = {
             elif r.filePaths.Length <> 1 then
                 return Error(exn "Not exactly one path")
             else
-                let arcPath = r.filePaths |> Array.exactlyOne
+                let arcContainerPath = r.filePaths |> Array.exactlyOne
+                let arcPath = ARCtrl.ArcPathHelper.combine arcContainerPath identifier
                 let windowId = windowIdFromIpcEvent event
-                do! ARC_VAULTS.CreateARCInVault(windowId, arcPath, identifier)
-
-                let recentARCs = RECENT_ARCS.Add(arcPath)
-                ARC_VAULTS.BroadcastRecentARCs()
-
-                let! fileEntries = getFileEntries arcPath
-                let fileTree = createFileEntryTree fileEntries
-
-                ARC_VAULTS.SetFileTree(windowId, fileTree)
-                return Ok arcPath
-        }
-    createARCInNewWindow =
-        fun identifier -> promise {
-            let! r =
-                dialog.showOpenDialog (
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
-
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne
-
-                let recentARCs = RECENT_ARCS.Add(arcPath)
-
-                match ARC_VAULTS.TryGetVaultByPath arcPath with
-                | None ->
-                    let! _ = ARC_VAULTS.RegisterVaultWithNewArc(arcPath, identifier)
-                    ARC_VAULTS.BroadcastRecentARCs()
-                    return Ok()
-                | Some vault ->
-                    vault.window.focus ()
-                    ARC_VAULTS.BroadcastRecentARCs()
-                    return Ok()
-        }
-    openARCInNewWindow =
-        fun _ -> promise {
-            let! r =
-                dialog.showOpenDialog (
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
-
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne
-                let recentARCs = RECENT_ARCS.Add(arcPath)
-
-                match ARC_VAULTS.TryGetVaultByPath arcPath with
-                | None ->
-                    let! windowId = ARC_VAULTS.RegisterVaultWithArc(arcPath)
-                    ARC_VAULTS.BroadcastRecentARCs()
-
-                    let! fileEntries = getFileEntries arcPath
-                    let fileTree = createFileEntryTree fileEntries
-                    ARC_VAULTS.SetFileTree(windowId, fileTree)
-
-                    return Ok()
-                | Some vault ->
-                    vault.window.focus ()
-                    ARC_VAULTS.BroadcastRecentARCs()
-                    return Ok()
+                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
+                return Ok(ArcOpenDisposition.path disposition)
         }
     closeARC =
         fun event -> promise {
@@ -276,33 +209,14 @@ let api: IPCTypes.IArcVaultsApi = {
                 let windowId = windowIdFromIpcEvent event
                 let vault = ARC_VAULTS.TryGetVault(windowId)
 
+                // Ensure the ARC stays in recent list before disposal marks it inactive.
                 if vault.IsSome && vault.Value.path.IsSome then
-                    let recentARCs = RECENT_ARCS.Add(vault.Value.path.Value)
-
-                    ARC_VAULTS.BroadcastRecentARCs()
+                    RECENT_ARCS.Add(vault.Value.path.Value) |> ignore
 
                 ARC_VAULTS.DisposeVault(windowId)
                 return Ok()
             with e ->
                 return Error e
-        }
-    focusExistingARCWindow =
-        fun arcPath -> promise {
-            match ARC_VAULTS.TryGetVaultByPath arcPath with
-            | None ->
-                let previousLength = RECENT_ARCS.Get().Length
-
-                let refreshedRecentARCs = RECENT_ARCS.Remove(arcPath)
-
-                if refreshedRecentARCs.Length <> previousLength then
-                    ARC_VAULTS.BroadcastRecentARCs()
-
-                return Error(exn $"No open ARC window found for path {arcPath}.")
-            | Some vault ->
-                let recentARCs = RECENT_ARCS.Add(arcPath)
-                vault.window.focus ()
-                ARC_VAULTS.BroadcastRecentARCs()
-                return Ok()
         }
     getOpenPath =
         fun event -> promise {
