@@ -2,7 +2,6 @@ module Renderer.components.MainWindowContent
 
 open ARCtrl
 open Feliz
-open Widgets
 open MainElement
 open Swate.Components
 open Swate.Electron.Shared
@@ -241,6 +240,7 @@ let Content
                                 prop.children [
                                     MainElement.CreateARCitectNavbar
                                         arcFileState
+                                        activeView
                                         activeTableIndex
                                         setArcFileState
                                         (Navbar.onSaveClick arcFileState setPreviewData)

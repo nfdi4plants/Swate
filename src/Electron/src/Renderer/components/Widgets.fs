@@ -1,4 +1,4 @@
-module Renderer.components.Widgets
+module Renderer.components.WidgetRegistry
 
 open Feliz
 open Swate.Components
@@ -19,7 +19,12 @@ let buildingBlockWidget
     WidgetType.BuildingBlock,
     {|
         prefix = "ADD_BUILDINGBLOCK"
-        content = Widgets.AddBuildingBlockWidget.Main(arcFileState, activeTableIndex, setArcFileState)
+        content =
+            Renderer.components.Widgets.AddBuildingBlockWidget.Main(
+                arcFileState,
+                activeTableIndex,
+                setArcFileState
+            )
     |}
 
 let templateWidget
@@ -30,7 +35,12 @@ let templateWidget
     WidgetType.Template,
     {|
         prefix = "ADD_TEMPLATE"
-        content = Widgets.AddTemplateWidget.Main(arcFileState, activeTableIndex, setArcFileState)
+        content =
+            Renderer.components.Widgets.AddTemplateWidget.Main(
+                arcFileState,
+                activeTableIndex,
+                setArcFileState
+            )
     |}
 
 let filePickerWidget
@@ -41,48 +51,35 @@ let filePickerWidget
     WidgetType.FilePicker,
         {|
             prefix = "FILEPICKER"
-            content = Widgets.AddFilePickerWidget.Main(arcFileState, activeTableIndex, setArcFileState)
+            content =
+                Renderer.components.Widgets.AddFilePickerWidget.Main(
+                    arcFileState,
+                    activeTableIndex,
+                    setArcFileState
+                )
         |}
 
-let dataAnnotatorWidget: WidgetType * WidgetDefinition =
+let dataAnnotatorWidget
+    (arcFileState: ArcFiles option)
+    (activeView: Renderer.components.AddDataAnnotatorWidget.HostView)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    : WidgetType * WidgetDefinition =
     WidgetType.DataAnnotator,
     {|
         prefix = "DATAANNOTATOR"
         content =
-            Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-64"
-                prop.children [
-                    Html.h3 [
-                        prop.className "swt:font-bold"
-                        prop.text "Data Annotator"
-                    ]
-                    Html.label [
-                        prop.className "swt:label swt:cursor-pointer swt:justify-start swt:gap-2"
-                        prop.children [
-                            Html.input [
-                                prop.type'.checkbox
-                                prop.className "swt:checkbox swt:checkbox-sm"
-                                //prop.isChecked annotateEnabled
-                                //prop.onChange (fun (isChecked: bool) -> setAnnotateEnabled isChecked)
-                            ]
-                            Html.span [ prop.text "Enable annotation" ]
-                        ]
-                    ]
-                    Html.span [
-                        prop.className "swt:text-xs swt:opacity-70"
-                        //prop.text (
-                        //    if annotateEnabled then
-                        //        "Status: enabled"
-                        //    else
-                        //        "Status: disabled"
-                        //)
-                    ]
-                ]
-            ]
+            Renderer.components.AddDataAnnotatorWidget.Main(
+                arcFileState,
+                activeView,
+                activeTableIndex,
+                setArcFileState
+            )
     |}
 
 let createWidgets
     (arcFileState: ArcFiles option)
+    (activeView: Renderer.components.AddDataAnnotatorWidget.HostView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
     : Map<WidgetType, WidgetDefinition> =
@@ -90,7 +87,7 @@ let createWidgets
         buildingBlockWidget arcFileState activeTableIndex setArcFileState
         templateWidget arcFileState activeTableIndex setArcFileState
         filePickerWidget arcFileState activeTableIndex setArcFileState
-        dataAnnotatorWidget
+        dataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
     ]
     |> Map.ofList
 

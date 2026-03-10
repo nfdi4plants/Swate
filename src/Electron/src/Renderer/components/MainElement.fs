@@ -5,7 +5,7 @@ open Swate.Components
 open Browser.Dom
 open ARCtrl
 open Renderer.MetadataForms
-open Widgets
+open WidgetRegistry
 
 [<RequireQualifiedAccess>]
 type PreviewActiveView =
@@ -38,11 +38,19 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
 
 let CreateARCitectNavbar
     (arcFile: ArcFiles option)
+    (activeView: PreviewActiveView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
     onSaveClick
     =
-    let widgets = createWidgets arcFile activeTableIndex setArcFileState
+    let widgetHostView =
+        match activeView with
+        | PreviewActiveView.Table _ -> Renderer.components.AddDataAnnotatorWidget.HostView.Table
+        | PreviewActiveView.DataMap -> Renderer.components.AddDataAnnotatorWidget.HostView.DataMap
+        | PreviewActiveView.Metadata -> Renderer.components.AddDataAnnotatorWidget.HostView.Metadata
+        | PreviewActiveView.Error _ -> Renderer.components.AddDataAnnotatorWidget.HostView.PreviewError
+
+    let widgets = createWidgets arcFile widgetHostView activeTableIndex setArcFileState
 
     Components.BaseNavbar.Main [
         CreateNavbarButtonsForAllWidgets widgets [ NavbarButtons(widgetTypes) ]
