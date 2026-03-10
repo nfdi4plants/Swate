@@ -1,4 +1,4 @@
-module Renderer.components.MainElement
+module Renderer.Components.MainElement
 
 open Feliz
 open Swate.Components
@@ -393,7 +393,8 @@ let CreateTableView activeView arcFileState setArcFileState =
 
             CreateDataMapPreview(run.DataMap.Value, setDatamap)
         | ArcFiles.DataMap(parent, datamap) ->
-            let setDatamap (nextDatamap: DataMap) = setArcFileState (ArcFiles.DataMap(parent, nextDatamap))
+            let setDatamap (nextDatamap: DataMap) =
+                setArcFileState (ArcFiles.DataMap(parent, nextDatamap))
 
             CreateDataMapPreview(datamap, setDatamap)
         | _ ->

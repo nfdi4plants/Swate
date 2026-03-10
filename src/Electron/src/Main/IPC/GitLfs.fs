@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.GitTypes
 
 let private childProcessDynamic: obj = importAll "node:child_process"
 

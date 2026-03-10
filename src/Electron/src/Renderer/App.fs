@@ -7,16 +7,18 @@ open Fable.Core
 open Swate.Components
 open Swate.Components.Landing
 open Swate.Electron.Shared
+open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
 open Browser.Dom
 
 open ARCtrl
 
-open Renderer.components
+open Renderer.Components
 
 
-let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
+let parseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFiles option =
     match ArcFileSaveMapping.tryParseArcFile fileType json with
     | Ok arcFile -> Some arcFile
     | Result.Error e ->
@@ -24,45 +26,55 @@ let ParseArcFileFromJson (fileType: ArcFilesDiscriminate) (json: string) : ArcFi
         None
 
 [<ReactComponent>]
+let LeftActionButtons () =
+    React.Fragment [
+
+    ]
+
+[<ReactComponent>]
 let Main () =
 
     let appState, setAppState = React.useState AppState.Init
     let (arcFileState: ArcFiles option), setArcFileState = React.useState None
-    let (pageState: PageState option), (setPageState: PageState option -> unit) = React.useState None
 
-    let landingState, setLandingState = React.useState (Renderer.context.LandingStateCtx.LandingState.init ())
-    let workspaceState, setWorkspaceState = React.useState (Renderer.context.WorkspaceStateCtx.WorkspaceState.init ())
+    let (pageState: PageState option), (setPageState: PageState option -> unit) =
+        React.useState None
+
+    let landingState, setLandingState =
+        React.useState (Renderer.Context.LandingStateCtx.LandingState.init ())
+
+    let workspaceState, setWorkspaceState =
+        React.useState (Renderer.Context.WorkspaceStateCtx.WorkspaceState.init ())
 
     let syncArcTimeoutRef = React.useRef<int option> None
-    let lastSyncedRequestKeyRef = React.useRef<(string * ArcFilesDiscriminate * string) option> None
+
+    let lastSyncedRequestKeyRef =
+        React.useRef<(string * ArcFilesDiscriminate * string) option> None
 
     let appCtx: StateContext<AppState> =
         React.useMemo (
-            (fun _ ->
-                {
-                    state = appState
-                    setState = setAppState
-                }),
+            (fun _ -> {
+                state = appState
+                setState = setAppState
+            }),
             [| box appState |]
         )
 
-    let landingCtx: StateContext<Renderer.context.LandingStateCtx.LandingState> =
+    let landingCtx: StateContext<Renderer.Context.LandingStateCtx.LandingState> =
         React.useMemo (
-            (fun _ ->
-                {
-                    state = landingState
-                    setState = setLandingState
-                }),
+            (fun _ -> {
+                state = landingState
+                setState = setLandingState
+            }),
             [| box landingState |]
         )
 
-    let workspaceCtx: StateContext<Renderer.context.WorkspaceStateCtx.WorkspaceState> =
+    let workspaceCtx: StateContext<Renderer.Context.WorkspaceStateCtx.WorkspaceState> =
         React.useMemo (
-            (fun _ ->
-                {
-                    state = workspaceState
-                    setState = setWorkspaceState
-                }),
+            (fun _ -> {
+                state = workspaceState
+                setState = setWorkspaceState
+            }),
             [| box workspaceState |]
         )
 
@@ -72,7 +84,7 @@ let Main () =
                 SelectedTreeItemPath = path
         }
 
-    let setRecentARCs (arcs: SelectorTypes.ARCPointer []) =
+    let setRecentARCs (arcs: SelectorTypes.ARCPointer[]) =
         workspaceCtx.setState {
             workspaceCtx.state with
                 RecentARCs = arcs
@@ -92,12 +104,12 @@ let Main () =
 
     React.useEffect (
         (fun () ->
-                match pageState with
-                | Some (PageState.ArcFileData(fileType, json)) ->
-                    match ParseArcFileFromJson fileType json with
-                    | Some arcFile -> setArcFileState (Some arcFile)
-                    | None -> setArcFileState None
-                | _ -> ()
+            match pageState with
+            | Some(PageState.ArcFileData(fileType, json)) ->
+                match parseArcFileFromJson fileType json with
+                | Some arcFile -> setArcFileState (Some arcFile)
+                | None -> setArcFileState None
+            | _ -> ()
         ),
         [| box pageState |]
     )
@@ -123,7 +135,7 @@ let Main () =
                         Fable.Core.JS.setTimeout
                             (fun () ->
                                 if lastSyncedRequestKeyRef.current <> Some requestKey then
-                                    Api.syncARC request |> Promise.start
+                                    Api.ipcArcVaultApi.syncARC (unbox null) request |> Promise.start
                                     lastSyncedRequestKeyRef.current <- Some requestKey
 
                                 syncArcTimeoutRef.current <- None
@@ -131,23 +143,20 @@ let Main () =
                             250
 
                     syncArcTimeoutRef.current <- Some timeoutId
-                | None ->
-                    lastSyncedRequestKeyRef.current <- None
-            | _ ->
-                lastSyncedRequestKeyRef.current <- None
+                | None -> lastSyncedRequestKeyRef.current <- None
+            | _ -> lastSyncedRequestKeyRef.current <- None
 
             FsReact.createDisposable (fun () -> clearPendingSync ())
         ),
         [| box appState; box arcFileState |]
     )
 
-    ///Used on initializing
+    // Used on initializing
     React.useEffectOnce (fun _ ->
-        Api.getOpenPath()
+        Api.ipcArcVaultApi.getOpenPath (unbox null)
         |> Promise.map (fun pathOption ->
             match pathOption with
-            | Some p ->
-                AppState.ARC p |> setAppState
+            | Some p -> AppState.ARC p |> setAppState
             | None ->
                 setAppState AppState.Init
                 setSelectedTreeItemPath None
@@ -156,18 +165,18 @@ let Main () =
     )
 
     let fileExplorer =
-       React.useMemo (
+        React.useMemo (
             (fun _ ->
                 let fileEntries = workspaceCtx.state.FileTree |> List.toArray
 
                 let fileTree =
                     if fileEntries.Length > 0 then
-                        Some(Renderer.components.FileExplorer.getFileTree fileEntries)
+                        Some(Renderer.Components.FileExplorer.getFileTree fileEntries)
                     else
                         None
 
                 if fileTree.IsSome then
-                    Renderer.components.FileExplorer.createFileTree
+                    Renderer.Components.FileExplorer.createFileTree
                         fileTree
                         workspaceCtx.state.SelectedTreeItemPath
                         setSelectedTreeItemPath
@@ -175,7 +184,10 @@ let Main () =
                 else
                     None
             ),
-            [|  workspaceCtx.state.FileTree; workspaceCtx.state.SelectedTreeItemPath |]
+            [|
+                workspaceCtx.state.FileTree
+                workspaceCtx.state.SelectedTreeItemPath
+            |]
         )
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
@@ -190,48 +202,24 @@ let Main () =
                 | None ->
                     setSelectedTreeItemPath None
                     setAppState AppState.Init
-        recentARCsUpdate =
-            fun arcs ->
-                console.log ("[Swate] CHANGE RECENTARCS!")
-                setRecentARCs arcs
+        recentARCsUpdate = ignore
         fileTreeUpdate =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")
                 setFileTree fileExplorer
         gitProgressUpdate =
-            fun progress ->
-                console.log ($"[Swate] Git progress {progress.Method} {progress.Stage} {progress.Progress}")
+            fun progress -> console.log ($"[Swate] Git progress {progress.Method} {progress.Stage} {progress.Progress}")
     }
 
-    let selector =
-        Selector.Main(
-            workspaceCtx.state.RecentARCs,
-            Selector.onARCClick,
-            Selector.actionbar appState,
-            onOpenSelector = Selector.onOpenSelector appState setRecentARCs
-        )
 
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     ///Main content module
     let children =
         React.useMemo (
-            (fun _ ->
-                MainWindowContent.Content(
-                    appState,
-                    setArcFileState,
-                    arcFileState,
-                    pageState,
-                    setPageState)
-            ),
-            [|
-                box appState
-                box pageState
-                box arcFileState
-            |]
+            (fun _ -> MainWindowContent.Content(appState, setArcFileState, arcFileState, pageState, setPageState)),
+            [| box appState; box pageState; box arcFileState |]
         )
-
-    let navbar = Navbar.Main(selector)
 
     let leftSidebar appState (fe: ReactElement) =
         Some(
@@ -249,41 +237,39 @@ let Main () =
                                         Draft = LandingDraft.init
                                         UiState = LandingUiState.init
                                 }
+
                                 setSelectedTreeItemPath None
                                 setArcFileState None
                                 setPageState (Some PageState.LandingDraft)
                             )
                         ]
                     | _ -> Html.none
-                    Html.h2 [
-                        prop.text "ARC-Tree"
-                    ]
+                    Html.h2 [ prop.text "ARC-Tree" ]
                     fe
                 |]
             ]
         )
 
-    let saveBeforeClose () : JS.Promise<Result<unit, string>> =
-        promise {
-            match arcFileState with
-            | None -> return Ok()
-            | Some arcFile ->
-                let! result = Navbar.saveArcFileWithPreview arcFile
+    let saveBeforeClose () : JS.Promise<Result<unit, string>> = promise {
+        match arcFileState with
+        | None -> return Ok()
+        | Some arcFile ->
+            let! result = MainWindowContent.MainWindowContentHelper.saveArcFileWithPreview arcFile
 
-                match result with
-                | Ok updatedPreview ->
-                    setPageState (Some updatedPreview)
-                    return Ok()
-                | Result.Error errorMsg ->
-                    let msg = $"Save failed: {errorMsg}"
-                    return Result.Error msg
-        }
+            match result with
+            | Ok updatedPreview ->
+                setPageState (Some updatedPreview)
+                return Ok()
+            | Result.Error errorMsg ->
+                let msg = $"Save failed: {errorMsg}"
+                return Result.Error msg
+    }
 
-    context.AppStateCtx.AppStateCtx.Provider(
+    Context.AppStateCtx.AppStateCtx.Provider(
         appCtx,
-        Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx.Provider(
+        Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx.Provider(
             workspaceCtx,
-            Renderer.context.LandingStateCtx.LandingStateCtx.Provider(
+            Renderer.Context.LandingStateCtx.LandingStateCtx.Provider(
                 landingCtx,
                 Layout.Main(
                     children =
@@ -291,13 +277,11 @@ let Main () =
                             children
                             CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
                         |],
-                    navbar = navbar,
+                    navbar = Renderer.Components.Navbar.Main(),
                     ?leftSidebar =
-                        (
-                            match fileExplorer with
-                            | Some fe -> leftSidebar appState fe
-                            | None -> None
-                         ),
+                        (match fileExplorer with
+                         | Some fe -> leftSidebar appState fe
+                         | None -> None),
                     leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
                 )
             )

@@ -1,4 +1,4 @@
-module Renderer.context.LandingStateCtx
+module Renderer.Context.LandingStateCtx
 
 open Swate.Components.Landing
 open Feliz
@@ -9,7 +9,7 @@ type LandingState = {
     UiState: LandingUiState
 } with
 
-    static member init () = {
+    static member init() = {
         Draft = LandingDraft.init
         UiState = LandingUiState.init
     }

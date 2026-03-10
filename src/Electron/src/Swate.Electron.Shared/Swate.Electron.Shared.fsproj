@@ -6,9 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="FileIOTypes.fs" />
+    <Compile Include="GitTypes.fs" />
     <Compile Include="IPCTypes.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="Api.fs" />
+    <Compile Include="FileIOHelper.fs" />
   </ItemGroup>
 
   <ItemGroup>

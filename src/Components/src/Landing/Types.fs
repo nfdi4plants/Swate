@@ -24,6 +24,7 @@ type LandingDraft = {
     TechnologyType: OntologyAnnotation option
     TechnologyPlatform: OntologyAnnotation option
 } with
+
     static member init = {
         Identifier = ""
         Title = ""
@@ -47,6 +48,7 @@ type LandingUiState = {
     Error: string option
     IsSubmitting: bool
 } with
+
     static member init = {
         ShowQuestions = false
         SelectedTarget = None

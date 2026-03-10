@@ -1,4 +1,4 @@
-module Renderer.components.ARCHelper
+module Renderer.Components.ARCHelper
 
 open Swate.Electron.Shared
 open ARCtrl
