@@ -517,9 +517,9 @@ type TemplateFilter =
             fun _ ->
                 Html.button [
                     prop.title "Filter communities"
+                    prop.type'.button
                     prop.tabIndex -1
-                    prop.className "swt:btn swt:btn-square swt:btn-neutral"
-                    prop.onClick (fun e -> e.preventDefault ())
+                    prop.className "swt:btn swt:btn-square swt:btn-neutral swt:pointer-events-none"
                     prop.children [
                         Html.div selectedIndices.Count
                         Icons.Institution(className = "swt:size-4")
