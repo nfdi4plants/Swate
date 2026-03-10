@@ -896,36 +896,21 @@ let Main
                                 prop.className "swt:text-xl swt:font-bold"
                                 prop.text "Add Template"
                             ]
+                            Html.div [
+                                prop.className "swt:text-xs swt:opacity-70 swt:ml-auto"
+                                prop.textf "%d selected" selectedTemplates.Length
+                            ]
                             Html.button [
                                 prop.className [
-                                    "swt:btn swt:btn-sm swt:ml-auto"
+                                    "swt:btn swt:btn-sm swt:w-full"
                                     if canImport then "swt:btn-primary" else "swt:btn-disabled"
                                 ]
                                 prop.disabled (not canImport)
                                 prop.onClick (fun _ -> openImportDialog ())
                                 prop.text "Import"
                             ]
-                            Html.div [
-                                prop.className "swt:text-xs swt:opacity-70"
-                                prop.textf "%d selected" selectedTemplates.Length
-                            ]
                         ]
                     ]
-                    match disabledMessage with
-                    | Some msg ->
-                        Html.div [
-                            prop.className "swt:alert swt:alert-warning swt:text-xs"
-                            prop.children [
-                                Html.text msg
-                            ]
-                        ]
-                    | None ->
-                        Html.div [
-                            prop.className "swt:alert swt:alert-success swt:text-xs"
-                            prop.children [
-                                Html.text "Templates will be appended to the active table."
-                            ]
-                        ]
                     BaseModal.Modal(
                         isOpen = showImportDialog,
                         setIsOpen = setShowImportDialog,

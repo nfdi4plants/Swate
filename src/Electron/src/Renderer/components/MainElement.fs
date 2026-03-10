@@ -45,10 +45,10 @@ let CreateARCitectNavbar
     =
     let widgetHostView =
         match activeView with
-        | PreviewActiveView.Table _ -> Renderer.components.AddDataAnnotatorWidget.HostView.Table
-        | PreviewActiveView.DataMap -> Renderer.components.AddDataAnnotatorWidget.HostView.DataMap
-        | PreviewActiveView.Metadata -> Renderer.components.AddDataAnnotatorWidget.HostView.Metadata
-        | PreviewActiveView.Error _ -> Renderer.components.AddDataAnnotatorWidget.HostView.PreviewError
+        | PreviewActiveView.Table _ -> Renderer.components.Widgets.AddDataAnnotatorWidget.HostView.Table
+        | PreviewActiveView.DataMap -> Renderer.components.Widgets.AddDataAnnotatorWidget.HostView.DataMap
+        | PreviewActiveView.Metadata -> Renderer.components.Widgets.AddDataAnnotatorWidget.HostView.Metadata
+        | PreviewActiveView.Error _ -> Renderer.components.Widgets.AddDataAnnotatorWidget.HostView.PreviewError
 
     let widgets = createWidgets arcFile widgetHostView activeTableIndex setArcFileState
 

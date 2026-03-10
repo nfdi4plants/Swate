@@ -61,7 +61,7 @@ let filePickerWidget
 
 let dataAnnotatorWidget
     (arcFileState: ArcFiles option)
-    (activeView: Renderer.components.AddDataAnnotatorWidget.HostView)
+    (activeView: Renderer.components.Widgets.AddDataAnnotatorWidget.HostView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
     : WidgetType * WidgetDefinition =
@@ -69,7 +69,7 @@ let dataAnnotatorWidget
     {|
         prefix = "DATAANNOTATOR"
         content =
-            Renderer.components.AddDataAnnotatorWidget.Main(
+            Renderer.components.Widgets.AddDataAnnotatorWidget.Main(
                 arcFileState,
                 activeView,
                 activeTableIndex,
@@ -79,7 +79,7 @@ let dataAnnotatorWidget
 
 let createWidgets
     (arcFileState: ArcFiles option)
-    (activeView: Renderer.components.AddDataAnnotatorWidget.HostView)
+    (activeView: Renderer.components.Widgets.AddDataAnnotatorWidget.HostView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
     : Map<WidgetType, WidgetDefinition> =
@@ -96,17 +96,25 @@ let createWidgets
 let NavbarButtons(widgetTypes: WidgetType list) =
     let context = WidgetContext.useWidgetController ()
 
+    let widgetInfo (widgetType: WidgetType) =
+        match widgetType with
+        | WidgetType.BuildingBlock -> "Add Building Block", Icons.BuildingBlock()
+        | WidgetType.Template -> "Add Template", Icons.Templates()
+        | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
+        | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
+        | WidgetType.Playground -> "Playground", Icons.Templates()
+
     let controlButton (widgetType: WidgetType) =
         let isActive = context.isActive widgetType
+        let label, icon = widgetInfo widgetType
+        let tooltip = if isActive then $"Close {label}" else $"Open {label}"
 
-        Html.button [
-            prop.className [
-                "swt:btn swt:btn-sm"
-                if isActive then "swt:btn-primary" else "swt:btn-outline"
-            ]
-            prop.textf "%s %s" (if isActive then "Close" else "Open") (widgetType.ToString())
-            prop.onClick (fun _ -> context.toggleWidget widgetType)
-        ]
+        QuickAccessButton.QuickAccessButton(
+            tooltip,
+            icon,
+            (fun _ -> context.toggleWidget widgetType),
+            classes = (if isActive then "swt:!text-primary" else "")
+        )
 
     Html.div [
         prop.className "swt:flex swt:flex-col swt:gap-3 swt:items-center swt:justify-center"
