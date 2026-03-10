@@ -45,25 +45,26 @@ module NavbarHelper =
 type private Selector =
 
     [<ReactComponent>]
-    static member private Actionbar(setNewArcModalIsOpen, toggleSelector: unit -> unit) =
+    static member CreateArcActionBtn(onClick: unit -> unit) =
+        Actionbar.ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", onClick)
 
-        let createARC =
-            Actionbar.ButtonInfo.create (
-                "swt:fluent--document-add-24-regular swt:size-5",
-                "Create a new ARC",
-                fun _ ->
-                    setNewArcModalIsOpen true
-                    toggleSelector ()
-            )
 
-        let openARCButtonInfo =
-            Actionbar.ButtonInfo.create (
-                "swt:fluent--folder-open-24-regular swt:size-5",
-                "Open an existing ARC",
-                fun _ ->
-                    NavbarHelper.Selector.openARC ()
-                    toggleSelector ()
-            )
+    [<ReactComponent>]
+    static member OpenArcActionBtn(onClick: unit -> unit) =
+        Actionbar.ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
+
+    [<ReactComponent>]
+    static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
+
+        let onCreateARC =
+            fun _ ->
+                setNewArcModalIsOpen true
+                toggleSelector ()
+
+        let onOpenARC =
+            fun _ ->
+                NavbarHelper.Selector.openARC ()
+                toggleSelector ()
 
         // let downloadARC =
         //     Actionbar.ButtonInfo.create (
@@ -71,7 +72,13 @@ type private Selector =
         //         "Download an existing ARC",
         //         onClick
         //     )
-        Actionbar.Main([| createARC; openARCButtonInfo |], 4)
+        Actionbar.Main(
+            [|
+                Selector.CreateArcActionBtn(onCreateARC)
+                Selector.OpenArcActionBtn(onOpenARC)
+            |],
+            4
+        )
 
     [<ReactComponent>]
     static member Main() =
