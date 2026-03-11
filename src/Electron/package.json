@@ -36,6 +36,6 @@
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron-forge/plugin-vite": "^7.10.2",
     "@electron/fuses": "^1.8.0",
-    "electron": "39.2.5"
+    "electron": "40.6.0"
   }
 }
