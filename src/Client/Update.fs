@@ -469,13 +469,13 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let nextModel = { model with ProtocolState = nextState }
             nextModel, nextCmd
 
-        // | CytoscapeMsg msg ->
-        //     let nextState, nextModel0, nextCmd =
-        //         Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel
-        //     let nextModel =
-        //         {nextModel0 with
-        //             CytoscapeModel = nextState}
-        //     nextModel, nextCmd
+         //| CytoscapeMsg msg ->
+         //    let nextState, nextModel0, nextCmd =
+         //        Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel
+         //    let nextModel =
+         //        {nextModel0 with
+         //            CytoscapeModel = nextState}
+         //    nextModel, nextCmd
 
         | DataAnnotatorMsg msg ->
             let nextState, nextModel0, nextCmd =
