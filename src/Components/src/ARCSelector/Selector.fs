@@ -230,46 +230,18 @@ type Selector =
         )
 
     [<ReactComponent>]
-    static member Entry(?debug: bool) =
-
-        let testRecentARCs = [|
-            ARCPointer.create ("Test 1", "/Here", false)
-            ARCPointer.create ("Test 2", "/Here/Here", false)
-            ARCPointer.create ("Test 3", "/Here/Here/Here", false)
-            ARCPointer.create (
-                "Test jfcesjföisjyfnwjtiewhroiajlkfnnalkfjwarkoiewfanflkndslkfjwiajofkcmscnskjfafdölmsalknoisjfamlkcnkj<ycwaklfnewjföosajö",
-                "/Here/Here/Here/Here",
-                false
-            )
-        |]
-
-        let recentARCs, setRecentARCs = React.useState (testRecentARCs)
-
-        let onClick (arcPointer: ARCPointer) =
-            let newRecentARCs =
-                recentARCs
-                |> Array.map (fun arc ->
-                    if arc.path = arcPointer.path then
-                        { arc with isActive = true }
-                    else
-                        { arc with isActive = false }
-                )
-
-            setRecentARCs newRecentARCs
-            console.log ($"Clicked on: {arcPointer.path}")
-
-        Selector.Main(recentARCs, onClick, potMaxWidth = 48, ?debug = debug)
-
-    [<ReactComponent>]
-    static member ActionbarInSelectorEntry(?maxNumberActionbar, ?debug: bool) =
+    static member Entry(?maxNumberActionbar, ?debug: bool) =
 
         let maxNumberActionbar = defaultArg maxNumberActionbar 3
         let selectorController = React.useRef ({ toggle = fun _ -> () }: SelectorRef)
 
+        let currentlyOpenArcPath, setCurrentlyOpenArcPath =
+            React.useState (None: string option)
+
         let testRecentARCs = [|
-            ARCPointer.create ("Test 1", "/Here", false)
-            ARCPointer.create ("Test 2", "/Here/Here", false)
-            ARCPointer.create ("Test 3", "/Here/Here/Here", false)
+            ARCPointer.create ("Test 1", "/Here/Test 1", false)
+            ARCPointer.create ("Test 2", "/Here/Test 2", false)
+            ARCPointer.create ("Test 3", "/Here/Test 3", false)
             ARCPointer.create (
                 "Test jfcesjföisjyfnwjtiewhroiajlkfnnalkfjwarkoiewfanflkndslkfjwiajofkcmscnskjfafdölmsalknoisjfamlkcnkj<ycwaklfnewjföosajö",
                 "/Here/Here/Here/Here",
@@ -317,6 +289,7 @@ type Selector =
 
             selectorController.current.toggle ()
             setRecentARCs newRecentARCs
+            setCurrentlyOpenArcPath (Some arcPointer.path)
 
             console.log ($"Clicked on: {arcPointer.path}")
 
@@ -326,37 +299,16 @@ type Selector =
 
             setRecentARCs newRecentARCs
 
+            if currentlyOpenArcPath = Some arcPointer.path then
+                setCurrentlyOpenArcPath None
+
         Selector.Main(
             recentARCs,
             onClick,
             rmvRecentArc,
             potMaxWidth = 48,
             actionbar = actionbar,
+            ?currentlyOpenArcPath = currentlyOpenArcPath,
             ?debug = debug,
             controlRef = selectorController
         )
-
-    [<ReactComponent>]
-    static member NavbarSelectorEntry(onClick, ?maxNumberActionbar, ?debug: bool) =
-
-        let maxNumberActionbar = defaultArg maxNumberActionbar 3
-
-        let testRecentARCs = [|
-            ARCPointer.create ("Test 1", "/Here", false)
-            ARCPointer.create ("Test 2", "/Here/Here", false)
-            ARCPointer.create ("Test 3", "/Here/Here/Here", false)
-            ARCPointer.create (
-                "Test jfcesjföisjyfnwjtiewhroiajlkfnnalkfjwarkoiewfanflkndslkfjwiajofkcmscnskjfafdölmsalknoisjfamlkcnkj<ycwaklfnewjföosajö",
-                "/Here/Here/Here/Here",
-                false
-            )
-        |]
-
-        let recentARCs, setRecentARCs = React.useState (testRecentARCs)
-
-        let actionbar = Actionbar.Entry(maxNumberActionbar, ?debug = debug)
-
-        let selector =
-            Selector.Main(recentARCs, onClick, potMaxWidth = 48, actionbar = actionbar, ?debug = debug)
-
-        Navbar.Main(selector, ?debug = debug)

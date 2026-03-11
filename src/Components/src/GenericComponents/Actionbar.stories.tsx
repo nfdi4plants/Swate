@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import Layout from "../Layout/Layout.fs.js";
-import { ActionbarInSelectorEntry } from '../ARCSelector/Selector.fs.js';
 import { Entry as ActionbarEntry } from './Actionbar.fs.js';
 
 const meta = {
@@ -25,26 +24,10 @@ export const DisplayActionbar: Story = {
   }
 }
 
-export const DisplayActionbarInSelector: Story = {
-  args: {
-    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      < ActionbarInSelectorEntry maxNumber = {5} maxNumberActionbar = {3} debug={true} />
-    </div>
-  }
-}
-
 export const DisplayActionbarWithoutRestElementButton: Story = {
   args: {
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
       < ActionbarEntry maxNumber = {5} debug={true} />
-    </div>
-  }
-}
-
-export const DisplayActionbarWithoutRestElementButtonInSelector: Story = {
-  args: {
-    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      < ActionbarInSelectorEntry maxNumber = {5} maxNumberActionbar = {5} debug={true} />
     </div>
   }
 }
