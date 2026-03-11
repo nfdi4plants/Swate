@@ -6,9 +6,17 @@ type Dropdown =
 
     [<ReactComponent>]
     static member Main
-        (isOpen, setIsOpen, toggle: ReactElement, children: ReactElement) =
+        (isOpen, setIsOpen, toggle: ReactElement, children: ReactElement, ?contentClassName: string, ?closeOnClick: bool) =
+
+        let closeOnClick = defaultArg closeOnClick true
+
+        let classNameDropdownContent =
+            defaultArg
+                contentClassName
+                "swt:w-max swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"
 
         let ref = React.useElementRef ()
+
         React.useListener.onClickAway (ref, fun _ -> setIsOpen false)
 
         Html.div [
@@ -19,14 +27,18 @@ type Dropdown =
                     "swt:dropdown-open"
             ]
             prop.children [
-                toggle
+                Html.div [
+
+                    toggle
+                ]
                 if isOpen then
                     Html.ul [
                         prop.tabIndex 0
-                        prop.className
-                            "swt:dropdown-content swt:w-max swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"
+                        prop.className [ "swt:dropdown-content"; classNameDropdownContent ]
+
                         //Close dropdown on click
-                        prop.onClick (fun _ -> setIsOpen false)
+                        if closeOnClick then
+                            prop.onClick (fun _ -> setIsOpen false)
                         prop.children children
                     ]
             ]

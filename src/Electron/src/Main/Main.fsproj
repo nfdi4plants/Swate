@@ -8,13 +8,25 @@
     <None Include="SimpleGitTest.fsx" />
     <None Include="ChokidarTest.fsx" />
     <Compile Include="IPC\GitLfs.fs" />
-    <Compile Include="FileTreeCreator.fs" />
-    <Compile Include="ArcHolder.fs" />
     <Compile Include="Bindings\Chokidar.fs" />
+    <Compile Include="Bindings\Filesystem.fs" />
+    <Compile Include="Bindings\Path.fs" />
+    <Compile Include="Bindings\SimpleGit.fs" />
+    <Compile Include="FileTreeCreator.fs" />
+    <Compile Include="SettingsStore.fs" />
+    <Compile Include="RecentArcStore.fs" />
+    <Compile Include="Git\GitTokenProvider.fs" />
+    <Compile Include="Git\GitAuthAdapter.fs" />
+    <Compile Include="Git\GitInternals.fs" />
+    <Compile Include="Git\GitService.fs" />
+    <Compile Include="Git\GitProvisioningService.fs" />
     <Compile Include="ArcVault.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
+    <Compile Include="IPC\IGitApi.fs" />
     <Compile Include="IPC\IArcVaultsApi.fs" />
     <Compile Include="main.fs" />
+    <None Include="SimpleGitTest.fsx" />
+    <None Include="ChokidarTest.fsx" />
   </ItemGroup>
 
   <ItemGroup>

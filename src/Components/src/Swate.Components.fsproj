@@ -76,6 +76,7 @@
     <Compile Include="GenericComponents\Dropdown.fs" />
     <Compile Include="GenericComponents\Actionbar.fs" />
     <Compile Include="GenericComponents\Navbar.fs" />
+    <Compile Include="ARCSelector\Types.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
@@ -134,6 +135,10 @@
     <Compile Include="Notes\Editor\TargetSelector.fs" />
     <Compile Include="Notes\Editor\Actions.fs" />
     <Compile Include="Notes\Editor\Notes.fs" />
+    <Compile Include="DataHubSidebar\Types.fs" />
+    <Compile Include="DataHubSidebar\DataHubSidebar.fs" />
+    <Compile Include="Authentication\Types.fs" />
+    <Compile Include="Authentication\Authentication.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>
 

@@ -608,7 +608,7 @@ let Main
     let deselectedTemplateColumns, setDeselectedTemplateColumns =
         React.useStateWithUpdater (Set.empty<System.Guid * int>)
     let showImportDialog, setShowImportDialog = React.useState false
-    let workspaceCtx = React.useContext Renderer.context.WorkspaceStateCtx.WorkspaceStateCtx
+    let workspaceCtx = React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
     let widgetCtx = WidgetContext.useWidgetController ()
 
     let importType = workspaceCtx.state.TemplateImportType

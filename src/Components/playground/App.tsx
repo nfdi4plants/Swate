@@ -20,6 +20,9 @@ import {FileExplorerExample_Example} from '../src/FileExplorer/FileExplorer.fs.t
 import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
 import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.fs.ts'
 import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
+import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
+import {Entry as DataHubSidebarEntry} from '../src/DataHubSidebar/DataHubSidebar.fs.ts';
+import {ActionbarInSelectorEntry as ARCSelectorEntry} from '../src/ARCSelector/Selector.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -185,13 +188,36 @@ function MarkdownTextContainer() {
   </div>
 }
 
+function AuthButtonContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Authentication Button</h2>
+    <AuthButton />
+  </div>
+}
+
+function DataHubSidebarContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Sidebar</h2>
+    <DataHubSidebarEntry />
+  </div>
+}
+
+function ARCSelectorContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>ARC Selector</h2>
+    <ARCSelectorEntry />
+  </div>
+}
+
 const App = () => {
     return (
-        <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
-            <NoteSearch />
-            <MarkdownTextContainer />
-            <LandingContainer />
-        </div>
+        <ARCSelectorContainer />
+        // <AuthButtonContainer />
+        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
+        //     <NoteSearch />
+        //     <MarkdownTextContainer />
+        //     <LandingContainer />
+        // </div>
     );
 };
 

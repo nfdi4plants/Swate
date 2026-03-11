@@ -1,4 +1,4 @@
-module Renderer.components.WidgetRegistry
+module Renderer.Components.WidgetRegistry
 
 open Feliz
 open Swate.Components

@@ -1,4 +1,4 @@
-module Renderer.components.InitState
+module Renderer.Components.InitState
 
 open Feliz
 
@@ -9,7 +9,7 @@ open Swate.Components
 module private InitStateHelper =
     let openARC =
         fun () -> promise {
-            let! r = Api.openARC()
+            let! r = Api.ipcArcVaultApi.openARC (unbox null)
 
             match r with
             | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -18,7 +18,7 @@ module private InitStateHelper =
 
     let createARC =
         fun identifier -> promise {
-            let! r = Api.createARC identifier
+            let! r = Api.ipcArcVaultApi.createARC (unbox null) identifier
 
             match r with
             | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -55,10 +55,7 @@ let CreateNewArcModalContent (close: unit -> unit) =
                         Html.input [
                             prop.type'.text
                             prop.required true
-                            prop.onKeyDown (
-                                key.enter,
-                                fun _ -> handleSubmit ()
-                            )
+                            prop.onKeyDown (key.enter, fun _ -> handleSubmit ())
                             prop.onChange (fun (v: string) ->
                                 if System.String.IsNullOrEmpty v then
                                     setIsValid true

@@ -1,4 +1,4 @@
-module Renderer.context.AppStateCtx
+module Renderer.Context.AppStateCtx
 
 open Swate.Components
 open Swate.Electron.Shared

@@ -183,7 +183,7 @@ let Main
             setStatusMessage None
 
             try
-                let! result = Api.pickPaths ()
+                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
 
                 match result with
                 | Ok paths ->

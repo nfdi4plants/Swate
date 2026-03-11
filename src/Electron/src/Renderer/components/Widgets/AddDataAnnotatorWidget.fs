@@ -4,8 +4,8 @@ open System
 open Feliz
 open ARCtrl
 open Swate.Components
-open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open DataAnnotator
 open DataAnnotatorDataSource
 
@@ -263,7 +263,7 @@ let Main
             setErrorMessage None
 
             try
-                let! fileResult = Api.openFile path
+                let! fileResult = Api.ipcArcVaultApi.openFile (unbox null) path
 
                 match fileResult with
                 | Error exn ->
@@ -296,7 +296,7 @@ let Main
             setStatusMessage None
             setErrorMessage None
 
-            let! pathResult = Api.pickPaths ()
+            let! pathResult = Api.ipcArcVaultApi.pickPaths (unbox null)
 
             match pathResult with
             | Error exn ->

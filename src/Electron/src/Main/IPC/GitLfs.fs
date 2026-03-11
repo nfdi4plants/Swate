@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.GitTypes
 
 let private childProcessDynamic: obj = importAll "node:child_process"
 
@@ -164,7 +165,7 @@ type NodeGitLfsAdapter() =
                 | Ok args ->
                     isRunning <- true
 
-                    let! result = runProcess args
+                    let! (result: GitLfsResult) = runProcess args
 
                     if not result.Success then
                         isRunning <- false

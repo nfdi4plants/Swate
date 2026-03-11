@@ -25,7 +25,7 @@ module Conversion =
 
             let rows =
                 normalizedFiles
-                |> List.map (fun fileName -> ResizeArray [ CompositeCell.createDataFromString(fileName) ])
+                |> List.map (fun fileName -> ResizeArray [ CompositeCell.createDataFromString (fileName) ])
                 |> ResizeArray
 
             table.AddRows(rows)

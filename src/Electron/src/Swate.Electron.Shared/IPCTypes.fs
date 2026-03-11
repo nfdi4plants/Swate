@@ -1,73 +1,46 @@
+/// This module SHOULD only contain the exact IPC communication types.
 module Swate.Electron.Shared.IPCTypes
 
-open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 
 open Swate.Components
 
 open ARCtrl.ARCtrlHelper
+open GitTypes
+open FileIOTypes
 
+module IPCTypesHelper =
 
-[<RequireQualifiedAccess>]
-type PageState =
-    | ArcFileData of fileType: ArcFilesDiscriminate * json: string
-    | Text of string
-    | Unknown
-    | LandingDraft
-    | Error of string
+    /// TODO: This is a pure UI type and should only be used in the renderer process. It is not meant to be sent over IPC, but rather to represent the state of the page after receiving data from the main process.
+    [<RequireQualifiedAccess>]
+    type PageState =
+        | ArcFileData of fileType: ArcFilesDiscriminate * json: string
+        | Text of string
+        | Unknown
+        | LandingDraft
+        | Error of string
 
-type SaveArcFileRequest = {
-    FileType: ArcFilesDiscriminate
-    Json: string
-}
+    [<RequireQualifiedAccess>]
+    type SaveBeforeQuitDecision =
+        | SaveAndClose
+        | CloseWithoutSaving
+        | CancelClose
 
-type WriteFileRequest = {
-    RelativePath: string
-    Content: string
-}
-
-// GIT LFS Types
-type GitLfsCommand =
-    | Pull
-    | Fetch
-    | Install
-    | Track
-    | Untrack
-    | Status
-
-type GitLfsRequest = {
-    RequestId: string
-    RepoPath: string
-    Command: GitLfsCommand
-    FilePath: string option
-    TimeoutMs: int option
-}
-
-type GitLfsResult = {
-    Success: bool
-    Output: string
-    Error: string
-}
-
-[<RequireQualifiedAccess>]
-type SaveBeforeQuitDecision =
-    | SaveAndClose
-    | CloseWithoutSaving
-    | CancelClose
+open IPCTypesHelper
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
-    /// Will open ARC in same window
+    /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
     openARC: IpcMainEvent -> JS.Promise<Result<string, exn>>
+    /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
+    openARCByPath: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    /// Create ARC via folder dialog. Main decides disposition.
     createARC: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
-    focusExistingARCWindow: string -> JS.Promise<Result<unit, exn>>
-    /// Will open ARC in a new window
-    openARCInNewWindow: unit -> JS.Promise<Result<unit, exn>>
-    createARCInNewWindow: string -> JS.Promise<Result<unit, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
-    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer []>
+    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
+    removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
     checkForARC: string -> JS.Promise<bool>
     pickPaths: IpcMainEvent -> JS.Promise<Result<string [], exn>>
 
@@ -85,59 +58,31 @@ type IGitLfsApi = {
     cancelChannel: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
 }
 
-type FileEntry = {
-    name: string
-    path: string
-    isDirectory: bool
-    isLfs: bool option
+/// Two Way Bridge: Renderer <-> Main
+type IGitApi = {
+    getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
+    getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
+    gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitInitRepository: IpcMainEvent -> string -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCloneRepository: IpcMainEvent -> GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitStagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitUnstagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    createBranch: IpcMainEvent -> GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
 }
-
-[<AutoOpen>]
-module FileEntryExtensions =
-
-    let createFileEntryTree (fileEntries: FileEntry[]) =
-        let dic = Dictionary<string, FileEntry>()
-        fileEntries |> Array.iter (fun fileEntry -> dic.Add(fileEntry.path, fileEntry))
-        dic
-
-    type FileEntry with
-
-        static member create(name: string, path: string, isDirectory: bool, ?isLfs: bool option) = {
-            name = name
-            path = path
-            isDirectory = isDirectory
-            isLfs = defaultArg isLfs None
-        }
-
-type FileItemDTO = {
-    name: string
-    isDirectory: bool
-    path: string
-    isLfs: bool option
-    children: Dictionary<string, FileItemDTO>
-}
-
-[<AutoOpen>]
-module FileItemDTOExtensions =
-
-    type FileItemDTO with
-
-        static member create(name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>, ?isLfs: bool option) = {
-            name = name
-            isDirectory = isDirectory
-            path = path
-            isLfs = defaultArg isLfs None
-            children = children
-        }
 
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
+    gitProgressUpdate: GitProgressDto -> unit
 }
 
-// Todo: What should filewatcher do when detecting changes?
+// TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer
 type IArcFileWatcherApi = {
     /// This function is called when ARC is reloaded due to local file changes.

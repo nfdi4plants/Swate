@@ -8,6 +8,8 @@ open Main
 open Main.Bindings
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
 
@@ -49,6 +51,7 @@ module ArcVaultHelper =
         let ignoreFn =
             fun (path: string) ->
                 let normalizedPath = path.Replace("\\", "/")
+
                 let segments =
                     normalizedPath.Trim('/').Split('/', System.StringSplitOptions.RemoveEmptyEntries)
 
@@ -255,15 +258,6 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some path)
         }
 
-        member this.OnClose() =
-            match this.path with
-            | Some path ->
-                let arcs = recentARCs |> Array.filter (fun arc -> arc.path <> path)
-                setRecentARCs arcs
-                printfn $"[Swate] Removed vault '{this.window.id}'"
-                arcs
-            | None -> [||]
-
         member this.OpenAssay(identifier: string) =
             let assay = this.arc.Value.TryGetAssay(identifier)
 
@@ -308,6 +302,35 @@ module ArcVaultExtensions =
 
         member this.SyncArc newArc = this.arc <- newArc
 
+        /// Load file entries from disk and push the file tree to the renderer.
+        member this.RefreshFileTree() = promise {
+            match this.path with
+            | Some arcPath ->
+                let! fileEntries = getFileEntries arcPath
+                let fileTree = createFileEntryTree fileEntries
+                this.SetFileTree(fileTree)
+            | None -> ()
+        }
+
+
+/// Describes the outcome of an ARC lifecycle action performed by the controller.
+[<RequireQualifiedAccess>]
+type ArcOpenDisposition =
+    | OpenedInCurrent of path: string
+    | OpenedInNewWindow of path: string
+    | FocusedExisting of path: string
+    | CreatedInCurrent of path: string
+    | CreatedInNewWindow of path: string
+
+module ArcOpenDisposition =
+    let path =
+        function
+        | ArcOpenDisposition.OpenedInCurrent p
+        | ArcOpenDisposition.OpenedInNewWindow p
+        | ArcOpenDisposition.FocusedExisting p
+        | ArcOpenDisposition.CreatedInCurrent p
+        | ArcOpenDisposition.CreatedInNewWindow p -> p
+
 
 type ArcVaults() =
     /// Key is window.id
@@ -315,15 +338,25 @@ type ArcVaults() =
 
     member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
-    member this.BroadcastRecentARCs(recentARCs: SelectorTypes.ARCPointer[]) =
+    member this.BroadcastRecentARCs() =
+        let recentARCs = RECENT_ARCS.Get()
+
         this.Vaults.Values
         |> Array.ofSeq
-        |> Array.iter (fun vault ->
-            Remoting.init
-            |> Remoting.withWindow vault.window
-            |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
-            |> fun client -> client.recentARCsUpdate recentARCs
-        )
+        |> fun arr ->
+            if arr.Length > 0 then
+                arr
+                |> Array.iter (fun vault ->
+                    Remoting.init
+                    |> Remoting.withWindow vault.window
+                    |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+                    |> fun client -> client.recentARCsUpdate recentARCs
+                )
+
+    /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
+    member private this.TrackRecentAndBroadcast(arcPath: string) =
+        RECENT_ARCS.Add(arcPath) |> ignore
+        this.BroadcastRecentARCs()
 
     member this.DisposeVault(id: int) =
         match this.Vaults.TryGetValue(id) with
@@ -331,7 +364,9 @@ type ArcVaults() =
         | true, vault ->
             vault.watcher |> Option.iter (fun watcher -> watcher.close () |> Promise.start)
             this.Vaults.Remove(id) |> ignore
-            swatelogfn id $"Removed vault."
+            vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
+            this.BroadcastRecentARCs()
+            printfn $"[Swate] Removed vault '{id}'"
 
     member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
         match this.TryGetVault(windowId) with
@@ -354,10 +389,8 @@ type ArcVaults() =
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
         window.onClose (fun closeEvent ->
-            if vault.isCloseApproved || vault.path.IsNone then
-                let recentARCs = vault.OnClose()
-                this.BroadcastRecentARCs recentARCs
-            else
+            if not vault.isCloseApproved then
+
                 closeEvent.preventDefault ()
 
                 if not vault.isCloseRequestPending then
@@ -452,6 +485,62 @@ type ArcVaults() =
 
     member this.TryGetVaultByPath(path: string) =
         this.Vaults.Values |> Seq.tryFind (fun v -> v.path = Some path)
+
+    // ── ARC Lifecycle Controller ──────────────────────────────────────────
+    // All open/create/focus decisions are made here.
+    // IPC handlers should delegate to these methods.
+
+    /// Open an existing ARC at the given path.
+    /// Decision: already-open → focus, calling window empty → open there, else → new window.
+    member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
+        match this.TryGetVaultByPath arcPath with
+        | Some vault ->
+            vault.window.focus ()
+            this.TrackRecentAndBroadcast(arcPath)
+            return ArcOpenDisposition.FocusedExisting arcPath
+        | None ->
+            match this.TryGetVault callingWindowId with
+            | Some vault when vault.path.IsNone ->
+                do! vault.OpenARC(arcPath)
+                do! vault.RefreshFileTree()
+                this.TrackRecentAndBroadcast(arcPath)
+                return ArcOpenDisposition.OpenedInCurrent arcPath
+            | _ ->
+                let! newWindowId = this.RegisterVaultWithArc(arcPath)
+
+                match this.TryGetVault newWindowId with
+                | Some newVault -> do! newVault.RefreshFileTree()
+                | None -> ()
+
+                this.TrackRecentAndBroadcast(arcPath)
+                return ArcOpenDisposition.OpenedInNewWindow arcPath
+    }
+
+    /// Create a new ARC at the given path with the given identifier.
+    /// Decision: path already open → focus, calling window empty → create there, else → new window.
+    member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
+        match this.TryGetVaultByPath arcPath with
+        | Some vault ->
+            vault.window.focus ()
+            this.TrackRecentAndBroadcast(arcPath)
+            return ArcOpenDisposition.FocusedExisting arcPath
+        | None ->
+            match this.TryGetVault callingWindowId with
+            | Some vault when vault.path.IsNone ->
+                do! vault.CreateARC(arcPath, identifier)
+                do! vault.RefreshFileTree()
+                this.TrackRecentAndBroadcast(arcPath)
+                return ArcOpenDisposition.CreatedInCurrent arcPath
+            | _ ->
+                let! newWindowId = this.RegisterVaultWithNewArc(arcPath, identifier)
+
+                match this.TryGetVault newWindowId with
+                | Some newVault -> do! newVault.RefreshFileTree()
+                | None -> ()
+
+                this.TrackRecentAndBroadcast(arcPath)
+                return ArcOpenDisposition.CreatedInNewWindow arcPath
+    }
 
 
 let ARC_VAULTS: ArcVaults = ArcVaults()
