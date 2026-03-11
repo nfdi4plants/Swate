@@ -114,7 +114,7 @@ type SearchComponent =
         let element = React.useElementRef ()
 
         Html.div [
-            prop.ref element
+            prop.ref element // The ref must be place here, otherwise the portalled term select area will trigger daisy join syntax
             prop.style [ style.position.relative ]
             prop.children [
                 Html.div [
