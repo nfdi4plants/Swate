@@ -2,7 +2,13 @@
 
 ## Overview
 
-Swate Electron authenticates users to GitLab-compatible DataHub instances via Personal Access Token (PAT). Authentication is verified server-side (Main process), credentials are encrypted at rest via Electron safe storage, and the token is injected into Git operations through the existing `GitTokenProvider` interface.
+Swate Electron authenticates users to GitLab-compatible DataHub instances via Personal Access Token (PAT).
+
+- Authentication is verified in the Main process (`GET /api/v4/user`).
+- Credentials are encrypted at rest using Electron `safeStorage`.
+- Multiple accounts are supported concurrently.
+- Git access tokens are supplied through `GitTokenProvider`.
+- Account-list changes are broadcast to all open windows.
 
 ## Architecture
 
@@ -10,58 +16,100 @@ Swate Electron authenticates users to GitLab-compatible DataHub instances via Pe
 Renderer                    Main Process
 ────────                    ────────────
 Navbar.fs UserAvatar        IPC/IAuthApi.fs
-  │  signIn(baseUrl, PAT)    │
-  │ ─────────────────────► Auth/AuthService.fs
+  │ signIn(baseUrl, PAT)      │
+  │ setActiveAccount(id)      │
+  │ removeAccount(id)         │
+  │ getAuthState()            │
+  │─────────────────────────► │ Auth/AuthService.fs
   │                           │  verifyToken → GitLab /api/v4/user
-  │                           │  persist → Auth/SecureAuthStore.fs
-  │                           │  wire → Git/GitTokenProvider.fs
-  │ ◄─────────────────────   │  return AuthResult
-  │  getAuthState()           │
-  │ ─────────────────────►    │  read in-memory state
-  │  signOut()                │
-  │ ─────────────────────►    │  clear memory + storage + reset provider
+  │                           │  persist/load → Auth/SecureAuthStore.fs
+  │                           │  update token provider
+  │ ◄───────────────────────  │ return AuthResult/AuthStateDto
+  │                           │
+  │ ◄───────────────────────  │ IMainUpdateRendererApi.authAccountsUpdate(accounts)
+  │                           │ (broadcast on account-list changes)
 ```
 
-## Where auth is stored
+## Storage model
+
+All auth storage lives under:
+
+- `{userData}/Settings/Auth`
+
+Where `{userData}` is `app.getPath("userData")`.
+
+### Files
 
 | Data | Location | Format |
 |------|----------|--------|
-| Encrypted PAT | `{userData}/Settings/Auth/auth-credentials.enc` | Base64-encoded `safeStorage.encryptString` output |
-| User metadata | `{userData}/Settings/Auth/auth-meta.json` | Plaintext JSON (name, email, avatar URL, DataHub URL) |
+| Encrypted PAT per account | `{userData}/Settings/Auth/{accountId}-credentials.enc` | Base64 of `safeStorage.encryptString(token)` |
+| Metadata per account | `{userData}/Settings/Auth/{accountId}-meta.json` | Plain JSON (`accountId`, `name`, `email`, `avatarUrl`, `targetDataHub`) |
+| Active account marker | `{userData}/Settings/Auth/active-account.json` | JSON containing `accountId` |
 
-- `{userData}` = `app.getPath("userData")` (e.g. `C:\Users\<user>\AppData\Roaming\Swate`)
-- The PAT never appears in plaintext on disk. It is encrypted by Electron's `safeStorage` API which uses OS-level credential stores (DPAPI on Windows, Keychain on macOS, libsecret/kwallet on Linux).
-- If `safeStorage.isEncryptionAvailable()` is false at runtime, sign-in still works for the session but credentials are not persisted to disk.
+- PATs are never written in plaintext.
+- `safeStorage` uses the OS credential backend (DPAPI/Keychain/libsecret or similar).
+- If `safeStorage.isEncryptionAvailable()` is `false`, sign-in fails with `AuthFailureKind.StorageUnavailable`.
 
 ## Token-provider integration
 
-On successful sign-in (or when restoring from storage on startup), `AuthService` calls:
+`AuthService` sets `GitTokenProvider` to call `tryGetTokenForHost`.
 
-```fsharp
-Git.GitTokenProvider.setTokenProvider {
-    TryGetAccessToken = fun host -> promise {
-        return AuthService.tryGetTokenForHost host
-    }
-}
-```
+Selection policy:
 
-`tryGetTokenForHost` compares the requested `host` against the authenticated DataHub's host. If they match, it returns the PAT. Otherwise it returns `None`, and Git operations for that host will fail with `Unauthorized` as documented in the Git Functionality Guide.
+1. If active account host matches requested host, use active account token.
+2. Otherwise search all accounts for matching host.
+3. If no match, return `None`.
 
-On sign-out, the provider is reset to the default (always returns `None`).
+Provider is refreshed on:
+
+- restore from storage
+- sign-in
+- sign-out
+- set active account
+- remove account
+
+If no accounts remain, provider behavior effectively becomes no-token (`None` for all hosts).
+
+## Active account and account list behavior
+
+- `AuthService` keeps in-memory state:
+  - `accounts: Map<accountId, (user, token)>`
+  - `activeAccountId: string option`
+- Active account is persisted in `active-account.json` and restored on startup.
+- If the persisted active account is missing, first available account is selected.
+
+### Cross-window synchronization
+
+`Main.IPC.AuthApi` broadcasts `authAccountsUpdate` (one-way Main -> Renderer) with the latest `AuthAccountSummary[]` on account-list mutations:
+
+- successful `signIn`
+- `signOut`
+- `revalidate`
+- `removeAccount`
+
+`setActiveAccount` does not broadcast `authAccountsUpdate`.
+
+Renderer (`Navbar.fs`) listens for `authAccountsUpdate` and updates only the local account-list UI state from that push.
 
 ## Expired token recovery / logout behavior
 
-1. **At sign-in time**: Main calls `GET /api/v4/user` with the PAT. If GitLab returns 401/403, sign-in fails immediately with a typed `AuthFailureKind` and no data is persisted.
+1. **At sign-in**
+  Main verifies `GET /api/v4/user` using PAT.
+  - 401 -> `Unauthorized`
+  - 403 -> `Forbidden`
+  - 404 -> `EndpointInvalid`
+  - other non-OK -> `Unknown`
+  - network error -> `Network`
 
-2. **During session (revalidate)**: Renderer can call `revalidate()` at any time. If the token is no longer valid, `AuthService` automatically signs the user out (clears memory + storage + provider) and returns the failure.
+2. **During session (`revalidate`)**
+  Revalidates the active account token.
+  If invalid, only that account is removed.
 
-3. **During Git operations**: If a fetch/pull/push fails with `Unauthorized` at the git-transport level, the renderer should prompt the user to sign in again. The auth state does not auto-clear on git-level auth failures — the user must explicitly sign out or sign in again with a new token.
+3. **During Git operations**
+  If Git fails with auth errors, the renderer should guide the user to re-authenticate.
 
-4. **Logout**: Calling `signOut()` removes:
-   - In-memory auth state (immediate)
-   - Encrypted PAT file from disk
-   - Metadata JSON file from disk
-   - Resets `GitTokenProvider` to default (no token)
+4. **Sign-out**
+  `signOut()` removes the currently active account (memory + disk), then selects another account if available.
 
 ## IPC contract
 
@@ -71,8 +119,15 @@ Defined in `Swate.Electron.Shared/IPCTypes.fs` as `IAuthApi`:
 - `getAuthState: unit -> Promise<Result<AuthStateDto, exn>>`
 - `signOut: unit -> Promise<Result<unit, exn>>`
 - `revalidate: unit -> Promise<Result<AuthResult, exn>>`
+- `listAccounts: unit -> Promise<Result<AuthAccountSummary array, exn>>`
+- `setActiveAccount: string -> Promise<Result<AuthStateDto, exn>>`
+- `removeAccount: string -> Promise<Result<unit, exn>>`
 
-Note: Unlike `IGitApi` and `IArcVaultsApi`, auth endpoints do not take `IpcMainEvent` as the first parameter because they are not window-scoped operations.
+And in `IMainUpdateRendererApi`:
+
+- `authAccountsUpdate: AuthAccountSummary[] -> unit`
+
+Note: `IAuthApi` endpoints do not take `IpcMainEvent` because auth state is managed centrally in Main.
 
 ## Error categories
 
@@ -84,5 +139,5 @@ Note: Unlike `IGitApi` and `IArcVaultsApi`, auth endpoints do not take `IpcMainE
 | `Forbidden` | 403 — token lacks required scopes |
 | `Network` | DNS/connection failure reaching the DataHub |
 | `EndpointInvalid` | DataHub URL is malformed or returns 404 |
-| `StorageUnavailable` | Electron safe storage not available (non-fatal for session) |
+| `StorageUnavailable` | Electron safe storage is not available |
 | `Unknown` | Unexpected error |
