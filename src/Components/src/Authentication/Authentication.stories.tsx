@@ -31,16 +31,28 @@ const signInWithPat = async (canvas: ReturnType<typeof within>) => {
   await userEvent.click(signInButton);
 };
 
-const expectLoggedInDataHub = async (canvas: ReturnType<typeof within>, expectedDataHub: string) => {
+const expectSignedIn = async (canvas: ReturnType<typeof within>) => {
   await waitFor(async () => {
     const signedInInfo = await canvas.findByTestId('SignedInInfo');
     expect(signedInInfo).toHaveTextContent('Signed In: true');
   }, { timeout: 4000 });
+};
 
+const expectLoggedOut = async (canvas: ReturnType<typeof within>) => {
+  await waitFor(async () => {
+    const signedInInfo = await canvas.findByTestId('SignedInInfo');
+    expect(signedInInfo).toHaveTextContent('Signed In: false');
+  }, { timeout: 4000 });
+};
+
+const expectAuthenticatedActions = async (canvas: ReturnType<typeof within>) => {
   await openUserMenu(canvas);
 
-  const loggedInDataHub = await canvas.findByTestId('LoggedInDataHub');
-  expect(loggedInDataHub).toHaveTextContent(`DataHub: ${expectedDataHub}`);
+  const logoutButton = await canvas.findByTestId('LogoutButton');
+  expect(logoutButton).toBeInTheDocument();
+
+  const addAnotherButton = await canvas.findByTestId('AddAnotherAccountButton');
+  expect(addAnotherButton).toBeInTheDocument();
 };
 
 export const Default: Story = {};
@@ -52,16 +64,8 @@ export const SignInFlow: Story = {
 
     await signInWithPat(canvas);
 
-    await waitFor(async () => {
-      const signedInInfo = await canvas.findByTestId('SignedInInfo');
-      expect(signedInInfo).toHaveTextContent('Signed In: true');
-    }, { timeout: 4000 });
-
-    await openUserMenu(canvas);
-
-    const logoutButton = await canvas.findByTestId('LogoutButton');
-    expect(logoutButton).toBeInTheDocument();
-    expect(canvas.getByText(/john doe/i)).toBeInTheDocument();
+    await expectSignedIn(canvas);
+    await expectAuthenticatedActions(canvas);
   },
 };
 
@@ -86,7 +90,6 @@ export const SwitchToSupportedDataHubFlow: Story = {
   name: 'Switch to supported DataHub',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const selectedDataHub = 'https://datahub.rz.rptu.de/';
 
     await openUserMenu(canvas);
 
@@ -106,7 +109,8 @@ export const SwitchToSupportedDataHubFlow: Story = {
     const signInButton = await canvas.findByTestId('SignInButton');
     await userEvent.click(signInButton);
 
-    await expectLoggedInDataHub(canvas, selectedDataHub);
+    await expectSignedIn(canvas);
+    await expectAuthenticatedActions(canvas);
   },
 };
 
@@ -137,7 +141,33 @@ export const SwitchToCustomDataHubFlow: Story = {
     const signInButton = await canvas.findByTestId('SignInButton');
     await userEvent.click(signInButton);
 
-    await expectLoggedInDataHub(canvas, selectedDataHub);
+    await expectSignedIn(canvas);
+    await expectAuthenticatedActions(canvas);
+  },
+};
+
+export const AddAnotherAccountFlow: Story = {
+  name: 'Add another account flow',
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await signInWithPat(canvas);
+    await expectSignedIn(canvas);
+
+    await openUserMenu(canvas);
+    const addAnotherButton = await canvas.findByTestId('AddAnotherAccountButton');
+    await userEvent.click(addAnotherButton);
+
+    const backButton = await canvas.findByTestId('AddAccountBackButton');
+    expect(backButton).toBeInTheDocument();
+
+    const tokenInput = await canvas.findByTestId('PersonalAccessTokenInput');
+    expect(tokenInput).toBeInTheDocument();
+
+    await userEvent.click(backButton);
+
+    const logoutButton = await canvas.findByTestId('LogoutButton');
+    expect(logoutButton).toBeInTheDocument();
   },
 };
 
@@ -148,10 +178,7 @@ export const LogoutFlow: Story = {
 
     await signInWithPat(canvas);
 
-    await waitFor(async () => {
-      const signedInInfo = await canvas.findByTestId('SignedInInfo');
-      expect(signedInInfo).toHaveTextContent('Signed In: true');
-    }, { timeout: 4000 });
+    await expectSignedIn(canvas);
 
     await openUserMenu(canvas);
     const logoutButton = await canvas.findByTestId('LogoutButton');
@@ -159,9 +186,46 @@ export const LogoutFlow: Story = {
 
     await userEvent.click(logoutButton);
 
+    await expectLoggedOut(canvas);
+  },
+};
+
+export const MultiAccountSwitchFlow: Story = {
+  name: 'Multi account switch flow',
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await signInWithPat(canvas);
+    await expectSignedIn(canvas);
+
+    await openUserMenu(canvas);
+
+    const switchSecondAccountButton = await canvas.findByTestId('UseAccountButton-acc-2');
+    await userEvent.click(switchSecondAccountButton);
+
     await waitFor(async () => {
-      let signedInInfo = await canvas.findByTestId('SignedInInfo');
-      expect(signedInInfo).toHaveTextContent('Signed In: false');
+      expect(canvas.queryByTestId('UseAccountButton-acc-2')).not.toBeInTheDocument();
+      expect(await canvas.findByTestId('UseAccountButton-acc-1')).toBeInTheDocument();
+    });
+  },
+};
+
+export const MultiAccountRemoveFlow: Story = {
+  name: 'Multi account remove flow',
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await signInWithPat(canvas);
+    await expectSignedIn(canvas);
+
+    await openUserMenu(canvas);
+
+    const removeSecondAccountButton = await canvas.findByTestId('RemoveAccountButton-acc-2');
+    await userEvent.click(removeSecondAccountButton);
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('AccountRow-acc-2')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('AccountRow-acc-1')).toBeInTheDocument();
     });
   },
 };

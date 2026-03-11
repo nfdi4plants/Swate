@@ -12,10 +12,14 @@ if SquirrelStartup.started then
 app
     .whenReady()
     .``then`` (fun () ->
+        // Restore persisted auth before any IPC handlers fire
+        Main.Auth.AuthService.tryRestoreFromStorage ()
+
         ARC_VAULTS.RegisterVault() |> ignore
 
         Remoting.init |> Remoting.buildHandler IPC.IGitApi.api
         Remoting.init |> Remoting.buildHandler IPC.ArcVaultsApi.api
+        Remoting.init |> Remoting.buildHandler Main.IPC.AuthApi.api
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then

@@ -10,6 +10,17 @@ open Fable.Electron.Remoting.Renderer
 
 module NavbarHelper =
 
+    let mutable authAccountsUpdateHandler: (Swate.Electron.Shared.AuthTypes.AuthAccountSummary array -> unit) option =
+        None
+
+    let registerAuthAccountsUpdateHandler (handler: Swate.Electron.Shared.AuthTypes.AuthAccountSummary array -> unit) =
+        authAccountsUpdateHandler <- Some handler
+
+    let unregisterAuthAccountsUpdateHandler () = authAccountsUpdateHandler <- None
+
+    let dispatchAuthAccountsUpdate (accounts: Swate.Electron.Shared.AuthTypes.AuthAccountSummary array) =
+        authAccountsUpdateHandler |> Option.iter (fun handler -> handler accounts)
+
     module Selector =
 
         /// Unified open: main process decides current window / new window / focus existing.
@@ -90,6 +101,7 @@ type private Selector =
         let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
             pathChange = setCurrentlyOpenArcPath
             recentARCsUpdate = fun arcs -> setRecentArc arcs
+            authAccountsUpdate = NavbarHelper.dispatchAuthAccountsUpdate
             fileTreeUpdate = ignore
             gitProgressUpdate = ignore
         }
@@ -134,6 +146,121 @@ type private Selector =
             )
         ]
 
+module private Authentication =
+
+    open AuthenticationTypes
+    open Swate.Electron.Shared.AuthTypes
+
+    let private toUserInfo (u: AuthUserDto) : UserInformation = {
+        Name = u.Name
+        Email = u.Email
+        AvatarUrl = u.AvatarUrl
+        Token = "" // never stored renderer-side
+        TargetDataHub = u.TargetDataHub
+    }
+
+    let private toAccountSummary (a: AuthAccountSummary) : AccountSummary = {
+        AccountId = a.AccountId
+        Name = a.Name
+        Email = a.Email
+        AvatarUrl = a.AvatarUrl
+        TargetDataHub = a.TargetDataHub
+        IsActive = a.IsActive
+    }
+
+    let private refreshState (setUser: UserInformation option -> unit) (setAccounts: AuthAccountSummary array -> unit) = promise {
+        let! stateResult = Api.ipcAuthApi.getAuthState ()
+
+        match stateResult with
+        | Ok state ->
+            setAccounts state.Accounts
+
+            match state.User with
+            | Some u when state.IsAuthenticated -> setUser (Some(toUserInfo u))
+            | _ -> setUser None
+        | Error _ ->
+            setUser None
+            setAccounts [||]
+    }
+
+    [<ReactComponent>]
+    let UserAvatar () =
+        let user, setUser = React.useState (None: UserInformation option)
+        let accounts, setAccounts = React.useState ([||]: AuthAccountSummary array)
+        let isLoading, setIsLoading = React.useState false
+
+        let refresh () =
+            refreshState setUser setAccounts |> Promise.start
+
+        // On mount: load persisted auth state from Main
+        React.useEffectOnce (fun _ ->
+            promise {
+                do! refreshState setUser setAccounts
+                setIsLoading false
+            }
+            |> Promise.start
+
+            NavbarHelper.registerAuthAccountsUpdateHandler setAccounts
+
+            FsReact.createDisposable (fun () -> NavbarHelper.unregisterAuthAccountsUpdateHandler ())
+        )
+
+        let onSignIn (signInInfo: SignInInformation) =
+            promise {
+                setIsLoading true
+
+                let request: AuthSignInRequest = {
+                    GitLabBaseUrl = signInInfo.GitLabBaseUrl
+                    PersonalAccessToken = signInInfo.PersonalAccessToken
+                }
+
+                let! result = Api.ipcAuthApi.signIn request
+
+                match result with
+                | Ok authResult when authResult.Success -> do! refreshState setUser setAccounts
+                | Ok authResult ->
+                    let msg = authResult.Message |> Option.defaultValue "Authentication failed."
+                    signInInfo.OnErrorCallback(exn msg)
+                | Error ex -> signInInfo.OnErrorCallback ex
+
+                setIsLoading false
+            }
+            |> Promise.start
+
+        let onLogout () =
+            promise {
+                let! _ = Api.ipcAuthApi.signOut ()
+                do! refreshState setUser setAccounts
+            }
+            |> Promise.start
+
+        let onSwitchAccount (accountId: string) =
+            promise {
+                let! _ = Api.ipcAuthApi.setActiveAccount accountId
+                refresh ()
+            }
+            |> Promise.start
+
+        let onRemoveAccount (accountId: string) =
+            promise {
+                let! _ = Api.ipcAuthApi.removeAccount accountId
+                refresh ()
+            }
+            |> Promise.start
+
+        let mappedAccounts = accounts |> Array.map toAccountSummary
+
+        Authentication.UserAvatar(
+            user,
+            onSignIn,
+            onLogout,
+            isLoading = isLoading,
+            dropdownClassName = "swt:dropdown-bottom swt:dropdown-end",
+            accounts = mappedAccounts,
+            onSwitchAccount = onSwitchAccount,
+            onRemoveAccount = onRemoveAccount
+        )
+
 type Navbar =
 
     [<ReactComponent>]
@@ -141,4 +268,14 @@ type Navbar =
 
         let left = Selector.Main()
 
-        Swate.Components.Navbar.Main(left = left)
+        let right =
+            Html.div [
+                prop.className "swt:flex swt:items-center"
+                prop.children [
+                    Authentication.UserAvatar()
+                    Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
+                    Layout.LeftSidebarToggleBtn()
+                ]
+            ]
+
+        Swate.Components.Navbar.Main(left = left, right = right)

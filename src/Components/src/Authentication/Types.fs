@@ -74,3 +74,13 @@ type UserInformation = {
         Token = token
         TargetDataHub = targetDataHub
     }
+
+/// Platform-agnostic account summary for multi-account UI.
+type AccountSummary = {
+    AccountId: string
+    Name: string
+    Email: string
+    AvatarUrl: string
+    TargetDataHub: string
+    IsActive: bool
+}

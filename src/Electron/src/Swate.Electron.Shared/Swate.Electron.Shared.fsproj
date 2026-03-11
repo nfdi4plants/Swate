@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="FileIOTypes.fs" />
+    <Compile Include="AuthTypes.fs" />
     <Compile Include="GitTypes.fs" />
     <Compile Include="IPCTypes.fs" />
     <Compile Include="Types.fs" />
