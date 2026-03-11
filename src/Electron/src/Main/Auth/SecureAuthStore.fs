@@ -1,5 +1,6 @@
 module Main.Auth.SecureAuthStore
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron.Main
@@ -34,6 +35,15 @@ let private bufferFromBase64 (base64: string) : Node.Buffer.Buffer = jsNative
 
 // ── helpers ──────────────────────────────────────────────────────────
 
+/// Extract host from a normalized base URL for token-provider matching.
+let internal extractHost (baseUrl: string) : string =
+    let mutable uri = Unchecked.defaultof<Uri>
+
+    if Uri.TryCreate(baseUrl, UriKind.Absolute, &uri) then
+        uri.Host.Trim().ToLowerInvariant()
+    else
+        baseUrl.Trim().ToLowerInvariant()
+
 let private getAuthDir () =
     let settingsRoot = Main.SettingsStore.getSettingsRootPath ()
     let dir = join [| settingsRoot; "Auth" |]
@@ -49,9 +59,23 @@ let private metaFilePath (accountId: string) =
 let private activeAccountFilePath () =
     join [| getAuthDir (); activeAccountFileName |]
 
+let private isSafeAccountId (accountId: string) : bool =
+    not (System.String.IsNullOrWhiteSpace accountId)
+    && accountId.Length <= 256
+    && accountId
+       |> Seq.forall (fun c -> System.Char.IsLetterOrDigit c || c = '_' || c = '-')
+
+let private tryGetAccountPaths (accountId: string) : (string * string) option =
+    if isSafeAccountId accountId then
+        Some(encryptedFilePath accountId, metaFilePath accountId)
+    else
+        None
+
 /// Generate a filesystem-safe account ID from host and email.
 let generateAccountId (targetDataHub: string) (email: string) : string =
-    let combined = $"{targetDataHub.ToLowerInvariant()}_{email.ToLowerInvariant()}"
+    let host = extractHost targetDataHub
+
+    let combined = $"{host}_{email.ToLowerInvariant()}"
 
     combined
     |> String.collect (fun c -> if System.Char.IsLetterOrDigit c then string c else "_")
@@ -68,6 +92,8 @@ let store (credential: StoredCredential) : Result<unit, string> =
     try
         if not (isAvailable ()) then
             Error "Electron safe storage is not available on this system."
+        elif not (isSafeAccountId credential.Metadata.AccountId) then
+            Error "Invalid account identifier format."
         else
             let accountId = credential.Metadata.AccountId
             let encrypted: Node.Buffer.Buffer = safeStorage.encryptString credential.Token
@@ -96,32 +122,39 @@ let tryLoad (accountId: string) : StoredCredential option =
     try
         if not (isAvailable ()) then
             None
-        elif not (existsSync (encryptedFilePath accountId)) then
-            None
-        elif not (existsSync (metaFilePath accountId)) then
-            None
         else
-            let base64 = readFileSync (encryptedFilePath accountId) TextEncoding.Utf8
-            let buffer = bufferFromBase64 base64
-            let token = safeStorage.decryptString buffer
-            let metaRaw = readFileSync (metaFilePath accountId) TextEncoding.Utf8
-            let meta: obj = JS.JSON.parse metaRaw
-            let name: string = meta?name
-            let email: string = meta?email
-            let avatarUrl: string = meta?avatarUrl
-            let targetDataHub: string = meta?targetDataHub
-            let storedAccountId: string = meta?accountId
+            match tryGetAccountPaths accountId with
+            | None -> None
+            | Some(enc, metaPath) ->
+                if not (existsSync enc) then
+                    None
+                elif not (existsSync metaPath) then
+                    None
+                else
+                    let base64 = readFileSync enc TextEncoding.Utf8
+                    let buffer = bufferFromBase64 base64
+                    let token = safeStorage.decryptString buffer
+                    let metaRaw = readFileSync metaPath TextEncoding.Utf8
+                    let meta: obj = JS.JSON.parse metaRaw
+                    let name: string = meta?name
+                    let email: string = meta?email
+                    let avatarUrl: string = meta?avatarUrl
+                    let targetDataHub: string = meta?targetDataHub
+                    let storedAccountId: string = meta?accountId
 
-            Some {
-                Metadata = {
-                    AccountId = storedAccountId
-                    Name = name
-                    Email = email
-                    AvatarUrl = avatarUrl
-                    TargetDataHub = targetDataHub
-                }
-                Token = token
-            }
+                    if not (isSafeAccountId storedAccountId) then
+                        None
+                    else
+                        Some {
+                            Metadata = {
+                                AccountId = storedAccountId
+                                Name = name
+                                Email = email
+                                AvatarUrl = avatarUrl
+                                TargetDataHub = targetDataHub
+                            }
+                            Token = token
+                        }
     with _ ->
         None
 
@@ -147,14 +180,14 @@ let loadAll () : StoredCredential list =
 
 let remove (accountId: string) : unit =
     try
-        let enc = encryptedFilePath accountId
-        let meta = metaFilePath accountId
+        match tryGetAccountPaths accountId with
+        | None -> ()
+        | Some(enc, metaPath) ->
+            if existsSync enc then
+                unlinkSync enc
 
-        if existsSync enc then
-            unlinkSync enc
-
-        if existsSync meta then
-            unlinkSync meta
+            if existsSync metaPath then
+                unlinkSync metaPath
     with _ ->
         ()
 
@@ -178,10 +211,7 @@ let getActiveAccountId () : string option =
             let parsed: obj = JS.JSON.parse raw
             let id: string = parsed?accountId
 
-            if System.String.IsNullOrWhiteSpace id then
-                None
-            else
-                Some id
+            if not (isSafeAccountId id) then None else Some id
         else
             None
     with _ ->
@@ -192,11 +222,12 @@ let setActiveAccountId (accountId: string option) : unit =
         let path = activeAccountFilePath ()
 
         match accountId with
-        | Some id ->
+        | Some id when isSafeAccountId id ->
             let json = JS.JSON.stringify {| accountId = id |}
             let tmp = path + ".tmp"
             writeFileSync tmp json TextEncoding.Utf8
             renameSync tmp path
+        | Some _ -> ()
         | None ->
             if existsSync path then
                 unlinkSync path

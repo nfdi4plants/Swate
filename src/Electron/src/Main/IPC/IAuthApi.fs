@@ -68,6 +68,7 @@ let api: IAuthApi = {
         fun (accountId: string) -> promise {
             try
                 let state = AuthService.setActiveAccount accountId
+                broadcastAccountsUpdate ()
                 return Ok state
             with _ ->
                 return Error(exn "Failed to switch active account.")

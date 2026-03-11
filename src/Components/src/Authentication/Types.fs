@@ -63,15 +63,13 @@ type UserInformation = {
     Name: string
     Email: string
     AvatarUrl: string
-    Token: string
     TargetDataHub: string
 } with
 
-    static member FromGitLabUser (gitLabUser: GitLabUser) (token: string) (targetDataHub: string) : UserInformation = {
+    static member FromGitLabUser (gitLabUser: GitLabUser) (targetDataHub: string) : UserInformation = {
         Name = gitLabUser.name
         Email = gitLabUser.email
         AvatarUrl = gitLabUser.avatar_url
-        Token = token
         TargetDataHub = targetDataHub
     }
 

@@ -10,17 +10,6 @@ open Fable.Electron.Remoting.Renderer
 
 module NavbarHelper =
 
-    let mutable authAccountsUpdateHandler: (Swate.Electron.Shared.AuthTypes.AuthAccountSummary array -> unit) option =
-        None
-
-    let registerAuthAccountsUpdateHandler (handler: Swate.Electron.Shared.AuthTypes.AuthAccountSummary array -> unit) =
-        authAccountsUpdateHandler <- Some handler
-
-    let unregisterAuthAccountsUpdateHandler () = authAccountsUpdateHandler <- None
-
-    let dispatchAuthAccountsUpdate (accounts: Swate.Electron.Shared.AuthTypes.AuthAccountSummary array) =
-        authAccountsUpdateHandler |> Option.iter (fun handler -> handler accounts)
-
     module Selector =
 
         /// Unified open: main process decides current window / new window / focus existing.
@@ -101,7 +90,7 @@ type private Selector =
         let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
             pathChange = setCurrentlyOpenArcPath
             recentARCsUpdate = fun arcs -> setRecentArc arcs
-            authAccountsUpdate = NavbarHelper.dispatchAuthAccountsUpdate
+            authAccountsUpdate = ignore
             fileTreeUpdate = ignore
             gitProgressUpdate = ignore
         }
@@ -116,9 +105,9 @@ type private Selector =
                 setIsLoading false
             }
             |> Promise.start
-        )
 
-        React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
+            Remoting.init |> Remoting.buildHandler ipcHandler
+        )
 
         let selectorControlRef =
             React.useRef ({ toggle = ignore }: SelectorTypes.SelectorRef)
@@ -155,7 +144,6 @@ module private Authentication =
         Name = u.Name
         Email = u.Email
         AvatarUrl = u.AvatarUrl
-        Token = "" // never stored renderer-side
         TargetDataHub = u.TargetDataHub
     }
 
@@ -192,17 +180,42 @@ module private Authentication =
         let refresh () =
             refreshState setUser setAccounts |> Promise.start
 
+        let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
+            pathChange = ignore
+            recentARCsUpdate = ignore
+            authAccountsUpdate =
+                fun accounts ->
+                    setAccounts accounts
+                    let activeAccount = accounts |> Array.tryFind (fun a -> a.IsActive)
+
+                    match activeAccount with
+                    | Some a ->
+                        {
+                            AccountId = a.AccountId
+                            Name = a.Name
+                            Email = a.Email
+                            AvatarUrl = a.AvatarUrl
+                            TargetDataHub = a.TargetDataHub
+                        }
+                        |> toUserInfo
+                        |> Some
+                        |> setUser
+
+                    | None -> setUser None
+            fileTreeUpdate = ignore
+            gitProgressUpdate = ignore
+        }
+
         // On mount: load persisted auth state from Main
         React.useEffectOnce (fun _ ->
+
+            Remoting.init |> Remoting.buildHandler ipcHandler
+
             promise {
                 do! refreshState setUser setAccounts
                 setIsLoading false
             }
             |> Promise.start
-
-            NavbarHelper.registerAuthAccountsUpdateHandler setAccounts
-
-            FsReact.createDisposable (fun () -> NavbarHelper.unregisterAuthAccountsUpdateHandler ())
         )
 
         let onSignIn (signInInfo: SignInInformation) =

@@ -34,15 +34,6 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
                 Message = "DataHub URL must be a valid HTTPS URL."
             }
 
-/// Extract host from a normalized base URL for token-provider matching.
-let internal extractHost (baseUrl: string) : string =
-    let mutable uri = Unchecked.defaultof<Uri>
-
-    if Uri.TryCreate(baseUrl, UriKind.Absolute, &uri) then
-        uri.Host.Trim().ToLowerInvariant()
-    else
-        baseUrl.Trim().ToLowerInvariant()
-
 /// Call GitLab /api/v4/user with the provided PAT to verify the token.
 /// Uses Fable.Fetch following the pattern in Authentication.fs.
 let private verifyToken (baseUrl: string) (pat: string) : JS.Promise<Result<AuthUserDto, AuthFailure>> = promise {
@@ -138,13 +129,17 @@ let private toSummary (user: AuthUserDto, _token: string) : AuthAccountSummary =
 let tryGetTokenForHost (host: string) : string option =
     // 1. Check active account
     match getActiveAccount () with
-    | Some(user, token) when String.Equals(extractHost user.TargetDataHub, host, StringComparison.OrdinalIgnoreCase) ->
+    | Some(user, token) when
+        String.Equals(SecureAuthStore.extractHost user.TargetDataHub, host, StringComparison.OrdinalIgnoreCase)
+        ->
         Some token
     | _ ->
         // 2. Search all accounts
         accounts
         |> Map.tryPick (fun _ (user, token) ->
-            if String.Equals(extractHost user.TargetDataHub, host, StringComparison.OrdinalIgnoreCase) then
+            if
+                String.Equals(SecureAuthStore.extractHost user.TargetDataHub, host, StringComparison.OrdinalIgnoreCase)
+            then
                 Some token
             else
                 None

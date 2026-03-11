@@ -66,7 +66,7 @@ module GitLabAPI =
                     let! gitLabUserInfo = response.json<AuthenticationTypes.GitLabUser> ()
 
                     let userInfo =
-                        UserInformation.FromGitLabUser gitLabUserInfo pat signInInfo.GitLabBaseUrl
+                        UserInformation.FromGitLabUser gitLabUserInfo signInInfo.GitLabBaseUrl
 
                     return Ok userInfo
 
@@ -477,7 +477,6 @@ type Authentication =
             Name = "John Doe"
             Email = "john-doe@mail.com"
             AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
-            Token = "1234567890"
             TargetDataHub = AuthenticationHelper.Default_DataHub_Url
         }
 
@@ -492,7 +491,6 @@ type Authentication =
                     let activeUser = {
                         exmpUserInformation with
                             TargetDataHub = signInInfo.GitLabBaseUrl
-                            Token = signInInfo.PersonalAccessToken
                     }
 
                     setUserInformation (Some activeUser)
@@ -541,7 +539,6 @@ type Authentication =
                         Name = active.Name
                         Email = active.Email
                         AvatarUrl = active.AvatarUrl
-                        Token = exmpUserInformation.Token
                         TargetDataHub = active.TargetDataHub
                     }
                 )
@@ -559,7 +556,6 @@ type Authentication =
                         Name = active.Name
                         Email = active.Email
                         AvatarUrl = active.AvatarUrl
-                        Token = exmpUserInformation.Token
                         TargetDataHub = active.TargetDataHub
                     }
                 )
