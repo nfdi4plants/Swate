@@ -41,7 +41,6 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
-    checkForARC: string -> JS.Promise<bool>
     pickPaths: IpcMainEvent -> JS.Promise<Result<string [], exn>>
 
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>

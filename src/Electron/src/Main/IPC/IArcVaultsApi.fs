@@ -235,10 +235,6 @@ let api: IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    checkForARC =
-        fun path -> promise {
-            return ARC_VAULTS.TryGetVaultByPath(path).IsSome
-        }
     pickPaths =
         fun _ -> promise {
             let properties =
