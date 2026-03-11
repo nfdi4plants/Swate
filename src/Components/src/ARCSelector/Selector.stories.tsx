@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
 import Layout from "../Layout/Layout.fs.js";
-import { ActionbarInSelectorEntry, Entry as SelectorEntry } from './Selector.fs.js';
+import { Entry } from './Selector.fs.js';
 
 const meta = {
   title: "Components/ArcSelector",
@@ -20,7 +20,7 @@ type Story = StoryObj<typeof meta>;
 export const DisplaySelector: Story = {
   args: {
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      < SelectorEntry debug={true} />
+      < Entry debug={true} />
     </div>
   }
 };
@@ -28,7 +28,7 @@ export const DisplaySelector: Story = {
 export const ClickingArcPointerUpdatesActiveArc: Story = {
   args: {
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <SelectorEntry debug={true} />
+      <Entry debug={true} />
     </div>
   },
   play: async ({ canvasElement }) => {
@@ -49,7 +49,7 @@ export const ClickingArcPointerUpdatesActiveArc: Story = {
 export const ClickingArcPointerClosesDropdown: Story = {
   args: {
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <SelectorEntry debug={true} />
+      <Entry debug={true} />
     </div>
   },
   play: async ({ canvasElement }) => {
@@ -74,7 +74,7 @@ export const ClickingArcPointerClosesDropdown: Story = {
 export const ClickingActionbarButtonClosesDropdown: Story = {
   args: {
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <ActionbarInSelectorEntry maxNumberActionbar={3} debug={true} />
+      <Entry maxNumberActionbar={3} debug={true} />
     </div>
   },
   play: async ({ canvasElement }) => {
@@ -100,7 +100,7 @@ export const ClickingActionbarButtonClosesDropdown: Story = {
 export const RestButtonShowsOptionsAndOptionsClickable: Story = {
   args: {
     children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <ActionbarInSelectorEntry maxNumberActionbar={3} debug={true} />
+      <Entry maxNumberActionbar={3} debug={true} />
     </div>
   },
   play: async ({ canvasElement }) => {
