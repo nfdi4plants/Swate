@@ -21,6 +21,10 @@ export default mergeConfig(
             storybookTest({
               // The location of your Storybook config, main.js|ts
               configDir: path.join(dirname, '.storybook'),
+              tags: {
+                // Skip stories marked as unstable in CI browser runs.
+                skip: ['skip-test'],
+              },
               // // This should match your package.json script to run Storybook
               // // The --no-open flag will skip the automatic opening of a browser
               // storybookScript: 'npm run storybook:no-compile --no-open',
@@ -28,6 +32,7 @@ export default mergeConfig(
           ],
           test: {
             name: 'storybook',
+            fileParallelism: false,
             // Enable browser mode
             browser: {
               enabled: true,
