@@ -464,7 +464,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         | ProtocolMsg fileUploadJsonMsg ->
             let nextState, model, nextCmd =
-                Protocol.update fileUploadJsonMsg currentModel.ProtocolState model
+                ProtocolState.update fileUploadJsonMsg currentModel.ProtocolState model
 
             let nextModel = { model with ProtocolState = nextState }
             nextModel, nextCmd

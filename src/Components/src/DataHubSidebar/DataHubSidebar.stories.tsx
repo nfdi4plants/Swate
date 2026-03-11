@@ -30,9 +30,10 @@ async function connectAndWait(canvas: ReturnType<typeof within>) {
   await waitFor(
     async () => {
       const badge = await canvas.findByTestId("DataHubStatusBadge");
-      expect(badge).toHaveTextContent("connected");
+      expect(badge).toHaveTextContent(/^connected$/i);
+      expect(await canvas.findByTestId("DisconnectButton")).toBeVisible();
     },
-    { timeout: 5000 },
+    { timeout: 10000 },
   );
 }
 
