@@ -11,7 +11,8 @@ type WidgetBlock =
         content: ReactElement
     }
 
-let buildingBlockWidget
+[<ReactComponent>]
+let BuildingBlockWidget
     (arcFileState: ArcFiles option)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
@@ -27,7 +28,8 @@ let buildingBlockWidget
             )
     |}
 
-let templateWidget
+[<ReactComponent>]
+let TemplateWidget
     (arcFileState: ArcFiles option)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
@@ -43,7 +45,8 @@ let templateWidget
             )
     |}
 
-let filePickerWidget
+[<ReactComponent>]
+let FilePickerWidget
     (arcFileState: ArcFiles option)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
@@ -59,7 +62,8 @@ let filePickerWidget
                 )
         |}
 
-let dataAnnotatorWidget
+[<ReactComponent>]
+let DataAnnotatorWidget
     (arcFileState: ArcFiles option)
     (activeView: Renderer.components.Widgets.AddDataAnnotatorWidget.HostView)
     (activeTableIndex: int option)
@@ -84,10 +88,10 @@ let createWidgets
     (setArcFileState: ArcFiles option -> unit)
     : Map<WidgetType, WidgetDefinition> =
     [
-        buildingBlockWidget arcFileState activeTableIndex setArcFileState
-        templateWidget arcFileState activeTableIndex setArcFileState
-        filePickerWidget arcFileState activeTableIndex setArcFileState
-        dataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
+        BuildingBlockWidget arcFileState activeTableIndex setArcFileState
+        TemplateWidget arcFileState activeTableIndex setArcFileState
+        FilePickerWidget arcFileState activeTableIndex setArcFileState
+        DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
     ]
     |> Map.ofList
 
@@ -136,6 +140,7 @@ let widgetTypes = [
     WidgetType.DataAnnotator
 ]
 
-let CreateNavbarButtonsForAllWidgets widgets children =
+[<ReactComponent>]
+let NavbarButtonsForAllWidgets widgets children =
 
     Widget.WidgetController(widgets, children = children)

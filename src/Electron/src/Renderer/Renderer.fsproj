@@ -22,7 +22,7 @@
     <Compile Include="Components\Widgets\AddFilePickerWidget.fs" />
     <Compile Include="Components\Widgets\DataAnnotatorDataSource.fs" />
     <Compile Include="Components\Widgets\AddDataAnnotatorWidget.fs" />
-    <Compile Include="Components\Widgets.fs" />
+    <Compile Include="Components\WidgetRegister.fs" />
     <Compile Include="Components\MainElement.fs" />
     <Compile Include="Components\MainWindowContent.fs" />
     <Compile Include="App.fs" />

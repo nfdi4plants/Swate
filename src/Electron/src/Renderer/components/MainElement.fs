@@ -36,6 +36,7 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
         prop.children [ AnnotationTable.AnnotationTable(tableState, setTable) ]
     ]
 
+[<ReactComponent>]
 let CreateARCitectNavbar
     (arcFile: ArcFiles option)
     (activeView: PreviewActiveView)
@@ -53,7 +54,7 @@ let CreateARCitectNavbar
     let widgets = createWidgets arcFile widgetHostView activeTableIndex setArcFileState
 
     Components.BaseNavbar.Main [
-        CreateNavbarButtonsForAllWidgets widgets [ NavbarButtons(widgetTypes) ]
+        NavbarButtonsForAllWidgets widgets [ NavbarButtons(widgetTypes) ]
         QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
     ]
 
