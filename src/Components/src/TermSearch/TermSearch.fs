@@ -3,7 +3,6 @@ namespace Swate.Components
 open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 
 module private APIExtentions =

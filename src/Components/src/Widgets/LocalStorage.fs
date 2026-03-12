@@ -69,10 +69,8 @@ module Size =
 
     let load (modalName: string) =
         let key = Key_Prefix + modalName
-        console.log $"modalName: {modalName}"
 
         try
-            console.log $"key: {key}"
             WebStorage.localStorage.getItem (key) |> Json.parseAs<Rect> |> Some
         with _ ->
             WebStorage.localStorage.removeItem (key)
