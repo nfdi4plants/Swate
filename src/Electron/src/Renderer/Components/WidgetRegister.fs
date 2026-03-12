@@ -11,7 +11,6 @@ type WidgetBlock =
         content: ReactElement
     }
 
-[<ReactComponent>]
 let BuildingBlockWidget
     (arcFileState: ArcFiles option)
     (activeTableIndex: int option)
@@ -28,7 +27,6 @@ let BuildingBlockWidget
             )
     |}
 
-[<ReactComponent>]
 let TemplateWidget
     (arcFileState: ArcFiles option)
     (activeTableIndex: int option)
@@ -45,7 +43,6 @@ let TemplateWidget
             )
     |}
 
-[<ReactComponent>]
 let FilePickerWidget
     (arcFileState: ArcFiles option)
     (activeTableIndex: int option)
@@ -62,7 +59,6 @@ let FilePickerWidget
                 )
         |}
 
-[<ReactComponent>]
 let DataAnnotatorWidget
     (arcFileState: ArcFiles option)
     (activeView: Renderer.components.Widgets.AddDataAnnotatorWidget.HostView)

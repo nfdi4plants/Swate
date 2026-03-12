@@ -53,10 +53,15 @@ let CreateARCitectNavbar
 
     let widgets = createWidgets arcFile widgetHostView activeTableIndex setArcFileState
 
-    Components.BaseNavbar.Main [
-        NavbarButtonsForAllWidgets widgets [ NavbarButtons(widgetTypes) ]
-        QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
-    ]
+    Widget.WidgetController(
+        widgets,
+        children = [
+            Components.BaseNavbar.Main [
+                NavbarButtons(widgetTypes)
+                QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
+            ]
+        ]
+    )
 
 [<Literal>]
 let private NewTablePrefix = "NewTable"

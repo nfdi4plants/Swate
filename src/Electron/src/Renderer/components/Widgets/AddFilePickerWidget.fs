@@ -161,7 +161,9 @@ let Main
             | Some _ -> None
             | None -> Some "Select a table tab first to use the file picker."
 
-    let canInsert = pathEntries.Length > 0 && selectedCells.IsSome && disabledMessage.IsNone
+    // Keep button behavior aligned with Client: allow click as soon as files are present.
+    // If no target cell is selected, insertPaths will surface a clear status message.
+    let canInsert = pathEntries.Length > 0 && disabledMessage.IsNone
 
     let appendPickedPaths (paths: string[]) =
         if paths.Length > 0 then

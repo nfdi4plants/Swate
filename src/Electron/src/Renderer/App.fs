@@ -271,18 +271,20 @@ let Main () =
             workspaceCtx,
             Renderer.Context.LandingStateCtx.LandingStateCtx.Provider(
                 landingCtx,
-                Layout.Main(
-                    children =
-                        React.Fragment [|
-                            children
-                            CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
-                        |],
-                    navbar = Renderer.Components.Navbar.Main(),
-                    ?leftSidebar =
-                        (match fileExplorer with
-                         | Some fe -> leftSidebar appState fe
-                         | None -> None),
-                    leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+                AnnotationTableContextProvider.AnnotationTableContextProvider(
+                    Layout.Main(
+                        children =
+                            React.Fragment [|
+                                children
+                                CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                            |],
+                        navbar = Renderer.Components.Navbar.Main(),
+                        ?leftSidebar =
+                            (match fileExplorer with
+                             | Some fe -> leftSidebar appState fe
+                             | None -> None),
+                        leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+                    )
                 )
             )
         )

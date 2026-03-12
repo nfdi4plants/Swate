@@ -344,59 +344,61 @@ let Main
             setSelectedTargets (selectedTargets.Add target)
 
     let submit () =
-        match arcFileState, dataFile, parsedFile with
-        | Some arcFile, Some dataFile, Some parsedFile ->
-            let selectors = SelectorsFromTargets parsedFile.HeaderRow.IsSome selectedTargets
+        if selectedTargets.IsEmpty then
+            setErrorMessage (Some "Select at least one target in the preview table.")
+        else
+            match arcFileState, dataFile, parsedFile with
+            | Some arcFile, Some dataFile, Some parsedFile ->
+                let selectors = SelectorsFromTargets parsedFile.HeaderRow.IsSome selectedTargets
 
-            let input: AnnotationInput = {
-                Selectors = selectors
-                FileName = dataFile.DataFileName
-                FileType = dataFile.DataFileType
-                TargetColumn = targetColumn
-            }
+                let input: AnnotationInput = {
+                    Selectors = selectors
+                    FileName = dataFile.DataFileName
+                    FileType = dataFile.DataFileType
+                    TargetColumn = targetColumn
+                }
 
-            let applySuccess count =
-                setArcFileState (Some(refreshArcFileRef arcFile))
-                setErrorMessage None
-                setStatusMessage (Some $"Applied {count} data annotation(s).")
-                widgetCtx.closeWidget WidgetType.DataAnnotator
+                let applySuccess count =
+                    setArcFileState (Some(refreshArcFileRef arcFile))
+                    setErrorMessage None
+                    setStatusMessage (Some $"Applied {count} data annotation(s).")
+                    widgetCtx.closeWidget WidgetType.DataAnnotator
 
-            match activeView with
-            | HostView.Table ->
-                match activeTableIndex with
-                | Some tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
-                    let table = arcFile.Tables().[tableIndex]
+                match activeView with
+                | HostView.Table ->
+                    match activeTableIndex with
+                    | Some tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
+                        let table = arcFile.Tables().[tableIndex]
 
-                    match ApplyToTable table input with
-                    | Ok count -> applySuccess count
-                    | Error err -> setErrorMessage (Some err)
-                | _ -> setErrorMessage (Some "No active table selected.")
-            | HostView.DataMap ->
-                let dataMapOpt =
-                    match arcFile with
-                    | ArcFiles.Assay assay when assay.DataMap.IsSome -> Some assay.DataMap.Value
-                    | ArcFiles.Study(study, _) when study.DataMap.IsSome -> Some study.DataMap.Value
-                    | ArcFiles.Run run when run.DataMap.IsSome -> Some run.DataMap.Value
-                    | ArcFiles.DataMap(_, dataMap) -> Some dataMap
-                    | _ -> None
+                        match ApplyToTable table input with
+                        | Ok count -> applySuccess count
+                        | Error err -> setErrorMessage (Some err)
+                    | _ -> setErrorMessage (Some "No active table selected.")
+                | HostView.DataMap ->
+                    let dataMapOpt =
+                        match arcFile with
+                        | ArcFiles.Assay assay when assay.DataMap.IsSome -> Some assay.DataMap.Value
+                        | ArcFiles.Study(study, _) when study.DataMap.IsSome -> Some study.DataMap.Value
+                        | ArcFiles.Run run when run.DataMap.IsSome -> Some run.DataMap.Value
+                        | ArcFiles.DataMap(_, dataMap) -> Some dataMap
+                        | _ -> None
 
-                match dataMapOpt with
-                | Some dataMap ->
-                    match ApplyToDataMap dataMap input with
-                    | Ok count -> applySuccess count
-                    | Error err -> setErrorMessage (Some err)
-                | None -> setErrorMessage (Some "No DataMap available.")
-            | HostView.Metadata ->
-                setErrorMessage (Some "Data annotation cannot be applied in metadata view.")
-            | HostView.PreviewError ->
-                setErrorMessage (Some "Data annotation cannot be applied while preview is in error state.")
-        | _ -> setErrorMessage (Some "Load a file and select at least one target.")
+                    match dataMapOpt with
+                    | Some dataMap ->
+                        match ApplyToDataMap dataMap input with
+                        | Ok count -> applySuccess count
+                        | Error err -> setErrorMessage (Some err)
+                    | None -> setErrorMessage (Some "No DataMap available.")
+                | HostView.Metadata ->
+                    setErrorMessage (Some "Data annotation cannot be applied in metadata view.")
+                | HostView.PreviewError ->
+                    setErrorMessage (Some "Data annotation cannot be applied while preview is in error state.")
+            | _ -> setErrorMessage (Some "Load a file first.")
 
     let canSubmit =
         disabledMessage.IsNone
         && dataFile.IsSome
         && parsedFile.IsSome
-        && (selectedTargets.IsEmpty |> not)
         && (loading |> not)
 
     let previewSection =
