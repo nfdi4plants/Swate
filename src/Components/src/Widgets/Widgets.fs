@@ -329,12 +329,26 @@ type Widget =
         ]
 
     [<ReactComponent>]
-    static member WidgetController(widgets: Map<WidgetType, WidgetDefinition>, ?children: ReactElement list) =
+    static member WidgetController
+        (
+            widgets: Map<WidgetType, WidgetDefinition>,
+            ?children: ReactElement list,
+            ?closeAllWhen: bool
+        ) =
 
         let activeWidgets, setActiveWidgets =
             React.useStateWithUpdater<WidgetType list> ([])
 
         let children = defaultArg children []
+        let closeAllWhen = defaultArg closeAllWhen false
+
+        React.useEffect (
+            (fun () ->
+                if closeAllWhen then
+                    setActiveWidgets (fun _ -> [])
+            ),
+            [| box closeAllWhen |]
+        )
 
         let closeWidget (widgetType: WidgetType) =
             setActiveWidgets (fun widgets -> widgets |> List.filter (fun widget -> widget <> widgetType))

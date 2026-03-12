@@ -93,7 +93,7 @@ let createWidgets
 
 
 [<ReactComponent>]
-let NavbarButtons(widgetTypes: WidgetType list) =
+let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
     let context = WidgetContext.useWidgetController ()
 
     let widgetInfo (widgetType: WidgetType) =
@@ -107,12 +107,19 @@ let NavbarButtons(widgetTypes: WidgetType list) =
     let controlButton (widgetType: WidgetType) =
         let isActive = context.isActive widgetType
         let label, icon = widgetInfo widgetType
-        let tooltip = if isActive then $"Close {label}" else $"Open {label}"
+        let tooltip =
+            if not isEnabled then
+                "Select a table to open widgets"
+            elif isActive then
+                $"Close {label}"
+            else
+                $"Open {label}"
 
         QuickAccessButton.QuickAccessButton(
             tooltip,
             icon,
             (fun _ -> context.toggleWidget widgetType),
+            isDisabled = (not isEnabled),
             classes = (if isActive then "swt:!text-primary" else "")
         )
 

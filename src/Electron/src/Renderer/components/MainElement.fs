@@ -52,12 +52,14 @@ let CreateARCitectNavbar
         | PreviewActiveView.Error _ -> Renderer.components.Widgets.AddDataAnnotatorWidget.HostView.PreviewError
 
     let widgets = createWidgets arcFile widgetHostView activeTableIndex setArcFileState
+    let hasSelectedTable = activeTableIndex.IsSome
 
     Widget.WidgetController(
         widgets,
+        closeAllWhen = (not hasSelectedTable),
         children = [
             Components.BaseNavbar.Main [
-                NavbarButtons(widgetTypes)
+                NavbarButtons(widgetTypes, hasSelectedTable)
                 QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
             ]
         ]
