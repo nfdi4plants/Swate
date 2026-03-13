@@ -228,20 +228,31 @@ let Main () =
                 prop.children [|
                     match appState with
                     | AppState.ARC _ ->
-                        Html.button [
-                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                            prop.text "Landing Page"
-                            prop.onClick (fun _ ->
-                                landingCtx.setState {
-                                    landingCtx.state with
-                                        Draft = LandingDraft.init
-                                        UiState = LandingUiState.init
-                                }
+                        let openLandingPage () =
+                            landingCtx.setState {
+                                landingCtx.state with
+                                    Draft = LandingDraft.init
+                                    UiState = LandingUiState.init
+                            }
 
-                                setSelectedTreeItemPath None
-                                setArcFileState None
-                                setPageState (Some PageState.LandingDraft)
-                            )
+                            setSelectedTreeItemPath None
+                            setArcFileState None
+                            setPageState (Some PageState.LandingDraft)
+
+                        Html.div [
+                            prop.className "swt:mb-2 swt:flex swt:justify-center"
+                            prop.children [
+                                Actionbar.Main(
+                                    [|
+                                        Actionbar.ButtonInfo.create (
+                                            "swt:fluent--document-bullet-list-24-regular swt:size-5",
+                                            "Landing Page",
+                                            openLandingPage
+                                        )
+                                    |],
+                                    4
+                                )
+                            ]
                         ]
                     | _ -> Html.none
                     Html.h2 [ prop.text "ARC-Tree" ]
