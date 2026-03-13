@@ -14,6 +14,7 @@ module private DataAnnotatorHelper =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
             Html.button [
+                prop.type'.button
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:btn-disabled"
                 else
@@ -50,6 +51,7 @@ module private DataAnnotatorHelper =
                         isOpen,
                         setOpen,
                         Html.button [
+                            prop.type'.button
                             prop.onClick (fun _ -> setOpen (not isOpen))
                             prop.role.button
                             prop.className
@@ -78,6 +80,7 @@ module private DataAnnotatorHelper =
                         )
                     ]
                     Html.button [
+                        prop.type'.button
                         prop.className "swt:btn swt:join-item"
                         prop.text "Update"
                         prop.disabled hasError
@@ -97,6 +100,7 @@ module private DataAnnotatorHelper =
                 ]
 
             Html.button [
+                prop.type'.button
                 if hasHeader then
                     prop.className "swt:btn swt:btn-primary"
                 else
@@ -182,6 +186,7 @@ module private DataAnnotatorHelper =
         let OpenModalButton model mkOpen =
 
             Html.button [
+                prop.type'.button
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:grow swt:btn-disabled"
                     prop.disabled true
@@ -230,7 +235,14 @@ module private DataAnnotatorHelper =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     let CellButton
-        (rowIndex: int, columnIndex: int, content: string, dtrgt: DataTarget option, state: Set<DataTarget>, setState)
+        (
+            rowIndex: int,
+            columnIndex: int,
+            content: string,
+            dtrgt: DataTarget option,
+            state: Set<DataTarget>,
+            setState: (Set<DataTarget> -> Set<DataTarget>) -> unit
+        )
         =
 
         let isDirectlyActive =
@@ -256,11 +268,12 @@ module private DataAnnotatorHelper =
                  Html.div [
                      prop.className "swt:w-full swt:h-full swt:flex swt:items-center swt:px-2 swt:py-1 swt:truncate"
                      prop.onClick (fun _ ->
-                         if isDirectlyActive then
-                             state.Remove dtrgt
-                         else
-                             state.Add dtrgt
-                         |> setState
+                         setState (fun (currentState: Set<DataTarget>) ->
+                             if currentState.Contains dtrgt then
+                                 currentState.Remove dtrgt
+                             else
+                                 currentState.Add dtrgt
+                         )
                      )
                      prop.children [
                          if isDirectlyActive then
@@ -278,7 +291,12 @@ module private DataAnnotatorHelper =
         )
 
     [<ReactComponent>]
-    let FileViewComponent (file: DataAnnotator.ParsedDataFile, state, setState) =
+    let FileViewComponent
+        (
+            file: DataAnnotator.ParsedDataFile,
+            state: Set<DataTarget>,
+            setState: (Set<DataTarget> -> Set<DataTarget>) -> unit
+        ) =
         let headerRow =
             file.HeaderRow
             |> Option.map (fun headerRow ->
@@ -348,10 +366,29 @@ open Components
 
 type DataAnnotator =
 
+    static member private tryValidateSubmit(model: Model, state: Set<DataTarget>, targetCol: TargetColumn) =
+        if state.IsEmpty then
+            Some "Select at least one target in the preview table."
+        else
+            match model.SpreadsheetModel.ActiveView with
+            | Spreadsheet.ActivePattern.IsTable ->
+                match targetCol with
+                | TargetColumn.Autodetect ->
+                    match model.SpreadsheetModel.ActiveTable.TryGetInputColumn(), model.SpreadsheetModel.ActiveTable.TryGetOutputColumn() with
+                    | Some _, Some _ ->
+                        Some "Both Input and Output columns already exist. Select Input or Output explicitly."
+                    | _ ->
+                        None
+                | _ ->
+                    None
+            | _ ->
+                None
+
     [<ReactComponent>]
     static member private Modal(model: Model, dispatch, rmvFile, rmv, isOpen, setIsOpen) =
-        let init: unit -> Set<DataTarget> = fun () -> Set.empty
-        let state, setState = React.useState (init)
+        let state, setState: Set<DataTarget> * (((Set<DataTarget> -> Set<DataTarget>) -> unit)) =
+            React.useStateWithUpdater (Set.empty<DataTarget>)
+        let errorMessage, setErrorMessage = React.useState (None: string option)
 
         let (targetCol: TargetColumn), setTargetCol =
             React.useState (TargetColumn.Autodetect)
@@ -369,50 +406,68 @@ type DataAnnotator =
 
         let footer =
             Html.div [
-                prop.className "swt:w-full swt:flex swt:justify-between swt:items-center swt:gap-2"
+                prop.className "swt:w-full swt:flex swt:flex-col swt:gap-2"
                 prop.children [
-                    Html.div [ prop.children [ DataAnnotatorButtons.ResetButton model rmvFile ] ]
                     Html.div [
-                        prop.className "swt:ml-auto swt:flex swt:gap-2"
-                        prop.style [ style.marginLeft length.auto ]
+                        prop.className "swt:w-full swt:flex swt:justify-between swt:items-center swt:gap-2"
                         prop.children [
-                            Html.button [
-                                prop.className "swt:btn swt:btn-outline"
-                                prop.text "Cancel"
-                                prop.onClick rmv
-                            ]
-                            Html.button [
-                                prop.className "swt:btn swt:btn-primary"
-                                prop.text "Submit"
-                                prop.onClick rmv
-                                prop.onClick (fun e ->
-                                    match model.DataAnnotatorModel.DataFile with
-                                    | Some dtf ->
-                                        let selectors = [|
-                                            for x in state do
-                                                x.ToFragmentSelectorString(
-                                                    model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome
-                                                )
-                                        |]
+                            Html.div [ prop.children [ DataAnnotatorButtons.ResetButton model rmvFile ] ]
+                            Html.div [
+                                prop.className "swt:ml-auto swt:flex swt:gap-2"
+                                prop.style [ style.marginLeft length.auto ]
+                                prop.children [
+                                    Html.button [
+                                        prop.type'.button
+                                        prop.className "swt:btn swt:btn-outline"
+                                        prop.text "Cancel"
+                                        prop.onClick rmv
+                                    ]
+                                    Html.button [
+                                        prop.type'.button
+                                        prop.className "swt:btn swt:btn-primary"
+                                        prop.text "Submit"
+                                        prop.disabled state.IsEmpty
+                                        prop.onClick (fun e ->
+                                            match DataAnnotator.tryValidateSubmit(model, state, targetCol) with
+                                            | Some message ->
+                                                setErrorMessage (Some message)
+                                            | None ->
+                                                match model.DataAnnotatorModel.DataFile with
+                                                | Some dtf ->
+                                                    let selectors = [|
+                                                        for x in state do
+                                                            x.ToFragmentSelectorString(
+                                                                model.DataAnnotatorModel.ParsedFile.Value.HeaderRow.IsSome
+                                                            )
+                                                    |]
 
-                                        let name = dtf.DataFileName
-                                        let dt = dtf.DataFileType
+                                                    let name = dtf.DataFileName
+                                                    let dt = dtf.DataFileType
 
-                                        SpreadsheetInterface.AddDataAnnotation {|
-                                            fileName = name
-                                            fileType = dt
-                                            fragmentSelectors = selectors
-                                            targetColumn = targetCol
-                                        |}
-                                        |> InterfaceMsg
-                                        |> dispatch
-                                    | None -> console.warn "No file selected"
+                                                    SpreadsheetInterface.AddDataAnnotation {|
+                                                        fileName = name
+                                                        fileType = dt
+                                                        fragmentSelectors = selectors
+                                                        targetColumn = targetCol
+                                                    |}
+                                                    |> InterfaceMsg
+                                                    |> dispatch
 
-                                    rmv e
-                                )
+                                                    setErrorMessage None
+                                                    rmv e
+                                                | None ->
+                                                    setErrorMessage (Some "No file selected.")
+                                        )
+                                    ]
+                                ]
                             ]
                         ]
                     ]
+                    if errorMessage.IsSome then
+                        Html.div [
+                            prop.className "swt:alert swt:alert-error swt:text-sm"
+                            prop.children [ Html.text errorMessage.Value ]
+                        ]
                 ]
             ]
 

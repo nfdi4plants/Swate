@@ -125,6 +125,11 @@
     <Compile Include="DataMapTable\DataMapTable.fs" />
     <Compile Include="Widgets\LocalStorage.fs" />
     <Compile Include="Widgets\Widgets.fs" />
+    <Compile Include="Widgets\WidgetSupport.fs" />
+    <Compile Include="Widgets\BuildingBlockWidget.fs" />
+    <Compile Include="Widgets\FilePickerWidget.fs" />
+    <Compile Include="Widgets\DataAnnotatorWidget.fs" />
+    <Compile Include="Widgets\TemplateWidget.fs" />
     <Compile Include="Notes\Types.fs" />
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
     <Compile Include="Notes\Editor\Types.fs" />

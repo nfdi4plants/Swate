@@ -6,6 +6,7 @@ let client =
     testList "Client" [
         Components.Tests.Table.ContextMenu.Main
         Components.Tests.Table.KeyboardNavigation.Main
+        Spreadsheet.Tests.DataAnnotator.Main
         OfficeAddIn.AnnotationTable.Successful.Main
     ]
 

@@ -3,13 +3,55 @@ module Renderer.Components.WidgetRegistry
 open Feliz
 open Swate.Components
 open ARCtrl
+open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
+let private filePickerServices: FilePickerWidgetServices = {
+    pickPaths =
+        fun () ->
+            promise {
+                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
+                return result |> Result.mapError (fun error -> error.Message)
+            }
+}
 
-type WidgetBlock =
-    {
-        prefix: string
-        content: ReactElement
-    }
+let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
+    pickPaths =
+        fun () ->
+            promise {
+                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
+                return result |> Result.mapError (fun error -> error.Message)
+            }
+    loadTextFile =
+        fun path ->
+            promise {
+                let! result = Api.ipcArcVaultApi.openFile (unbox null) path
+
+                return
+                    match result with
+                    | Error error -> Error error.Message
+                    | Ok(PageState.Text content) -> Ok content
+                    | Ok _ -> Error "Selected file could not be loaded as plain text. Only csv/tsv/txt are supported."
+            }
+}
+
+let private templateServices: TemplateWidgetServices = {
+    loadTemplates =
+        fun () ->
+            async {
+                try
+                    let! templatesJson = Api.templateApi.getTemplates()
+
+                    let templates =
+                        templatesJson
+                        |> ARCtrl.Json.Templates.fromJsonString
+                        |> Array.ofSeq
+
+                    return Ok templates
+                with error ->
+                    return Error error.Message
+            }
+}
 
 let BuildingBlockWidget
     (arcFileState: ArcFiles option)
@@ -20,7 +62,7 @@ let BuildingBlockWidget
     {|
         prefix = "ADD_BUILDINGBLOCK"
         content =
-            Renderer.components.Widgets.AddBuildingBlockWidget.Main(
+            Swate.Components.BuildingBlockWidget.Main(
                 arcFileState,
                 activeTableIndex,
                 setArcFileState
@@ -31,15 +73,20 @@ let TemplateWidget
     (arcFileState: ArcFiles option)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
+    (importType: TableJoinOptions)
+    (setImportType: TableJoinOptions -> unit)
     : WidgetType * WidgetDefinition =
     WidgetType.Template,
     {|
         prefix = "ADD_TEMPLATE"
         content =
-            Renderer.components.Widgets.AddTemplateWidget.Main(
+            Swate.Components.TemplateWidget.Main(
                 arcFileState,
                 activeTableIndex,
-                setArcFileState
+                setArcFileState,
+                importType,
+                setImportType,
+                templateServices
             )
     |}
 
@@ -52,16 +99,17 @@ let FilePickerWidget
         {|
             prefix = "FILEPICKER"
             content =
-                Renderer.components.Widgets.AddFilePickerWidget.Main(
+                Swate.Components.FilePickerWidget.Main(
                     arcFileState,
                     activeTableIndex,
-                    setArcFileState
+                    setArcFileState,
+                    filePickerServices
                 )
         |}
 
 let DataAnnotatorWidget
     (arcFileState: ArcFiles option)
-    (activeView: Renderer.components.Widgets.AddDataAnnotatorWidget.HostView)
+    (activeView: WidgetHostView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
     : WidgetType * WidgetDefinition =
@@ -69,23 +117,26 @@ let DataAnnotatorWidget
     {|
         prefix = "DATAANNOTATOR"
         content =
-            Renderer.components.Widgets.AddDataAnnotatorWidget.Main(
+            Swate.Components.DataAnnotatorWidget.Main(
                 arcFileState,
                 activeView,
                 activeTableIndex,
-                setArcFileState
+                setArcFileState,
+                dataAnnotatorServices
             )
     |}
 
 let createWidgets
     (arcFileState: ArcFiles option)
-    (activeView: Renderer.components.Widgets.AddDataAnnotatorWidget.HostView)
+    (activeView: WidgetHostView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
+    (importType: TableJoinOptions)
+    (setImportType: TableJoinOptions -> unit)
     : Map<WidgetType, WidgetDefinition> =
     [
         BuildingBlockWidget arcFileState activeTableIndex setArcFileState
-        TemplateWidget arcFileState activeTableIndex setArcFileState
+        TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
         DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
     ]
