@@ -14,7 +14,6 @@ module private DataAnnotatorHelper =
 
         let ResetButton model (rmvFile: Browser.Types.Event -> unit) =
             Html.button [
-                prop.type'.button
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:btn-disabled"
                 else
@@ -51,7 +50,6 @@ module private DataAnnotatorHelper =
                         isOpen,
                         setOpen,
                         Html.button [
-                            prop.type'.button
                             prop.onClick (fun _ -> setOpen (not isOpen))
                             prop.role.button
                             prop.className
@@ -80,7 +78,6 @@ module private DataAnnotatorHelper =
                         )
                     ]
                     Html.button [
-                        prop.type'.button
                         prop.className "swt:btn swt:join-item"
                         prop.text "Update"
                         prop.disabled hasError
@@ -100,7 +97,6 @@ module private DataAnnotatorHelper =
                 ]
 
             Html.button [
-                prop.type'.button
                 if hasHeader then
                     prop.className "swt:btn swt:btn-primary"
                 else
@@ -186,7 +182,6 @@ module private DataAnnotatorHelper =
         let OpenModalButton model mkOpen =
 
             Html.button [
-                prop.type'.button
                 if model.DataAnnotatorModel.DataFile.IsNone then
                     prop.className "swt:btn swt:grow swt:btn-disabled"
                     prop.disabled true
@@ -417,13 +412,11 @@ type DataAnnotator =
                                 prop.style [ style.marginLeft length.auto ]
                                 prop.children [
                                     Html.button [
-                                        prop.type'.button
                                         prop.className "swt:btn swt:btn-outline"
                                         prop.text "Cancel"
                                         prop.onClick rmv
                                     ]
                                     Html.button [
-                                        prop.type'.button
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.text "Submit"
                                         prop.disabled state.IsEmpty

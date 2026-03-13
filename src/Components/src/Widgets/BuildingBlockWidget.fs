@@ -259,7 +259,6 @@ type BuildingBlockWidget =
                         prop.style [ style.position.relative ]
                         prop.children [
                             Html.button [
-                                prop.type'.button
                                 prop.className [
                                     "swt:btn swt:join-item swt:border swt:!border-base-content"
                                     if state.BodyCellType = CompositeCellDiscriminate.Term then
@@ -276,7 +275,6 @@ type BuildingBlockWidget =
                                 )
                             ]
                             Html.button [
-                                prop.type'.button
                                 prop.className [
                                     "swt:btn swt:join-item swt:border swt:!border-base-content"
                                     if state.BodyCellType = CompositeCellDiscriminate.Unitized then

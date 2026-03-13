@@ -411,7 +411,6 @@ type DataAnnotatorWidget =
             prop.className "swt:flex swt:flex-wrap swt:gap-2"
             prop.children [
                 Html.button [
-                    prop.type'.button
                     prop.className "swt:btn swt:btn-primary swt:btn-sm"
                     prop.disabled loading
                     prop.text "Choose File"
@@ -428,7 +427,6 @@ type DataAnnotatorWidget =
                     )
                 ]
                 Html.button [
-                    prop.type'.button
                     prop.className "swt:btn swt:btn-outline swt:btn-sm"
                     prop.disabled dataFile.IsNone
                     prop.text "Reset"
@@ -737,14 +735,12 @@ type DataAnnotatorWidget =
                                     prop.onKeyDown (key.enter, fun _ -> applySeparator ())
                                 ]
                                 Html.button [
-                                    prop.type'.button
                                     prop.className "swt:btn swt:btn-sm"
                                     prop.text "Apply Separator"
                                     prop.onClick (fun _ -> applySeparator ())
                                     prop.disabled (String.IsNullOrWhiteSpace separatorInput)
                                 ]
                                 Html.button [
-                                    prop.type'.button
                                     prop.className "swt:btn swt:btn-sm"
                                     prop.text (
                                         match parsedFile with
@@ -798,13 +794,11 @@ type DataAnnotatorWidget =
                         prop.className "swt:flex swt:gap-2"
                         prop.children [
                             Html.button [
-                                prop.type'.button
                                 prop.className "swt:btn swt:btn-outline"
                                 prop.text "Cancel"
                                 prop.onClick (fun _ -> widgetCtx.closeWidget WidgetType.DataAnnotator)
                             ]
                             Html.button [
-                                prop.type'.button
                                 prop.className "swt:btn swt:btn-primary swt:ml-auto"
                                 prop.disabled (not canSubmit)
                                 prop.text "Submit"
