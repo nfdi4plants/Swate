@@ -1,0 +1,41 @@
+openapi: 3.0.3
+info:
+  title: Swate API
+  description: Research data management API for NFDI4Plants
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+    description: Development server
+paths:
+  /api/IOntologyAPIv2/getTestNumber:
+    get:
+      summary: Get test number
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: integer
+  /api/IOntologyAPIv2/getAllOntologies:
+    get:
+      summary: Get all ontologies
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+  /api/IServiceAPIv1/getAppVersion:
+    get:
+      summary: Get app version
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: string

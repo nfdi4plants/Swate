@@ -385,8 +385,6 @@ module V1 =
                 }
         }
 
-    open Helper
-
     let createIOntologyApi credentials =
         Remoting.createApi ()
         |> Remoting.withRouteBuilder Route.builder
