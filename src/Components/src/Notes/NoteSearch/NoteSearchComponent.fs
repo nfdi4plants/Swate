@@ -176,7 +176,7 @@ module NoteSearchComponent =
             setStartSearch,
             dropdownOpen: bool,
             setDropdownOpen: bool -> unit,
-            filterOptions,
+            filterOptions: string,
             setFilterOptions
         ) =
         Html.div [
