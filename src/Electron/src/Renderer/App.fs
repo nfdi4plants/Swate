@@ -113,6 +113,12 @@ let Main () =
                 FileTree = immutableFileTree
         })
 
+    let requestOpenWidget (widgetType: WidgetType) =
+        setWorkspaceState (fun state -> {
+            state with
+                RequestedWidgetToOpen = Some widgetType
+        })
+
     let pageActionDeps: Renderer.Navigation.PageActions.Deps = {
         setPageState = setPageState
         setArcFileState = setArcFileState
@@ -254,27 +260,39 @@ let Main () =
         )
 
     let actionBar =
+        let actionButtons =
+            [|
+                Actionbar.ButtonInfo.create (
+                    "swt:fluent--document-bullet-list-24-regular swt:size-5",
+                    "Labbook View",
+                    fun () -> Renderer.Navigation.PageActions.openLandingPage pageActionDeps
+                )
+                Actionbar.ButtonInfo.create (
+                    "swt:fluent--document-24-regular swt:size-5",
+                    "Notes",
+                    fun () -> Renderer.Navigation.PageActions.openNotesPage pageActionDeps
+                )
+                Actionbar.ButtonInfo.create (
+                    "swt:fluent--search-24-regular swt:size-5",
+                    "Note Search",
+                    fun () -> Renderer.Navigation.PageActions.openNotesSearchPage pageActionDeps
+                )
+                Actionbar.ButtonInfo.create (
+                    "swt:fluent--table-24-regular swt:size-5",
+                    "Open ARC Object Selector",
+                    (fun () ->
+                        if arcFileState.IsSome then
+                            requestOpenWidget WidgetType.ARCObjectSelector
+                    ),
+                    arcFileState.IsNone
+                )
+            |]
+
         Html.div [
             prop.className "swt:mb-2 swt:flex swt:justify-center"
             prop.children [
                 Actionbar.Main(
-                    [|
-                        Actionbar.ButtonInfo.create (
-                            "swt:fluent--document-bullet-list-24-regular swt:size-5",
-                            "Labbook View",
-                            fun () -> Renderer.Navigation.PageActions.openLandingPage pageActionDeps
-                        )
-                        Actionbar.ButtonInfo.create (
-                            "swt:fluent--document-24-regular swt:size-5",
-                            "Notes",
-                            fun () -> Renderer.Navigation.PageActions.openNotesPage pageActionDeps
-                        )
-                        Actionbar.ButtonInfo.create (
-                            "swt:fluent--search-24-regular swt:size-5",
-                            "Note Search",
-                            fun () -> Renderer.Navigation.PageActions.openNotesSearchPage pageActionDeps
-                        )
-                    |],
+                    actionButtons,
                     4
                 )
             ]

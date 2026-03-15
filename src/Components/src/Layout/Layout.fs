@@ -89,18 +89,17 @@ type Layout =
         let isActive = defaultArg isActive false
 
         Html.div [
+            prop.title tooltip
             prop.className [
-                "swt:tooltip swt:border-r-2"
-                tooltipClassName |> Option.defaultValue "swt:tooltip-right"
+                "swt:border-r-2"
                 if isActive then
                     "swt:border-primary"
                 else
                     "swt:border-transparent"
             ]
-            prop.ariaLabel tooltip
             prop.children [
-                Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
                 Html.button [
+                    prop.ariaLabel tooltip
                     prop.className "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
                     prop.children [
                         Html.i [ prop.className ("swt:iconify " + iconClassName) ]
@@ -217,7 +216,7 @@ type Layout =
                 if not isOpen then style.width 0 else style.width width
             ]
             prop.className [
-                "swt:flex swt:flex-row swt:h-full swt:relative swt:border-base-content/50 swt:bg-base-100"
+                "swt:flex swt:flex-row swt:h-full swt:relative swt:z-10 swt:border-base-content/50 swt:bg-base-100"
                 match side with
                 | Sidebar.Side.Left -> "swt:border-r"
                 | Sidebar.Side.Right -> "swt:border-l"
@@ -225,7 +224,7 @@ type Layout =
             prop.children [
                 Html.div [
                     prop.className [
-                        "swt:w-full swt:h-full swt:overflow-x-hidden swt:overflow-y-auto"
+                        "swt:w-full swt:h-full swt:overflow-x-visible swt:overflow-y-auto"
                         "swt:scrollbar-fade"
                     ]
                     prop.children children

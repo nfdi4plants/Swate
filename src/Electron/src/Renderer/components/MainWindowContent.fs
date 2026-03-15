@@ -469,6 +469,7 @@ let Content
                                 MainElement.CreateARCitectNavbar
                                     arcFileState
                                     activeView
+                                    setActiveView
                                     activeTableIndex
                                     setArcFileState
                                     (MainWindowContentHelper.onSaveClick arcFileState setPreviewData)

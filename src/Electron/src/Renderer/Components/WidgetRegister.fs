@@ -126,15 +126,34 @@ let DataAnnotatorWidget
             )
     |}
 
+let ARCObjectSelectorWidget
+    (arcFileState: ArcFiles option)
+    (selectedTarget: ARCObjectTarget option)
+    (onSelectTarget: ARCObjectTarget -> unit)
+    : WidgetType * WidgetDefinition =
+    WidgetType.ARCObjectSelector,
+    {|
+        prefix = "ARC_OBJECT_SELECTOR"
+        content =
+            Swate.Components.ARCObjectSelectorWidget.Main(
+                arcFileState,
+                selectedTarget,
+                onSelectTarget
+            )
+    |}
+
 let createWidgets
     (arcFileState: ArcFiles option)
     (activeView: WidgetHostView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
+    (selectedTarget: ARCObjectTarget option)
+    (onSelectTarget: ARCObjectTarget -> unit)
     (importType: TableJoinOptions)
     (setImportType: TableJoinOptions -> unit)
     : Map<WidgetType, WidgetDefinition> =
     [
+        ARCObjectSelectorWidget arcFileState selectedTarget onSelectTarget
         BuildingBlockWidget arcFileState activeTableIndex setArcFileState
         TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
@@ -142,13 +161,55 @@ let createWidgets
     ]
     |> Map.ofList
 
+let widgetDisabledReason
+    (arcFileState: ArcFiles option)
+    (activeView: WidgetHostView)
+    (activeTableIndex: int option)
+    (widgetType: WidgetType)
+    =
+    match widgetType with
+    | WidgetType.ARCObjectSelector ->
+        if arcFileState.IsSome then
+            None
+        else
+            Some "Open an ARC file first."
+    | WidgetType.BuildingBlock
+    | WidgetType.Template
+    | WidgetType.FilePicker ->
+        match arcFileState with
+        | None -> Some "Open an ARC file first."
+        | Some _ when activeTableIndex.IsNone -> Some "Select a table to open widgets."
+        | Some _ -> None
+    | WidgetType.DataAnnotator ->
+        match arcFileState with
+        | None ->
+            Some "Open an ARC file first."
+        | Some arcFile ->
+            match activeView with
+            | WidgetHostView.MetadataView ->
+                Some "Switch to a table or datamap tab to use Data Annotator."
+            | WidgetHostView.PreviewErrorView ->
+                Some "Data Annotator is unavailable while the preview is in an error state."
+            | WidgetHostView.TableView ->
+                if activeTableIndex.IsSome then
+                    None
+                else
+                    Some "Select a table tab to use Data Annotator."
+            | WidgetHostView.DataMapView ->
+                if WidgetArcFile.tryGetDataMap arcFile |> Option.isSome then
+                    None
+                else
+                    Some "No DataMap available for this ARC file."
+    | WidgetType.Playground ->
+        None
 
 [<ReactComponent>]
-let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
+let NavbarButtons(widgetTypes: WidgetType list, getDisabledReason: WidgetType -> string option) =
     let context = WidgetContext.useWidgetController ()
 
     let widgetInfo (widgetType: WidgetType) =
         match widgetType with
+        | WidgetType.ARCObjectSelector -> "ARC Object Selector", Icons.MagnifyingGlassPlus()
         | WidgetType.BuildingBlock -> "Add Building Block", Icons.BuildingBlock()
         | WidgetType.Template -> "Add Template", Icons.Templates()
         | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
@@ -157,20 +218,23 @@ let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
 
     let controlButton (widgetType: WidgetType) =
         let isActive = context.isActive widgetType
+        let disabledReason = getDisabledReason widgetType
         let label, icon = widgetInfo widgetType
         let tooltip =
-            if not isEnabled then
-                "Select a table to open widgets"
-            elif isActive then
-                $"Close {label}"
-            else
-                $"Open {label}"
+            match disabledReason with
+            | Some reason ->
+                reason
+            | None ->
+                if isActive then
+                    $"Close {label}"
+                else
+                    $"Open {label}"
 
         QuickAccessButton.QuickAccessButton(
             tooltip,
             icon,
             (fun _ -> context.toggleWidget widgetType),
-            isDisabled = (not isEnabled),
+            isDisabled = disabledReason.IsSome,
             classes = (if isActive then "swt:!text-primary" else "")
         )
 
@@ -188,6 +252,7 @@ let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
     ]
 
 let widgetTypes = [
+    WidgetType.ARCObjectSelector
     WidgetType.BuildingBlock
     WidgetType.Template
     WidgetType.FilePicker

@@ -37,9 +37,40 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
     ]
 
 [<ReactComponent>]
+let WidgetOpenRequestHandler
+    (arcFile: ArcFiles option)
+    (widgetHostView: WidgetHostView)
+    (activeTableIndex: int option)
+    =
+    let workspaceCtx = React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
+    let widgetCtx = WidgetContext.useWidgetController ()
+
+    React.useEffect (
+        (fun () ->
+            match workspaceCtx.state.RequestedWidgetToOpen with
+            | Some requestedWidget ->
+                match widgetDisabledReason arcFile widgetHostView activeTableIndex requestedWidget with
+                | None ->
+                    widgetCtx.openWidget requestedWidget
+                | Some reason ->
+                    console.warn ($"[Swate] Could not open widget '{requestedWidget}': {reason}")
+
+                workspaceCtx.setState {
+                    workspaceCtx.state with
+                        RequestedWidgetToOpen = None
+                }
+            | None -> ()
+        ),
+        [| box workspaceCtx.state.RequestedWidgetToOpen |]
+    )
+
+    Html.none
+
+[<ReactComponent>]
 let CreateARCitectNavbar
     (arcFile: ArcFiles option)
     (activeView: PreviewActiveView)
+    (setActiveView: PreviewActiveView -> unit)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
     onSaveClick
@@ -59,23 +90,43 @@ let CreateARCitectNavbar
                 TemplateImportType = nextImportType
         }
 
+    let selectedTarget =
+        match activeView with
+        | PreviewActiveView.Metadata -> Some ARCObjectTarget.Metadata
+        | PreviewActiveView.Table tableIndex -> Some(ARCObjectTarget.TableView tableIndex)
+        | PreviewActiveView.DataMap -> Some ARCObjectTarget.DataMap
+        | PreviewActiveView.Error _ -> None
+
+    let onSelectTarget (target: ARCObjectTarget) =
+        match target with
+        | ARCObjectTarget.Metadata ->
+            setActiveView PreviewActiveView.Metadata
+        | ARCObjectTarget.TableView tableIndex ->
+            setActiveView (PreviewActiveView.Table tableIndex)
+        | ARCObjectTarget.DataMap ->
+            setActiveView PreviewActiveView.DataMap
+
     let widgets =
         createWidgets
             arcFile
             widgetHostView
             activeTableIndex
             setArcFileState
+            selectedTarget
+            onSelectTarget
             workspaceCtx.state.TemplateImportType
             setImportType
 
-    let hasSelectedTable = activeTableIndex.IsSome
+    let getDisabledReason widgetType =
+        widgetDisabledReason arcFile widgetHostView activeTableIndex widgetType
 
     Widget.WidgetController(
         widgets,
-        closeAllWhen = (not hasSelectedTable),
+        closeAllWhen = arcFile.IsNone,
         children = [
+            WidgetOpenRequestHandler arcFile widgetHostView activeTableIndex
             Components.BaseNavbar.Main [
-                NavbarButtons(widgetTypes, hasSelectedTable)
+                NavbarButtons(widgetTypes, getDisabledReason)
                 QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
             ]
         ]

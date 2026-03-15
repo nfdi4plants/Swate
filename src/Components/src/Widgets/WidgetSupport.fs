@@ -12,6 +12,12 @@ type WidgetHostView =
     | PreviewErrorView
 
 [<RequireQualifiedAccess>]
+type ARCObjectTarget =
+    | Metadata
+    | TableView of int
+    | DataMap
+
+[<RequireQualifiedAccess>]
 module WidgetArcFile =
 
     let refreshRef (arcFile: ArcFiles) =
@@ -50,6 +56,35 @@ type DataAnnotatorWidgetServices = {
 type TemplateWidgetServices = {
     loadTemplates: unit -> Async<Result<Template[], string>>
 }
+
+[<RequireQualifiedAccess>]
+module ARCObjectTarget =
+
+    let availableTargets (arcFile: ArcFiles) =
+        [
+            ARCObjectTarget.Metadata
+
+            yield!
+                arcFile.Tables()
+                |> Seq.mapi (fun tableIndex _ -> ARCObjectTarget.TableView tableIndex)
+
+            if WidgetArcFile.tryGetDataMap arcFile |> Option.isSome then
+                ARCObjectTarget.DataMap
+        ]
+
+    let label (arcFile: ArcFiles) (target: ARCObjectTarget) =
+        match target with
+        | ARCObjectTarget.Metadata ->
+            "Metadata"
+        | ARCObjectTarget.TableView tableIndex ->
+            let tables = arcFile.Tables()
+
+            if tableIndex >= 0 && tableIndex < tables.Count then
+                tables.[tableIndex].Name
+            else
+                $"Table {tableIndex + 1}"
+        | ARCObjectTarget.DataMap ->
+            "DataMap"
 
 [<RequireQualifiedAccess>]
 module WidgetTemplateImport =

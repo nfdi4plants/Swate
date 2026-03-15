@@ -126,6 +126,7 @@
     <Compile Include="Widgets\LocalStorage.fs" />
     <Compile Include="Widgets\Widgets.fs" />
     <Compile Include="Widgets\WidgetSupport.fs" />
+    <Compile Include="Widgets\ARCObjectSelectorWidget.fs" />
     <Compile Include="Widgets\BuildingBlockWidget.fs" />
     <Compile Include="Widgets\FilePickerWidget.fs" />
     <Compile Include="Widgets\DataAnnotatorWidget.fs" />

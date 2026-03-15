@@ -121,6 +121,7 @@ module ResizeEventListener =
 [<RequireQualifiedAccess>]
 [<StringEnum>]
 type WidgetType =
+    | ARCObjectSelector
     | BuildingBlock
     | Template
     | FilePicker

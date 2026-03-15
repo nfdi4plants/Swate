@@ -10,6 +10,7 @@ type WorkspaceState = {
     FileTree: FileEntry list
     SelectedTreeItemPath: string option
     TemplateImportType: TableJoinOptions
+    RequestedWidgetToOpen: WidgetType option
 } with
 
     static member init() = {
@@ -17,6 +18,7 @@ type WorkspaceState = {
         FileTree = []
         SelectedTreeItemPath = None
         TemplateImportType = TableJoinOptions.Headers
+        RequestedWidgetToOpen = None
     }
 
 let WorkspaceStateCtx =

@@ -19,24 +19,28 @@ type Actionbar =
             (onClick: MouseEvent -> unit),
             ?toolTipPosition: string,
             ?debug: bool,
-            ?buttonTestId: string
+            ?buttonTestId: string,
+            ?isDisabled: bool
         ) =
 
         let debug = defaultArg debug false
 
         let toolTipPosition = defaultArg toolTipPosition "swt:tooltip-right"
+        let isDisabled = defaultArg isDisabled false
 
         Html.div [
-            prop.className $"swt:tooltip {toolTipPosition}"
-            prop.ariaLabel tooltip
+            prop.title tooltip
             prop.children [
-                Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
                 Html.button [
                     if debug then
                         prop.testId "button-test"
+                    prop.ariaLabel tooltip
                     prop.className [
                         "swt:btn swt:btn-primary swt:btn-square swt:btn-ghost swt:p-0 swt:btn-xs"
+                        if isDisabled then
+                            "swt:btn-disabled swt:opacity-50"
                     ]
+                    prop.disabled isDisabled
                     if buttonTestId.IsSome then
                         prop.testId buttonTestId.Value
                     prop.children [ Html.i [ prop.className [ "swt:iconify " + icon ] ] ]
@@ -134,17 +138,31 @@ type Actionbar =
             React.useMemo (
                 (fun _ ->
                     let onClick button =
-                        fun (e: MouseEvent) -> button.onClick ()
+                        fun (_: MouseEvent) ->
+                            if not button.isDisabled then
+                                button.onClick ()
 
                     if buttons.Length > 0 && buttons.Length > maxNumber + 1 then
                         Array.take maxNumber buttons
                         |> Array.map (fun button ->
-                            Actionbar.Button(button.icon, button.toolTip, (onClick button), debug = debug)
+                            Actionbar.Button(
+                                button.icon,
+                                button.toolTip,
+                                (onClick button),
+                                debug = debug,
+                                isDisabled = button.isDisabled
+                            )
                         )
                     else
                         buttons
                         |> Array.map (fun button ->
-                            Actionbar.Button(button.icon, button.toolTip, (onClick button), debug = debug)
+                            Actionbar.Button(
+                                button.icon,
+                                button.toolTip,
+                                (onClick button),
+                                debug = debug,
+                                isDisabled = button.isDisabled
+                            )
                         )
                 ),
                 [| buttons |]

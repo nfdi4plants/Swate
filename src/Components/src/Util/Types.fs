@@ -338,10 +338,15 @@ module Actionbar =
         icon: string
         toolTip: string
         onClick: unit -> unit
+        isDisabled: bool
     } with
 
-        static member create(icon: string, toolTip: string, (onClick: unit -> unit)) = {
+        static member create(icon: string, toolTip: string, (onClick: unit -> unit), isDisabled: bool) = {
             icon = icon
             toolTip = toolTip
             onClick = onClick
+            isDisabled = isDisabled
         }
+
+        static member create(icon: string, toolTip: string, (onClick: unit -> unit)) =
+            ButtonInfo.create(icon, toolTip, onClick, false)
