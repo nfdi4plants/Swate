@@ -14,5 +14,8 @@ type LandingState = {
         UiState = LandingUiState.init
     }
 
+let reset (ctx: StateContext<LandingState>) =
+    ctx.setState (LandingState.init ())
+
 let LandingStateCtx =
     React.createContext<StateContext<LandingState>> (StateContext.init (LandingState.init ()))

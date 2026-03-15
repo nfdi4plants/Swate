@@ -10,7 +10,7 @@ module Conversion =
         |> List.map _.Trim()
         |> List.filter (System.String.IsNullOrWhiteSpace >> not)
 
-    let private isSafePathSegment (value: string) =
+    let isSafePathSegment (value: string) =
         not (System.String.IsNullOrWhiteSpace value)
         && not (value.Contains "/")
         && not (value.Contains "\\")

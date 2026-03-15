@@ -250,6 +250,28 @@ let api: IPCTypes.IArcVaultsApi = {
             else
                 return Ok result.filePaths
         }
+    readNotes =
+        fun event -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        let! fileEntries =
+                            if vault.fileTree.Count > 0 then
+                                promise { return vault.fileTree.Values |> Seq.toArray }
+                            else
+                                getFileEntries arcPath
+
+                        let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
+                        return Ok notes
+            with e ->
+                return Error e
+        }
     saveArcFile =
         fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
             try

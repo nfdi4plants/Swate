@@ -54,15 +54,19 @@ type Notes =
                 | None ->
                     setError (Some "Select a Study or Assay target first.")
                 | Some targetRef ->
-                    match Conversion.resolveProtocolName draft with
+                    match draft.DateCreated with
                     | None ->
-                        setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                    | Some protocolName ->
-                        match Conversion.mkExistingTargetRelativePath targetRef protocolName with
+                        setError (Some "Date Created is required.")
+                    | Some dateCreated ->
+                        match Conversion.resolveProtocolName draft with
                         | None ->
-                            setError (Some "Could not resolve a safe target path.")
-                        | Some relativePath ->
-                            createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+                            setError (Some "Title is invalid for protocol naming. Choose a different title.")
+                        | Some protocolName ->
+                            match Conversion.mkExistingTargetRelativePath targetRef dateCreated protocolName with
+                            | None ->
+                                setError (Some "Could not resolve a safe target path.")
+                            | Some relativePath ->
+                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
 
         let submitNewRootNote () =
             if Validation.isRequiredDataValid draft |> not then

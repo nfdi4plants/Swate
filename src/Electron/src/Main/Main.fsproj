@@ -13,6 +13,7 @@
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\SimpleGit.fs" />
     <Compile Include="FileTreeCreator.fs" />
+    <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="SettingsStore.fs" />
     <Compile Include="RecentArcStore.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />
