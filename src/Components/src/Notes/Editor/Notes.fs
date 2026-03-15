@@ -26,7 +26,7 @@ type Notes =
             | None ->
                 setError (Some "Date Created is required.")
             | Some dateCreated ->
-                let content = Conversion.formatMarkdown draft
+                let content = NoteConversion.formatMarkdown draft
 
                 let payload = {
                     Intent = {
@@ -58,11 +58,11 @@ type Notes =
                     | None ->
                         setError (Some "Date Created is required.")
                     | Some dateCreated ->
-                        match Conversion.resolveProtocolName draft with
+                        match NoteConversion.resolveProtocolName draft with
                         | None ->
                             setError (Some "Title is invalid for protocol naming. Choose a different title.")
                         | Some protocolName ->
-                            match Conversion.mkExistingTargetRelativePath targetRef dateCreated protocolName with
+                            match NoteConversion.mkExistingTargetRelativePath targetRef dateCreated protocolName with
                             | None ->
                                 setError (Some "Could not resolve a safe target path.")
                             | Some relativePath ->
@@ -76,11 +76,11 @@ type Notes =
                 | None ->
                     setError (Some "Date Created is required.")
                 | Some dateCreated ->
-                    match Conversion.resolveProtocolName draft with
+                    match NoteConversion.resolveProtocolName draft with
                     | None ->
                         setError (Some "Title is invalid for protocol naming. Choose a different title.")
                     | Some protocolName ->
-                        match Conversion.mkNewRootNoteRelativePath dateCreated protocolName with
+                        match NoteConversion.mkNewRootNoteRelativePath dateCreated protocolName with
                         | None ->
                             setError (Some "Could not resolve a safe note path.")
                         | Some relativePath ->
