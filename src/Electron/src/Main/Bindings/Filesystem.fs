@@ -23,3 +23,9 @@ let writeFileSync (path: string) (content: string) (encoding: TextEncoding) : un
 
 [<Import("renameSync", "fs")>]
 let renameSync (oldPath: string) (newPath: string) : unit = jsNative
+
+[<Import("unlinkSync", "fs")>]
+let unlinkSync (path: string) : unit = jsNative
+
+[<Import("readdirSync", "fs")>]
+let readdirSync (path: string) : string array = jsNative

@@ -143,6 +143,7 @@
     <Compile Include="DataHubSidebar\Types.fs" />
     <Compile Include="DataHubSidebar\DataHubSidebar.fs" />
     <Compile Include="Authentication\Types.fs" />
+    <Compile Include="Authentication\AccountManager.fs" />
     <Compile Include="Authentication\Authentication.fs" />
     <Compile Include="Style.fs" />
   </ItemGroup>

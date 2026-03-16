@@ -90,6 +90,7 @@ type private Selector =
         let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
             pathChange = setCurrentlyOpenArcPath
             recentARCsUpdate = fun arcs -> setRecentArc arcs
+            authAccountsUpdate = ignore
             fileTreeUpdate = ignore
             gitProgressUpdate = ignore
         }
@@ -104,9 +105,9 @@ type private Selector =
                 setIsLoading false
             }
             |> Promise.start
-        )
 
-        React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
+            Remoting.init |> Remoting.buildHandler ipcHandler
+        )
 
         let selectorControlRef =
             React.useRef ({ toggle = ignore }: SelectorTypes.SelectorRef)
@@ -134,6 +135,145 @@ type private Selector =
             )
         ]
 
+module private Authentication =
+
+    open AuthenticationTypes
+    open Swate.Electron.Shared.AuthTypes
+
+    let private toUserInfo (u: AuthUserDto) : UserInformation = {
+        Name = u.Name
+        Email = u.Email
+        AvatarUrl = u.AvatarUrl
+        TargetDataHub = u.TargetDataHub
+    }
+
+    let private toAccountSummary (a: AuthAccountSummary) : AccountSummary = {
+        AccountId = a.AccountId
+        Name = a.Name
+        Email = a.Email
+        AvatarUrl = a.AvatarUrl
+        TargetDataHub = a.TargetDataHub
+        IsActive = a.IsActive
+    }
+
+    let private refreshState (setUser: UserInformation option -> unit) (setAccounts: AuthAccountSummary array -> unit) = promise {
+        let! stateResult = Api.ipcAuthApi.getAuthState ()
+
+        match stateResult with
+        | Ok state ->
+            setAccounts state.Accounts
+
+            match state.User with
+            | Some u when state.IsAuthenticated -> setUser (Some(toUserInfo u))
+            | _ -> setUser None
+        | Error _ ->
+            setUser None
+            setAccounts [||]
+    }
+
+    [<ReactComponent>]
+    let UserAvatar () =
+        let user, setUser = React.useState (None: UserInformation option)
+        let accounts, setAccounts = React.useState ([||]: AuthAccountSummary array)
+        let isLoading, setIsLoading = React.useState false
+
+        let refresh () =
+            refreshState setUser setAccounts |> Promise.start
+
+        let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
+            pathChange = ignore
+            recentARCsUpdate = ignore
+            authAccountsUpdate =
+                fun accounts ->
+                    setAccounts accounts
+                    let activeAccount = accounts |> Array.tryFind (fun a -> a.IsActive)
+
+                    match activeAccount with
+                    | Some a ->
+                        {
+                            AccountId = a.AccountId
+                            Name = a.Name
+                            Email = a.Email
+                            AvatarUrl = a.AvatarUrl
+                            TargetDataHub = a.TargetDataHub
+                        }
+                        |> toUserInfo
+                        |> Some
+                        |> setUser
+
+                    | None -> setUser None
+            fileTreeUpdate = ignore
+            gitProgressUpdate = ignore
+        }
+
+        // On mount: load persisted auth state from Main
+        React.useEffectOnce (fun _ ->
+
+            Remoting.init |> Remoting.buildHandler ipcHandler
+
+            promise {
+                do! refreshState setUser setAccounts
+                setIsLoading false
+            }
+            |> Promise.start
+        )
+
+        let onSignIn (signInInfo: SignInInformation) =
+            promise {
+                setIsLoading true
+
+                let request: AuthSignInRequest = {
+                    GitLabBaseUrl = signInInfo.GitLabBaseUrl
+                    PersonalAccessToken = signInInfo.PersonalAccessToken
+                }
+
+                let! result = Api.ipcAuthApi.signIn request
+
+                match result with
+                | Ok authResult when authResult.Success -> do! refreshState setUser setAccounts
+                | Ok authResult ->
+                    let msg = authResult.Message |> Option.defaultValue "Authentication failed."
+                    signInInfo.OnErrorCallback(exn msg)
+                | Error ex -> signInInfo.OnErrorCallback ex
+
+                setIsLoading false
+            }
+            |> Promise.start
+
+        let onLogout () =
+            promise {
+                let! _ = Api.ipcAuthApi.signOut ()
+                do! refreshState setUser setAccounts
+            }
+            |> Promise.start
+
+        let onSwitchAccount (accountId: string) =
+            promise {
+                let! _ = Api.ipcAuthApi.setActiveAccount accountId
+                refresh ()
+            }
+            |> Promise.start
+
+        let onRemoveAccount (accountId: string) =
+            promise {
+                let! _ = Api.ipcAuthApi.removeAccount accountId
+                refresh ()
+            }
+            |> Promise.start
+
+        let mappedAccounts = accounts |> Array.map toAccountSummary
+
+        Authentication.UserAvatar(
+            user,
+            onSignIn,
+            onLogout,
+            isLoading = isLoading,
+            dropdownClassName = "swt:dropdown-bottom swt:dropdown-end",
+            accounts = mappedAccounts,
+            onSwitchAccount = onSwitchAccount,
+            onRemoveAccount = onRemoveAccount
+        )
+
 type Navbar =
 
     [<ReactComponent>]
@@ -141,4 +281,14 @@ type Navbar =
 
         let left = Selector.Main()
 
-        Swate.Components.Navbar.Main(left = left)
+        let right =
+            Html.div [
+                prop.className "swt:flex swt:items-center"
+                prop.children [
+                    Authentication.UserAvatar()
+                    Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
+                    Layout.LeftSidebarToggleBtn()
+                ]
+            ]
+
+        Swate.Components.Navbar.Main(left = left, right = right)
