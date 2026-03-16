@@ -66,7 +66,7 @@ module GitLabAPI =
                     let! gitLabUserInfo = response.json<AuthenticationTypes.GitLabUser> ()
 
                     let userInfo =
-                        UserInformation.FromGitLabUser gitLabUserInfo pat signInInfo.GitLabBaseUrl
+                        UserInformation.FromGitLabUser gitLabUserInfo signInInfo.GitLabBaseUrl
 
                     return Ok userInfo
 
@@ -341,37 +341,21 @@ type Authentication =
         ]
 
     [<ReactComponent>]
-    static member private UserInfo(user: UserInformation, onLogout: unit -> unit) =
-        React.Fragment [
-            // header area with name and email
-            Html.li [
-                prop.children [
-                    Html.a [
-                        prop.className "swt:justify-between"
-                        prop.text user.Name
-                    ]
-                    Html.p [
-                        prop.className "swt:text-sm swt:text-gray-500"
-                        prop.text user.Email
-                    ]
-                    Html.p [
-                        prop.testId "LoggedInDataHub"
-                        prop.className "swt:text-xs swt:text-gray-500"
-                        prop.textf "DataHub: %s" user.TargetDataHub
-                    ]
-                ]
-            ]
-            // options area with a list of buttons, for now only logout
-            Html.li [
-                prop.children [
-                    Html.button [
-                        prop.testId "LogoutButton"
-                        prop.className "swt:btn swt:btn-error swt:btn-outline swt:btn-sm swt:w-full"
-                        prop.text "Logout"
-                        prop.onClick (fun _ -> onLogout ())
-                    ]
-                ]
-            ]
+    static member LogoutBtn(onLogout: unit -> unit) =
+        Html.button [
+            prop.testId "LogoutButton"
+            prop.className "swt:btn swt:btn-error swt:btn-outline swt:btn-sm swt:w-full"
+            prop.text "Logout"
+            prop.onClick (fun _ -> onLogout ())
+        ]
+
+    [<ReactComponent>]
+    static member AddAnotherAccountBtn(onAddAccount: unit -> unit) =
+        Html.button [
+            prop.testId "AddAnotherAccountButton"
+            prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:w-full swt:gap-1"
+            prop.onClick (fun _ -> onAddAccount ())
+            prop.text "Add another account"
         ]
 
     [<ReactComponent>]
@@ -380,16 +364,23 @@ type Authentication =
             userInformation: UserInformation option,
             onSignIn: SignInInformation -> unit,
             onLogout: unit -> unit,
-            ?isLoading: bool
+            ?isLoading: bool,
+            ?dropdownClassName: string,
+            ?accounts: AccountSummary array,
+            ?onSwitchAccount: string -> unit,
+            ?onRemoveAccount: string -> unit
         ) =
 
         let isOpen, setIsOpen = React.useState false
         let error, setError = React.useState (None: exn option)
+        let showAddAccount, setShowAddAccount = React.useState false
+        let accounts = accounts |> Option.defaultValue [||]
 
         let onSignIn =
             fun signInInfo ->
                 setError None
                 setIsOpen false
+                setShowAddAccount false
                 onSignIn signInInfo
 
         let ToggleContent =
@@ -410,10 +401,41 @@ type Authentication =
             React.useMemo (
                 (fun () ->
                     match userInformation with
-                    | Some userInformation -> Authentication.UserInfo(userInformation, onLogout)
+                    | Some user ->
+                        if showAddAccount then
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Html.button [
+                                        prop.testId "AddAccountBackButton"
+                                        prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:self-start"
+                                        prop.onClick (fun _ -> setShowAddAccount false)
+                                        prop.text "\u2190 Back to account"
+                                    ]
+                                    Authentication.NotAuthenticatedView(onSignIn, setError)
+                                ]
+                            ]
+                        else
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    AccountManager.Main(
+                                        accounts,
+                                        ?onSwitchAccount = onSwitchAccount,
+                                        ?onRemoveAccount = onRemoveAccount
+                                    )
+                                    Authentication.LogoutBtn onLogout
+                                    Authentication.AddAnotherAccountBtn(fun () -> setShowAddAccount true)
+                                ]
+                            ]
                     | None -> Authentication.NotAuthenticatedView(onSignIn, setError)
                 ),
-                [| box userInformation; box error |]
+                [|
+                    box userInformation
+                    box error
+                    box showAddAccount
+                    box accounts
+                |]
             )
 
         React.Fragment [
@@ -430,13 +452,14 @@ type Authentication =
                 Html.button [
                     prop.testId "UserButtonToggle"
                     prop.onClick (fun _ -> setIsOpen (not isOpen))
-                    prop.className "swt:btn swt:btn-circle"
+                    prop.className "swt:btn swt:btn-circle swt:btn-sm"
                     prop.children [ ToggleContent ]
                 ],
                 Html.div [ prop.testId "UserDropdownContent"; prop.children content ],
                 contentClassName =
                     "swt:flex swt:flex-col swt:min-w-xs swt:gap-2 swt:border-base-content swt:border-1 swt:p-2 swt:shadow-lg swt:rounded swt:bg-base-100 swt:top-[110%]",
-                closeOnClick = false
+                closeOnClick = false,
+                ?dropdownClassName = dropdownClassName
             )
         ]
 
@@ -446,13 +469,14 @@ type Authentication =
         let userInformation, setUserInformation =
             React.useState (None: UserInformation option)
 
+        let accounts, setAccounts = React.useState ([||]: AccountSummary array)
+
         let isLoading, setIsLoading = React.useState false
 
         let exmpUserInformation = {
             Name = "John Doe"
             Email = "john-doe@mail.com"
             AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
-            Token = "1234567890"
             TargetDataHub = AuthenticationHelper.Default_DataHub_Url
         }
 
@@ -464,19 +488,78 @@ type Authentication =
                     // Testing, ignore for story tests
                     // let! userInformation = GitLabAPI.getUserAPIRequest signInInfo
                     // Here should be try get user information from the DataHub using the provided signInInfo and handle possible errors by calling signInInfo.OnErrorCallback with the error message. For now we just simulate a successful sign in with example user information and a delay.
-                    setUserInformation (
-                        Some {
-                            exmpUserInformation with
-                                TargetDataHub = signInInfo.GitLabBaseUrl
-                                Token = signInInfo.PersonalAccessToken
+                    let activeUser = {
+                        exmpUserInformation with
+                            TargetDataHub = signInInfo.GitLabBaseUrl
+                    }
+
+                    setUserInformation (Some activeUser)
+
+                    setAccounts [|
+                        {
+                            AccountId = "acc-1"
+                            Name = activeUser.Name
+                            Email = activeUser.Email
+                            AvatarUrl = activeUser.AvatarUrl
+                            TargetDataHub = activeUser.TargetDataHub
+                            IsActive = true
                         }
-                    )
+                        {
+                            AccountId = "acc-2"
+                            Name = "Max Mustermann"
+                            Email = "max@example.org"
+                            AvatarUrl = "https://www.gravatar.com/avatar/22222222222222222222222222222222?d=mp&f=y"
+                            TargetDataHub = "https://datahub.rz.rptu.de/"
+                            IsActive = false
+                        }
+                    |]
 
                     setIsLoading false
                 }
                 |> Promise.start
 
-        let onLogout = fun () -> setUserInformation None
+        let onLogout () =
+            setUserInformation None
+            setAccounts [||]
+
+        let onSwitchAccount (accountId: string) =
+            let next =
+                accounts
+                |> Array.map (fun account -> {
+                    account with
+                        IsActive = account.AccountId = accountId
+                })
+
+            setAccounts next
+
+            match next |> Array.tryFind (fun account -> account.IsActive) with
+            | Some active ->
+                setUserInformation (
+                    Some {
+                        Name = active.Name
+                        Email = active.Email
+                        AvatarUrl = active.AvatarUrl
+                        TargetDataHub = active.TargetDataHub
+                    }
+                )
+            | None -> setUserInformation None
+
+        let onRemoveAccount (accountId: string) =
+            let next = accounts |> Array.filter (fun account -> account.AccountId <> accountId)
+
+            setAccounts next
+
+            match next |> Array.tryFind (fun account -> account.IsActive) with
+            | Some active ->
+                setUserInformation (
+                    Some {
+                        Name = active.Name
+                        Email = active.Email
+                        AvatarUrl = active.AvatarUrl
+                        TargetDataHub = active.TargetDataHub
+                    }
+                )
+            | None -> setUserInformation None
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:m-10 swt:gap-2"
@@ -489,6 +572,14 @@ type Authentication =
                     prop.testId "SignedInInfo"
                     prop.textf "Signed In: %b" (Option.isSome userInformation)
                 ]
-                Authentication.UserAvatar(userInformation, onSignIn, onLogout, isLoading = isLoading)
+                Authentication.UserAvatar(
+                    userInformation,
+                    onSignIn,
+                    onLogout,
+                    isLoading = isLoading,
+                    accounts = accounts,
+                    onSwitchAccount = onSwitchAccount,
+                    onRemoveAccount = onRemoveAccount
+                )
             ]
         ]

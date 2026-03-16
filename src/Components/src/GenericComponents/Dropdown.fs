@@ -6,7 +6,15 @@ type Dropdown =
 
     [<ReactComponent>]
     static member Main
-        (isOpen, setIsOpen, toggle: ReactElement, children: ReactElement, ?contentClassName: string, ?closeOnClick: bool) =
+        (
+            isOpen,
+            setIsOpen,
+            toggle: ReactElement,
+            children: ReactElement,
+            ?dropdownClassName: string,
+            ?contentClassName: string,
+            ?closeOnClick: bool
+        ) =
 
         let closeOnClick = defaultArg closeOnClick true
 
@@ -25,6 +33,7 @@ type Dropdown =
                 "swt:dropdown swt:inline-block"
                 if isOpen then
                     "swt:dropdown-open"
+                defaultArg dropdownClassName ""
             ]
             prop.children [
                 Html.div [
