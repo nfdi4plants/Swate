@@ -113,14 +113,6 @@ let Main () =
                 FileTree = immutableFileTree
         })
 
-    let pageActionDeps: Renderer.Navigation.PageActions.Deps = {
-        setPageState = setPageState
-        setArcFileState = setArcFileState
-        setSelectedTreeItemPath = setSelectedTreeItemPath
-        landingCtx = landingCtx
-        notesCtx = notesCtx
-    }
-
     React.useEffect (
         (fun () ->
             match pageState with
@@ -177,7 +169,7 @@ let Main () =
             match pathOption with
             | Some p ->
                 AppState.ARC p |> setAppState
-                Renderer.Navigation.PageActions.openArcStartPage pageActionDeps
+                Renderer.Navigation.PageActions.openArcStartPage notesCtx landingCtx setArcFileState setSelectedTreeItemPath setPageState
             | None ->
                 setAppState AppState.Init
                 setSelectedTreeItemPath None
@@ -220,7 +212,7 @@ let Main () =
                 match pathOption with
                 | Some p ->
                     AppState.ARC p |> setAppState
-                    Renderer.Navigation.PageActions.openArcStartPage pageActionDeps
+                    Renderer.Navigation.PageActions.openArcStartPage notesCtx landingCtx setArcFileState setSelectedTreeItemPath setPageState
                 | None ->
                     setSelectedTreeItemPath None
                     setPageState None
@@ -262,17 +254,17 @@ let Main () =
                         Actionbar.ButtonInfo.create (
                             "swt:fluent--document-bullet-list-24-regular swt:size-5",
                             "Labbook View",
-                            fun () -> Renderer.Navigation.PageActions.openLandingPage pageActionDeps
+                            fun () -> Renderer.Navigation.PageActions.openLandingPage landingCtx setArcFileState setSelectedTreeItemPath setPageState
                         )
                         Actionbar.ButtonInfo.create (
                             "swt:fluent--document-24-regular swt:size-5",
-                            "Notes",
-                            fun () -> Renderer.Navigation.PageActions.openNotesPage pageActionDeps
+                            "Create Note",
+                            fun () -> Renderer.Navigation.PageActions.createNewNote notesCtx setArcFileState setSelectedTreeItemPath setPageState
                         )
                         Actionbar.ButtonInfo.create (
                             "swt:fluent--search-24-regular swt:size-5",
                             "Note Search",
-                            fun () -> Renderer.Navigation.PageActions.openNotesSearchPage pageActionDeps
+                            fun () -> Renderer.Navigation.PageActions.openNotesSearchPage setArcFileState setSelectedTreeItemPath setPageState
                         )
                     |],
                     4

@@ -171,10 +171,11 @@ let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<NoteSear
             }
         )
 
-    let! notesWithOptions = Fable.Core.JS.Promise.all notePromises
+    let! notesWithOptions = Fable.Core.JS.Constructors.Promise.all notePromises
 
     return
         notesWithOptions
+        |> fun notesWithOptions -> notesWithOptions :?> NoteSearch option []
         |> Array.choose id
         |> Array.sortByDescending (fun note -> note.Date)
 }
