@@ -1,6 +1,5 @@
 namespace Swate.Components.NoteTypes
 
-open ARCtrl
 
 type NoteSearch = {
     RelativePath: string
