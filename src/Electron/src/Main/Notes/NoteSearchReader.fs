@@ -156,17 +156,25 @@ let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<NoteSear
             |> Option.map (fun relativePath -> entry.path, relativePath)
         )
 
-    let notes = ResizeArray<NoteSearch>()
+    // Process all note files in parallel, preserving per-file error handling
+    let notePromises =
+        noteEntries
+        |> Array.map (fun (absolutePath, relativePath) ->
+            promise {
+                try
+                    let! modifiedAt = tryGetFileModifiedDate absolutePath
+                    let! content = readUtf8FileAsync absolutePath
+                    return Some(parseNote relativePath content modifiedAt)
+                with _ ->
+                    // Match previous behavior: silently skip files that fail to read/parse
+                    return None
+            }
+        )
 
-    for absolutePath, relativePath in noteEntries do
-        try
-            let! modifiedAt = tryGetFileModifiedDate absolutePath
-            let! content = readUtf8FileAsync absolutePath
-            notes.Add(parseNote relativePath content modifiedAt)
-        with _ ->
-            ()
+    let! notesWithOptions = Fable.Core.JS.Promise.all notePromises
 
     return
-        notes.ToArray()
+        notesWithOptions
+        |> Array.choose id
         |> Array.sortByDescending (fun note -> note.Date)
 }
