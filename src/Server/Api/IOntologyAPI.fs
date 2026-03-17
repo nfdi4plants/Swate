@@ -91,11 +91,11 @@ module V3 =
         |> OpenApi.withTitle "Swate Ontology API"
         |> OpenApi.withServers [
             {
-                Url = "https://swate.nfdi4plants.org/"
+                Url = Swate.Components.Shared.URLs.PRODUCTION_URL
                 Description = Some "Production server"
             }
             {
-                Url = "https://swate-alpha.nfdi4plants.org/"
+                Url = Swate.Components.Shared.URLs.PRODUCTION_URL_ALPHA
                 Description = Some "Nightly server"
             }
             {

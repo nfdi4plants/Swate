@@ -47,8 +47,7 @@ module private AboutHelper =
                         Html.div [
                             prop.className "not-prose"
                             prop.children [
-                                //Daisy.button.a [
-                                Html.button [
+                                Html.a [
                                     prop.href imageHref
                                     prop.className [ "swt:btn swt:btn-square swt:btn-primary swt:btn-lg" ]
                                     prop.children [
@@ -152,7 +151,7 @@ module private AboutHelper =
                     prop.children [
                         Html.li [
                             Html.a [
-                                prop.href Swate.Components.Shared.URLs.Docs.IOntologyApiv3
+                                prop.href Swate.Components.Shared.URLs.Docs.IOntologyAPIv3
                                 prop.target.blank
                                 prop.text "IOntologyAPIv3"
                             ]

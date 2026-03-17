@@ -3,7 +3,10 @@ namespace Swate.Components.Shared
 module URLs =
 
     [<Literal>]
-    let PRODUCTION_URL = @"https://swate-alpha.nfdi4plants.org"
+    let PRODUCTION_URL_ALPHA = @"https://swate-alpha.nfdi4plants.org"
+
+    [<Literal>]
+    let PRODUCTION_URL = @"https://swate.nfdi4plants.org"
 
     module Data =
 
@@ -16,7 +19,7 @@ module URLs =
     module Docs =
 
         [<Literal>]
-        let IOntologyApiv3 = "/api/IOntologyAPIv3/docs"
+        let IOntologyAPIv3 = "/api/IOntologyAPIv3/docs"
 
 
     type Helpdesk =
