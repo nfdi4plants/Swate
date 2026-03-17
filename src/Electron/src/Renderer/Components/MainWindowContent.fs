@@ -116,6 +116,7 @@ let CreateARCPreview
         | ArcFiles.Assay assay -> assay.DataMap.IsSome
         | ArcFiles.Study(study, _) -> study.DataMap.IsSome
         | ArcFiles.Run run -> run.DataMap.IsSome
+        | ArcFiles.Workflow workflow -> workflow.DataMap.IsSome
         | ArcFiles.DataMap _ -> true
         | _ -> false
 
@@ -260,6 +261,7 @@ let Content
         arcFileState,
         pageState,
         setPreviewData,
+        setSelectedExplorerItemId,
         setSelectedTreeItemPath
     ) =
 
@@ -310,6 +312,9 @@ let Content
                                     activeView
                                     activeTableIndex
                                     setArcFileState
+                                    setSelectedExplorerItemId
+                                    setSelectedTreeItemPath
+                                    setPreviewData
                                     (MainWindowContentHelper.onSaveClick arcFileState setPreviewData)
                             ]
                         ]

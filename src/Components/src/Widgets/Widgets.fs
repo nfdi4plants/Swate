@@ -125,6 +125,7 @@ type WidgetType =
     | Template
     | FilePicker
     | DataAnnotator
+    | ARCObject
     | Playground
 
 type WidgetBlock =

@@ -3,6 +3,7 @@ module Renderer.Components.WidgetRegistry
 open Feliz
 open Swate.Components
 open ARCtrl
+open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
@@ -126,6 +127,47 @@ let DataAnnotatorWidget
             )
     |}
 
+[<ReactComponent>]
+let private ARCObjectWidgetContent
+    (setSelectedExplorerItemId: string option -> unit)
+    (setSelectedTreeItemPath: string option -> unit)
+    (setPageState: PageState option -> unit)
+    =
+    let appCtx = React.useContext Renderer.Context.AppStateCtx.AppStateCtx
+
+    let workspaceCtx =
+        React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
+
+    let rootRepoPath =
+        match appCtx.state with
+        | AppState.ARC arcPath -> Some arcPath
+        | AppState.Init -> None
+
+    let treePane =
+        Renderer.Components.ArcExplorer.createArcExplorer
+            rootRepoPath
+            workspaceCtx.state.ArcExplorerTree
+            workspaceCtx.state.SelectedExplorerItemId
+            workspaceCtx.state.SelectedTreeItemPath
+            setSelectedExplorerItemId
+            setSelectedTreeItemPath
+            setPageState
+
+    match treePane with
+    | Some treePane -> Swate.Components.ARCObjectWidget.Main(treePane = treePane)
+    | None -> Swate.Components.ARCObjectWidget.Main()
+
+let ARCObjectWidget
+    (setSelectedExplorerItemId: string option -> unit)
+    (setSelectedTreeItemPath: string option -> unit)
+    (setPageState: PageState option -> unit)
+    : WidgetType * WidgetDefinition =
+    WidgetType.ARCObject,
+    {|
+        prefix = "ARC_OBJECT"
+        content = ARCObjectWidgetContent setSelectedExplorerItemId setSelectedTreeItemPath setPageState
+    |}
+
 let createWidgets
     (arcFileState: ArcFiles option)
     (activeView: WidgetHostView)
@@ -133,18 +175,26 @@ let createWidgets
     (setArcFileState: ArcFiles option -> unit)
     (importType: TableJoinOptions)
     (setImportType: TableJoinOptions -> unit)
+    (setSelectedExplorerItemId: string option -> unit)
+    (setSelectedTreeItemPath: string option -> unit)
+    (setPageState: PageState option -> unit)
     : Map<WidgetType, WidgetDefinition> =
     [
         BuildingBlockWidget arcFileState activeTableIndex setArcFileState
         TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
         DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
+        ARCObjectWidget setSelectedExplorerItemId setSelectedTreeItemPath setPageState
     ]
     |> Map.ofList
 
+let private widgetRequiresTable =
+    function
+    | WidgetType.ARCObject -> false
+    | _ -> true
 
 [<ReactComponent>]
-let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
+let NavbarButtons(widgetTypes: WidgetType list, hasSelectedTable: bool) =
     let context = WidgetContext.useWidgetController ()
 
     let widgetInfo (widgetType: WidgetType) =
@@ -153,13 +203,15 @@ let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
         | WidgetType.Template -> "Add Template", Icons.Templates()
         | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
         | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
+        | WidgetType.ARCObject -> "ARC Object", Icons.Docs()
         | WidgetType.Playground -> "Playground", Icons.Templates()
 
     let controlButton (widgetType: WidgetType) =
         let isActive = context.isActive widgetType
         let label, icon = widgetInfo widgetType
+        let isDisabled = widgetRequiresTable widgetType && not hasSelectedTable
         let tooltip =
-            if not isEnabled then
+            if isDisabled then
                 "Select a table to open widgets"
             elif isActive then
                 $"Close {label}"
@@ -170,7 +222,7 @@ let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
             tooltip,
             icon,
             (fun _ -> context.toggleWidget widgetType),
-            isDisabled = (not isEnabled),
+            isDisabled = isDisabled,
             classes = (if isActive then "swt:!text-primary" else "")
         )
 
@@ -192,6 +244,7 @@ let widgetTypes = [
     WidgetType.Template
     WidgetType.FilePicker
     WidgetType.DataAnnotator
+    WidgetType.ARCObject
 ]
 
 [<ReactComponent>]

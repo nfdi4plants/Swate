@@ -406,11 +406,16 @@ let api: IPCTypes.IArcVaultsApi = {
                             match parentFolder with
                             | "studies" -> arc.TryGetStudy(identifier) |> Option.bind (fun study -> study.DataMap)
                             | "assays" -> arc.TryGetAssay(identifier) |> Option.bind (fun assay -> assay.DataMap)
+                            | "workflows" ->
+                                arc.TryGetWorkflow(identifier)
+                                |> Option.bind (fun workflow -> workflow.DataMap)
                             | "runs" -> arc.TryGetRun(identifier) |> Option.bind (fun run -> run.DataMap)
                             | _ ->
                                 [
                                     arc.TryGetStudy(identifier) |> Option.bind (fun study -> study.DataMap)
                                     arc.TryGetAssay(identifier) |> Option.bind (fun assay -> assay.DataMap)
+                                    arc.TryGetWorkflow(identifier)
+                                    |> Option.bind (fun workflow -> workflow.DataMap)
                                     arc.TryGetRun(identifier) |> Option.bind (fun run -> run.DataMap)
                                 ]
                                 |> List.tryPick id
@@ -445,7 +450,9 @@ let api: IPCTypes.IArcVaultsApi = {
                 | Some arcPath, Some arc ->
                     match syncARCFile arc request with
                     | Error saveError -> return Error saveError
-                    | Ok _ -> return Ok()
+                    | Ok _ ->
+                        vault.SendArcExplorerTree()
+                        return Ok()
                 | _ -> return Error(exn "ARC is not loaded.")
         }
     runGitLfs =

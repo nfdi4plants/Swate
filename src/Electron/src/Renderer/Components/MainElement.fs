@@ -42,6 +42,9 @@ let CreateARCitectNavbar
     (activeView: PreviewActiveView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
+    (setSelectedExplorerItemId: string option -> unit)
+    (setSelectedTreeItemPath: string option -> unit)
+    (setPageState: Swate.Electron.Shared.IPCTypes.IPCTypesHelper.PageState option -> unit)
     onSaveClick
     =
     let workspaceCtx = React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
@@ -67,12 +70,14 @@ let CreateARCitectNavbar
             setArcFileState
             workspaceCtx.state.TemplateImportType
             setImportType
+            setSelectedExplorerItemId
+            setSelectedTreeItemPath
+            setPageState
 
     let hasSelectedTable = activeTableIndex.IsSome
 
     Widget.WidgetController(
         widgets,
-        closeAllWhen = (not hasSelectedTable),
         children = [
             Components.BaseNavbar.Main [
                 NavbarButtons(widgetTypes, hasSelectedTable)
@@ -121,6 +126,7 @@ let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (set
             | ArcFiles.Assay assay -> assay.DataMap.IsSome
             | ArcFiles.Study(study, _) -> study.DataMap.IsSome
             | ArcFiles.Run run -> run.DataMap.IsSome
+            | ArcFiles.Workflow workflow -> workflow.DataMap.IsSome
             | ArcFiles.DataMap _ -> true
             | _ -> false
         | PreviewActiveView.Metadata -> false
@@ -139,6 +145,9 @@ let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (set
                 setArcFile (WidgetArcFile.refreshRef arcFile)
             | PreviewActiveView.DataMap, ArcFiles.Study(study, _) when study.DataMap.IsSome ->
                 study.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
+                setArcFile (WidgetArcFile.refreshRef arcFile)
+            | PreviewActiveView.DataMap, ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
+                workflow.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
                 setArcFile (WidgetArcFile.refreshRef arcFile)
             | PreviewActiveView.DataMap, ArcFiles.Run run when run.DataMap.IsSome ->
                 run.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
@@ -289,6 +298,21 @@ let CreateARCitectFooter
                         Html.span [ prop.text "DataMap" ]
                     |]
                 ]
+            | ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
+                Html.button [
+                    prop.className [
+                        footerTabBaseClasses
+                        if activeView = PreviewActiveView.DataMap then
+                            "swt:btn-primary swt:border-2 swt:!border-white"
+                        else
+                            "swt:btn-ghost"
+                    ]
+                    prop.onClick (fun _ -> setActiveView PreviewActiveView.DataMap)
+                    prop.children [|
+                        Html.span [ prop.className "swt:i-fluent--database-24-regular" ]
+                        Html.span [ prop.text "DataMap" ]
+                    |]
+                ]
             | ArcFiles.DataMap _ ->
                 Html.button [
                     prop.className [
@@ -379,6 +403,12 @@ let CreateTableView activeView arcFileState setArcFileState =
                 setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
             CreateDataMapPreview(run.DataMap.Value, setDatamap)
+        | ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
+            let setDatamap (nextDatamap: DataMap) =
+                workflow.DataMap <- Some nextDatamap
+                setArcFileState (WidgetArcFile.refreshRef arcFileState)
+
+            CreateDataMapPreview(workflow.DataMap.Value, setDatamap)
         | ArcFiles.DataMap(parent, datamap) ->
             let setDatamap (nextDatamap: DataMap) =
                 setArcFileState (ArcFiles.DataMap(parent, nextDatamap))

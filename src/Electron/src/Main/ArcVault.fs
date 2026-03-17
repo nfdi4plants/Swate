@@ -6,6 +6,7 @@ open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
+open Main.ArcExplorerTreeCreator
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
@@ -100,6 +101,19 @@ type ArcVault(window: BrowserWindow) =
 module ArcVaultExtensions =
     type ArcVault with
 
+        member private this.BuildArcExplorerTree() =
+            match this.path, this.arc with
+            | Some arcPath, Some arc -> createArcExplorerTree arcPath arc this.fileTree.Values
+            | _ -> []
+
+        member this.SendArcExplorerTree() =
+            let sendMsg =
+                Remoting.init
+                |> Remoting.withWindow this.window
+                |> Remoting.buildClient<IMainUpdateRendererApi>
+
+            sendMsg.arcExplorerTreeUpdate (this.BuildArcExplorerTree())
+
         member private this._ScheduleReloadArc(sendMsgApi: IArcFileWatcherApi) =
 
             fun (eventName: string) (path: string) ->
@@ -189,6 +203,7 @@ module ArcVaultExtensions =
                 |> Remoting.buildClient<IMainUpdateRendererApi>
 
             sendMsg.fileTreeUpdate fileTree
+            sendMsg.arcExplorerTreeUpdate (this.BuildArcExplorerTree())
 
         member this.LoadArc() = promise {
             if this.path.IsSome then

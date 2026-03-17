@@ -8,6 +8,8 @@ open Swate.Electron.Shared.FileIOTypes
 type WorkspaceState = {
     RecentARCs: SelectorTypes.ARCPointer[]
     FileTree: FileEntry list
+    ArcExplorerTree: ArcExplorerNode list
+    SelectedExplorerItemId: string option
     SelectedTreeItemPath: string option
     TemplateImportType: TableJoinOptions
 } with
@@ -15,6 +17,8 @@ type WorkspaceState = {
     static member init() = {
         RecentARCs = [||]
         FileTree = []
+        ArcExplorerTree = []
+        SelectedExplorerItemId = None
         SelectedTreeItemPath = None
         TemplateImportType = TableJoinOptions.Headers
     }

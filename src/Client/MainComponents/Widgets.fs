@@ -68,8 +68,6 @@ module MoveEventListener =
 
 module ResizeEventListener =
 
-    open Fable.Core.JsInterop
-
     let adaptElement (innerWidth: int) (innerHeight: int) (size: Rect) (position: Rect) setWidth setPosition =
         let combinedWidth = size.X + position.X
         let combinedHeight = size.Y + position.Y

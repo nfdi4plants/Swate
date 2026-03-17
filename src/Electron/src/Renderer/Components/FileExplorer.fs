@@ -168,7 +168,6 @@ let private insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry
             let child =
                 match node.children.TryGetValue(part) with
                 | true, existing when ((not isLast) || entry.isDirectory) && not existing.isDirectory ->
-                    // A node may first appear via a file path segment; upgrade it to a directory when needed.
                     let upgraded = { existing with isDirectory = true }
                     node.children.[part] <- upgraded
                     upgraded
@@ -210,7 +209,6 @@ let getFileTree (fileEntries: FileEntry[]) =
     let adaptedFileEntries =
         fileEntries
         |> Array.filter (fun fileEntry -> normalizePath fileEntry.path <> rootPath)
-        // Deterministic order avoids creating parents from file entries before their directory entries.
         |> Array.sortBy (fun fileEntry ->
             let depth = splitPath fileEntry.path |> Array.length
             depth, (if fileEntry.isDirectory then 0 else 1), normalizePath fileEntry.path

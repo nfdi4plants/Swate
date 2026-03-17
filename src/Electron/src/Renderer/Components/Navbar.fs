@@ -92,6 +92,7 @@ type private Selector =
             recentARCsUpdate = fun arcs -> setRecentArc arcs
             authAccountsUpdate = ignore
             fileTreeUpdate = ignore
+            arcExplorerTreeUpdate = ignore
             gitProgressUpdate = ignore
         }
 
@@ -203,6 +204,7 @@ module private Authentication =
 
                     | None -> setUser None
             fileTreeUpdate = ignore
+            arcExplorerTreeUpdate = ignore
             gitProgressUpdate = ignore
         }
 

@@ -92,7 +92,14 @@ let Main () =
     let setSelectedTreeItemPath (path: string option) =
         setWorkspaceState (fun state -> {
             state with
+                SelectedExplorerItemId = None
                 SelectedTreeItemPath = path
+        })
+
+    let setSelectedExplorerItemId (id: string option) =
+        setWorkspaceState (fun state -> {
+            state with
+                SelectedExplorerItemId = id
         })
 
     let setRecentARCs (arcs: SelectorTypes.ARCPointer[]) =
@@ -111,6 +118,12 @@ let Main () =
         setWorkspaceState (fun state -> {
             state with
                 FileTree = immutableFileTree
+        })
+
+    let setArcExplorerTree (arcExplorerTree: ArcExplorerNode list) =
+        setWorkspaceState (fun state -> {
+            state with
+                ArcExplorerTree = arcExplorerTree
         })
 
     React.useEffect (
@@ -214,6 +227,12 @@ let Main () =
                     AppState.ARC p |> setAppState
                     Renderer.Navigation.PageActions.openArcStartPage notesCtx landingCtx setArcFileState setSelectedTreeItemPath setPageState
                 | None ->
+                    setWorkspaceState (fun state -> {
+                        state with
+                            FileTree = []
+                            ArcExplorerTree = []
+                            SelectedExplorerItemId = None
+                    })
                     setSelectedTreeItemPath None
                     setPageState None
                     setArcFileState None
@@ -224,6 +243,10 @@ let Main () =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")
                 setFileTree fileExplorer
+        arcExplorerTreeUpdate =
+            fun arcExplorerTree ->
+                console.log ("[Swate] ARC Explorer Create!")
+                setArcExplorerTree arcExplorerTree
         gitProgressUpdate =
             fun progress -> console.log ($"[Swate] Git progress {progress.Method} {progress.Stage} {progress.Progress}")
     }
@@ -241,6 +264,7 @@ let Main () =
                     arcFileState,
                     pageState,
                     setPageState,
+                    setSelectedExplorerItemId,
                     setSelectedTreeItemPath
                 )),
             [| box appState; box pageState; box arcFileState |]

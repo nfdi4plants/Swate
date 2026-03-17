@@ -21,6 +21,50 @@ type FileEntry = {
     isLfs: bool option
 }
 
+[<RequireQualifiedAccess>]
+type ArcExplorerNodeKind =
+    | Arc
+    | Group
+    | Study
+    | Assay
+    | Workflow
+    | Run
+    | Note
+    | Sample
+
+type ArcExplorerNode = {
+    id: string
+    name: string
+    kind: ArcExplorerNodeKind
+    path: string option
+    isSelectable: bool
+    isReference: bool
+    isLfs: bool option
+    children: ArcExplorerNode list
+} with
+
+    static member create
+        (
+            id: string,
+            name: string,
+            kind: ArcExplorerNodeKind,
+            ?path: string option,
+            ?isSelectable: bool,
+            ?isReference: bool,
+            ?isLfs: bool option,
+            ?children: ArcExplorerNode list
+        ) =
+        {
+            id = id
+            name = name
+            kind = kind
+            path = defaultArg path None
+            isSelectable = defaultArg isSelectable true
+            isReference = defaultArg isReference false
+            isLfs = defaultArg isLfs None
+            children = defaultArg children []
+        }
+
 [<AutoOpen>]
 module FileEntryExtensions =
 
