@@ -1,66 +1,108 @@
 namespace Swate.Components
 
-open Swate.Components.NoteTypes
+open System
+open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
-open ARCtrl
 open Feliz
+open Swate.Components.NoteTypes
 
 module noteSearchTests =
+
     let notes: NoteSearch list = [
         {
+            RelativePath = "notes/10_02_2026/Grocery_Planning.md"
             Title = "Grocery Planning"
-            Date = System.DateTime(2026, 2, 10)
-            Tags = Some(ResizeArray [ OntologyAnnotation("Planning", "http://example.com/ontology/planning"); OntologyAnnotation("Food", "http://example.com/ontology/food"); OntologyAnnotation("Weekly", "http://example.com/ontology/weekly") ])
+            Date = DateTime(2026, 2, 10)
+            Tags = [| "Planning"; "Food"; "Weekly" |]
             Content =
-                "I need to prepare a proper grocery list for the week. We are running low on vegetables and fresh fruit. I also want to try cooking a new pasta recipe. Remember to check if we still have olive oil and spices. It might be worth buying extra rice in bulk. I should compare prices between the local store and the supermarket. Don’t forget snacks for movie night."
+                "I need to prepare a proper grocery list for the week. We are running low on vegetables and fresh fruit. I also want to try cooking a new pasta recipe. Remember to check if we still have olive oil and spices. It might be worth buying extra rice in bulk. I should compare prices between the local store and the supermarket. Don't forget snacks for movie night."
         }
         {
+            RelativePath = "notes/12_02_2026/Project_Ideas_for_Side_App.md"
             Title = "Project Ideas for Side App"
-            Date = System.DateTime(2026, 2, 12)
-            Tags = Some(ResizeArray [ OntologyAnnotation("Development", "http://example.com/ontology/development"); OntologyAnnotation("Software", "http://example.com/ontology/software") ])
+            Date = DateTime(2026, 2, 12)
+            Tags = [| "Development"; "Software" |]
             Content =
                 "I have been thinking about building a lightweight note search engine. The app should support tagging and full text search. It would be nice to experiment with fuzzy matching. Maybe I can implement ranking based on keyword frequency. I should also consider how to store notes efficiently. Performance testing will be important once the dataset grows. A small UI prototype in Feliz could help validate the concept."
         }
         {
+            RelativePath = "notes/14_02_2026/Workout_Routine_Update.md"
             Title = "Workout Routine Update"
-            Date = System.DateTime(2026, 2, 14)
-            Tags = Some(ResizeArray [ OntologyAnnotation("Fitness", "http://example.com/ontology/fitness"); OntologyAnnotation("Health", "http://example.com/ontology/health"); OntologyAnnotation("Routine", "http://example.com/ontology/routine") ])
+            Date = DateTime(2026, 2, 14)
+            Tags = [| "Fitness"; "Health"; "Routine" |]
             Content =
                 "This week I want to adjust my workout schedule. Strength training should be prioritized over cardio. I will focus on compound lifts like squats and deadlifts. Rest days are important for recovery. Tracking progress in a simple log could help. Nutrition also plays a major role in performance. I should increase protein intake slightly."
         }
         {
+            RelativePath = "notes/16_02_2026/Books_to_Read.md"
             Title = "Books to Read"
-            Date = System.DateTime(2026, 2, 16)
-            Tags = Some(ResizeArray [ OntologyAnnotation("Education", "http://example.com/ontology/education"); OntologyAnnotation("Reading", "http://example.com/ontology/reading") ])
+            Date = DateTime(2026, 2, 16)
+            Tags = [| "Education"; "Reading" |]
             Content =
                 "There are several books I want to read this year. I am especially interested in software architecture topics. Clean code practices are always worth revisiting. I also want to explore a few science fiction novels. Reading before bed helps reduce screen time. Maybe I should join an online book club. Keeping short summaries of each book would help retention."
         }
         {
+            RelativePath = "notes/18_02_2026/Travel_Planning.md"
             Title = "Travel Planning"
-            Date = System.DateTime(2026, 2, 18)
-            Tags = Some(ResizeArray [ OntologyAnnotation("Travel", "http://example.com/ontology/travel"); OntologyAnnotation("Leisure", "http://example.com/ontology/leisure"); OntologyAnnotation("Budget", "http://example.com/ontology/budget") ])
+            Date = DateTime(2026, 2, 18)
+            Tags = [| "Travel"; "Leisure"; "Budget" |]
             Content =
                 "I am considering a short trip during the summer. A quiet place near the ocean sounds relaxing. Budget planning needs to be done in advance. I should look for affordable flights soon. Packing light will make travel easier. It would be nice to explore local food markets. Taking plenty of photos is a must."
         }
         {
+            RelativePath = "notes/20_02_2026/Learning_Goals.md"
             Title = "Learning Goals"
-            Date = System.DateTime(2026, 2, 20)
-            Tags = Some(ResizeArray [ OntologyAnnotation("Learning", "http://example.com/ontology/learning"); OntologyAnnotation("FunctionalProgramming", "http://example.com/ontology/functional-programming"); OntologyAnnotation("Goals", "http://example.com/ontology/goals") ])
+            Date = DateTime(2026, 2, 20)
+            Tags = [| "Learning"; "FunctionalProgramming"; "Goals" |]
             Content =
                 "This month I want to deepen my knowledge of functional programming. Practicing F# daily will help reinforce concepts. I should review discriminated unions and pattern matching. Building small sample projects is better than only reading theory. Understanding performance tradeoffs is also important. Writing blog posts about what I learn could clarify my thinking. Consistency matters more than intensity."
         }
         {
+            RelativePath = "notes/22_02_2026/Home_Office_Improvements.md"
             Title = "Home Office Improvements"
-            Date = System.DateTime(2026, 2, 22)
-            Tags = Some(ResizeArray [ OntologyAnnotation("Productivity", "http://example.com/ontology/productivity"); OntologyAnnotation("HomeOffice", "http://example.com/ontology/home-office") ])
+            Date = DateTime(2026, 2, 22)
+            Tags = [| "Productivity"; "HomeOffice" |]
             Content =
                 "My home office setup could use some improvements. A better chair would improve posture during long coding sessions. Cable management is currently a mess. Adding a small plant might make the space more inviting. Proper lighting reduces eye strain. I should reorganize the desk drawers this weekend. A second monitor might increase productivity."
         }
     ]
 
 module NoteSearchComponent =
-    let searchInput (setSearchTerm, setStartSearch, dropdownOpen: bool, setDropdownOpen: bool -> unit, filterOptions: string, setFilterOptions) =
+
+    let private containsIgnoreCase (needle: string) (haystack: string) =
+        haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
+
+    let filterNotes (searchTerm: string) (filterOptions: string) (notes: NoteSearch list) =
+        match filterOptions with
+        | "Title" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Title)
+        | "Content" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Content)
+        | "Tags" ->
+            notes
+            |> List.filter (fun note -> note.Tags |> Array.exists (containsIgnoreCase searchTerm))
+        | _ ->
+            notes
+            |> List.filter (fun note ->
+                containsIgnoreCase searchTerm note.Title
+                || containsIgnoreCase searchTerm note.Content
+                || (note.Tags |> Array.exists (containsIgnoreCase searchTerm))
+            )
+
+    let private createContentPreview (note: NoteSearch) =
+        if note.Content.Length > 45 then
+            note.Content.Substring(0, 45) + "..."
+        else
+            note.Content
+
+    let searchInput
+        (
+            setSearchTerm,
+            setStartSearch,
+            dropdownOpen: bool,
+            setDropdownOpen: bool -> unit,
+            filterOptions: string,
+            setFilterOptions
+        ) =
         Html.div [
             prop.className "swt:w-full swt:mt-4 swt:join"
             prop.children [
@@ -83,13 +125,15 @@ module NoteSearchComponent =
                         ]
                     ]
                 ]
-
                 Html.div [
                     prop.className "swt:join-item swt:relative swt:w-20"
                     prop.children [
                         Html.button [
                             prop.text filterOptions
-                            prop.className ("swt:btn swt:btn-primary swt:join-item swt:border swt:border-current swt:w-full" + if dropdownOpen then " swt:rounded-b-none" else "")
+                            prop.className (
+                                "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current swt:w-full"
+                                + if dropdownOpen then " swt:rounded-b-none" else ""
+                            )
                             prop.onClick (fun e ->
                                 e.stopPropagation()
                                 setDropdownOpen (not dropdownOpen)
@@ -102,22 +146,34 @@ module NoteSearchComponent =
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "All"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "All")
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "All"
+                                        )
                                     ]
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Title"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "Title")
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "Title"
+                                        )
                                     ]
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Tags"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "Tags")
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "Tags"
+                                        )
                                     ]
                                     Html.button [
                                         prop.className "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
                                         prop.text "Content"
-                                        prop.onClick (fun _ -> setDropdownOpen false; setFilterOptions "Content")
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "Content"
+                                        )
                                     ]
                                 ]
                             ]
@@ -125,7 +181,8 @@ module NoteSearchComponent =
                 ]
             ]
         ]
-    let searchSuggestion (note: NoteSearch, contentPreview: string) =
+
+    let searchSuggestion (note: NoteSearch, onOpen: string -> unit) =
         Html.div [
             prop.className "swt:p-3"
             prop.children [
@@ -139,19 +196,7 @@ module NoteSearchComponent =
                         Html.button [
                             prop.className "swt:btn swt:btn-sm swt:btn-primary"
                             prop.text "Open"
-                            prop.onClick (fun _ ->
-                                Browser.Dom.window.alert (
-                                    sprintf
-                                        "Title: %s\nDate: %s\nTags: %s\nContent:\n\n%s"
-                                        note.Title
-                                        (note.Date.ToString("yyyy-MM-dd"))
-                                        (note.Tags
-                                        |> Option.map (fun tags -> tags |> Seq.map (fun tag -> tag.NameText) |> String.concat ", ")
-                                        |> Option.defaultValue "")
-                                        note.Content
-                                )
-                            //replace with actual note opening logic / opening note editing component
-                            )
+                            prop.onClick (fun _ -> onOpen note.RelativePath)
                         ]
                     ]
                 ]
@@ -162,32 +207,35 @@ module NoteSearchComponent =
                 Html.div [
                     prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:mt-1"
                     prop.children [
-                        for tag in (note.Tags |> Option.defaultValue (ResizeArray [])) do
+                        for tag in note.Tags do
                             Html.span [
                                 prop.className "swt:text-sm swt:text-gray-500 swt:border swt:border-current swt:inline-block swt:px-2 swt:py-1 swt:rounded"
-                                prop.text tag.NameText
+                                prop.text tag
                             ]
                     ]
                 ]
                 Html.p [
-                    prop.className "swt:mt-2 ";
-                    prop.text contentPreview ]
-
+                    prop.className "swt:mt-2"
+                    prop.text (createContentPreview note)
+                ]
             ]
         ]
 
-
 [<Erase; Mangle(false)>]
-
 type SearchComponent =
 
     [<ReactComponent>]
-    static member Entry() =
+    static member Main(notes: NoteSearch list, isLoading: bool, error: string option, onOpen: string -> unit) =
+        let startSearch, setStartSearch = React.useState false
+        let searchTerm, setSearchTerm = React.useState ""
+        let dropdownOpen, setDropdownOpen = React.useState false
+        let filterOptions, setFilterOptions = React.useState "All"
 
-        let startSearch, setStartSearch = React.useState (false)
-        let searchTerm, setSearchTerm = React.useState ("")
-        let dropdownOpen, setDropdownOpen = React.useState (false)
-        let filterOptions, setFilterOptions = React.useState ("All")
+        let searchResults =
+            if startSearch then
+                NoteSearchComponent.filterNotes searchTerm filterOptions notes
+            else
+                []
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:items-center swt:pt-8 swt:min-h-screen"
@@ -200,59 +248,49 @@ type SearchComponent =
                     prop.className "swt:w-full swt:max-w-md"
                     prop.onClick (fun e -> e.stopPropagation())
                     prop.children [
-                        NoteSearchComponent.searchInput (setSearchTerm, setStartSearch, dropdownOpen, setDropdownOpen, filterOptions, setFilterOptions)
+                        NoteSearchComponent.searchInput (
+                            setSearchTerm,
+                            setStartSearch,
+                            dropdownOpen,
+                            setDropdownOpen,
+                            filterOptions,
+                            setFilterOptions
+                        )
                         if startSearch then
-                            let searchResults =
-                                match filterOptions with
-                                | "Title" ->
-                                    noteSearchTests.notes
-                                    |> List.filter (fun note -> note.Title.ToLower().Contains(searchTerm.ToLower()))
-                                | "Content" ->
-                                    noteSearchTests.notes
-                                    |> List.filter (fun note -> note.Content.ToLower().Contains(searchTerm.ToLower()))
-                                | "Tags" ->
-                                    noteSearchTests.notes
-                                    |> List.filter (fun note ->
-                                        note.Tags
-                                        |> Option.exists (fun tags ->
-                                            tags
-                                            |> Seq.exists (fun tag -> tag.NameText.ToLower().Contains(searchTerm.ToLower()))
-                                        )
-                                    )
-                                | _ ->
-                                    noteSearchTests.notes
-                                    |> List.filter (fun note ->
-                                        note.Title.ToLower().Contains(searchTerm.ToLower())
-                                        || note.Content.ToLower().Contains(searchTerm.ToLower())
-                                        || (note.Tags
-                                            |> Option.exists (fun tags ->
-                                                tags
-                                                |> Seq.exists (fun tag -> tag.NameText.ToLower().Contains(searchTerm.ToLower()))
-                                            )
-                                        )
-                                    )
-
-                            if startSearch && not searchResults.IsEmpty then
+                            if isLoading then
+                                Html.div [
+                                    prop.className "swt:mt-2 swt:text-center"
+                                    prop.text "Loading notes..."
+                                ]
+                            elif error.IsSome then
+                                Html.div [
+                                    prop.className "swt:mt-2 swt:text-center swt:text-error"
+                                    prop.text error.Value
+                                ]
+                            elif not searchResults.IsEmpty then
                                 Html.div [
                                     prop.className
                                         "swt:border-2 swt:border-current swt:rounded-md swt:mt-2 swt:bg-base-100 swt:shadow-md swt:divide-y swt:divide-current"
                                     prop.children [
                                         for note in searchResults do
-                                            let contentPreview =
-                                                if note.Content.Length > 45 then
-                                                    note.Content.Substring(0, 45) + "..."
-                                                else
-                                                    note.Content
-
-                                            NoteSearchComponent.searchSuggestion (note, contentPreview)
+                                            NoteSearchComponent.searchSuggestion (note, onOpen)
                                     ]
                                 ]
                             else
                                 Html.div [
                                     prop.className "swt:mt-2 swt:text-center"
-                                    prop.text "no results found"
+                                    prop.text "No results found."
                                 ]
                     ]
                 ]
             ]
         ]
+
+    [<ReactComponent>]
+    static member Entry() =
+        SearchComponent.Main(
+            noteSearchTests.notes,
+            false,
+            None,
+            (fun relativePath -> window.alert $"Open note: {relativePath}")
+        )

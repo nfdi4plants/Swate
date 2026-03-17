@@ -165,7 +165,7 @@ type NodeGitLfsAdapter() =
                 | Ok args ->
                     isRunning <- true
 
-                    let! result: GitLfsResult = runProcess args
+                    let! (result: GitLfsResult) = runProcess args
 
                     if not result.Success then
                         isRunning <- false

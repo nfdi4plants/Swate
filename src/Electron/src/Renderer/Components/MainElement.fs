@@ -5,6 +5,7 @@ open Swate.Components
 open Browser.Dom
 open ARCtrl
 open Renderer.MetadataForms
+open WidgetRegistry
 
 [<RequireQualifiedAccess>]
 type PreviewActiveView =
@@ -29,60 +30,56 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
         [| box table |]
     )
 
-    AnnotationTableContextProvider.AnnotationTableContextProvider(
-        Html.div [
-            //It works but not as clean as we want it
-            prop.className "swt:w-screen swt:pb-4"
-            prop.children [ AnnotationTable.AnnotationTable(tableState, setTable) ]
+    Html.div [
+        //It works but not as clean as we want it
+        prop.className "swt:w-screen swt:pb-4"
+        prop.children [ AnnotationTable.AnnotationTable(tableState, setTable) ]
+    ]
+
+[<ReactComponent>]
+let CreateARCitectNavbar
+    (arcFile: ArcFiles option)
+    (activeView: PreviewActiveView)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    onSaveClick
+    =
+    let workspaceCtx = React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
+
+    let widgetHostView =
+        match activeView with
+        | PreviewActiveView.Table _ -> WidgetHostView.TableView
+        | PreviewActiveView.DataMap -> WidgetHostView.DataMapView
+        | PreviewActiveView.Metadata -> WidgetHostView.MetadataView
+        | PreviewActiveView.Error _ -> WidgetHostView.PreviewErrorView
+
+    let setImportType (nextImportType: TableJoinOptions) =
+        workspaceCtx.setState {
+            workspaceCtx.state with
+                TemplateImportType = nextImportType
+        }
+
+    let widgets =
+        createWidgets
+            arcFile
+            widgetHostView
+            activeTableIndex
+            setArcFileState
+            workspaceCtx.state.TemplateImportType
+            setImportType
+
+    let hasSelectedTable = activeTableIndex.IsSome
+
+    Widget.WidgetController(
+        widgets,
+        closeAllWhen = (not hasSelectedTable),
+        children = [
+            Components.BaseNavbar.Main [
+                NavbarButtons(widgetTypes, hasSelectedTable)
+                QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
+            ]
         ]
     )
-
-// let CreateARCitectWidgetNavbarList (activeView: PreviewActiveView) (addWidget: MainComponents.Widget -> unit) =
-//     let addBuildingBlock =
-//         QuickAccessButton.QuickAccessButton(
-//             "Add Building Block",
-//             Icons.BuildingBlock(),
-//             (fun _ -> addWidget MainComponents.Widget._BuildingBlock)
-//         )
-
-//     let addTemplate =
-//         QuickAccessButton.QuickAccessButton(
-//             "Add Template",
-//             Icons.Templates(),
-//             (fun _ -> addWidget MainComponents.Widget._Template)
-//         )
-
-//     let filePicker =
-//         QuickAccessButton.QuickAccessButton(
-//             "File Picker",
-//             Icons.FilePicker(),
-//             (fun _ -> addWidget MainComponents.Widget._FilePicker)
-//         )
-
-//     let dataAnnotator =
-//         QuickAccessButton.QuickAccessButton(
-//             "Data Annotator",
-//             Icons.DataAnnotator(),
-//             (fun _ -> addWidget MainComponents.Widget._DataAnnotator),
-//             classes = "swt:w-min"
-//         )
-
-//     React.Fragment [
-//         match activeView with
-//         | PreviewActiveView.Table _ ->
-//             addBuildingBlock
-//             addTemplate
-//             filePicker
-//             dataAnnotator
-//         | PreviewActiveView.DataMap -> dataAnnotator
-//         | PreviewActiveView.Metadata -> Html.none
-//     ]
-
-let CreateARCitectNavbarList (arcFile: ArcFiles option) onSaveClick =
-    Components.BaseNavbar.Main [
-        //CreateARCitectWidgetNavbarList activeView addWidget
-        QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
-    ]
 
 [<Literal>]
 let private NewTablePrefix = "NewTable"
@@ -106,16 +103,6 @@ let private createNewTableName (tables: ResizeArray<ArcTable>) =
             name
 
     loop 0
-
-let private refreshArcFileRef (arcFile: ArcFiles) =
-    match arcFile with
-    | ArcFiles.Investigation investigation -> ArcFiles.Investigation investigation
-    | ArcFiles.Study(study, assays) -> ArcFiles.Study(study, assays)
-    | ArcFiles.Assay assay -> ArcFiles.Assay assay
-    | ArcFiles.Run run -> ArcFiles.Run run
-    | ArcFiles.Workflow workflow -> ArcFiles.Workflow workflow
-    | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap)
-    | ArcFiles.Template template -> ArcFiles.Template template
 
 [<ReactComponent>]
 let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (setArcFile: ArcFiles -> unit) =
@@ -146,19 +133,19 @@ let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (set
             match activeView, arcFile with
             | PreviewActiveView.Table tableIndex, _ when tableIndex >= 0 && tableIndex < tables.Count ->
                 tables.[tableIndex].AddRowsEmpty rowCount
-                setArcFile (refreshArcFileRef arcFile)
+                setArcFile (WidgetArcFile.refreshRef arcFile)
             | PreviewActiveView.DataMap, ArcFiles.Assay assay when assay.DataMap.IsSome ->
                 assay.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                setArcFile (refreshArcFileRef arcFile)
+                setArcFile (WidgetArcFile.refreshRef arcFile)
             | PreviewActiveView.DataMap, ArcFiles.Study(study, _) when study.DataMap.IsSome ->
                 study.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                setArcFile (refreshArcFileRef arcFile)
+                setArcFile (WidgetArcFile.refreshRef arcFile)
             | PreviewActiveView.DataMap, ArcFiles.Run run when run.DataMap.IsSome ->
                 run.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                setArcFile (refreshArcFileRef arcFile)
+                setArcFile (WidgetArcFile.refreshRef arcFile)
             | PreviewActiveView.DataMap, ArcFiles.DataMap(_, dataMap) ->
                 dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                setArcFile (refreshArcFileRef arcFile)
+                setArcFile (WidgetArcFile.refreshRef arcFile)
             | _ -> ()
 
     if canAddRows then
@@ -212,7 +199,7 @@ let CreateARCitectFooter
             let nextTable = ArcTable.init nextName
 
             tables.Add(nextTable)
-            setArcFile (refreshArcFileRef arcFile)
+            setArcFile (WidgetArcFile.refreshRef arcFile)
             setActiveView (PreviewActiveView.Table(tables.Count - 1))
 
     let footerTabBaseClasses =
@@ -364,7 +351,7 @@ let CreateTableView activeView arcFileState setArcFileState =
         if index < tables.Count then
             let setTable (nextTable: ArcTable) =
                 tables.[index] <- nextTable
-                setArcFileState (refreshArcFileRef arcFileState)
+                setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
             CreateTablePreview tables.[index] setTable
         else
@@ -377,7 +364,7 @@ let CreateTableView activeView arcFileState setArcFileState =
         | ArcFiles.Assay assay when assay.DataMap.IsSome ->
             let setDatamap (nextDatamap: DataMap) =
                 assay.DataMap <- Some nextDatamap
-                setArcFileState (refreshArcFileRef arcFileState)
+                setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
             CreateDataMapPreview(assay.DataMap.Value, setDatamap)
         | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
@@ -389,7 +376,7 @@ let CreateTableView activeView arcFileState setArcFileState =
         | ArcFiles.Run run when run.DataMap.IsSome ->
             let setDatamap (nextDatamap: DataMap) =
                 run.DataMap <- Some nextDatamap
-                setArcFileState (refreshArcFileRef arcFileState)
+                setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
             CreateDataMapPreview(run.DataMap.Value, setDatamap)
         | ArcFiles.DataMap(parent, datamap) ->

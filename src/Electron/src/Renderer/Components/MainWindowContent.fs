@@ -1,15 +1,20 @@
 module Renderer.Components.MainWindowContent
 
+open System
 open ARCtrl
+open Fable.Core
 open Feliz
-open Swate.Components.Landing
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open MainElement
+open Swate.Components
+open Swate.Components.NoteTypes
+open Swate.Components.Landing
+open Swate.Components.Notes.Editor
+open Swate.Electron.Shared
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+
 
 module MainWindowContentHelper =
-
-    open Fable.Core
 
     let saveArcFileWithPreview (arcFile: ArcFiles) : JS.Promise<Result<PageState, string>> = promise {
         match ArcFileSaveMapping.tryCreateSaveRequest arcFile with
@@ -157,7 +162,13 @@ let ComputeARCContent
     setLandingDraft
     landingUiState
     setLandingUiState
+    notesDraft
+    setNotesDraft
+    notesUiState
+    setNotesUiState
+    availableNotesTargets
     appState
+    workspaceFileTree
     setSelectedTreeItemPath
     setPreviewData
     (path: string)
@@ -217,6 +228,23 @@ let ComputeARCContent
                     setSelectedTreeItemPath
                     setPreviewData
             )
+        | PageState.NotesDraft ->
+            Notes.Wizard(
+                notesDraft,
+                setNotesDraft,
+                notesUiState,
+                setNotesUiState,
+                NoteSearchPage.createFromNotes
+                    notesUiState
+                    setNotesUiState
+                    setNotesDraft
+                    appState
+                    setSelectedTreeItemPath
+                    setPreviewData,
+                availableNotesTargets
+            )
+        | PageState.NotesSearch ->
+            NoteSearchPage.CreateNotesSearchPage(appState, workspaceFileTree, setSelectedTreeItemPath, setPreviewData)
     | None ->
         Html.h1 [
             prop.text path
@@ -225,14 +253,30 @@ let ComputeARCContent
         ]
 
 [<ReactComponent>]
-let Content (appState: AppState, setArcFileState, arcFileState, pageState, setPreviewData) =
+let Content
+    (
+        appState: AppState,
+        setArcFileState,
+        arcFileState,
+        pageState,
+        setPreviewData,
+        setSelectedTreeItemPath
+    ) =
 
     let landingCtx = React.useContext Renderer.Context.LandingStateCtx.LandingStateCtx
+
+    let notesCtx = React.useContext Renderer.Context.NotesStateCtx.NotesStateCtx
 
     let workspaceCtx =
         React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
 
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
+
+    let availableNotesTargets =
+        React.useMemo (
+            (fun _ -> NoteSearchPage.createAvailableNotesTargets workspaceCtx.state.FileTree),
+            [| box workspaceCtx.state.FileTree |]
+        )
 
     match appState with
     | AppState.Init ->
@@ -246,6 +290,12 @@ let Content (appState: AppState, setArcFileState, arcFileState, pageState, setPr
             ]
         ]
     | AppState.ARC path ->
+
+        let activeTableIndex =
+            match activeView with
+            | PreviewActiveView.Table tableIndex -> Some tableIndex
+            | _ -> None
+
         Html.div [
             prop.className "swt:drawer swt:md:drawer-open swt:size-full swt:flex"
             prop.children [
@@ -255,8 +305,11 @@ let Content (appState: AppState, setArcFileState, arcFileState, pageState, setPr
                         Html.div [
                             prop.className "swt:flex-none"
                             prop.children [
-                                MainElement.CreateARCitectNavbarList
+                                MainElement.CreateARCitectNavbar
                                     arcFileState
+                                    activeView
+                                    activeTableIndex
+                                    setArcFileState
                                     (MainWindowContentHelper.onSaveClick arcFileState setPreviewData)
                             ]
                         ]
@@ -278,13 +331,19 @@ let Content (appState: AppState, setArcFileState, arcFileState, pageState, setPr
                                                 UiState = uiState
                                         }
                                     )
-                                    appState
-                                    (fun path ->
-                                        workspaceCtx.setState {
-                                            workspaceCtx.state with
-                                                SelectedTreeItemPath = path
+                                    notesCtx.state.Draft
+                                    (fun draft -> notesCtx.setState { notesCtx.state with Draft = draft })
+                                    notesCtx.state.UiState
+                                    (fun uiState ->
+                                        notesCtx.setState {
+                                            notesCtx.state with
+                                                UiState = uiState
                                         }
                                     )
+                                    availableNotesTargets
+                                    appState
+                                    workspaceCtx.state.FileTree
+                                    setSelectedTreeItemPath
                                     setPreviewData
                                     path
                             ]

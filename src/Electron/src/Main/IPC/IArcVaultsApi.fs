@@ -235,7 +235,43 @@ let api: IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    checkForARC = fun path -> promise { return ARC_VAULTS.TryGetVaultByPath(path).IsSome }
+    pickPaths =
+        fun _ -> promise {
+            let properties =
+                [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                |]
+
+            let! result = dialog.showOpenDialog (properties = properties)
+
+            if result.canceled then
+                return Error(exn "Cancelled")
+            else
+                return Ok result.filePaths
+        }
+    readNotes =
+        fun event -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        let! fileEntries =
+                            if vault.fileTree.Count > 0 then
+                                promise { return vault.fileTree.Values |> Seq.toArray }
+                            else
+                                getFileEntries arcPath
+
+                        let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
+                        return Ok notes
+            with e ->
+                return Error e
+        }
     saveArcFile =
         fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
             try

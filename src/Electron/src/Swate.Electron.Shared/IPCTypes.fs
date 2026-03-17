@@ -1,11 +1,11 @@
 /// This module SHOULD only contain the exact IPC communication types.
 module Swate.Electron.Shared.IPCTypes
 
-open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 
 open Swate.Components
+open Swate.Components.NoteTypes
 
 open ARCtrl.ARCtrlHelper
 open AuthTypes
@@ -21,6 +21,8 @@ module IPCTypesHelper =
         | Text of string
         | Unknown
         | LandingDraft
+        | NotesDraft
+        | NotesSearch
         | Error of string
 
     [<RequireQualifiedAccess>]
@@ -43,9 +45,10 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
-    checkForARC: string -> JS.Promise<bool>
+    pickPaths: IpcMainEvent -> JS.Promise<Result<string [], exn>>
 
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>
+    readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PageState, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>

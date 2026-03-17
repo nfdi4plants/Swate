@@ -5,7 +5,6 @@ open Fable.Electron.Remoting.Renderer
 open Fable.Core
 
 open Swate.Components
-open Swate.Components.Landing
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes
@@ -43,8 +42,11 @@ let Main () =
     let landingState, setLandingState =
         React.useState (Renderer.Context.LandingStateCtx.LandingState.init ())
 
+    let notesState, setNotesState =
+        React.useState (Renderer.Context.NotesStateCtx.NotesState.init ())
+
     let workspaceState, setWorkspaceState =
-        React.useState (Renderer.Context.WorkspaceStateCtx.WorkspaceState.init ())
+        React.useStateWithUpdater (Renderer.Context.WorkspaceStateCtx.WorkspaceState.init ())
 
     let syncArcTimeoutRef = React.useRef<int option> None
 
@@ -73,22 +75,31 @@ let Main () =
         React.useMemo (
             (fun _ -> {
                 state = workspaceState
-                setState = setWorkspaceState
+                setState = fun nextState -> setWorkspaceState (fun _ -> nextState)
             }),
             [| box workspaceState |]
         )
 
+    let notesCtx: StateContext<Renderer.Context.NotesStateCtx.NotesState> =
+        React.useMemo (
+            (fun _ -> {
+                state = notesState
+                setState = setNotesState
+            }),
+            [| box notesState |]
+        )
+
     let setSelectedTreeItemPath (path: string option) =
-        workspaceCtx.setState {
-            workspaceCtx.state with
+        setWorkspaceState (fun state -> {
+            state with
                 SelectedTreeItemPath = path
-        }
+        })
 
     let setRecentARCs (arcs: SelectorTypes.ARCPointer[]) =
-        workspaceCtx.setState {
-            workspaceCtx.state with
+        setWorkspaceState (fun state -> {
+            state with
                 RecentARCs = arcs
-        }
+        })
 
     let setFileTree (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>) =
         let immutableFileTree =
@@ -97,10 +108,10 @@ let Main () =
             |> Array.sortBy (fun entry -> entry.path)
             |> Array.toList
 
-        workspaceCtx.setState {
-            workspaceCtx.state with
+        setWorkspaceState (fun state -> {
+            state with
                 FileTree = immutableFileTree
-        }
+        })
 
     React.useEffect (
         (fun () ->
@@ -156,10 +167,13 @@ let Main () =
         Api.ipcArcVaultApi.getOpenPath (unbox null)
         |> Promise.map (fun pathOption ->
             match pathOption with
-            | Some p -> AppState.ARC p |> setAppState
+            | Some p ->
+                AppState.ARC p |> setAppState
+                Renderer.Navigation.PageActions.openArcStartPage notesCtx landingCtx setArcFileState setSelectedTreeItemPath setPageState
             | None ->
                 setAppState AppState.Init
                 setSelectedTreeItemPath None
+                setPageState None
         )
         |> Promise.start
     )
@@ -198,9 +212,11 @@ let Main () =
                 match pathOption with
                 | Some p ->
                     AppState.ARC p |> setAppState
-                    setSelectedTreeItemPath pathOption
+                    Renderer.Navigation.PageActions.openArcStartPage notesCtx landingCtx setArcFileState setSelectedTreeItemPath setPageState
                 | None ->
                     setSelectedTreeItemPath None
+                    setPageState None
+                    setArcFileState None
                     setAppState AppState.Init
         recentARCsUpdate = ignore
         authAccountsUpdate = ignore
@@ -218,9 +234,44 @@ let Main () =
     ///Main content module
     let children =
         React.useMemo (
-            (fun _ -> MainWindowContent.Content(appState, setArcFileState, arcFileState, pageState, setPageState)),
+            (fun _ ->
+                MainWindowContent.Content(
+                    appState,
+                    setArcFileState,
+                    arcFileState,
+                    pageState,
+                    setPageState,
+                    setSelectedTreeItemPath
+                )),
             [| box appState; box pageState; box arcFileState |]
         )
+
+    let actionBar =
+        Html.div [
+            prop.className "swt:mb-2 swt:flex swt:justify-center"
+            prop.children [
+                Actionbar.Main(
+                    [|
+                        Actionbar.ButtonInfo.create (
+                            "swt:fluent--document-bullet-list-24-regular swt:size-5",
+                            "Labbook View",
+                            fun () -> Renderer.Navigation.PageActions.openLandingPage landingCtx setArcFileState setSelectedTreeItemPath setPageState
+                        )
+                        Actionbar.ButtonInfo.create (
+                            "swt:fluent--document-24-regular swt:size-5",
+                            "Create Note",
+                            fun () -> Renderer.Navigation.PageActions.createNewNote notesCtx setArcFileState setSelectedTreeItemPath setPageState
+                        )
+                        Actionbar.ButtonInfo.create (
+                            "swt:fluent--search-24-regular swt:size-5",
+                            "Note Search",
+                            fun () -> Renderer.Navigation.PageActions.openNotesSearchPage setArcFileState setSelectedTreeItemPath setPageState
+                        )
+                    |],
+                    4
+                )
+            ]
+        ]
 
     let leftSidebar appState (fe: ReactElement) =
         Some(
@@ -228,22 +279,7 @@ let Main () =
                 prop.className "swt:p-4"
                 prop.children [|
                     match appState with
-                    | AppState.ARC _ ->
-                        Html.button [
-                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:mb-2 swt:w-full"
-                            prop.text "Landing Page"
-                            prop.onClick (fun _ ->
-                                landingCtx.setState {
-                                    landingCtx.state with
-                                        Draft = LandingDraft.init
-                                        UiState = LandingUiState.init
-                                }
-
-                                setSelectedTreeItemPath None
-                                setArcFileState None
-                                setPageState (Some PageState.LandingDraft)
-                            )
-                        ]
+                    | AppState.ARC _ -> actionBar
                     | _ -> Html.none
                     Html.h2 [ prop.text "ARC-Tree" ]
                     fe
@@ -272,18 +308,23 @@ let Main () =
             workspaceCtx,
             Renderer.Context.LandingStateCtx.LandingStateCtx.Provider(
                 landingCtx,
-                Layout.Main(
-                    children =
-                        React.Fragment [|
-                            children
-                            CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
-                        |],
-                    navbar = Renderer.Components.Navbar.Main(),
-                    ?leftSidebar =
-                        (match fileExplorer with
-                         | Some fe -> leftSidebar appState fe
-                         | None -> None),
-                    leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+                Renderer.Context.NotesStateCtx.NotesStateCtx.Provider(
+                    notesCtx,
+                    AnnotationTableContextProvider.AnnotationTableContextProvider(
+                        Layout.Main(
+                            children =
+                                React.Fragment [|
+                                    children
+                                    CloseWindowController.CloseWindowController.Subscription(saveBeforeClose)
+                                |],
+                            navbar = Renderer.Components.Navbar.Main(),
+                            ?leftSidebar =
+                                (match fileExplorer with
+                                 | Some fe -> leftSidebar appState fe
+                                 | None -> None),
+                            leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+                        )
+                    )
                 )
             )
         )

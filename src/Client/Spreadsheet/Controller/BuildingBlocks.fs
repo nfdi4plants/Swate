@@ -113,8 +113,10 @@ let addDataAnnotation
         |})
     (state: Spreadsheet.Model)
     : Spreadsheet.Model =
+    let table = state.ActiveTable
+
     let tryIfNone () =
-        match state.ActiveTable.TryGetInputColumn(), state.ActiveTable.TryGetOutputColumn() with
+        match table.TryGetInputColumn(), table.TryGetOutputColumn() with
         | Some _, None
         | None, None -> CompositeHeader.Output IOType.Data
         | None, Some _ -> CompositeHeader.Input IOType.Data
@@ -126,17 +128,30 @@ let addDataAnnotation
         | DataAnnotator.TargetColumn.Output -> CompositeHeader.Output IOType.Data
         | DataAnnotator.TargetColumn.Autodetect -> tryIfNone ()
 
+    if table.ColumnCount > 0 && data.fragmentSelectors.Length > table.RowCount then
+        table.AddRowsEmpty(data.fragmentSelectors.Length - table.RowCount)
+
+    let mkEmptyDataCell () =
+        let d = Data()
+        CompositeCell.createData d
+
+    let targetRowCount = System.Math.Max(table.RowCount, data.fragmentSelectors.Length)
+
     let values = [|
-        for selector in data.fragmentSelectors do
+        for rowIndex in 0 .. targetRowCount - 1 do
             let d = Data()
-            d.FilePath <- Some data.fileName
-            d.Selector <- Some selector
-            d.Format <- Some data.fileType
-            d.SelectorFormat <- Some Swate.Components.Shared.URLs.Data.SelectorFormat.csv
-            CompositeCell.createData d
+            if rowIndex < data.fragmentSelectors.Length then
+                let selector = data.fragmentSelectors.[rowIndex]
+                d.FilePath <- Some data.fileName
+                d.Selector <- Some selector
+                d.Format <- Some data.fileType
+                d.SelectorFormat <- Some Swate.Components.Shared.URLs.Data.SelectorFormat.csv
+                CompositeCell.createData d
+            else
+                mkEmptyDataCell ()
     |]
 
-    state.ActiveTable.AddColumn(newHeader, values |> ResizeArray, forceReplace = true)
+    table.AddColumn(newHeader, values |> ResizeArray, forceReplace = true)
     { state with ArcFile = state.ArcFile }
 
 let joinTable

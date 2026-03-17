@@ -1,7 +1,7 @@
 [<AutoOpen>]
 module Main.FileTreeCreator
 
-open Swate.Electron.Shared
+
 open System.Collections.Generic
 open Fable.Core.JsInterop
 open Swate.Electron.Shared.FileIOTypes

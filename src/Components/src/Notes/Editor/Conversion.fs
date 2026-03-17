@@ -2,15 +2,12 @@ namespace Swate.Components.Notes.Editor
 
 open System
 open ARCtrl
+open Swate.Components.Landing
 
 [<RequireQualifiedAccess>]
-module Conversion =
+module NoteConversion =
 
-    let isSafePathSegment (value: string) =
-        not (String.IsNullOrWhiteSpace value)
-        && not (value.Contains "/")
-        && not (value.Contains "\\")
-        && not (value.Contains "..")
+    let private notesRootFolder = "notes"
 
     let formatDateFolder (dateCreated: DateTime) =
         sprintf "%02d_%02d_%04d" dateCreated.Day dateCreated.Month dateCreated.Year
@@ -18,22 +15,24 @@ module Conversion =
     let resolveProtocolName (draft: NotesDraft) =
         Validation.sanitizeProtocolName draft.Title
 
-    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (protocolName: string) =
+    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (dateCreated: DateTime) (protocolName: string) =
         let folder =
             match targetRef.Kind with
             | NotesTargetKind.Study -> "studies"
             | NotesTargetKind.Assay -> "assays"
 
-        if isSafePathSegment targetRef.Name && isSafePathSegment protocolName then
-            Some $"{folder}/{targetRef.Name}/protocols/{protocolName}.md"
+        let dateFolder = formatDateFolder dateCreated
+
+        if Conversion.isSafePathSegment dateFolder && Conversion.isSafePathSegment targetRef.Name && Conversion.isSafePathSegment protocolName then
+            Some $"{notesRootFolder}/{folder}/{targetRef.Name}/{dateFolder}/{protocolName}.md"
         else
             None
 
     let mkNewRootNoteRelativePath (dateCreated: DateTime) (protocolName: string) =
         let dateFolder = formatDateFolder dateCreated
 
-        if isSafePathSegment dateFolder && isSafePathSegment protocolName then
-            Some $"Notes/{dateFolder}/{protocolName}/{protocolName}.md"
+        if Conversion.isSafePathSegment dateFolder && Conversion.isSafePathSegment protocolName then
+            Some $"{notesRootFolder}/{dateFolder}/{protocolName}.md"
         else
             None
 

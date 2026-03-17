@@ -58,7 +58,7 @@ type AnnotationTableContextMenuUtil =
 
             table.RemoveRows(rowCoordinates)
         else
-            table.RemoveRow(rowIndex - 1)
+            table.RemoveRow(rowIndex)
 
         table.Copy()
 
@@ -757,7 +757,7 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex - 1, arcTable, selectHandle)
+                        AnnotationTableContextMenuUtil.deleteColumn (cc, columnIndex, arcTable, selectHandle)
                         |> setArcTable
             )
             ContextMenuItem(
@@ -769,7 +769,7 @@ type AnnotationTableContextMenu =
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
                         setModal (
-                            AnnotationTable.ModalTypes.MoveColumn(cc, {| x = columnIndex - 1; y = 0 |})
+                            AnnotationTable.ModalTypes.MoveColumn(cc, {| x = columnIndex; y = 0 |})
                             |> Some
                         )
             )
@@ -786,7 +786,6 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
-
                         AnnotationTableContextMenuUtil.deleteRow (cc, index - 1, table, selectHandle)
                         |> setTable
             )

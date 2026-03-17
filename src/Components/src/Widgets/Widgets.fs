@@ -5,7 +5,6 @@ open Browser.Types
 open WidgetsLocalStorage
 open Swate
 open Swate.Components
-open ARCtrl
 
 module InitExtensions =
 
@@ -127,6 +126,15 @@ type WidgetType =
     | FilePicker
     | DataAnnotator
     | Playground
+
+type WidgetBlock =
+    {
+        prefix: string
+        content: ReactElement
+    }
+
+    static member CreateWidgetBlock prefix content : WidgetBlock =
+        { prefix = prefix; content = content }
 
 module WidgetContext =
 
@@ -321,12 +329,26 @@ type Widget =
         ]
 
     [<ReactComponent>]
-    static member WidgetController(widgets: Map<WidgetType, WidgetDefinition>, ?children: ReactElement list) =
+    static member WidgetController
+        (
+            widgets: Map<WidgetType, WidgetDefinition>,
+            ?children: ReactElement list,
+            ?closeAllWhen: bool
+        ) =
 
         let activeWidgets, setActiveWidgets =
             React.useStateWithUpdater<WidgetType list> ([])
 
         let children = defaultArg children []
+        let closeAllWhen = defaultArg closeAllWhen false
+
+        React.useEffect (
+            (fun () ->
+                if closeAllWhen then
+                    setActiveWidgets (fun _ -> [])
+            ),
+            [| box closeAllWhen |]
+        )
 
         let closeWidget (widgetType: WidgetType) =
             setActiveWidgets (fun widgets -> widgets |> List.filter (fun widget -> widget <> widgetType))
