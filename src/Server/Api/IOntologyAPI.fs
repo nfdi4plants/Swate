@@ -84,6 +84,159 @@ open Helper
 [<RequireQualifiedAccess>]
 module V3 =
 
+    open Fable.Remoting.OpenAPI
+
+    let docs =
+        Fable.Remoting.OpenAPI.OpenApi.options
+        |> OpenApi.withTitle "Swate Ontology API"
+        |> OpenApi.withServers [
+            {
+                Url = "https://swate.nfdi4plants.org/"
+                Description = Some "Production server"
+            }
+            {
+                Url = "https://swate-alpha.nfdi4plants.org/"
+                Description = Some "Nightly server"
+            }
+            {
+                Url = "/"
+                Description = Some "Local development server"
+            }
+        ]
+        |> OpenApi.withDescription "API for searching and retrieving ontology terms and trees in Swate."
+        |> OpenApi.withVersion "3.0.0"
+        |> OpenApi.withEndpointDocsFor<IOntologyAPIv3, unit -> Async<int>> <@ fun api -> api.getTestNumber @> {
+            OpenApiDefaults.endpointDocumentation with
+                Summary = Some "Development health check"
+                Description =
+                    Some
+                        "This endpoint returns a static integer value and is intended for development diagnostics only."
+        }
+        |> OpenApi.withEndpointDocsFor<IOntologyAPIv3, TermQuery -> Async<Term[]>> <@ fun api -> api.searchTerm @> {
+            OpenApiDefaults.endpointDocumentation with
+                Summary = Some "Search terms"
+                Description =
+                    Some
+                        "Searches ontology terms by accession or name. If the query matches accession notation (for example `MS:1000031`), an accession lookup is performed. Otherwise, name-based search is used. If `searchMode` is omitted, the server uses `Exact` for queries shorter than 3 characters and `PerformanceComplete` otherwise. If `parentTermId` is supplied, the search is constrained to descendants of that parent."
+        }
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, TermQuery, Term[]>
+            <@ fun api -> api.searchTerm @>
+            {
+                Name = "Accession example"
+                Summary = Some "Direct accession lookup"
+                Description = Some "Looks up the term with accession `MS:1000031`."
+                ExternalValue = None
+            }
+            (TermQuery.create ("MS:1000031"))
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, TermQuery, Term[]>
+            <@ fun api -> api.searchTerm @>
+            {
+                Name = "Parent-scoped search example"
+                Summary = Some "Name search constrained by parent"
+                Description = Some "Searches for terms matching `leaf` under parent `PO:0025034` with a custom limit."
+                ExternalValue = None
+            }
+            (TermQuery.create ("leaf", limit = 10, parentTermId = "PO:0025034"))
+        |> OpenApi.withEndpointDocsFor<IOntologyAPIv3, TermQuery[] -> Async<TermQueryResults[]>>
+            <@ fun api -> api.searchTerms @>
+            {
+                OpenApiDefaults.endpointDocumentation with
+                    Summary = Some "Batch search terms"
+                    Description =
+                        Some
+                            "Searches multiple term queries in one request. Each query is resolved independently, and the response preserves input order by returning one `TermQueryResults` item per input query."
+            }
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, TermQuery[], TermQueryResults[]>
+            <@ fun api -> api.searchTerms @>
+            {
+                Name = "Batch request example"
+                Summary = Some "Multiple exact searches"
+                Description = Some "Executes a batch of query objects and returns one result collection per query."
+                ExternalValue = None
+            }
+            [|
+                TermQuery.create ("MS:1000031", searchMode = Database.FullTextSearch.Exact)
+                TermQuery.create ("Arabidopsis", searchMode = Database.FullTextSearch.Exact)
+            |]
+        |> OpenApi.withEndpointDocsFor<IOntologyAPIv3, string -> Async<Term option>> <@ fun api -> api.getTermById @> {
+            OpenApiDefaults.endpointDocumentation with
+                Summary = Some "Get a term by its accession"
+                Description =
+                    Some
+                        "This endpoint retrieves a term from the database based on its unique accession identifier. The response will contain the term details if found, or null if no term with the given accession exists. If multiple terms are found for the same accession, the endpoint fails because accession values are expected to be unique."
+        }
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, string, Term option>
+            <@ fun api -> api.getTermById @>
+            {
+                Name = "Simple example"
+                Summary = Some "Access by `:` notation"
+                Description = Some "Returns the term with the given accession `MS:1000031`."
+                ExternalValue = None
+            }
+            "MS:1000031"
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, string, Term option>
+            <@ fun api -> api.getTermById @>
+            {
+                Name = "Not found example"
+                Summary = Some "Non-existent accession"
+                Description = Some "Returns null for a non-existent accession `RND:09090909`."
+                ExternalValue = None
+            }
+            "RND:09090909"
+        |> OpenApi.withEndpointDocsFor<IOntologyAPIv3, ParentTermQuery -> Async<ParentTermQueryResults>>
+            <@ fun api -> api.searchChildTerms @>
+            {
+                OpenApiDefaults.endpointDocumentation with
+                    Summary = Some "Find child terms"
+                    Description =
+                        Some
+                            "Returns child terms for a given parent term accession. The response wraps the original query and the matching result terms. If no `limit` is supplied, the database default limit is applied."
+            }
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, ParentTermQuery, ParentTermQueryResults>
+            <@ fun api -> api.searchChildTerms @>
+            {
+                Name = "Child terms example"
+                Summary = Some "List descendants for a parent"
+                Description = Some "Returns child terms for parent accession `PO:0025034` with an explicit limit."
+                ExternalValue = None
+            }
+            (ParentTermQuery.create ("PO:0025034", limit = 300))
+        |> OpenApi.withEndpointDocsFor<IOntologyAPIv3, AdvancedSearchQuery -> Async<Term[]>>
+            <@ fun api -> api.searchTermAdvanced @>
+            {
+                OpenApiDefaults.endpointDocumentation with
+                    Summary = Some "Advanced term search"
+                    Description =
+                        Some
+                            "Performs advanced full text search over term names and/or definitions. At least one of `TermName` or `TermDefinition` must be non-empty. Optionally filter by ontology via `OntologyName` and include obsolete terms via `KeepObsolete`."
+            }
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, AdvancedSearchQuery, Term[]>
+            <@ fun api -> api.searchTermAdvanced @>
+            {
+                Name = "Name + ontology filter example"
+                Summary = Some "Search by name in one ontology"
+                Description = Some "Searches for terms matching `instrument` in ontology `ms`."
+                ExternalValue = None
+            }
+            {
+                AdvancedSearchQuery.init () with
+                    OntologyName = Some "ms"
+                    TermName = "instrument"
+            }
+        |> OpenApi.withEndpointRequestNamedExampleFor<IOntologyAPIv3, AdvancedSearchQuery, Term[]>
+            <@ fun api -> api.searchTermAdvanced @>
+            {
+                Name = "Definition example"
+                Summary = Some "Search by definition text"
+                Description = Some "Searches by term definition and includes obsolete terms."
+                ExternalValue = None
+            }
+            {
+                AdvancedSearchQuery.init () with
+                    TermDefinition = "liquid chromatography"
+                    KeepObsolete = true
+            }
+
     let ontologyApi (credentials: Helper.Neo4JCredentials) : IOntologyAPIv3 = {
         //Development
         getTestNumber = fun () -> async { return 42 }
@@ -132,7 +285,7 @@ module V3 =
         |> Remoting.fromValue (ontologyApi credentials)
         |> Remoting.withDiagnosticsLogger (printfn "%A")
         |> Remoting.withErrorHandler Helper.errorHandler
-        |> Remoting.buildHttpHandler
+        |> Remoting.OpenAPI.withDocs docs
 
 open Swate.Components.Shared
 
@@ -393,7 +546,7 @@ module V1 =
         |> Remoting.fromValue (ontologyApi credentials)
         |> Remoting.withDiagnosticsLogger (printfn "%A")
         |> Remoting.withErrorHandler errorHandler
-        |> Remoting.buildHttpHandler
+        |> Remoting.OpenAPI.withDocs Fable.Remoting.OpenAPI.OpenApi.options
 
 [<RequireQualifiedAccess>]
 module V2 =
@@ -675,4 +828,4 @@ module V2 =
         |> Remoting.fromValue (ontologyApi credentials)
         |> Remoting.withDiagnosticsLogger (printfn "%A")
         |> Remoting.withErrorHandler errorHandler
-        |> Remoting.buildHttpHandler
+        |> Remoting.OpenAPI.withDocs Fable.Remoting.OpenAPI.OpenApi.options

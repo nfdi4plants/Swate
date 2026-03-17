@@ -6,7 +6,8 @@ open Feliz
 
 module private AboutHelper =
 
-    let IntroductionElement =
+    [<ReactComponent>]
+    let IntroductionElement () =
         Html.div [
 
             prop.children [
@@ -34,7 +35,7 @@ module private AboutHelper =
             ]
         ]
 
-
+    [<ReactComponent>]
     let MediaContainer (content: ReactElement, imageSrc: string, imageHref: string) =
         Html.div [
             prop.className "swt:hero"
@@ -50,7 +51,9 @@ module private AboutHelper =
                                 Html.button [
                                     prop.href imageHref
                                     prop.className [ "swt:btn swt:btn-square swt:btn-primary swt:btn-lg" ]
-                                    prop.children [ Html.img [ prop.src imageSrc; prop.className "swt:size-8" ] ]
+                                    prop.children [
+                                        Html.img [ prop.src imageSrc; prop.className "swt:size-8" ]
+                                    ]
                                 ]
                             ]
                         ]
@@ -59,7 +62,8 @@ module private AboutHelper =
             ]
         ]
 
-    let GetInContactElements =
+    [<ReactComponent>]
+    let GetInContactElements () =
         React.Fragment [
             MediaContainer(
                 React.Fragment [
@@ -134,13 +138,40 @@ module private AboutHelper =
             )
         ]
 
+    [<ReactComponent>]
+    let APIDocsElement () =
+        Html.div [
+            prop.className "swt:prose-sm swt:md:prose swt:lg:prose-lg"
+            prop.children [
+                Html.h2 "API Documentation"
+                Html.div [
+                    prop.className "swt:text-base-content/70"
+                    prop.text "Swate offers some APIs to retrieve ontology information."
+                ]
+                Html.ul [
+                    prop.children [
+                        Html.li [
+                            Html.a [
+                                prop.href Swate.Components.Shared.URLs.Docs.IOntologyApiv3
+                                prop.target.blank
+                                prop.text "IOntologyAPIv3"
+                            ]
+                            Html.span
+                                " - API for searching and retrieving ontology terms and trees in Swate. This is the API used by Swate itself and thus the most up-to-date one. If you want to retrieve ontology information for your own applications, this is the API you should use."
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
 type About =
     static member Main() =
         Html.div [
             prop.className "swt:prose-sm swt:md:prose swt:lg:prose-lg swt:divide-y-2 swt:gap-y-2 swt:py-1 swt:lg:py-4"
             prop.children [
                 Html.h1 "Swate"
-                AboutHelper.IntroductionElement
-                AboutHelper.GetInContactElements
+                AboutHelper.IntroductionElement()
+                AboutHelper.GetInContactElements()
+                AboutHelper.APIDocsElement()
             ]
         ]

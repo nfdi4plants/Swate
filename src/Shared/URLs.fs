@@ -15,20 +15,8 @@ module URLs =
     [<RequireQualifiedAccessAttribute>]
     module Docs =
 
-        type FileType =
-            | Html
-            | Yaml
-
-            member this.toStr =
-                match this with
-                | Html -> ".html"
-                | Yaml -> ".yaml"
-
-
-        let private Base = "/docs"
-
-        let OntologyApi (filetype: FileType) =
-            Base + "/IOntologyAPIv2" + filetype.toStr
+        [<Literal>]
+        let IOntologyApiv3 = "/api/IOntologyAPIv3/docs"
 
 
     type Helpdesk =
