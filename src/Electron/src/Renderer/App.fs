@@ -219,6 +219,7 @@ let Main () =
                     setArcFileState None
                     setAppState AppState.Init
         recentARCsUpdate = ignore
+        authAccountsUpdate = ignore
         fileTreeUpdate =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")

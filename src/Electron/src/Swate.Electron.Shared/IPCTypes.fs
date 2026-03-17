@@ -8,6 +8,7 @@ open Swate.Components
 open Swate.Components.NoteTypes
 
 open ARCtrl.ARCtrlHelper
+open AuthTypes
 open GitTypes
 open FileIOTypes
 
@@ -81,6 +82,7 @@ type IGitApi = {
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
+    authAccountsUpdate: AuthAccountSummary[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit
 }
@@ -93,3 +95,14 @@ type IArcFileWatcherApi = {
 }
 
 type IMainSaveBeforeQuitApi = { requestSaveBeforeQuit: unit -> unit }
+
+/// Two Way Bridge: Renderer <-> Main
+type IAuthApi = {
+    signIn: AuthSignInRequest -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
+    getAuthState: unit -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
+    signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
+    revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
+    listAccounts: unit -> Fable.Core.JS.Promise<Result<AuthAccountSummary array, exn>>
+    setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
+    removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
+}
