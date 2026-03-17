@@ -42,7 +42,8 @@ module private BuildingBlockWidgetState =
         (left: CompositeHeaderDiscriminate)
         (right: CompositeHeaderDiscriminate)
         =
-        (left.IsTermColumn() = right.IsTermColumn()) && (left.HasIOType() = right.HasIOType())
+        (left.IsTermColumn() = right.IsTermColumn())
+        && (left.HasIOType() = right.HasIOType())
 
     let createCompositeHeaderFromState (state: Model) =
         let getOA () =
@@ -109,7 +110,7 @@ type BuildingBlockWidget =
         "Free Text", IOType.FreeText ""
     |]
 
-    static member private disabledState (message: string) =
+    static member private disabledState(message: string) =
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-80 swt:p-2"
             prop.children [
@@ -202,9 +203,7 @@ type BuildingBlockWidget =
                     prop.className "swt:input swt:border-current"
                     prop.valueOrDefault state.CommentHeader
                     prop.placeholder "Comment header"
-                    prop.onChange (fun (value: string) ->
-                        setState { state with CommentHeader = value }
-                    )
+                    prop.onChange (fun (value: string) -> setState { state with CommentHeader = value })
                 ]
             elif state.HeaderCellType.HasOA() then
                 TermSearch.TermSearch(
@@ -229,8 +228,7 @@ type BuildingBlockWidget =
                         prop.readOnly true
                         prop.valueOrDefault (ioType.ToString())
                     ]
-                | None ->
-                    Html.none
+                | None -> Html.none
             else
                 Html.none
 
@@ -260,7 +258,7 @@ type BuildingBlockWidget =
                         prop.children [
                             Html.button [
                                 prop.className [
-                                    "swt:btn swt:join-item swt:border swt:!border-base-content"
+                                    "swt:btn swt:join-item swt:border swt:border-base-content!"
                                     if state.BodyCellType = CompositeCellDiscriminate.Term then
                                         "swt:btn-primary"
                                     else
@@ -276,7 +274,7 @@ type BuildingBlockWidget =
                             ]
                             Html.button [
                                 prop.className [
-                                    "swt:btn swt:join-item swt:border swt:!border-base-content"
+                                    "swt:btn swt:join-item swt:border swt:border-base-content!"
                                     if state.BodyCellType = CompositeCellDiscriminate.Unitized then
                                         "swt:btn-primary"
                                     else
@@ -305,24 +303,22 @@ type BuildingBlockWidget =
 
     [<ReactComponent>]
     static member Main
-        (
-            arcFileState: ArcFiles option,
-            activeTableIndex: int option,
-            setArcFileState: ArcFiles option -> unit
-        ) =
+        (arcFileState: ArcFiles option, activeTableIndex: int option, setArcFileState: ArcFiles option -> unit)
+        =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
-        let annotationCtx = React.useContext Contexts.AnnotationTable.AnnotationTableStateCtx
+
+        let annotationCtx =
+            React.useContext Contexts.AnnotationTable.AnnotationTableStateCtx
+
         let widgetCtx = WidgetContext.useWidgetController ()
 
         match arcFileState with
-        | None ->
-            BuildingBlockWidget.disabledState "Open an ARC first."
+        | None -> BuildingBlockWidget.disabledState "Open an ARC first."
         | Some arcFile ->
             match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
-            | None ->
-                BuildingBlockWidget.disabledState "Switch to a table tab to add a building block."
-            | Some (_, table) ->
+            | None -> BuildingBlockWidget.disabledState "Switch to a table tab to add a building block."
+            | Some(_, table) ->
                 let selectedColumnIndex =
                     annotationCtx.state
                     |> Map.tryFind table.Name
@@ -331,8 +327,15 @@ type BuildingBlockWidget =
 
                 let setHeaderCellType (nextHeaderType: CompositeHeaderDiscriminate) =
                     let nextState =
-                        if BuildingBlockWidgetState.isSameMajorCompositeHeaderDiscriminate state.HeaderCellType nextHeaderType then
-                            { state with HeaderCellType = nextHeaderType }
+                        if
+                            BuildingBlockWidgetState.isSameMajorCompositeHeaderDiscriminate
+                                state.HeaderCellType
+                                nextHeaderType
+                        then
+                            {
+                                state with
+                                    HeaderCellType = nextHeaderType
+                            }
                         else
                             let nextBodyCellType =
                                 if nextHeaderType.IsTermColumn() then
@@ -361,15 +364,13 @@ type BuildingBlockWidget =
 
                 let setHeaderTerm (termOpt: Term option) =
                     let nextHeaderArg =
-                        termOpt
-                        |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case1)
+                        termOpt |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case1)
 
                     setState { state with HeaderArg = nextHeaderArg }
 
                 let setBodyTerm (termOpt: Term option) =
                     let nextBodyArg =
-                        termOpt
-                        |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case2)
+                        termOpt |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case2)
 
                     setState { state with BodyArg = nextBodyArg }
 
@@ -381,8 +382,7 @@ type BuildingBlockWidget =
                         | Some bodyCell ->
                             let rowCount = System.Math.Max(1, table.RowCount)
                             Array.init rowCount (fun _ -> bodyCell.Copy()) |> ResizeArray
-                        | None ->
-                            state.HeaderCellType.CreateEmptyDefaultCells table.RowCount
+                        | None -> state.HeaderCellType.CreateEmptyDefaultCells table.RowCount
 
                     let cells =
                         match header with
@@ -394,8 +394,7 @@ type BuildingBlockWidget =
                             match table.TryGetInputColumn() with
                             | Some inputColumn -> inputColumn.Cells
                             | None -> cells
-                        | _ ->
-                            cells
+                        | _ -> cells
 
                     let insertionIndex =
                         match selectedColumnIndex with
@@ -434,10 +433,7 @@ type BuildingBlockWidget =
                                         prop.type'.submit
                                         prop.className [
                                             "swt:btn swt:btn-wide"
-                                            if isValid then
-                                                "swt:btn-primary"
-                                            else
-                                                "swt:btn-error"
+                                            if isValid then "swt:btn-primary" else "swt:btn-error"
                                         ]
                                         prop.disabled (not isValid)
                                         prop.text "Add Column"
