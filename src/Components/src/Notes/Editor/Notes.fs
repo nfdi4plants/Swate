@@ -26,7 +26,7 @@ type Notes =
             | None ->
                 setError (Some "Date Created is required.")
             | Some dateCreated ->
-                let content = Conversion.formatMarkdown draft
+                let content = NoteConversion.formatMarkdown draft
 
                 let payload = {
                     Intent = {
@@ -54,15 +54,19 @@ type Notes =
                 | None ->
                     setError (Some "Select a Study or Assay target first.")
                 | Some targetRef ->
-                    match Conversion.resolveProtocolName draft with
+                    match draft.DateCreated with
                     | None ->
-                        setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                    | Some protocolName ->
-                        match Conversion.mkExistingTargetRelativePath targetRef protocolName with
+                        setError (Some "Date Created is required.")
+                    | Some dateCreated ->
+                        match NoteConversion.resolveProtocolName draft with
                         | None ->
-                            setError (Some "Could not resolve a safe target path.")
-                        | Some relativePath ->
-                            createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+                            setError (Some "Title is invalid for protocol naming. Choose a different title.")
+                        | Some protocolName ->
+                            match NoteConversion.mkExistingTargetRelativePath targetRef dateCreated protocolName with
+                            | None ->
+                                setError (Some "Could not resolve a safe target path.")
+                            | Some relativePath ->
+                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
 
         let submitNewRootNote () =
             if Validation.isRequiredDataValid draft |> not then
@@ -72,11 +76,11 @@ type Notes =
                 | None ->
                     setError (Some "Date Created is required.")
                 | Some dateCreated ->
-                    match Conversion.resolveProtocolName draft with
+                    match NoteConversion.resolveProtocolName draft with
                     | None ->
                         setError (Some "Title is invalid for protocol naming. Choose a different title.")
                     | Some protocolName ->
-                        match Conversion.mkNewRootNoteRelativePath dateCreated protocolName with
+                        match NoteConversion.mkNewRootNoteRelativePath dateCreated protocolName with
                         | None ->
                             setError (Some "Could not resolve a safe note path.")
                         | Some relativePath ->

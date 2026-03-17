@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Electron
 
 open Swate.Components
+open Swate.Components.NoteTypes
 
 open ARCtrl.ARCtrlHelper
 open AuthTypes
@@ -20,6 +21,8 @@ module IPCTypesHelper =
         | Text of string
         | Unknown
         | LandingDraft
+        | NotesDraft
+        | NotesSearch
         | Error of string
 
     [<RequireQualifiedAccess>]
@@ -45,6 +48,7 @@ type IArcVaultsApi = {
     pickPaths: IpcMainEvent -> JS.Promise<Result<string [], exn>>
 
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>
+    readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PageState, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
