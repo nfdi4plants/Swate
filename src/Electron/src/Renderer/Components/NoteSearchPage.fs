@@ -2,13 +2,9 @@ module Renderer.Components.NoteSearchPage
 
 
 open System
-open ARCtrl
-open Fable.Core
 open Feliz
-open MainElement
 open Swate.Components
 open Swate.Components.NoteTypes
-open Swate.Components.Landing
 open Swate.Components.Notes.Editor
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes

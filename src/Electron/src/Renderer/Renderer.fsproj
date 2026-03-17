@@ -7,18 +7,20 @@
   <ItemGroup>
     <Compile Include="Api.fs" />
     <Compile Include="MetadataForm.fs" />
-    <Compile Include="context\AppStateCtx.fs" />
-    <Compile Include="context\LandingStateCtx.fs" />
-    <Compile Include="context\NotesStateCtx.fs" />
-    <Compile Include="context\WorkspaceStateCtx.fs" />
+    <Compile Include="Context\AppStateCtx.fs" />
+    <Compile Include="Context\LandingStateCtx.fs" />
+    <Compile Include="Context\NotesStateCtx.fs" />
+    <Compile Include="Context\WorkspaceStateCtx.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="Components\FileExplorer.fs" />
     <Compile Include="Components\WidgetRegister.fs" />
+    <Compile Include="Components\NoteSearchPage.fs" />
     <Compile Include="Components\MainElement.fs" />
     <Compile Include="Components\MainWindowContent.fs" />
+    <Compile Include="Navigation\PageActions.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
     <Content Include="tailwind.css" />
