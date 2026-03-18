@@ -33,27 +33,16 @@ let private bufferToBase64 (buf: Node.Buffer.Buffer) : string = jsNative
 [<Emit("Buffer.from($0, 'base64')")>]
 let private bufferFromBase64 (base64: string) : Node.Buffer.Buffer = jsNative
 
-#if FABLE_COMPILER
 type private CryptoHash =
     abstract update: data: string * inputEncoding: string -> CryptoHash
     abstract digest: encoding: string -> string
 
 [<Import("createHash", "crypto")>]
 let private createHash (algorithm: string) : CryptoHash = jsNative
-#endif
 
 let private sha256Hex (input: string) : string =
-#if FABLE_COMPILER
     let hash = createHash "sha256"
     hash.update(input, "utf8").digest("hex")
-#else
-    use sha = System.Security.Cryptography.SHA256.Create()
-    let bytes = System.Text.Encoding.UTF8.GetBytes input
-    let hash = sha.ComputeHash bytes
-    hash
-    |> Array.map (fun b -> b.ToString("x2"))
-    |> String.concat ""
-#endif
 
 // ── helpers ──────────────────────────────────────────────────────────
 
