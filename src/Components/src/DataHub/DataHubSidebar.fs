@@ -205,219 +205,219 @@ type DataHubSidebar =
             ]
         ]
 
-    // ARC browser panel
+// ARC browser panel
 
 
 
-    // selected project actions
+// selected project actions
 
-    [<ReactComponent>]
-    static member private ProjectActions
-        (
-            project: ARCProject,
-            onSave: ARCProject -> unit,
-            onFetch: ARCProject -> unit,
-            onShare: ARCProject -> unit,
-            operationState: OperationState,
-            operationMessage: string option,
-            hasChanges: bool
-        ) =
-        Html.div [
-            prop.testId "ProjectActionsPanel"
-            prop.className "swt:flex swt:flex-col swt:gap-2"
-            prop.children [
-                Html.div [
-                    prop.className "swt:flex swt:items-center swt:gap-2 swt:p-2 swt:rounded swt:bg-base-200"
-                    prop.children [
-                        Html.span [
-                            prop.className "swt:iconify swt:fluent--folder-24-regular swt:size-5"
-                        ]
-                        Html.span [
-                            prop.testId "SelectedProjectName"
-                            prop.className "swt:font-semibold swt:truncate"
-                            prop.text project.Name
-                        ]
-                    ]
-                ]
+// [<ReactComponent>]
+// static member private ProjectActions
+//     (
+//         project: ARCProject,
+//         onSave: ARCProject -> unit,
+//         onFetch: ARCProject -> unit,
+//         onShare: ARCProject -> unit,
+//         operationState: OperationState,
+//         operationMessage: string option,
+//         hasChanges: bool
+//     ) =
+//     Html.div [
+//         prop.testId "ProjectActionsPanel"
+//         prop.className "swt:flex swt:flex-col swt:gap-2"
+//         prop.children [
+//             Html.div [
+//                 prop.className "swt:flex swt:items-center swt:gap-2 swt:p-2 swt:rounded swt:bg-base-200"
+//                 prop.children [
+//                     Html.span [
+//                         prop.className "swt:iconify swt:fluent--folder-24-regular swt:size-5"
+//                     ]
+//                     Html.span [
+//                         prop.testId "SelectedProjectName"
+//                         prop.className "swt:font-semibold swt:truncate"
+//                         prop.text project.Name
+//                     ]
+//                 ]
+//             ]
 
-                Html.p [
-                    prop.className "swt:text-xs swt:text-base-content/60"
-                    prop.text "Save uploads all local changes. Fetch downloads the latest version."
-                ]
+//             Html.p [
+//                 prop.className "swt:text-xs swt:text-base-content/60"
+//                 prop.text "Save uploads all local changes. Fetch downloads the latest version."
+//             ]
 
-                let isWorking = operationState = OperationState.Loading
+//             let isWorking = operationState = OperationState.Loading
 
-                Html.button [
-                    prop.testId "SaveToDataHubButton"
-                    prop.className "swt:btn swt:btn-primary swt:btn-sm swt:w-full"
-                    prop.disabled (isWorking || not hasChanges)
-                    prop.title "Save all local changes to the DataHub"
-                    prop.children [
-                        if isWorking then
-                            Html.span [
-                                prop.className "swt:loading swt:loading-spinner swt:loading-xs"
-                            ]
-                        Icons.CloudUpload("swt:size-4")
-                        Html.span [ prop.text "Save to DataHub" ]
-                    ]
-                    prop.onClick (fun _ -> onSave project)
-                ]
+//             Html.button [
+//                 prop.testId "SaveToDataHubButton"
+//                 prop.className "swt:btn swt:btn-primary swt:btn-sm swt:w-full"
+//                 prop.disabled (isWorking || not hasChanges)
+//                 prop.title "Save all local changes to the DataHub"
+//                 prop.children [
+//                     if isWorking then
+//                         Html.span [
+//                             prop.className "swt:loading swt:loading-spinner swt:loading-xs"
+//                         ]
+//                     Icons.CloudUpload("swt:size-4")
+//                     Html.span [ prop.text "Save to DataHub" ]
+//                 ]
+//                 prop.onClick (fun _ -> onSave project)
+//             ]
 
-                Html.button [
-                    prop.testId "FetchFromDataHubButton"
-                    prop.className "swt:btn swt:btn-outline swt:btn-sm swt:w-full"
-                    prop.disabled isWorking
-                    prop.children [
-                        Icons.ArrowsRotate()
-                        Html.span [ prop.text "Get Latest from DataHub" ]
-                    ]
-                    prop.onClick (fun _ -> onFetch project)
-                ]
+//             Html.button [
+//                 prop.testId "FetchFromDataHubButton"
+//                 prop.className "swt:btn swt:btn-outline swt:btn-sm swt:w-full"
+//                 prop.disabled isWorking
+//                 prop.children [
+//                     Icons.ArrowsRotate()
+//                     Html.span [ prop.text "Get Latest from DataHub" ]
+//                 ]
+//                 prop.onClick (fun _ -> onFetch project)
+//             ]
 
-                Html.button [
-                    prop.testId "ShareARCButton"
-                    prop.className "swt:btn swt:btn-ghost swt:btn-sm swt:w-full"
-                    prop.disabled isWorking
-                    prop.children [ Icons.Copy(); Html.span [ prop.text "Copy Share Link" ] ]
-                    prop.onClick (fun _ -> onShare project)
-                ]
+//             Html.button [
+//                 prop.testId "ShareARCButton"
+//                 prop.className "swt:btn swt:btn-ghost swt:btn-sm swt:w-full"
+//                 prop.disabled isWorking
+//                 prop.children [ Icons.Copy(); Html.span [ prop.text "Copy Share Link" ] ]
+//                 prop.onClick (fun _ -> onShare project)
+//             ]
 
-                match operationState, operationMessage with
-                | OperationState.Success, Some msg ->
-                    Html.div [
-                        prop.testId "OperationSuccess"
-                        prop.className "swt:alert swt:alert-success swt:text-xs swt:py-1"
-                        prop.children [ Icons.Check("swt:size-4"); Html.span [ prop.text msg ] ]
-                    ]
-                | OperationState.Error, Some msg ->
-                    Html.div [
-                        prop.testId "OperationError"
-                        prop.className "swt:alert swt:alert-error swt:text-xs swt:py-1"
-                        prop.children [ Icons.ExclamationTriangle(); Html.span [ prop.text msg ] ]
-                    ]
-                | _ -> Html.none
-            ]
-        ]
+//             match operationState, operationMessage with
+//             | OperationState.Success, Some msg ->
+//                 Html.div [
+//                     prop.testId "OperationSuccess"
+//                     prop.className "swt:alert swt:alert-success swt:text-xs swt:py-1"
+//                     prop.children [ Icons.Check("swt:size-4"); Html.span [ prop.text msg ] ]
+//                 ]
+//             | OperationState.Error, Some msg ->
+//                 Html.div [
+//                     prop.testId "OperationError"
+//                     prop.className "swt:alert swt:alert-error swt:text-xs swt:py-1"
+//                     prop.children [ Icons.ExclamationTriangle(); Html.span [ prop.text msg ] ]
+//                 ]
+//             | _ -> Html.none
+//         ]
+//     ]
 
-    // connected header
+// // connected header
 
-    [<ReactComponent>]
-    static member private ConnectedHeader(dataHubUrl: string, onDisconnect: unit -> unit) =
-        Html.div [
-            prop.className "swt:flex swt:items-center swt:gap-2"
-            prop.children [
-                Html.span [
-                    prop.className "swt:iconify swt:fluent--cloud-checkmark-24-regular swt:size-5 swt:text-success"
-                ]
-                Html.span [
-                    prop.className "swt:text-lg swt:font-bold"
-                    prop.text "DataHub"
-                ]
-                DataHubSidebar.StatusBadge("connected", "success")
-                Html.button [
-                    prop.testId "DisconnectButton"
-                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:ml-auto"
-                    prop.title "Disconnect"
-                    prop.onClick (fun _ -> onDisconnect ())
-                    prop.children [ Icons.LinkSlash() ]
-                ]
-            ]
-        ]
+// [<ReactComponent>]
+// static member private ConnectedHeader(dataHubUrl: string, onDisconnect: unit -> unit) =
+//     Html.div [
+//         prop.className "swt:flex swt:items-center swt:gap-2"
+//         prop.children [
+//             Html.span [
+//                 prop.className "swt:iconify swt:fluent--cloud-checkmark-24-regular swt:size-5 swt:text-success"
+//             ]
+//             Html.span [
+//                 prop.className "swt:text-lg swt:font-bold"
+//                 prop.text "DataHub"
+//             ]
+//             DataHubSidebar.StatusBadge("connected", "success")
+//             Html.button [
+//                 prop.testId "DisconnectButton"
+//                 prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:ml-auto"
+//                 prop.title "Disconnect"
+//                 prop.onClick (fun _ -> onDisconnect ())
+//                 prop.children [ Icons.LinkSlash() ]
+//             ]
+//         ]
+//     ]
 
-    // PUBLIC ENTRY POINT
+// // PUBLIC ENTRY POINT
 
-    [<ReactComponent>]
-    static member Main
-        (
-            connectionState: ConnectionState,
-            ?dataHubUrl: string,
-            ?selectedProject: ARCProject option,
-            ?onConnect: unit -> unit,
-            ?onDisconnect: unit -> unit,
-            ?onSelectProject: ARCProject -> unit,
-            ?onSave: ARCProject -> unit,
-            ?onFetch: ARCProject -> unit,
-            ?onShare: ARCProject -> unit,
-            ?operationState: OperationState,
-            ?operationMessage: string option,
-            ?errorMessage: string option,
-            ?changedFiles: ChangedFile[],
-            ?onDiscardFile: ChangedFile -> unit,
-            ?browserMode: ARCBrowserMode,
-            ?onBrowserModeChange: ARCBrowserMode -> unit,
-            ?browserProjects: ARCProject[],
-            ?isLoadingBrowser: bool
-        ) =
+// [<ReactComponent>]
+// static member Main
+//     (
+//         connectionState: ConnectionState,
+//         ?dataHubUrl: string,
+//         ?selectedProject: ARCProject option,
+//         ?onConnect: unit -> unit,
+//         ?onDisconnect: unit -> unit,
+//         ?onSelectProject: ARCProject -> unit,
+//         ?onSave: ARCProject -> unit,
+//         ?onFetch: ARCProject -> unit,
+//         ?onShare: ARCProject -> unit,
+//         ?operationState: OperationState,
+//         ?operationMessage: string option,
+//         ?errorMessage: string option,
+//         ?changedFiles: ChangedFile[],
+//         ?onDiscardFile: ChangedFile -> unit,
+//         ?browserMode: ARCBrowserMode,
+//         ?onBrowserModeChange: ARCBrowserMode -> unit,
+//         ?browserProjects: ARCProject[],
+//         ?isLoadingBrowser: bool
+//     ) =
 
-        let selectedProject = defaultArg selectedProject None
-        let onConnect = defaultArg onConnect ignore
-        let onDisconnect = defaultArg onDisconnect ignore
-        let onSelectProject = defaultArg onSelectProject ignore
-        let onSave = defaultArg onSave ignore
-        let onFetch = defaultArg onFetch ignore
-        let onShare = defaultArg onShare ignore
-        let operationState = defaultArg operationState OperationState.Idle
-        let operationMessage = defaultArg operationMessage None
-        let errorMessage = defaultArg errorMessage None
-        let changedFiles = defaultArg changedFiles [||]
-        let onDiscardFile = defaultArg onDiscardFile ignore
-        let browserMode = defaultArg browserMode ARCBrowserMode.YourARCs
-        let onBrowserModeChange = defaultArg onBrowserModeChange ignore
-        let browserProjects = defaultArg browserProjects [||]
-        let isLoadingBrowser = defaultArg isLoadingBrowser false
+//     let selectedProject = defaultArg selectedProject None
+//     let onConnect = defaultArg onConnect ignore
+//     let onDisconnect = defaultArg onDisconnect ignore
+//     let onSelectProject = defaultArg onSelectProject ignore
+//     let onSave = defaultArg onSave ignore
+//     let onFetch = defaultArg onFetch ignore
+//     let onShare = defaultArg onShare ignore
+//     let operationState = defaultArg operationState OperationState.Idle
+//     let operationMessage = defaultArg operationMessage None
+//     let errorMessage = defaultArg errorMessage None
+//     let changedFiles = defaultArg changedFiles [||]
+//     let onDiscardFile = defaultArg onDiscardFile ignore
+//     let browserMode = defaultArg browserMode ARCBrowserMode.YourARCs
+//     let onBrowserModeChange = defaultArg onBrowserModeChange ignore
+//     let browserProjects = defaultArg browserProjects [||]
+//     let isLoadingBrowser = defaultArg isLoadingBrowser false
 
-        Html.div [
-            prop.testId "DataHubSidebar"
-            prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-3 swt:w-full swt:overflow-y-auto"
-            prop.children [
-                match connectionState with
-                | ConnectionState.Disconnected
-                | ConnectionState.Connecting ->
-                    DataHubSidebar.DisconnectedView(
-                        onConnect,
-                        isConnecting = (connectionState = ConnectionState.Connecting)
-                    )
-                | ConnectionState.Connected ->
-                    DataHubSidebar.ConnectedHeader(defaultArg dataHubUrl "DataHub", onDisconnect)
+//     Html.div [
+//         prop.testId "DataHubSidebar"
+//         prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-3 swt:w-full swt:overflow-y-auto"
+//         prop.children [
+//             match connectionState with
+//             | ConnectionState.Disconnected
+//             | ConnectionState.Connecting ->
+//                 DataHubSidebar.DisconnectedView(
+//                     onConnect,
+//                     isConnecting = (connectionState = ConnectionState.Connecting)
+//                 )
+//             | ConnectionState.Connected ->
+//                 DataHubSidebar.ConnectedHeader(defaultArg dataHubUrl "DataHub", onDisconnect)
 
-                    match selectedProject with
-                    | Some proj ->
-                        Html.div [ prop.className "swt:divider swt:my-0" ]
-                        DataHubSidebar.ChangedFilesList(changedFiles, onDiscardFile)
-                        Html.div [ prop.className "swt:divider swt:my-0" ]
+//                 match selectedProject with
+//                 | Some proj ->
+//                     Html.div [ prop.className "swt:divider swt:my-0" ]
+//                     DataHubSidebar.ChangedFilesList(changedFiles, onDiscardFile)
+//                     Html.div [ prop.className "swt:divider swt:my-0" ]
 
-                        DataHubSidebar.ProjectActions(
-                            proj,
-                            onSave,
-                            onFetch,
-                            onShare,
-                            operationState,
-                            operationMessage,
-                            hasChanges = (changedFiles.Length > 0)
-                        )
-                    | None -> ()
+//                     DataHubSidebar.ProjectActions(
+//                         proj,
+//                         onSave,
+//                         onFetch,
+//                         onShare,
+//                         operationState,
+//                         operationMessage,
+//                         hasChanges = (changedFiles.Length > 0)
+//                     )
+//                 | None -> ()
 
-                    Html.div [ prop.className "swt:divider swt:my-0" ]
+//                 Html.div [ prop.className "swt:divider swt:my-0" ]
 
-                    DataHubBrowser.DataHubBrowser(
-                        browserMode,
-                        onBrowserModeChange,
-                        browserProjects,
-                        isLoadingBrowser,
-                        onSelectProject,
-                        selectedProject
-                    )
+//                 DataHubBrowser.DataHubBrowser(
+//                     browserMode,
+//                     onBrowserModeChange,
+//                     browserProjects,
+//                     isLoadingBrowser,
+//                     onSelectProject,
+//                     selectedProject
+//                 )
 
-                match errorMessage with
-                | Some err ->
-                    Html.div [
-                        prop.testId "GlobalError"
-                        prop.className "swt:alert swt:alert-error swt:text-xs swt:py-1"
-                        prop.children [ Icons.ExclamationTriangle(); Html.span [ prop.text err ] ]
-                    ]
-                | None -> ()
-            ]
-        ]
+//             match errorMessage with
+//             | Some err ->
+//                 Html.div [
+//                     prop.testId "GlobalError"
+//                     prop.className "swt:alert swt:alert-error swt:text-xs swt:py-1"
+//                     prop.children [ Icons.ExclamationTriangle(); Html.span [ prop.text err ] ]
+//                 ]
+//             | None -> ()
+//         ]
+//     ]
 
 // // STORYBOOK ENTRY
 

@@ -74,11 +74,9 @@ type ExploreProjectDto = {
     avatar_url: string option
     visibility: string option
     star_count: int
-    created_at: string
-    updated_at: string
-    last_activity_at: string
+    created_at: System.DateTime option
+    last_activity_at: System.DateTime option
     tag_list: string array
-    license_name: string option
     ``namespace``: ExploreNamespaceDto
 }
 
@@ -146,11 +144,9 @@ type private GitLabProjectResponse = {
     visibility: string option
     star_count: int
     created_at: string
-    updated_at: string
     last_activity_at: string
     topics: string array option
     tag_list: string array option
-    license: {| name: string option |} option
     ``namespace``: GitLabNamespaceResponse
 }
 
@@ -279,11 +275,15 @@ module private Internals =
         avatar_url = project.avatar_url
         visibility = project.visibility
         star_count = project.star_count
-        created_at = project.created_at
-        updated_at = project.updated_at
-        last_activity_at = project.last_activity_at
+        created_at =
+            match System.DateTime.TryParse project.created_at with
+            | (true, dt) -> Some dt
+            | _ -> None
+        last_activity_at =
+            match System.DateTime.TryParse project.last_activity_at with
+            | (true, dt) -> Some dt
+            | _ -> None
         tag_list = project.topics |> Option.orElse project.tag_list |> Option.defaultValue [||]
-        license_name = project.license |> Option.bind (fun license -> license.name)
         ``namespace`` = toExploreNamespaceDto project.``namespace``
         name_with_namespace = project.name_with_namespace
     }
@@ -303,24 +303,6 @@ module private Internals =
         avatar_url = user.avatar_url
     }
 
-    [<Emit("Date.parse($0)")>]
-    let private parseDateMilliseconds (_value: string) : float = jsNative
-
-    [<Emit("Date.now()")>]
-    let private nowMilliseconds () : float = jsNative
-
-    let private trendingScore (project: ExploreProjectDto) =
-        let updated = parseDateMilliseconds project.updated_at
-
-        if Double.IsNaN(updated) then
-            float project.star_count
-        else
-            let ageInDays = max 0.0 ((nowMilliseconds () - updated) / 86400000.0)
-            float project.star_count + (30.0 / (1.0 + ageInDays))
-
-    let rankTrending (projects: ExploreProjectDto array) =
-        projects |> Array.sortByDescending trendingScore
-
     let sendGet<'T> (url: string) (pat: string option) : JS.Promise<Result<PagedResponse<'T>, GitLabError>> =
 
         promise {
@@ -332,7 +314,6 @@ module private Internals =
                 if not response.Ok then
                     return Error(mapHttpError response.Status)
                 else
-                    Browser.Dom.console.log (response)
                     let pagination = readPagination response
 
                     try
@@ -436,10 +417,16 @@ type GitLabApi =
 
             return
                 response
-                |> Result.map (fun x -> {
-                    Items = x.Items |> Array.map Internals.toExploreProjectDto
-                    Pagination = x.Pagination
-                })
+                |> Result.map (fun x ->
+                    Browser.Dom.console.log x.Items.[0]
+                    let itemsDTOs = x.Items |> Array.map Internals.toExploreProjectDto
+                    Browser.Dom.console.log itemsDTOs.[0]
+
+                    {
+                        Items = itemsDTOs
+                        Pagination = x.Pagination
+                    }
+                )
         }
 
     /// GET /api/v4/users/:user_id/projects
@@ -495,7 +482,6 @@ type GitLabApi =
 
                 let url = appendQueryParams baseEndpoint queryParams
                 let! response = Internals.sendGet<GitLabProjectResponse> url (Some pat)
-                Browser.Dom.console.log response
 
                 return
                     response
@@ -603,54 +589,6 @@ type GitLabApi =
             ?search = search
         )
 
-    /// Derived trending list because REST has no dedicated trending endpoint.
-    static member ListExploreTrending
-        (
-            baseUrl: string,
-            pat: string,
-            ?strategy: TrendingStrategy,
-            ?page: int,
-            ?perPage: int,
-            ?visibility: string,
-            ?search: string
-        ) : JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>> =
-        promise {
-            let strategy = defaultArg strategy TrendingStrategy.ByLastActivity
-
-            match strategy with
-            | TrendingStrategy.ByLastActivity ->
-                return!
-                    GitLabApi.ListProjects(
-                        baseUrl,
-                        pat,
-                        ?page = page,
-                        ?perPage = perPage,
-                        orderBy = ProjectSortField.LastActivityAt,
-                        sort = SortDirection.Desc,
-                        ?visibility = visibility,
-                        ?search = search
-                    )
-            | TrendingStrategy.ByStarsAndRecency ->
-                let! result =
-                    GitLabApi.ListProjects(
-                        baseUrl,
-                        pat,
-                        ?page = page,
-                        ?perPage = perPage,
-                        orderBy = ProjectSortField.UpdatedAt,
-                        sort = SortDirection.Desc,
-                        ?visibility = visibility,
-                        ?search = search
-                    )
-
-                return
-                    result
-                    |> Result.map (fun x -> {
-                        Items = Internals.rankTrending x.Items
-                        Pagination = x.Pagination
-                    })
-        }
-
     /// UI compatibility helper for sort mapping.
     static member ListProjectsForUiSort
         (
@@ -673,108 +611,3 @@ type GitLabApi =
             ?search = search,
             ?visibility = visibility
         )
-
-    /// Explore bootstrap call: most starred, trending, user repos, groups, and per-group repos.
-    static member GetExploreBootstrap
-        (
-            baseUrl: string,
-            pat: string,
-            ?page: int,
-            ?perPage: int,
-            ?trendingStrategy: TrendingStrategy,
-            ?maxGroups: int,
-            ?groupProjectsPerPage: int
-        ) : JS.Promise<Result<ExploreBootstrapDto, GitLabError>> =
-        promise {
-            let page = defaultArg page 1
-            let perPage = defaultArg perPage 20
-            let maxGroups = defaultArg maxGroups 5
-            let groupProjectsPerPage = defaultArg groupProjectsPerPage 20
-
-            let! mostStarredResult = GitLabApi.ListExploreMostStarred(baseUrl, pat, page = page, perPage = perPage)
-
-            match mostStarredResult with
-            | Error err -> return Error err
-            | Ok mostStarred ->
-                let! trendingResult =
-                    GitLabApi.ListExploreTrending(
-                        baseUrl,
-                        pat,
-                        strategy = defaultArg trendingStrategy TrendingStrategy.ByLastActivity,
-                        page = page,
-                        perPage = perPage
-                    )
-
-                match trendingResult with
-                | Error err -> return Error err
-                | Ok trending ->
-                    let! userResult = GitLabApi.GetCurrentUser(baseUrl, pat)
-
-                    match userResult with
-                    | Error err -> return Error err
-                    | Ok currentUser ->
-                        let! myReposResult =
-                            GitLabApi.ListUserPersonalProjects(
-                                baseUrl,
-                                pat,
-                                page = page,
-                                perPage = perPage,
-                                sort = SortDirection.Desc,
-                                orderBy = ProjectSortField.UpdatedAt,
-                                owned = true
-                            )
-
-                        match myReposResult with
-                        | Error err -> return Error err
-                        | Ok myRepos ->
-                            let! groupsResult =
-                                GitLabApi.ListGroupsForCurrentUser(baseUrl, pat, page = page, perPage = perPage)
-
-                            match groupsResult with
-                            | Error err -> return Error err
-                            | Ok groups ->
-                                let selectedGroups = groups.Items |> Array.truncate maxGroups
-
-                                let rec fetchGroupRepos
-                                    (remaining: GroupDto list)
-                                    (acc: GroupProjectsDto list)
-                                    : JS.Promise<Result<GroupProjectsDto list, GitLabError>> =
-                                    promise {
-                                        match remaining with
-                                        | [] -> return Ok(List.rev acc)
-                                        | group :: rest ->
-                                            let! projectsResult =
-                                                GitLabApi.ListGroupProjects(
-                                                    baseUrl,
-                                                    pat,
-                                                    group.id,
-                                                    page = 1,
-                                                    perPage = groupProjectsPerPage,
-                                                    orderBy = ProjectSortField.UpdatedAt,
-                                                    sort = SortDirection.Desc,
-                                                    includeSubgroups = true,
-                                                    withShared = true
-                                                )
-
-                                            match projectsResult with
-                                            | Error err -> return Error err
-                                            | Ok projects ->
-                                                return!
-                                                    fetchGroupRepos rest ({ Group = group; Projects = projects } :: acc)
-                                    }
-
-                                let! groupReposResult = fetchGroupRepos (selectedGroups |> Array.toList) []
-
-                                match groupReposResult with
-                                | Error err -> return Error err
-                                | Ok groupRepos ->
-                                    return
-                                        Ok {
-                                            MostStarred = mostStarred
-                                            Trending = trending
-                                            CurrentUser = currentUser
-                                            MyRepos = myRepos
-                                            Groups = groups
-                                            GroupRepos = groupRepos |> List.toArray
-                                        }
-        }

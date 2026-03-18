@@ -39,11 +39,9 @@ let yourRepos: ExploreProjectDto array = [|
         avatar_url = Some "https://picsum.photos/40/40?r=1"
         visibility = Some "private"
         star_count = 7
-        created_at = "2026-01-10T09:00:00Z"
-        updated_at = "2026-03-10T09:00:00Z"
-        last_activity_at = "2026-03-12T11:00:00Z"
+        created_at = System.DateTime(2026, 1, 10, 9, 0, 0) |> Some
+        last_activity_at = System.DateTime(2026, 3, 12, 11, 0, 0) |> Some
         tag_list = [| "metabolomics"; "arc" |]
-        license_name = Some "MIT"
         ``namespace`` = ns 1 "kevin" "kevin"
     }
     {
@@ -56,11 +54,9 @@ let yourRepos: ExploreProjectDto array = [|
         avatar_url = Some "https://picsum.photos/40/40?r=2"
         visibility = Some "private"
         star_count = 11
-        created_at = "2025-11-03T12:00:00Z"
-        updated_at = "2026-03-01T09:00:00Z"
-        last_activity_at = "2026-03-11T08:00:00Z"
+        created_at = System.DateTime(2025, 11, 5, 10, 0, 0) |> Some
+        last_activity_at = System.DateTime(2026, 3, 1, 9, 0, 0) |> Some
         tag_list = [| "rnaseq"; "arc" |]
-        license_name = Some "Apache-2.0"
         ``namespace`` = ns 1 "kevin" "kevin"
     }
     {
@@ -73,11 +69,9 @@ let yourRepos: ExploreProjectDto array = [|
         avatar_url = None
         visibility = Some "private"
         star_count = 3
-        created_at = "2025-10-09T10:00:00Z"
-        updated_at = "2026-02-27T09:00:00Z"
-        last_activity_at = "2026-02-27T09:00:00Z"
+        created_at = System.DateTime(2025, 10, 9, 10, 0, 0) |> Some
+        last_activity_at = System.DateTime(2026, 2, 27, 9, 0, 0) |> Some
         tag_list = [| "proteomics"; "arc" |]
-        license_name = Some "MIT"
         ``namespace`` = ns 1 "kevin" "kevin"
     }
 |]
@@ -93,11 +87,9 @@ let mostStarred: ExploreProjectDto array = [|
         avatar_url = Some "https://picsum.photos/40/40?r=10"
         visibility = Some "public"
         star_count = 233
-        created_at = "2024-01-01T09:00:00Z"
-        updated_at = "2026-03-08T10:00:00Z"
-        last_activity_at = "2026-03-12T15:00:00Z"
+        created_at = System.DateTime(2024, 1, 15, 9, 0, 0) |> Some
+        last_activity_at = System.DateTime(2026, 3, 11, 14, 0, 0) |> Some
         tag_list = [| "ontology"; "plants" |]
-        license_name = Some "CC-BY-4.0"
         ``namespace`` = ns 100 "NFDI4Plants" "nfdi4plants"
     }
     {
@@ -110,11 +102,9 @@ let mostStarred: ExploreProjectDto array = [|
         avatar_url = Some "https://picsum.photos/40/40?r=11"
         visibility = Some "public"
         star_count = 190
-        created_at = "2024-02-01T09:00:00Z"
-        updated_at = "2026-03-09T10:00:00Z"
-        last_activity_at = "2026-03-12T14:00:00Z"
+        created_at = System.DateTime(2024, 5, 20, 9, 0, 0) |> Some
+        last_activity_at = System.DateTime(2026, 3, 9, 12, 0, 0) |> Some
         tag_list = [| "arc"; "specification" |]
-        license_name = Some "CC-BY-4.0"
         ``namespace`` = ns 100 "NFDI4Plants" "nfdi4plants"
     }
     {
@@ -127,11 +117,9 @@ let mostStarred: ExploreProjectDto array = [|
         avatar_url = Some "https://picsum.photos/40/40?r=12"
         visibility = Some "public"
         star_count = 99
-        created_at = "2025-01-01T09:00:00Z"
-        updated_at = "2026-03-04T10:00:00Z"
-        last_activity_at = "2026-03-10T14:00:00Z"
+        created_at = System.DateTime(2024, 8, 1, 9, 0, 0) |> Some
+        last_activity_at = System.DateTime(2026, 3, 5, 10, 0, 0) |> Some
         tag_list = [| "templates"; "arc" |]
-        license_name = Some "MIT"
         ``namespace`` = ns 101 "Plant Data" "plant-data"
     }
 |]
@@ -152,11 +140,9 @@ let orgRepos: Map<int, ExploreProjectDto array> =
                 avatar_url = None
                 visibility = Some "internal"
                 star_count = 27
-                created_at = "2025-06-11T09:00:00Z"
-                updated_at = "2026-03-01T10:00:00Z"
-                last_activity_at = "2026-03-07T10:00:00Z"
+                created_at = System.DateTime(2025, 9, 15, 9, 0, 0) |> Some
+                last_activity_at = System.DateTime(2026, 3, 1, 10, 0, 0) |> Some
                 tag_list = [| "modeling"; "growth" |]
-                license_name = Some "GPL-3.0"
                 ``namespace`` = ns 101 "Plant Data" "plant-data"
             }
         |]

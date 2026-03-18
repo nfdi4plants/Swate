@@ -6,142 +6,41 @@ open Swate.Components.Types.Actionbar
 
 open DataHubTypes
 open Swate.Components.Api.GitLabApi
+open Swate.Components.DataHubTypes
 
-type private ExploreTab =
-    | All
-    | YourRepos
-    | MostStarred
-    | YourOrganisations
+module private DataHubBrowserHelper =
 
-type private ExploreSortField =
-    | LastUpdated
-    | DateCreated
-    | Name
-    | Stars
+    let timeAgoUpdated (dt: System.DateTime option) =
+        match dt with
+        | Some dateTime ->
+            let span = System.DateTime.UtcNow - dateTime.ToUniversalTime()
 
-module private ExploreSortField =
-
-    let toProjectSortField =
-        function
-        | ExploreSortField.LastUpdated -> ProjectSortField.UpdatedAt
-        | ExploreSortField.DateCreated -> ProjectSortField.CreatedAt
-        | ExploreSortField.Name -> ProjectSortField.Name
-        | ExploreSortField.Stars -> ProjectSortField.StarCount
+            if span.TotalSeconds < 60.0 then
+                sprintf "Updated %d seconds ago" (int span.TotalSeconds)
+            elif span.TotalMinutes < 60.0 then
+                sprintf "Updated %d minutes ago" (int span.TotalMinutes)
+            elif span.TotalHours < 24.0 then
+                sprintf "Updated %d hours ago" (int span.TotalHours)
+            elif span.TotalDays < 30.0 then
+                sprintf "Updated %d days ago" (int span.TotalDays)
+            elif span.TotalDays < 365.0 then
+                sprintf "Updated %d months ago" (int (span.TotalDays / 30.0))
+            else
+                sprintf "Updated %d years ago" (int (span.TotalDays / 365.0))
+            |> Some
+        | None -> None
 
 [<Erase; Mangle(false)>]
 type DataHubBrowser =
 
     [<ReactComponent>]
-    static member ARCDetails(project: ARCProject, onSelectProject: ARCProject -> unit, ?isSelected: bool) =
-        Html.li [
-            prop.className "swt:list-row"
-            prop.key (string project.Id)
-            prop.children [
-                Html.div [
-                    Html.a [
-                        prop.testId ("ARCBrowserItem-" + string project.Id)
-                        prop.className [
-                            "swt:link swt:font-medium"
-                            if defaultArg isSelected false then
-                                "swt:text-primary"
-                        ]
-                        prop.onClick (fun _ -> onSelectProject project)
-                        prop.text project.Name
-                    ]
-                ]
-            ]
-        ]
-
-    [<ReactComponent>]
-    static member DataHubBrowser
-        (
-            browserMode: ARCBrowserMode,
-            onBrowserModeChange: ARCBrowserMode -> unit,
-            browserProjects: ARCProject[],
-            isLoadingBrowser: bool,
-            onSelectProject: ARCProject -> unit,
-            selectedProject: ARCProject option
-        ) =
-        Html.div [
-            prop.testId "ARCBrowserPanel"
-            prop.className "swt:flex swt:flex-col swt:gap-1"
-            prop.children [
-                DataHubComponents.DataHubComponents.SectionHeading("ARC Browser")
-                Html.div [
-                    prop.testId "ARCBrowserTabs"
-                    prop.role.tabList
-                    prop.className "swt:tabs swt:tabs-box swt:tabs-xs swt:w-full"
-                    prop.children [
-                        let modes = [
-                            ARCBrowserMode.YourARCs, "Your ARCs"
-                            ARCBrowserMode.Latest, "Latest"
-                            ARCBrowserMode.Featured, "Featured"
-                        ]
-
-                        for mode, label in modes do
-                            Html.div [
-                                prop.role.tab
-                                prop.testId ("ARCBrowserTab-" + label.Replace(" ", ""))
-                                prop.key label
-                                prop.className [
-                                    "swt:tab"
-                                    if browserMode = mode then
-                                        "swt:tab-active"
-                                ]
-                                prop.onClick (fun _ -> onBrowserModeChange mode)
-                                prop.text label
-                            ]
-                    ]
-                ]
-                if isLoadingBrowser then
-                    Html.div [
-                        prop.testId "ARCBrowserLoading"
-                        prop.className "swt:flex swt:items-center swt:gap-2 swt:py-2"
-                        prop.children [
-                            Html.span [
-                                prop.className "swt:loading swt:loading-spinner swt:loading-sm"
-                            ]
-                            Html.span [
-                                prop.className "swt:text-sm swt:text-base-content/70"
-                                prop.text "Loading ARCs..."
-                            ]
-                        ]
-                    ]
-                elif browserProjects.Length = 0 then
-                    Html.p [
-                        prop.testId "ARCBrowserEmpty"
-                        prop.className "swt:text-sm swt:text-base-content/60 swt:py-2"
-                        prop.text "No ARCs available."
-                    ]
-                else
-                    Html.ul [
-                        prop.className "swt:list swt:bg-base-100 swt:rounded-box swt:shadow-md"
-                        prop.children [
-                            for project in browserProjects do
-                                let isSelected =
-                                    selectedProject
-                                    |> Option.map (fun p -> p.Id = project.Id)
-                                    |> Option.defaultValue false
-
-                                DataHubBrowser.ARCDetails(project, onSelectProject, isSelected)
-                        ]
-                    ]
-            ]
-        ]
-
-    [<ReactComponent>]
     static member private RepoListRow
         (
             project: ExploreProjectDto,
-            isLocallyCloned: bool,
-            onClone: ExploreProjectDto -> unit,
-            ?onOpen: (ExploreProjectDto -> unit),
-            ?extraButtons: (ExploreProjectDto -> ReactElement list)
+            // onClone: ExploreProjectDto -> unit,
+            // ?onOpen: (ExploreProjectDto -> unit),
+            ?extraButtons: (ExploreProjectDto -> ReactElement)
         ) =
-        let owner =
-            project.path_with_namespace.Split('/')
-            |> Array.tryHead
-            |> Option.defaultValue project.``namespace``.name
 
         let visibility = project.visibility |> Option.defaultValue "public"
 
@@ -155,37 +54,42 @@ type DataHubBrowser =
             if System.String.IsNullOrWhiteSpace project.name then
                 "?"
             else
-                project.name.Substring(0, 1).ToUpperInvariant()
+                let c = System.Math.Min(3, project.name.Length)
+                project.name.Substring(0, c).ToUpperInvariant()
 
-        let actionButtons = [|
-            ButtonInfo.create (
-                "swt:fluent--arrow-download-24-regular swt:size-5",
-                "Clone repository",
-                (fun () -> onClone project)
-            )
-            match isLocallyCloned, onOpen with
-            | true, Some openFn ->
-                ButtonInfo.create (
-                    "swt:fluent--open-24-regular swt:size-5",
-                    "Open local repository",
-                    (fun () -> openFn project)
-                )
-            | _ -> ()
-        |]
+        let lastActivityString =
+            project.last_activity_at |> DataHubBrowserHelper.timeAgoUpdated
+
+        // let actionButtons = [|
+        //     ButtonInfo.create (
+        //         "swt:fluent--arrow-download-24-regular swt:size-5",
+        //         "Clone repository",
+        //         (fun () -> onClone project)
+        //     )
+        //     // match isLocallyCloned, onOpen with
+        //     // | true, Some openFn ->
+        //     //     ButtonInfo.create (
+        //     //         "swt:fluent--open-24-regular swt:size-5",
+        //     //         "Open local repository",
+        //     //         (fun () -> openFn project)
+        //     //     )
+        //     | _ -> ()
+        // |]
 
         Html.li [
             prop.testId ("GitLabRepoRow-" + string project.id)
             prop.className [
-                "swt:list-row swt:flex-col sm:swt:flex-row swt:items-start swt:gap-3"
-                if isLocallyCloned then
-                    "swt:bg-success/10 swt:border swt:border-success/30 swt:rounded"
+                "swt:list-row swt:flex-col sm:swt:flex-row"
+            // if isLocallyCloned then
+            //     "swt:bg-success/10 swt:border swt:border-success/30 swt:rounded"
             ]
             prop.children [
+                // Avatar
                 Html.div [
-                    prop.className "swt:avatar swt:self-start"
+                    prop.className "swt:avatar swt:self-start swt:min-w-16"
                     prop.children [
                         Html.div [
-                            prop.className "swt:w-10 swt:h-10 swt:rounded"
+                            prop.className "swt:w-16 swt:h-16 swt:rounded"
                             prop.children [
                                 match project.avatar_url with
                                 | Some avatarUrl when not (System.String.IsNullOrWhiteSpace avatarUrl) ->
@@ -193,99 +97,116 @@ type DataHubBrowser =
                                 | _ ->
                                     Html.div [
                                         prop.className
-                                            "swt:w-full swt:h-full swt:rounded swt:bg-base-300 swt:flex swt:items-center swt:justify-center swt:text-xs swt:font-semibold"
+                                            "swt:w-full swt:h-full swt:rounded swt:bg-base-300 swt:flex swt:items-center swt:justify-center swt:text-xl swt:font-semibold"
                                         prop.text avatarInitial
                                     ]
                             ]
                         ]
                     ]
                 ]
+                // Center ref
                 Html.div [
-                    prop.className "swt:flex-1 swt:min-w-0"
+                    prop.className "swt:flex swt:items-center swt:grow swt:min-w-0 swt:gap-2"
                     prop.children [
-                        Html.div [
-                            prop.className "swt:flex swt:items-center swt:gap-2"
-                            prop.children [
-                                Html.span [
-                                    prop.className "swt:text-xs swt:text-base-content/60"
-                                    prop.text owner
-                                ]
-                                Html.div [
-                                    prop.className "swt:tooltip swt:tooltip-top"
-                                    prop.ariaLabel visibilityLabel
-                                    prop.children [
-                                        Html.div [
-                                            prop.className "swt:tooltip-content"
-                                            prop.text visibilityLabel
-                                        ]
-                                        Html.i [ prop.className [ "swt:iconify"; visibilityIcon ] ]
-                                    ]
-                                ]
-                                if isLocallyCloned then
-                                    Html.span [
-                                        prop.className "swt:badge swt:badge-success swt:badge-xs"
-                                        prop.text "cloned"
-                                    ]
-                            ]
-                        ]
                         Html.a [
                             prop.href project.web_url
-                            prop.target "_blank"
+                            prop.target.blank
                             prop.rel "noopener noreferrer"
-                            prop.className "swt:link swt:link-primary swt:font-semibold swt:block swt:truncate"
-                            prop.text project.name
-                        ]
-                        Html.p [
-                            prop.className "swt:text-xs swt:text-base-content/70"
-                            prop.text (project.description |> Option.defaultValue "No description")
-                        ]
-                        Html.div [
-                            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1 swt:pt-1"
+                            prop.className "swt:link swt:link-hover swt:text-base-content/70 swt:block swt:truncate"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:badge swt:badge-outline swt:badge-xs"
-                                    prop.text ("stars " + string project.star_count)
+                                    prop.className "swt:max-md:hidden"
+                                    prop.text (project.``namespace``.name + " / ")
                                 ]
                                 Html.span [
-                                    prop.className "swt:text-xs swt:text-base-content/60"
-                                    prop.text ("updated " + project.updated_at)
+                                    prop.className "swt:text-base-content swt:font-semibold"
+                                    prop.text project.name
                                 ]
-                                match project.license_name with
-                                | Some licenseName when not (System.String.IsNullOrWhiteSpace licenseName) ->
-                                    Html.span [
-                                        prop.className "swt:badge swt:badge-ghost swt:badge-xs"
-                                        prop.text ("license " + licenseName)
-                                    ]
-                                | _ -> Html.none
-                                for tag in project.tag_list |> Array.truncate 3 do
-                                    Html.span [
-                                        prop.className "swt:badge swt:badge-ghost swt:badge-xs"
-                                        prop.text ("tag " + tag)
-                                    ]
                             ]
                         ]
-                        match extraButtons with
-                        | Some render ->
+                        Html.div [
+                            prop.className "swt:tooltip swt:tooltip-top swt:size-4"
+                            prop.ariaLabel visibilityLabel
+                            prop.children [
+                                Html.div [
+                                    prop.className "swt:tooltip-content"
+                                    prop.text visibilityLabel
+                                ]
+                                Html.i [ prop.className [ "swt:iconify"; visibilityIcon ] ]
+                            ]
+                        ]
+                    ]
+                ]
+                if project.description.IsSome then
+                    Html.div [
+                        prop.className "swt:list-col-wrap swt:gap-1 swt:flex swt:flex-col"
+                        prop.children [
                             Html.div [
-                                prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:pt-1"
-                                prop.children (render project)
+                                prop.className
+                                    "swt:text-xs swt:text-base-content/70 swt:max-sm:hidden swt:max-md:line-clamp-3"
+                                prop.text project.description.Value
+                            ]
+                            Html.div [
+                                prop.className "swt:flex swt:gap-1 swt:flex-wrap swt:flex-row"
+                                prop.children [
+                                    for tag in project.tag_list |> Array.truncate 3 do
+                                        Html.span [
+                                            prop.className "swt:badge swt:badge-neutral swt:badge-xs"
+                                            prop.text tag
+                                        ]
+                                ]
+                            ]
+                        ]
+                    ]
+                Html.div [
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:flex swt:items-center swt:justify-end swt:gap-1"
+                            prop.children [
+                                Html.span [ prop.className "swt:iconify swt:fluent--star-12-regular" ]
+                                Html.span [
+                                    prop.className "swt:text-xs swt:text-base-content/70"
+                                    prop.text (string project.star_count)
+                                ]
+                            ]
+                        ]
+                        match lastActivityString with
+                        | Some _ ->
+                            Html.div [
+                                prop.className "swt:text-xs swt:text-base-content/60 swt:text-right"
+                                prop.text (lastActivityString.Value)
                             ]
                         | None -> Html.none
                     ]
                 ]
-                Html.div [
-                    prop.className "swt:self-end sm:swt:self-center"
-                    prop.children [ Actionbar.Main(actionButtons, 2) ]
-                ]
+                match extraButtons with
+                | Some render -> render project
+                | None -> Html.none
             ]
         ]
 
     [<ReactComponent>]
-    static member private Filter(onSearchSubmit, tab, groups: GroupDto array, isAuthenticated: bool) =
-        let searchTerm, setSearchTerm = React.useState ""
-        let sortField, setSortField = React.useState ExploreSortField.LastUpdated
-        let sortDirection, setSortDirection = React.useState SortDirection.Desc
-        let selectedGroupId, setSelectedGroupId = React.useState (None: int option)
+    static member private Filter
+        (
+            tab: ExploreTab,
+            isAuthenticated: bool,
+            searchTerm: string,
+            setSearchTerm: string -> unit,
+            onSearchSubmit: unit -> unit,
+            sortField: ExploreSortField,
+            setSortField: ExploreSortField -> unit,
+            sortDirection: SortDirection,
+            setSortDirection: SortDirection -> unit,
+            groups: GroupDto array,
+            selectedGroupId: int option,
+            setSelectedGroupId: int option -> unit,
+            groupsLoadError: string option
+        ) =
+
+        let sortLabel =
+            match sortDirection with
+            | SortDirection.Asc -> "Sort ascending"
+            | SortDirection.Desc -> "Sort descending"
 
         Html.div [
             prop.className
@@ -316,7 +237,8 @@ type DataHubBrowser =
                         prop.children [
                             Html.select [
                                 prop.testId "GitLabExploreSortFieldSelect"
-                                prop.className "swt:select swt:select-sm swt:btn swt:join-item swt:max-sm:w-full"
+                                prop.className
+                                    "swt:select swt:select-sm swt:btn swt:join-item swt:max-sm:w-full swt:*:min-w-max"
                                 prop.value (
                                     match sortField with
                                     | ExploreSortField.LastUpdated -> "last-updated"
@@ -346,11 +268,8 @@ type DataHubBrowser =
                                 prop.testId "GitLabExploreSortDirectionButton"
                                 prop.className
                                     "swt:btn swt:btn-sm swt:btn-outline swt:join-item swt:bg-base-100 swt:border-base-content/30!"
-                                prop.ariaLabel (
-                                    match sortDirection with
-                                    | SortDirection.Asc -> "Sort ascending"
-                                    | SortDirection.Desc -> "Sort descending"
-                                )
+                                prop.ariaLabel sortLabel
+                                prop.title sortLabel
                                 prop.onClick (fun _ ->
                                     let nextDirection =
                                         match sortDirection with
@@ -364,15 +283,16 @@ type DataHubBrowser =
                                         prop.className [
                                             "swt:iconify"
                                             match sortDirection with
-                                            | SortDirection.Asc -> "swt:fluent--arrow-sort-up-24-regular swt:size-4"
-                                            | SortDirection.Desc -> "swt:fluent--arrow-sort-down-24-regular swt:size-4"
+                                            | SortDirection.Asc ->
+                                                "swt:fluent--arrow-sort-up-lines-16-regular swt:size-4"
+                                            | SortDirection.Desc ->
+                                                "swt:fluent--arrow-sort-down-lines-16-regular swt:size-4"
                                         ]
                                     ]
                                 ]
                             ]
                         ]
                     ]
-                // TODO: reenable
                 if tab = ExploreTab.YourOrganisations then
                     Html.select [
                         prop.testId "GitLabExploreOrganisationSelect"
@@ -480,35 +400,87 @@ type DataHubBrowser =
 
 
     [<ReactComponent>]
-    static member ExplorePanel
+    static member private ExplorePanel
         (
-            tab: ExploreTab,
-            setTab: ExploreTab -> unit,
-            isAuthenticated: bool,
-            searchTerm: string,
-            setSearchTerm: string -> unit,
-            onSearchSubmit: unit -> unit,
-            sortField: ExploreSortField,
-            setSortField: ExploreSortField -> unit,
-            sortDirection: SortDirection,
-            setSortDirection: SortDirection -> unit,
-            groups: GroupDto array,
-            groupsLoaded: bool,
-            groupsLoadError: string option,
-            selectedGroupId: int option,
-            setSelectedGroupId: int option -> unit,
-            repos: ExploreProjectDto array,
-            isLoading: bool,
-            error: string option,
-            pagination: PaginationMetadata option,
-            onPageChange: int -> unit,
-            isLocallyCloned: ExploreProjectDto -> bool,
-            onClone: ExploreProjectDto -> unit,
+            user: CurrentUserDto option,
+            loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult, string>>,
+            reloadTrigger: int,
             ?onOpen: (ExploreProjectDto -> unit),
-            ?extraButtons: (ExploreProjectDto -> ReactElement list)
+            ?projectTrailingElements: (ExploreProjectDto -> ReactElement)
         ) =
 
         let tab, setTab = React.useState ExploreTab.All
+        let searchTerm, setSearchTerm = React.useState ""
+        let submittedSearchTerm, setSubmittedSearchTerm = React.useState ""
+        let sortField, setSortField = React.useState ExploreSortField.LastUpdated
+        let sortDirection, setSortDirection = React.useState SortDirection.Desc
+        let selectedGroupId, setSelectedGroupId = React.useState (None: int option)
+        let groups, setGroups = React.useState [||]
+        let groupsLoaded, setGroupsLoaded = React.useState false
+        let groupsLoadError, setGroupsLoadError = React.useState (None: string option)
+        let repos, setRepos = React.useState [||]
+        let page, setPage = React.useState 1
+        let pageSize = 20
+        let isLoading, setIsLoading = React.useState false
+        let error, setError = React.useState (None: string option)
+        let pagination, setPagination = React.useState (None: PaginationMetadata option)
+
+        let isAuthenticated = user.IsSome
+
+        let onSearchSubmit () =
+            setSubmittedSearchTerm searchTerm
+            setPage 1
+
+        React.useEffect (
+            (fun () ->
+                promise {
+                    setIsLoading true
+                    setError None
+
+                    let request = {
+                        Target = tab
+                        SearchTerm = submittedSearchTerm
+                        Page = page
+                        PerPage = pageSize
+                        SortField = sortField
+                        SortDirection = sortDirection
+                        SelectedGroupId = selectedGroupId
+                        IsAuthenticated = isAuthenticated
+                        User = user
+                    }
+
+                    let! result = loadRepos request
+
+                    match result with
+                    | Ok loaded ->
+                        setRepos loaded.Repos
+                        setPagination loaded.Pagination
+                        setGroups loaded.Groups
+                        setGroupsLoaded loaded.GroupsLoaded
+                        setGroupsLoadError loaded.GroupsLoadError
+
+                        if selectedGroupId.IsNone && loaded.Groups.Length > 0 then
+                            setSelectedGroupId (Some loaded.Groups[0].id)
+                    | Error err ->
+                        setError (Some err)
+                        setRepos [||]
+                        setPagination None
+
+                    setIsLoading false
+                }
+                |> Promise.start
+            ),
+            [|
+                box tab
+                box page
+                box submittedSearchTerm
+                box selectedGroupId
+                box sortField
+                box sortDirection
+                box isAuthenticated
+                box reloadTrigger
+            |]
+        )
 
         Html.div [
             prop.testId "GitLabExplorePanel"
@@ -516,9 +488,42 @@ type DataHubBrowser =
             prop.children [
                 DataHubComponents.DataHubComponents.SectionHeading("GitLab Explore")
                 // tabs
-                DataHubBrowser.Tabs(tab, setTab, isAuthenticated)
+                DataHubBrowser.Tabs(
+                    tab,
+                    (fun next ->
+                        setTab next
+                        setPage 1
+                    ),
+                    isAuthenticated
+                )
                 // filter
-                DataHubBrowser.Filter(onSearchSubmit, tab, groups, isAuthenticated)
+                DataHubBrowser.Filter(
+                    tab,
+                    isAuthenticated,
+                    searchTerm,
+                    (fun term ->
+                        setSearchTerm term
+                        setPage 1
+                    ),
+                    onSearchSubmit,
+                    sortField,
+                    (fun next ->
+                        setSortField next
+                        setPage 1
+                    ),
+                    sortDirection,
+                    (fun next ->
+                        setSortDirection next
+                        setPage 1
+                    ),
+                    groups,
+                    selectedGroupId,
+                    (fun gid ->
+                        setSelectedGroupId gid
+                        setPage 1
+                    ),
+                    groupsLoadError
+                )
                 if isLoading then
                     Html.div [
                         prop.testId "GitLabExploreLoading"
@@ -573,40 +578,23 @@ type DataHubBrowser =
                         prop.className "swt:list swt:bg-base-100 swt:rounded-box swt:shadow-md"
                         prop.children [
                             for repo in repos do
-                                DataHubBrowser.RepoListRow(
-                                    repo,
-                                    isLocallyCloned repo,
-                                    onClone,
-                                    ?onOpen = onOpen,
-                                    ?extraButtons = extraButtons
-                                )
+                                DataHubBrowser.RepoListRow(repo, ?extraButtons = projectTrailingElements)
                         ]
                     ]
 
                 // Pagination
-                DataHubBrowser.Pagination(pagination, onPageChange)
+                DataHubBrowser.Pagination(pagination, setPage)
             ]
         ]
 
     [<ReactComponent>]
     static member Entry() =
-        let tab, setTab = React.useState ExploreTab.All
         let isAuthenticated = false
-        let searchTerm, setSearchTerm = React.useState ""
-        let submittedSearchTerm, setSubmittedSearchTerm = React.useState ""
-        let sortField, setSortField = React.useState ExploreSortField.LastUpdated
-        let sortDirection, setSortDirection = React.useState SortDirection.Desc
-        let selectedGroupId, setSelectedGroupId = React.useState (Some 100)
-        let repos, setRepos = React.useState [||]
-        let page, setPage = React.useState 1
-        let pageSize = 2
-        let isLoading, setIsLoading = React.useState false
-        let error, setError = React.useState (None: string option)
-        let pagination, setPagination = React.useState (None: PaginationMetadata option)
+        let reloadTrigger = 0
 
         let isLocallyCloned (p: ExploreProjectDto) = p.id % 2 = 0
 
-        let paginate (items: ExploreProjectDto array) (page: int) =
+        let paginate (items: ExploreProjectDto array) (page: int) (pageSize: int) =
             let totalPages =
                 let f = float items.Length / float pageSize
                 let ceilV = System.Math.Ceiling f |> int
@@ -633,10 +621,10 @@ type DataHubBrowser =
         let containsCi (text: string) (query: string) =
             text.ToLowerInvariant().Contains(query.ToLowerInvariant())
 
-        let sortRepos (items: ExploreProjectDto array) =
+        let sortRepos (sortField: ExploreSortField) (sortDirection: SortDirection) (items: ExploreProjectDto array) =
             let sorted =
                 match sortField with
-                | ExploreSortField.LastUpdated -> items |> Array.sortBy (fun p -> p.updated_at)
+                | ExploreSortField.LastUpdated -> items |> Array.sortBy (fun p -> p.last_activity_at)
                 | ExploreSortField.DateCreated -> items |> Array.sortBy (fun p -> p.created_at)
                 | ExploreSortField.Name -> items |> Array.sortBy (fun p -> p.name.ToLowerInvariant())
                 | ExploreSortField.Stars -> items |> Array.sortBy (fun p -> p.star_count)
@@ -657,106 +645,58 @@ type DataHubBrowser =
         let isPublicRepo (project: ExploreProjectDto) =
             not (project.path_with_namespace.Contains("/private/"))
 
-        let load () =
-            promise {
-                setIsLoading true
-                setError None
-                do! Promise.sleep 250
+        let loadRepos (request: ExploreLoadRequest) = promise {
+            do! Promise.sleep 250
 
-                let source =
-                    match tab with
-                    | ExploreTab.All ->
-                        if isAuthenticated then
-                            allRepos
-                        else
-                            allRepos |> Array.filter isPublicRepo
-                    | ExploreTab.YourRepos -> MockData.DataHub.yourRepos
-                    | ExploreTab.MostStarred -> MockData.DataHub.mostStarred
-                    | ExploreTab.YourOrganisations ->
-                        match selectedGroupId with
-                        | Some gid -> MockData.DataHub.orgRepos |> Map.tryFind gid |> Option.defaultValue [||]
-                        | None -> [||]
+            let source =
+                match request.Target with
+                | ExploreTab.All ->
+                    if request.IsAuthenticated then
+                        allRepos
+                    else
+                        allRepos |> Array.filter isPublicRepo
+                | ExploreTab.YourRepos -> MockData.DataHub.yourRepos
+                | ExploreTab.MostStarred -> MockData.DataHub.mostStarred
+                | ExploreTab.YourOrganisations ->
+                    match request.SelectedGroupId with
+                    | Some gid -> MockData.DataHub.orgRepos |> Map.tryFind gid |> Option.defaultValue [||]
+                    | None -> [||]
 
-                let filtered =
-                    source
-                    |> Array.filter (fun p ->
-                        System.String.IsNullOrWhiteSpace submittedSearchTerm
-                        || containsCi p.name submittedSearchTerm
-                        || containsCi p.path_with_namespace submittedSearchTerm
-                        || containsCi (p.description |> Option.defaultValue "") submittedSearchTerm
-                    )
-                    |> (fun items ->
-                        if tab = ExploreTab.MostStarred then
-                            items |> Array.sortByDescending (fun p -> p.star_count)
-                        else
-                            sortRepos items
-                    )
+            let filtered =
+                source
+                |> Array.filter (fun p ->
+                    System.String.IsNullOrWhiteSpace request.SearchTerm
+                    || containsCi p.name request.SearchTerm
+                    || containsCi p.path_with_namespace request.SearchTerm
+                    || containsCi (p.description |> Option.defaultValue "") request.SearchTerm
+                )
+                |> (fun items ->
+                    if request.Target = ExploreTab.MostStarred then
+                        items |> Array.sortByDescending (fun p -> p.star_count)
+                    else
+                        sortRepos request.SortField request.SortDirection items
+                )
 
-                let pageItems, pageMeta = paginate filtered page
-                setRepos pageItems
-                setPagination (Some pageMeta)
-                setIsLoading false
-            }
-            |> Promise.start
+            let pageItems, pageMeta = paginate filtered request.Page request.PerPage
 
-        React.useEffect (
-            (fun () -> load ()),
-            [|
-                box tab
-                box page
-                box submittedSearchTerm
-                box selectedGroupId
-                box sortField
-                box sortDirection
-            |]
-        )
+            return
+                Ok {
+                    Repos = pageItems
+                    Pagination = Some pageMeta
+                    Groups = MockData.DataHub.groups
+                    GroupsLoaded = true
+                    GroupsLoadError = None
+                }
+        }
 
         DataHubBrowser.ExplorePanel(
-            tab,
-            (fun next ->
-                setTab next
-                setPage 1
-            ),
-            isAuthenticated,
-            searchTerm,
-            (fun term ->
-                setSearchTerm term
-                setPage 1
-            ),
-            (fun () ->
-                setSubmittedSearchTerm searchTerm
-                setPage 1
-            ),
-            sortField,
-            (fun next ->
-                setSortField next
-                setPage 1
-            ),
-            sortDirection,
-            (fun next ->
-                setSortDirection next
-                setPage 1
-            ),
-            MockData.DataHub.groups,
-            true,
             None,
-            selectedGroupId,
-            (fun gid ->
-                setSelectedGroupId gid
-                setPage 1
-            ),
-            repos,
-            isLoading,
-            error,
-            pagination,
-            setPage,
-            isLocallyCloned,
-            (fun p -> Browser.Dom.console.log ($"clone {p.path_with_namespace}")),
-            onOpen = (fun p -> Browser.Dom.console.log ($"open {p.path_with_namespace}")),
-            extraButtons =
+            loadRepos,
+            reloadTrigger,
+            projectTrailingElements =
                 (fun p ->
                     if p.star_count > 100 then
-                        [
+                        React.Fragment [
                             Html.button [
                                 prop.testId ("GitLabRepoStarredBadgeButton-" + string p.id)
                                 prop.className "swt:btn swt:btn-xs swt:btn-warning"
@@ -764,32 +704,52 @@ type DataHubBrowser =
                             ]
                         ]
                     else
-                        []
+                        React.Fragment []
                 )
         )
 
     [<ReactComponent>]
-    static member GitLabEntry(?user: CurrentUserDto) =
-        let user, setUser = React.useState (user)
+    static member GitLabEntry() =
+        let currentUser, setCurrentUser = React.useState None
         let baseUrl, setBaseUrl = React.useState "https://git.nfdi4plants.org"
         let pat, setPat = React.useState "UfCieq6HDu32MFUDkfOMem86MQp1OmY0CA.01.0y00qka22"
-        let tab, setTab = React.useState ExploreTab.All
-        let submittedSearchTerm, setSubmittedSearchTerm = React.useState ""
-        // let searchTerm, setSearchTerm = React.useState ""
-        // let sortField, setSortField = React.useState ExploreSortField.LastUpdated
-        // let sortDirection, setSortDirection = React.useState SortDirection.Desc
-        let groups, setGroups = React.useState [||]
-        // let selectedGroupId, setSelectedGroupId = React.useState (None: int option)
-        let repos, setRepos = React.useState [||]
-        let page, setPage = React.useState 1
-        let isLoading, setIsLoading = React.useState false
-        let error, setError = React.useState (None: string option)
-        let pagination, setPagination = React.useState (None: PaginationMetadata option)
-        let groupsLoaded, setGroupsLoaded = React.useState false
-        let groupsLoadError, setGroupsLoadError = React.useState (None: string option)
+        let reloadTrigger, setReloadTrigger = React.useState 0
 
-        let isAuthenticated = true
         let isConnected = not (System.String.IsNullOrWhiteSpace baseUrl)
+
+        let emptyResponse (page: int) (perPage: int) : PagedResponse<ExploreProjectDto> = {
+            Items = [||]
+            Pagination = {
+                Link = None
+                NextPage = None
+                Page = Some page
+                PerPage = Some perPage
+                PrevPage = None
+                Total = Some 0
+                TotalPages = Some 1
+                NextCursor = None
+                PrevCursor = None
+            }
+        }
+
+        let login =
+            fun (pat: string) -> promise {
+                let! userResponse = GitLabApi.GetCurrentUser(baseUrl, pat)
+
+                match userResponse with
+                | Ok user -> setCurrentUser (Some user)
+                | Error err ->
+                    Browser.Dom.console.error (
+                        "Failed to get current user: "
+                        + (
+                            match err with
+                            | GitLabError.DecodeError ex -> ex.Message
+                            | _ -> ""
+                        )
+                    )
+
+                    setCurrentUser None
+            }
 
         let gitLabErrorToString =
             function
@@ -801,180 +761,126 @@ type DataHubBrowser =
             | GitLabError.DecodeError ex -> $"Failed to decode GitLab response: {ex.Message}"
             | GitLabError.InvalidRequest message -> message
 
-        let loadGroupsIfNeeded () = promise {
-            if groups.Length = 0 && isConnected && isAuthenticated then
-                setGroupsLoadError None
-                let! groupsResult = GitLabApi.ListGroupsForCurrentUser(baseUrl, pat, page = 1, perPage = 100)
+        let loadRepos (request: ExploreLoadRequest) = promise {
+            if not isConnected then
+                return Ok ExploreLoadResult.empty
+            else
+                let visibility = if request.IsAuthenticated then None else Some "public"
 
-                match groupsResult with
-                | Ok g ->
-                    setGroups g.Items
-                    setGroupsLoaded true
-                    setGroupsLoadError None
+                let requestPat = if request.IsAuthenticated then pat else ""
 
-                    if selectedGroupId.IsNone && g.Items.Length > 0 then
-                        setSelectedGroupId (Some g.Items[0].id)
-                | Error _ ->
-                    setGroupsLoaded true
-                    setGroupsLoadError (Some "Failed to load groups")
-        }
+                let orderBy =
+                    if request.Target = ExploreTab.MostStarred then
+                        ProjectSortField.StarCount
+                    else
+                        ExploreSortField.toProjectSortField request.SortField
 
-        let load () =
-            promise {
-                if not isConnected then
-                    setRepos [||]
-                    setPagination None
-                    return ()
-                else
-                    setIsLoading true
-                    setError None
+                let sort =
+                    if request.Target = ExploreTab.MostStarred then
+                        SortDirection.Desc
+                    else
+                        request.SortDirection
 
-                    let visibility = if isAuthenticated then None else Some "public"
+                let! groupsResult =
+                    if request.Target = ExploreTab.YourOrganisations && request.IsAuthenticated then
+                        GitLabApi.ListGroupsForCurrentUser(baseUrl, pat, page = 1, perPage = 100)
+                    else
+                        promise {
+                            return
+                                Ok {
+                                    Items = [||]
+                                    Pagination = {
+                                        Link = None
+                                        NextPage = None
+                                        Page = Some 1
+                                        PerPage = Some 100
+                                        PrevPage = None
+                                        Total = Some 0
+                                        TotalPages = Some 1
+                                        NextCursor = None
+                                        PrevCursor = None
+                                    }
+                                }
+                        }
 
-                    let requestPat = if isAuthenticated then pat else ""
+                let groups, groupsLoaded, groupsLoadError =
+                    match groupsResult with
+                    | Ok g -> g.Items, (request.Target <> ExploreTab.YourOrganisations) || request.IsAuthenticated, None
+                    | Error _ -> [||], true, Some "Failed to load groups"
 
-                    let orderBy =
-                        if tab = ExploreTab.MostStarred then
-                            ProjectSortField.StarCount
-                        else
-                            ExploreSortField.toProjectSortField sortField
+                let selectedGroupId =
+                    match request.SelectedGroupId with
+                    | Some gid -> Some gid
+                    | None when groups.Length > 0 -> Some groups[0].id
+                    | None -> None
 
-                    let sort =
-                        if tab = ExploreTab.MostStarred then
-                            SortDirection.Desc
-                        else
-                            sortDirection
-
-                    if tab = ExploreTab.YourOrganisations then
-                        do! loadGroupsIfNeeded ()
-
-                    let! result =
-                        match tab with
-                        | ExploreTab.All ->
-                            GitLabApi.ListProjects(
+                let! result =
+                    match request.Target with
+                    | ExploreTab.All ->
+                        GitLabApi.ListProjects(
+                            baseUrl,
+                            requestPat,
+                            page = request.Page,
+                            perPage = request.PerPage,
+                            search = request.SearchTerm,
+                            orderBy = orderBy,
+                            sort = sort,
+                            ?visibility = visibility
+                        )
+                    | ExploreTab.YourRepos ->
+                        if request.IsAuthenticated then
+                            GitLabApi.ListUserPersonalProjects(
                                 baseUrl,
-                                requestPat,
-                                page = page,
-                                perPage = 20,
-                                search = submittedSearchTerm,
+                                pat,
+                                page = request.Page,
+                                perPage = request.PerPage,
+                                search = request.SearchTerm,
                                 orderBy = orderBy,
-                                sort = sort,
-                                ?visibility = visibility
+                                sort = sort
                             )
-                        | ExploreTab.YourRepos ->
-                            if isAuthenticated then
-                                GitLabApi.ListUserPersonalProjects(
+                        else
+                            promise { return Ok(emptyResponse request.Page request.PerPage) }
+                    | ExploreTab.MostStarred ->
+                        GitLabApi.ListExploreMostStarred(
+                            baseUrl,
+                            requestPat,
+                            page = request.Page,
+                            perPage = request.PerPage,
+                            search = request.SearchTerm,
+                            ?visibility = visibility
+                        )
+                    | ExploreTab.YourOrganisations ->
+                        if request.IsAuthenticated then
+                            match selectedGroupId with
+                            | Some gid ->
+                                GitLabApi.ListGroupProjects(
                                     baseUrl,
                                     pat,
-                                    page = page,
-                                    perPage = 20,
-                                    search = submittedSearchTerm,
+                                    gid,
+                                    page = request.Page,
+                                    perPage = request.PerPage,
+                                    includeSubgroups = true,
+                                    withShared = true,
+                                    search = request.SearchTerm,
                                     orderBy = orderBy,
                                     sort = sort
                                 )
-                            else
-                                promise {
-                                    return
-                                        Ok {
-                                            Items = [||]
-                                            Pagination = {
-                                                Link = None
-                                                NextPage = None
-                                                Page = Some 1
-                                                PerPage = Some 20
-                                                PrevPage = None
-                                                Total = Some 0
-                                                TotalPages = Some 1
-                                                NextCursor = None
-                                                PrevCursor = None
-                                            }
-                                        }
-                                }
-                        | ExploreTab.MostStarred ->
-                            GitLabApi.ListExploreMostStarred(
-                                baseUrl,
-                                requestPat,
-                                page = page,
-                                perPage = 20,
-                                search = submittedSearchTerm,
-                                ?visibility = visibility
-                            )
-                        | ExploreTab.YourOrganisations ->
-                            if isAuthenticated then
-                                match selectedGroupId with
-                                | Some gid ->
-                                    GitLabApi.ListGroupProjects(
-                                        baseUrl,
-                                        pat,
-                                        gid,
-                                        page = page,
-                                        perPage = 20,
-                                        includeSubgroups = true,
-                                        withShared = true,
-                                        search = submittedSearchTerm,
-                                        orderBy = orderBy,
-                                        sort = sort
-                                    )
-                                | None -> promise {
-                                    return
-                                        Ok {
-                                            Items = [||]
-                                            Pagination = {
-                                                Link = None
-                                                NextPage = None
-                                                Page = Some 1
-                                                PerPage = Some 20
-                                                PrevPage = None
-                                                Total = Some 0
-                                                TotalPages = Some 1
-                                                NextCursor = None
-                                                PrevCursor = None
-                                            }
-                                        }
-                                  }
-                            else
-                                promise {
-                                    return
-                                        Ok {
-                                            Items = [||]
-                                            Pagination = {
-                                                Link = None
-                                                NextPage = None
-                                                Page = Some 1
-                                                PerPage = Some 20
-                                                PrevPage = None
-                                                Total = Some 0
-                                                TotalPages = Some 1
-                                                NextCursor = None
-                                                PrevCursor = None
-                                            }
-                                        }
-                                }
+                            | None -> promise { return Ok(emptyResponse request.Page request.PerPage) }
+                        else
+                            promise { return Ok(emptyResponse request.Page request.PerPage) }
 
-                    match result with
-                    | Ok okResult ->
-                        setRepos okResult.Items
-                        setPagination (Some okResult.Pagination)
-                    | Error err ->
-                        setError (Some(gitLabErrorToString err))
-                        setRepos [||]
-
-                    setIsLoading false
-            }
-            |> Promise.start
-
-        React.useEffect (
-            (fun () -> load ()),
-            [|
-                box tab
-                box page
-                box submittedSearchTerm
-                box selectedGroupId
-                box sortField
-                box sortDirection
-                box isAuthenticated
-            |]
-        )
+                match result with
+                | Ok okResult ->
+                    return
+                        Ok {
+                            Repos = okResult.Items
+                            Pagination = Some okResult.Pagination
+                            Groups = groups
+                            GroupsLoaded = groupsLoaded
+                            GroupsLoadError = groupsLoadError
+                        }
+                | Error err -> return Error(gitLabErrorToString err)
+        }
 
         Html.div [
             prop.testId "GitLabEntryPanel"
@@ -990,24 +896,31 @@ type DataHubBrowser =
                             prop.value baseUrl
                             prop.onChange setBaseUrl
                         ]
-                        Html.input [
-                            prop.type'.password
-                            prop.testId "GitLabEntryPatInput"
-                            prop.className "swt:input swt:input-sm swt:w-full"
-                            prop.placeholder "Personal Access Token"
-                            prop.value pat
-                            prop.onChange setPat
+                        Html.div [
+                            prop.className "swt:join swt:w-full"
+                            prop.children [
+                                Html.input [
+                                    prop.type'.password
+                                    prop.testId "GitLabEntryPatInput"
+                                    prop.className "swt:input swt:input-sm swt:w-full swt:join-item"
+                                    prop.placeholder "Personal Access Token"
+                                    prop.value pat
+                                    prop.onChange setPat
+                                ]
+                                Html.button [
+                                    prop.className "swt:btn swt:btn-sm swt:join-item"
+                                    prop.text "Login"
+                                    prop.disabled (not isConnected || System.String.IsNullOrWhiteSpace pat)
+                                    prop.onClick (fun _ -> login pat |> Promise.start)
+                                ]
+                            ]
                         ]
                         Html.button [
                             prop.testId "GitLabEntryLoadButton"
                             prop.className "swt:btn swt:btn-sm swt:btn-primary"
-                            prop.text "Load"
+                            prop.text "Reload Repos"
                             prop.disabled (not isConnected)
-                            prop.onClick (fun _ ->
-                                setPage 1
-                                setSubmittedSearchTerm searchTerm
-                                load ()
-                            )
+                            prop.onClick (fun _ -> setReloadTrigger (reloadTrigger + 1))
                         ]
                         Html.button [
                             prop.text "Test"
@@ -1023,47 +936,33 @@ type DataHubBrowser =
                         ]
                     ]
                 ]
+
+                let ExampleProjectTrailingElements (project: ExploreProjectDto) =
+                    Actionbar.Main(
+                        [|
+                            ButtonInfo.create (
+                                "swt:iconify swt:fluent--arrow-download-16-filled",
+                                "Download",
+                                fun _ -> Browser.Dom.window.alert ("Download " + project.name)
+                            )
+                            ButtonInfo.create (
+                                "swt:iconify swt:fluent--star-16-regular",
+                                "Star",
+                                fun _ -> Browser.Dom.window.alert ("Star " + project.name)
+                            )
+                        |],
+                        1,
+                        barClassName =
+                            "swt:w-fit swt:h-fit swt:flex swt:flex-col swt:bg-base-300 swt:rounded-lg swt:shadow-sm",
+                        tooltipPosition = DaisyuiTooltipPosition.Left,
+                        buttonSize = DaisyUISize.SM
+                    )
+
                 DataHubBrowser.ExplorePanel(
-                    tab,
-                    (fun next ->
-                        setTab next
-                        setPage 1
-                    ),
-                    isAuthenticated,
-                    searchTerm,
-                    (fun term ->
-                        setSearchTerm term
-                        setPage 1
-                    ),
-                    (fun () ->
-                        setSubmittedSearchTerm searchTerm
-                        setPage 1
-                    ),
-                    sortField,
-                    (fun next ->
-                        setSortField next
-                        setPage 1
-                    ),
-                    sortDirection,
-                    (fun next ->
-                        setSortDirection next
-                        setPage 1
-                    ),
-                    groups,
-                    groupsLoaded,
-                    groupsLoadError,
-                    selectedGroupId,
-                    (fun gid ->
-                        setSelectedGroupId gid
-                        setPage 1
-                    ),
-                    repos,
-                    isLoading,
-                    error,
-                    pagination,
-                    setPage,
-                    (fun _ -> false),
-                    (fun p -> Browser.Dom.console.log ($"clone {p.path_with_namespace}"))
+                    currentUser,
+                    loadRepos,
+                    reloadTrigger,
+                    projectTrailingElements = ExampleProjectTrailingElements
                 )
             ]
         ]

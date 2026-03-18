@@ -1,16 +1,58 @@
 module Swate.Components.DataHubTypes
 
 open Fable.Core
+open Swate.Components.Api.GitLabApi
 
-/// Represents a single ARC project as returned by the DataHub.
-type ARCProject = {
-    Id: int
-    Name: string
-    Description: string option
-    WebUrl: string
-    LastActivity: string option
-    ImageUrl: string option
+type ExploreTab =
+    | All
+    | YourRepos
+    | MostStarred
+    | YourOrganisations
+
+type ExploreSortField =
+    | LastUpdated
+    | DateCreated
+    | Name
+    | Stars
+
+module ExploreSortField =
+
+    let toProjectSortField =
+        function
+        | ExploreSortField.LastUpdated -> ProjectSortField.UpdatedAt
+        | ExploreSortField.DateCreated -> ProjectSortField.CreatedAt
+        | ExploreSortField.Name -> ProjectSortField.Name
+        | ExploreSortField.Stars -> ProjectSortField.StarCount
+
+type ExploreLoadRequest = {
+    Target: ExploreTab
+    SearchTerm: string
+    Page: int
+    PerPage: int
+    SortField: ExploreSortField
+    SortDirection: SortDirection
+    SelectedGroupId: int option
+    IsAuthenticated: bool
+    User: CurrentUserDto option
 }
+
+type ExploreLoadResult = {
+    Repos: ExploreProjectDto array
+    Pagination: PaginationMetadata option
+    Groups: GroupDto array
+    GroupsLoaded: bool
+    GroupsLoadError: string option
+}
+
+module ExploreLoadResult =
+
+    let empty = {
+        Repos = [||]
+        Pagination = None
+        Groups = [||]
+        GroupsLoaded = false
+        GroupsLoadError = None
+    }
 
 /// Information about a successfully completed operation.
 type OperationResult = {
