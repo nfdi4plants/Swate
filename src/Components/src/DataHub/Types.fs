@@ -1,4 +1,4 @@
-module Swate.Components.DataHubSidebarTypes
+module Swate.Components.DataHubTypes
 
 open Fable.Core
 
@@ -9,6 +9,7 @@ type ARCProject = {
     Description: string option
     WebUrl: string
     LastActivity: string option
+    ImageUrl: string option
 }
 
 /// Information about a successfully completed operation.

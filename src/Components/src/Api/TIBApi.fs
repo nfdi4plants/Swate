@@ -1,32 +1,14 @@
-module Swate.Components.Api
+/// https://api.terminology.tib.eu/swagger-ui/index.html
+module Swate.Components.Api.TIBApi
+
 
 open Swate.Components
 open Swate.Components.Shared
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Remoting.Client
-
-let SwateApi: IOntologyAPIv3 =
-    Remoting.createApi ()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<IOntologyAPIv3>
-
-// https://api.terminology.tib.eu/swagger-ui/index.html
 open Fetch
-
-let private makeQueryParam (name: string, value: obj) =
-    Fable.Core.JS.encodeURIComponent name
-    + "="
-    + (string >> Fable.Core.JS.encodeURIComponent) value
-
-let private makeQueryParamStr (queryParams: (string * obj) list) : string =
-    queryParams
-    |> List.map (fun (name, value) -> makeQueryParam (name, value))
-    |> String.concat "&"
-    |> (+) "?"
-
-let private appendQueryParams (url: string) (queryParams: (string * obj) list) : string =
-    url + makeQueryParamStr queryParams
+open Swate.Components.Api.Helper
 
 
 [<RequireQualifiedAccess>]

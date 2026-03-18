@@ -19,7 +19,7 @@ const meta: Meta<typeof DataHubSidebarEntry> = {
   ],
 };
 
-export default meta;
+// export default meta;
 type Story = StoryObj<typeof DataHubSidebarEntry>;
 
 // Helpers

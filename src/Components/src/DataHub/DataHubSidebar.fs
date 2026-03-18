@@ -5,7 +5,8 @@ open Fable.Core.JsInterop
 open Feliz
 open Browser.Types
 
-open DataHubSidebarTypes
+open DataHubTypes
+open Swate.Components.MockData.DataHub
 
 [<Erase; Mangle(false)>]
 type DataHubSidebar =
@@ -28,20 +29,13 @@ type DataHubSidebar =
         ]
 
     [<ReactComponent>]
-    static member private SectionHeading(text: string) =
-        Html.h3 [
-            prop.className "swt:text-sm swt:font-semibold swt:text-base-content/70 swt:uppercase swt:tracking-wide"
-            prop.text text
-        ]
-
-    [<ReactComponent>]
     static member private ChangedFileStatusDot(status: ChangedFileStatus) =
         let color, label =
             match status with
-            | ChangedFileStatus.New     -> "swt:bg-success", "new"
+            | ChangedFileStatus.New -> "swt:bg-success", "new"
             | ChangedFileStatus.Changed -> "swt:bg-warning", "changed"
-            | ChangedFileStatus.Deleted -> "swt:bg-error",   "deleted"
-            | ChangedFileStatus.Moved   -> "swt:bg-info",    "moved"
+            | ChangedFileStatus.Deleted -> "swt:bg-error", "deleted"
+            | ChangedFileStatus.Moved -> "swt:bg-info", "moved"
 
         Html.span [
             prop.title label
@@ -85,7 +79,12 @@ type DataHubSidebar =
                                 prop.className "swt:loading swt:loading-spinner swt:loading-sm"
                             ]
                         Html.span [
-                            prop.text (if isConnecting then "Connecting..." else "Connect to DataHub")
+                            prop.text (
+                                if isConnecting then
+                                    "Connecting..."
+                                else
+                                    "Connect to DataHub"
+                            )
                         ]
                     ]
                     prop.onClick (fun _ -> onConnect ())
@@ -103,7 +102,7 @@ type DataHubSidebar =
             prop.testId "ChangedFilesList"
             prop.className "swt:flex swt:flex-col swt:gap-1"
             prop.children [
-                DataHubSidebar.SectionHeading("Local Changes")
+                DataHubComponents.DataHubComponents.SectionHeading("Local Changes")
                 if changedFiles.Length = 0 then
                     Html.p [
                         prop.testId "ChangedFilesEmpty"
@@ -138,10 +137,10 @@ type DataHubSidebar =
                                             prop.className "swt:text-xs swt:text-base-content/50 swt:shrink-0"
                                             prop.text (
                                                 match file.Status with
-                                                | ChangedFileStatus.New     -> "new"
+                                                | ChangedFileStatus.New -> "new"
                                                 | ChangedFileStatus.Changed -> "changed"
                                                 | ChangedFileStatus.Deleted -> "deleted"
-                                                | ChangedFileStatus.Moved   -> "moved"
+                                                | ChangedFileStatus.Moved -> "moved"
                                             )
                                         ]
                                         Html.button [
@@ -164,13 +163,19 @@ type DataHubSidebar =
                                 ]
                         ]
                     ]
+
                     Html.span [
                         prop.className "swt:text-xs swt:text-base-content/50 swt:mt-1"
-                        prop.text (string changedFiles.Length + " file(s) with local changes. Right-click a file to discard.")
+                        prop.text (
+                            string changedFiles.Length
+                            + " file(s) with local changes. Right-click a file to discard."
+                        )
                     ]
+
                     ContextMenu.ContextMenu(
                         (fun (data: obj) ->
                             let filePath = data |> unbox<string>
+
                             [
                                 ContextMenuItem(
                                     text = Html.span [ prop.text "Discard this change" ],
@@ -178,8 +183,7 @@ type DataHubSidebar =
                                     onClick =
                                         (fun e ->
                                             e.buttonEvent.stopPropagation ()
-                                            let file =
-                                                changedFiles |> Array.tryFind (fun f -> f.Path = filePath)
+                                            let file = changedFiles |> Array.tryFind (fun f -> f.Path = filePath)
                                             file |> Option.iter onDiscardFile
                                         )
                                 )
@@ -203,107 +207,7 @@ type DataHubSidebar =
 
     // ARC browser panel
 
-    [<ReactComponent>]
-    static member private ARCBrowser
-        (
-            browserMode: ARCBrowserMode,
-            onBrowserModeChange: ARCBrowserMode -> unit,
-            browserProjects: ARCProject[],
-            isLoadingBrowser: bool,
-            onSelectProject: ARCProject -> unit,
-            selectedProject: ARCProject option
-        ) =
-        Html.div [
-            prop.testId "ARCBrowserPanel"
-            prop.className "swt:flex swt:flex-col swt:gap-1"
-            prop.children [
-                DataHubSidebar.SectionHeading("ARC Browser")
-                Html.div [
-                    prop.testId "ARCBrowserTabs"
-                    prop.role.tabList
-                    prop.className "swt:tabs swt:tabs-box swt:tabs-xs swt:w-full"
-                    prop.children [
-                        let modes =
-                            [
-                                ARCBrowserMode.YourARCs, "Your ARCs"
-                                ARCBrowserMode.Latest, "Latest"
-                                ARCBrowserMode.Featured, "Featured"
-                            ]
 
-                        for mode, label in modes do
-                            Html.div [
-                                prop.role.tab
-                                prop.testId ("ARCBrowserTab-" + label.Replace(" ", ""))
-                                prop.key label
-                                prop.className [
-                                    "swt:tab"
-                                    if browserMode = mode then
-                                        "swt:tab-active"
-                                ]
-                                prop.onClick (fun _ -> onBrowserModeChange mode)
-                                prop.text label
-                            ]
-                    ]
-                ]
-                if isLoadingBrowser then
-                    Html.div [
-                        prop.testId "ARCBrowserLoading"
-                        prop.className "swt:flex swt:items-center swt:gap-2 swt:py-2"
-                        prop.children [
-                            Html.span [
-                                prop.className "swt:loading swt:loading-spinner swt:loading-sm"
-                            ]
-                            Html.span [
-                                prop.className "swt:text-sm swt:text-base-content/70"
-                                prop.text "Loading ARCs..."
-                            ]
-                        ]
-                    ]
-                elif browserProjects.Length = 0 then
-                    Html.p [
-                        prop.testId "ARCBrowserEmpty"
-                        prop.className "swt:text-sm swt:text-base-content/60 swt:py-2"
-                        prop.text (
-                            match browserMode with
-                            | ARCBrowserMode.YourARCs -> "No ARCs found. Create one to get started."
-                            | ARCBrowserMode.Latest -> "No recent ARCs available."
-                            | ARCBrowserMode.Featured -> "No featured ARCs at the moment."
-                        )
-                    ]
-                else
-                    Html.ul [
-                        prop.className
-                            "swt:menu swt:menu-sm swt:flex-nowrap swt:max-h-48 swt:overflow-y-auto swt:bg-base-200 swt:rounded"
-                        prop.children [
-                            for project in browserProjects do
-                                let isSelected =
-                                    selectedProject
-                                    |> Option.map (fun p -> p.Id = project.Id)
-                                    |> Option.defaultValue false
-
-                                Html.li [
-                                    prop.key (string project.Id)
-                                    prop.children [
-                                        Html.a [
-                                            prop.testId ("ARCBrowserItem-" + string project.Id)
-                                            prop.className [
-                                                if isSelected then
-                                                    "swt:active"
-                                            ]
-                                            prop.onClick (fun _ -> onSelectProject project)
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "swt:truncate"
-                                                    prop.text project.Name
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                        ]
-                    ]
-            ]
-        ]
 
     // selected project actions
 
@@ -481,6 +385,7 @@ type DataHubSidebar =
                         Html.div [ prop.className "swt:divider swt:my-0" ]
                         DataHubSidebar.ChangedFilesList(changedFiles, onDiscardFile)
                         Html.div [ prop.className "swt:divider swt:my-0" ]
+
                         DataHubSidebar.ProjectActions(
                             proj,
                             onSave,
@@ -493,7 +398,8 @@ type DataHubSidebar =
                     | None -> ()
 
                     Html.div [ prop.className "swt:divider swt:my-0" ]
-                    DataHubSidebar.ARCBrowser(
+
+                    DataHubBrowser.DataHubBrowser(
                         browserMode,
                         onBrowserModeChange,
                         browserProjects,
@@ -513,189 +419,119 @@ type DataHubSidebar =
             ]
         ]
 
-    // STORYBOOK ENTRY
+// // STORYBOOK ENTRY
 
-    [<ReactComponent>]
-    static member Entry() =
+// [<ReactComponent>]
+// static member Entry() =
 
-        let connectionState, setConnectionState =
-            React.useState ConnectionState.Disconnected
+//     let connectionState, setConnectionState =
+//         React.useState ConnectionState.Disconnected
 
-        let selectedProject, setSelectedProject =
-            React.useState (None: ARCProject option)
+//     let selectedProject, setSelectedProject = React.useState (None: ARCProject option)
 
-        let operationState, setOperationState =
-            React.useState OperationState.Idle
+//     let operationState, setOperationState = React.useState OperationState.Idle
 
-        let operationMessage, setOperationMessage =
-            React.useState (None: string option)
+//     let operationMessage, setOperationMessage = React.useState (None: string option)
 
-        let errorMessage, setErrorMessage =
-            React.useState (None: string option)
+//     let errorMessage, setErrorMessage = React.useState (None: string option)
 
-        let changedFiles, setChangedFiles =
-            React.useState ([||]: ChangedFile[])
+//     let changedFiles, setChangedFiles = React.useState ([||]: ChangedFile[])
 
-        let browserMode, setBrowserMode =
-            React.useState ARCBrowserMode.YourARCs
+//     let browserMode, setBrowserMode = React.useState ARCBrowserMode.YourARCs
 
-        let browserProjects, setBrowserProjects =
-            React.useState ([||]: ARCProject[])
+//     let browserProjects, setBrowserProjects = React.useState ([||]: ARCProject[])
 
-        let isLoadingBrowser, setIsLoadingBrowser =
-            React.useState false
+//     let isLoadingBrowser, setIsLoadingBrowser = React.useState false
 
-        let sampleYourARCs: ARCProject[] = [|
-            {
-                Id = 1
-                Name = "Metabolomics Study 2026"
-                Description = Some "LC-MS of leaf tissue"
-                WebUrl = "https://git.nfdi4plants.org/user/metabolomics-2026"
-                LastActivity = Some "2026-03-01"
-            }
-            {
-                Id = 2
-                Name = "RNAseq Drought Stress"
-                Description = Some "Paired-end sequencing"
-                WebUrl = "https://git.nfdi4plants.org/user/rnaseq-drought"
-                LastActivity = Some "2026-02-28"
-            }
-            {
-                Id = 3
-                Name = "Proteomics Roots"
-                Description = None
-                WebUrl = "https://git.nfdi4plants.org/user/proteomics-roots"
-                LastActivity = Some "2026-01-15"
-            }
-        |]
+//     let loadBrowserProjects (mode: ARCBrowserMode) =
+//         setIsLoadingBrowser true
 
-        let sampleLatestARCs: ARCProject[] = [|
-            {
-                Id = 10
-                Name = "Lipidomics Arabidopsis"
-                Description = Some "Lipid profiling"
-                WebUrl = "https://git.nfdi4plants.org/community/lipidomics-arab"
-                LastActivity = Some "2026-03-04"
-            }
-            {
-                Id = 11
-                Name = "Single-Cell Transcriptomics"
-                Description = Some "10x Genomics workflow"
-                WebUrl = "https://git.nfdi4plants.org/community/sc-transcriptomics"
-                LastActivity = Some "2026-03-03"
-            }
-        |]
+//         promise {
+//             do! Promise.sleep 500
 
-        let sampleFeaturedARCs: ARCProject[] = [|
-            {
-                Id = 20
-                Name = "CEPLAS Reference ARC"
-                Description = Some "Best-practice template ARC"
-                WebUrl = "https://git.nfdi4plants.org/featured/ceplas-reference"
-                LastActivity = Some "2026-02-20"
-            }
-        |]
+//             let projects =
+//                 match mode with
+//                 | ARCBrowserMode.YourARCs -> sampleYourARCs
+//                 | ARCBrowserMode.Latest -> sampleLatestARCs
+//                 | ARCBrowserMode.Featured -> sampleFeaturedARCs
 
-        let sampleChangedFiles: ChangedFile[] = [|
-            { Path = "assays/metabolomics/isa.assay.xlsx"; Status = ChangedFileStatus.Changed; OldPath = None }
-            { Path = "studies/drought/protocols/extraction.md"; Status = ChangedFileStatus.New; OldPath = None }
-            { Path = "runs/old-run/result.csv"; Status = ChangedFileStatus.Deleted; OldPath = None }
-            {
-                Path = "workflows/analysis.cwl"
-                Status = ChangedFileStatus.Moved
-                OldPath = Some "workflows/old-analysis.cwl"
-            }
-        |]
+//             setBrowserProjects projects
+//             setIsLoadingBrowser false
+//         }
+//         |> Promise.start
 
-        let loadBrowserProjects (mode: ARCBrowserMode) =
-            setIsLoadingBrowser true
+//     let onConnect () =
+//         setErrorMessage None
+//         setConnectionState ConnectionState.Connecting
 
-            promise {
-                do! Promise.sleep 500
+//         promise {
+//             do! Promise.sleep 1000
+//             setConnectionState ConnectionState.Connected
+//             setBrowserMode ARCBrowserMode.YourARCs
+//             loadBrowserProjects ARCBrowserMode.YourARCs
+//         }
+//         |> Promise.start
 
-                let projects =
-                    match mode with
-                    | ARCBrowserMode.YourARCs -> sampleYourARCs
-                    | ARCBrowserMode.Latest -> sampleLatestARCs
-                    | ARCBrowserMode.Featured -> sampleFeaturedARCs
+//     let onDisconnect () =
+//         setConnectionState ConnectionState.Disconnected
+//         setSelectedProject None
+//         setOperationState OperationState.Idle
+//         setOperationMessage None
+//         setErrorMessage None
+//         setChangedFiles [||]
+//         setBrowserProjects [||]
+//         setBrowserMode ARCBrowserMode.YourARCs
+//         setIsLoadingBrowser false
 
-                setBrowserProjects projects
-                setIsLoadingBrowser false
-            }
-            |> Promise.start
+//     let onSelectProject (p: ARCProject) =
+//         setSelectedProject (Some p)
+//         setOperationState OperationState.Idle
+//         setOperationMessage None
+//         setChangedFiles sampleChangedFiles
 
-        let onConnect () =
-            setErrorMessage None
-            setConnectionState ConnectionState.Connecting
+//     let onDiscardFile (f: ChangedFile) =
+//         setChangedFiles (changedFiles |> Array.filter (fun cf -> cf.Path <> f.Path))
 
-            promise {
-                do! Promise.sleep 1000
-                setConnectionState ConnectionState.Connected
-                setBrowserMode ARCBrowserMode.YourARCs
-                loadBrowserProjects ARCBrowserMode.YourARCs
-            }
-            |> Promise.start
+//     let onBrowserModeChange (mode: ARCBrowserMode) =
+//         setBrowserMode mode
+//         loadBrowserProjects mode
 
-        let onDisconnect () =
-            setConnectionState ConnectionState.Disconnected
-            setSelectedProject None
-            setOperationState OperationState.Idle
-            setOperationMessage None
-            setErrorMessage None
-            setChangedFiles [||]
-            setBrowserProjects [||]
-            setBrowserMode ARCBrowserMode.YourARCs
-            setIsLoadingBrowser false
+//     let runOperation msg =
+//         fun (_: ARCProject) ->
+//             setOperationState OperationState.Loading
+//             setOperationMessage None
 
-        let onSelectProject (p: ARCProject) =
-            setSelectedProject (Some p)
-            setOperationState OperationState.Idle
-            setOperationMessage None
-            setChangedFiles sampleChangedFiles
+//             promise {
+//                 do! Promise.sleep 1200
+//                 setOperationState OperationState.Success
+//                 setOperationMessage (Some msg)
+//             }
+//             |> Promise.start
 
-        let onDiscardFile (f: ChangedFile) =
-            setChangedFiles (changedFiles |> Array.filter (fun cf -> cf.Path <> f.Path))
+//     let onSave = runOperation "All changes saved to the DataHub."
+//     let onFetch = runOperation "Your ARC was updated with the latest version."
 
-        let onBrowserModeChange (mode: ARCBrowserMode) =
-            setBrowserMode mode
-            loadBrowserProjects mode
+//     let onShare (p: ARCProject) =
+//         setOperationState OperationState.Success
+//         setOperationMessage (Some("Link copied: " + p.WebUrl))
 
-        let runOperation msg =
-            fun (_: ARCProject) ->
-                setOperationState OperationState.Loading
-                setOperationMessage None
-
-                promise {
-                    do! Promise.sleep 1200
-                    setOperationState OperationState.Success
-                    setOperationMessage (Some msg)
-                }
-                |> Promise.start
-
-        let onSave = runOperation "All changes saved to the DataHub."
-        let onFetch = runOperation "Your ARC was updated with the latest version."
-
-        let onShare (p: ARCProject) =
-            setOperationState OperationState.Success
-            setOperationMessage (Some ("Link copied: " + p.WebUrl))
-
-        DataHubSidebar.Main(
-            connectionState,
-            dataHubUrl = "https://git.nfdi4plants.org/",
-            selectedProject = selectedProject,
-            onConnect = onConnect,
-            onDisconnect = onDisconnect,
-            onSelectProject = onSelectProject,
-            onSave = onSave,
-            onFetch = onFetch,
-            onShare = onShare,
-            operationState = operationState,
-            operationMessage = operationMessage,
-            errorMessage = errorMessage,
-            changedFiles = changedFiles,
-            onDiscardFile = onDiscardFile,
-            browserMode = browserMode,
-            onBrowserModeChange = onBrowserModeChange,
-            browserProjects = browserProjects,
-            isLoadingBrowser = isLoadingBrowser
-        )
+//     DataHubSidebar.Main(
+//         connectionState,
+//         dataHubUrl = "https://git.nfdi4plants.org/",
+//         selectedProject = selectedProject,
+//         onConnect = onConnect,
+//         onDisconnect = onDisconnect,
+//         onSelectProject = onSelectProject,
+//         onSave = onSave,
+//         onFetch = onFetch,
+//         onShare = onShare,
+//         operationState = operationState,
+//         operationMessage = operationMessage,
+//         errorMessage = errorMessage,
+//         changedFiles = changedFiles,
+//         onDiscardFile = onDiscardFile,
+//         browserMode = browserMode,
+//         onBrowserModeChange = onBrowserModeChange,
+//         browserProjects = browserProjects,
+//         isLoadingBrowser = isLoadingBrowser
+//     )
