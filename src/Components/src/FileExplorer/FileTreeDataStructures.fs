@@ -1,7 +1,6 @@
 namespace Swate.Components.FileExplorerTypes
 
 open System
-
 type FileItem = {
     Id: string
     Name: string
@@ -60,7 +59,7 @@ module FileTree =
         SizeFormatted = None
         ItemType = "node"
         Label = Some name
-        Selectable = false
+        Selectable = true
         Path = path
     }
 
@@ -80,7 +79,7 @@ module FileTree =
         SizeFormatted = None
         ItemType = "node"
         Label = Some name
-        Selectable = false
+        Selectable = true
         Path = path
     }
 
@@ -100,7 +99,7 @@ module FileTree =
         SizeFormatted = None
         ItemType = config.ItemType
         Label = Some config.Name
-        Selectable = false
+        Selectable = true
         Path = path
     }
 

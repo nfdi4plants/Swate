@@ -65,22 +65,27 @@ type Breadcrumbs =
                         ]
                         @ (path
                            |> List.map (fun item ->
-                               Html.li [
-                                   prop.className "swt:flex swt:items-center"
-                                   prop.children [
-                                       // Separator
-                                       Html.span [
-                                           prop.className "swt:mx-2 swt:text-gray-400"
-                                           prop.text "/"
-                                       ]
-                                       Html.a [
-                                           prop.className "swt:link swt:link-hover"
-                                           prop.text item.Name
-                                           prop.onClick (fun _ -> onNavigate item.Id)
-                                       ]
-                                   ]
-                               ]
-                           ))
+                                Html.li [
+                                    prop.className "swt:flex swt:items-center"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:mx-2 swt:text-gray-400"
+                                            prop.text "/"
+                                        ]
+                                        if item.Selectable then
+                                            Html.a [
+                                                prop.className "swt:link swt:link-hover"
+                                                prop.text item.Name
+                                                prop.onClick (fun _ -> onNavigate item.Id)
+                                            ]
+                                        else
+                                            Html.span [
+                                                prop.className "swt:opacity-70"
+                                                prop.text item.Name
+                                            ]
+                                    ]
+                                ]
+                            ))
                     )
                 ]
             ]
@@ -145,11 +150,16 @@ type Breadcrumbs =
                                         ]
                                         if item.ItemType = "ellipsis" then
                                             Html.span [ prop.className "swt:text-gray-500"; prop.text "..." ]
-                                        else
+                                        elif item.Selectable then
                                             Html.a [
                                                 prop.className "swt:link swt:link-hover swt:text-xs"
                                                 prop.text item.Name
                                                 prop.onClick (fun _ -> onNavigate item.Id)
+                                            ]
+                                        else
+                                            Html.span [
+                                                prop.className "swt:text-xs swt:opacity-70"
+                                                prop.text item.Name
                                             ]
                                     ]
                                 ]
