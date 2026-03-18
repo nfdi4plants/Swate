@@ -56,6 +56,18 @@ type GitLabError =
     | HttpError of int
     | DecodeError of exn
     | InvalidRequest of string
+    | Unknown of exn
+
+    member this.GitLabErrorToString =
+        match this with
+        | GitLabError.NetworkError ex -> $"Network error: {ex.Message}"
+        | GitLabError.Unauthorized -> "Unauthorized (check your Personal Access Token)."
+        | GitLabError.Forbidden -> "Forbidden (missing permissions for this resource)."
+        | GitLabError.NotFound -> "GitLab resource not found."
+        | GitLabError.HttpError code -> $"GitLab request failed with HTTP {code}."
+        | GitLabError.DecodeError ex -> $"Failed to decode GitLab response: {ex.Message}"
+        | GitLabError.InvalidRequest message -> message
+        | GitLabError.Unknown ex -> $"An unknown error occurred: {ex.Message}"
 
 type ExploreNamespaceDto = {
     id: int

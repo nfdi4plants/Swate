@@ -1,12 +1,191 @@
 namespace Swate.Components
 
 open Fable.Core
+open Elmish
 open Feliz
+open Feliz.UseElmish
 open Swate.Components.Types.Actionbar
-
 open DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.DataHubTypes
+
+
+module DatahubBrowserModel =
+
+    type Msg =
+        | SetTab of ExploreTab
+        | SetDraftSearchTerm of string
+        | SubmitSearch
+        | SetSortField of ExploreSortField
+        | SetSortDirection of SortDirection
+        | SetSelectedGroupId of int option
+        | SetPage of int
+        | LoadReposRequest of ExploreLoadRequest
+        | LoadReposResponse of Result<ExploreLoadResult, GitLabError>
+
+    type State = {
+        Tab: ExploreTab
+        DraftSearchTerm: string
+        SubmittedSearchTerm: string
+        SortField: ExploreSortField
+        SortDirection: SortDirection
+        SelectedGroupId: int option
+        Groups: GroupDto array
+        GroupsLoaded: bool
+        GroupsLoadError: string option
+        Repos: ExploreProjectDto array
+        Page: int
+        PerPage: int
+        IsLoading: bool
+        Error: GitLabError option
+        Pagination: PaginationMetadata option
+        IsAuthenticated: bool
+        User: CurrentUserDto option
+    }
+
+    let private buildRequest (state: State) : ExploreLoadRequest = {
+        Target = state.Tab
+        SearchTerm = state.SubmittedSearchTerm
+        Page = state.Page
+        PerPage = state.PerPage
+        SortField = state.SortField
+        SortDirection = state.SortDirection
+        SelectedGroupId = state.SelectedGroupId
+        IsAuthenticated = state.IsAuthenticated
+        User = state.User
+    }
+
+    let init (user: CurrentUserDto option) =
+        let state = {
+            Tab = ExploreTab.All
+            DraftSearchTerm = ""
+            SubmittedSearchTerm = ""
+            SortField = ExploreSortField.LastUpdated
+            SortDirection = SortDirection.Desc
+            SelectedGroupId = None
+            Groups = [||]
+            GroupsLoaded = false
+            GroupsLoadError = None
+            Repos = [||]
+            Page = 1
+            PerPage = 20
+            IsLoading = false
+            Error = None
+            Pagination = None
+            IsAuthenticated = user.IsSome
+            User = user
+        }
+
+        state, Cmd.ofMsg (LoadReposRequest(buildRequest state))
+
+    let private reloadWith (state: State) =
+        state, Cmd.ofMsg (LoadReposRequest(buildRequest state))
+
+    let update (loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult, GitLabError>>) msg state =
+        match msg with
+        | SetTab tab ->
+            if tab = state.Tab then
+                state, Cmd.none
+            else
+                reloadWith { state with Tab = tab; Page = 1 }
+        | SetDraftSearchTerm term ->
+            {
+                state with
+                    DraftSearchTerm = term
+                    Page = 1
+            },
+            Cmd.none
+        | SubmitSearch ->
+            let nextState = {
+                state with
+                    SubmittedSearchTerm = state.DraftSearchTerm
+                    Page = 1
+            }
+
+            reloadWith nextState
+        | SetSortField sortField ->
+            if sortField = state.SortField then
+                state, Cmd.none
+            else
+                reloadWith {
+                    state with
+                        SortField = sortField
+                        Page = 1
+                }
+        | SetSortDirection sortDirection ->
+            if sortDirection = state.SortDirection then
+                state, Cmd.none
+            else
+                reloadWith {
+                    state with
+                        SortDirection = sortDirection
+                        Page = 1
+                }
+        | SetSelectedGroupId selectedGroupId ->
+            if selectedGroupId = state.SelectedGroupId then
+                state, Cmd.none
+            else
+                reloadWith {
+                    state with
+                        SelectedGroupId = selectedGroupId
+                        Page = 1
+                }
+        | SetPage page ->
+            if page = state.Page then
+                state, Cmd.none
+            else
+                reloadWith { state with Page = page }
+        | LoadReposRequest request ->
+            let nextState = {
+                state with
+                    IsLoading = true
+                    Error = None
+            }
+
+            let cmd =
+                Cmd.OfPromise.either
+                    loadRepos
+                    request
+                    (function
+                    | Ok result -> LoadReposResponse(Ok result)
+                    | Error err -> LoadReposResponse(Error err))
+                    (GitLabError.Unknown >> Error >> LoadReposResponse)
+
+            nextState, cmd
+        | LoadReposResponse(Ok result) ->
+            let updatedState = {
+                state with
+                    Repos = result.Repos
+                    Pagination = result.Pagination
+                    Groups = result.Groups
+                    GroupsLoaded = result.GroupsLoaded
+                    GroupsLoadError = result.GroupsLoadError
+                    IsLoading = false
+                    Error = None
+            }
+
+            if
+                state.Tab = ExploreTab.YourOrganisations
+                && state.SelectedGroupId.IsNone
+                && result.Groups.Length > 0
+            then
+                let nextState = {
+                    updatedState with
+                        SelectedGroupId = Some result.Groups[0].id
+                }
+
+                reloadWith nextState
+            else
+                updatedState, Cmd.none
+        | LoadReposResponse(Error error) ->
+            {
+                state with
+                    Error = Some error
+                    Repos = [||]
+                    Pagination = None
+                    IsLoading = false
+            },
+            Cmd.none
 
 module private DataHubBrowserHelper =
 
@@ -415,85 +594,20 @@ type DataHubBrowser =
     static member ExplorePanel
         (
             user: CurrentUserDto option,
-            loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult, string>>,
+            loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult, GitLabError>>,
             reloadTrigger: int,
             ?onOpen: (ExploreProjectDto -> unit),
             ?projectActionBtns: (ExploreProjectDto -> ButtonInfo[])
         ) =
-
-        let tab, setTab = React.useState ExploreTab.All
-        let searchTerm, setSearchTerm = React.useState ""
-        /// Is used to be set when the user submits the search to trigger the useEffect that loads the repos. This is needed to avoid loading the repos on every keystroke when the user types in the search field.
-        let submittedSearchTerm, setSubmittedSearchTerm = React.useState ""
-        let sortField, setSortField = React.useState ExploreSortField.LastUpdated
-        let sortDirection, setSortDirection = React.useState SortDirection.Desc
-        let selectedGroupId, setSelectedGroupId = React.useState (None: int option)
-        let groups, setGroups = React.useState [||]
-        let groupsLoaded, setGroupsLoaded = React.useState false
-        let groupsLoadError, setGroupsLoadError = React.useState (None: string option)
-        let repos, setRepos = React.useState [||]
-        let page, setPage = React.useState 1
-        let pageSize = 20
-        let isLoading, setIsLoading = React.useState false
-        let error, setError = React.useState (None: string option)
-        let pagination, setPagination = React.useState (None: PaginationMetadata option)
-
-        let isAuthenticated = user.IsSome
+        let model, dispatch =
+            React.useElmish (
+                (fun () -> DatahubBrowserModel.init user),
+                DatahubBrowserModel.update loadRepos,
+                [| box user; box reloadTrigger |]
+            )
 
         let onSearchSubmit () =
-            setSubmittedSearchTerm searchTerm
-            setPage 1
-
-        React.useEffect (
-            (fun () ->
-                promise {
-                    setIsLoading true
-                    setError None
-
-                    let request = {
-                        Target = tab
-                        SearchTerm = submittedSearchTerm
-                        Page = page
-                        PerPage = pageSize
-                        SortField = sortField
-                        SortDirection = sortDirection
-                        SelectedGroupId = selectedGroupId
-                        IsAuthenticated = isAuthenticated
-                        User = user
-                    }
-
-                    let! result = loadRepos request
-
-                    match result with
-                    | Ok loaded ->
-                        setRepos loaded.Repos
-                        setPagination loaded.Pagination
-                        setGroups loaded.Groups
-                        setGroupsLoaded loaded.GroupsLoaded
-                        setGroupsLoadError loaded.GroupsLoadError
-
-                        if selectedGroupId.IsNone && loaded.Groups.Length > 0 then
-                            setSelectedGroupId (Some loaded.Groups[0].id)
-                    | Error err ->
-                        setError (Some err)
-                        setRepos [||]
-                        setPagination None
-
-                    setIsLoading false
-                }
-                |> Promise.start
-            ),
-            [|
-                box tab
-                box page
-                box submittedSearchTerm
-                box selectedGroupId
-                box sortField
-                box sortDirection
-                box isAuthenticated
-                box reloadTrigger
-            |]
-        )
+            dispatch DatahubBrowserModel.SubmitSearch
 
         Html.div [
             prop.testId "GitLabExplorePanel"
@@ -502,42 +616,27 @@ type DataHubBrowser =
                 DataHubComponents.DataHubComponents.SectionHeading("GitLab Explore")
                 // tabs
                 DataHubBrowser.Tabs(
-                    tab,
-                    (fun next ->
-                        setTab next
-                        setPage 1
-                    ),
-                    isAuthenticated
+                    model.Tab,
+                    (fun next -> dispatch (DatahubBrowserModel.SetTab next)),
+                    model.IsAuthenticated
                 )
                 // filter
                 DataHubBrowser.Filter(
-                    tab,
-                    isAuthenticated,
-                    searchTerm,
-                    (fun term ->
-                        setSearchTerm term
-                        setPage 1
-                    ),
+                    model.Tab,
+                    model.IsAuthenticated,
+                    model.DraftSearchTerm,
+                    (fun term -> dispatch (DatahubBrowserModel.SetDraftSearchTerm term)),
                     onSearchSubmit,
-                    sortField,
-                    (fun next ->
-                        setSortField next
-                        setPage 1
-                    ),
-                    sortDirection,
-                    (fun next ->
-                        setSortDirection next
-                        setPage 1
-                    ),
-                    groups,
-                    selectedGroupId,
-                    (fun gid ->
-                        setSelectedGroupId gid
-                        setPage 1
-                    ),
-                    groupsLoadError
+                    model.SortField,
+                    (fun next -> dispatch (DatahubBrowserModel.SetSortField next)),
+                    model.SortDirection,
+                    (fun next -> dispatch (DatahubBrowserModel.SetSortDirection next)),
+                    model.Groups,
+                    model.SelectedGroupId,
+                    (fun gid -> dispatch (DatahubBrowserModel.SetSelectedGroupId gid)),
+                    model.GroupsLoadError
                 )
-                if isLoading then
+                if model.IsLoading then
                     Html.div [
                         prop.testId "GitLabExploreLoading"
                         prop.className "swt:flex swt:items-center swt:gap-2"
@@ -550,22 +649,23 @@ type DataHubBrowser =
                     ]
                 else
                     Html.none
-                match error with
+                match model.Error with
                 | Some err ->
                     Html.div [
                         prop.testId "GitLabExploreError"
                         prop.className "swt:alert swt:alert-error swt:text-xs"
-                        prop.children [ Html.span err ]
+                        prop.children [ Html.span err.GitLabErrorToString ]
                     ]
                 | None -> Html.none
                 let showOrgNoGroups =
-                    tab = ExploreTab.YourOrganisations
-                    && isAuthenticated
-                    && groupsLoaded
-                    && groups.Length = 0
-                    && groupsLoadError.IsNone
+                    model.Tab = ExploreTab.YourOrganisations
+                    && model.IsAuthenticated
+                    && model.GroupsLoaded
+                    && model.Groups.Length = 0
+                    && model.GroupsLoadError.IsNone
 
-                let showOrgLoadError = tab = ExploreTab.YourOrganisations && groupsLoadError.IsSome
+                let showOrgLoadError =
+                    model.Tab = ExploreTab.YourOrganisations && model.GroupsLoadError.IsSome
 
                 if showOrgLoadError then
                     Html.p [
@@ -579,24 +679,24 @@ type DataHubBrowser =
                         prop.className "swt:text-sm swt:text-base-content/60"
                         prop.text "No groups found"
                     ]
-                elif (not isLoading) && repos.Length = 0 then
+                elif (not model.IsLoading) && model.Repos.Length = 0 then
                     Html.p [
                         prop.testId "GitLabExploreEmpty"
                         prop.className "swt:text-sm swt:text-base-content/60"
                         prop.text "No repositories found for current filter and search."
                     ]
-                elif repos.Length > 0 then
+                elif model.Repos.Length > 0 then
                     Html.ul [
                         prop.testId "GitLabExploreRepoList"
                         prop.className "swt:list swt:bg-base-100 swt:rounded-box swt:shadow-md"
                         prop.children [
-                            for repo in repos do
+                            for repo in model.Repos do
                                 DataHubBrowser.RepoListRow(repo, ?extraButtons = projectActionBtns)
                         ]
                     ]
 
                 // Pagination
-                DataHubBrowser.Pagination(pagination, setPage)
+                DataHubBrowser.Pagination(model.Pagination, (fun page -> dispatch (DatahubBrowserModel.SetPage page)))
             ]
         ]
 
@@ -759,16 +859,6 @@ type DataHubBrowser =
                     setCurrentUser None
             }
 
-        let gitLabErrorToString =
-            function
-            | GitLabError.NetworkError ex -> $"Network error: {ex.Message}"
-            | GitLabError.Unauthorized -> "Unauthorized (check your Personal Access Token)."
-            | GitLabError.Forbidden -> "Forbidden (missing permissions for this resource)."
-            | GitLabError.NotFound -> "GitLab resource not found."
-            | GitLabError.HttpError code -> $"GitLab request failed with HTTP {code}."
-            | GitLabError.DecodeError ex -> $"Failed to decode GitLab response: {ex.Message}"
-            | GitLabError.InvalidRequest message -> message
-
         let loadRepos (request: ExploreLoadRequest) = promise {
             if not isConnected then
                 return Ok ExploreLoadResult.empty
@@ -887,7 +977,7 @@ type DataHubBrowser =
                             GroupsLoaded = groupsLoaded
                             GroupsLoadError = groupsLoadError
                         }
-                | Error err -> return Error(gitLabErrorToString err)
+                | Error err -> return Error(err)
         }
 
         Html.div [

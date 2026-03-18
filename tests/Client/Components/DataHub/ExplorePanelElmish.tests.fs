@@ -1,0 +1,128 @@
+module ExplorePanelElmish
+
+open Fable.Core
+open Fable.Mocha
+open Swate.Components
+open Swate.Components.Api.GitLabApi
+open Swate.Components.DataHubTypes
+
+let private noopLoadRepos (_: ExploreLoadRequest) = promise { return Ok ExploreLoadResult.empty }
+
+let private reduce msg state =
+    DatahubBrowserModel.update noopLoadRepos msg state |> fst
+
+let private mkPageMeta page : PaginationMetadata = {
+    Link = None
+    NextPage = Some(page + 1)
+    Page = Some page
+    PerPage = Some 20
+    PrevPage = if page > 1 then Some(page - 1) else None
+    Total = Some 42
+    TotalPages = Some 3
+    NextCursor = None
+    PrevCursor = None
+}
+
+let Main =
+    testList "DataHub ExplorePanel Elmish" [
+        testCase "SetTab resets page to first"
+        <| fun _ ->
+            let initial, _ = DatahubBrowserModel.init None
+            let seeded = { initial with Page = 4 }
+
+            let next = reduce (DatahubBrowserModel.SetTab ExploreTab.MostStarred) seeded
+
+            Expect.equal next.Tab ExploreTab.MostStarred "Tab should update to selected tab."
+            Expect.equal next.Page 1 "Changing tab should reset pagination to page 1."
+
+        testCase "SubmitSearch promotes draft term and resets page"
+        <| fun _ ->
+            let initial, _ = DatahubBrowserModel.init None
+
+            let seeded = {
+                initial with
+                    DraftSearchTerm = "rnaseq"
+                    SubmittedSearchTerm = ""
+                    Page = 5
+            }
+
+            let next = reduce DatahubBrowserModel.SubmitSearch seeded
+
+            Expect.equal next.SubmittedSearchTerm "rnaseq" "Submitted search should use the draft term."
+            Expect.equal next.Page 1 "Submitting search should reset pagination to page 1."
+
+        testCase "LoadReposResponse Ok updates repos pagination and groups"
+        <| fun _ ->
+            let initial, _ = DatahubBrowserModel.init None
+            let expectedRepos = MockData.DataHub.mostStarred |> Array.truncate 2
+            let expectedGroups = MockData.DataHub.groups |> Array.truncate 2
+
+            let loaded: ExploreLoadResult = {
+                Repos = expectedRepos
+                Pagination = Some(mkPageMeta 2)
+                Groups = expectedGroups
+                GroupsLoaded = true
+                GroupsLoadError = None
+            }
+
+            let seeded = {
+                initial with
+                    IsLoading = true
+                    Error = Some "stale"
+            }
+
+            let next = reduce (DatahubBrowserModel.LoadReposResponse(Ok loaded)) seeded
+
+            Expect.equal next.Repos expectedRepos "Successful response should populate repositories."
+            Expect.equal next.Pagination loaded.Pagination "Successful response should set pagination metadata."
+            Expect.equal next.Groups expectedGroups "Successful response should update groups."
+            Expect.equal next.GroupsLoaded true "Groups loaded flag should be updated from API result."
+            Expect.equal next.GroupsLoadError None "Groups load error should be cleared when response has no error."
+            Expect.equal next.IsLoading false "Loading should stop after a successful response."
+            Expect.equal next.Error None "Top-level error should be cleared on successful response."
+
+        testCase "LoadReposResponse Error sets error and clears list state"
+        <| fun _ ->
+            let initial, _ = DatahubBrowserModel.init None
+
+            let seeded = {
+                initial with
+                    IsLoading = true
+                    Repos = MockData.DataHub.yourRepos |> Array.truncate 1
+                    Pagination = Some(mkPageMeta 1)
+            }
+
+            let next = reduce (DatahubBrowserModel.LoadReposResponse(Error "boom")) seeded
+
+            Expect.equal next.Error (Some "boom") "Error response should be stored in model."
+            Expect.equal next.IsLoading false "Loading should stop after an error response."
+            Expect.equal next.Repos [||] "Error response should clear repositories."
+            Expect.equal next.Pagination None "Error response should clear pagination."
+
+        testCase "YourOrganisations fallback selects first group"
+        <| fun _ ->
+            let initial, _ = DatahubBrowserModel.init None
+            let expectedFirstGroup = MockData.DataHub.groups[0]
+
+            let seeded = {
+                initial with
+                    Tab = ExploreTab.YourOrganisations
+                    SelectedGroupId = None
+                    IsLoading = true
+            }
+
+            let loaded: ExploreLoadResult = {
+                Repos = [||]
+                Pagination = None
+                Groups = MockData.DataHub.groups
+                GroupsLoaded = true
+                GroupsLoadError = None
+            }
+
+            let next = reduce (DatahubBrowserModel.LoadReposResponse(Ok loaded)) seeded
+
+            Expect.equal
+                next.SelectedGroupId
+                (Some expectedFirstGroup.id)
+                "When no group is selected in YourOrganisations, first group should be selected automatically."
+    ]
