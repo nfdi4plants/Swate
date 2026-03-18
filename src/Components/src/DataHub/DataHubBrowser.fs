@@ -33,13 +33,26 @@ module private DataHubBrowserHelper =
 [<Erase; Mangle(false)>]
 type DataHubBrowser =
 
+
+    [<ReactComponent>]
+    static member private ActionbarButtons(buttonInfos: ButtonInfo[]) =
+        Actionbar.Main(
+            buttonInfos,
+            1,
+            barClassName =
+                "swt:w-fit swt:h-fit swt:flex swt:flex-col swt:bg-base-300 swt:rounded-lg swt:shadow-sm swt:join swt:join-vertical",
+            tooltipPosition = DaisyuiTooltipPosition.Left,
+            buttonSize = DaisyUISize.SM,
+            buttonClassName = "swt:btn swt:btn-primary swt:btn-square swt:join-item"
+        )
+
     [<ReactComponent>]
     static member private RepoListRow
         (
             project: ExploreProjectDto,
             // onClone: ExploreProjectDto -> unit,
             // ?onOpen: (ExploreProjectDto -> unit),
-            ?extraButtons: (ExploreProjectDto -> ReactElement)
+            ?extraButtons: ExploreProjectDto -> ButtonInfo[]
         ) =
 
         let visibility = project.visibility |> Option.defaultValue "public"
@@ -78,11 +91,7 @@ type DataHubBrowser =
 
         Html.li [
             prop.testId ("GitLabRepoRow-" + string project.id)
-            prop.className [
-                "swt:list-row swt:flex-col sm:swt:flex-row"
-            // if isLocallyCloned then
-            //     "swt:bg-success/10 swt:border swt:border-success/30 swt:rounded"
-            ]
+            prop.className [ "swt:list-row" ]
             prop.children [
                 // Avatar
                 Html.div [
@@ -180,7 +189,9 @@ type DataHubBrowser =
                     ]
                 ]
                 match extraButtons with
-                | Some render -> render project
+                | Some fn ->
+                    let buttons = fn project
+                    DataHubBrowser.ActionbarButtons(buttons)
                 | None -> Html.none
             ]
         ]
@@ -222,6 +233,7 @@ type DataHubBrowser =
                             prop.placeholder "Search repositories"
                             prop.value searchTerm
                             prop.onChange setSearchTerm
+                            prop.onKeyDown (key.enter, (fun _ -> onSearchSubmit ()))
                         ]
                         Html.button [
                             prop.testId "GitLabExploreSearchButton"
@@ -314,6 +326,7 @@ type DataHubBrowser =
             ]
         ]
 
+    [<ReactComponent>]
     static member private Tabs(tab, setTab, isAuthenticated) =
         Html.div [
             prop.testId "GitLabExploreTabs"
@@ -398,19 +411,19 @@ type DataHubBrowser =
             ]
         | None -> Html.none
 
-
     [<ReactComponent>]
-    static member private ExplorePanel
+    static member ExplorePanel
         (
             user: CurrentUserDto option,
             loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult, string>>,
             reloadTrigger: int,
             ?onOpen: (ExploreProjectDto -> unit),
-            ?projectTrailingElements: (ExploreProjectDto -> ReactElement)
+            ?projectActionBtns: (ExploreProjectDto -> ButtonInfo[])
         ) =
 
         let tab, setTab = React.useState ExploreTab.All
         let searchTerm, setSearchTerm = React.useState ""
+        /// Is used to be set when the user submits the search to trigger the useEffect that loads the repos. This is needed to avoid loading the repos on every keystroke when the user types in the search field.
         let submittedSearchTerm, setSubmittedSearchTerm = React.useState ""
         let sortField, setSortField = React.useState ExploreSortField.LastUpdated
         let sortDirection, setSortDirection = React.useState SortDirection.Desc
@@ -578,7 +591,7 @@ type DataHubBrowser =
                         prop.className "swt:list swt:bg-base-100 swt:rounded-box swt:shadow-md"
                         prop.children [
                             for repo in repos do
-                                DataHubBrowser.RepoListRow(repo, ?extraButtons = projectTrailingElements)
+                                DataHubBrowser.RepoListRow(repo, ?extraButtons = projectActionBtns)
                         ]
                     ]
 
@@ -693,19 +706,14 @@ type DataHubBrowser =
             None,
             loadRepos,
             reloadTrigger,
-            projectTrailingElements =
-                (fun p ->
-                    if p.star_count > 100 then
-                        React.Fragment [
-                            Html.button [
-                                prop.testId ("GitLabRepoStarredBadgeButton-" + string p.id)
-                                prop.className "swt:btn swt:btn-xs swt:btn-warning"
-                                prop.text "Hot"
-                            ]
-                        ]
-                    else
-                        React.Fragment []
-                )
+            projectActionBtns =
+                (fun p -> [|
+                    ButtonInfo.create (
+                        "swt:fluent--arrow-download-24-regular swt:size-5",
+                        "Clone repository",
+                        (fun _ -> Browser.Dom.window.alert ("Clone " + p.web_url))
+                    )
+                |])
         )
 
     [<ReactComponent>]
@@ -937,32 +945,20 @@ type DataHubBrowser =
                     ]
                 ]
 
-                let ExampleProjectTrailingElements (project: ExploreProjectDto) =
-                    Actionbar.Main(
-                        [|
-                            ButtonInfo.create (
-                                "swt:iconify swt:fluent--arrow-download-16-filled",
-                                "Download",
-                                fun _ -> Browser.Dom.window.alert ("Download " + project.name)
-                            )
-                            ButtonInfo.create (
-                                "swt:iconify swt:fluent--star-16-regular",
-                                "Star",
-                                fun _ -> Browser.Dom.window.alert ("Star " + project.name)
-                            )
-                        |],
-                        1,
-                        barClassName =
-                            "swt:w-fit swt:h-fit swt:flex swt:flex-col swt:bg-base-300 swt:rounded-lg swt:shadow-sm",
-                        tooltipPosition = DaisyuiTooltipPosition.Left,
-                        buttonSize = DaisyUISize.SM
-                    )
+                let btnInfo =
+                    fun (project: ExploreProjectDto) -> [|
+                        ButtonInfo.create (
+                            "swt:iconify swt:fluent--arrow-download-24-filled",
+                            "Download",
+                            fun _ -> Browser.Dom.window.alert ("Download " + project.name)
+                        )
+                        ButtonInfo.create (
+                            "swt:iconify swt:fluent--star-24-regular",
+                            "Star",
+                            fun _ -> Browser.Dom.window.alert ("Star " + project.name)
+                        )
+                    |]
 
-                DataHubBrowser.ExplorePanel(
-                    currentUser,
-                    loadRepos,
-                    reloadTrigger,
-                    projectTrailingElements = ExampleProjectTrailingElements
-                )
+                DataHubBrowser.ExplorePanel(currentUser, loadRepos, reloadTrigger, projectActionBtns = btnInfo)
             ]
         ]

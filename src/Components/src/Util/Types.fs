@@ -36,6 +36,7 @@ type DaisyUIColors =
     | Warning
     | Error
 
+[<RequireQualifiedAccess>]
 type DaisyuiTooltipPosition =
     | Top
     | Right

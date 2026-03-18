@@ -17,8 +17,9 @@ type Actionbar =
             buttonInfo: ButtonInfo,
             buttonSize: DaisyUISize,
             tooltipPosition: DaisyuiTooltipPosition,
-            ?debug: bool,
-            ?buttonTestId: string
+            ?buttonClassName: string,
+            ?buttonTestId: string,
+            ?debug: bool
         ) =
 
         let debug = defaultArg debug false
@@ -42,7 +43,9 @@ type Actionbar =
                 if debug then
                     prop.testId "button-test"
                 prop.className [
-                    "swt:btn swt:btn-primary swt:btn-square swt:btn-ghost"
+                    match buttonClassName with
+                    | Some customClass -> customClass
+                    | None -> "swt:btn swt:btn-primary swt:btn-square swt:btn-ghost"
                     btnSize
                 ]
                 if buttonTestId.IsSome then
@@ -103,7 +106,9 @@ type Actionbar =
     static member createMouseEvent (eventType: string) (options: obj) : MouseEvent = jsNative
 
     [<ReactComponent>]
-    static member RestElement(buttons: ButtonInfo[], maxNumber, buttonSize, tooltipPosition, ?debug: bool) =
+    static member RestElement
+        (buttons: ButtonInfo[], maxNumber, buttonSize, tooltipPosition, ?buttonClassName, ?debug: bool)
+        =
 
         let debug = defaultArg debug false
 
@@ -145,6 +150,7 @@ type Actionbar =
                         buttonInfo,
                         buttonSize,
                         tooltipPosition,
+                        ?buttonClassName = buttonClassName,
                         debug = debug,
                         buttonTestId = "actionbar-rest-button"
                     )
@@ -163,7 +169,8 @@ type Actionbar =
             ?debug: bool,
             ?barClassName: string,
             ?buttonSize: DaisyUISize,
-            ?tooltipPosition: DaisyuiTooltipPosition
+            ?tooltipPosition: DaisyuiTooltipPosition,
+            ?buttonClassName: string
         ) =
 
         let debug = defaultArg debug false
@@ -182,7 +189,8 @@ type Actionbar =
                             button,
                             debug = debug,
                             buttonSize = buttonSize,
-                            tooltipPosition = tooltipPosition
+                            tooltipPosition = tooltipPosition,
+                            ?buttonClassName = buttonClassName
                         )
                     )
                 ),
@@ -191,7 +199,16 @@ type Actionbar =
 
         let restElements =
             React.useMemo (
-                (fun _ -> Actionbar.RestElement(buttons, maxNumber, buttonSize, tooltipPosition, debug = debug)),
+                (fun _ ->
+                    Actionbar.RestElement(
+                        buttons,
+                        maxNumber,
+                        buttonSize,
+                        tooltipPosition,
+                        ?buttonClassName = buttonClassName,
+                        debug = debug
+                    )
+                ),
                 [| buttons |]
             )
 
