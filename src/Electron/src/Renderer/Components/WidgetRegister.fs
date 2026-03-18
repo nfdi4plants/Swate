@@ -153,9 +153,31 @@ let private ARCObjectWidgetContent
             setSelectedTreeItemPath
             setPageState
 
+    let explorerItems =
+        Renderer.Components.ArcExplorer.toFileItems workspaceCtx.state.ArcExplorerTree
+
+    let selectedItemId =
+        Renderer.Components.ArcExplorer.getSelectedItemId
+            workspaceCtx.state.ArcExplorerTree
+            workspaceCtx.state.SelectedExplorerItemId
+            workspaceCtx.state.SelectedTreeItemPath
+
+    let handleExplorerSelection =
+        Renderer.Components.ArcExplorer.createOpenPreviewHandler
+            setSelectedExplorerItemId
+            setSelectedTreeItemPath
+            setPageState
+
+    let explorerPane =
+        Swate.Components.ARCObjectWidget.ExplorerContent(
+            explorerItems,
+            ?selectedItemId = selectedItemId,
+            onItemClick = handleExplorerSelection
+        )
+
     match treePane with
-    | Some treePane -> Swate.Components.ARCObjectWidget.Main(treePane = treePane)
-    | None -> Swate.Components.ARCObjectWidget.Main()
+    | Some treePane -> Swate.Components.ARCObjectWidget.Main(treePane = treePane, explorerPane = explorerPane)
+    | None -> Swate.Components.ARCObjectWidget.Main(explorerPane = explorerPane)
 
 let ARCObjectWidget
     (setSelectedExplorerItemId: string option -> unit)

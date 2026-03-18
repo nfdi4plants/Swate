@@ -18,20 +18,51 @@ type ARCObjectWidget =
     static member private StoryItemIdRoot = "arc"
     static member private StoryItemIdStudy = "study:plant-stress"
     static member private StoryItemIdStudyAssayRef = "study:plant-stress:assay-ref:metabolomics"
+    static member private StoryItemIdStudyAssayRef2 = "study:plant-stress:assay-ref:transcriptomics"
+    static member private StoryItemIdStudy2 = "study:soil-microbiome"
+    static member private StoryItemIdStudy2AssayRef = "study:soil-microbiome:assay-ref:amplicon"
     static member private StoryItemIdAssay = "assay:metabolomics"
+    static member private StoryItemIdAssay2 = "assay:transcriptomics"
+    static member private StoryItemIdAssay3 = "assay:amplicon-sequencing"
     static member private StoryItemIdWorkflow = "workflow:extraction"
+    static member private StoryItemIdWorkflow2 = "workflow:cleanup"
     static member private StoryItemIdRun = "run:2026-04-01"
-    static member private StoryItemIdNote = "note:plant-stress:sampling-protocol"
+    static member private StoryItemIdRun2 = "run:2026-04-08"
+    static member private StoryItemIdStudyDataMap = "study:plant-stress:datamap"
+    static member private StoryItemIdStudy2DataMap = "study:soil-microbiome:datamap"
+    static member private StoryItemIdAssayDataMap = "assay:metabolomics:datamap"
+    static member private StoryItemIdAssay2DataMap = "assay:transcriptomics:datamap"
+    static member private StoryItemIdAssay3DataMap = "assay:amplicon-sequencing:datamap"
+    static member private StoryItemIdWorkflowDataMap = "workflow:extraction:datamap"
+    static member private StoryItemIdWorkflow2DataMap = "workflow:cleanup:datamap"
+    static member private StoryItemIdRunDataMap = "run:2026-04-01:datamap"
+    static member private StoryItemIdRun2DataMap = "run:2026-04-08:datamap"
+    static member private StoryItemIdNote = "study:plant-stress:note-ref:sampling-protocol"
+    static member private StoryItemIdNote2 = "study:plant-stress:note-ref:leaf-scoring"
+    static member private StoryItemIdNote3 = "study:soil-microbiome:note-ref:field-observations"
+    static member private StoryItemIdNoteRoot1 = "note:root:project-overview"
+    static member private StoryItemIdNoteRoot2 = "note:root:release-checklist"
+    static member private StoryItemIdCanonicalStudyNote1 = "note:studies:plant-stress:sampling-protocol"
+    static member private StoryItemIdCanonicalStudyNote2 = "note:studies:plant-stress:leaf-scoring"
+    static member private StoryItemIdCanonicalStudyNote3 = "note:studies:soil-microbiome:field-observations"
     static member private StoryItemIdSample = "sample:leaf-01"
+    static member private StoryItemIdSample2 = "sample:leaf-02"
+    static member private StoryItemIdSample3 = "sample:soil-core-a"
 
     static member private StoryItems() : FileItem list =
-        let folder id name children =
+        let folder iconPath id name children =
             {
-                FileTree.createFolder name None "swt:fluent--folder-24-regular" with
+                FileTree.createFolder name None iconPath with
                     Id = id
                     IsExpanded = true
                     Children = Some children
             }
+
+        let group id name children =
+            folder "swt:fluent--folder-24-regular" id name children
+
+        let objectNode id name children =
+            folder "swt:fluent--document-24-regular" id name children
 
         let document id name =
             {
@@ -51,45 +82,99 @@ type ARCObjectWidget =
                     Id = id
             }
 
+        let datamap id =
+            {
+                FileTree.createFile "DataMap" None "swt:fluent--database-24-regular" with
+                    Id = id
+            }
+
         [
-            folder
+            group
                 ARCObjectWidget.StoryItemIdRoot
                 "MyArc"
                 [
-                    folder
+                    group
                         "group:studies"
                         "Studies"
                         [
-                            folder
+                            objectNode
                                 ARCObjectWidget.StoryItemIdStudy
                                 "PlantStressStudy"
                                 [
-                                    folder
+                                    datamap ARCObjectWidget.StoryItemIdStudyDataMap
+                                    group
                                         "study:plant-stress:assays"
                                         "Assays"
-                                        [ document ARCObjectWidget.StoryItemIdStudyAssayRef "MetabolomicsAssay" ]
-                                    folder
+                                        [
+                                            document ARCObjectWidget.StoryItemIdStudyAssayRef "MetabolomicsAssay"
+                                            document ARCObjectWidget.StoryItemIdStudyAssayRef2 "TranscriptomicsAssay"
+                                        ]
+                                    group
                                         "study:plant-stress:notes"
                                         "Notes"
-                                        [ note ARCObjectWidget.StoryItemIdNote "Sampling protocol" ]
-                                    folder
+                                        [
+                                            note ARCObjectWidget.StoryItemIdNote "Sampling protocol"
+                                            note ARCObjectWidget.StoryItemIdNote2 "Leaf scoring rubric"
+                                        ]
+                                    group
                                         "study:plant-stress:samples"
                                         "Samples"
-                                        [ tag ARCObjectWidget.StoryItemIdSample "Leaf-01" ]
+                                        [
+                                            tag ARCObjectWidget.StoryItemIdSample "Leaf-01"
+                                            tag ARCObjectWidget.StoryItemIdSample2 "Leaf-02"
+                                        ]
+                                ]
+                            objectNode
+                                ARCObjectWidget.StoryItemIdStudy2
+                                "SoilMicrobiomeStudy"
+                                [
+                                    datamap ARCObjectWidget.StoryItemIdStudy2DataMap
+                                    group
+                                        "study:soil-microbiome:assays"
+                                        "Assays"
+                                        [ document ARCObjectWidget.StoryItemIdStudy2AssayRef "AmpliconSequencingAssay" ]
+                                    group
+                                        "study:soil-microbiome:notes"
+                                        "Notes"
+                                        [ note ARCObjectWidget.StoryItemIdNote3 "Field observations" ]
+                                    group
+                                        "study:soil-microbiome:samples"
+                                        "Samples"
+                                        [ tag ARCObjectWidget.StoryItemIdSample3 "SoilCore-A" ]
                                 ]
                         ]
-                    folder
+                    group
                         "group:assays"
                         "Assays"
-                        [ document ARCObjectWidget.StoryItemIdAssay "MetabolomicsAssay" ]
-                    folder
+                        [
+                            objectNode ARCObjectWidget.StoryItemIdAssay "MetabolomicsAssay" [ datamap ARCObjectWidget.StoryItemIdAssayDataMap ]
+                            objectNode ARCObjectWidget.StoryItemIdAssay2 "TranscriptomicsAssay" [ datamap ARCObjectWidget.StoryItemIdAssay2DataMap ]
+                            objectNode ARCObjectWidget.StoryItemIdAssay3 "AmpliconSequencingAssay" [ datamap ARCObjectWidget.StoryItemIdAssay3DataMap ]
+                        ]
+                    group
                         "group:workflows"
                         "Workflows"
-                        [ document ARCObjectWidget.StoryItemIdWorkflow "ExtractionWorkflow" ]
-                    folder
+                        [
+                            objectNode ARCObjectWidget.StoryItemIdWorkflow "ExtractionWorkflow" [ datamap ARCObjectWidget.StoryItemIdWorkflowDataMap ]
+                            objectNode ARCObjectWidget.StoryItemIdWorkflow2 "CleanupWorkflow" [ datamap ARCObjectWidget.StoryItemIdWorkflow2DataMap ]
+                        ]
+                    group
                         "group:runs"
                         "Runs"
-                        [ document ARCObjectWidget.StoryItemIdRun "Run-2026-04-01" ]
+                        [
+                            objectNode ARCObjectWidget.StoryItemIdRun "Run-2026-04-01" [ datamap ARCObjectWidget.StoryItemIdRunDataMap ]
+                            objectNode ARCObjectWidget.StoryItemIdRun2 "Run-2026-04-08" [ datamap ARCObjectWidget.StoryItemIdRun2DataMap ]
+                        ]
+                    group
+                        "group:notes"
+                        "Notes"
+                        [
+                            note ARCObjectWidget.StoryItemIdNoteRoot1 "Project overview"
+                            note ARCObjectWidget.StoryItemIdNoteRoot2 "Release checklist"
+                            note ARCObjectWidget.StoryItemIdCanonicalStudyNote1 "Sampling protocol"
+                            note ARCObjectWidget.StoryItemIdCanonicalStudyNote2 "Leaf scoring rubric"
+                            note ARCObjectWidget.StoryItemIdCanonicalStudyNote3 "Field observations"
+                        ]
                 ]
         ]
 
@@ -101,22 +186,173 @@ type ARCObjectWidget =
             ("PlantStressStudy", "Study", "Canonical object", "studies/PlantStressStudy/isa.study.xlsx", "Registered study with linked assay refs, notes, and derived samples.")
             ARCObjectWidget.StoryItemIdStudyAssayRef,
             ("MetabolomicsAssay", "Assay Reference", "Relationship node", "assays/MetabolomicsAssay/isa.assay.xlsx", "Reference node from the study to the canonical assay entry.")
+            ARCObjectWidget.StoryItemIdStudyAssayRef2,
+            ("TranscriptomicsAssay", "Assay Reference", "Relationship node", "assays/TranscriptomicsAssay/isa.assay.xlsx", "A second assay reference on the same study to show multi-assay study links.")
+            ARCObjectWidget.StoryItemIdStudy2,
+            ("SoilMicrobiomeStudy", "Study", "Canonical object", "studies/SoilMicrobiomeStudy/isa.study.xlsx", "A second study broadens the ARC tree and shows that the widget handles multiple study branches.")
+            ARCObjectWidget.StoryItemIdStudy2AssayRef,
+            ("AmpliconSequencingAssay", "Assay Reference", "Relationship node", "assays/AmpliconSequencingAssay/isa.assay.xlsx", "Study-to-assay reference for the soil microbiome branch.")
             ARCObjectWidget.StoryItemIdAssay,
             ("MetabolomicsAssay", "Assay", "Canonical object", "assays/MetabolomicsAssay/isa.assay.xlsx", "Assay metadata and tables live on the canonical assay node.")
+            ARCObjectWidget.StoryItemIdAssay2,
+            ("TranscriptomicsAssay", "Assay", "Canonical object", "assays/TranscriptomicsAssay/isa.assay.xlsx", "A second canonical assay highlights that the explorer is not limited to a single assay.")
+            ARCObjectWidget.StoryItemIdAssay3,
+            ("AmpliconSequencingAssay", "Assay", "Canonical object", "assays/AmpliconSequencingAssay/isa.assay.xlsx", "A third assay extends the storybook ARC with a distinct study branch.")
             ARCObjectWidget.StoryItemIdWorkflow,
             ("ExtractionWorkflow", "Workflow", "Canonical object", "workflows/ExtractionWorkflow/isa.workflow.xlsx", "Workflow nodes can expose subworkflow references and workflow datamaps.")
+            ARCObjectWidget.StoryItemIdWorkflow2,
+            ("CleanupWorkflow", "Workflow", "Canonical object", "workflows/CleanupWorkflow/isa.workflow.xlsx", "A second workflow makes the workflow area visibly multi-item.")
             ARCObjectWidget.StoryItemIdRun,
             ("Run-2026-04-01", "Run", "Canonical object", "runs/Run-2026-04-01/isa.run.xlsx", "Run nodes can reference workflows and derived sample collections.")
+            ARCObjectWidget.StoryItemIdRun2,
+            ("Run-2026-04-08", "Run", "Canonical object", "runs/Run-2026-04-08/isa.run.xlsx", "A second run shows repeated operational objects in the story.")
+            ARCObjectWidget.StoryItemIdStudyDataMap,
+            ("DataMap", "DataMap", "Canonical child", "studies/PlantStressStudy/isa.datamap.xlsx", "Selecting the study datamap keeps tree focus on the DataMap object and opens the owning study in DataMap view.")
+            ARCObjectWidget.StoryItemIdStudy2DataMap,
+            ("DataMap", "DataMap", "Canonical child", "studies/SoilMicrobiomeStudy/isa.datamap.xlsx", "A second study datamap shows that multiple study branches can expose DataMap children.")
+            ARCObjectWidget.StoryItemIdAssayDataMap,
+            ("DataMap", "DataMap", "Canonical child", "assays/MetabolomicsAssay/isa.datamap.xlsx", "The metabolomics assay exposes a DataMap child in the ARC object tree.")
+            ARCObjectWidget.StoryItemIdAssay2DataMap,
+            ("DataMap", "DataMap", "Canonical child", "assays/TranscriptomicsAssay/isa.datamap.xlsx", "A second assay datamap keeps the assay branch visibly multi-object.")
+            ARCObjectWidget.StoryItemIdAssay3DataMap,
+            ("DataMap", "DataMap", "Canonical child", "assays/AmpliconSequencingAssay/isa.datamap.xlsx", "The amplicon sequencing assay also exposes its DataMap in the object tree.")
+            ARCObjectWidget.StoryItemIdWorkflowDataMap,
+            ("DataMap", "DataMap", "Canonical child", "workflows/ExtractionWorkflow/isa.datamap.xlsx", "Workflow datamaps appear as direct children of workflow objects.")
+            ARCObjectWidget.StoryItemIdWorkflow2DataMap,
+            ("DataMap", "DataMap", "Canonical child", "workflows/CleanupWorkflow/isa.datamap.xlsx", "A second workflow datamap shows that datamaps are not limited to studies and assays.")
+            ARCObjectWidget.StoryItemIdRunDataMap,
+            ("DataMap", "DataMap", "Canonical child", "runs/Run-2026-04-01/isa.datamap.xlsx", "Run datamaps appear directly under run objects.")
+            ARCObjectWidget.StoryItemIdRun2DataMap,
+            ("DataMap", "DataMap", "Canonical child", "runs/Run-2026-04-08/isa.datamap.xlsx", "A second run datamap rounds out the showcase across all supported ARC object kinds.")
             ARCObjectWidget.StoryItemIdNote,
-            ("Sampling protocol", "Note", "Filesystem-backed", "notes/studies/PlantStressStudy/17_03_2026/sampling_protocol.md", "Notes remain backed by markdown files even in the object tree.")
+            ("Sampling protocol", "Note", "Relationship node", "Notes/studies/PlantStressStudy/17_03_2026/sampling_protocol.md", "Reference node from the study to the canonical note entry in the top-level Notes section.")
+            ARCObjectWidget.StoryItemIdNote2,
+            ("Leaf scoring rubric", "Note", "Relationship node", "Notes/studies/PlantStressStudy/18_03_2026/leaf_scoring_rubric.md", "A second study note reference showing that a study can link multiple notes.")
+            ARCObjectWidget.StoryItemIdNote3,
+            ("Field observations", "Note", "Relationship node", "Notes/studies/SoilMicrobiomeStudy/18_03_2026/field_observations.md", "Reference node from the second study to its canonical note entry.")
+            ARCObjectWidget.StoryItemIdNoteRoot1,
+            ("Project overview", "Note", "Filesystem-backed", "Notes/19_03_2026/project_overview.md", "A root-level ARC note rendered directly under ARC -> Notes.")
+            ARCObjectWidget.StoryItemIdNoteRoot2,
+            ("Release checklist", "Note", "Filesystem-backed", "Notes/20_03_2026/release_checklist.md", "A second root-level note broadens the top-level Notes section in the showcase.")
+            ARCObjectWidget.StoryItemIdCanonicalStudyNote1,
+            ("Sampling protocol", "Note", "Filesystem-backed", "Notes/studies/PlantStressStudy/17_03_2026/sampling_protocol.md", "A study-targeted note rendered directly under ARC -> Notes.")
+            ARCObjectWidget.StoryItemIdCanonicalStudyNote2,
+            ("Leaf scoring rubric", "Note", "Filesystem-backed", "Notes/studies/PlantStressStudy/18_03_2026/leaf_scoring_rubric.md", "A second study-targeted note rendered directly under ARC -> Notes.")
+            ARCObjectWidget.StoryItemIdCanonicalStudyNote3,
+            ("Field observations", "Note", "Filesystem-backed", "Notes/studies/SoilMicrobiomeStudy/18_03_2026/field_observations.md", "A study-targeted note for the soil microbiome branch, shown directly under ARC -> Notes.")
             ARCObjectWidget.StoryItemIdSample,
             ("Leaf-01", "Sample", "Virtual node", "-", "Sample nodes are derived from table content, not standalone files.")
+            ARCObjectWidget.StoryItemIdSample2,
+            ("Leaf-02", "Sample", "Virtual node", "-", "A second sample keeps the plant stress study visibly multi-sample.")
+            ARCObjectWidget.StoryItemIdSample3,
+            ("SoilCore-A", "Sample", "Virtual node", "-", "A sample belonging to the second study branch.")
         ]
         |> Map.ofList
+
+    static member private TryFindItemAndParent(itemId: string, items: FileItem list) =
+        let rec loop (parent: FileItem option) (items: FileItem list) =
+            items
+            |> List.tryPick (fun item ->
+                if item.Id = itemId then
+                    Some(item, parent)
+                else
+                    item.Children |> Option.bind (loop (Some item)))
+
+        loop None items
+
+    static member private GetExplorerItems(selectedId: string option, items: FileItem list) =
+        selectedId
+        |> Option.bind (fun itemId -> ARCObjectWidget.TryFindItemAndParent(itemId, items))
+        |> Option.map (fun (selectedItem, _parentItem) ->
+            let children = selectedItem.Children |> Option.defaultValue []
+
+            if List.isEmpty children then
+                ("Current", selectedItem.Name, selectedItem.Id, [ selectedItem ])
+            else
+                ("Children", selectedItem.Name, selectedItem.Id, children))
+
+    [<ReactComponent>]
+    static member ExplorerContent(items: FileItem list, ?selectedItemId: string, ?onItemClick: FileItem -> unit) =
+        let onItemClick = defaultArg onItemClick ignore
+        let explorerItems = ARCObjectWidget.GetExplorerItems(selectedItemId, items)
+
+        let iconTile (subtitle: string) (item: FileItem) isCurrentTarget =
+            Html.button [
+                prop.type'.button
+                prop.className [
+                    "swt:flex swt:flex-col swt:items-center swt:justify-center swt:gap-3 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:min-h-28 swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
+                    if isCurrentTarget then "swt:border-primary swt:bg-primary/10"
+                ]
+                prop.onClick (fun _ -> onItemClick item)
+                prop.children [
+                    Html.i [
+                        prop.className [ "swt:iconify swt:text-4xl swt:text-primary"; item.IconPath ]
+                    ]
+                    Html.div [
+                        prop.className "swt:flex swt:flex-col swt:gap-1"
+                        prop.children [
+                            Html.span [ prop.className "swt:text-sm swt:font-medium"; prop.text item.Name ]
+                            Html.span [ prop.className "swt:text-xs swt:opacity-60"; prop.text subtitle ]
+                        ]
+                    ]
+                ]
+            ]
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-4 swt:h-full swt:overflow-auto"
+            prop.children [
+                match explorerItems with
+                | Some(relationLabel, sourceName, sourceId, visibleItems) ->
+                    let tileSubtitle =
+                        match relationLabel with
+                        | "Children" -> $"Child of {sourceName}"
+                        | "Current" -> "Selected object"
+                        | _ -> sourceName
+
+                    Html.div [
+                        prop.className "swt:flex swt:flex-col swt:gap-1"
+                        prop.children [
+                            Html.span [
+                                prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
+                                prop.text relationLabel
+                            ]
+                            Html.h4 [ prop.className "swt:text-lg swt:font-semibold"; prop.text sourceName ]
+                            Html.p [
+                                prop.className "swt:text-sm swt:opacity-70"
+                                prop.text (
+                                    match relationLabel with
+                                    | "Children" -> "Direct children of the selected ARC object."
+                                    | "Current" -> "The selected ARC object has no children, so it is shown directly."
+                                    | _ -> "Current selection."
+                                )
+                            ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "swt:grid swt:grid-cols-2 swt:xl:grid-cols-3 swt:gap-3"
+                        prop.children [
+                            for item in visibleItems do
+                                iconTile tileSubtitle item (item.Id = sourceId)
+                        ]
+                    ]
+                | None ->
+                    Html.div [
+                        prop.className
+                            "swt:flex swt:flex-1 swt:items-center swt:justify-center swt:rounded-lg swt:border swt:border-dashed swt:border-base-300 swt:bg-base-200/40 swt:p-6"
+                        prop.children [
+                            Html.p [
+                                prop.className "swt:text-sm swt:text-center swt:opacity-70"
+                                prop.text "Select an ARC object in the tree to explore its nearby objects."
+                            ]
+                        ]
+                    ]
+            ]
+        ]
 
     [<ReactComponent>]
     static member private StoryExample() =
         let selectedId, setSelectedId = React.useState ARCObjectWidget.StoryItemIdStudy
+        let items = ARCObjectWidget.StoryItems()
         let selectedMeta =
             ARCObjectWidget.StoryMeta
             |> Map.tryFind selectedId
@@ -125,8 +361,6 @@ type ARCObjectWidget =
         let selectedTitle, kind, role, previewTarget, description = selectedMeta
 
         let treePane =
-            let items = ARCObjectWidget.StoryItems()
-
             Swate.Components.FileExplorer.FileExplorer(
                 initialItems = items,
                 selectedItemId = selectedId,
@@ -134,39 +368,7 @@ type ARCObjectWidget =
             )
 
         let explorerPane =
-            Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-4 swt:h-full swt:overflow-auto"
-                prop.children [
-                    Html.div [
-                        prop.className "swt:flex swt:flex-col swt:gap-1"
-                        prop.children [
-                            Html.span [ prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"; prop.text role ]
-                            Html.h4 [ prop.className "swt:text-lg swt:font-semibold"; prop.text selectedTitle ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-200/40 swt:p-4"
-                        prop.children [
-                            Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-2"; prop.text "How This Example Behaves" ]
-                            Html.ul [
-                                prop.className "swt:list-disc swt:pl-5 swt:text-sm swt:space-y-1"
-                                prop.children [
-                                    Html.li "The left pane reuses the generic tree widget."
-                                    Html.li "Clicking a node updates the middle and right panes."
-                                    Html.li "Canonical nodes and reference nodes are both visible."
-                                ]
-                            ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "swt:flex-1 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-4"
-                        prop.children [
-                            Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-2"; prop.text "Selected Object" ]
-                            Html.p [ prop.className "swt:text-sm swt:opacity-80"; prop.text description ]
-                        ]
-                    ]
-                ]
-            ]
+            ARCObjectWidget.ExplorerContent(items, selectedItemId = selectedId, onItemClick = fun item -> setSelectedId item.Id)
 
         let detailsPane =
             Html.div [
@@ -215,7 +417,7 @@ type ARCObjectWidget =
                         ]
                         Html.p [
                             prop.className "swt:text-sm swt:opacity-70"
-                            prop.text "Placeholder layout for ARC object navigation and inspection."
+                            prop.text "Select an object in the tree to inspect its children, or the selected object itself when it is a leaf."
                         ]
                     ]
                 ]

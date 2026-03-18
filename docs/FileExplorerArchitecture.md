@@ -110,7 +110,7 @@ sequenceDiagram
   - `Study -> Assay`
   - `Workflow -> Subworkflow`
   - `Run -> Workflow`
-- Notes remain filesystem-derived from `notes/...` paths.
+- Notes remain filesystem-derived from `Notes/...` paths.
 - Samples are virtual nodes derived from ARC tables by collecting sample identifiers from `IOType.Sample` columns.
 - Datamap file clicks are still resolved through the owning ISA object path before preview.
 - The reusable explorer component is still application-agnostic; Electron-specific behavior remains in the renderer adapter.

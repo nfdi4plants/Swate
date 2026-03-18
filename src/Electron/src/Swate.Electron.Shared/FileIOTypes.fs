@@ -29,6 +29,7 @@ type ArcExplorerNodeKind =
     | Assay
     | Workflow
     | Run
+    | DataMap
     | Note
     | Sample
 

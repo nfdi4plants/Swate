@@ -51,14 +51,14 @@ module private ArcExplorerTreeCreator =
 
     let isNoteMarkdownPath (relativePath: string) =
         let normalized = normalizeRelativePath relativePath
-        normalized.StartsWith("notes/", StringComparison.OrdinalIgnoreCase)
+        normalized.StartsWith("Notes/", StringComparison.OrdinalIgnoreCase)
         && normalized.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
 
     let tryParseNoteTarget (relativePath: string) =
         let segments =
             (normalizeRelativePath relativePath).Split('/', StringSplitOptions.RemoveEmptyEntries)
 
-        if segments.Length < 2 || not (segments.[0].Equals("notes", StringComparison.OrdinalIgnoreCase)) then
+        if segments.Length < 2 || not (segments.[0].Equals("Notes", StringComparison.OrdinalIgnoreCase)) then
             Root
         elif
             segments.Length >= 5
@@ -139,6 +139,15 @@ module private ArcExplorerTreeCreator =
             isLfs = isLfs
         )
 
+    let createDataMapNode parentId path isLfs =
+        ArcExplorerNode.create (
+            $"{parentId}:datamap",
+            "DataMap",
+            ArcExplorerNodeKind.DataMap,
+            path = Some path,
+            isLfs = isLfs
+        )
+
     let investigationPreviewPath (arcPath: string) = $"{normalizePath arcPath}/isa.investigation.xlsx" |> normalizePath
 
     let studyPreviewPath (arcPath: string) (identifier: string) =
@@ -152,6 +161,9 @@ module private ArcExplorerTreeCreator =
 
     let runPreviewPath (arcPath: string) (identifier: string) =
         $"{normalizePath arcPath}/runs/{identifier}/isa.run.xlsx" |> normalizePath
+
+    let objectDataMapPath (arcPath: string) (folderName: string) (identifier: string) =
+        $"{normalizePath arcPath}/{folderName}/{identifier}/isa.datamap.xlsx" |> normalizePath
 
     let tryGetLfsByPath (lfsByPath: Map<string, bool option>) (path: string option) =
         path
@@ -320,11 +332,14 @@ module private ArcExplorerTreeCreator =
     let createStudyNode arcPath assaysByIdentifier lfsByPath notes (study: ArcStudy) =
         let parentId = $"study:{study.Identifier}"
         let previewPath = Some(studyPreviewPath arcPath study.Identifier)
+        let dataMapPath = objectDataMapPath arcPath "studies" study.Identifier
         let studyNotes = tryFindNotesForTarget (Study study.Identifier) notes
         let studySamples = extractStudySampleNames assaysByIdentifier study
 
         [
             createStudyRelationshipsGroup arcPath lfsByPath parentId study
+            if study.DataMap.IsSome then
+                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
             createNotesGroup parentId studyNotes
             createSamplesGroup parentId false studySamples
         ]
@@ -340,9 +355,12 @@ module private ArcExplorerTreeCreator =
     let createAssayNode arcPath lfsByPath notes (assay: ArcAssay) =
         let parentId = $"assay:{assay.Identifier}"
         let previewPath = Some(assayPreviewPath arcPath assay.Identifier)
+        let dataMapPath = objectDataMapPath arcPath "assays" assay.Identifier
         let assayNotes = tryFindNotesForTarget (Assay assay.Identifier) notes
 
         [
+            if assay.DataMap.IsSome then
+                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
             createNotesGroup parentId assayNotes
         ]
         |> List.choose id
@@ -357,10 +375,13 @@ module private ArcExplorerTreeCreator =
     let createWorkflowNode arcPath lfsByPath notes (workflow: ArcWorkflow) =
         let parentId = $"workflow:{workflow.Identifier}"
         let previewPath = Some(workflowPreviewPath arcPath workflow.Identifier)
+        let dataMapPath = objectDataMapPath arcPath "workflows" workflow.Identifier
         let workflowNotes = tryFindNotesForTarget (Workflow workflow.Identifier) notes
 
         [
             createWorkflowRelationshipsGroup arcPath lfsByPath parentId workflow
+            if workflow.DataMap.IsSome then
+                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
             createNotesGroup parentId workflowNotes
         ]
         |> List.choose id
@@ -375,11 +396,14 @@ module private ArcExplorerTreeCreator =
     let createRunNode arcPath lfsByPath notes (run: ArcRun) =
         let parentId = $"run:{run.Identifier}"
         let previewPath = Some(runPreviewPath arcPath run.Identifier)
+        let dataMapPath = objectDataMapPath arcPath "runs" run.Identifier
         let runNotes = tryFindNotesForTarget (Run run.Identifier) notes
         let runSamples = extractSampleNames run.Tables
 
         [
             createRunRelationshipsGroup arcPath lfsByPath parentId run
+            if run.DataMap.IsSome then
+                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
             createNotesGroup parentId runNotes
             createSamplesGroup parentId true runSamples
         ]
@@ -393,61 +417,21 @@ module private ArcExplorerTreeCreator =
             (tryGetLfsByPath lfsByPath previewPath)
 
     let createTopLevelNotesGroup (notes: NoteEntry list) =
-        let createCanonicalNotesGroup id name noteEntries =
+        let createCanonicalNoteNodes idPrefix noteEntries =
             noteEntries
             |> List.sortBy (fun note -> note.RelativePath.ToLowerInvariant (), note.RelativePath)
             |> List.map (fun note ->
                 createNoteNode
-                    $"note:{note.RelativePath.ToLowerInvariant()}"
+                    $"{idPrefix}:{note.RelativePath.ToLowerInvariant()}"
                     note.Name
                     note.AbsolutePath
                     false
                     note.IsLfs)
-            |> sortByName
-            |> createGroup id name
-
-        let createTargetBucket groupId name (picker: NoteEntry -> (string * NoteEntry) option) =
-            let groupedNotes =
-                notes
-                |> List.choose picker
-                |> List.groupBy fst
-                |> List.sortBy (fun (targetName, _) -> targetName.ToLowerInvariant (), targetName)
-                |> List.map (fun (targetName, entries) ->
-                    entries
-                    |> List.map snd
-                    |> createCanonicalNotesGroup $"{groupId}:{targetName}" targetName)
-
-            if List.isEmpty groupedNotes then None else Some(createGroup groupId name groupedNotes)
-
-        let rootNotes =
-            notes
-            |> List.filter (fun note -> note.Target = Root)
 
         let children =
-            [
-                if not (List.isEmpty rootNotes) then
-                    createCanonicalNotesGroup "notes:root" "Root Notes" rootNotes
-                yield!
-                    [
-                        createTargetBucket "notes:studies" "Studies" (fun note ->
-                            match note.Target with
-                            | Study identifier -> Some(identifier, note)
-                            | _ -> None)
-                        createTargetBucket "notes:assays" "Assays" (fun note ->
-                            match note.Target with
-                            | Assay identifier -> Some(identifier, note)
-                            | _ -> None)
-                        createTargetBucket "notes:workflows" "Workflows" (fun note ->
-                            match note.Target with
-                            | Workflow identifier -> Some(identifier, note)
-                            | _ -> None)
-                        createTargetBucket "notes:runs" "Runs" (fun note ->
-                            match note.Target with
-                            | Run identifier -> Some(identifier, note)
-                            | _ -> None)
-                    ]
-                    |> List.choose (fun group -> group)
-            ]
+            notes
+            |> createCanonicalNoteNodes "note"
+            |> sortByName
 
         createGroup "group:notes" "Notes" children
 

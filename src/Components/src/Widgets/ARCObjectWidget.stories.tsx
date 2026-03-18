@@ -29,6 +29,11 @@ export const Default: Story = {
     expect(screen.getByText('ARC Object Explorer')).toBeInTheDocument();
     expect(screen.getByText('ARC Object Details')).toBeInTheDocument();
     expect(screen.getAllByText('PlantStressStudy').length).toBeGreaterThan(0);
-    expect(screen.getByText('Selected Object')).toBeInTheDocument();
+    expect(screen.getAllByText('SoilMicrobiomeStudy').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('TranscriptomicsAssay').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DataMap').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Project overview').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Release checklist').length).toBeGreaterThan(0);
+    expect(screen.getByText('Properties')).toBeInTheDocument();
   },
 };

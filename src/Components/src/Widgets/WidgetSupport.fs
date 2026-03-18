@@ -34,6 +34,7 @@ module WidgetArcFile =
         match arcFile with
         | ArcFiles.Assay assay when assay.DataMap.IsSome -> Some assay.DataMap.Value
         | ArcFiles.Study(study, _) when study.DataMap.IsSome -> Some study.DataMap.Value
+        | ArcFiles.Workflow workflow when workflow.DataMap.IsSome -> Some workflow.DataMap.Value
         | ArcFiles.Run run when run.DataMap.IsSome -> Some run.DataMap.Value
         | ArcFiles.DataMap(_, dataMap) -> Some dataMap
         | _ -> None

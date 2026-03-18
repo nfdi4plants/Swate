@@ -24,7 +24,7 @@ type ARCObjectTree =
 
         Html.section [
             prop.className
-                "swt:flex swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:min-h-72 swt:h-full"
+                "swt:flex swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:min-h-72 swt:h-full swt:overflow-auto"
             prop.children [
                 Html.h3 [
                     prop.className "swt:text-sm swt:font-semibold"

@@ -23,6 +23,9 @@ let private resolvePreviewPath (path: string) =
     let isStudyDatamapFile =
         lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
 
+    let isWorkflowDatamapFile =
+        lowered.Contains("/workflows/") && lowered.EndsWith("/isa.datamap.xlsx")
+
     let isRunDatamapFile =
         lowered.Contains("/runs/") && lowered.EndsWith("/isa.datamap.xlsx")
 
@@ -32,6 +35,9 @@ let private resolvePreviewPath (path: string) =
     elif isStudyDatamapFile then
         let folderPath = normalized.Substring(0, normalized.LastIndexOf('/'))
         $"{folderPath}/isa.study.xlsx"
+    elif isWorkflowDatamapFile then
+        let folderPath = normalized.Substring(0, normalized.LastIndexOf('/'))
+        $"{folderPath}/isa.workflow.xlsx"
     elif isRunDatamapFile then
         let folderPath = normalized.Substring(0, normalized.LastIndexOf('/'))
         $"{folderPath}/isa.run.xlsx"
@@ -124,14 +130,15 @@ let createFileTree
             | None -> setPageState (Some(PageState.Error $"File '{item.Name}' has no path."))
             | Some path when item.IsDirectory -> setPageState None
             | Some path ->
+                let selectedPath = normalizePath path
                 let previewPath = resolvePreviewPath path
 
-                if previewPath <> normalizePath path then
+                if previewPath <> selectedPath then
                     console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
                 else
                     console.log ($"[Renderer] Opening file: {previewPath}")
 
-                setSelectedTreeItemPath (Some previewPath)
+                setSelectedTreeItemPath (Some selectedPath)
                 let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
 
                 match result with

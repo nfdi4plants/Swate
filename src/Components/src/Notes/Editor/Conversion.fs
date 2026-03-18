@@ -7,7 +7,7 @@ open Swate.Components.Landing
 [<RequireQualifiedAccess>]
 module NoteConversion =
 
-    let private notesRootFolder = "notes"
+    let private notesRootFolder = "Notes"
 
     let formatDateFolder (dateCreated: DateTime) =
         sprintf "%02d_%02d_%04d" dateCreated.Day dateCreated.Month dateCreated.Year

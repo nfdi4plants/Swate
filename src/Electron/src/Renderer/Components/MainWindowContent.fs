@@ -13,6 +13,21 @@ open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
+let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+
+let private isDataMapPath (path: string) =
+    normalizePath path
+    |> fun normalizedPath -> normalizedPath.EndsWith("/isa.datamap.xlsx", StringComparison.OrdinalIgnoreCase)
+
+let private canRenderDataMapViewForArcFile =
+    function
+    | ArcFiles.Assay assay -> assay.DataMap.IsSome
+    | ArcFiles.Study(study, _) -> study.DataMap.IsSome
+    | ArcFiles.Run run -> run.DataMap.IsSome
+    | ArcFiles.Workflow workflow -> workflow.DataMap.IsSome
+    | ArcFiles.DataMap _ -> true
+    | _ -> false
+
 
 module MainWindowContentHelper =
 
@@ -111,14 +126,7 @@ let CreateARCPreview
 
     let setArcFile arcFile = setArcFileState (Some arcFile)
 
-    let canRenderDataMapView =
-        match arcFile with
-        | ArcFiles.Assay assay -> assay.DataMap.IsSome
-        | ArcFiles.Study(study, _) -> study.DataMap.IsSome
-        | ArcFiles.Run run -> run.DataMap.IsSome
-        | ArcFiles.Workflow workflow -> workflow.DataMap.IsSome
-        | ArcFiles.DataMap _ -> true
-        | _ -> false
+    let canRenderDataMapView = canRenderDataMapViewForArcFile arcFile
 
     React.useEffect (
         (fun () ->
@@ -273,6 +281,28 @@ let Content
         React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
 
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
+
+    React.useEffect (
+        (fun () ->
+            let shouldShowDataMap =
+                match arcFileState with
+                | Some arcFile when canRenderDataMapViewForArcFile arcFile ->
+                    match arcFile with
+                    | ArcFiles.DataMap _ -> true
+                    | _ ->
+                        workspaceCtx.state.SelectedTreeItemPath
+                        |> Option.exists isDataMapPath
+                | _ -> false
+
+            if shouldShowDataMap && activeView <> PreviewActiveView.DataMap then
+                setActiveView PreviewActiveView.DataMap
+        ),
+        [|
+            box arcFileState
+            box workspaceCtx.state.SelectedTreeItemPath
+            box activeView
+        |]
+    )
 
     let availableNotesTargets =
         React.useMemo (

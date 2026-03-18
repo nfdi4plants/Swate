@@ -44,6 +44,7 @@ let private iconForNode (node: ArcExplorerNode) =
     match node.kind with
     | ArcExplorerNodeKind.Arc
     | ArcExplorerNodeKind.Group -> "swt:fluent--folder-24-regular"
+    | ArcExplorerNodeKind.DataMap -> "swt:fluent--database-24-regular"
     | ArcExplorerNodeKind.Sample -> "swt:fluent--tag-24-regular"
     | ArcExplorerNodeKind.Note
     | ArcExplorerNodeKind.Study
@@ -96,6 +97,54 @@ let rec private toFileItem (node: ArcExplorerNode) =
                 Selectable = node.isSelectable
         }
 
+let toFileItems (nodes: ArcExplorerNode list) = nodes |> List.map toFileItem
+
+let getSelectedItemId
+    (nodes: ArcExplorerNode list)
+    (selectedExplorerItemId: string option)
+    (selectedTreeItemPath: string option)
+    =
+    selectedExplorerItemId
+    |> Option.orElseWith (fun () ->
+        selectedTreeItemPath |> Option.bind (fun path -> tryFindNodeIdByPath path nodes))
+
+let createOpenPreviewHandler
+    (setSelectedExplorerItemId: string option -> unit)
+    (setSelectedTreeItemPath: string option -> unit)
+    (setPageState: PageState option -> unit)
+    =
+    let openPreview (item: FileItem) =
+        promise {
+            match item.Path with
+            | None ->
+                setSelectedTreeItemPath None
+                setSelectedExplorerItemId (Some item.Id)
+                setPageState None
+            | Some path ->
+                let selectedPath = normalizePath path
+                let previewPath = resolvePreviewPath path
+
+                if previewPath <> selectedPath then
+                    console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
+                else
+                    console.log ($"[Renderer] Opening file: {previewPath}")
+
+                setSelectedTreeItemPath (Some selectedPath)
+                setSelectedExplorerItemId (Some item.Id)
+                let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+
+                match result with
+                | Ok data ->
+                    console.log ("[Renderer] Received data, processing...")
+                    setPageState (Some data)
+                | Error exn ->
+                    console.log ($"[Renderer] Error: {exn.Message}")
+                    setPageState (Some(PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
+        }
+        |> Promise.start
+
+    openPreview
+
 let createArcExplorer
     (rootRepoPath: string option)
     (nodes: ArcExplorerNode list)
@@ -105,10 +154,7 @@ let createArcExplorer
     (setSelectedTreeItemPath: string option -> unit)
     (setPageState: PageState option -> unit)
     =
-    let selectedItemId =
-        selectedExplorerItemId
-        |> Option.orElseWith (fun () ->
-            selectedTreeItemPath |> Option.bind (fun path -> tryFindNodeIdByPath path nodes))
+    let selectedItemId = getSelectedItemId nodes selectedExplorerItemId selectedTreeItemPath
 
     let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) = promise {
         let request: GitLfsRequest = {
@@ -142,39 +188,12 @@ let createArcExplorer
     let contextMenuItems (item: FileItem) =
         FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
 
-    let openPreview (item: FileItem) =
-        promise {
-            match item.Path with
-            | None ->
-                setSelectedTreeItemPath None
-                setSelectedExplorerItemId (Some item.Id)
-                setPageState None
-            | Some path ->
-                let previewPath = resolvePreviewPath path
-
-                if previewPath <> normalizePath path then
-                    console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
-                else
-                    console.log ($"[Renderer] Opening file: {previewPath}")
-
-                setSelectedTreeItemPath (Some previewPath)
-                setSelectedExplorerItemId (Some item.Id)
-                let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
-
-                match result with
-                | Ok data ->
-                    console.log ("[Renderer] Received data, processing...")
-                    setPageState (Some data)
-                | Error exn ->
-                    console.log ($"[Renderer] Error: {exn.Message}")
-                    setPageState (Some(PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
-        }
-        |> Promise.start
+    let openPreview = createOpenPreviewHandler setSelectedExplorerItemId setSelectedTreeItemPath setPageState
 
     if List.isEmpty nodes then
         None
     else
-        let items = nodes |> List.map toFileItem
+        let items = toFileItems nodes
 
         Some(
             Swate.Components.FileExplorer.FileExplorer(
