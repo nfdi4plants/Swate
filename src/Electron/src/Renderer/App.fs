@@ -96,10 +96,7 @@ let Main () =
         })
 
     let setRecentARCs (arcs: SelectorTypes.ARCPointer[]) =
-        setWorkspaceState (fun state -> {
-            state with
-                RecentARCs = arcs
-        })
+        setWorkspaceState (fun state -> { state with RecentARCs = arcs })
 
     let setFileTree (fileTree: System.Collections.Generic.Dictionary<string, FileEntry>) =
         let immutableFileTree =
@@ -169,7 +166,13 @@ let Main () =
             match pathOption with
             | Some p ->
                 AppState.ARC p |> setAppState
-                Renderer.Navigation.PageActions.openArcStartPage notesCtx landingCtx setArcFileState setSelectedTreeItemPath setPageState
+
+                Renderer.Navigation.PageActions.openArcStartPage
+                    notesCtx
+                    landingCtx
+                    setArcFileState
+                    setSelectedTreeItemPath
+                    setPageState
             | None ->
                 setAppState AppState.Init
                 setSelectedTreeItemPath None
@@ -212,7 +215,13 @@ let Main () =
                 match pathOption with
                 | Some p ->
                     AppState.ARC p |> setAppState
-                    Renderer.Navigation.PageActions.openArcStartPage notesCtx landingCtx setArcFileState setSelectedTreeItemPath setPageState
+
+                    Renderer.Navigation.PageActions.openArcStartPage
+                        notesCtx
+                        landingCtx
+                        setArcFileState
+                        setSelectedTreeItemPath
+                        setPageState
                 | None ->
                     setSelectedTreeItemPath None
                     setPageState None
@@ -242,7 +251,8 @@ let Main () =
                     pageState,
                     setPageState,
                     setSelectedTreeItemPath
-                )),
+                )
+            ),
             [| box appState; box pageState; box arcFileState |]
         )
 
@@ -255,17 +265,31 @@ let Main () =
                         Actionbar.ButtonInfo.create (
                             "swt:fluent--document-bullet-list-24-regular swt:size-5",
                             "Labbook View",
-                            fun () -> Renderer.Navigation.PageActions.openLandingPage landingCtx setArcFileState setSelectedTreeItemPath setPageState
+                            fun _ ->
+                                Renderer.Navigation.PageActions.openLandingPage
+                                    landingCtx
+                                    setArcFileState
+                                    setSelectedTreeItemPath
+                                    setPageState
                         )
                         Actionbar.ButtonInfo.create (
                             "swt:fluent--document-24-regular swt:size-5",
                             "Create Note",
-                            fun () -> Renderer.Navigation.PageActions.createNewNote notesCtx setArcFileState setSelectedTreeItemPath setPageState
+                            fun _ ->
+                                Renderer.Navigation.PageActions.createNewNote
+                                    notesCtx
+                                    setArcFileState
+                                    setSelectedTreeItemPath
+                                    setPageState
                         )
                         Actionbar.ButtonInfo.create (
                             "swt:fluent--search-24-regular swt:size-5",
                             "Note Search",
-                            fun () -> Renderer.Navigation.PageActions.openNotesSearchPage setArcFileState setSelectedTreeItemPath setPageState
+                            fun _ ->
+                                Renderer.Navigation.PageActions.openNotesSearchPage
+                                    setArcFileState
+                                    setSelectedTreeItemPath
+                                    setPageState
                         )
                     |],
                     4
