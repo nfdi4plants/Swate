@@ -4,7 +4,7 @@ open Fable.Core
 open Fetch
 open Swate.Electron.Shared.AuthTypes
 
-type internal GitLabAuthFailure = {
+type GitLabAuthFailure = {
     Kind: AuthFailureKind
     Message: string
 }

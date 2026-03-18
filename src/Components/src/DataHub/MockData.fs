@@ -33,6 +33,7 @@ let yourRepos: ExploreProjectDto array = [|
         id = 1
         name = "metabolomics-arc"
         path_with_namespace = "kevin/metabolomics-arc"
+        name_with_namespace = "kevin / metabolomics-arc"
         description = Some "LC-MS metabolomics workflow"
         web_url = "https://git.nfdi4plants.org/kevin/metabolomics-arc"
         avatar_url = Some "https://picsum.photos/40/40?r=1"
@@ -46,6 +47,7 @@ let yourRepos: ExploreProjectDto array = [|
         id = 2
         name = "rnaseq-arc"
         path_with_namespace = "kevin/rnaseq-arc"
+        name_with_namespace = "kevin / rnaseq-arc"
         description = Some "RNA-seq analysis templates"
         web_url = "https://git.nfdi4plants.org/kevin/rnaseq-arc"
         avatar_url = Some "https://picsum.photos/40/40?r=2"
@@ -59,6 +61,7 @@ let yourRepos: ExploreProjectDto array = [|
         id = 3
         name = "proteomics-arc"
         path_with_namespace = "kevin/proteomics-arc"
+        name_with_namespace = "kevin / proteomics-arc"
         description = Some "Proteomics starter ARC"
         web_url = "https://git.nfdi4plants.org/kevin/proteomics-arc"
         avatar_url = None
@@ -75,6 +78,7 @@ let mostStarred: ExploreProjectDto array = [|
         id = 10
         name = "plant-ontology"
         path_with_namespace = "nfdi4plants/plant-ontology"
+        name_with_namespace = "NFDI4Plants / Plant Ontology"
         description = Some "Controlled vocabulary and mappings"
         web_url = "https://git.nfdi4plants.org/nfdi4plants/plant-ontology"
         avatar_url = Some "https://picsum.photos/40/40?r=10"
@@ -88,6 +92,7 @@ let mostStarred: ExploreProjectDto array = [|
         id = 11
         name = "arc-spec"
         path_with_namespace = "nfdi4plants/arc-spec"
+        name_with_namespace = "NFDI4Plants / ARC Specification"
         description = Some "ARC specification"
         web_url = "https://git.nfdi4plants.org/nfdi4plants/arc-spec"
         avatar_url = Some "https://picsum.photos/40/40?r=11"
@@ -101,6 +106,7 @@ let mostStarred: ExploreProjectDto array = [|
         id = 12
         name = "arc-templates"
         path_with_namespace = "plant-data/arc-templates"
+        name_with_namespace = "Plant Data / ARC Templates"
         description = Some "Reusable ARC templates"
         web_url = "https://git.nfdi4plants.org/plant-data/arc-templates"
         avatar_url = Some "https://picsum.photos/40/40?r=12"
@@ -122,6 +128,7 @@ let orgRepos: Map<int, ExploreProjectDto array> =
                 id = 13
                 name = "growth-model"
                 path_with_namespace = "plant-data/growth-model"
+                name_with_namespace = "Plant Data / Growth Model"
                 description = Some "Plant growth model experiments"
                 web_url = "https://git.nfdi4plants.org/plant-data/growth-model"
                 avatar_url = None

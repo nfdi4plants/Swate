@@ -68,6 +68,7 @@ type ExploreProjectDto = {
     id: int
     name: string
     path_with_namespace: string
+    name_with_namespace: string
     description: string option
     web_url: string
     avatar_url: string option
@@ -135,6 +136,7 @@ type private GitLabProjectResponse = {
     id: int
     name: string
     path_with_namespace: string
+    name_with_namespace: string
     description: string option
     web_url: string
     avatar_url: string option
@@ -277,6 +279,7 @@ module private Internals =
         updated_at = project.updated_at
         last_activity_at = project.last_activity_at
         ``namespace`` = toExploreNamespaceDto project.``namespace``
+        name_with_namespace = project.name_with_namespace
     }
 
     let toGroupDto (group: GitLabGroupResponse) : GroupDto = {
@@ -440,6 +443,8 @@ type GitLabApi =
         (
             baseUrl: string,
             pat: string,
+            // Without a userId, this endpoint fetches user by PAT and uses their ID, which is the common case for "My Repos". To improve performance, callers that already have the user ID can provide it to skip the extra user fetch.
+            ?userId: int,
             ?page: int,
             ?perPage: int,
             ?pagination: PaginationMode,
@@ -453,12 +458,22 @@ type GitLabApi =
             ?minAccessLevel: int
         ) : JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>> =
         promise {
-            let! currentUser = GitLabApi.GetCurrentUser(baseUrl, pat)
+            let! currentUserId =
+                match userId with
+                | Some id -> Promise.lift (Ok id)
+                | None -> promise {
+                    let! user = GitLabApi.GetCurrentUser(baseUrl, pat)
 
-            match currentUser with
+                    return
+                        match user with
+                        | Ok u -> Ok u.id
+                        | Error err -> Error err
+                  }
+
+            match currentUserId with
             | Error err -> return Error err
-            | Ok user ->
-                let baseEndpoint = $"{baseUrl.TrimEnd('/')}/api/v4/users/{user.id}/projects"
+            | Ok userId ->
+                let baseEndpoint = $"{baseUrl.TrimEnd('/')}/api/v4/users/{userId}/projects"
 
                 let queryParams =
                     []
@@ -476,6 +491,7 @@ type GitLabApi =
 
                 let url = appendQueryParams baseEndpoint queryParams
                 let! response = Internals.sendGet<GitLabProjectResponse> url pat
+                Browser.Dom.console.log response
 
                 return
                     response

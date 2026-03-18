@@ -1,10 +1,7 @@
 namespace Swate.Components
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
-open Browser.Types
-open Fetch
 
 open DataHubTypes
 open Swate.Components.Api.GitLabApi
@@ -162,10 +159,6 @@ type DataHubBrowser =
                                 Html.span [
                                     prop.className "swt:text-xs swt:text-base-content/60"
                                     prop.text owner
-                                ]
-                                Html.span [
-                                    prop.className "swt:badge swt:badge-ghost swt:badge-xs"
-                                    prop.text "author: n/a"
                                 ]
                                 Html.span [
                                     prop.className "swt:badge swt:badge-outline swt:badge-xs"
@@ -538,91 +531,19 @@ type DataHubBrowser =
             not (System.String.IsNullOrWhiteSpace baseUrl)
             && not (System.String.IsNullOrWhiteSpace pat)
 
-        let tryGetHeader (response: obj) (name: string) : string option =
-            let headers = response?headers
-
-            if isNullOrUndefined headers then
-                None
-            else
-                headers?get (name) |> Option.ofObj
-
-        let tryParseInt (value: string option) =
-            match value with
-            | Some raw when not (System.String.IsNullOrWhiteSpace raw) ->
-                let mutable parsed = 0
-
-                if System.Int32.TryParse(raw, &parsed) then
-                    Some parsed
-                else
-                    None
-            | _ -> None
-
-        let toPagination (response: obj) : PaginationMetadata = {
-            Link = tryGetHeader response "link"
-            NextPage = tryParseInt (tryGetHeader response "x-next-page")
-            Page = tryParseInt (tryGetHeader response "x-page")
-            PerPage = tryParseInt (tryGetHeader response "x-per-page")
-            PrevPage = tryParseInt (tryGetHeader response "x-prev-page")
-            Total = tryParseInt (tryGetHeader response "x-total")
-            TotalPages = tryParseInt (tryGetHeader response "x-total-pages")
-            NextCursor = tryGetHeader response "x-next-cursor"
-            PrevCursor = tryGetHeader response "x-prev-cursor"
-        }
-
-        let requestOptions = [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [
-                HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat)
-                HttpRequestHeaders.Accept "application/json"
-            ]
-        ]
-
-        let getCurrentUserId () = promise {
-            let! response = fetchUnsafe ($"{baseUrl.TrimEnd('/')}/api/v4/user") requestOptions
-
-            if not response.Ok then
-                return Error $"HTTP {response.Status} on /user"
-            else
-                let! user = response.json<{| id: int |}> ()
-                return Ok user.id
-        }
-
-        let fetchGroups () = promise {
-            let url = $"{baseUrl.TrimEnd('/')}/api/v4/groups?page=1&per_page=100"
-            let! response = fetchUnsafe url requestOptions
-
-            if not response.Ok then
-                return Error $"HTTP {response.Status} on /groups"
-            else
-                let! payload = response.json<GroupDto array> ()
-                let pagination = toPagination (box response)
-
-                return
-                    Ok {
-                        Items = payload
-                        Pagination = pagination
-                    }
-        }
-
-        let fetchProjects (url: string) = promise {
-            let! response = fetchUnsafe url requestOptions
-
-            if not response.Ok then
-                return Error $"HTTP {response.Status} on projects endpoint"
-            else
-                let! payload = response.json<ExploreProjectDto array> ()
-                let pagination = toPagination (box response)
-
-                return
-                    Ok {
-                        Items = payload
-                        Pagination = pagination
-                    }
-        }
+        let gitLabErrorToString =
+            function
+            | GitLabError.NetworkError ex -> $"Network error: {ex.Message}"
+            | GitLabError.Unauthorized -> "Unauthorized (check your Personal Access Token)."
+            | GitLabError.Forbidden -> "Forbidden (missing permissions for this resource)."
+            | GitLabError.NotFound -> "GitLab resource not found."
+            | GitLabError.HttpError code -> $"GitLab request failed with HTTP {code}."
+            | GitLabError.DecodeError ex -> $"Failed to decode GitLab response: {ex.Message}"
+            | GitLabError.InvalidRequest message -> message
 
         let loadGroupsIfNeeded () = promise {
             if groups.Length = 0 && isConnected then
-                let! groupsResult = fetchGroups ()
+                let! groupsResult = GitLabApi.ListGroupsForCurrentUser(baseUrl, pat, page = 1, perPage = 100)
 
                 match groupsResult with
                 | Ok g ->
@@ -630,7 +551,7 @@ type DataHubBrowser =
 
                     if selectedGroupId.IsNone && g.Items.Length > 0 then
                         setSelectedGroupId (Some g.Items[0].id)
-                | Error err -> setError (Some(string err))
+                | Error err -> setError (Some(gitLabErrorToString err))
         }
 
         let load () =
@@ -648,29 +569,37 @@ type DataHubBrowser =
 
                     let! result =
                         match tab with
-                        | ExploreTab.YourRepos -> promise {
-                            let! userIdResult = getCurrentUserId ()
-
-                            match userIdResult with
-                            | Error e -> return Error e
-                            | Ok userId ->
-                                let url =
-                                    $"{baseUrl.TrimEnd('/')}/api/v4/users/{userId}/projects?page={page}&per_page=20&search={JS.encodeURIComponent debouncedSearchTerm}"
-
-                                return! fetchProjects url
-                          }
+                        | ExploreTab.YourRepos ->
+                            GitLabApi.ListUserPersonalProjects(
+                                baseUrl,
+                                pat,
+                                page = page,
+                                perPage = 20,
+                                search = debouncedSearchTerm,
+                                orderBy = ProjectSortField.UpdatedAt,
+                                sort = SortDirection.Desc
+                            )
                         | ExploreTab.MostStarred ->
-                            let url =
-                                $"{baseUrl.TrimEnd('/')}/api/v4/projects?page={page}&per_page=20&order_by=star_count&sort=desc&search={JS.encodeURIComponent debouncedSearchTerm}"
-
-                            fetchProjects url
+                            GitLabApi.ListExploreMostStarred(
+                                baseUrl,
+                                pat,
+                                page = page,
+                                perPage = 20,
+                                search = debouncedSearchTerm
+                            )
                         | ExploreTab.YourOrganisations ->
                             match selectedGroupId with
                             | Some gid ->
-                                let url =
-                                    $"{baseUrl.TrimEnd('/')}/api/v4/groups/{gid}/projects?page={page}&per_page=20&include_subgroups=true&with_shared=true&search={JS.encodeURIComponent debouncedSearchTerm}"
-
-                                fetchProjects url
+                                GitLabApi.ListGroupProjects(
+                                    baseUrl,
+                                    pat,
+                                    gid,
+                                    page = page,
+                                    perPage = 20,
+                                    includeSubgroups = true,
+                                    withShared = true,
+                                    search = debouncedSearchTerm
+                                )
                             | None -> promise {
                                 return
                                     Ok {
@@ -694,7 +623,7 @@ type DataHubBrowser =
                         setRepos okResult.Items
                         setPagination (Some okResult.Pagination)
                     | Error err ->
-                        setError (Some err)
+                        setError (Some(gitLabErrorToString err))
                         setRepos [||]
 
                     setIsLoading false
