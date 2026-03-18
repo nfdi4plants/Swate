@@ -72,6 +72,14 @@ let rec private tryFindNodeIdByPath (path: string) (nodes: ArcExplorerNode list)
     |> Option.orElseWith (fun () -> matches |> List.tryHead)
     |> Option.map (fun node -> node.id)
 
+let rec tryFindNodeById (nodeId: string) (nodes: ArcExplorerNode list) =
+    nodes
+    |> List.tryPick (fun node ->
+        if node.id = nodeId then
+            Some node
+        else
+            tryFindNodeById nodeId node.children)
+
 let rec private toFileItem (node: ArcExplorerNode) =
     let children = node.children |> List.map toFileItem
 

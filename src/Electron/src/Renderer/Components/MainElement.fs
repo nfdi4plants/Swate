@@ -39,6 +39,7 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
 [<ReactComponent>]
 let CreateARCitectNavbar
     (arcFile: ArcFiles option)
+    (pageState: Swate.Electron.Shared.IPCTypes.IPCTypesHelper.PageState option)
     (activeView: PreviewActiveView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
@@ -65,6 +66,7 @@ let CreateARCitectNavbar
     let widgets =
         createWidgets
             arcFile
+            pageState
             widgetHostView
             activeTableIndex
             setArcFileState

@@ -339,6 +339,7 @@ let Content
                             prop.children [
                                 MainElement.CreateARCitectNavbar
                                     arcFileState
+                                    pageState
                                     activeView
                                     activeTableIndex
                                     setArcFileState

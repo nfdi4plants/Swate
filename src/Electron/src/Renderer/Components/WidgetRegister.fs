@@ -1,11 +1,390 @@
 module Renderer.Components.WidgetRegistry
 
+open System
 open Feliz
 open Swate.Components
+open Swate.Components.MarkdownText
+open Swate.Components.MarkdownText.JsBindings
 open ARCtrl
 open Swate.Electron.Shared
+open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+
+let private asOptionalText (value: string option) =
+    value
+    |> Option.bind (fun text ->
+        if String.IsNullOrWhiteSpace text then
+            None
+        else
+            Some text)
+
+let private summariseStrings (values: seq<string>) =
+    values
+    |> Seq.filter (fun value -> String.IsNullOrWhiteSpace value |> not)
+    |> Seq.distinct
+    |> Seq.toList
+    |> function
+        | [] -> None
+        | [ single ] -> Some single
+        | [ first; second ] -> Some $"{first}; {second}"
+        | first :: second :: rest -> Some $"{first}; {second}; +{rest.Length} more"
+
+let private personDisplayName (person: Person) =
+    [ person.FirstName; person.MidInitials; person.LastName ]
+    |> List.choose id
+    |> List.filter (fun value -> String.IsNullOrWhiteSpace value |> not)
+    |> function
+        | [] -> person.ORCID |> asOptionalText |> Option.defaultValue "Unnamed person"
+        | parts -> String.concat " " parts
+
+let private ontologyLabel (annotation: OntologyAnnotation option) =
+    annotation |> Option.map _.NameText |> asOptionalText
+
+let private nodeKindLabel =
+    function
+    | ArcExplorerNodeKind.Arc -> "ARC"
+    | ArcExplorerNodeKind.Group -> "Group"
+    | ArcExplorerNodeKind.Study -> "Study"
+    | ArcExplorerNodeKind.Assay -> "Assay"
+    | ArcExplorerNodeKind.Workflow -> "Workflow"
+    | ArcExplorerNodeKind.Run -> "Run"
+    | ArcExplorerNodeKind.DataMap -> "DataMap"
+    | ArcExplorerNodeKind.Note -> "Note"
+    | ArcExplorerNodeKind.Sample -> "Sample"
+
+let private nodeHasMetadata =
+    function
+    | ArcExplorerNodeKind.Arc
+    | ArcExplorerNodeKind.Study
+    | ArcExplorerNodeKind.Assay
+    | ArcExplorerNodeKind.Workflow
+    | ArcExplorerNodeKind.Run -> true
+    | ArcExplorerNodeKind.Group
+    | ArcExplorerNodeKind.DataMap
+    | ArcExplorerNodeKind.Note
+    | ArcExplorerNodeKind.Sample -> false
+
+let private textValue (value: string) =
+    Html.span [
+        prop.className "swt:text-sm swt:whitespace-pre-wrap swt:break-words"
+        prop.text value
+    ]
+
+let private codeValue (value: string) =
+    Html.code [
+        prop.className "swt:text-xs swt:font-mono swt:break-all"
+        prop.text value
+    ]
+
+let private textRow label value = label, textValue value
+
+let private codeRow label value = label, codeValue value
+
+let private optionalTextRow label value =
+    value |> Option.map (fun text -> textRow label text)
+
+let private dataMapSummaryRows (dataMap: DataMap) =
+    let headers =
+        seq {
+            for index in 0 .. dataMap.ColumnCount - 1 do
+                yield dataMap.GetHeader(index).ToString()
+        }
+        |> summariseStrings
+
+    [
+        textRow "Data Contexts" (string dataMap.DataContexts.Count)
+        textRow "Columns" (string dataMap.ColumnCount)
+        yield! headers |> Option.map (fun value -> textRow "Headers" value) |> Option.toList
+    ]
+
+let private metadataRows (arcFile: ArcFiles) =
+    match arcFile with
+    | ArcFiles.Investigation investigation ->
+        [
+            textRow "Identifier" investigation.Identifier
+            yield! optionalTextRow "Title" (asOptionalText investigation.Title) |> Option.toList
+            yield! optionalTextRow "Description" (asOptionalText investigation.Description) |> Option.toList
+            yield! optionalTextRow "Submission Date" (asOptionalText investigation.SubmissionDate) |> Option.toList
+            yield!
+                optionalTextRow "Public Release" (asOptionalText investigation.PublicReleaseDate)
+                |> Option.toList
+            yield!
+                summariseStrings (investigation.Contacts |> Seq.map personDisplayName)
+                |> Option.map (fun value -> textRow "Contacts" value)
+                |> Option.toList
+            yield! Some(textRow "Publications" (string investigation.Publications.Count)) |> Option.toList
+            yield!
+                Some(textRow "Ontology Sources" (string investigation.OntologySourceReferences.Count))
+                |> Option.toList
+            yield! Some(textRow "Comments" (string investigation.Comments.Count)) |> Option.toList
+        ]
+    | ArcFiles.Study(study, _) ->
+        [
+            textRow "Identifier" study.Identifier
+            yield! optionalTextRow "Title" (asOptionalText study.Title) |> Option.toList
+            yield! optionalTextRow "Description" (asOptionalText study.Description) |> Option.toList
+            yield! Some(textRow "Tables" (string study.TableCount)) |> Option.toList
+            yield! optionalTextRow "Submission Date" (asOptionalText study.SubmissionDate) |> Option.toList
+            yield! optionalTextRow "Public Release" (asOptionalText study.PublicReleaseDate) |> Option.toList
+            yield!
+                summariseStrings (study.StudyDesignDescriptors |> Seq.map _.NameText)
+                |> Option.map (fun value -> textRow "Design" value)
+                |> Option.toList
+            yield!
+                summariseStrings (study.Contacts |> Seq.map personDisplayName)
+                |> Option.map (fun value -> textRow "Contacts" value)
+                |> Option.toList
+            yield! Some(textRow "Publications" (string study.Publications.Count)) |> Option.toList
+            yield! Some(textRow "Comments" (string study.Comments.Count)) |> Option.toList
+        ]
+    | ArcFiles.Assay assay ->
+        [
+            textRow "Identifier" assay.Identifier
+            yield! optionalTextRow "Title" (asOptionalText assay.Title) |> Option.toList
+            yield! optionalTextRow "Description" (asOptionalText assay.Description) |> Option.toList
+            yield! Some(textRow "Tables" (string assay.TableCount)) |> Option.toList
+            yield! ontologyLabel assay.MeasurementType |> Option.map (fun value -> textRow "Measurement" value) |> Option.toList
+            yield! ontologyLabel assay.TechnologyType |> Option.map (fun value -> textRow "Technology" value) |> Option.toList
+            yield! ontologyLabel assay.TechnologyPlatform |> Option.map (fun value -> textRow "Platform" value) |> Option.toList
+            yield!
+                summariseStrings (assay.Performers |> Seq.map personDisplayName)
+                |> Option.map (fun value -> textRow "Performers" value)
+                |> Option.toList
+            yield! Some(textRow "Comments" (string assay.Comments.Count)) |> Option.toList
+        ]
+    | ArcFiles.Workflow workflow ->
+        [
+            textRow "Identifier" workflow.Identifier
+            yield! optionalTextRow "Title" (asOptionalText workflow.Title) |> Option.toList
+            yield! optionalTextRow "Description" (asOptionalText workflow.Description) |> Option.toList
+            yield! optionalTextRow "Version" (asOptionalText workflow.Version) |> Option.toList
+            yield! ontologyLabel workflow.WorkflowType |> Option.map (fun value -> textRow "Type" value) |> Option.toList
+            yield! optionalTextRow "URI" (asOptionalText workflow.URI) |> Option.toList
+            yield!
+                summariseStrings workflow.SubWorkflowIdentifiers
+                |> Option.map (fun value -> textRow "Subworkflows" value)
+                |> Option.toList
+            yield!
+                summariseStrings (workflow.Contacts |> Seq.map personDisplayName)
+                |> Option.map (fun value -> textRow "Contacts" value)
+                |> Option.toList
+            yield! Some(textRow "Comments" (string workflow.Comments.Count)) |> Option.toList
+        ]
+    | ArcFiles.Run run ->
+        [
+            textRow "Identifier" run.Identifier
+            yield! optionalTextRow "Title" (asOptionalText run.Title) |> Option.toList
+            yield! optionalTextRow "Description" (asOptionalText run.Description) |> Option.toList
+            yield! Some(textRow "Tables" (string run.TableCount)) |> Option.toList
+            yield! ontologyLabel run.MeasurementType |> Option.map (fun value -> textRow "Measurement" value) |> Option.toList
+            yield! ontologyLabel run.TechnologyType |> Option.map (fun value -> textRow "Technology" value) |> Option.toList
+            yield! ontologyLabel run.TechnologyPlatform |> Option.map (fun value -> textRow "Platform" value) |> Option.toList
+            yield!
+                summariseStrings run.WorkflowIdentifiers
+                |> Option.map (fun value -> textRow "Workflows" value)
+                |> Option.toList
+            yield!
+                summariseStrings (run.Performers |> Seq.map personDisplayName)
+                |> Option.map (fun value -> textRow "Performers" value)
+                |> Option.toList
+            yield! Some(textRow "Comments" (string run.Comments.Count)) |> Option.toList
+        ]
+    | ArcFiles.DataMap(_, dataMap) -> dataMapSummaryRows dataMap
+    | ArcFiles.Template template ->
+        [
+            textRow "Name" template.Name
+            yield! optionalTextRow "Description" (asOptionalText (Some template.Description)) |> Option.toList
+            yield! optionalTextRow "Version" (asOptionalText (Some template.Version)) |> Option.toList
+            yield!
+                optionalTextRow "Last Updated" (Some(template.LastUpdated.ToString("yyyy-MM-dd HH:mm")))
+                |> Option.toList
+            yield! Some(textRow "Organisation" (template.Organisation.ToString())) |> Option.toList
+            yield!
+                summariseStrings (template.Tags |> Seq.map _.NameText)
+                |> Option.map (fun value -> textRow "Tags" value)
+                |> Option.toList
+            yield!
+                summariseStrings (template.Authors |> Seq.map personDisplayName)
+                |> Option.map (fun value -> textRow "Authors" value)
+                |> Option.toList
+        ]
+
+let private currentPreviewRowsForNode (selectedNode: ArcExplorerNode) (arcFile: ArcFiles) =
+    match selectedNode.kind with
+    | ArcExplorerNodeKind.DataMap -> WidgetArcFile.tryGetDataMap arcFile |> Option.map dataMapSummaryRows
+    | _ when arcFile.Tables().Count > 0 ->
+        let tableNames = arcFile.Tables() |> Seq.map _.Name |> summariseStrings
+
+        Some [
+            textRow "Tables" (string (arcFile.Tables().Count))
+            yield! tableNames |> Option.map (fun value -> textRow "Names" value) |> Option.toList
+        ]
+    | _ -> WidgetArcFile.tryGetDataMap arcFile |> Option.map dataMapSummaryRows
+
+let private noMetadataMessage =
+    function
+    | ArcExplorerNodeKind.Sample -> "Sample nodes are derived from table content and do not currently expose standalone metadata."
+    | ArcExplorerNodeKind.Group -> "Select a concrete ARC object to inspect its metadata."
+    | _ -> "No additional metadata is available for this selection."
+
+[<ReactComponent>]
+let private ARCObjectSection(title: string, children: ReactElement list) =
+    Html.div [
+        prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+        prop.children [
+            Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-3"; prop.text title ]
+            Html.div [
+                prop.className "swt:flex swt:flex-col swt:gap-3"
+                prop.children children
+            ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private ARCObjectPropertyTable(rows: (string * ReactElement) list) =
+    Html.dl [
+        prop.className "swt:grid swt:grid-cols-1 swt:gap-y-3"
+        prop.children [
+            for label, value in rows do
+                Html.div [
+                    prop.className "swt:flex swt:flex-col swt:gap-1"
+                    prop.children [
+                        Html.dt [
+                            prop.className "swt:text-xs swt:font-semibold swt:uppercase swt:tracking-wide swt:opacity-60"
+                            prop.text label
+                        ]
+                        Html.dd [
+                            prop.className "swt:min-w-0"
+                            prop.children [ value ]
+                        ]
+                    ]
+                ]
+        ]
+    ]
+
+[<ReactComponent>]
+let private ARCObjectSelectionSection(selectedNode: ArcExplorerNode) =
+    let rows = [
+        textRow "Kind" (nodeKindLabel selectedNode.kind)
+        textRow "Role" (if selectedNode.isReference then "Reference" else "Canonical")
+        if selectedNode.path.IsSome then
+            codeRow "Path" selectedNode.path.Value
+        else
+            textRow "Path" "Virtual"
+    ]
+
+    ARCObjectSection(
+        "Selection",
+        [
+            Html.h4 [ prop.className "swt:text-base swt:font-semibold swt:break-words"; prop.text selectedNode.name ]
+            ARCObjectPropertyTable rows
+        ]
+    )
+
+[<ReactComponent>]
+let private ARCObjectStatusSection(title: string, message: string) =
+    ARCObjectSection(
+        title,
+        [
+            Html.p [
+                prop.className "swt:text-sm swt:opacity-80"
+                prop.text message
+            ]
+        ]
+    )
+
+[<ReactComponent>]
+let private ARCObjectErrorSection(title: string, message: string) =
+    ARCObjectSection(
+        title,
+        [
+            Html.p [
+                prop.className "swt:text-sm swt:text-error"
+                prop.text message
+            ]
+        ]
+    )
+
+[<ReactComponent>]
+let private ARCObjectNoteContentSection(content: string) =
+    ARCObjectSection(
+        "Note Content",
+        [
+            if String.IsNullOrWhiteSpace content then
+                Html.p [
+                    prop.className "swt:text-sm swt:opacity-80"
+                    prop.text "This note is empty."
+                ]
+            else
+                Html.div [
+                    prop.className
+                        "wmde-markdown-var swt:min-w-0 swt:max-w-none swt:overflow-auto swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100"
+                    prop.children [
+                        ReactMDEditor.MarkdownPreview(
+                            content,
+                            className = "swt:p-4",
+                            components = Preview.components,
+                            rehypePlugins = Preview.rehypePlugins
+                        )
+                    ]
+                ]
+        ]
+    )
+
+[<ReactComponent>]
+let private ARCObjectDetailsContent
+    (selectedNode: ArcExplorerNode option)
+    (pageState: PageState option)
+    (arcFileState: ArcFiles option)
+    =
+    match selectedNode with
+    | None ->
+        Html.div [
+            prop.className
+                "swt:flex swt:flex-1 swt:items-center swt:justify-center swt:rounded-lg swt:border swt:border-dashed swt:border-base-300 swt:bg-base-200/40 swt:p-6"
+            prop.children [
+                Html.p [
+                    prop.className "swt:text-sm swt:text-center swt:opacity-70"
+                    prop.text "Select an ARC object to inspect its details."
+                ]
+            ]
+        ]
+    | Some selectedNode ->
+        let currentPreviewRows =
+            arcFileState |> Option.bind (currentPreviewRowsForNode selectedNode)
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-3 swt:h-full"
+            prop.children [
+                ARCObjectSelectionSection(selectedNode)
+
+                match selectedNode.kind with
+                | ArcExplorerNodeKind.Note ->
+                    match pageState with
+                    | Some(PageState.Text content) -> ARCObjectNoteContentSection(content)
+                    | Some(PageState.Error message) -> ARCObjectErrorSection("Note Content", message)
+                    | _ -> ARCObjectStatusSection("Note Content", "Loading note content...")
+                | kind when kind = ArcExplorerNodeKind.DataMap ->
+                    match pageState with
+                    | Some(PageState.Error message) -> ARCObjectErrorSection("Current Preview", message)
+                    | _ ->
+                        match currentPreviewRows with
+                        | Some rows -> ARCObjectSection("Current Preview", [ ARCObjectPropertyTable rows ])
+                        | None -> ARCObjectStatusSection("Current Preview", "No DataMap preview is loaded.")
+                | kind when nodeHasMetadata kind ->
+                    match pageState with
+                    | Some(PageState.Error message) -> ARCObjectErrorSection("Metadata", message)
+                    | _ ->
+                        match arcFileState with
+                        | Some arcFile -> ARCObjectSection("Metadata", [ ARCObjectPropertyTable (metadataRows arcFile) ])
+                        | None -> ARCObjectStatusSection("Metadata", "Loading metadata...")
+                | _ ->
+                    match currentPreviewRows with
+                    | Some rows -> ARCObjectSection("Current Preview", [ ARCObjectPropertyTable rows ])
+                    | None -> ARCObjectStatusSection("Current Preview", noMetadataMessage selectedNode.kind)
+            ]
+        ]
 
 let private filePickerServices: FilePickerWidgetServices = {
     pickPaths =
@@ -129,6 +508,8 @@ let DataAnnotatorWidget
 
 [<ReactComponent>]
 let private ARCObjectWidgetContent
+    (arcFileState: ArcFiles option)
+    (pageState: PageState option)
     (setSelectedExplorerItemId: string option -> unit)
     (setSelectedTreeItemPath: string option -> unit)
     (setPageState: PageState option -> unit)
@@ -162,6 +543,11 @@ let private ARCObjectWidgetContent
             workspaceCtx.state.SelectedExplorerItemId
             workspaceCtx.state.SelectedTreeItemPath
 
+    let selectedNode =
+        selectedItemId
+        |> Option.bind (fun nodeId ->
+            Renderer.Components.ArcExplorer.tryFindNodeById nodeId workspaceCtx.state.ArcExplorerTree)
+
     let handleExplorerSelection =
         Renderer.Components.ArcExplorer.createOpenPreviewHandler
             setSelectedExplorerItemId
@@ -175,11 +561,16 @@ let private ARCObjectWidgetContent
             onItemClick = handleExplorerSelection
         )
 
+    let detailsPane = ARCObjectDetailsContent selectedNode pageState arcFileState
+
     match treePane with
-    | Some treePane -> Swate.Components.ARCObjectWidget.Main(treePane = treePane, explorerPane = explorerPane)
-    | None -> Swate.Components.ARCObjectWidget.Main(explorerPane = explorerPane)
+    | Some treePane ->
+        Swate.Components.ARCObjectWidget.Main(treePane = treePane, explorerPane = explorerPane, detailsPane = detailsPane)
+    | None -> Swate.Components.ARCObjectWidget.Main(explorerPane = explorerPane, detailsPane = detailsPane)
 
 let ARCObjectWidget
+    (arcFileState: ArcFiles option)
+    (pageState: PageState option)
     (setSelectedExplorerItemId: string option -> unit)
     (setSelectedTreeItemPath: string option -> unit)
     (setPageState: PageState option -> unit)
@@ -187,11 +578,12 @@ let ARCObjectWidget
     WidgetType.ARCObject,
     {|
         prefix = "ARC_OBJECT"
-        content = ARCObjectWidgetContent setSelectedExplorerItemId setSelectedTreeItemPath setPageState
+        content = ARCObjectWidgetContent arcFileState pageState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
     |}
 
 let createWidgets
     (arcFileState: ArcFiles option)
+    (pageState: PageState option)
     (activeView: WidgetHostView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
@@ -206,7 +598,7 @@ let createWidgets
         TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
         DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
-        ARCObjectWidget setSelectedExplorerItemId setSelectedTreeItemPath setPageState
+        ARCObjectWidget arcFileState pageState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
     ]
     |> Map.ofList
 
