@@ -31,8 +31,8 @@ export const TabSwitchFlow: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const yourReposTab = await canvas.findByTestId("GitLabExploreTab-YourRepos");
-    expect(yourReposTab.className).toMatch(/tab-active/);
+    const allTab = await canvas.findByTestId("GitLabExploreTab-All");
+    expect(allTab.className).toMatch(/tab-active/);
 
     const mostStarredTab = await canvas.findByTestId("GitLabExploreTab-MostStarred");
     await userEvent.click(mostStarredTab);
@@ -42,12 +42,12 @@ export const TabSwitchFlow: Story = {
       expect(await canvas.findByTestId("GitLabRepoRow-10")).toBeInTheDocument();
     });
 
-    const orgTab = await canvas.findByTestId("GitLabExploreTab-YourOrganisations");
-    await userEvent.click(orgTab);
+    const yourReposTab = await canvas.findByTestId("GitLabExploreTab-YourRepos");
+    await userEvent.click(yourReposTab);
 
     await waitFor(async () => {
-      expect((await canvas.findByTestId("GitLabExploreTab-YourOrganisations")).className).toMatch(/tab-active/);
-      expect(await canvas.findByTestId("GitLabExploreOrganisationSelect")).toBeInTheDocument();
+      expect(await canvas.findByTestId("GitLabExploreTab-YourRepos")).toHaveAttribute("aria-disabled", "true");
+      expect((await canvas.findByTestId("GitLabExploreTab-MostStarred")).className).toMatch(/tab-active/);
     });
   },
 };
@@ -59,35 +59,33 @@ export const SearchCombinedWithTabFilter: Story = {
 
     const searchInput = await canvas.findByTestId("GitLabExploreSearchInput");
     await userEvent.clear(searchInput);
-    await userEvent.type(searchInput, "rna");
+    await userEvent.type(searchInput, "ontology");
+    await userEvent.click(await canvas.findByTestId("GitLabExploreSearchButton"));
 
     await waitFor(async () => {
-      expect(await canvas.findByTestId("GitLabRepoRow-2")).toBeInTheDocument();
-      expect(canvas.queryByTestId("GitLabRepoRow-1")).not.toBeInTheDocument();
+      expect(await canvas.findByTestId("GitLabRepoRow-10")).toBeInTheDocument();
     });
 
     const mostStarredTab = await canvas.findByTestId("GitLabExploreTab-MostStarred");
     await userEvent.click(mostStarredTab);
 
     await waitFor(async () => {
-      expect(await canvas.findByTestId("GitLabExploreEmpty")).toBeInTheDocument();
+      expect(await canvas.findByTestId("GitLabRepoRow-10")).toBeInTheDocument();
     });
   },
 };
 
 export const OrganisationFilteringFlow: Story = {
-  name: "Organisation filter flow",
+  name: "Organisation tab restricted when logged out",
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(await canvas.findByTestId("GitLabExploreTab-YourOrganisations"));
-
-    const select = await canvas.findByTestId("GitLabExploreOrganisationSelect");
-    await userEvent.selectOptions(select, "101");
+    const orgTab = await canvas.findByTestId("GitLabExploreTab-YourOrganisations");
+    expect(orgTab).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(orgTab);
 
     await waitFor(async () => {
-      expect(await canvas.findByTestId("GitLabRepoRow-12")).toBeInTheDocument();
-      expect(canvas.queryByTestId("GitLabRepoRow-10")).not.toBeInTheDocument();
+      expect((await canvas.findByTestId("GitLabExploreTab-All")).className).toMatch(/tab-active/);
     });
   },
 };
@@ -116,13 +114,12 @@ export const PaginationFlow: Story = {
 };
 
 export const ClonedRepoVisualAndOpenButton: Story = {
-  name: "Cloned repo visual and open button",
+  name: "Cloned repo visual state",
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await waitFor(async () => {
-      expect(await canvas.findByTestId("GitLabRepoOpenButton-2")).toBeInTheDocument();
-      expect(canvas.queryByTestId("GitLabRepoOpenButton-1")).not.toBeInTheDocument();
+      expect(await canvas.findByText("cloned")).toBeInTheDocument();
     });
   },
 };
@@ -135,6 +132,7 @@ export const EmptyStateFlow: Story = {
     const searchInput = await canvas.findByTestId("GitLabExploreSearchInput");
     await userEvent.clear(searchInput);
     await userEvent.type(searchInput, "zzzz-no-match");
+    await userEvent.click(await canvas.findByTestId("GitLabExploreSearchButton"));
 
     await waitFor(async () => {
       expect(await canvas.findByTestId("GitLabExploreEmpty")).toBeInTheDocument();

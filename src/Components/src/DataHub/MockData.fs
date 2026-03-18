@@ -37,10 +37,13 @@ let yourRepos: ExploreProjectDto array = [|
         description = Some "LC-MS metabolomics workflow"
         web_url = "https://git.nfdi4plants.org/kevin/metabolomics-arc"
         avatar_url = Some "https://picsum.photos/40/40?r=1"
+        visibility = Some "private"
         star_count = 7
         created_at = "2026-01-10T09:00:00Z"
         updated_at = "2026-03-10T09:00:00Z"
         last_activity_at = "2026-03-12T11:00:00Z"
+        tag_list = [| "metabolomics"; "arc" |]
+        license_name = Some "MIT"
         ``namespace`` = ns 1 "kevin" "kevin"
     }
     {
@@ -51,10 +54,13 @@ let yourRepos: ExploreProjectDto array = [|
         description = Some "RNA-seq analysis templates"
         web_url = "https://git.nfdi4plants.org/kevin/rnaseq-arc"
         avatar_url = Some "https://picsum.photos/40/40?r=2"
+        visibility = Some "private"
         star_count = 11
         created_at = "2025-11-03T12:00:00Z"
         updated_at = "2026-03-01T09:00:00Z"
         last_activity_at = "2026-03-11T08:00:00Z"
+        tag_list = [| "rnaseq"; "arc" |]
+        license_name = Some "Apache-2.0"
         ``namespace`` = ns 1 "kevin" "kevin"
     }
     {
@@ -65,10 +71,13 @@ let yourRepos: ExploreProjectDto array = [|
         description = Some "Proteomics starter ARC"
         web_url = "https://git.nfdi4plants.org/kevin/proteomics-arc"
         avatar_url = None
+        visibility = Some "private"
         star_count = 3
         created_at = "2025-10-09T10:00:00Z"
         updated_at = "2026-02-27T09:00:00Z"
         last_activity_at = "2026-02-27T09:00:00Z"
+        tag_list = [| "proteomics"; "arc" |]
+        license_name = Some "MIT"
         ``namespace`` = ns 1 "kevin" "kevin"
     }
 |]
@@ -82,10 +91,13 @@ let mostStarred: ExploreProjectDto array = [|
         description = Some "Controlled vocabulary and mappings"
         web_url = "https://git.nfdi4plants.org/nfdi4plants/plant-ontology"
         avatar_url = Some "https://picsum.photos/40/40?r=10"
+        visibility = Some "public"
         star_count = 233
         created_at = "2024-01-01T09:00:00Z"
         updated_at = "2026-03-08T10:00:00Z"
         last_activity_at = "2026-03-12T15:00:00Z"
+        tag_list = [| "ontology"; "plants" |]
+        license_name = Some "CC-BY-4.0"
         ``namespace`` = ns 100 "NFDI4Plants" "nfdi4plants"
     }
     {
@@ -96,10 +108,13 @@ let mostStarred: ExploreProjectDto array = [|
         description = Some "ARC specification"
         web_url = "https://git.nfdi4plants.org/nfdi4plants/arc-spec"
         avatar_url = Some "https://picsum.photos/40/40?r=11"
+        visibility = Some "public"
         star_count = 190
         created_at = "2024-02-01T09:00:00Z"
         updated_at = "2026-03-09T10:00:00Z"
         last_activity_at = "2026-03-12T14:00:00Z"
+        tag_list = [| "arc"; "specification" |]
+        license_name = Some "CC-BY-4.0"
         ``namespace`` = ns 100 "NFDI4Plants" "nfdi4plants"
     }
     {
@@ -110,10 +125,13 @@ let mostStarred: ExploreProjectDto array = [|
         description = Some "Reusable ARC templates"
         web_url = "https://git.nfdi4plants.org/plant-data/arc-templates"
         avatar_url = Some "https://picsum.photos/40/40?r=12"
+        visibility = Some "public"
         star_count = 99
         created_at = "2025-01-01T09:00:00Z"
         updated_at = "2026-03-04T10:00:00Z"
         last_activity_at = "2026-03-10T14:00:00Z"
+        tag_list = [| "templates"; "arc" |]
+        license_name = Some "MIT"
         ``namespace`` = ns 101 "Plant Data" "plant-data"
     }
 |]
@@ -132,10 +150,13 @@ let orgRepos: Map<int, ExploreProjectDto array> =
                 description = Some "Plant growth model experiments"
                 web_url = "https://git.nfdi4plants.org/plant-data/growth-model"
                 avatar_url = None
+                visibility = Some "internal"
                 star_count = 27
                 created_at = "2025-06-11T09:00:00Z"
                 updated_at = "2026-03-01T10:00:00Z"
                 last_activity_at = "2026-03-07T10:00:00Z"
+                tag_list = [| "modeling"; "growth" |]
+                license_name = Some "GPL-3.0"
                 ``namespace`` = ns 101 "Plant Data" "plant-data"
             }
         |]

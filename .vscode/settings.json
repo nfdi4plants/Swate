@@ -26,6 +26,8 @@
         "editor.defaultFormatter": "Ionide.Ionide-fsharp"
     },
     "chat.tools.terminal.autoApprove": {
-      "dotnet build": true
+      "dotnet build": true,
+      "ForEach-Object": true,
+      "npx vitest": true
     }
 }

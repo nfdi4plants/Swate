@@ -72,10 +72,13 @@ type ExploreProjectDto = {
     description: string option
     web_url: string
     avatar_url: string option
+    visibility: string option
     star_count: int
     created_at: string
     updated_at: string
     last_activity_at: string
+    tag_list: string array
+    license_name: string option
     ``namespace``: ExploreNamespaceDto
 }
 
@@ -140,10 +143,14 @@ type private GitLabProjectResponse = {
     description: string option
     web_url: string
     avatar_url: string option
+    visibility: string option
     star_count: int
     created_at: string
     updated_at: string
     last_activity_at: string
+    topics: string array option
+    tag_list: string array option
+    license: {| name: string option |} option
     ``namespace``: GitLabNamespaceResponse
 }
 
@@ -163,12 +170,6 @@ type private GitLabGroupResponse = {
 }
 
 module private Internals =
-
-    let ensurePAT (pat: string) : Result<string, GitLabError> =
-        if String.IsNullOrWhiteSpace pat then
-            Error(GitLabError.InvalidRequest "Personal Access Token is required.")
-        else
-            Ok pat
 
     let private mapSortField =
         function
@@ -201,9 +202,11 @@ module private Internals =
         | 404 -> GitLabError.NotFound
         | code -> GitLabError.HttpError code
 
-    let makeGetRequestOptions (pat: string) (acceptJson: bool) =
+    let makeGetRequestOptions (pat: string option) (acceptJson: bool) =
         let headers = [
-            HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat)
+            match pat with
+            | Some token when not (String.IsNullOrWhiteSpace token) -> HttpRequestHeaders.Custom("PRIVATE-TOKEN", token)
+            | _ -> ()
             if acceptJson then
                 HttpRequestHeaders.Accept "application/json"
         ]
@@ -274,10 +277,13 @@ module private Internals =
         description = project.description
         web_url = project.web_url
         avatar_url = project.avatar_url
+        visibility = project.visibility
         star_count = project.star_count
         created_at = project.created_at
         updated_at = project.updated_at
         last_activity_at = project.last_activity_at
+        tag_list = project.topics |> Option.orElse project.tag_list |> Option.defaultValue [||]
+        license_name = project.license |> Option.bind (fun license -> license.name)
         ``namespace`` = toExploreNamespaceDto project.``namespace``
         name_with_namespace = project.name_with_namespace
     }
@@ -315,42 +321,39 @@ module private Internals =
     let rankTrending (projects: ExploreProjectDto array) =
         projects |> Array.sortByDescending trendingScore
 
-    let sendGet<'T> (url: string) (pat: string) : JS.Promise<Result<PagedResponse<'T>, GitLabError>> =
+    let sendGet<'T> (url: string) (pat: string option) : JS.Promise<Result<PagedResponse<'T>, GitLabError>> =
 
         promise {
-            match ensurePAT pat with
-            | Error err -> return Error err
-            | Ok _ ->
-                let requestOptions = makeGetRequestOptions pat true
+            let requestOptions = makeGetRequestOptions pat true
 
-                try
-                    let! response = fetchUnsafe url requestOptions
+            try
+                let! response = fetchUnsafe url requestOptions
 
-                    if not response.Ok then
-                        return Error(mapHttpError response.Status)
-                    else
-                        Browser.Dom.console.log (response)
-                        let pagination = readPagination response
+                if not response.Ok then
+                    return Error(mapHttpError response.Status)
+                else
+                    Browser.Dom.console.log (response)
+                    let pagination = readPagination response
 
-                        try
-                            let! payload = response.json<'T array> ()
+                    try
+                        let! payload = response.json<'T array> ()
 
-                            return
-                                Ok {
-                                    Items = payload
-                                    Pagination = pagination
-                                }
-                        with decodeError ->
-                            return Error(GitLabError.DecodeError decodeError)
-                with networkError ->
-                    return Error(GitLabError.NetworkError networkError)
+                        return
+                            Ok {
+                                Items = payload
+                                Pagination = pagination
+                            }
+                    with decodeError ->
+                        return Error(GitLabError.DecodeError decodeError)
+            with networkError ->
+                return Error(GitLabError.NetworkError networkError)
         }
 
     let sendGetSingle<'T> (url: string) (pat: string) : JS.Promise<Result<'T, GitLabError>> = promise {
-        match ensurePAT pat with
-        | Error err -> return Error err
-        | Ok _ ->
-            let requestOptions = makeGetRequestOptions pat true
+        if String.IsNullOrWhiteSpace pat then
+            return Error(GitLabError.InvalidRequest "Personal Access Token is required.")
+        else
+            let requestOptions = makeGetRequestOptions (Some pat) true
 
             try
                 let! response = fetchUnsafe url requestOptions
@@ -428,7 +431,8 @@ type GitLabApi =
                 | _ -> queryParams
 
             let url = appendQueryParams baseEndpoint effectiveQueryParams
-            let! response = Internals.sendGet<GitLabProjectResponse> url pat
+            let patHeader = if String.IsNullOrWhiteSpace pat then None else Some pat
+            let! response = Internals.sendGet<GitLabProjectResponse> url patHeader
 
             return
                 response
@@ -490,7 +494,7 @@ type GitLabApi =
                     |> Internals.addInt "min_access_level" minAccessLevel
 
                 let url = appendQueryParams baseEndpoint queryParams
-                let! response = Internals.sendGet<GitLabProjectResponse> url pat
+                let! response = Internals.sendGet<GitLabProjectResponse> url (Some pat)
                 Browser.Dom.console.log response
 
                 return
@@ -526,7 +530,7 @@ type GitLabApi =
                 |> Internals.addInt "per_page" perPage
 
             let url = appendQueryParams baseEndpoint queryParams
-            let! response = Internals.sendGet<GitLabGroupResponse> url pat
+            let! response = Internals.sendGet<GitLabGroupResponse> url (Some pat)
 
             return
                 response
@@ -564,7 +568,7 @@ type GitLabApi =
                 |> Internals.addString "search" search
 
             let url = appendQueryParams baseEndpoint queryParams
-            let! response = Internals.sendGet<GitLabProjectResponse> url pat
+            let! response = Internals.sendGet<GitLabProjectResponse> url (Some pat)
 
             return
                 response
