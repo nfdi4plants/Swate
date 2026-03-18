@@ -820,7 +820,7 @@ type DataHubBrowser =
     static member GitLabEntry() =
         let currentUser, setCurrentUser = React.useState None
         let baseUrl, setBaseUrl = React.useState "https://git.nfdi4plants.org"
-        let pat, setPat = React.useState "UfCieq6HDu32MFUDkfOMem86MQp1OmY0CA.01.0y00qka22"
+        let pat, setPat = React.useState ""
         let reloadTrigger, setReloadTrigger = React.useState 0
 
         let isConnected = not (System.String.IsNullOrWhiteSpace baseUrl)
