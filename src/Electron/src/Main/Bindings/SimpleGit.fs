@@ -26,7 +26,7 @@ type IAbortController =
 
 [<AllowNullLiteral>]
 type SimpleGitTimeoutOptions
-    [<ParamObject>]
+    [<ParamObject; Emit("$0")>]
     (
         ?block: int,
         ?stdOut: bool,
@@ -38,7 +38,7 @@ type SimpleGitTimeoutOptions
 
 [<AllowNullLiteral>]
 type SimpleGitUnsafeOptions
-    [<ParamObject>]
+    [<ParamObject; Emit("$0")>]
     (
         ?allowUnsafeCustomBinary: bool,
         ?allowUnsafeProtocolOverride: bool,
@@ -431,7 +431,7 @@ type CwdDirectory =
 
 [<AllowNullLiteral>]
 type SimpleGitCompletionOptions
-    [<ParamObject>]
+    [<ParamObject; Emit("$0")>]
     (
         ?onClose: U2<bool, int>,
         ?onExit: U2<bool, int>
@@ -441,7 +441,7 @@ type SimpleGitCompletionOptions
 
 [<AllowNullLiteral>]
 type SimpleGitSpawnOptions
-    [<ParamObject>]
+    [<ParamObject; Emit("$0")>]
     (
         ?uid: int,
         ?gid: int
@@ -451,7 +451,7 @@ type SimpleGitSpawnOptions
 
 [<AllowNullLiteral>]
 type SimpleGitOptions
-    [<ParamObject>]
+    [<ParamObject; Emit("$0")>]
     (
         ?baseDir: string,
         ?binary: SimpleGitBinary,
