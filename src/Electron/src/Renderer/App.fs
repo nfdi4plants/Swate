@@ -243,10 +243,10 @@ let Main () =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")
                 setFileTree fileExplorer
-        arcExplorerTreeUpdate =
-            fun arcExplorerTree ->
-                console.log ("[Swate] ARC Explorer Create!")
-                setArcExplorerTree arcExplorerTree
+        //arcExplorerTreeUpdate =
+        //    fun arcExplorerTree ->
+        //        console.log ("[Swate] ARC Explorer Create!")
+        //        setArcExplorerTree arcExplorerTree
         gitProgressUpdate =
             fun progress -> console.log ($"[Swate] Git progress {progress.Method} {progress.Stage} {progress.Progress}")
     }

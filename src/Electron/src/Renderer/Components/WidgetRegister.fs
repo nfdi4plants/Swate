@@ -611,26 +611,26 @@ let private ARCObjectWidgetContent
         Swate.Components.ARCObjectWidget.Main(treePane = treePane, explorerPane = explorerPane, detailsPane = detailsPane)
     | None -> Swate.Components.ARCObjectWidget.Main(explorerPane = explorerPane, detailsPane = detailsPane)
 
-let ARCObjectWidget
-    (arcFileState: ArcFiles option)
-    (pageState: PageState option)
-    (setArcFileState: ArcFiles option -> unit)
-    (setSelectedExplorerItemId: string option -> unit)
-    (setSelectedTreeItemPath: string option -> unit)
-    (setPageState: PageState option -> unit)
-    : WidgetType * WidgetDefinition =
-    WidgetType.ARCObject,
-    {|
-        prefix = "ARC_OBJECT"
-        content =
-            ARCObjectWidgetContent
-                arcFileState
-                pageState
-                setArcFileState
-                setSelectedExplorerItemId
-                setSelectedTreeItemPath
-                setPageState
-    |}
+//let ARCObjectWidget
+//    (arcFileState: ArcFiles option)
+//    (pageState: PageState option)
+//    (setArcFileState: ArcFiles option -> unit)
+//    (setSelectedExplorerItemId: string option -> unit)
+//    (setSelectedTreeItemPath: string option -> unit)
+//    (setPageState: PageState option -> unit)
+//    : WidgetType * WidgetDefinition =
+//    WidgetType.ARCObject,
+//    {|
+//        prefix = "ARC_OBJECT"
+//        content =
+//            ARCObjectWidgetContent
+//                arcFileState
+//                pageState
+//                setArcFileState
+//                setSelectedExplorerItemId
+//                setSelectedTreeItemPath
+//                setPageState
+//    |}
 
 let createWidgets
     (arcFileState: ArcFiles option)
@@ -649,13 +649,13 @@ let createWidgets
         TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
         DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
-        ARCObjectWidget arcFileState pageState setArcFileState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
+        //ARCObjectWidget arcFileState pageState setArcFileState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
     ]
     |> Map.ofList
 
 let private widgetRequiresTable =
     function
-    | WidgetType.ARCObject -> false
+    //| WidgetType.ARCObject -> false
     | _ -> true
 
 [<ReactComponent>]
@@ -668,7 +668,7 @@ let NavbarButtons(widgetTypes: WidgetType list, hasSelectedTable: bool) =
         | WidgetType.Template -> "Add Template", Icons.Templates()
         | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
         | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
-        | WidgetType.ARCObject -> "ARC Object", Icons.Docs()
+        //| WidgetType.ARCObject -> "ARC Object", Icons.Docs()
         | WidgetType.Playground -> "Playground", Icons.Templates()
 
     let controlButton (widgetType: WidgetType) =
@@ -709,7 +709,7 @@ let widgetTypes = [
     WidgetType.Template
     WidgetType.FilePicker
     WidgetType.DataAnnotator
-    WidgetType.ARCObject
+    //WidgetType.ARCObject
 ]
 
 [<ReactComponent>]

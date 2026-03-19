@@ -84,7 +84,7 @@ type IMainUpdateRendererApi = {
     recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
     authAccountsUpdate: AuthAccountSummary[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
-    arcExplorerTreeUpdate: ArcExplorerNode list -> unit
+    //arcExplorerTreeUpdate: ArcExplorerNode list -> unit
     gitProgressUpdate: GitProgressDto -> unit
 }
 

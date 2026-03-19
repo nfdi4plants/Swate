@@ -34,6 +34,7 @@ type FileItemConfig = {
 type DirectoryInteractionMode =
     | SingleClickToggle
     | OpenOnDoubleClickCloseOnSingleClick
+    | ToggleOnSingleClickSelectOnDoubleClick
 
 
 // ============================================================================

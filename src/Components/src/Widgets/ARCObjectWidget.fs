@@ -50,19 +50,19 @@ type ARCObjectWidget =
     static member private StoryItemIdSample3 = "sample:soil-core-a"
 
     static member private StoryItems() : FileItem list =
-        let folder iconPath id name children =
+        let folder iconPath id name isExpanded children =
             {
                 FileTree.createFolder name None iconPath with
                     Id = id
-                    IsExpanded = true
+                    IsExpanded = isExpanded
                     Children = Some children
             }
 
         let group id name children =
-            folder "swt:fluent--folder-24-regular" id name children
+            folder "swt:fluent--folder-24-regular" id name false children
 
         let objectNode id name children =
-            folder "swt:fluent--document-24-regular" id name children
+            folder "swt:fluent--document-24-regular" id name false children
 
         let document id name =
             {
@@ -89,9 +89,11 @@ type ARCObjectWidget =
             }
 
         [
-            group
+            folder
+                "swt:fluent--folder-24-regular"
                 ARCObjectWidget.StoryItemIdRoot
                 "MyArc"
+                false
                 [
                     group
                         "group:studies"
@@ -503,9 +505,66 @@ type ARCObjectWidget =
         ]
 
     [<ReactComponent>]
+    static member private StoryNavbar
+        (selectedId: string, setSelectedId: string -> unit, selectedTitle: string, kind: string, role: string)
+        =
+        let navButton (targetId: string) (label: string) =
+            Html.button [
+                prop.type'.button
+                prop.className [
+                    "swt:btn swt:btn-sm"
+                    if selectedId = targetId then "swt:btn-primary" else "swt:btn-ghost"
+                ]
+                prop.text label
+                prop.onClick (fun _ -> setSelectedId targetId)
+            ]
+
+        Html.div [
+            prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100"
+            prop.children [
+                Swate.Components.Navbar.Main(
+                    left =
+                        Html.div [
+                            prop.className "swt:flex swt:items-center swt:gap-2"
+                            prop.children [
+                                Html.span [ prop.className "swt:badge swt:badge-outline"; prop.text "Story" ]
+                                Html.span [ prop.className "swt:text-sm swt:font-semibold"; prop.text "ARC Object Navbar" ]
+                            ]
+                        ],
+                    middle =
+                        Html.div [
+                            prop.className "swt:flex swt:flex-col swt:justify-center swt:min-w-0"
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
+                                    prop.text $"{kind} | {role}"
+                                ]
+                                Html.span [
+                                    prop.className "swt:text-sm swt:font-medium swt:truncate"
+                                    prop.text selectedTitle
+                                ]
+                            ]
+                        ],
+                    right =
+                        Html.div [
+                            prop.className "swt:flex swt:flex-wrap swt:justify-end swt:gap-2"
+                            prop.children [
+                                navButton ARCObjectWidget.StoryItemIdRoot "Root"
+                                navButton ARCObjectWidget.StoryItemIdStudy "Study"
+                                navButton ARCObjectWidget.StoryItemIdAssay "Assay"
+                                navButton ARCObjectWidget.StoryItemIdRun "Run"
+                            ]
+                        ]
+                )
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private StoryExample() =
         let selectedId, setSelectedId = React.useState ARCObjectWidget.StoryItemIdStudy
-        let items = ARCObjectWidget.StoryItems()
+        let items =
+            React.useMemo ((fun () -> ARCObjectWidget.StoryItems()), [||])
+
         let selectedMeta =
             ARCObjectWidget.StoryMeta
             |> Map.tryFind selectedId
@@ -516,12 +575,14 @@ type ARCObjectWidget =
             |> Map.tryFind selectedId
 
         let selectedTitle, kind, role, previewTarget, description = selectedMeta
+        let navbar = ARCObjectWidget.StoryNavbar(selectedId, setSelectedId, selectedTitle, kind, role)
 
         let treePane =
             Swate.Components.FileExplorer.FileExplorer(
                 initialItems = items,
                 selectedItemId = selectedId,
-                onItemClick = (fun item -> setSelectedId item.Id)
+                onItemClick = (fun item -> setSelectedId item.Id),
+                useDirectoryChevronToggle = true
             )
 
         let explorerPane =
@@ -574,14 +635,14 @@ type ARCObjectWidget =
                             Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-2"; prop.text "Notes" ]
                             Html.p [ prop.className "swt:text-sm swt:opacity-80"; prop.text description ]
                         ]
-                    ]
-                ]
-            ]
+                     ]
+                 ]
+             ]
 
-        ARCObjectWidget.Main(treePane = treePane, explorerPane = explorerPane, detailsPane = detailsPane)
+        ARCObjectWidget.Main(navbar = navbar, treePane = treePane, explorerPane = explorerPane, detailsPane = detailsPane)
 
     [<ReactComponent>]
-    static member Main(?treePane: ReactElement, ?explorerPane: ReactElement, ?detailsPane: ReactElement) =
+    static member Main(?navbar: ReactElement, ?treePane: ReactElement, ?explorerPane: ReactElement, ?detailsPane: ReactElement) =
         Html.div [
             prop.className ARCObjectWidget.WidgetContainerClass
             prop.children [
@@ -598,6 +659,9 @@ type ARCObjectWidget =
                         ]
                     ]
                 ]
+                match navbar with
+                | Some navbar -> navbar
+                | None -> Html.none
                 Html.div [
                     prop.className
                         "swt:grid swt:grid-cols-1 swt:lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)_minmax(14rem,18rem)] swt:gap-3 swt:flex-1 swt:min-h-0"

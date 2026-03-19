@@ -209,6 +209,7 @@ let createArcExplorer
                 onItemClick = openPreview,
                 onContextMenu = contextMenuItems,
                 ?selectedItemId = selectedItemId,
-                directoryInteractionMode = DirectoryInteractionMode.OpenOnDoubleClickCloseOnSingleClick
+                directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
+                useDirectoryChevronToggle = true
             )
         )
