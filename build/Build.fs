@@ -43,6 +43,10 @@ let main args =
             match Test.Run.client |> Async.RunSynchronously with
             | Ok() -> 0
             | Error _ -> 1
+        | "run" :: "electron-core" :: _ ->
+            match Test.Run.electronCore |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
         | "run" :: "components" :: _ ->
             match Test.Run.components |> Async.RunSynchronously with
             | Ok() -> 0

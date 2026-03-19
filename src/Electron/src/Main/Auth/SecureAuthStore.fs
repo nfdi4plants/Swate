@@ -33,6 +33,17 @@ let private bufferToBase64 (buf: Node.Buffer.Buffer) : string = jsNative
 [<Emit("Buffer.from($0, 'base64')")>]
 let private bufferFromBase64 (base64: string) : Node.Buffer.Buffer = jsNative
 
+type private CryptoHash =
+    abstract update: data: string * inputEncoding: string -> CryptoHash
+    abstract digest: encoding: string -> string
+
+[<Import("createHash", "crypto")>]
+let private createHash (algorithm: string) : CryptoHash = jsNative
+
+let private sha256Hex (input: string) : string =
+    let hash = createHash "sha256"
+    hash.update(input, "utf8").digest("hex")
+
 // ── helpers ──────────────────────────────────────────────────────────
 
 /// Extract host from a normalized base URL for token-provider matching.
@@ -71,14 +82,15 @@ let private tryGetAccountPaths (accountId: string) : (string * string) option =
     else
         None
 
-/// Generate a filesystem-safe account ID from host and email.
-let generateAccountId (targetDataHub: string) (email: string) : string =
+let private normalizeAccountIdentity (targetDataHub: string) (email: string) : string =
     let host = extractHost targetDataHub
+    let normalizedEmail = email.Trim().ToLowerInvariant()
+    $"{host}|{normalizedEmail}"
 
-    let combined = $"{host}_{email.ToLowerInvariant()}"
-
-    combined
-    |> String.collect (fun c -> if System.Char.IsLetterOrDigit c then string c else "_")
+/// Generate a deterministic filesystem-safe account ID from host and email.
+let generateAccountId (targetDataHub: string) (email: string) : string =
+    normalizeAccountIdentity targetDataHub email
+    |> sha256Hex
 
 // ── public API ───────────────────────────────────────────────────────
 
