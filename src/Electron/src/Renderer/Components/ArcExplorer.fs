@@ -208,6 +208,7 @@ let createArcExplorer
                 initialItems = items,
                 onItemClick = openPreview,
                 onContextMenu = contextMenuItems,
-                ?selectedItemId = selectedItemId
+                ?selectedItemId = selectedItemId,
+                directoryInteractionMode = DirectoryInteractionMode.OpenOnDoubleClickCloseOnSingleClick
             )
         )

@@ -35,5 +35,7 @@ export const Default: Story = {
     expect(screen.getAllByText('Project overview').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Release checklist').length).toBeGreaterThan(0);
     expect(screen.getByText('Properties')).toBeInTheDocument();
+    expect(screen.getByText('Metadata')).toBeInTheDocument();
+    expect(screen.getByText('PS-2026-001')).toBeInTheDocument();
   },
 };

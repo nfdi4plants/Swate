@@ -3,8 +3,6 @@ module Renderer.Components.WidgetRegistry
 open System
 open Feliz
 open Swate.Components
-open Swate.Components.MarkdownText
-open Swate.Components.MarkdownText.JsBindings
 open ARCtrl
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -64,6 +62,26 @@ let private nodeHasMetadata =
     | ArcExplorerNodeKind.DataMap
     | ArcExplorerNodeKind.Note
     | ArcExplorerNodeKind.Sample -> false
+
+let private usesDetailedMetadataForm =
+    function
+    | ArcExplorerNodeKind.Study
+    | ArcExplorerNodeKind.Assay
+    | ArcExplorerNodeKind.Workflow
+    | ArcExplorerNodeKind.Run -> true
+    | _ -> false
+
+let private arcFileMatchesMetadataNodeKind
+    (selectedNodeKind: ArcExplorerNodeKind)
+    (arcFile: ArcFiles)
+    =
+    match selectedNodeKind, arcFile with
+    | ArcExplorerNodeKind.Arc, ArcFiles.Investigation _
+    | ArcExplorerNodeKind.Study, ArcFiles.Study _
+    | ArcExplorerNodeKind.Assay, ArcFiles.Assay _
+    | ArcExplorerNodeKind.Workflow, ArcFiles.Workflow _
+    | ArcExplorerNodeKind.Run, ArcFiles.Run _ -> true
+    | _ -> false
 
 let private textValue (value: string) =
     Html.span [
@@ -317,26 +335,43 @@ let private ARCObjectNoteContentSection(content: string) =
                     prop.text "This note is empty."
                 ]
             else
-                Html.div [
+                Html.pre [
                     prop.className
-                        "wmde-markdown-var swt:min-w-0 swt:max-w-none swt:overflow-auto swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100"
-                    prop.children [
-                        ReactMDEditor.MarkdownPreview(
-                            content,
-                            className = "swt:p-4",
-                            components = Preview.components,
-                            rehypePlugins = Preview.rehypePlugins
-                        )
-                    ]
+                        "swt:min-w-0 swt:max-w-none swt:overflow-auto swt:whitespace-pre-wrap swt:break-words swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:text-sm"
+                    prop.text content
                 ]
         ]
     )
+
+[<ReactComponent>]
+let private ARCObjectDetailedMetadataContent
+    (arcFile: ArcFiles)
+    (setArcFileState: ArcFiles option -> unit)
+    =
+    let setArcFile arcFile = setArcFileState (Some arcFile)
+
+    Html.div [
+        prop.className "swt:min-w-0"
+        prop.children [
+            match arcFile with
+            | ArcFiles.Study(study, assays) ->
+                Renderer.MetadataForms.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
+            | ArcFiles.Assay assay ->
+                Renderer.MetadataForms.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
+            | ArcFiles.Workflow workflow ->
+                Renderer.MetadataForms.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
+            | ArcFiles.Run run ->
+                Renderer.MetadataForms.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
+            | _ -> Html.none
+        ]
+    ]
 
 [<ReactComponent>]
 let private ARCObjectDetailsContent
     (selectedNode: ArcExplorerNode option)
     (pageState: PageState option)
     (arcFileState: ArcFiles option)
+    (setArcFileState: ArcFiles option -> unit)
     =
     match selectedNode with
     | None ->
@@ -351,6 +386,10 @@ let private ARCObjectDetailsContent
             ]
         ]
     | Some selectedNode ->
+        let metadataArcFile =
+            arcFileState
+            |> Option.filter (arcFileMatchesMetadataNodeKind selectedNode.kind)
+
         let currentPreviewRows =
             arcFileState |> Option.bind (currentPreviewRowsForNode selectedNode)
 
@@ -376,8 +415,11 @@ let private ARCObjectDetailsContent
                     match pageState with
                     | Some(PageState.Error message) -> ARCObjectErrorSection("Metadata", message)
                     | _ ->
-                        match arcFileState with
-                        | Some arcFile -> ARCObjectSection("Metadata", [ ARCObjectPropertyTable (metadataRows arcFile) ])
+                        match metadataArcFile with
+                        | Some arcFile when usesDetailedMetadataForm selectedNode.kind ->
+                            ARCObjectDetailedMetadataContent arcFile setArcFileState
+                        | Some arcFile ->
+                            ARCObjectSection("Metadata", [ ARCObjectPropertyTable (metadataRows arcFile) ])
                         | None -> ARCObjectStatusSection("Metadata", "Loading metadata...")
                 | _ ->
                     match currentPreviewRows with
@@ -510,6 +552,7 @@ let DataAnnotatorWidget
 let private ARCObjectWidgetContent
     (arcFileState: ArcFiles option)
     (pageState: PageState option)
+    (setArcFileState: ArcFiles option -> unit)
     (setSelectedExplorerItemId: string option -> unit)
     (setSelectedTreeItemPath: string option -> unit)
     (setPageState: PageState option -> unit)
@@ -561,7 +604,7 @@ let private ARCObjectWidgetContent
             onItemClick = handleExplorerSelection
         )
 
-    let detailsPane = ARCObjectDetailsContent selectedNode pageState arcFileState
+    let detailsPane = ARCObjectDetailsContent selectedNode pageState arcFileState setArcFileState
 
     match treePane with
     | Some treePane ->
@@ -571,6 +614,7 @@ let private ARCObjectWidgetContent
 let ARCObjectWidget
     (arcFileState: ArcFiles option)
     (pageState: PageState option)
+    (setArcFileState: ArcFiles option -> unit)
     (setSelectedExplorerItemId: string option -> unit)
     (setSelectedTreeItemPath: string option -> unit)
     (setPageState: PageState option -> unit)
@@ -578,7 +622,14 @@ let ARCObjectWidget
     WidgetType.ARCObject,
     {|
         prefix = "ARC_OBJECT"
-        content = ARCObjectWidgetContent arcFileState pageState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
+        content =
+            ARCObjectWidgetContent
+                arcFileState
+                pageState
+                setArcFileState
+                setSelectedExplorerItemId
+                setSelectedTreeItemPath
+                setPageState
     |}
 
 let createWidgets
@@ -598,7 +649,7 @@ let createWidgets
         TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
         DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
-        ARCObjectWidget arcFileState pageState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
+        ARCObjectWidget arcFileState pageState setArcFileState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
     ]
     |> Map.ofList
 

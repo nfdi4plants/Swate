@@ -36,47 +36,65 @@ type FileExplorer =
             ?initialItems: FileItem list,
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
-            ?selectedItemId: string
+            ?selectedItemId: string,
+            ?directoryInteractionMode: DirectoryInteractionMode
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
         let initialModel = FileExplorerLogic.init (defaultArg initialItems [])
+        let directoryInteractionMode = defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
+        let includeSelectedDirectoryInVisiblePath = directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
 
         let model, dispatch = React.useReducer (reducer, initialModel)
         let containerRef = React.useElementRef ()
 
         React.useEffect (
-            (fun () -> dispatch (FileExplorerLogic.UpdateItems(defaultArg initialItems []))),
-            [| box initialItems |]
+            (fun () ->
+                dispatch (
+                    FileExplorerLogic.UpdateItems(
+                        defaultArg initialItems [],
+                        selectedItemId,
+                        includeSelectedDirectoryInVisiblePath
+                    )
+                )),
+            [| box initialItems; box includeSelectedDirectoryInVisiblePath |]
         )
 
         React.useEffect (
             (fun () ->
                 match selectedItemId with
                 | Some itemId ->
-                    dispatch (FileExplorerLogic.EnsurePathVisible itemId)
+                    dispatch (
+                        FileExplorerLogic.EnsurePathVisible(itemId, includeSelectedDirectoryInVisiblePath)
+                    )
 
                     if model.SelectedId <> Some itemId then
                         dispatch (FileExplorerLogic.SelectItem itemId)
                 | None -> ()
             ),
-            [| box selectedItemId; box model.Items |]
+            [| box selectedItemId; box includeSelectedDirectoryInVisiblePath |]
         )
 
-        let isItemOnSelectedPath (itemId: string) =
-            model.BreadcrumbPath |> List.exists (fun item -> item.Id = itemId)
-
-        let isCollapseLocked (item: FileItem) =
-            item.IsDirectory && model.ExpandedIds.Contains item.Id && isItemOnSelectedPath item.Id
-
-        let toggleExpanded item =
-            if not (isCollapseLocked item) then
-                dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-
         let handleItemClick item =
-            if item.Selectable then
-                dispatch (FileExplorerLogic.SelectItem item.Id)
-                onItemClick |> Option.iter (fun fn -> fn item)
+            dispatch (FileExplorerLogic.SelectItem item.Id)
+            onItemClick |> Option.iter (fun fn -> fn item)
+
+        let handleDirectoryClick (item: FileItem) (isExpanded: bool) (ev: Browser.Types.MouseEvent) =
+            ev.preventDefault ()
+            ev.stopPropagation ()
+
+            match directoryInteractionMode with
+            | DirectoryInteractionMode.SingleClickToggle ->
+                dispatch (FileExplorerLogic.ToggleExpanded item.Id)
+                handleItemClick item
+            | DirectoryInteractionMode.OpenOnDoubleClickCloseOnSingleClick ->
+                if isExpanded then
+                    dispatch (FileExplorerLogic.ToggleExpanded item.Id)
+                    handleItemClick item
+                elif ev.detail >= 2 then
+                    dispatch (FileExplorerLogic.ToggleExpanded item.Id)
+                else
+                    handleItemClick item
 
         let copyPathToClipboard (path: string) =
             promise {
@@ -107,7 +125,6 @@ type FileExplorer =
                 | None -> ()
                 if item.IsDirectory then
                     let isExpanded = model.ExpandedIds.Contains item.Id
-                    let collapseLocked = isCollapseLocked item
 
                     {
                         Label = if isExpanded then "Collapse" else "Expand"
@@ -116,8 +133,8 @@ type FileExplorer =
                                 "swt:fluent--folder-open-24-regular"
                             else
                                 "swt:fluent--folder-24-regular"
-                        OnClick = fun () -> toggleExpanded item
-                        Disabled = Some collapseLocked
+                        OnClick = fun () -> dispatch (FileExplorerLogic.ToggleExpanded item.Id)
+                        Disabled = None
                     }
             ]
 
@@ -177,29 +194,6 @@ type FileExplorer =
             let isSelected = model.SelectedId = Some item.Id
             let selectedClass = if isSelected then "swt:bg-base-300" else ""
             let isExpanded = model.ExpandedIds.Contains item.Id
-            let collapseLocked = isCollapseLocked item
-
-            let renderLabelControl (children: ReactElement list) onClick =
-                if item.Selectable then
-                    Html.button [
-                        prop.type'.button
-                        prop.testId $"file-item-row-{item.Id}"
-                        prop.custom ("data-file-item-id", item.Id)
-                        prop.className "swt:flex swt:items-center swt:gap-2 swt:text-left swt:flex-1"
-                        prop.onClick (fun ev ->
-                            ev.preventDefault ()
-                            ev.stopPropagation ()
-                            onClick ()
-                        )
-                        prop.children children
-                    ]
-                else
-                    Html.span [
-                        prop.testId $"file-item-row-{item.Id}"
-                        prop.custom ("data-file-item-id", item.Id)
-                        prop.className "swt:flex swt:items-center swt:gap-2 swt:flex-1 swt:opacity-80"
-                        prop.children children
-                    ]
 
             match item.Children with
             | Some children ->
@@ -207,76 +201,64 @@ type FileExplorer =
                     prop.key item.Id
                     prop.custom ("data-file-item-id", item.Id)
                     prop.children [
-                        Html.div [
-                            prop.className ("swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between swt:gap-2 " + selectedClass)
-                            prop.custom ("data-selected", if isSelected then "true" else "false")
+                        Html.details [
+                            if isExpanded then
+                                prop.custom ("open", true)
                             prop.children [
-                                Html.div [
-                                    prop.className "swt:flex swt:items-center swt:gap-2 swt:flex-1"
+                                Html.summary [
+                                    prop.custom ("data-file-item-id", item.Id)
+                                    prop.className ("swt:px-2 swt:py-1 swt:cursor-pointer " + selectedClass)
+                                    prop.onClick (handleDirectoryClick item isExpanded)
                                     prop.children [
-                                        Html.button [
-                                            prop.type'.button
-                                            prop.testId $"file-item-toggle-{item.Id}"
-                                            prop.custom ("data-file-item-id", item.Id)
-                                            prop.className "swt:btn swt:btn-ghost swt:btn-xs"
-                                            prop.ariaLabel $"Toggle {item.Name}"
-                                            prop.disabled collapseLocked
-                                            prop.onClick (fun ev ->
-                                                ev.preventDefault ()
-                                                ev.stopPropagation ()
-                                                toggleExpanded item
-                                            )
+                                        Html.div [
+                                            prop.className "swt:flex swt:items-center swt:justify-between swt:gap-2"
                                             prop.children [
-                                                Html.i [
-                                                    prop.className [
-                                                        "swt:iconify"
-                                                        if isExpanded then
-                                                            "swt:fluent--chevron-down-24-regular"
-                                                        else
-                                                            "swt:fluent--chevron-right-24-regular"
+                                                Html.div [
+                                                    prop.className "swt:flex swt:items-center swt:gap-2"
+                                                    prop.children [
+                                                        Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
+                                                        Html.span item.Name
                                                     ]
                                                 ]
+
+                                                // LFS badge and size if applicable
+                                                if item.IsLFS = Some true then
+                                                    Html.div [
+                                                        prop.className "swt:flex swt:gap-2 swt:items-center"
+                                                        prop.children [
+                                                            Html.button [
+                                                                prop.className "swt:btn swt:btn-xs"
+                                                                prop.disabled (item.Downloaded = Some true)
+                                                                prop.text "LFS"
+                                                                prop.onClick (fun e ->
+                                                                    e.stopPropagation ()
+
+                                                                    dispatch (
+                                                                        FileExplorerLogic.ToggleLFSDownload item.Id
+                                                                    )
+                                                                )
+                                                            ]
+                                                            match item.SizeFormatted with
+                                                            | Some size ->
+                                                                Html.span [
+                                                                    prop.className "swt:badge swt:badge-sm"
+                                                                    prop.text size
+                                                                ]
+                                                            | None -> Html.none
+                                                        ]
+                                                    ]
                                             ]
                                         ]
-                                        renderLabelControl
-                                            [
-                                                Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
-                                                Html.span item.Name
-                                            ]
-                                            (fun () -> handleItemClick item)
                                     ]
                                 ]
 
-                                if item.IsLFS = Some true then
-                                    Html.div [
-                                        prop.className "swt:flex swt:gap-2 swt:items-center"
-                                        prop.children [
-                                            Html.button [
-                                                prop.className "swt:btn swt:btn-xs"
-                                                prop.disabled (item.Downloaded = Some true)
-                                                prop.text "LFS"
-                                                prop.onClick (fun e ->
-                                                    e.stopPropagation ()
-                                                    dispatch (FileExplorerLogic.ToggleLFSDownload item.Id)
-                                                )
-                                            ]
-                                            match item.SizeFormatted with
-                                            | Some size ->
-                                                Html.span [
-                                                    prop.className "swt:badge swt:badge-sm"
-                                                    prop.text size
-                                                ]
-                                            | None -> Html.none
-                                        ]
+                                if isExpanded then
+                                    Html.ul [
+                                        prop.className "swt:ml-4"
+                                        prop.children (children |> List.map renderItem)
                                     ]
                             ]
                         ]
-                        if isExpanded then
-                            Html.ul [
-                                prop.testId $"file-item-children-{item.Id}"
-                                prop.className "swt:ml-4"
-                                prop.children (children |> List.map renderItem)
-                            ]
                     ]
                 ]
             | None ->
@@ -284,20 +266,23 @@ type FileExplorer =
                     prop.key item.Id
                     prop.custom ("data-file-item-id", item.Id)
                     prop.children [
-                        Html.div [
+                        Html.a [
+                            prop.custom ("data-file-item-id", item.Id)
                             prop.className (
                                 "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between "
                                 + selectedClass
                             )
-                            prop.custom ("data-selected", if isSelected then "true" else "false")
+                            prop.onClick (fun _ -> handleItemClick item)
                             prop.children [
-                                renderLabelControl
-                                    [
+                                Html.div [
+                                    prop.className "swt:flex swt:items-center swt:gap-2"
+                                    prop.children [
                                         Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
                                         Html.span item.Name
                                     ]
-                                    (fun () -> handleItemClick item)
+                                ]
 
+                                // LFS badge for files
                                 if item.IsLFS = Some true then
                                     Html.div [
                                         prop.className "swt:flex swt:gap-2 swt:items-center"
@@ -404,95 +389,6 @@ module FileExplorerExample =
                     initialItems = initialItems,
                     onItemClick = handleItemClick,
                     onContextMenu = handleContextMenu
-                )
-            ]
-        ]
-
-module FileExplorerTestHarness =
-
-    let private folder iconPath id name isSelectable children =
-        {
-            FileTree.createFolder name None iconPath with
-                Id = id
-                IsExpanded = true
-                Selectable = isSelectable
-                Children = Some children
-        }
-
-    let private file iconPath id name isSelectable =
-        {
-            FileTree.createFile name None iconPath with
-                Id = id
-                Selectable = isSelectable
-        }
-
-    [<ReactComponent>]
-    let ARCSelectionHarness () =
-        let icons = FileExplorer.defaultIconPaths
-        let initialSelection = "note:protocol"
-        let selectedId, setSelectedId = React.useState initialSelection
-
-        let items: FileItem list = [
-            folder
-                icons.folder
-                "arc"
-                "TestArc"
-                true
-                [
-                    folder
-                        icons.folder
-                        "group:studies"
-                        "Studies Group"
-                        false
-                        [
-                            folder
-                                icons.folder
-                                "study:plant"
-                                "Plant Study"
-                                true
-                                [
-                                    folder
-                                        icons.folder
-                                        "study:plant:notes"
-                                        "Study Notes Group"
-                                        false
-                                        [ file icons.markdown "note:protocol" "Protocol Note" true ]
-                                ]
-                        ]
-                    folder
-                        icons.folder
-                        "group:runs"
-                        "Runs Group"
-                        false
-                        [
-                            folder
-                                icons.folder
-                                "run:2026"
-                                "Run 2026"
-                                true
-                                [ file icons.txt "run:2026:result" "Run Result" true ]
-                        ]
-                ]
-        ]
-
-        Html.div [
-            prop.className "swt:p-4 swt:flex swt:flex-col swt:gap-4"
-            prop.children [
-                Html.div [
-                    prop.className "swt:text-sm"
-                    prop.children [
-                        Html.span [ prop.className "swt:font-semibold"; prop.text "Selected:" ]
-                        Html.span [
-                            prop.testId "selected-item-id"
-                            prop.className "swt:ml-2 swt:font-mono"
-                            prop.text selectedId
-                        ]
-                    ]
-                ]
-                FileExplorer.FileExplorer(
-                    initialItems = items,
-                    selectedItemId = selectedId,
-                    onItemClick = (fun item -> setSelectedId item.Id)
                 )
             ]
         ]

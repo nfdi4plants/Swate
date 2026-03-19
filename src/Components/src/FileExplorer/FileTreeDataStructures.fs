@@ -1,6 +1,7 @@
 namespace Swate.Components.FileExplorerTypes
 
 open System
+
 type FileItem = {
     Id: string
     Name: string
@@ -28,6 +29,11 @@ type FileItemConfig = {
     IsDirectory: bool
     ItemType: string
 }
+
+[<RequireQualifiedAccess>]
+type DirectoryInteractionMode =
+    | SingleClickToggle
+    | OpenOnDoubleClickCloseOnSingleClick
 
 
 // ============================================================================
@@ -59,7 +65,7 @@ module FileTree =
         SizeFormatted = None
         ItemType = "node"
         Label = Some name
-        Selectable = true
+        Selectable = false
         Path = path
     }
 
@@ -79,7 +85,7 @@ module FileTree =
         SizeFormatted = None
         ItemType = "node"
         Label = Some name
-        Selectable = true
+        Selectable = false
         Path = path
     }
 
@@ -99,7 +105,7 @@ module FileTree =
         SizeFormatted = None
         ItemType = config.ItemType
         Label = Some config.Name
-        Selectable = true
+        Selectable = false
         Path = path
     }
 
@@ -252,6 +258,23 @@ type ContextMenuItem = {
 }
 
 module FileExplorerLogic =
+    let private expandedIdsFromPath includeSelectedItem itemId items =
+        let pathItems =
+            match FileTree.getPath itemId items [] with
+            | Some pathItems -> pathItems
+            | None -> []
+
+        let expandablePathItems =
+            if includeSelectedItem then
+                pathItems
+            else
+                pathItems
+                |> List.take (max 0 (List.length pathItems - 1))
+
+        expandablePathItems
+        |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
+        |> Set.ofList
+
     let rec private collectExpandedIds acc items =
         items
         |> List.fold
@@ -291,10 +314,10 @@ module FileExplorerLogic =
         | ToggleExpanded of string
         | SelectItem of string
         | NavigateTo of string
-        | EnsurePathVisible of string
+        | EnsurePathVisible of itemId: string * includeSelectedItem: bool
         | ShowContextMenu of float * float * ContextMenuItem list
         | HideContextMenu
-        | UpdateItems of FileItem list
+        | UpdateItems of FileItem list * selectedItemId: string option * includeSelectedItem: bool
         | AddChild of parentId: string * child: FileItem
         | RemoveItem of string
         | RenameItem of string * string
@@ -351,18 +374,10 @@ module FileExplorerLogic =
             else
                 update (SelectItem itemId) model
 
-        | EnsurePathVisible itemId ->
-            let expandedFromPath =
-                match FileTree.getPath itemId model.Items [] with
-                | Some pathItems ->
-                    pathItems
-                    |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
-                    |> Set.ofList
-                | None -> Set.empty
-
+        | EnsurePathVisible(itemId, includeSelectedItem) ->
             {
                 model with
-                    ExpandedIds = Set.union model.ExpandedIds expandedFromPath
+                    ExpandedIds = Set.union model.ExpandedIds (expandedIdsFromPath includeSelectedItem itemId model.Items)
             }
 
         | ShowContextMenu(x, y, menuItems) -> {
@@ -378,7 +393,7 @@ module FileExplorerLogic =
                 ContextMenuVisible = false
           }
 
-        | UpdateItems items ->
+        | UpdateItems(items, selectedItemId, includeSelectedItem) ->
             let validIds = collectIds Set.empty items
             let expandedFromItems = collectExpandedIds Set.empty items
 
@@ -386,10 +401,32 @@ module FileExplorerLogic =
                 model.ExpandedIds
                 |> Set.filter (fun id -> validIds.Contains id)
 
+            let nextSelectedId =
+                selectedItemId
+                |> Option.orElse model.SelectedId
+
+            let breadcrumbPath =
+                match nextSelectedId with
+                | Some itemId ->
+                    match FileTree.getPath itemId items [] with
+                    | Some path -> path
+                    | None -> []
+                | None -> []
+
+            let expandedFromSelection =
+                nextSelectedId
+                |> Option.map (fun itemId -> expandedIdsFromPath includeSelectedItem itemId items)
+                |> Option.defaultValue Set.empty
+
             {
                 model with
                     Items = items
-                    ExpandedIds = Set.union persistedExpanded expandedFromItems
+                    SelectedId = nextSelectedId
+                    BreadcrumbPath = breadcrumbPath
+                    ExpandedIds =
+                        persistedExpanded
+                        |> Set.union expandedFromItems
+                        |> Set.union expandedFromSelection
             }
 
         | AddChild(parentId, child) ->

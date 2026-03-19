@@ -249,6 +249,159 @@ type ARCObjectWidget =
         ]
         |> Map.ofList
 
+    static member private StoryMetadataRows =
+        [
+            ARCObjectWidget.StoryItemIdStudy,
+            [
+                "Identifier", "PS-2026-001"
+                "Title", "Plant Stress Response Under Progressive Drought"
+                "Description", "A controlled greenhouse study tracking transcript, metabolite, and phenotype changes during water limitation."
+                "Tables", "2"
+                "Submission Date", "2026-03-12"
+                "Public Release", "2026-06-01"
+                "Design", "Drought stress; time series"
+                "Contacts", "Nadia Green; Oliver Hartmann"
+                "Publications", "1"
+                "Comments", "Includes shared sample identifiers across linked assays."
+            ]
+            ARCObjectWidget.StoryItemIdStudy2,
+            [
+                "Identifier", "SM-2026-004"
+                "Title", "Soil Microbiome Recovery After Compost Amendment"
+                "Description", "A field study following microbial community changes after regenerative soil treatment."
+                "Tables", "1"
+                "Submission Date", "2026-03-18"
+                "Public Release", "2026-07-15"
+                "Design", "Field trial; amplicon sequencing"
+                "Contacts", "Lina Becker"
+                "Publications", "0"
+                "Comments", "Samples are grouped by treatment plot and collection week."
+            ]
+            ARCObjectWidget.StoryItemIdAssay,
+            [
+                "Identifier", "MetabolomicsAssay"
+                "Title", "Leaf Metabolite Profiling"
+                "Description", "Mass spectrometry assay quantifying osmoprotectants and stress-associated metabolites."
+                "Tables", "3"
+                "Measurement", "metabolite profiling"
+                "Technology", "mass spectrometry"
+                "Platform", "Orbitrap Exploris 240"
+                "Performers", "Elena Rossi; Max Weber"
+                "Comments", "Aligned with the plant stress study time points."
+            ]
+            ARCObjectWidget.StoryItemIdStudyAssayRef,
+            [
+                "Identifier", "MetabolomicsAssay"
+                "Title", "Leaf Metabolite Profiling"
+                "Description", "Mass spectrometry assay quantifying osmoprotectants and stress-associated metabolites."
+                "Tables", "3"
+                "Measurement", "metabolite profiling"
+                "Technology", "mass spectrometry"
+                "Platform", "Orbitrap Exploris 240"
+                "Performers", "Elena Rossi; Max Weber"
+                "Comments", "Aligned with the plant stress study time points."
+            ]
+            ARCObjectWidget.StoryItemIdAssay2,
+            [
+                "Identifier", "TranscriptomicsAssay"
+                "Title", "Leaf Transcriptome Sequencing"
+                "Description", "RNA-seq assay tracking drought-induced expression programs."
+                "Tables", "2"
+                "Measurement", "transcript profiling"
+                "Technology", "RNA sequencing"
+                "Platform", "Illumina NovaSeq 6000"
+                "Performers", "Priya Shah"
+                "Comments", "Shares the same plant cohort as the metabolomics branch."
+            ]
+            ARCObjectWidget.StoryItemIdStudyAssayRef2,
+            [
+                "Identifier", "TranscriptomicsAssay"
+                "Title", "Leaf Transcriptome Sequencing"
+                "Description", "RNA-seq assay tracking drought-induced expression programs."
+                "Tables", "2"
+                "Measurement", "transcript profiling"
+                "Technology", "RNA sequencing"
+                "Platform", "Illumina NovaSeq 6000"
+                "Performers", "Priya Shah"
+                "Comments", "Shares the same plant cohort as the metabolomics branch."
+            ]
+            ARCObjectWidget.StoryItemIdAssay3,
+            [
+                "Identifier", "AmpliconSequencingAssay"
+                "Title", "16S rRNA Community Survey"
+                "Description", "Amplicon sequencing assay capturing bacterial community shifts after soil amendment."
+                "Tables", "1"
+                "Measurement", "microbial community profiling"
+                "Technology", "amplicon sequencing"
+                "Platform", "Illumina MiSeq"
+                "Performers", "Jonas Klein"
+                "Comments", "Primary assay for the soil microbiome branch."
+            ]
+            ARCObjectWidget.StoryItemIdStudy2AssayRef,
+            [
+                "Identifier", "AmpliconSequencingAssay"
+                "Title", "16S rRNA Community Survey"
+                "Description", "Amplicon sequencing assay capturing bacterial community shifts after soil amendment."
+                "Tables", "1"
+                "Measurement", "microbial community profiling"
+                "Technology", "amplicon sequencing"
+                "Platform", "Illumina MiSeq"
+                "Performers", "Jonas Klein"
+                "Comments", "Primary assay for the soil microbiome branch."
+            ]
+            ARCObjectWidget.StoryItemIdWorkflow,
+            [
+                "Identifier", "ExtractionWorkflow"
+                "Title", "Polar Metabolite Extraction"
+                "Description", "Bench workflow covering quenching, grinding, extraction, and QC pooling."
+                "Version", "2.1"
+                "Type", "wet-lab protocol"
+                "URI", "https://example.org/workflows/extraction-v2-1"
+                "Subworkflows", "cleanup"
+                "Contacts", "Marta Ivanova"
+                "Comments", "Feeds directly into the metabolomics assay branch."
+            ]
+            ARCObjectWidget.StoryItemIdWorkflow2,
+            [
+                "Identifier", "CleanupWorkflow"
+                "Title", "Post-Extraction Cleanup"
+                "Description", "Sample cleanup and concentration workflow executed before LC-MS injection."
+                "Version", "1.4"
+                "Type", "sample preparation"
+                "URI", "https://example.org/workflows/cleanup-v1-4"
+                "Subworkflows", "None"
+                "Contacts", "Marta Ivanova"
+                "Comments", "Reusable downstream workflow for multiple metabolomics studies."
+            ]
+            ARCObjectWidget.StoryItemIdRun,
+            [
+                "Identifier", "Run-2026-04-01"
+                "Title", "Week 1 Drought Run"
+                "Description", "Operational run capturing the first drought sampling week."
+                "Tables", "2"
+                "Measurement", "metabolite profiling"
+                "Technology", "mass spectrometry"
+                "Platform", "Orbitrap Exploris 240"
+                "Workflows", "ExtractionWorkflow"
+                "Performers", "Elena Rossi"
+                "Comments", "Includes pooled QC injections at the beginning and end of the sequence."
+            ]
+            ARCObjectWidget.StoryItemIdRun2,
+            [
+                "Identifier", "Run-2026-04-08"
+                "Title", "Week 2 Drought Run"
+                "Description", "Follow-up run extending the same acquisition series into the second drought week."
+                "Tables", "2"
+                "Measurement", "metabolite profiling"
+                "Technology", "mass spectrometry"
+                "Platform", "Orbitrap Exploris 240"
+                "Workflows", "ExtractionWorkflow; CleanupWorkflow"
+                "Performers", "Elena Rossi; Max Weber"
+                "Comments", "Carries forward retention-time alignment controls from the first run."
+            ]
+        ]
+        |> Map.ofList
+
     static member private TryFindItemAndParent(itemId: string, items: FileItem list) =
         let rec loop (parent: FileItem option) (items: FileItem list) =
             items
@@ -358,6 +511,10 @@ type ARCObjectWidget =
             |> Map.tryFind selectedId
             |> Option.defaultValue ("Unknown", "Unknown", "Unknown", "-", "No details available.")
 
+        let selectedMetadataRows =
+            ARCObjectWidget.StoryMetadataRows
+            |> Map.tryFind selectedId
+
         let selectedTitle, kind, role, previewTarget, description = selectedMeta
 
         let treePane =
@@ -391,6 +548,26 @@ type ARCObjectWidget =
                             ]
                         ]
                     ]
+                    match selectedMetadataRows with
+                    | Some rows ->
+                        Html.div [
+                            prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+                            prop.children [
+                                Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-2"; prop.text "Metadata" ]
+                                Html.dl [
+                                    prop.className "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-2 swt:text-sm"
+                                    prop.children [
+                                        for label, value in rows do
+                                            Html.dt [ prop.className "swt:font-medium"; prop.text label ]
+                                            Html.dd [
+                                                prop.className "swt:break-words"
+                                                prop.text value
+                                            ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    | None -> Html.none
                     Html.div [
                         prop.className "swt:flex-1 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
                         prop.children [
