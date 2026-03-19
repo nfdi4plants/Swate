@@ -40,7 +40,6 @@ module DatahubBrowserModel =
         Error: GitLabError option
         Pagination: PaginationMetadata option
         IsAuthenticated: bool
-        User: CurrentUserDto option
     }
 
     let private buildRequest (state: State) : ExploreLoadRequest = {
@@ -52,7 +51,6 @@ module DatahubBrowserModel =
         SortDirection = state.SortDirection
         SelectedGroupId = state.SelectedGroupId
         IsAuthenticated = state.IsAuthenticated
-        User = state.User
     }
 
     let init (user: CurrentUserDto option) =
@@ -73,7 +71,6 @@ module DatahubBrowserModel =
             Error = None
             Pagination = None
             IsAuthenticated = user.IsSome
-            User = user
         }
 
         state, Cmd.ofMsg (LoadReposRequest(buildRequest state))
@@ -221,7 +218,7 @@ type DataHubBrowser =
             barClassName =
                 "swt:w-fit swt:h-fit swt:flex swt:flex-col swt:bg-base-300 swt:rounded-lg swt:shadow-sm swt:join swt:join-vertical",
             tooltipPosition = DaisyuiTooltipPosition.Left,
-            buttonSize = DaisyUISize.SM,
+            buttonSize = DaisyuiSize.SM,
             buttonClassName = "swt:btn swt:btn-primary swt:btn-square swt:join-item"
         )
 
@@ -594,17 +591,133 @@ type DataHubBrowser =
     static member ExplorePanel
         (
             user: CurrentUserDto option,
-            loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult, GitLabError>>,
-            reloadTrigger: int,
-            ?onOpen: (ExploreProjectDto -> unit),
+            loaders: ExploreLoaders,
+            ?reloadTrigger: int,
+            ?onRender: (ExploreProjectDto -> unit),
             ?projectActionBtns: (ExploreProjectDto -> ButtonInfo[])
         ) =
+
+        let emptyPagination (page: int) (perPage: int) : PaginationMetadata = {
+            Link = None
+            NextPage = None
+            Page = Some page
+            PerPage = Some perPage
+            PrevPage = None
+            Total = Some 0
+            TotalPages = Some 1
+            NextCursor = None
+            PrevCursor = None
+        }
+
+        let emptyProjectsResponse (page: int) (perPage: int) : PagedResponse<ExploreProjectDto> = {
+            Items = [||]
+            Pagination = emptyPagination page perPage
+        }
+
+        let emptyGroupsResponse (page: int) (perPage: int) : PagedResponse<GroupDto> = {
+            Items = [||]
+            Pagination = emptyPagination page perPage
+        }
+
+        let loadRepos (request: ExploreLoadRequest) = promise {
+            let visibility = if request.IsAuthenticated then None else Some "public"
+
+            let orderBy =
+                if request.Target = ExploreTab.MostStarred then
+                    ProjectSortField.StarCount
+                else
+                    ExploreSortField.toProjectSortField request.SortField
+
+            let sort =
+                if request.Target = ExploreTab.MostStarred then
+                    SortDirection.Desc
+                else
+                    request.SortDirection
+
+            let repoQuery = {
+                SearchTerm = request.SearchTerm
+                Page = request.Page
+                PerPage = request.PerPage
+                OrderBy = orderBy
+                Sort = sort
+                Visibility = visibility
+            }
+
+            let! groupsResult =
+                if request.Target = ExploreTab.YourOrganisations && request.IsAuthenticated then
+                    loaders.LoadOrganisationGroups { Page = 1; PerPage = 100 }
+                else
+                    promise { return Ok(emptyGroupsResponse 1 100) }
+
+            let groups, groupsLoaded, groupsLoadError =
+                match groupsResult with
+                | Ok g -> g.Items, (request.Target <> ExploreTab.YourOrganisations) || request.IsAuthenticated, None
+                | Error _ -> [||], true, Some "Failed to load groups"
+
+            let selectedGroupId =
+                match request.SelectedGroupId with
+                | Some gid -> Some gid
+                | None when groups.Length > 0 -> Some groups[0].id
+                | None -> None
+
+            let! result =
+                match request.Target with
+                | ExploreTab.All -> loaders.LoadAllRepos repoQuery
+                | ExploreTab.YourRepos ->
+                    if request.IsAuthenticated then
+                        loaders.LoadUserRepos repoQuery
+                    else
+                        promise { return Ok(emptyProjectsResponse request.Page request.PerPage) }
+                | ExploreTab.MostStarred ->
+                    loaders.LoadMostStarredRepos {
+                        SearchTerm = request.SearchTerm
+                        Page = request.Page
+                        PerPage = request.PerPage
+                        Visibility = visibility
+                    }
+                | ExploreTab.YourOrganisations ->
+                    if request.IsAuthenticated then
+                        match selectedGroupId with
+                        | Some gid ->
+                            loaders.LoadOrganisationRepos {
+                                GroupId = gid
+                                SearchTerm = request.SearchTerm
+                                Page = request.Page
+                                PerPage = request.PerPage
+                                OrderBy = orderBy
+                                Sort = sort
+                                IncludeSubgroups = true
+                                WithShared = true
+                            }
+                        | None -> promise { return Ok(emptyProjectsResponse request.Page request.PerPage) }
+                    else
+                        promise { return Ok(emptyProjectsResponse request.Page request.PerPage) }
+
+            match result with
+            | Ok okResult ->
+                return
+                    Ok {
+                        Repos = okResult.Items
+                        Pagination = Some okResult.Pagination
+                        Groups = groups
+                        GroupsLoaded = groupsLoaded
+                        GroupsLoadError = groupsLoadError
+                    }
+            | Error err -> return Error(err)
+        }
+
         let model, dispatch =
             React.useElmish (
                 (fun () -> DatahubBrowserModel.init user),
                 DatahubBrowserModel.update loadRepos,
                 [| box user; box reloadTrigger |]
             )
+
+        React.useEffect (fun () ->
+            match onRender with
+            | Some fn -> model.Repos |> Array.iter fn
+            | None -> ()
+        )
 
         let onSearchSubmit () =
             dispatch DatahubBrowserModel.SubmitSearch
@@ -705,9 +818,20 @@ type DataHubBrowser =
         let isAuthenticated = false
         let reloadTrigger = 0
 
+        let callCount, setCallCount =
+            React.useState (
+                {|
+                    all = 0
+                    mostStarred = 0
+                    userRepos = 0
+                    organisationGroups = 0
+                    organisationRepos = 0
+                |}
+            )
+
         let isLocallyCloned (p: ExploreProjectDto) = p.id % 2 = 0
 
-        let paginate (items: ExploreProjectDto array) (page: int) (pageSize: int) =
+        let paginate (items: 'T array) (page: int) (pageSize: int) =
             let totalPages =
                 let f = float items.Length / float pageSize
                 let ceilV = System.Math.Ceiling f |> int
@@ -758,63 +882,204 @@ type DataHubBrowser =
         let isPublicRepo (project: ExploreProjectDto) =
             not (project.path_with_namespace.Contains("/private/"))
 
-        let loadRepos (request: ExploreLoadRequest) = promise {
+        let sortReposByProjectSort
+            (sortField: ProjectSortField)
+            (sortDirection: SortDirection)
+            (items: ExploreProjectDto array)
+            =
+            let sorted =
+                match sortField with
+                | ProjectSortField.Name -> items |> Array.sortBy (fun p -> p.name.ToLowerInvariant())
+                | ProjectSortField.CreatedAt -> items |> Array.sortBy (fun p -> p.created_at)
+                | ProjectSortField.UpdatedAt -> items |> Array.sortBy (fun p -> p.last_activity_at)
+                | ProjectSortField.StarCount -> items |> Array.sortBy (fun p -> p.star_count)
+                | ProjectSortField.LastActivityAt -> items |> Array.sortBy (fun p -> p.last_activity_at)
+
+            match sortDirection with
+            | SortDirection.Asc -> sorted
+            | SortDirection.Desc -> sorted |> Array.rev
+
+        let filterRepos (searchTerm: string) (items: ExploreProjectDto array) =
+            items
+            |> Array.filter (fun p ->
+                System.String.IsNullOrWhiteSpace searchTerm
+                || containsCi p.name searchTerm
+                || containsCi p.path_with_namespace searchTerm
+                || containsCi (p.description |> Option.defaultValue "") searchTerm
+            )
+
+        let loadAllRepos (query: ExploreRepoQuery) = promise {
+            setCallCount {|
+                callCount with
+                    all = callCount.all + 1
+            |}
+
             do! Promise.sleep 250
 
             let source =
-                match request.Target with
-                | ExploreTab.All ->
-                    if request.IsAuthenticated then
-                        allRepos
-                    else
-                        allRepos |> Array.filter isPublicRepo
-                | ExploreTab.YourRepos -> MockData.DataHub.yourRepos
-                | ExploreTab.MostStarred -> MockData.DataHub.mostStarred
-                | ExploreTab.YourOrganisations ->
-                    match request.SelectedGroupId with
-                    | Some gid -> MockData.DataHub.orgRepos |> Map.tryFind gid |> Option.defaultValue [||]
-                    | None -> [||]
+                match query.Visibility with
+                | Some "public" -> allRepos |> Array.filter isPublicRepo
+                | _ -> allRepos
 
             let filtered =
                 source
-                |> Array.filter (fun p ->
-                    System.String.IsNullOrWhiteSpace request.SearchTerm
-                    || containsCi p.name request.SearchTerm
-                    || containsCi p.path_with_namespace request.SearchTerm
-                    || containsCi (p.description |> Option.defaultValue "") request.SearchTerm
-                )
-                |> (fun items ->
-                    if request.Target = ExploreTab.MostStarred then
-                        items |> Array.sortByDescending (fun p -> p.star_count)
-                    else
-                        sortRepos request.SortField request.SortDirection items
-                )
+                |> filterRepos query.SearchTerm
+                |> sortReposByProjectSort query.OrderBy query.Sort
 
-            let pageItems, pageMeta = paginate filtered request.Page request.PerPage
+            let pageItems, pageMeta = paginate filtered query.Page query.PerPage
 
             return
                 Ok {
-                    Repos = pageItems
-                    Pagination = Some pageMeta
-                    Groups = MockData.DataHub.groups
-                    GroupsLoaded = true
-                    GroupsLoadError = None
+                    Items = pageItems
+                    Pagination = pageMeta
                 }
         }
 
-        DataHubBrowser.ExplorePanel(
-            None,
-            loadRepos,
-            reloadTrigger,
-            projectActionBtns =
-                (fun p -> [|
-                    ButtonInfo.create (
-                        "swt:fluent--arrow-download-24-regular swt:size-5",
-                        "Clone repository",
-                        (fun _ -> Browser.Dom.window.alert ("Clone " + p.web_url))
-                    )
-                |])
-        )
+        let loadMostStarredRepos (query: ExploreMostStarredQuery) = promise {
+            setCallCount {|
+                callCount with
+                    mostStarred = callCount.mostStarred + 1
+            |}
+
+            do! Promise.sleep 250
+
+            let source =
+                match query.Visibility with
+                | Some "public" -> MockData.DataHub.mostStarred |> Array.filter isPublicRepo
+                | _ -> MockData.DataHub.mostStarred
+
+            let filtered =
+                source
+                |> filterRepos query.SearchTerm
+                |> Array.sortByDescending (fun p -> p.star_count)
+
+            let pageItems, pageMeta = paginate filtered query.Page query.PerPage
+
+            return
+                Ok {
+                    Items = pageItems
+                    Pagination = pageMeta
+                }
+        }
+
+        let loadUserRepos (query: ExploreRepoQuery) = promise {
+            setCallCount {|
+                callCount with
+                    userRepos = callCount.userRepos + 1
+            |}
+
+            do! Promise.sleep 250
+
+            let filtered =
+                MockData.DataHub.yourRepos
+                |> filterRepos query.SearchTerm
+                |> sortReposByProjectSort query.OrderBy query.Sort
+
+            let pageItems, pageMeta = paginate filtered query.Page query.PerPage
+
+            return
+                Ok {
+                    Items = pageItems
+                    Pagination = pageMeta
+                }
+        }
+
+        let loadOrganisationGroups (query: ExploreGroupsQuery) = promise {
+            setCallCount {|
+                callCount with
+                    organisationGroups = callCount.organisationGroups + 1
+            |}
+
+            do! Promise.sleep 250
+
+            let pageItems, pageMeta = paginate MockData.DataHub.groups query.Page query.PerPage
+
+            return
+                Ok {
+                    Items = pageItems
+                    Pagination = pageMeta
+                }
+        }
+
+        let loadOrganisationRepos (query: ExploreGroupProjectsQuery) = promise {
+            setCallCount {|
+                callCount with
+                    organisationRepos = callCount.organisationRepos + 1
+            |}
+
+            do! Promise.sleep 250
+
+            let source =
+                MockData.DataHub.orgRepos
+                |> Map.tryFind query.GroupId
+                |> Option.defaultValue [||]
+
+            let filtered =
+                source
+                |> filterRepos query.SearchTerm
+                |> sortReposByProjectSort query.OrderBy query.Sort
+
+            let pageItems, pageMeta = paginate filtered query.Page query.PerPage
+
+            return
+                Ok {
+                    Items = pageItems
+                    Pagination = pageMeta
+                }
+        }
+
+        let loaders: ExploreLoaders = {
+            LoadAllRepos = loadAllRepos
+            LoadMostStarredRepos = loadMostStarredRepos
+            LoadUserRepos = loadUserRepos
+            LoadOrganisationGroups = loadOrganisationGroups
+            LoadOrganisationRepos = loadOrganisationRepos
+        }
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-2"
+            prop.children [
+                Html.div [
+                    prop.testId "GitLabExploreMockCallCounter"
+                    prop.className "swt:flex swt:gap-2 swt:flex-wrap swt:text-xs swt:text-base-content/70"
+                    prop.children [
+                        Html.span [
+                            prop.testId "GitLabExploreMockCountAll"
+                            prop.textf "all:%i" callCount.all
+                        ]
+                        Html.span [
+                            prop.testId "GitLabExploreMockCountMostStarred"
+                            prop.textf "most-starred:%i" callCount.mostStarred
+                        ]
+                        Html.span [
+                            prop.testId "GitLabExploreMockCountUserRepos"
+                            prop.textf "user-repos:%i" callCount.userRepos
+                        ]
+                        Html.span [
+                            prop.testId "GitLabExploreMockCountOrgGroups"
+                            prop.textf "org-groups:%i" callCount.organisationGroups
+                        ]
+                        Html.span [
+                            prop.testId "GitLabExploreMockCountOrgRepos"
+                            prop.textf "org-repos:%i" callCount.organisationRepos
+                        ]
+                    ]
+                ]
+                DataHubBrowser.ExplorePanel(
+                    None,
+                    loaders,
+                    reloadTrigger,
+                    projectActionBtns =
+                        (fun p -> [|
+                            ButtonInfo.create (
+                                "swt:fluent--arrow-download-24-regular swt:size-5",
+                                "Clone repository",
+                                (fun _ -> Browser.Dom.window.alert ("Clone " + p.web_url))
+                            )
+                        |])
+                )
+            ]
+        ]
 
     [<ReactComponent>]
     static member GitLabEntry() =
@@ -859,125 +1124,96 @@ type DataHubBrowser =
                     setCurrentUser None
             }
 
-        let loadRepos (request: ExploreLoadRequest) = promise {
-            if not isConnected then
-                return Ok ExploreLoadResult.empty
+        let emptyGroupsResponse (page: int) (perPage: int) : PagedResponse<GroupDto> = {
+            Items = [||]
+            Pagination = {
+                Link = None
+                NextPage = None
+                Page = Some page
+                PerPage = Some perPage
+                PrevPage = None
+                Total = Some 0
+                TotalPages = Some 1
+                NextCursor = None
+                PrevCursor = None
+            }
+        }
+
+        let loadAllRepos (query: ExploreRepoQuery) =
+            if isConnected then
+                let requestPat = if query.Visibility.IsSome then "" else pat
+
+                GitLabApi.ListProjects(
+                    baseUrl,
+                    requestPat,
+                    page = query.Page,
+                    perPage = query.PerPage,
+                    search = query.SearchTerm,
+                    orderBy = query.OrderBy,
+                    sort = query.Sort,
+                    ?visibility = query.Visibility
+                )
             else
-                let visibility = if request.IsAuthenticated then None else Some "public"
+                promise { return Ok(emptyResponse query.Page query.PerPage) }
 
-                let requestPat = if request.IsAuthenticated then pat else ""
+        let loadMostStarredRepos (query: ExploreMostStarredQuery) =
+            if isConnected then
+                let requestPat = if query.Visibility.IsSome then "" else pat
 
-                let orderBy =
-                    if request.Target = ExploreTab.MostStarred then
-                        ProjectSortField.StarCount
-                    else
-                        ExploreSortField.toProjectSortField request.SortField
+                GitLabApi.ListExploreMostStarred(
+                    baseUrl,
+                    requestPat,
+                    page = query.Page,
+                    perPage = query.PerPage,
+                    search = query.SearchTerm,
+                    ?visibility = query.Visibility
+                )
+            else
+                promise { return Ok(emptyResponse query.Page query.PerPage) }
 
-                let sort =
-                    if request.Target = ExploreTab.MostStarred then
-                        SortDirection.Desc
-                    else
-                        request.SortDirection
+        let loadUserRepos (query: ExploreRepoQuery) =
+            if isConnected then
+                GitLabApi.ListUserPersonalProjects(
+                    baseUrl,
+                    pat,
+                    page = query.Page,
+                    perPage = query.PerPage,
+                    search = query.SearchTerm,
+                    orderBy = query.OrderBy,
+                    sort = query.Sort
+                )
+            else
+                promise { return Ok(emptyResponse query.Page query.PerPage) }
 
-                let! groupsResult =
-                    if request.Target = ExploreTab.YourOrganisations && request.IsAuthenticated then
-                        GitLabApi.ListGroupsForCurrentUser(baseUrl, pat, page = 1, perPage = 100)
-                    else
-                        promise {
-                            return
-                                Ok {
-                                    Items = [||]
-                                    Pagination = {
-                                        Link = None
-                                        NextPage = None
-                                        Page = Some 1
-                                        PerPage = Some 100
-                                        PrevPage = None
-                                        Total = Some 0
-                                        TotalPages = Some 1
-                                        NextCursor = None
-                                        PrevCursor = None
-                                    }
-                                }
-                        }
+        let loadOrganisationGroups (query: ExploreGroupsQuery) =
+            if isConnected then
+                GitLabApi.ListGroupsForCurrentUser(baseUrl, pat, page = query.Page, perPage = query.PerPage)
+            else
+                promise { return Ok(emptyGroupsResponse query.Page query.PerPage) }
 
-                let groups, groupsLoaded, groupsLoadError =
-                    match groupsResult with
-                    | Ok g -> g.Items, (request.Target <> ExploreTab.YourOrganisations) || request.IsAuthenticated, None
-                    | Error _ -> [||], true, Some "Failed to load groups"
+        let loadOrganisationRepos (query: ExploreGroupProjectsQuery) =
+            if isConnected then
+                GitLabApi.ListGroupProjects(
+                    baseUrl,
+                    pat,
+                    query.GroupId,
+                    page = query.Page,
+                    perPage = query.PerPage,
+                    includeSubgroups = query.IncludeSubgroups,
+                    withShared = query.WithShared,
+                    search = query.SearchTerm,
+                    orderBy = query.OrderBy,
+                    sort = query.Sort
+                )
+            else
+                promise { return Ok(emptyResponse query.Page query.PerPage) }
 
-                let selectedGroupId =
-                    match request.SelectedGroupId with
-                    | Some gid -> Some gid
-                    | None when groups.Length > 0 -> Some groups[0].id
-                    | None -> None
-
-                let! result =
-                    match request.Target with
-                    | ExploreTab.All ->
-                        GitLabApi.ListProjects(
-                            baseUrl,
-                            requestPat,
-                            page = request.Page,
-                            perPage = request.PerPage,
-                            search = request.SearchTerm,
-                            orderBy = orderBy,
-                            sort = sort,
-                            ?visibility = visibility
-                        )
-                    | ExploreTab.YourRepos ->
-                        if request.IsAuthenticated then
-                            GitLabApi.ListUserPersonalProjects(
-                                baseUrl,
-                                pat,
-                                page = request.Page,
-                                perPage = request.PerPage,
-                                search = request.SearchTerm,
-                                orderBy = orderBy,
-                                sort = sort
-                            )
-                        else
-                            promise { return Ok(emptyResponse request.Page request.PerPage) }
-                    | ExploreTab.MostStarred ->
-                        GitLabApi.ListExploreMostStarred(
-                            baseUrl,
-                            requestPat,
-                            page = request.Page,
-                            perPage = request.PerPage,
-                            search = request.SearchTerm,
-                            ?visibility = visibility
-                        )
-                    | ExploreTab.YourOrganisations ->
-                        if request.IsAuthenticated then
-                            match selectedGroupId with
-                            | Some gid ->
-                                GitLabApi.ListGroupProjects(
-                                    baseUrl,
-                                    pat,
-                                    gid,
-                                    page = request.Page,
-                                    perPage = request.PerPage,
-                                    includeSubgroups = true,
-                                    withShared = true,
-                                    search = request.SearchTerm,
-                                    orderBy = orderBy,
-                                    sort = sort
-                                )
-                            | None -> promise { return Ok(emptyResponse request.Page request.PerPage) }
-                        else
-                            promise { return Ok(emptyResponse request.Page request.PerPage) }
-
-                match result with
-                | Ok okResult ->
-                    return
-                        Ok {
-                            Repos = okResult.Items
-                            Pagination = Some okResult.Pagination
-                            Groups = groups
-                            GroupsLoaded = groupsLoaded
-                            GroupsLoadError = groupsLoadError
-                        }
-                | Error err -> return Error(err)
+        let loaders: ExploreLoaders = {
+            LoadAllRepos = loadAllRepos
+            LoadMostStarredRepos = loadMostStarredRepos
+            LoadUserRepos = loadUserRepos
+            LoadOrganisationGroups = loadOrganisationGroups
+            LoadOrganisationRepos = loadOrganisationRepos
         }
 
         Html.div [
@@ -1038,17 +1274,17 @@ type DataHubBrowser =
                 let btnInfo =
                     fun (project: ExploreProjectDto) -> [|
                         ButtonInfo.create (
-                            "swt:iconify swt:fluent--arrow-download-24-filled",
+                            "swt:fluent--arrow-download-24-filled",
                             "Download",
                             fun _ -> Browser.Dom.window.alert ("Download " + project.name)
                         )
                         ButtonInfo.create (
-                            "swt:iconify swt:fluent--star-24-regular",
+                            "swt:fluent--star-24-regular",
                             "Star",
                             fun _ -> Browser.Dom.window.alert ("Star " + project.name)
                         )
                     |]
 
-                DataHubBrowser.ExplorePanel(currentUser, loadRepos, reloadTrigger, projectActionBtns = btnInfo)
+                DataHubBrowser.ExplorePanel(currentUser, loaders, reloadTrigger, projectActionBtns = btnInfo)
             ]
         ]

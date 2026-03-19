@@ -15,7 +15,7 @@ type Actionbar =
     static member Button
         (
             buttonInfo: ButtonInfo,
-            buttonSize: DaisyUISize,
+            buttonSize: DaisyuiSize,
             tooltipPosition: DaisyuiTooltipPosition,
             ?buttonClassName: string,
             ?buttonTestId: string,
@@ -33,10 +33,10 @@ type Actionbar =
 
         let btnSize =
             match buttonSize with
-            | DaisyUISize.XS -> "swt:btn-xs"
-            | DaisyUISize.SM -> "swt:btn-sm"
-            | DaisyUISize.MD -> "swt:btn-md"
-            | DaisyUISize.LG -> "swt:btn-lg"
+            | DaisyuiSize.XS -> "swt:btn-xs"
+            | DaisyuiSize.SM -> "swt:btn-sm"
+            | DaisyuiSize.MD -> "swt:btn-md"
+            | DaisyuiSize.LG -> "swt:btn-lg"
 
         let Button =
             Html.button [
@@ -168,13 +168,13 @@ type Actionbar =
             maxNumber: int,
             ?debug: bool,
             ?barClassName: string,
-            ?buttonSize: DaisyUISize,
+            ?buttonSize: DaisyuiSize,
             ?tooltipPosition: DaisyuiTooltipPosition,
             ?buttonClassName: string
         ) =
 
         let debug = defaultArg debug false
-        let buttonSize = defaultArg buttonSize DaisyUISize.MD
+        let buttonSize = defaultArg buttonSize DaisyuiSize.MD
         let tooltipPosition = defaultArg tooltipPosition DaisyuiTooltipPosition.Bottom
 
         let selectedElements =

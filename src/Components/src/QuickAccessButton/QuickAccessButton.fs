@@ -15,7 +15,7 @@ type QuickAccessButton =
             onclick: Event -> unit,
             ?isDisabled: bool,
             ?props: IReactProperty seq,
-            ?color: DaisyUIColors,
+            ?color: DaisyuiColors,
             ?classes: string
         ) =
         let isDisabled = defaultArg isDisabled false
@@ -25,13 +25,13 @@ type QuickAccessButton =
                 "swt:btn swt:btn-ghost swt:btn-square swt:btn-transparent swt:bg-transparent swt:border-none swt:shadow-none"
 
                 match color with
-                | Some DaisyUIColors.Primary -> "swt:hover:!text-primary"
-                | Some DaisyUIColors.Secondary -> "swt:hover:!text-secondary"
-                | Some DaisyUIColors.Accent -> "swt:hover:!text-accent"
-                | Some DaisyUIColors.Error -> "swt:hover:!text-error"
-                | Some DaisyUIColors.Info -> "swt:hover:!text-info"
-                | Some DaisyUIColors.Success -> "swt:hover:!text-success"
-                | Some DaisyUIColors.Warning -> "swt:hover:!text-warning"
+                | Some DaisyuiColors.Primary -> "swt:hover:!text-primary"
+                | Some DaisyuiColors.Secondary -> "swt:hover:!text-secondary"
+                | Some DaisyuiColors.Accent -> "swt:hover:!text-accent"
+                | Some DaisyuiColors.Error -> "swt:hover:!text-error"
+                | Some DaisyuiColors.Info -> "swt:hover:!text-info"
+                | Some DaisyuiColors.Success -> "swt:hover:!text-success"
+                | Some DaisyuiColors.Warning -> "swt:hover:!text-warning"
                 | None -> "swt:hover:!text-primary"
 
                 if classes.IsSome then

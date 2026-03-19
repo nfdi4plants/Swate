@@ -430,9 +430,7 @@ type GitLabApi =
             return
                 response
                 |> Result.map (fun x ->
-                    Browser.Dom.console.log x.Items.[0]
                     let itemsDTOs = x.Items |> Array.map Internals.toExploreProjectDto
-                    Browser.Dom.console.log itemsDTOs.[0]
 
                     {
                         Items = itemsDTOs

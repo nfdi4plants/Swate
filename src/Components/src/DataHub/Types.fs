@@ -3,12 +3,14 @@ module Swate.Components.DataHubTypes
 open Fable.Core
 open Swate.Components.Api.GitLabApi
 
+[<RequireQualifiedAccess>]
 type ExploreTab =
     | All
     | YourRepos
     | MostStarred
     | YourOrganisations
 
+[<RequireQualifiedAccess>]
 type ExploreSortField =
     | LastUpdated
     | DateCreated
@@ -33,7 +35,6 @@ type ExploreLoadRequest = {
     SortDirection: SortDirection
     SelectedGroupId: int option
     IsAuthenticated: bool
-    User: CurrentUserDto option
 }
 
 type ExploreLoadResult = {
@@ -53,6 +54,44 @@ module ExploreLoadResult =
         GroupsLoaded = false
         GroupsLoadError = None
     }
+
+type ExploreRepoQuery = {
+    SearchTerm: string
+    Page: int
+    PerPage: int
+    OrderBy: ProjectSortField
+    Sort: SortDirection
+    Visibility: string option
+}
+
+type ExploreMostStarredQuery = {
+    SearchTerm: string
+    Page: int
+    PerPage: int
+    Visibility: string option
+}
+
+type ExploreGroupsQuery = { Page: int; PerPage: int }
+
+type ExploreGroupProjectsQuery = {
+    GroupId: int
+    SearchTerm: string
+    Page: int
+    PerPage: int
+    OrderBy: ProjectSortField
+    Sort: SortDirection
+    IncludeSubgroups: bool
+    WithShared: bool
+}
+
+type ExploreLoaders = {
+    LoadAllRepos: ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    LoadMostStarredRepos: ExploreMostStarredQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    LoadUserRepos: ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    LoadOrganisationGroups: ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
+    LoadOrganisationRepos:
+        ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+}
 
 /// Information about a successfully completed operation.
 type OperationResult = {

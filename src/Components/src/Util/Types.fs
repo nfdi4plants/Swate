@@ -20,14 +20,14 @@ type ComboBoxRef = {|
 |}
 
 [<RequireQualifiedAccess>]
-type DaisyUISize =
+type DaisyuiSize =
     | XS
     | SM
     | MD
     | LG
 
 [<RequireQualifiedAccess>]
-type DaisyUIColors =
+type DaisyuiColors =
     | Primary
     | Secondary
     | Accent

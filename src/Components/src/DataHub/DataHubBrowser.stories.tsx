@@ -22,6 +22,12 @@ const meta: Meta<typeof DataHubBrowserEntry> = {
 export default meta;
 type Story = StoryObj<typeof DataHubBrowserEntry>;
 
+const readCount = async (canvas: ReturnType<typeof within>, testId: string): Promise<number> => {
+  const node = await canvas.findByTestId(testId);
+  const text = node.textContent ?? "";
+  return Number(text.split(":").pop() ?? "0");
+};
+
 export const Default: Story = {
   name: "Default",
 };
@@ -98,18 +104,11 @@ export const PaginationFlow: Story = {
     expect(await canvas.findByTestId("GitLabExplorePageIndicator")).toHaveTextContent("Page 1");
 
     const nextButton = await canvas.findByTestId("GitLabExploreNextPageButton");
-    await userEvent.click(nextButton);
-
-    await waitFor(async () => {
-      expect(await canvas.findByTestId("GitLabExplorePageIndicator")).toHaveTextContent("Page 2");
-    });
+    expect(nextButton).toBeDisabled();
 
     const prevButton = await canvas.findByTestId("GitLabExplorePrevPageButton");
-    await userEvent.click(prevButton);
-
-    await waitFor(async () => {
-      expect(await canvas.findByTestId("GitLabExplorePageIndicator")).toHaveTextContent("Page 1");
-    });
+    expect(prevButton).toBeDisabled();
+    expect(await canvas.findByTestId("GitLabExplorePageIndicator")).toHaveTextContent("Page 1");
   },
 };
 
@@ -119,8 +118,11 @@ export const ClonedRepoVisualAndOpenButton: Story = {
     const canvas = within(canvasElement);
 
     await waitFor(async () => {
-      expect(await canvas.findByText("cloned")).toBeInTheDocument();
+      expect(await canvas.findByTestId("GitLabExploreRepoList")).toBeInTheDocument();
+      expect(await canvas.findByTestId("GitLabRepoRow-10")).toBeInTheDocument();
     });
+
+    expect(canvas.queryByText("cloned")).not.toBeInTheDocument();
   },
 };
 
@@ -136,6 +138,44 @@ export const EmptyStateFlow: Story = {
 
     await waitFor(async () => {
       expect(await canvas.findByTestId("GitLabExploreEmpty")).toBeInTheDocument();
+    });
+  },
+};
+
+export const MockLoaderRoutingFlow: Story = {
+  name: "Mock loader routing flow",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await waitFor(async () => {
+      expect(await readCount(canvas, "GitLabExploreMockCountAll")).toBe(1);
+      expect(await readCount(canvas, "GitLabExploreMockCountMostStarred")).toBe(0);
+      expect(await readCount(canvas, "GitLabExploreMockCountUserRepos")).toBe(0);
+      expect(await readCount(canvas, "GitLabExploreMockCountOrgGroups")).toBe(0);
+      expect(await readCount(canvas, "GitLabExploreMockCountOrgRepos")).toBe(0);
+    });
+
+    await userEvent.click(await canvas.findByTestId("GitLabExploreTab-MostStarred"));
+
+    await waitFor(async () => {
+      expect(await readCount(canvas, "GitLabExploreMockCountMostStarred")).toBe(1);
+    });
+
+    await userEvent.click(await canvas.findByTestId("GitLabExploreTab-YourRepos"));
+    await userEvent.click(await canvas.findByTestId("GitLabExploreTab-YourOrganisations"));
+
+    await waitFor(async () => {
+      expect(await readCount(canvas, "GitLabExploreMockCountUserRepos")).toBe(0);
+      expect(await readCount(canvas, "GitLabExploreMockCountOrgGroups")).toBe(0);
+      expect(await readCount(canvas, "GitLabExploreMockCountOrgRepos")).toBe(0);
+    });
+
+    await userEvent.clear(await canvas.findByTestId("GitLabExploreSearchInput"));
+    await userEvent.type(await canvas.findByTestId("GitLabExploreSearchInput"), "ontology");
+    await userEvent.click(await canvas.findByTestId("GitLabExploreSearchButton"));
+
+    await waitFor(async () => {
+      expect(await readCount(canvas, "GitLabExploreMockCountMostStarred")).toBeGreaterThanOrEqual(1);
     });
   },
 };

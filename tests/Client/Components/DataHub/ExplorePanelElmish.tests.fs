@@ -68,7 +68,7 @@ let Main =
             let seeded = {
                 initial with
                     IsLoading = true
-                    Error = Some "stale"
+                    Error = GitLabError.Unknown(exn "stale") |> Some
             }
 
             let next = reduce (DatahubBrowserModel.LoadReposResponse(Ok loaded)) seeded
@@ -92,9 +92,14 @@ let Main =
                     Pagination = Some(mkPageMeta 1)
             }
 
-            let next = reduce (DatahubBrowserModel.LoadReposResponse(Error "boom")) seeded
+            let next =
+                reduce (DatahubBrowserModel.LoadReposResponse(Error(GitLabError.Unknown(exn "boom")))) seeded
 
-            Expect.equal next.Error (Some "boom") "Error response should be stored in model."
+            Expect.isTrue next.Error.Value.IsUnknown "Error response should be stored in model."
+
+            let errmsg = next.Error.Value.GitLabErrorToString
+            Expect.isTrue (errmsg.Contains("boom")) "Error message should be included in error details."
+
             Expect.equal next.IsLoading false "Loading should stop after an error response."
             Expect.equal next.Repos [||] "Error response should clear repositories."
             Expect.equal next.Pagination None "Error response should clear pagination."
