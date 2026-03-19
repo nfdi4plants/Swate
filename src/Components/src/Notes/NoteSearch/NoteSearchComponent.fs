@@ -73,7 +73,7 @@ module NoteSearchComponent =
     let private containsIgnoreCase (needle: string) (haystack: string) =
         haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
 
-    let filterNotes (searchTerm: string) (filterOptions: string) (notes: NoteSearch list) =
+    let filterNotes (searchTerm: string) (filterOptions: string list) (notes: NoteSearch list) =
         match filterOptions with
         | "Title" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Title)
         | "Content" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Content)
@@ -100,7 +100,7 @@ module NoteSearchComponent =
             setStartSearch,
             dropdownOpen: bool,
             setDropdownOpen: bool -> unit,
-            filterOptions: string,
+            filterOptions: list<string>,
             setFilterOptions
         ) =
         Html.div [
@@ -130,7 +130,7 @@ module NoteSearchComponent =
                     prop.className "swt:join-item swt:relative swt:w-20"
                     prop.children [
                         Html.button [
-                            prop.text ("Search in " + filterOptions)
+                            prop.text ("Search in ")
                             prop.className (
                                 "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current"
                                 + if dropdownOpen then " swt:rounded-b-none" else ""
@@ -235,7 +235,7 @@ type SearchComponent =
         let startSearch, setStartSearch = React.useState false
         let searchTerm, setSearchTerm = React.useState ""
         let dropdownOpen, setDropdownOpen = React.useState false
-        let filterOptions, setFilterOptions = React.useState "All"
+        let filterOptions, setFilterOptions = React.useState []
 
         let searchResults =
             if startSearch then
@@ -276,7 +276,7 @@ type SearchComponent =
                             elif not searchResults.IsEmpty then
                                 Html.div [
                                     prop.className
-                                        "swt:border-2 swt:border-current swt:rounded-md swt:mt-2 swt:bg-base-100 swt:shadow-md swt:divide-y swt:divide-current"
+                                        "swt:border swt:border-current swt:rounded-md swt:mt-2 swt:bg-base-100 swt:shadow-md swt:divide-y swt:divide-current"
                                     prop.children [
                                         for note in searchResults do
                                             NoteSearchComponent.searchSuggestion (note, onOpen)
