@@ -119,56 +119,29 @@ module noteSearchTests =
 
 module NoteSearchComponent =
 
-    let filterbutton (setFilterOptions: list<string> -> unit, filterOptions: list<string>, option: string) =
-        Html.div [
-            prop.className "swt:flex swt:gap-4 swt:items-center swt:p-2 swt:text-sm"
-            prop.children [
-                Html.input [
-                    prop.type' "checkbox"
-                    prop.className "swt:checkbox swt:checkbox-sm"
-                    prop.onClick (fun _ ->
-                        let newOptions =
-                            if List.contains option filterOptions then
-                                List.filter (fun o -> o <> option) filterOptions //remove option if it is already in the list
-                            else
-                                option :: filterOptions //add option to the list if it is not already in the list
+    let private containsIgnoreCase (needle: string) (haystack: string) =
+        haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
 
-                        setFilterOptions newOptions
-                    )
-                ]
-                Html.div [ prop.text option ]
-            ]
-        ]
+    let filterNotes (searchTerm: string) (filterOptions: string list) (notes: NoteSearch list) =
+        match filterOptions with
+        | "Title" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Title)
+        | "Content" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Content)
+        | "Tags" ->
+            notes
+            |> List.filter (fun note -> note.Tags |> Array.exists (containsIgnoreCase searchTerm))
+        | _ ->
+            notes
+            |> List.filter (fun note ->
+                containsIgnoreCase searchTerm note.Title
+                || containsIgnoreCase searchTerm note.Content
+                || (note.Tags |> Array.exists (containsIgnoreCase searchTerm))
+            )
 
-    let filterDropdown
-        (dropdownOpen: bool, setDropdownOpen: bool -> unit, filterOptions: list<string>, setFilterOptions)
-        =
-        Html.div [
-            prop.className "swt:join-item swt:relative swt:w-max-content"
-            prop.children [
-                Html.button [
-                    prop.text "Filter options"
-                    prop.className (
-                        "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current swt:w-full"
-                        + if dropdownOpen then "swt:rounded-b-none" else ""
-                    )
-                    prop.onClick (fun e ->
-                        e.stopPropagation ()
-                        setDropdownOpen (not dropdownOpen)
-                    )
-                ]
-                if dropdownOpen then
-                    Html.div [
-                        prop.className
-                            "swt:absolute swt:right-0 swt:top-full swt:bg-base-100 swt:border swt:border-current swt:rounded-b swt:z-10 swt:min-w-full swt:flex swt:flex-col"
-                        prop.children [
-                            filterbutton (setFilterOptions, filterOptions, "Title")
-                            filterbutton (setFilterOptions, filterOptions, "Content")
-                            filterbutton (setFilterOptions, filterOptions, "Tags")
-                        ]
-                    ]
-            ]
-        ]
+    let private createContentPreview (note: NoteSearch) =
+        if note.Content.Length > 45 then
+            note.Content.Substring(0, 45) + "..."
+        else
+            note.Content
 
     let searchInput
         (
@@ -176,7 +149,7 @@ module NoteSearchComponent =
             setStartSearch,
             dropdownOpen: bool,
             setDropdownOpen: bool -> unit,
-            filterOptions: string,
+            filterOptions: list<string>,
             setFilterOptions
         ) =
         Html.div [
@@ -206,7 +179,7 @@ module NoteSearchComponent =
                     prop.className "swt:join-item swt:relative swt:w-20"
                     prop.children [
                         Html.button [
-                            prop.text ("Search in " + filterOptions)
+                            prop.text ("Search in ")
                             prop.className (
                                 "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current"
                                 + if dropdownOpen then " swt:rounded-b-none" else ""
@@ -326,10 +299,11 @@ type SearchComponent =
         let dropdownOpen, setDropdownOpen = React.useState false
         let filterOptions, setFilterOptions = React.useState []
 
-        let startSearch, setStartSearch = React.useState (false)
-        let searchTerm, setSearchTerm = React.useState ("")
-        let dropdownOpen, setDropdownOpen = React.useState (false)
-        let filterOptions, setFilterOptions = React.useState ([])
+        let searchResults =
+            if startSearch then
+                NoteSearchComponent.filterNotes searchTerm filterOptions notes
+            else
+                []
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:items-center swt:pt-8 swt:min-h-screen"
