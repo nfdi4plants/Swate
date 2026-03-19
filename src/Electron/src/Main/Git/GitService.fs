@@ -335,6 +335,27 @@ let getDiff (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<strin
                 })
 }
 
+let getWordDiff (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<string>> = promise {
+    match validatePathspecs pathSpecs with
+    | Error validationError -> return errorResult validationError
+    | Ok safePathSpecs ->
+        return!
+            withLocalGit
+                arcPath
+                (fun git -> promise {
+                    let diffArgs = [|
+                        "diff"
+                        "--word-diff=porcelain"
+                        "-U0"
+                        "--"
+                        yield! safePathSpecs
+                    |]
+
+                    let! diff = git.raw diffArgs
+                    return diff
+                })
+}
+
 let fetch
     (arcPath: string)
     (remoteName: string option)

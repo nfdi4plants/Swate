@@ -184,6 +184,17 @@ Vitest.describe("GitService local repository workflow", fun () ->
                 Vitest.expect(diffText.Contains("-gamma")).toBe(true)
                 Vitest.expect(diffText.Contains("+delta")).toBe(true)
 
+                let! wordDiffText =
+                    unwrapResultAsync (GitService.getWordDiff context.RepoPath [| commitWorkflowFilePath |]) (expectOk "git word diff")
+
+                Vitest.expect(wordDiffText.Contains("diff --git")).toBe(true)
+                Vitest.expect(wordDiffText.Contains("@@ -2,2 +2,2 @@")).toBe(true)
+                Vitest.expect(wordDiffText.Contains("-beta")).toBe(false)
+                Vitest.expect(wordDiffText.Contains("-gamma")).toBe(true)
+                Vitest.expect(wordDiffText.Contains("+updated")).toBe(true)
+                Vitest.expect(wordDiffText.Contains("+delta")).toBe(true)
+                Vitest.expect(wordDiffText.Contains("~")).toBe(true)
+
                 let! secondStageResult = GitService.stagePaths context.RepoPath [| commitWorkflowFilePath |]
                 expectOk "git add after edit" secondStageResult |> ignore
 
@@ -263,6 +274,16 @@ Vitest.describe("GitService local repository workflow", fun () ->
             withTempRepository (fun context -> promise {
                 let! failure =
                     unwrapResultAsync (GitService.getDiff context.RepoPath [| "../outside.txt" |]) expectError
+
+                Vitest.expect(failure.Message.Contains("traversal")).toBe(true)
+            })
+    })
+
+    Vitest.test("rejects invalid word diff pathspecs before invoking git", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let! failure =
+                    unwrapResultAsync (GitService.getWordDiff context.RepoPath [| "../outside.txt" |]) expectError
 
                 Vitest.expect(failure.Message.Contains("traversal")).toBe(true)
             })
