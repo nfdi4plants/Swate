@@ -133,12 +133,20 @@ module NoteSearchComponent =
                             else
                                 option :: filterOptions //add option to the list if it is not already in the list
 
-                        setFilterOptions newOptions
-                    )
-                ]
-                Html.div [ prop.text option ]
-            ]
-        ]
+    let filterNotes (searchTerm: string) (filterOptions: string list) (notes: NoteSearch list) =
+        match filterOptions with
+        | "Title" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Title)
+        | "Content" -> notes |> List.filter (fun note -> containsIgnoreCase searchTerm note.Content)
+        | "Tags" ->
+            notes
+            |> List.filter (fun note -> note.Tags |> Array.exists (containsIgnoreCase searchTerm))
+        | _ ->
+            notes
+            |> List.filter (fun note ->
+                containsIgnoreCase searchTerm note.Title
+                || containsIgnoreCase searchTerm note.Content
+                || (note.Tags |> Array.exists (containsIgnoreCase searchTerm))
+            )
 
     let filterDropdown
         (dropdownOpen: bool, setDropdownOpen: bool -> unit, filterOptions: list<string>, setFilterOptions)
@@ -202,7 +210,65 @@ module NoteSearchComponent =
                         ]
                     ]
                 ]
-                filterDropdown (dropdownOpen, setDropdownOpen, filterOptions, setFilterOptions)
+                Html.div [
+                    prop.className "swt:join-item swt:relative swt:w-20"
+                    prop.children [
+                        Html.button [
+                            prop.text ("Search in ")
+                            prop.className (
+                                "swt:btn swt:btn-primary swt:join-item swt:border swt:border-current"
+                                + if dropdownOpen then " swt:rounded-b-none" else ""
+                            )
+                            prop.onClick (fun e ->
+                                e.stopPropagation ()
+                                setDropdownOpen (not dropdownOpen)
+                            )
+                        ]
+                        if dropdownOpen then
+                            Html.div [
+                                prop.className
+                                    "swt:absolute swt:right-0 swt:top-full swt:bg-base-100 swt:border swt:border-current swt:rounded-b swt:z-10 swt:min-w-full swt:flex swt:flex-col"
+                                prop.children [
+                                    Html.button [
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "All"
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "all"
+                                        )
+                                    ]
+                                    Html.button [
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "Title"
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "title"
+                                        )
+                                    ]
+                                    Html.button [
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "Tags"
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "tags"
+                                        )
+                                    ]
+                                    Html.button [
+                                        prop.className
+                                            "swt:px-4 swt:py-2 swt:text-sm swt:text-left swt:hover:bg-base-200"
+                                        prop.text "Content"
+                                        prop.onClick (fun _ ->
+                                            setDropdownOpen false
+                                            setFilterOptions "content"
+                                        )
+                                    ]
+                                ]
+                            ]
+                    ]
+                ]
             ]
         ]
 
