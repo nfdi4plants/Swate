@@ -83,6 +83,11 @@
     <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
     <Compile Include="FileExplorer\FileExplorerBreadcrumbs.fs" />
     <Compile Include="FileExplorer\FileExplorer.fs" />
+    <Compile Include="GitComparison\GitTextComparison.Core.fs" />
+    <Compile Include="GitComparison\GitTextComparison.fs" />
+    <Compile Include="GitComparison\GitComparisonView.fs" />
+    <Compile Include="GitComparison\GitDiffViewer.fs" />
+    <Compile Include="GitComparison\GitMergeConflictViewer.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
