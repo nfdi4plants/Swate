@@ -28,6 +28,14 @@ const readCount = async (canvas: ReturnType<typeof within>, testId: string): Pro
   return Number(text.split(":").pop() ?? "0");
 };
 
+const expectMockSignedIn = async (canvas: ReturnType<typeof within>, isSignedIn: boolean) => {
+  await waitFor(async () => {
+    expect(await canvas.findByTestId("GitLabExploreMockAuthState")).toHaveTextContent(
+      `signed-in:${isSignedIn ? "true" : "false"}`,
+    );
+  });
+};
+
 export const Default: Story = {
   name: "Default",
 };
@@ -176,6 +184,61 @@ export const MockLoaderRoutingFlow: Story = {
 
     await waitFor(async () => {
       expect(await readCount(canvas, "GitLabExploreMockCountMostStarred")).toBeGreaterThanOrEqual(1);
+    });
+  },
+};
+
+export const LoggedInStateFlow: Story = {
+  name: "Entry wrapper logged-in state flow",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expectMockSignedIn(canvas, false);
+
+    const yourReposTab = await canvas.findByTestId("GitLabExploreTab-YourRepos");
+    expect(yourReposTab).toHaveAttribute("aria-disabled", "true");
+
+    await userEvent.click(await canvas.findByTestId("GitLabExploreMockLoginButton"));
+
+    await expectMockSignedIn(canvas, true);
+
+    await waitFor(async () => {
+      expect(await canvas.findByTestId("GitLabExploreTab-YourRepos")).toHaveAttribute("aria-disabled", "false");
+      expect(await canvas.findByTestId("GitLabExploreTab-YourOrganisations")).toHaveAttribute("aria-disabled", "false");
+    });
+
+    await userEvent.click(await canvas.findByTestId("GitLabExploreTab-YourRepos"));
+
+    await waitFor(async () => {
+      expect((await canvas.findByTestId("GitLabExploreTab-YourRepos")).className).toMatch(/tab-active/);
+      expect(await readCount(canvas, "GitLabExploreMockCountUserRepos")).toBeGreaterThanOrEqual(1);
+    });
+  },
+};
+
+export const LoginLogoutToggleFlow: Story = {
+  name: "Entry wrapper login/logout toggle flow",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expectMockSignedIn(canvas, false);
+
+    await userEvent.click(await canvas.findByTestId("GitLabExploreMockLoginButton"));
+    await expectMockSignedIn(canvas, true);
+
+    await userEvent.click(await canvas.findByTestId("GitLabExploreTab-YourOrganisations"));
+
+    await waitFor(async () => {
+      expect((await canvas.findByTestId("GitLabExploreTab-YourOrganisations")).className).toMatch(/tab-active/);
+    });
+
+    await userEvent.click(await canvas.findByTestId("GitLabExploreMockLogoutButton"));
+    await expectMockSignedIn(canvas, false);
+
+    await waitFor(async () => {
+      expect(await canvas.findByTestId("GitLabExploreTab-YourRepos")).toHaveAttribute("aria-disabled", "true");
+      expect(await canvas.findByTestId("GitLabExploreTab-YourOrganisations")).toHaveAttribute("aria-disabled", "true");
+      expect((await canvas.findByTestId("GitLabExploreTab-All")).className).toMatch(/tab-active/);
     });
   },
 };

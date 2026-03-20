@@ -815,7 +815,21 @@ type DataHubBrowser =
 
     [<ReactComponent>]
     static member Entry() =
-        let isAuthenticated = false
+        let currentUser, setCurrentUser = React.useState None
+
+        let mockUser: CurrentUserDto = {
+            id = 1
+            username = "storybook-user"
+            name = "Storybook User"
+            avatar_url = None
+        }
+
+        let login () =
+            setCurrentUser (Some mockUser)
+
+        let logout () =
+            setCurrentUser None
+
         let reloadTrigger = 0
 
         let callCount, setCallCount =
@@ -1040,6 +1054,30 @@ type DataHubBrowser =
             prop.className "swt:flex swt:flex-col swt:gap-2"
             prop.children [
                 Html.div [
+                    prop.testId "GitLabExploreMockAuthControls"
+                    prop.className "swt:flex swt:items-center swt:gap-2 swt:flex-wrap swt:text-xs"
+                    prop.children [
+                        Html.span [
+                            prop.testId "GitLabExploreMockAuthState"
+                            prop.textf "signed-in:%s" (if currentUser.IsSome then "true" else "false")
+                        ]
+                        Html.button [
+                            prop.testId "GitLabExploreMockLoginButton"
+                            prop.className "swt:btn swt:btn-xs"
+                            prop.text "Login"
+                            prop.disabled currentUser.IsSome
+                            prop.onClick (fun _ -> login ())
+                        ]
+                        Html.button [
+                            prop.testId "GitLabExploreMockLogoutButton"
+                            prop.className "swt:btn swt:btn-xs swt:btn-outline"
+                            prop.text "Logout"
+                            prop.disabled currentUser.IsNone
+                            prop.onClick (fun _ -> logout ())
+                        ]
+                    ]
+                ]
+                Html.div [
                     prop.testId "GitLabExploreMockCallCounter"
                     prop.className "swt:flex swt:gap-2 swt:flex-wrap swt:text-xs swt:text-base-content/70"
                     prop.children [
@@ -1066,7 +1104,7 @@ type DataHubBrowser =
                     ]
                 ]
                 DataHubBrowser.ExplorePanel(
-                    None,
+                    currentUser,
                     loaders,
                     reloadTrigger,
                     projectActionBtns =
