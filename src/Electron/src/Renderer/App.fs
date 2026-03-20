@@ -191,7 +191,7 @@ let Main () =
         |> Promise.start
     )
 
-    let fileExplorer =
+    let leftExplorer =
         React.useMemo (
             (fun _ ->
                 let fileEntries = workspaceCtx.state.FileTree |> List.toArray
@@ -243,10 +243,10 @@ let Main () =
             fun fileExplorer ->
                 console.log ("[Swate] FILETREE Create!")
                 setFileTree fileExplorer
-        //arcExplorerTreeUpdate =
-        //    fun arcExplorerTree ->
-        //        console.log ("[Swate] ARC Explorer Create!")
-        //        setArcExplorerTree arcExplorerTree
+        arcExplorerTreeUpdate =
+            fun arcExplorerTree ->
+                console.log ("[Swate] ARC Explorer Create!")
+                setArcExplorerTree arcExplorerTree
         gitProgressUpdate =
             fun progress -> console.log ($"[Swate] Git progress {progress.Method} {progress.Stage} {progress.Progress}")
     }
@@ -305,7 +305,7 @@ let Main () =
                     match appState with
                     | AppState.ARC _ -> actionBar
                     | _ -> Html.none
-                    Html.h2 [ prop.text "ARC-Tree" ]
+                    Html.h2 [ prop.text "Files" ]
                     fe
                 |]
             ]
@@ -343,7 +343,7 @@ let Main () =
                                 |],
                             navbar = Renderer.Components.Navbar.Main(),
                             ?leftSidebar =
-                                (match fileExplorer with
+                                (match leftExplorer with
                                  | Some fe -> leftSidebar appState fe
                                  | None -> None),
                             leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]

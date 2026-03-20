@@ -20,6 +20,7 @@ type ARCObjectWidget =
         {| label = "Assay"; item = "Assay" |}
         {| label = "Workflow"; item = "Workflow" |}
         {| label = "Run"; item = "Run" |}
+        {| label = "Table"; item = "Table" |}
         {| label = "DataMap"; item = "DataMap" |}
         {| label = "Note"; item = "Note" |}
         {| label = "Sample"; item = "Sample" |}
@@ -257,6 +258,24 @@ type ARCObjectWidget =
     static member private StoryItemIdWorkflow2DataMap = "workflow:cleanup:datamap"
     static member private StoryItemIdRunDataMap = "run:2026-04-01:datamap"
     static member private StoryItemIdRun2DataMap = "run:2026-04-08:datamap"
+    static member private StoryItemIdStudyTable1 = "study:plant-stress:table:design-matrix"
+    static member private StoryItemIdStudyTable2 = "study:plant-stress:table:phenotype-scoring"
+    static member private StoryItemIdStudy2Table1 = "study:soil-microbiome:table:plot-sampling"
+    static member private StoryItemIdAssayTable1 = "assay:metabolomics:table:metabolite-measurements"
+    static member private StoryItemIdAssayTable2 = "assay:metabolomics:table:peak-annotation"
+    static member private StoryItemIdAssayTable3 = "assay:metabolomics:table:qc-injection-summary"
+    static member private StoryItemIdAssay2Table1 = "assay:transcriptomics:table:rna-samples"
+    static member private StoryItemIdAssay2Table2 = "assay:transcriptomics:table:differential-expression"
+    static member private StoryItemIdAssay3Table1 = "assay:amplicon-sequencing:table:asv-abundance"
+    static member private StoryItemIdRunTable1 = "run:2026-04-01:table:injection-sequence"
+    static member private StoryItemIdRunTable2 = "run:2026-04-01:table:instrument-qc"
+    static member private StoryItemIdRun2Table1 = "run:2026-04-08:table:injection-sequence"
+    static member private StoryItemIdRun2Table2 = "run:2026-04-08:table:retention-alignment"
+    static member private StoryItemIdAssaySample1 = "assay:metabolomics:sample-ref:leaf-01"
+    static member private StoryItemIdAssaySample2 = "assay:metabolomics:sample-ref:leaf-02"
+    static member private StoryItemIdAssay2Sample1 = "assay:transcriptomics:sample-ref:leaf-01"
+    static member private StoryItemIdAssay2Sample2 = "assay:transcriptomics:sample-ref:leaf-02"
+    static member private StoryItemIdAssay3Sample1 = "assay:amplicon-sequencing:sample-ref:soil-core-a"
     static member private StoryItemIdNote = "study:plant-stress:note-ref:sampling-protocol"
     static member private StoryItemIdNote2 = "study:plant-stress:note-ref:leaf-scoring"
     static member private StoryItemIdNote3 = "study:soil-microbiome:note-ref:field-observations"
@@ -308,6 +327,12 @@ type ARCObjectWidget =
                     Id = id
             }
 
+        let table id name =
+            {
+                FileTree.createFile name None "swt:fluent--table-24-regular" with
+                    Id = id
+            }
+
         [
             folder
                 "swt:fluent--folder-24-regular"
@@ -324,6 +349,13 @@ type ARCObjectWidget =
                                 "PlantStressStudy"
                                 [
                                     datamap ARCObjectWidget.StoryItemIdStudyDataMap
+                                    group
+                                        "study:plant-stress:tables"
+                                        "Tables"
+                                        [
+                                            table ARCObjectWidget.StoryItemIdStudyTable1 "Study Design Matrix"
+                                            table ARCObjectWidget.StoryItemIdStudyTable2 "Phenotype Scoring Table"
+                                        ]
                                     group
                                         "study:plant-stress:assays"
                                         "Assays"
@@ -352,6 +384,10 @@ type ARCObjectWidget =
                                 [
                                     datamap ARCObjectWidget.StoryItemIdStudy2DataMap
                                     group
+                                        "study:soil-microbiome:tables"
+                                        "Tables"
+                                        [ table ARCObjectWidget.StoryItemIdStudy2Table1 "Plot Sampling Schedule" ]
+                                    group
                                         "study:soil-microbiome:assays"
                                         "Assays"
                                         [ document ARCObjectWidget.StoryItemIdStudy2AssayRef "AmpliconSequencingAssay" ]
@@ -369,9 +405,61 @@ type ARCObjectWidget =
                         "group:assays"
                         "Assays"
                         [
-                            objectNode ARCObjectWidget.StoryItemIdAssay "MetabolomicsAssay" [ datamap ARCObjectWidget.StoryItemIdAssayDataMap ]
-                            objectNode ARCObjectWidget.StoryItemIdAssay2 "TranscriptomicsAssay" [ datamap ARCObjectWidget.StoryItemIdAssay2DataMap ]
-                            objectNode ARCObjectWidget.StoryItemIdAssay3 "AmpliconSequencingAssay" [ datamap ARCObjectWidget.StoryItemIdAssay3DataMap ]
+                            objectNode
+                                ARCObjectWidget.StoryItemIdAssay
+                                "MetabolomicsAssay"
+                                [
+                                    datamap ARCObjectWidget.StoryItemIdAssayDataMap
+                                    group
+                                        "assay:metabolomics:tables"
+                                        "Tables"
+                                        [
+                                            table ARCObjectWidget.StoryItemIdAssayTable1 "Metabolite Measurements"
+                                            table ARCObjectWidget.StoryItemIdAssayTable2 "Peak Annotation"
+                                            table ARCObjectWidget.StoryItemIdAssayTable3 "QC Injection Summary"
+                                        ]
+                                    group
+                                        "assay:metabolomics:samples"
+                                        "Samples"
+                                        [
+                                            tag ARCObjectWidget.StoryItemIdAssaySample1 "Leaf-01"
+                                            tag ARCObjectWidget.StoryItemIdAssaySample2 "Leaf-02"
+                                        ]
+                                ]
+                            objectNode
+                                ARCObjectWidget.StoryItemIdAssay2
+                                "TranscriptomicsAssay"
+                                [
+                                    datamap ARCObjectWidget.StoryItemIdAssay2DataMap
+                                    group
+                                        "assay:transcriptomics:tables"
+                                        "Tables"
+                                        [
+                                            table ARCObjectWidget.StoryItemIdAssay2Table1 "RNA Sample Sheet"
+                                            table ARCObjectWidget.StoryItemIdAssay2Table2 "Differential Expression Matrix"
+                                        ]
+                                    group
+                                        "assay:transcriptomics:samples"
+                                        "Samples"
+                                        [
+                                            tag ARCObjectWidget.StoryItemIdAssay2Sample1 "Leaf-01"
+                                            tag ARCObjectWidget.StoryItemIdAssay2Sample2 "Leaf-02"
+                                        ]
+                                ]
+                            objectNode
+                                ARCObjectWidget.StoryItemIdAssay3
+                                "AmpliconSequencingAssay"
+                                [
+                                    datamap ARCObjectWidget.StoryItemIdAssay3DataMap
+                                    group
+                                        "assay:amplicon-sequencing:tables"
+                                        "Tables"
+                                        [ table ARCObjectWidget.StoryItemIdAssay3Table1 "ASV Abundance Table" ]
+                                    group
+                                        "assay:amplicon-sequencing:samples"
+                                        "Samples"
+                                        [ tag ARCObjectWidget.StoryItemIdAssay3Sample1 "SoilCore-A" ]
+                                ]
                         ]
                     group
                         "group:workflows"
@@ -384,8 +472,32 @@ type ARCObjectWidget =
                         "group:runs"
                         "Runs"
                         [
-                            objectNode ARCObjectWidget.StoryItemIdRun "Run-2026-04-01" [ datamap ARCObjectWidget.StoryItemIdRunDataMap ]
-                            objectNode ARCObjectWidget.StoryItemIdRun2 "Run-2026-04-08" [ datamap ARCObjectWidget.StoryItemIdRun2DataMap ]
+                            objectNode
+                                ARCObjectWidget.StoryItemIdRun
+                                "Run-2026-04-01"
+                                [
+                                    datamap ARCObjectWidget.StoryItemIdRunDataMap
+                                    group
+                                        "run:2026-04-01:tables"
+                                        "Tables"
+                                        [
+                                            table ARCObjectWidget.StoryItemIdRunTable1 "Injection Sequence"
+                                            table ARCObjectWidget.StoryItemIdRunTable2 "Instrument QC"
+                                        ]
+                                ]
+                            objectNode
+                                ARCObjectWidget.StoryItemIdRun2
+                                "Run-2026-04-08"
+                                [
+                                    datamap ARCObjectWidget.StoryItemIdRun2DataMap
+                                    group
+                                        "run:2026-04-08:tables"
+                                        "Tables"
+                                        [
+                                            table ARCObjectWidget.StoryItemIdRun2Table1 "Injection Sequence"
+                                            table ARCObjectWidget.StoryItemIdRun2Table2 "Retention Alignment QC"
+                                        ]
+                                ]
                         ]
                     group
                         "group:notes"
@@ -428,6 +540,42 @@ type ARCObjectWidget =
             ("Run-2026-04-01", "Run", "Canonical object", "runs/Run-2026-04-01/isa.run.xlsx", "Run nodes can reference workflows and derived sample collections.")
             ARCObjectWidget.StoryItemIdRun2,
             ("Run-2026-04-08", "Run", "Canonical object", "runs/Run-2026-04-08/isa.run.xlsx", "A second run shows repeated operational objects in the story.")
+            ARCObjectWidget.StoryItemIdStudyTable1,
+            ("Study Design Matrix", "Table", "Workbook child", "studies/PlantStressStudy/isa.study.xlsx -> Table 1", "Study table listing drought regimes, greenhouse blocks, and scheduled harvest days.")
+            ARCObjectWidget.StoryItemIdStudyTable2,
+            ("Phenotype Scoring Table", "Table", "Workbook child", "studies/PlantStressStudy/isa.study.xlsx -> Table 2", "Study table capturing wilt scores, imaging slots, and recovery observations.")
+            ARCObjectWidget.StoryItemIdStudy2Table1,
+            ("Plot Sampling Schedule", "Table", "Workbook child", "studies/SoilMicrobiomeStudy/isa.study.xlsx -> Table 1", "Study table mapping field plots to treatment arms and collection weeks.")
+            ARCObjectWidget.StoryItemIdAssayTable1,
+            ("Metabolite Measurements", "Table", "Workbook child", "assays/MetabolomicsAssay/isa.assay.xlsx -> Table 1", "Primary metabolomics matrix with feature intensities for each sampled plant.")
+            ARCObjectWidget.StoryItemIdAssayTable2,
+            ("Peak Annotation", "Table", "Workbook child", "assays/MetabolomicsAssay/isa.assay.xlsx -> Table 2", "Feature annotation table linking peaks to compounds and confidence levels.")
+            ARCObjectWidget.StoryItemIdAssayTable3,
+            ("QC Injection Summary", "Table", "Workbook child", "assays/MetabolomicsAssay/isa.assay.xlsx -> Table 3", "Quality-control summary table for pooled samples and internal standards.")
+            ARCObjectWidget.StoryItemIdAssay2Table1,
+            ("RNA Sample Sheet", "Table", "Workbook child", "assays/TranscriptomicsAssay/isa.assay.xlsx -> Table 1", "Transcriptomics table aligning extraction batches, libraries, and sequencing lanes.")
+            ARCObjectWidget.StoryItemIdAssay2Table2,
+            ("Differential Expression Matrix", "Table", "Workbook child", "assays/TranscriptomicsAssay/isa.assay.xlsx -> Table 2", "Result-oriented table summarising log fold changes and adjusted p-values.")
+            ARCObjectWidget.StoryItemIdAssay3Table1,
+            ("ASV Abundance Table", "Table", "Workbook child", "assays/AmpliconSequencingAssay/isa.assay.xlsx -> Table 1", "Amplicon assay table containing per-sample ASV abundances and taxonomy rollups.")
+            ARCObjectWidget.StoryItemIdRunTable1,
+            ("Injection Sequence", "Table", "Workbook child", "runs/Run-2026-04-01/isa.run.xlsx -> Table 1", "Run table describing acquisition order, blanks, pooled QC injections, and carryover checks.")
+            ARCObjectWidget.StoryItemIdRunTable2,
+            ("Instrument QC", "Table", "Workbook child", "runs/Run-2026-04-01/isa.run.xlsx -> Table 2", "Instrument quality table tracking spray stability and calibration checkpoints during the run.")
+            ARCObjectWidget.StoryItemIdRun2Table1,
+            ("Injection Sequence", "Table", "Workbook child", "runs/Run-2026-04-08/isa.run.xlsx -> Table 1", "Second run sequence table for the follow-up acquisition week.")
+            ARCObjectWidget.StoryItemIdRun2Table2,
+            ("Retention Alignment QC", "Table", "Workbook child", "runs/Run-2026-04-08/isa.run.xlsx -> Table 2", "Run table highlighting retention-time alignment drift and corrective actions.")
+            ARCObjectWidget.StoryItemIdAssaySample1,
+            ("Leaf-01", "Sample", "Relationship node", "-", "Sample reference derived from the metabolomics assay tables.")
+            ARCObjectWidget.StoryItemIdAssaySample2,
+            ("Leaf-02", "Sample", "Relationship node", "-", "A second metabolomics sample reference derived from the assay tables.")
+            ARCObjectWidget.StoryItemIdAssay2Sample1,
+            ("Leaf-01", "Sample", "Relationship node", "-", "Sample reference derived from the transcriptomics assay tables.")
+            ARCObjectWidget.StoryItemIdAssay2Sample2,
+            ("Leaf-02", "Sample", "Relationship node", "-", "A second transcriptomics sample reference derived from the assay tables.")
+            ARCObjectWidget.StoryItemIdAssay3Sample1,
+            ("SoilCore-A", "Sample", "Relationship node", "-", "Sample reference derived from the amplicon sequencing assay tables.")
             ARCObjectWidget.StoryItemIdStudyDataMap,
             ("DataMap", "DataMap", "Canonical child", "studies/PlantStressStudy/isa.datamap.xlsx", "Selecting the study datamap keeps tree focus on the DataMap object and opens the owning study in DataMap view.")
             ARCObjectWidget.StoryItemIdStudy2DataMap,
@@ -620,6 +768,123 @@ type ARCObjectWidget =
                 "Workflows", "ExtractionWorkflow; CleanupWorkflow"
                 "Performers", "Elena Rossi; Max Weber"
                 "Comments", "Carries forward retention-time alignment controls from the first run."
+            ]
+            ARCObjectWidget.StoryItemIdStudyTable1,
+            [
+                "Identifier", "Study Design Matrix"
+                "Rows", "12"
+                "Columns", "6"
+                "Parent", "PlantStressStudy"
+                "Primary Column", "Factor[Water regime]"
+                "Comments", "Defines treatment blocks and harvest days for the drought study."
+            ]
+            ARCObjectWidget.StoryItemIdStudyTable2,
+            [
+                "Identifier", "Phenotype Scoring Table"
+                "Rows", "36"
+                "Columns", "7"
+                "Parent", "PlantStressStudy"
+                "Primary Column", "Characteristic[Leaf wilting]"
+                "Comments", "Captures repeated visual scores for each plant across time points."
+            ]
+            ARCObjectWidget.StoryItemIdStudy2Table1,
+            [
+                "Identifier", "Plot Sampling Schedule"
+                "Rows", "18"
+                "Columns", "5"
+                "Parent", "SoilMicrobiomeStudy"
+                "Primary Column", "Factor[Compost treatment]"
+                "Comments", "Maps field plots to amendment regime and collection week."
+            ]
+            ARCObjectWidget.StoryItemIdAssayTable1,
+            [
+                "Identifier", "Metabolite Measurements"
+                "Rows", "96"
+                "Columns", "14"
+                "Parent", "MetabolomicsAssay"
+                "Primary Column", "Sample Name"
+                "Comments", "Main assay matrix with quantified metabolite features."
+            ]
+            ARCObjectWidget.StoryItemIdAssayTable2,
+            [
+                "Identifier", "Peak Annotation"
+                "Rows", "96"
+                "Columns", "9"
+                "Parent", "MetabolomicsAssay"
+                "Primary Column", "Metabolite Assignment"
+                "Comments", "Links detected features to candidate compounds and confidence scores."
+            ]
+            ARCObjectWidget.StoryItemIdAssayTable3,
+            [
+                "Identifier", "QC Injection Summary"
+                "Rows", "18"
+                "Columns", "6"
+                "Parent", "MetabolomicsAssay"
+                "Primary Column", "QC Type"
+                "Comments", "Summarises pooled QC behaviour and internal standard drift."
+            ]
+            ARCObjectWidget.StoryItemIdAssay2Table1,
+            [
+                "Identifier", "RNA Sample Sheet"
+                "Rows", "48"
+                "Columns", "10"
+                "Parent", "TranscriptomicsAssay"
+                "Primary Column", "Library Name"
+                "Comments", "Associates extracted RNA with library prep batches and lanes."
+            ]
+            ARCObjectWidget.StoryItemIdAssay2Table2,
+            [
+                "Identifier", "Differential Expression Matrix"
+                "Rows", "24"
+                "Columns", "8"
+                "Parent", "TranscriptomicsAssay"
+                "Primary Column", "Gene Identifier"
+                "Comments", "Aggregates contrast results used for downstream interpretation."
+            ]
+            ARCObjectWidget.StoryItemIdAssay3Table1,
+            [
+                "Identifier", "ASV Abundance Table"
+                "Rows", "64"
+                "Columns", "11"
+                "Parent", "AmpliconSequencingAssay"
+                "Primary Column", "OTU/ASV Identifier"
+                "Comments", "Contains abundance counts and taxonomy summaries for each soil core."
+            ]
+            ARCObjectWidget.StoryItemIdRunTable1,
+            [
+                "Identifier", "Injection Sequence"
+                "Rows", "54"
+                "Columns", "7"
+                "Parent", "Run-2026-04-01"
+                "Primary Column", "Injection Order"
+                "Comments", "Acquisition order including blanks, pooled QC, and study samples."
+            ]
+            ARCObjectWidget.StoryItemIdRunTable2,
+            [
+                "Identifier", "Instrument QC"
+                "Rows", "18"
+                "Columns", "6"
+                "Parent", "Run-2026-04-01"
+                "Primary Column", "QC Check"
+                "Comments", "Instrument checks recorded throughout the first drought run."
+            ]
+            ARCObjectWidget.StoryItemIdRun2Table1,
+            [
+                "Identifier", "Injection Sequence"
+                "Rows", "57"
+                "Columns", "7"
+                "Parent", "Run-2026-04-08"
+                "Primary Column", "Injection Order"
+                "Comments", "Follow-up acquisition order for the second drought week."
+            ]
+            ARCObjectWidget.StoryItemIdRun2Table2,
+            [
+                "Identifier", "Retention Alignment QC"
+                "Rows", "24"
+                "Columns", "5"
+                "Parent", "Run-2026-04-08"
+                "Primary Column", "Retention Drift"
+                "Comments", "Tracks alignment drift and correction status across the run."
             ]
         ]
         |> Map.ofList

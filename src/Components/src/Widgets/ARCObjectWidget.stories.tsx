@@ -35,16 +35,24 @@ export const Default: Story = {
     expect(screen.getAllByText('SoilMicrobiomeStudy').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Assays').length).toBeGreaterThan(0);
     expect(screen.getAllByText('DataMap').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Tables').length).toBeGreaterThan(0);
     expect(screen.getByText('Properties')).toBeInTheDocument();
     expect(screen.getByText('Metadata')).toBeInTheDocument();
     expect(screen.getByText('PS-2026-001')).toBeInTheDocument();
 
-    await userEvent.click(searchInput);
+    await userEvent.type(searchInput, 'QC Injection');
 
     const listbox = await screen.findByRole('listbox');
-    const options = within(listbox).getAllByRole('option');
-    expect(options).toHaveLength(10);
-    expect(options[0]).toHaveTextContent('AmpliconSequencingAssay');
+    const option = within(listbox).getByRole('option', { name: /qc injection summary/i });
+    expect(option).toBeInTheDocument();
     expect(listbox).toHaveTextContent('Parent:');
+
+    await userEvent.click(option);
+
+    expect(screen.getAllByText('QC Injection Summary').length).toBeGreaterThan(0);
+    expect(screen.getByText('Workbook child')).toBeInTheDocument();
+    expect(screen.getByText('assays/MetabolomicsAssay/isa.assay.xlsx -> Table 3')).toBeInTheDocument();
+    expect(screen.getByText('Rows')).toBeInTheDocument();
+    expect(screen.getByText('18')).toBeInTheDocument();
   },
 };

@@ -28,6 +28,34 @@ let private canRenderDataMapViewForArcFile =
     | ArcFiles.DataMap _ -> true
     | _ -> false
 
+let private canRenderTableViewForArcFile (tableIndex: int) (arcFile: ArcFiles) =
+    tableIndex >= 0 && tableIndex < arcFile.Tables().Count
+
+let private tryGetSelectionDrivenActiveView
+    (selectedNode: ArcExplorerNode option)
+    (selectedTreeItemPath: string option)
+    (arcFileState: ArcFiles option)
+    =
+    match selectedNode, arcFileState with
+    | Some selectedNode, Some arcFile ->
+        match selectedNode.kind, selectedNode.previewTarget with
+        | ArcExplorerNodeKind.Table, ArcExplorerNodePreviewTarget.Table tableIndex
+            when canRenderTableViewForArcFile tableIndex arcFile
+            ->
+            Some(PreviewActiveView.Table tableIndex)
+        | ArcExplorerNodeKind.DataMap, _ when canRenderDataMapViewForArcFile arcFile -> Some PreviewActiveView.DataMap
+        | ArcExplorerNodeKind.Arc, _
+        | ArcExplorerNodeKind.Study, _
+        | ArcExplorerNodeKind.Assay, _
+        | ArcExplorerNodeKind.Workflow, _
+        | ArcExplorerNodeKind.Run, _ -> Some PreviewActiveView.Metadata
+        | _ -> None
+    | None, Some arcFile when canRenderDataMapViewForArcFile arcFile ->
+        selectedTreeItemPath
+        |> Option.filter isDataMapPath
+        |> Option.map (fun _ -> PreviewActiveView.DataMap)
+    | _ -> None
+
 
 module MainWindowContentHelper =
 
@@ -281,26 +309,44 @@ let Content
         React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
 
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
+    let lastSelectionDrivenViewKeyRef = React.useRef<string option> None
+
+    let selectedExplorerNode =
+        workspaceCtx.state.SelectedExplorerItemId
+        |> Option.bind (fun nodeId ->
+            Renderer.Components.ArcExplorer.tryFindNodeById nodeId workspaceCtx.state.ArcExplorerTree)
 
     React.useEffect (
         (fun () ->
-            let shouldShowDataMap =
-                match arcFileState with
-                | Some arcFile when canRenderDataMapViewForArcFile arcFile ->
-                    match arcFile with
-                    | ArcFiles.DataMap _ -> true
-                    | _ ->
-                        workspaceCtx.state.SelectedTreeItemPath
-                        |> Option.exists isDataMapPath
-                | _ -> false
+            let selectionDrivenViewKey =
+                match selectedExplorerNode, workspaceCtx.state.SelectedTreeItemPath with
+                | Some selectedNode, _ -> Some $"{selectedNode.id}|{selectedNode.kind}|{selectedNode.previewTarget}"
+                | None, Some selectedPath when isDataMapPath selectedPath -> Some $"datamap|{selectedPath}"
+                | _ -> None
 
-            if shouldShowDataMap && activeView <> PreviewActiveView.DataMap then
-                setActiveView PreviewActiveView.DataMap
+            match
+                tryGetSelectionDrivenActiveView
+                    selectedExplorerNode
+                    workspaceCtx.state.SelectedTreeItemPath
+                    arcFileState
+            with
+            | Some desiredView ->
+                if lastSelectionDrivenViewKeyRef.current <> selectionDrivenViewKey then
+                    if desiredView <> activeView then
+                        setActiveView desiredView
+
+                    lastSelectionDrivenViewKeyRef.current <- selectionDrivenViewKey
+            | None ->
+                if selectionDrivenViewKey.IsNone then
+                    lastSelectionDrivenViewKeyRef.current <- None
         ),
         [|
+            box selectedExplorerNode
+            box workspaceCtx.state.SelectedExplorerItemId
+            box workspaceCtx.state.ArcExplorerTree
+            box pageState
             box arcFileState
             box workspaceCtx.state.SelectedTreeItemPath
-            box activeView
         |]
     )
 

@@ -126,6 +126,22 @@ module private ArcExplorerTreeCreator =
             children = children
         )
 
+    let createTableNode parentId (tableIndex: int) (table: ArcTable) path isLfs =
+        let tableName =
+            if String.IsNullOrWhiteSpace table.Name then
+                $"Table {tableIndex + 1}"
+            else
+                table.Name
+
+        ArcExplorerNode.create (
+            $"{parentId}:table:{tableIndex}",
+            tableName,
+            ArcExplorerNodeKind.Table,
+            path = Some path,
+            previewTarget = ArcExplorerNodePreviewTarget.Table tableIndex,
+            isLfs = isLfs
+        )
+
     let createSampleNode id name isReference =
         ArcExplorerNode.create (id, name, ArcExplorerNodeKind.Sample, isReference = isReference)
 
@@ -248,6 +264,14 @@ module private ArcExplorerTreeCreator =
             |> createGroup $"{parentId}:samples" "Samples"
             |> Some
 
+    let createTablesGroup parentId previewPath isLfs (tables: ResizeArray<ArcTable>) =
+        tables
+        |> Seq.mapi (fun tableIndex table -> createTableNode parentId tableIndex table previewPath isLfs)
+        |> List.ofSeq
+        |> function
+            | [] -> None
+            | tableNodes -> tableNodes |> createGroup $"{parentId}:tables" "Tables" |> Some
+
     let createStudyRelationshipsGroup arcPath lfsByPath parentId (study: ArcStudy) =
         let assayRefs =
             study.RegisteredAssayIdentifiers
@@ -335,9 +359,11 @@ module private ArcExplorerTreeCreator =
         let dataMapPath = objectDataMapPath arcPath "studies" study.Identifier
         let studyNotes = tryFindNotesForTarget (Study study.Identifier) notes
         let studySamples = extractStudySampleNames assaysByIdentifier study
+        let studyIsLfs = tryGetLfsByPath lfsByPath previewPath
 
         [
             createStudyRelationshipsGroup arcPath lfsByPath parentId study
+            createTablesGroup parentId (previewPath.Value) studyIsLfs study.Tables
             if study.DataMap.IsSome then
                 createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
             createNotesGroup parentId studyNotes
@@ -350,18 +376,22 @@ module private ArcExplorerTreeCreator =
             ArcExplorerNodeKind.Study
             previewPath
             false
-            (tryGetLfsByPath lfsByPath previewPath)
+            studyIsLfs
 
     let createAssayNode arcPath lfsByPath notes (assay: ArcAssay) =
         let parentId = $"assay:{assay.Identifier}"
         let previewPath = Some(assayPreviewPath arcPath assay.Identifier)
         let dataMapPath = objectDataMapPath arcPath "assays" assay.Identifier
         let assayNotes = tryFindNotesForTarget (Assay assay.Identifier) notes
+        let assaySamples = extractSampleNames assay.Tables
+        let assayIsLfs = tryGetLfsByPath lfsByPath previewPath
 
         [
+            createTablesGroup parentId (previewPath.Value) assayIsLfs assay.Tables
             if assay.DataMap.IsSome then
                 createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
             createNotesGroup parentId assayNotes
+            createSamplesGroup parentId true assaySamples
         ]
         |> List.choose id
         |> createObjectNode
@@ -370,7 +400,7 @@ module private ArcExplorerTreeCreator =
             ArcExplorerNodeKind.Assay
             previewPath
             false
-            (tryGetLfsByPath lfsByPath previewPath)
+            assayIsLfs
 
     let createWorkflowNode arcPath lfsByPath notes (workflow: ArcWorkflow) =
         let parentId = $"workflow:{workflow.Identifier}"
@@ -399,9 +429,11 @@ module private ArcExplorerTreeCreator =
         let dataMapPath = objectDataMapPath arcPath "runs" run.Identifier
         let runNotes = tryFindNotesForTarget (Run run.Identifier) notes
         let runSamples = extractSampleNames run.Tables
+        let runIsLfs = tryGetLfsByPath lfsByPath previewPath
 
         [
             createRunRelationshipsGroup arcPath lfsByPath parentId run
+            createTablesGroup parentId (previewPath.Value) runIsLfs run.Tables
             if run.DataMap.IsSome then
                 createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
             createNotesGroup parentId runNotes
@@ -414,7 +446,7 @@ module private ArcExplorerTreeCreator =
             ArcExplorerNodeKind.Run
             previewPath
             false
-            (tryGetLfsByPath lfsByPath previewPath)
+            runIsLfs
 
     let createTopLevelNotesGroup (notes: NoteEntry list) =
         let createCanonicalNoteNodes idPrefix noteEntries =

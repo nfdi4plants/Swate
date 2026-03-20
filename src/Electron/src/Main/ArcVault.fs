@@ -112,8 +112,7 @@ module ArcVaultExtensions =
                 |> Remoting.withWindow this.window
                 |> Remoting.buildClient<IMainUpdateRendererApi>
 
-            //sendMsg.arcExplorerTreeUpdate (this.BuildArcExplorerTree())
-            ()
+            sendMsg.arcExplorerTreeUpdate (this.BuildArcExplorerTree())
 
         member private this._ScheduleReloadArc(sendMsgApi: IArcFileWatcherApi) =
 
@@ -204,7 +203,7 @@ module ArcVaultExtensions =
                 |> Remoting.buildClient<IMainUpdateRendererApi>
 
             sendMsg.fileTreeUpdate fileTree
-            //sendMsg.arcExplorerTreeUpdate (this.BuildArcExplorerTree())
+            sendMsg.arcExplorerTreeUpdate (this.BuildArcExplorerTree())
 
         member this.LoadArc() = promise {
             if this.path.IsSome then

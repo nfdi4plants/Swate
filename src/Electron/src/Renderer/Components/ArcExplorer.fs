@@ -44,6 +44,7 @@ let private iconForNode (node: ArcExplorerNode) =
     match node.kind with
     | ArcExplorerNodeKind.Arc
     | ArcExplorerNodeKind.Group -> "swt:fluent--folder-24-regular"
+    | ArcExplorerNodeKind.Table -> "swt:fluent--table-24-regular"
     | ArcExplorerNodeKind.DataMap -> "swt:fluent--database-24-regular"
     | ArcExplorerNodeKind.Sample -> "swt:fluent--tag-24-regular"
     | ArcExplorerNodeKind.Note

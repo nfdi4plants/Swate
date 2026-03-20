@@ -48,6 +48,7 @@ let private nodeKindLabel =
     | ArcExplorerNodeKind.Assay -> "Assay"
     | ArcExplorerNodeKind.Workflow -> "Workflow"
     | ArcExplorerNodeKind.Run -> "Run"
+    | ArcExplorerNodeKind.Table -> "Table"
     | ArcExplorerNodeKind.DataMap -> "DataMap"
     | ArcExplorerNodeKind.Note -> "Note"
     | ArcExplorerNodeKind.Sample -> "Sample"
@@ -60,6 +61,7 @@ let private nodeHasMetadata =
     | ArcExplorerNodeKind.Workflow
     | ArcExplorerNodeKind.Run -> true
     | ArcExplorerNodeKind.Group
+    | ArcExplorerNodeKind.Table
     | ArcExplorerNodeKind.DataMap
     | ArcExplorerNodeKind.Note
     | ArcExplorerNodeKind.Sample -> false
@@ -114,6 +116,16 @@ let private dataMapSummaryRows (dataMap: DataMap) =
     [
         textRow "Data Contexts" (string dataMap.DataContexts.Count)
         textRow "Columns" (string dataMap.ColumnCount)
+        yield! headers |> Option.map (fun value -> textRow "Headers" value) |> Option.toList
+    ]
+
+let private tableSummaryRows (table: ArcTable) =
+    let headers = table.Headers |> Seq.map _.ToString() |> summariseStrings
+
+    [
+        textRow "Name" table.Name
+        textRow "Rows" (string table.RowCount)
+        textRow "Columns" (string table.ColumnCount)
         yield! headers |> Option.map (fun value -> textRow "Headers" value) |> Option.toList
     ]
 
@@ -231,6 +243,13 @@ let private metadataRows (arcFile: ArcFiles) =
 
 let private currentPreviewRowsForNode (selectedNode: ArcExplorerNode) (arcFile: ArcFiles) =
     match selectedNode.kind with
+    | ArcExplorerNodeKind.Table ->
+        match selectedNode.previewTarget with
+        | ArcExplorerNodePreviewTarget.Table tableIndex
+            when tableIndex >= 0 && tableIndex < arcFile.Tables().Count
+            ->
+            arcFile.Tables().[tableIndex] |> tableSummaryRows |> Some
+        | _ -> None
     | ArcExplorerNodeKind.DataMap -> WidgetArcFile.tryGetDataMap arcFile |> Option.map dataMapSummaryRows
     | _ when arcFile.Tables().Count > 0 ->
         let tableNames = arcFile.Tables() |> Seq.map _.Name |> summariseStrings
@@ -243,6 +262,7 @@ let private currentPreviewRowsForNode (selectedNode: ArcExplorerNode) (arcFile: 
 
 let private noMetadataMessage =
     function
+    | ArcExplorerNodeKind.Table -> "Table nodes open a specific ARC table and expose its basic dimensions."
     | ArcExplorerNodeKind.Sample -> "Sample nodes are derived from table content and do not currently expose standalone metadata."
     | ArcExplorerNodeKind.Group -> "Select a concrete ARC object to inspect its metadata."
     | _ -> "No additional metadata is available for this selection."
@@ -737,26 +757,26 @@ let private ARCObjectWidgetContent
             detailsPane = detailsPane
         )
 
-//let ARCObjectWidget
-//    (arcFileState: ArcFiles option)
-//    (pageState: PageState option)
-//    (setArcFileState: ArcFiles option -> unit)
-//    (setSelectedExplorerItemId: string option -> unit)
-//    (setSelectedTreeItemPath: string option -> unit)
-//    (setPageState: PageState option -> unit)
-//    : WidgetType * WidgetDefinition =
-//    WidgetType.ARCObject,
-//    {|
-//        prefix = "ARC_OBJECT"
-//        content =
-//            ARCObjectWidgetContent
-//                arcFileState
-//                pageState
-//                setArcFileState
-//                setSelectedExplorerItemId
-//                setSelectedTreeItemPath
-//                setPageState
-//    |}
+let ARCObjectWidget
+    (arcFileState: ArcFiles option)
+    (pageState: PageState option)
+    (setArcFileState: ArcFiles option -> unit)
+    (setSelectedExplorerItemId: string option -> unit)
+    (setSelectedTreeItemPath: string option -> unit)
+    (setPageState: PageState option -> unit)
+    : WidgetType * WidgetDefinition =
+    WidgetType.ARCObject,
+    {|
+        prefix = "ARC_OBJECT"
+        content =
+            ARCObjectWidgetContent
+                arcFileState
+                pageState
+                setArcFileState
+                setSelectedExplorerItemId
+                setSelectedTreeItemPath
+                setPageState
+    |}
 
 let createWidgets
     (arcFileState: ArcFiles option)
@@ -775,7 +795,7 @@ let createWidgets
         TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
         DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
-        //ARCObjectWidget arcFileState pageState setArcFileState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
+        ARCObjectWidget arcFileState pageState setArcFileState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
     ]
     |> Map.ofList
 
@@ -835,7 +855,7 @@ let widgetTypes = [
     WidgetType.Template
     WidgetType.FilePicker
     WidgetType.DataAnnotator
-    //WidgetType.ARCObject
+    WidgetType.ARCObject
 ]
 
 [<ReactComponent>]
