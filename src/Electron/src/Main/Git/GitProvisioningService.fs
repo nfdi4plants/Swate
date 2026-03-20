@@ -126,10 +126,13 @@ let ensureCloneTargetIsEmpty (state: CloneTargetState) : Result<unit, exn> =
         Ok ()
 
 let shouldRetryWithoutAuth (failure: GitService.GitFailure) =
-    let message = failure.Message |> Option.ofObj |> Option.defaultValue String.Empty
+    let message =
+        failure.Message
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> fun text -> text.ToLowerInvariant()
 
-    let contains (term: string) =
-        message.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0
+    let contains (term: string) = message.Contains(term)
 
     match failure.Kind with
     | GitService.GitFailureKind.Forbidden ->

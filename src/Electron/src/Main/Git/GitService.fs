@@ -57,9 +57,15 @@ let private remoteNamePattern = Regex("^[A-Za-z0-9._/-]+$")
 let private invalidBranchCharactersPattern = Regex(@"[~^:?*\[\\\s]")
 
 let classifyFailureKind (message: string) =
+    let normalizedMessage =
+        message
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> fun text -> text.ToLowerInvariant()
+
     let containsAny (terms: string[]) =
         terms
-        |> Array.exists (fun term -> message.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+        |> Array.exists normalizedMessage.Contains
 
     if containsAny [| "abort"; "cancelled"; "canceled"; "aborterror" |] then
         Canceled
