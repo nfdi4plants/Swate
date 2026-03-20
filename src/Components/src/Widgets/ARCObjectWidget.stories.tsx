@@ -28,14 +28,23 @@ export const Default: Story = {
     expect(screen.getByText('ARC Object Tree')).toBeInTheDocument();
     expect(screen.getByText('ARC Object Explorer')).toBeInTheDocument();
     expect(screen.getByText('ARC Object Details')).toBeInTheDocument();
+    expect(screen.getByText('All kinds')).toBeInTheDocument();
+    const searchInput = screen.getByPlaceholderText(/search visible objects/i);
+    expect(searchInput).toBeInTheDocument();
     expect(screen.getAllByText('PlantStressStudy').length).toBeGreaterThan(0);
     expect(screen.getAllByText('SoilMicrobiomeStudy').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('TranscriptomicsAssay').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Assays').length).toBeGreaterThan(0);
     expect(screen.getAllByText('DataMap').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Project overview').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Release checklist').length).toBeGreaterThan(0);
     expect(screen.getByText('Properties')).toBeInTheDocument();
     expect(screen.getByText('Metadata')).toBeInTheDocument();
     expect(screen.getByText('PS-2026-001')).toBeInTheDocument();
+
+    await userEvent.click(searchInput);
+
+    const listbox = await screen.findByRole('listbox');
+    const options = within(listbox).getAllByRole('option');
+    expect(options).toHaveLength(10);
+    expect(options[0]).toHaveTextContent('AmpliconSequencingAssay');
+    expect(listbox).toHaveTextContent('Parent:');
   },
 };
