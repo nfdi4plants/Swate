@@ -242,3 +242,38 @@ export const LoginLogoutToggleFlow: Story = {
     });
   },
 };
+
+export const LatestResponseWinsInRaceCondition: Story = {
+  name: "Latest request wins in race condition",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await waitFor(async () => {
+      expect(await canvas.findByTestId("GitLabRepoRow-10")).toBeInTheDocument();
+    });
+
+    const searchInput = await canvas.findByTestId("GitLabExploreSearchInput");
+    const searchButton = await canvas.findByTestId("GitLabExploreSearchButton");
+
+    await userEvent.clear(searchInput);
+    await userEvent.type(searchInput, "ontology __race_slow__");
+    await userEvent.click(searchButton);
+
+    await userEvent.clear(searchInput);
+    await userEvent.type(searchInput, "arc-spec __race_fast__");
+    await userEvent.click(searchButton);
+
+    await waitFor(async () => {
+      expect(await canvas.findByTestId("GitLabRepoRow-11")).toBeInTheDocument();
+      expect(canvas.queryByTestId("GitLabRepoRow-10")).not.toBeInTheDocument();
+      expect(canvas.queryByTestId("GitLabExploreError")).not.toBeInTheDocument();
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    expect(await canvas.findByTestId("GitLabRepoRow-11")).toBeInTheDocument();
+    expect(canvas.queryByTestId("GitLabRepoRow-10")).not.toBeInTheDocument();
+    expect(canvas.queryByTestId("GitLabExploreError")).not.toBeInTheDocument();
+    expect(canvas.queryByTestId("GitLabExploreLoading")).not.toBeInTheDocument();
+  },
+};

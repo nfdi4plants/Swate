@@ -21,9 +21,11 @@ module DatahubBrowserModel =
         | SetSelectedGroupId of int option
         | SetPage of int
         | LoadReposRequest of ExploreLoadRequest
-        | LoadReposResponse of Result<ExploreLoadResult, GitLabError>
+        | LoadReposResponse of System.Guid * Result<ExploreLoadResult, GitLabError>
 
     type State = {
+        /// This field is used to store the id of the latest fetch request for repositories. When a response is received, its id is compared to this field to determine if the response is still relevant (i.e., if it corresponds to the most recent request). This helps prevent race conditions.
+        LatestReposFetchID: System.Guid option
         Tab: ExploreTab
         DraftSearchTerm: string
         SubmittedSearchTerm: string
@@ -55,6 +57,7 @@ module DatahubBrowserModel =
 
     let init (user: CurrentUserDto option) =
         let state = {
+            LatestReposFetchID = None
             Tab = ExploreTab.All
             DraftSearchTerm = ""
             SubmittedSearchTerm = ""
@@ -133,8 +136,11 @@ module DatahubBrowserModel =
             else
                 reloadWith { state with Page = page }
         | LoadReposRequest request ->
+            let requestId = System.Guid.NewGuid()
+
             let nextState = {
                 state with
+                    LatestReposFetchID = Some requestId
                     IsLoading = true
                     Error = None
             }
@@ -144,45 +150,57 @@ module DatahubBrowserModel =
                     loadRepos
                     request
                     (function
-                    | Ok result -> LoadReposResponse(Ok result)
-                    | Error err -> LoadReposResponse(Error err))
-                    (GitLabError.Unknown >> Error >> LoadReposResponse)
+                    | Ok result -> LoadReposResponse(requestId, Ok result)
+                    | Error err -> LoadReposResponse(requestId, Error err))
+                    (fun err -> LoadReposResponse(requestId, Error(GitLabError.Unknown err)))
 
             nextState, cmd
-        | LoadReposResponse(Ok result) ->
-            let updatedState = {
-                state with
-                    Repos = result.Repos
-                    Pagination = result.Pagination
-                    Groups = result.Groups
-                    GroupsLoaded = result.GroupsLoaded
-                    GroupsLoadError = result.GroupsLoadError
-                    IsLoading = false
-                    Error = None
-            }
 
-            if
-                state.Tab = ExploreTab.YourOrganisations
-                && state.SelectedGroupId.IsNone
-                && result.Groups.Length > 0
-            then
-                let nextState = {
-                    updatedState with
-                        SelectedGroupId = Some result.Groups[0].id
+        | LoadReposResponse(guid, result) ->
+            match result with
+            | Ok _ when state.LatestReposFetchID <> Some guid ->
+                // This response is outdated, ignore it
+                state, Cmd.none
+            | Ok response ->
+                let updatedState = {
+                    state with
+                        LatestReposFetchID = None
+                        Repos = response.Repos
+                        Pagination = response.Pagination
+                        Groups = response.Groups
+                        GroupsLoaded = response.GroupsLoaded
+                        GroupsLoadError = response.GroupsLoadError
+                        IsLoading = false
+                        Error = None
                 }
 
-                reloadWith nextState
-            else
-                updatedState, Cmd.none
-        | LoadReposResponse(Error error) ->
-            {
-                state with
-                    Error = Some error
-                    Repos = [||]
-                    Pagination = None
-                    IsLoading = false
-            },
-            Cmd.none
+                if
+                    state.Tab = ExploreTab.YourOrganisations
+                    && state.SelectedGroupId.IsNone
+                    && response.Groups.Length > 0
+                then
+                    let nextState = {
+                        updatedState with
+                            SelectedGroupId = Some response.Groups[0].id
+                    }
+
+                    reloadWith nextState
+                else
+                    updatedState, Cmd.none
+            | Error err ->
+                {
+                    state with
+                        LatestReposFetchID =
+                            if state.LatestReposFetchID = Some guid then
+                                None
+                            else
+                                state.LatestReposFetchID
+                        Error = Some err
+                        Repos = [||]
+                        Pagination = None
+                        IsLoading = false
+                },
+                Cmd.none
 
 module private DataHubBrowserHelper =
 
@@ -824,11 +842,9 @@ type DataHubBrowser =
             avatar_url = None
         }
 
-        let login () =
-            setCurrentUser (Some mockUser)
+        let login () = setCurrentUser (Some mockUser)
 
-        let logout () =
-            setCurrentUser None
+        let logout () = setCurrentUser None
 
         let reloadTrigger = 0
 
@@ -922,13 +938,30 @@ type DataHubBrowser =
                 || containsCi (p.description |> Option.defaultValue "") searchTerm
             )
 
+        /// This is used to test race conditions by including specific tokens in the search term that trigger different response delays
+        let getMockDelayAndSearchTerm (searchTerm: string) =
+            let slowToken = "__race_slow__"
+            let fastToken = "__race_fast__"
+
+            let delayMs =
+                if searchTerm.Contains(slowToken) then 900
+                elif searchTerm.Contains(fastToken) then 60
+                else 250
+
+            let cleanedSearchTerm =
+                searchTerm.Replace(slowToken, "").Replace(fastToken, "").Trim()
+
+            delayMs, cleanedSearchTerm
+
         let loadAllRepos (query: ExploreRepoQuery) = promise {
+            let delayMs, cleanedSearchTerm = getMockDelayAndSearchTerm query.SearchTerm
+
             setCallCount {|
                 callCount with
                     all = callCount.all + 1
             |}
 
-            do! Promise.sleep 250
+            do! Promise.sleep delayMs
 
             let source =
                 match query.Visibility with
@@ -937,7 +970,7 @@ type DataHubBrowser =
 
             let filtered =
                 source
-                |> filterRepos query.SearchTerm
+                |> filterRepos cleanedSearchTerm
                 |> sortReposByProjectSort query.OrderBy query.Sort
 
             let pageItems, pageMeta = paginate filtered query.Page query.PerPage
@@ -950,12 +983,14 @@ type DataHubBrowser =
         }
 
         let loadMostStarredRepos (query: ExploreMostStarredQuery) = promise {
+            let delayMs, cleanedSearchTerm = getMockDelayAndSearchTerm query.SearchTerm
+
             setCallCount {|
                 callCount with
                     mostStarred = callCount.mostStarred + 1
             |}
 
-            do! Promise.sleep 250
+            do! Promise.sleep delayMs
 
             let source =
                 match query.Visibility with
@@ -964,7 +999,7 @@ type DataHubBrowser =
 
             let filtered =
                 source
-                |> filterRepos query.SearchTerm
+                |> filterRepos cleanedSearchTerm
                 |> Array.sortByDescending (fun p -> p.star_count)
 
             let pageItems, pageMeta = paginate filtered query.Page query.PerPage
@@ -977,16 +1012,18 @@ type DataHubBrowser =
         }
 
         let loadUserRepos (query: ExploreRepoQuery) = promise {
+            let delayMs, cleanedSearchTerm = getMockDelayAndSearchTerm query.SearchTerm
+
             setCallCount {|
                 callCount with
                     userRepos = callCount.userRepos + 1
             |}
 
-            do! Promise.sleep 250
+            do! Promise.sleep delayMs
 
             let filtered =
                 MockData.DataHub.yourRepos
-                |> filterRepos query.SearchTerm
+                |> filterRepos cleanedSearchTerm
                 |> sortReposByProjectSort query.OrderBy query.Sort
 
             let pageItems, pageMeta = paginate filtered query.Page query.PerPage
@@ -1016,12 +1053,14 @@ type DataHubBrowser =
         }
 
         let loadOrganisationRepos (query: ExploreGroupProjectsQuery) = promise {
+            let delayMs, cleanedSearchTerm = getMockDelayAndSearchTerm query.SearchTerm
+
             setCallCount {|
                 callCount with
                     organisationRepos = callCount.organisationRepos + 1
             |}
 
-            do! Promise.sleep 250
+            do! Promise.sleep delayMs
 
             let source =
                 MockData.DataHub.orgRepos
@@ -1030,7 +1069,7 @@ type DataHubBrowser =
 
             let filtered =
                 source
-                |> filterRepos query.SearchTerm
+                |> filterRepos cleanedSearchTerm
                 |> sortReposByProjectSort query.OrderBy query.Sort
 
             let pageItems, pageMeta = paginate filtered query.Page query.PerPage
