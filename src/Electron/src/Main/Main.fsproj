@@ -22,6 +22,7 @@
     <Compile Include="Git\GitService.fs" />
     <Compile Include="Git\GitProvisioningService.fs" />
     <Compile Include="Auth\SecureAuthStore.fs" />
+    <Compile Include="Auth\GitLabApi.fs" />
     <Compile Include="Auth\AuthService.fs" />
     <Compile Include="ArcVault.fs" />
     <Compile Include="IPC\IPCHelper.fs" />

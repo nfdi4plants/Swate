@@ -26,6 +26,7 @@
     <PackageReference Include="Fable.React.Types" />
     <PackageReference Include="Fable.Core" />
     <PackageReference Include="Feliz" />
+    <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
   </ItemGroup>
 
@@ -63,9 +64,12 @@
     <Compile Include="Util\Constants.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
-    <Compile Include="Util\Api.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\ReactContexts.fs" />
+    <Compile Include="Api\Helper.fs" />
+    <Compile Include="Api\SwateApi.fs" />
+    <Compile Include="Api\GitLabApi.fs" />
+    <Compile Include="Api\TIBApi.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
@@ -145,8 +149,11 @@
     <Compile Include="Notes\Editor\TargetSelector.fs" />
     <Compile Include="Notes\Editor\Actions.fs" />
     <Compile Include="Notes\Editor\Notes.fs" />
-    <Compile Include="DataHubSidebar\Types.fs" />
-    <Compile Include="DataHubSidebar\DataHubSidebar.fs" />
+    <Compile Include="DataHub\Types.fs" />
+    <Compile Include="DataHub\MockData.fs" />
+    <Compile Include="DataHub\GenericComponents.fs" />
+    <Compile Include="DataHub\DataHubBrowser.fs" />
+    <Compile Include="DataHub\DataHubSidebar.fs" />
     <Compile Include="Authentication\Types.fs" />
     <Compile Include="Authentication\AccountManager.fs" />
     <Compile Include="Authentication\Authentication.fs" />

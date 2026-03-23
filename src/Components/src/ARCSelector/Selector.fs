@@ -251,7 +251,8 @@ type Selector =
 
         let recentARCs, setRecentARCs = React.useState (testRecentARCs)
 
-        let closeDropdown () = selectorController.current.toggle ()
+        let closeDropdown =
+            fun (_: Browser.Types.MouseEvent) -> selectorController.current.toggle ()
 
         let actionbarButtons = [|
             ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", closeDropdown)

@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
     plugins: [
         react({
-            include: /\.(fs|js|jsx|ts|tsx)$/,
+            include: /\.(js|jsx|ts|tsx)$/,
             babel: {
                 plugins: ['babel-plugin-react-compiler'],
             },

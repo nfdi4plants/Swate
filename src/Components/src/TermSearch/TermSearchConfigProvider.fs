@@ -6,7 +6,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 
-
 module private TermSearchConfigProviderHelper =
 
     [<Literal>]
@@ -22,7 +21,7 @@ module private TermSearchConfigProviderHelper =
                     let n = TIB_PREFIX + c
 
                     let query: Swate.Components.Types.SearchCall =
-                        fun (q: string) -> Swate.Components.Api.TIBApi.defaultSearch (q, 10, c)
+                        fun (q: string) -> Swate.Components.Api.TIBApi.TIBApi.defaultSearch (q, 10, c)
 
                     yield (n, query)
             ]
@@ -33,7 +32,7 @@ module private TermSearchConfigProviderHelper =
 
                     let query: Swate.Components.Types.ParentSearchCall =
                         fun (parent: string, query: string) ->
-                            Swate.Components.Api.TIBApi.searchChildrenOf (query, parent, 10, c)
+                            Swate.Components.Api.TIBApi.TIBApi.searchChildrenOf (query, parent, 10, c)
 
                     yield (n, query)
             ]
@@ -43,7 +42,8 @@ module private TermSearchConfigProviderHelper =
                     let n = TIB_PREFIX + c
 
                     let query: Swate.Components.Types.AllChildrenSearchCall =
-                        fun (p: string) -> Swate.Components.Api.TIBApi.searchAllChildrenOf (p, 300, collection = c)
+                        fun (p: string) ->
+                            Swate.Components.Api.TIBApi.TIBApi.searchAllChildrenOf (p, 300, collection = c)
 
                     yield (n, query)
             ]
@@ -71,7 +71,7 @@ type TermSearchConfigProvider =
                 promise {
 
                     let! collections =
-                        Api.TIBApi.getCollections ()
+                        Api.TIBApi.TIBApi.getCollections ()
                         |> Promise.catch (fun ex -> console.error "Error fetching TIB collections:" ex)
 
                     let collectionSet = Set.ofArray collections.content

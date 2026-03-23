@@ -20,7 +20,14 @@ type ComboBoxRef = {|
 |}
 
 [<RequireQualifiedAccess>]
-type DaisyUIColors =
+type DaisyuiSize =
+    | XS
+    | SM
+    | MD
+    | LG
+
+[<RequireQualifiedAccess>]
+type DaisyuiColors =
     | Primary
     | Secondary
     | Accent
@@ -28,6 +35,14 @@ type DaisyUIColors =
     | Success
     | Warning
     | Error
+
+[<RequireQualifiedAccess>]
+type DaisyuiTooltipPosition =
+    | Top
+    | Right
+    | Bottom
+    | Left
+
 
 type StateContext<'T> = { state: 'T; setState: 'T -> unit }
 
@@ -336,12 +351,12 @@ module Actionbar =
 
     type ButtonInfo = {
         icon: string
-        toolTip: string
-        onClick: unit -> unit
+        toolTip: string option
+        onClick: Browser.Types.MouseEvent -> unit
     } with
 
-        static member create(icon: string, toolTip: string, (onClick: unit -> unit)) = {
+        static member create(icon: string, toolTip: string, (onClick: Browser.Types.MouseEvent -> unit)) = {
             icon = icon
-            toolTip = toolTip
+            toolTip = Some toolTip
             onClick = onClick
         }
