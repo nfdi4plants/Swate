@@ -78,6 +78,7 @@ module DatahubBrowserModel =
 
         state, Cmd.ofMsg (LoadReposRequest(buildRequest state))
 
+    /// Wrapper for calling LoadReposRequest after updating the state.
     let private reloadWith (state: State) =
         state, Cmd.ofMsg (LoadReposRequest(buildRequest state))
 
@@ -512,7 +513,11 @@ type DataHubBrowser =
                         )
                         prop.disabled ((not isAuthenticated) || groups.Length = 0 || groupsLoadError.IsSome)
                         prop.children [
-                            Html.option [ prop.value ""; prop.text "Select organisation" ]
+                            Html.option [
+                                prop.value ""
+                                prop.text "Select organisation"
+                                prop.disabled true
+                            ]
                             for g in groups do
                                 Html.option [ prop.value (string g.id); prop.text g.name ]
                         ]
@@ -1253,6 +1258,7 @@ type DataHubBrowser =
                 GitLabApi.ListUserPersonalProjects(
                     baseUrl,
                     pat,
+                    ?userId = (currentUser |> Option.map (fun u -> u.id)),
                     page = query.Page,
                     perPage = query.PerPage,
                     search = query.SearchTerm,

@@ -65,13 +65,16 @@ let Main =
                 GroupsLoadError = None
             }
 
+            let guid = System.Guid.NewGuid()
+
             let seeded = {
                 initial with
+                    LatestReposFetchID = Some guid
                     IsLoading = true
                     Error = GitLabError.Unknown(exn "stale") |> Some
             }
 
-            let next = reduce (DatahubBrowserModel.LoadReposResponse(Ok loaded)) seeded
+            let next = reduce (DatahubBrowserModel.LoadReposResponse(guid, Ok loaded)) seeded
 
             Expect.equal next.Repos expectedRepos "Successful response should populate repositories."
             Expect.equal next.Pagination loaded.Pagination "Successful response should set pagination metadata."
@@ -85,15 +88,18 @@ let Main =
         <| fun _ ->
             let initial, _ = DatahubBrowserModel.init None
 
+            let guid = System.Guid.NewGuid()
+
             let seeded = {
                 initial with
+                    LatestReposFetchID = Some guid
                     IsLoading = true
                     Repos = MockData.DataHub.yourRepos |> Array.truncate 1
                     Pagination = Some(mkPageMeta 1)
             }
 
             let next =
-                reduce (DatahubBrowserModel.LoadReposResponse(Error(GitLabError.Unknown(exn "boom")))) seeded
+                reduce (DatahubBrowserModel.LoadReposResponse(guid, Error(GitLabError.Unknown(exn "boom")))) seeded
 
             Expect.isTrue next.Error.Value.IsUnknown "Error response should be stored in model."
 
@@ -108,9 +114,11 @@ let Main =
         <| fun _ ->
             let initial, _ = DatahubBrowserModel.init None
             let expectedFirstGroup = MockData.DataHub.groups[0]
+            let guid = System.Guid.NewGuid()
 
             let seeded = {
                 initial with
+                    LatestReposFetchID = Some guid
                     Tab = ExploreTab.YourOrganisations
                     SelectedGroupId = None
                     IsLoading = true
@@ -124,7 +132,7 @@ let Main =
                 GroupsLoadError = None
             }
 
-            let next = reduce (DatahubBrowserModel.LoadReposResponse(Ok loaded)) seeded
+            let next = reduce (DatahubBrowserModel.LoadReposResponse(guid, Ok loaded)) seeded
 
             Expect.equal
                 next.SelectedGroupId

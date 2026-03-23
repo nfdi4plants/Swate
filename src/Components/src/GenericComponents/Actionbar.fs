@@ -194,7 +194,13 @@ type Actionbar =
                         )
                     )
                 ),
-                [| buttons |]
+                [|
+                    buttons
+                    buttonSize
+                    tooltipPosition
+                    buttonClassName
+                    maxNumber
+                |]
             )
 
         let restElements =
@@ -209,7 +215,13 @@ type Actionbar =
                         debug = debug
                     )
                 ),
-                [| buttons |]
+                [|
+                    buttons
+                    buttonSize
+                    tooltipPosition
+                    buttonClassName
+                    maxNumber
+                |]
             )
 
         let selectedElement = React.Fragment selectedElements
