@@ -4,7 +4,7 @@ open Fable.Core
 open Feliz
 
 [<Erase; Mangle(false)>]
-type ARCObjectExplorer =
+type ARCObjectPanel =
 
     [<ReactComponent>]
     static member Main(name: string, ?content: ReactElement) =

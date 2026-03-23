@@ -15,6 +15,7 @@
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="Components\FileExplorer.fs" />
+    <Compile Include="Components\ArcObjectExplorer.fs" />
     <Compile Include="Components\WidgetRegister.fs" />
     <Compile Include="Components\NoteSearchPage.fs" />
     <Compile Include="Components\MainElement.fs" />
