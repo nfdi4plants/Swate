@@ -21,3 +21,7 @@ type WorkspaceState = {
 
 let WorkspaceStateCtx =
     React.createContext<StateContext<WorkspaceState>> (StateContext.init (WorkspaceState.init ()))
+
+
+[<Hook>]
+let useWorkspaceStateCtx () = React.useContext WorkspaceStateCtx

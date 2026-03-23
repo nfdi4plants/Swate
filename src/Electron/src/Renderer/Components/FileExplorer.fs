@@ -7,6 +7,11 @@ open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 
+type FileExplorerActions = {
+    SetSelectedTreeItemPath: string option -> unit
+    SetPageState: PageState option -> unit
+}
+
 let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
 let private splitPath (path: string) =
@@ -38,12 +43,7 @@ let private resolvePreviewPath (path: string) =
     else
         normalized
 
-let createFileTree
-    (parent: FileItemDTO option)
-    (selectedTreeItemPath: string option)
-    (setSelectedTreeItemPath: string option -> unit)
-    (setPageState: PageState option -> unit)
-    =
+let createFileTree (parent: FileItemDTO option) (selectedTreeItemPath: string option) (actions: FileExplorerActions) =
     let rootRepoPath = parent |> Option.map (fun p -> normalizePath p.path)
 
     let isFocusedPathOrAncestor (nodePath: string) =
@@ -109,8 +109,8 @@ let createFileTree
 
     let setError (errorMsg: string option) =
         match errorMsg with
-        | Some msg -> setPageState (Some(PageState.Error msg))
-        | None -> setPageState None
+        | Some msg -> actions.SetPageState(Some(PageState.Error msg))
+        | None -> actions.SetPageState None
 
     let toggleLfsMark =
         FileExplorerGitLfsHelper.ToggleLfsMark(rootRepoPath, setError, runToggleLfsMark)
@@ -121,8 +121,8 @@ let createFileTree
     let openPreview (item: FileItem) =
         promise {
             match item.Path with
-            | None -> setPageState (Some(PageState.Error $"File '{item.Name}' has no path."))
-            | Some path when item.IsDirectory -> setPageState None
+            | None -> actions.SetPageState(Some(PageState.Error $"File '{item.Name}' has no path."))
+            | Some path when item.IsDirectory -> actions.SetPageState None
             | Some path ->
                 let previewPath = resolvePreviewPath path
 
@@ -131,16 +131,19 @@ let createFileTree
                 else
                     console.log ($"[Renderer] Opening file: {previewPath}")
 
-                setSelectedTreeItemPath (Some previewPath)
+                actions.SetSelectedTreeItemPath(Some previewPath)
                 let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
 
                 match result with
                 | Ok data ->
                     console.log ("[Renderer] Received data, processing...")
-                    setPageState (Some data)
+                    actions.SetPageState(Some data)
                 | Error exn ->
                     console.log ($"[Renderer] Error: {exn.Message}")
-                    setPageState (Some(PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
+
+                    actions.SetPageState(
+                        Some(PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}")
+                    )
         }
         |> Promise.start
 

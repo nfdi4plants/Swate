@@ -6,9 +6,10 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         react({
+            include: /\.(js|jsx|ts|tsx)$/,
             babel: {
-                // plugins: ['babel-plugin-react-compiler'],
-            }
+                plugins: ['babel-plugin-react-compiler'],
+            },
         }),
         tailwindcss()
     ],

@@ -15,6 +15,11 @@ open FileIOTypes
 module IPCTypesHelper =
 
     /// TODO: This is a pure UI type and should only be used in the renderer process. It is not meant to be sent over IPC, but rather to represent the state of the page after receiving data from the main process.
+    type LeftSidebarState =
+        | FileExplorer
+        | Notes
+
+    /// TODO: This is a pure UI type and should only be used in the renderer process. It is not meant to be sent over IPC, but rather to represent the state of the page after receiving data from the main process.
     [<RequireQualifiedAccess>]
     type PageState =
         | ArcFileData of fileType: ArcFilesDiscriminate * json: string
@@ -45,7 +50,7 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
-    pickPaths: IpcMainEvent -> JS.Promise<Result<string [], exn>>
+    pickPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
 
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>
     readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>

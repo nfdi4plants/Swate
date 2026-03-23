@@ -9,7 +9,9 @@
   },
   "scripts": {
     "fable": "dotnet fable ./src/Swate.Electron.fsproj -o ./src/fable_output -e fs.jsx --verbose",
+    "fable:watch": "npm run fable -- --watch",
     "start": "npm run fable -- --watch --run electron-forge start",
+    "start:e": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
