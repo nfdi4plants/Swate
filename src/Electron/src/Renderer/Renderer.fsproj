@@ -6,7 +6,6 @@
 
   <ItemGroup>
     <Compile Include="Api.fs" />
-    <Compile Include="MetadataForm.fs" />
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="context\LandingStateCtx.fs" />
     <Compile Include="context\NotesStateCtx.fs" />
@@ -16,7 +15,6 @@
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="Components\FileExplorer.fs" />
-    <Compile Include="Components\ArcExplorer.fs" />
     <Compile Include="Components\WidgetRegister.fs" />
     <Compile Include="Components\NoteSearchPage.fs" />
     <Compile Include="Components\MainElement.fs" />

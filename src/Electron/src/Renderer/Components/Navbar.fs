@@ -1,12 +1,10 @@
 namespace Renderer.Components
 
-open Fable.Core
-open Feliz
 
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Feliz
 open Swate.Components
 open Fable.Electron.Remoting.Renderer
+
 
 module NavbarHelper =
 

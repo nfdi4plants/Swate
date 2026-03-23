@@ -5,6 +5,7 @@ open Fable.Electron.Remoting.Renderer
 open Fable.Core
 
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes

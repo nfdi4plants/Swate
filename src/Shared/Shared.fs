@@ -292,3 +292,57 @@ type IOntologyAPIv2 = {
     // Tree related requests
     getTreeByAccession: string -> Async<TreeTypes.Tree>
 }
+
+[<RequireQualifiedAccess>]
+type ArcExplorerNodeKind =
+    | Arc
+    | Group
+    | Study
+    | Assay
+    | Workflow
+    | Run
+    | Table
+    | DataMap
+    | Note
+    | Sample
+
+[<RequireQualifiedAccess>]
+type ArcExplorerNodePreviewTarget =
+    | Default
+    | Table of int
+
+type ArcExplorerNode = {
+    id: string
+    name: string
+    kind: ArcExplorerNodeKind
+    path: string option
+    previewTarget: ArcExplorerNodePreviewTarget
+    isSelectable: bool
+    isReference: bool
+    isLfs: bool option
+    children: ArcExplorerNode list
+} with
+
+    static member create
+        (
+            id: string,
+            name: string,
+            kind: ArcExplorerNodeKind,
+            ?path: string option,
+            ?previewTarget: ArcExplorerNodePreviewTarget,
+            ?isSelectable: bool,
+            ?isReference: bool,
+            ?isLfs: bool option,
+            ?children: ArcExplorerNode list
+        ) =
+        {
+            id = id
+            name = name
+            kind = kind
+            path = defaultArg path None
+            previewTarget = defaultArg previewTarget ArcExplorerNodePreviewTarget.Default
+            isSelectable = defaultArg isSelectable true
+            isReference = defaultArg isReference false
+            isLfs = defaultArg isLfs None
+            children = defaultArg children []
+        }

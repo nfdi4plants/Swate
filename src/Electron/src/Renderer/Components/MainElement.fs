@@ -4,7 +4,7 @@ open Feliz
 open Swate.Components
 open Browser.Dom
 open ARCtrl
-open Renderer.MetadataForms
+open Swate.Components.MetadataForms
 open WidgetRegistry
 
 [<RequireQualifiedAccess>]
@@ -43,9 +43,6 @@ let CreateARCitectNavbar
     (activeView: PreviewActiveView)
     (activeTableIndex: int option)
     (setArcFileState: ArcFiles option -> unit)
-    (setSelectedExplorerItemId: string option -> unit)
-    (setSelectedTreeItemPath: string option -> unit)
-    (setPageState: Swate.Electron.Shared.IPCTypes.IPCTypesHelper.PageState option -> unit)
     onSaveClick
     =
     let workspaceCtx = React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
@@ -72,9 +69,6 @@ let CreateARCitectNavbar
             setArcFileState
             workspaceCtx.state.TemplateImportType
             setImportType
-            setSelectedExplorerItemId
-            setSelectedTreeItemPath
-            setPageState
 
     let hasSelectedTable = activeTableIndex.IsSome
 

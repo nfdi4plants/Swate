@@ -123,12 +123,13 @@
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />
     <Compile Include="AnnotationTable\AnnotationTable.fs" />
     <Compile Include="DataMapTable\DataMapTable.fs" />
+    <Compile Include="Widgets\MetadataForm.fs" />
     <Compile Include="Widgets\LocalStorage.fs" />
     <Compile Include="Widgets\Widgets.fs" />
     <Compile Include="Widgets\WidgetSupport.fs" />
-    <Compile Include="Widgets\ARCObjectTree.fs" />
+    <Compile Include="Widgets\ARCObjectFixture.fs" />
     <Compile Include="Widgets\ARCObjectExplorer.fs" />
-    <Compile Include="Widgets\ARCObjectDetails.fs" />
+    <Compile Include="Widgets\ArcExplorer.fs" />
     <Compile Include="Widgets\ARCObjectWidget.fs" />
     <Compile Include="Widgets\BuildingBlockWidget.fs" />
     <Compile Include="Widgets\FilePickerWidget.fs" />

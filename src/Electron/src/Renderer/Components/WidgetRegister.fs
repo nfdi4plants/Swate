@@ -3,10 +3,12 @@ module Renderer.Components.WidgetRegistry
 open System
 open Feliz
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 open ARCtrl
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
@@ -137,17 +139,13 @@ let private metadataRows (arcFile: ArcFiles) =
             yield! optionalTextRow "Title" (asOptionalText investigation.Title) |> Option.toList
             yield! optionalTextRow "Description" (asOptionalText investigation.Description) |> Option.toList
             yield! optionalTextRow "Submission Date" (asOptionalText investigation.SubmissionDate) |> Option.toList
-            yield!
-                optionalTextRow "Public Release" (asOptionalText investigation.PublicReleaseDate)
-                |> Option.toList
+            yield! optionalTextRow "Public Release" (asOptionalText investigation.PublicReleaseDate) |> Option.toList
             yield!
                 summariseStrings (investigation.Contacts |> Seq.map personDisplayName)
                 |> Option.map (fun value -> textRow "Contacts" value)
                 |> Option.toList
             yield! Some(textRow "Publications" (string investigation.Publications.Count)) |> Option.toList
-            yield!
-                Some(textRow "Ontology Sources" (string investigation.OntologySourceReferences.Count))
-                |> Option.toList
+            yield! Some(textRow "Ontology Sources" (string investigation.OntologySourceReferences.Count)) |> Option.toList
             yield! Some(textRow "Comments" (string investigation.Comments.Count)) |> Option.toList
         ]
     | ArcFiles.Study(study, _) ->
@@ -227,9 +225,7 @@ let private metadataRows (arcFile: ArcFiles) =
             textRow "Name" template.Name
             yield! optionalTextRow "Description" (asOptionalText (Some template.Description)) |> Option.toList
             yield! optionalTextRow "Version" (asOptionalText (Some template.Version)) |> Option.toList
-            yield!
-                optionalTextRow "Last Updated" (Some(template.LastUpdated.ToString("yyyy-MM-dd HH:mm")))
-                |> Option.toList
+            yield! optionalTextRow "Last Updated" (Some(template.LastUpdated.ToString("yyyy-MM-dd HH:mm"))) |> Option.toList
             yield! Some(textRow "Organisation" (template.Organisation.ToString())) |> Option.toList
             yield!
                 summariseStrings (template.Tags |> Seq.map _.NameText)
@@ -245,9 +241,7 @@ let private currentPreviewRowsForNode (selectedNode: ArcExplorerNode) (arcFile: 
     match selectedNode.kind with
     | ArcExplorerNodeKind.Table ->
         match selectedNode.previewTarget with
-        | ArcExplorerNodePreviewTarget.Table tableIndex
-            when tableIndex >= 0 && tableIndex < arcFile.Tables().Count
-            ->
+        | ArcExplorerNodePreviewTarget.Table tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
             arcFile.Tables().[tableIndex] |> tableSummaryRows |> Some
         | _ -> None
     | ArcExplorerNodeKind.DataMap -> WidgetArcFile.tryGetDataMap arcFile |> Option.map dataMapSummaryRows
@@ -340,6 +334,172 @@ let private searchableArcExplorerItems (nodes: ArcExplorerNode list) (items: Fil
                 node.name, Some(String.concat " | " subtitleParts), item))
     |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
     |> List.toArray
+
+let private filePickerServices: FilePickerWidgetServices = {
+    pickPaths =
+        fun () ->
+            promise {
+                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
+                return result |> Result.mapError (fun error -> error.Message)
+            }
+}
+
+let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
+    pickPaths =
+        fun () ->
+            promise {
+                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
+                return result |> Result.mapError (fun error -> error.Message)
+            }
+    loadTextFile =
+        fun path ->
+            promise {
+                let! result = Api.ipcArcVaultApi.openFile (unbox null) path
+
+                return
+                    match result with
+                    | Error error -> Error error.Message
+                    | Ok(PageState.Text content) -> Ok content
+                    | Ok _ -> Error "Selected file could not be loaded as plain text. Only csv/tsv/txt are supported."
+            }
+}
+
+let private templateServices: TemplateWidgetServices = {
+    loadTemplates =
+        fun () ->
+            async {
+                try
+                    let! templatesJson = Api.templateApi.getTemplates()
+
+                    let templates =
+                        templatesJson
+                        |> ARCtrl.Json.Templates.fromJsonString
+                        |> Array.ofSeq
+
+                    return Ok templates
+                with error ->
+                    return Error error.Message
+            }
+}
+
+let private createArcExplorerServices
+    (setPageState: PageState option -> unit)
+    : ArcExplorerServices =
+    let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) = promise {
+        let request: GitLfsRequest = {
+            RequestId = Guid.NewGuid().ToString()
+            RepoPath = repoPath
+            Command =
+                if markAsLfs then
+                    GitLfsCommand.Track
+                else
+                    GitLfsCommand.Untrack
+            FilePath = Some relativePath
+            TimeoutMs = Some 10000
+        }
+
+        let! result = Api.ipcArcVaultApi.runGitLfs (unbox null) request
+
+        return
+            match result with
+            | Ok _ -> Ok()
+            | Error exn -> Error exn.Message
+    }
+
+    let setStatusMessage (errorMsg: string option) =
+        match errorMsg with
+        | Some msg -> setPageState (Some(PageState.Error msg))
+        | None -> setPageState None
+
+    let openPreview (previewPath: string) = promise {
+        let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+
+        return
+            match result with
+            | Ok data ->
+                setPageState (Some data)
+                Ok()
+            | Error exn -> Error exn.Message
+    }
+
+    {
+        openPreview = openPreview
+        setStatusMessage = setStatusMessage
+        runToggleLfsMark = runToggleLfsMark
+    }
+
+let BuildingBlockWidget
+    (arcFileState: ArcFiles option)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    : WidgetType * WidgetDefinition =
+    WidgetType.BuildingBlock,
+    {|
+        prefix = "ADD_BUILDINGBLOCK"
+        content =
+            Swate.Components.BuildingBlockWidget.Main(
+                arcFileState,
+                activeTableIndex,
+                setArcFileState
+            )
+    |}
+
+let TemplateWidget
+    (arcFileState: ArcFiles option)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    (importType: TableJoinOptions)
+    (setImportType: TableJoinOptions -> unit)
+    : WidgetType * WidgetDefinition =
+    WidgetType.Template,
+    {|
+        prefix = "ADD_TEMPLATE"
+        content =
+            Swate.Components.TemplateWidget.Main(
+                arcFileState,
+                activeTableIndex,
+                setArcFileState,
+                importType,
+                setImportType,
+                templateServices
+            )
+    |}
+
+let FilePickerWidget
+    (arcFileState: ArcFiles option)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    : WidgetType * WidgetDefinition =
+    WidgetType.FilePicker,
+        {|
+            prefix = "FILEPICKER"
+            content =
+                Swate.Components.FilePickerWidget.Main(
+                    arcFileState,
+                    activeTableIndex,
+                    setArcFileState,
+                    filePickerServices
+                )
+        |}
+
+let DataAnnotatorWidget
+    (arcFileState: ArcFiles option)
+    (activeView: WidgetHostView)
+    (activeTableIndex: int option)
+    (setArcFileState: ArcFiles option -> unit)
+    : WidgetType * WidgetDefinition =
+    WidgetType.DataAnnotator,
+    {|
+        prefix = "DATAANNOTATOR"
+        content =
+            Swate.Components.DataAnnotatorWidget.Main(
+                arcFileState,
+                activeView,
+                activeTableIndex,
+                setArcFileState,
+                dataAnnotatorServices
+            )
+    |}
 
 [<ReactComponent>]
 let private ARCObjectSection(title: string, children: ReactElement list) =
@@ -450,13 +610,13 @@ let private ARCObjectDetailedMetadataContent
         prop.children [
             match arcFile with
             | ArcFiles.Study(study, assays) ->
-                Renderer.MetadataForms.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
+                Swate.Components.MetadataForms.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
             | ArcFiles.Assay assay ->
-                Renderer.MetadataForms.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
+                Swate.Components.MetadataForms.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
             | ArcFiles.Workflow workflow ->
-                Renderer.MetadataForms.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
+                Swate.Components.MetadataForms.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
             | ArcFiles.Run run ->
-                Renderer.MetadataForms.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
+                Swate.Components.MetadataForms.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
             | _ -> Html.none
         ]
     ]
@@ -523,126 +683,6 @@ let private ARCObjectDetailsContent
             ]
         ]
 
-let private filePickerServices: FilePickerWidgetServices = {
-    pickPaths =
-        fun () ->
-            promise {
-                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
-                return result |> Result.mapError (fun error -> error.Message)
-            }
-}
-
-let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
-    pickPaths =
-        fun () ->
-            promise {
-                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
-                return result |> Result.mapError (fun error -> error.Message)
-            }
-    loadTextFile =
-        fun path ->
-            promise {
-                let! result = Api.ipcArcVaultApi.openFile (unbox null) path
-
-                return
-                    match result with
-                    | Error error -> Error error.Message
-                    | Ok(PageState.Text content) -> Ok content
-                    | Ok _ -> Error "Selected file could not be loaded as plain text. Only csv/tsv/txt are supported."
-            }
-}
-
-let private templateServices: TemplateWidgetServices = {
-    loadTemplates =
-        fun () ->
-            async {
-                try
-                    let! templatesJson = Api.templateApi.getTemplates()
-
-                    let templates =
-                        templatesJson
-                        |> ARCtrl.Json.Templates.fromJsonString
-                        |> Array.ofSeq
-
-                    return Ok templates
-                with error ->
-                    return Error error.Message
-            }
-}
-
-let BuildingBlockWidget
-    (arcFileState: ArcFiles option)
-    (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
-    : WidgetType * WidgetDefinition =
-    WidgetType.BuildingBlock,
-    {|
-        prefix = "ADD_BUILDINGBLOCK"
-        content =
-            Swate.Components.BuildingBlockWidget.Main(
-                arcFileState,
-                activeTableIndex,
-                setArcFileState
-            )
-    |}
-
-let TemplateWidget
-    (arcFileState: ArcFiles option)
-    (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
-    (importType: TableJoinOptions)
-    (setImportType: TableJoinOptions -> unit)
-    : WidgetType * WidgetDefinition =
-    WidgetType.Template,
-    {|
-        prefix = "ADD_TEMPLATE"
-        content =
-            Swate.Components.TemplateWidget.Main(
-                arcFileState,
-                activeTableIndex,
-                setArcFileState,
-                importType,
-                setImportType,
-                templateServices
-            )
-    |}
-
-let FilePickerWidget
-    (arcFileState: ArcFiles option)
-    (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
-    : WidgetType * WidgetDefinition =
-    WidgetType.FilePicker,
-        {|
-            prefix = "FILEPICKER"
-            content =
-                Swate.Components.FilePickerWidget.Main(
-                    arcFileState,
-                    activeTableIndex,
-                    setArcFileState,
-                    filePickerServices
-                )
-        |}
-
-let DataAnnotatorWidget
-    (arcFileState: ArcFiles option)
-    (activeView: WidgetHostView)
-    (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
-    : WidgetType * WidgetDefinition =
-    WidgetType.DataAnnotator,
-    {|
-        prefix = "DATAANNOTATOR"
-        content =
-            Swate.Components.DataAnnotatorWidget.Main(
-                arcFileState,
-                activeView,
-                activeTableIndex,
-                setArcFileState,
-                dataAnnotatorServices
-            )
-    |}
-
 [<ReactComponent>]
 let private ARCObjectWidgetContent
     (arcFileState: ArcFiles option)
@@ -671,24 +711,26 @@ let private ARCObjectWidgetContent
     let filteredExplorerTree =
         filterArcExplorerTreeByKinds visibleKinds workspaceCtx.state.ArcExplorerTree
 
+    let arcExplorerServices = createArcExplorerServices setPageState
+
     let treePane =
-        Renderer.Components.ArcExplorer.createArcExplorer
+        Swate.Components.ArcExplorer.createArcExplorer
             rootRepoPath
             filteredExplorerTree
             workspaceCtx.state.SelectedExplorerItemId
             workspaceCtx.state.SelectedTreeItemPath
             setSelectedExplorerItemId
             setSelectedTreeItemPath
-            setPageState
+            arcExplorerServices
 
     let explorerItems =
-        Renderer.Components.ArcExplorer.toFileItems filteredExplorerTree
+        Swate.Components.ArcExplorer.toFileItems filteredExplorerTree
 
     let searchItems =
         searchableArcExplorerItems filteredExplorerTree explorerItems
 
     let selectedItemId =
-        Renderer.Components.ArcExplorer.getSelectedItemId
+        Swate.Components.ArcExplorer.getSelectedItemId
             filteredExplorerTree
             workspaceCtx.state.SelectedExplorerItemId
             workspaceCtx.state.SelectedTreeItemPath
@@ -696,13 +738,13 @@ let private ARCObjectWidgetContent
     let selectedNode =
         selectedItemId
         |> Option.bind (fun nodeId ->
-            Renderer.Components.ArcExplorer.tryFindNodeById nodeId filteredExplorerTree)
+            Swate.Components.ArcExplorer.tryFindNodeById nodeId filteredExplorerTree)
 
     let handleExplorerSelection =
-        Renderer.Components.ArcExplorer.createOpenPreviewHandler
+        Swate.Components.ArcExplorer.createOpenPreviewHandler
             setSelectedExplorerItemId
             setSelectedTreeItemPath
-            setPageState
+            arcExplorerServices
 
     let selectedTitle =
         selectedNode
@@ -757,26 +799,6 @@ let private ARCObjectWidgetContent
             detailsPane = detailsPane
         )
 
-let ARCObjectWidget
-    (arcFileState: ArcFiles option)
-    (pageState: PageState option)
-    (setArcFileState: ArcFiles option -> unit)
-    (setSelectedExplorerItemId: string option -> unit)
-    (setSelectedTreeItemPath: string option -> unit)
-    (setPageState: PageState option -> unit)
-    : WidgetType * WidgetDefinition =
-    WidgetType.ARCObject,
-    {|
-        prefix = "ARC_OBJECT"
-        content =
-            ARCObjectWidgetContent
-                arcFileState
-                pageState
-                setArcFileState
-                setSelectedExplorerItemId
-                setSelectedTreeItemPath
-                setPageState
-    |}
 
 let createWidgets
     (arcFileState: ArcFiles option)
@@ -786,23 +808,14 @@ let createWidgets
     (setArcFileState: ArcFiles option -> unit)
     (importType: TableJoinOptions)
     (setImportType: TableJoinOptions -> unit)
-    (setSelectedExplorerItemId: string option -> unit)
-    (setSelectedTreeItemPath: string option -> unit)
-    (setPageState: PageState option -> unit)
     : Map<WidgetType, WidgetDefinition> =
     [
         BuildingBlockWidget arcFileState activeTableIndex setArcFileState
         TemplateWidget arcFileState activeTableIndex setArcFileState importType setImportType
         FilePickerWidget arcFileState activeTableIndex setArcFileState
         DataAnnotatorWidget arcFileState activeView activeTableIndex setArcFileState
-        ARCObjectWidget arcFileState pageState setArcFileState setSelectedExplorerItemId setSelectedTreeItemPath setPageState
     ]
     |> Map.ofList
-
-let private widgetRequiresTable =
-    function
-    | WidgetType.ARCObject -> false
-    | _ -> true
 
 [<ReactComponent>]
 let NavbarButtons(widgetTypes: WidgetType list, hasSelectedTable: bool) =
@@ -814,13 +827,12 @@ let NavbarButtons(widgetTypes: WidgetType list, hasSelectedTable: bool) =
         | WidgetType.Template -> "Add Template", Icons.Templates()
         | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
         | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
-        | WidgetType.ARCObject -> "ARC Object", Icons.Docs()
         | WidgetType.Playground -> "Playground", Icons.Templates()
 
     let controlButton (widgetType: WidgetType) =
         let isActive = context.isActive widgetType
         let label, icon = widgetInfo widgetType
-        let isDisabled = widgetRequiresTable widgetType && not hasSelectedTable
+        let isDisabled = not hasSelectedTable
         let tooltip =
             if isDisabled then
                 "Select a table to open widgets"
@@ -855,7 +867,6 @@ let widgetTypes = [
     WidgetType.Template
     WidgetType.FilePicker
     WidgetType.DataAnnotator
-    WidgetType.ARCObject
 ]
 
 [<ReactComponent>]

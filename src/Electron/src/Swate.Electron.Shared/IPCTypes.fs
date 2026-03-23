@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Electron
 
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Components.NoteTypes
 
 open ARCtrl.ARCtrlHelper

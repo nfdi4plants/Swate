@@ -2,6 +2,7 @@ module Main.ArcExplorerTreeCreator
 
 open System
 open ARCtrl
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
 type private NoteTarget =

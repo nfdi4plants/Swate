@@ -1,15 +1,11 @@
-module Renderer.MetadataForms
+module Swate.Components.MetadataForms
 
 open System
 open Feliz
 open Browser.Types
 open ARCtrl
 open Swate.Components
-open Swate.Components.Shared
-open Fable.Core.JsInterop
-open Fetch
-open Components.Forms
-open Components.JsBindings
+open Swate.Components.Metadata
 
 
 /// Generic form helpers for Electron metadata editing
@@ -118,7 +114,7 @@ type FormHelpers =
                                     prop.placeholder placeholder.Value
                             ]
                             if rmv.IsSome then
-                                Components.Forms.Helper.deleteButton rmv.Value
+                                Helper.deleteButton rmv.Value
                         ]
                     ]
                 if validationError.IsSome then

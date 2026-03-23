@@ -3,6 +3,7 @@ module Renderer.Context.WorkspaceStateCtx
 open Feliz
 open ARCtrl
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
 type WorkspaceState = {

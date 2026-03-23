@@ -7,7 +7,7 @@ open Feliz
 type ARCObjectExplorer =
 
     [<ReactComponent>]
-    static member Main(?content: ReactElement) =
+    static member Main(name: string, ?content: ReactElement) =
         let content =
             defaultArg
                 content
@@ -28,7 +28,7 @@ type ARCObjectExplorer =
             prop.children [
                 Html.h3 [
                     prop.className "swt:text-sm swt:font-semibold"
-                    prop.text "ARC Object Explorer"
+                    prop.text name
                 ]
                 content
             ]

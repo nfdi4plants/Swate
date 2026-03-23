@@ -1,6 +1,6 @@
 namespace Swate.Components
 
-open Swate.Components.Shared
+
 open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
@@ -446,20 +446,20 @@ module FileExplorerExample =
             FileTree.createFile "resume.pdf" None icons.pdf
             {
                 FileTree.createFolder "My Files" None icons.folder with
-                    IsExpanded = true
+                    IsExpanded = false
                     Children =
                         Some [
                             FileTree.createFile "Project-final.psd" None icons.psd
                             {
                                 FileTree.createFolder "Subfolder" None icons.folder with
-                                    IsExpanded = true
+                                    IsExpanded = false
                                     Children =
                                         Some [
                                             FileTree.createFile "nested-file-1.txt" None icons.txt
                                             FileTree.createFile "nested-file-2.md" None icons.markdown
                                             {
                                                 FileTree.createFolder "NestedFolder" None icons.folder with
-                                                    IsExpanded = true
+                                                    IsExpanded = false
                                                     Children =
                                                         Some [
                                                             FileTree.createFile "Project-2-final.psd" None icons.psd

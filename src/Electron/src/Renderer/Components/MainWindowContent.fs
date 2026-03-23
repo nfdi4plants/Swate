@@ -6,6 +6,7 @@ open Fable.Core
 open Feliz
 open MainElement
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Components.NoteTypes
 open Swate.Components.Landing
 open Swate.Components.Notes.Editor
@@ -314,7 +315,7 @@ let Content
     let selectedExplorerNode =
         workspaceCtx.state.SelectedExplorerItemId
         |> Option.bind (fun nodeId ->
-            Renderer.Components.ArcExplorer.tryFindNodeById nodeId workspaceCtx.state.ArcExplorerTree)
+            Swate.Components.ArcExplorer.tryFindNodeById nodeId workspaceCtx.state.ArcExplorerTree)
 
     React.useEffect (
         (fun () ->
@@ -389,9 +390,6 @@ let Content
                                     activeView
                                     activeTableIndex
                                     setArcFileState
-                                    setSelectedExplorerItemId
-                                    setSelectedTreeItemPath
-                                    setPreviewData
                                     (MainWindowContentHelper.onSaveClick arcFileState setPreviewData)
                             ]
                         ]
