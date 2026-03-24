@@ -297,9 +297,10 @@ type Widget =
     [<ReactComponent>]
     static member DataAnnotator(model: Model, dispatch, rmv) =
         let inputRef = React.useInputRef ()
-        let selectedFilesRef = React.useRef(Map.empty<string, Browser.Types.File>)
+        let selectedFilesRef = React.useRef (Map.empty<string, Browser.Types.File>)
+
         let pendingPickResolve =
-            React.useRef(None: (Result<string[], string> -> unit) option)
+            React.useRef (None: (Result<string[], string> -> unit) option)
 
         let activeView =
             match model.SpreadsheetModel.ActiveView with
@@ -309,43 +310,35 @@ type Widget =
 
         let setArcFileState nextArcFileState =
             match nextArcFileState with
-            | Some nextArcFile ->
-                nextArcFile
-                |> Spreadsheet.UpdateArcFile
-                |> SpreadsheetMsg
-                |> dispatch
-            | None ->
-                ()
+            | Some nextArcFile -> nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+            | None -> ()
 
         let services =
             React.useMemo (
-                (fun _ ->
-                    {
-                        pickPaths =
-                            fun () ->
-                                Promise.create (fun resolve _ ->
-                                    pendingPickResolve.current <- Some resolve
+                (fun _ -> {
+                    pickPaths =
+                        fun () ->
+                            Promise.create (fun resolve _ ->
+                                pendingPickResolve.current <- Some resolve
 
-                                    match inputRef.current with
-                                    | Some input ->
-                                        input.value <- ""
-                                        input.click ()
-                                    | None ->
-                                        pendingPickResolve.current <- None
-                                        resolve (Result.Error "Browser file input is unavailable.")
-                                )
-                        loadTextFile =
-                            fun path ->
-                                promise {
-                                    match selectedFilesRef.current |> Map.tryFind path with
-                                    | Some file ->
-                                        let! content = file.text ()
-                                        return Result.Ok content
-                                    | None ->
-                                        return Result.Error "Selected file is no longer available. Choose the file again."
-                                }
-                    }
-                ),
+                                match inputRef.current with
+                                | Some input ->
+                                    input.value <- ""
+                                    input.click ()
+                                | None ->
+                                    pendingPickResolve.current <- None
+                                    resolve (Result.Error "Browser file input is unavailable.")
+                            )
+                    loadTextFile =
+                        fun path -> promise {
+                            match selectedFilesRef.current |> Map.tryFind path with
+                            | Some file ->
+                                let! content = file.text ()
+                                return Result.Ok content
+                            | None ->
+                                return Result.Error "Selected file is no longer available. Choose the file again."
+                        }
+                }),
                 [||]
             )
 
@@ -367,13 +360,14 @@ type Widget =
                             pendingPickResolve.current <- None
                         )
                     ]
-                    Swate.Components.DataAnnotatorWidget.Main(
-                        model.SpreadsheetModel.ArcFile,
-                        activeView,
-                        model.SpreadsheetModel.ActiveView.TryTableIndex,
-                        setArcFileState,
-                        services
-                    )
+                    if model.SpreadsheetModel.ArcFile.IsSome then
+                        Swate.Components.DataAnnotatorWidget.Main(
+                            model.SpreadsheetModel.ArcFile.Value,
+                            activeView,
+                            model.SpreadsheetModel.ActiveView.TryTableIndex,
+                            (Some >> setArcFileState),
+                            services
+                        )
                 ]
             ]
 

@@ -19,8 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ARCtrl.Core" />
-    <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="ARCtrl.Javascript" />
     <PackageReference Include="Fable.Remoting.Client" />
     <PackageReference Include="Fable.Fetch" />
     <PackageReference Include="Fable.React.Types" />

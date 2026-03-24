@@ -265,39 +265,35 @@ module History =
             if host = Some Swatehost.ARCitect then
                 match spreadsheetState.ArcFile with // model is not yet updated at this position.
                 | Some(Assay assay) ->
-                    ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Assay, ArcAssay.toJsonString 0 assay, None)
+                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Assay, ArcAssay.toJsonString 0 assay, None)
                     |> Promise.start
                 | Some(Study(study, _)) ->
-                    ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study, None)
+                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Study, ArcStudy.toJsonString 0 study, None)
                     |> Promise.start
                 | Some(Investigation inv) ->
                     ARCitect.api.Save(
-                        ARCitect.Interop.InteropTypes.ARCFile.Investigation,
+                        ArcFilesDiscriminateStringEnum.Investigation,
                         ArcInvestigation.toJsonString 0 inv,
                         None
                     )
                     |> Promise.start
                 | Some(Run run) ->
-                    ARCitect.api.Save(ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run, None)
+                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Run, ArcRun.toJsonString 0 run, None)
                     |> Promise.start
                 | Some(Workflow workflow) ->
                     ARCitect.api.Save(
-                        ARCitect.Interop.InteropTypes.ARCFile.Workflow,
+                        ArcFilesDiscriminateStringEnum.Workflow,
                         ArcWorkflow.toJsonString 0 workflow,
                         None
                     )
                     |> Promise.start
                 | Some(Template template) ->
-                    ARCitect.api.Save(
-                        ARCitect.Interop.InteropTypes.ARCFile.Template,
-                        Template.toJsonString 0 template,
-                        None
-                    )
+                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Template, Template.toJsonString 0 template, None)
                     |> Promise.start
                 | Some(DataMap(parent, datamap)) ->
                     if parent.IsSome then
                         ARCitect.api.Save(
-                            ARCitect.Interop.InteropTypes.ARCFile.DataMap,
+                            ArcFilesDiscriminateStringEnum.DataMap,
                             DataMap.toJsonString 0 datamap,
                             parent
                         )
@@ -469,13 +465,13 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             let nextModel = { model with ProtocolState = nextState }
             nextModel, nextCmd
 
-         //| CytoscapeMsg msg ->
-         //    let nextState, nextModel0, nextCmd =
-         //        Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel
-         //    let nextModel =
-         //        {nextModel0 with
-         //            CytoscapeModel = nextState}
-         //    nextModel, nextCmd
+        //| CytoscapeMsg msg ->
+        //    let nextState, nextModel0, nextCmd =
+        //        Cytoscape.Update.update msg currentModel.CytoscapeModel currentModel
+        //    let nextModel =
+        //        {nextModel0 with
+        //            CytoscapeModel = nextState}
+        //    nextModel, nextCmd
 
         | DataAnnotatorMsg msg ->
             let nextState, nextModel0, nextCmd =

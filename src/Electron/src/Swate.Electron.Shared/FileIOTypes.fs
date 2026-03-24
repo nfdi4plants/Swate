@@ -3,21 +3,10 @@ module Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 open System.Collections.Generic
 
-type SaveArcFileRequest = {
-    FileType: ArcFilesDiscriminate
-    Json: string
-}
-
-type WriteFileRequest = {
-    RelativePath: string
-    Content: string
-}
-
-
 type FileEntry = {
     name: string
-    path: string
     isDirectory: bool
+    path: string
     isLfs: bool option
 }
 
@@ -38,16 +27,16 @@ module FileEntryExtensions =
             isLfs = defaultArg isLfs None
         }
 
-type FileItemDTO = {
+type FileTreeNode = {
     name: string
     isDirectory: bool
     path: string
     isLfs: bool option
-    children: Dictionary<string, FileItemDTO>
+    children: Dictionary<string, FileTreeNode>
 } with
 
     static member create
-        (name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>, ?isLfs: bool option)
+        (name: string, isDirectory: bool, path: string, children: Dictionary<string, FileTreeNode>, ?isLfs: bool option)
         =
         {
             name = name
@@ -56,3 +45,11 @@ type FileItemDTO = {
             isLfs = defaultArg isLfs None
             children = children
         }
+
+open ARCtrl.Contract
+
+type FileContentDTO = {|
+    fileType: DTOType
+    content: string
+    path: string
+|}

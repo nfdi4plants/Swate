@@ -2,23 +2,13 @@ module Model.ARCitect
 
 open ARCtrl
 open Fable.Core
+open Swate.Components
 
 module Interop =
 
     [<RequireQualifiedAccess>]
     module InteropTypes =
 
-        /// StringEnum to make it a simple string in js world
-        [<RequireQualifiedAccessAttribute>]
-        [<StringEnum>]
-        type ARCFile =
-            | [<CompiledName("investigation")>] Investigation
-            | [<CompiledName("study")>] Study
-            | [<CompiledName("assay")>] Assay
-            | [<CompiledName("run")>] Run
-            | [<CompiledName("workflow")>] Workflow
-            | [<CompiledName("datamap")>] DataMap
-            | [<CompiledName("template")>] Template
 
         type ARCitectFile = {|
             mimetype: string
@@ -28,8 +18,8 @@ module Interop =
         |}
 
     type IARCitectOutAPI = {
-        Init: unit -> JS.Promise<(InteropTypes.ARCFile * string * DatamapParentInfo option) option>
-        Save: InteropTypes.ARCFile * string * DatamapParentInfo option -> JS.Promise<unit>
+        Init: unit -> JS.Promise<(ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option) option>
+        Save: ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option -> JS.Promise<unit>
         /// selectDictionaries:bool -> JS.Promise<wasSuccessful: bool>
         RequestPaths: bool -> JS.Promise<bool>
         /// () -> JS.Promise<wasSuccessful: bool>
@@ -44,7 +34,7 @@ module Interop =
         ResponsePaths: string[] -> JS.Promise<bool>
         ResponseFile: InteropTypes.ARCitectFile -> JS.Promise<bool>
         Refresh: unit -> JS.Promise<bool>
-        SetARCFile: InteropTypes.ARCFile * string * DatamapParentInfo option -> JS.Promise<bool>
+        SetARCFile: ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option -> JS.Promise<bool>
     }
 
 let api =
@@ -54,7 +44,7 @@ let api =
 open Elmish
 
 type Msg =
-    | Init of ApiCall<unit, (Interop.InteropTypes.ARCFile * string * DatamapParentInfo option) option>
+    | Init of ApiCall<unit, (ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option) option>
     | Save of ArcFiles
     /// ApiCall<selectDirectories: bool, wasSuccessful: bool>
     | RequestPaths of ApiCall<bool, bool>

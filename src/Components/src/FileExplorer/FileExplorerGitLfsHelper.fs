@@ -7,23 +7,21 @@ type FileExplorerGitLfsHelper =
 
     static member private NormalizePath(path: string) = path.Replace("\\", "/").TrimEnd('/')
 
-    static member private TryToRepoRelativePath(rootRepoPath: string option, filePath: string) =
-        match rootRepoPath with
-        | None -> None
-        | Some repoPath ->
-            let normalizedRepoPath = FileExplorerGitLfsHelper.NormalizePath repoPath
-            let normalizedFilePath = FileExplorerGitLfsHelper.NormalizePath filePath
-            let prefix = normalizedRepoPath + "/"
-            if normalizedFilePath = normalizedRepoPath then
-                Some(normalizedRepoPath, "")
-            elif normalizedFilePath.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase) then
-                Some(normalizedRepoPath, normalizedFilePath.Substring(prefix.Length))
-            else
-                None
+    static member private TryToRepoRelativePath(rootRepoPath: string, filePath: string) =
+        let normalizedRepoPath = FileExplorerGitLfsHelper.NormalizePath rootRepoPath
+        let normalizedFilePath = FileExplorerGitLfsHelper.NormalizePath filePath
+        let prefix = normalizedRepoPath + "/"
+
+        if normalizedFilePath = normalizedRepoPath then
+            Some(normalizedRepoPath, "")
+        elif normalizedFilePath.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase) then
+            Some(normalizedRepoPath, normalizedFilePath.Substring(prefix.Length))
+        else
+            None
 
     static member ToggleLfsMark
         (
-            rootRepoPath: string option,
+            rootRepoPath: string,
             setError: string option -> unit,
             runToggle: string -> string -> bool -> JS.Promise<Result<unit, string>>
         ) : (FileItem -> bool -> unit) =
@@ -33,8 +31,7 @@ type FileExplorerGitLfsHelper =
                 | None -> ()
                 | Some itemPath ->
                     match FileExplorerGitLfsHelper.TryToRepoRelativePath(rootRepoPath, itemPath) with
-                    | None ->
-                        setError (Some $"Could not resolve repository-relative path for '{item.Name}'.")
+                    | None -> setError (Some $"Could not resolve repository-relative path for '{item.Name}'.")
                     | Some(_, relativePath) when System.String.IsNullOrWhiteSpace relativePath ->
                         setError (Some "Cannot mark ARC root as a Git LFS file.")
                     | Some(repoPath, relativePath) ->

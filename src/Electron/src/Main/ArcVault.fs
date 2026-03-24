@@ -180,7 +180,23 @@ module ArcVaultExtensions =
 
                     this.fileWatcherReloadArcTimeout <- Some timeoutId
 
-        member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
+        /// This function is used to propagate updates to the in-memory ARC instance to the file system
+        member this.SetArc(arc: ARC) = promise {
+            this.arc <- Some arc
+            this.window.title <- arc.Identifier
+            this.isBusyWriting <- true
+            let! result = this.arc.Value.TryUpdateAsync(this.path.Value)
+            this.isBusyWriting <- false
+
+            return
+                match result with
+                | Ok _ -> Ok()
+                | Error e ->
+                    let e2 = e |> String.concat "\n\n" |> exn
+                    Error e2
+        }
+
+        member private this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
 
             let sendMsg =
@@ -256,48 +272,6 @@ module ArcVaultExtensions =
 
                 do! this.Startup()
                 sendMsg.pathChange (Some path)
-        }
-
-        member this.OpenAssay(identifier: string) =
-            let assay = this.arc.Value.TryGetAssay(identifier)
-
-            match assay with
-            | Some assay -> Some assay
-            | None -> None
-
-        member this.OpenStudy(identifier: string) =
-            let study = this.arc.Value.TryGetStudy(identifier)
-
-            match study with
-            | Some study -> Some study
-            | None -> None
-
-        member this.OpenWorkflow(identifier: string) =
-            let workflow = this.arc.Value.TryGetWorkflow(identifier)
-
-            match workflow with
-            | Some workflow -> Some workflow
-            | None -> None
-
-        member this.OpenRun(identifier: string) =
-            let run = this.arc.Value.TryGetRun(identifier)
-
-            match run with
-            | Some run -> Some run
-            | None -> None
-
-        member this.GetContracts() =
-            match this.arc with
-            | Some arc -> arc.GetUpdateContracts()
-            | None -> failwith "No arc available"
-
-        member this.UpdateAsync() = promise {
-            match this.arc, this.path with
-            | Some arc, Some arcPath ->
-                do! arc.UpdateAsync(arcPath)
-                do! arc.WriteAsync(arcPath)
-            | Some _, None -> failwith "No path available"
-            | None, _ -> failwith "No arc available"
         }
 
         member this.SyncArc newArc = this.arc <- newArc
@@ -470,13 +444,6 @@ type ArcVaults() =
 
         return ()
     }
-
-    member this.SetFileTree(windowId: int, fileTree: Dictionary<string, FileEntry>) =
-        let potVault = this.TryGetVault(windowId)
-
-        match potVault with
-        | Some(vault: ArcVault) -> vault.SetFileTree(fileTree)
-        | None -> failwith $"Vault with window-id '{windowId}' not found."
 
     member this.TryGetVault(windowId: int) =
         match this.Vaults.TryGetValue windowId with

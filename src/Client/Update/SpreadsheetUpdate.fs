@@ -28,7 +28,7 @@ module Spreadsheet =
             | ImportJsonRaw importData ->
                 let cmd =
                     Cmd.OfFunc.either
-                        (UpdateUtil.JsonImportHelper.parseFromJsonString)
+                        (Json.Import.parseFromJsonString)
                         (importData.jsonString, importData.jsonType, importData.filetype, importData.fileName)
                         (UpdateArcFile >> SpreadsheetMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -253,7 +253,7 @@ module Spreadsheet =
 
                 state, model, cmd
             | ExportJson(arcfile, jef) ->
-                let jsonExport = UpdateUtil.JsonExportHelper.parseToJsonString (arcfile, jef)
+                let jsonExport = Json.Export.parseToJsonString (arcfile, jef)
                 UpdateUtil.downloadFromString (jsonExport)
                 state, model, Cmd.none
             | ExportXlsx arcfile ->
