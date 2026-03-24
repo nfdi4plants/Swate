@@ -22,7 +22,8 @@ let private tryGetRepoRelativePath (repoRoot: string) (absolutePath: string) =
 
 let private isNoteMarkdownPath (relativePath: string) =
     let normalizedPath = normalizePath relativePath
-    normalizedPath.StartsWith("Notes/", StringComparison.OrdinalIgnoreCase)
+    let lowered = normalizedPath.ToLowerInvariant()
+    lowered.StartsWith("notes/") && lowered.EndsWith(".md")
     && normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
 
 let private tryParseDateText (value: string) =

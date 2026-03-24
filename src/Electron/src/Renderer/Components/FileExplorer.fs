@@ -157,7 +157,7 @@ let createFileTree
                 initialItems = [ fileItem.Value ],
                 onItemClick = openPreview,
                 onContextMenu = contextMenuItems,
-                ?selectedItemId = selectedTreeItemPath
+                ?selectedItemId = Some selectedTreeItemPath
             )
         )
     else

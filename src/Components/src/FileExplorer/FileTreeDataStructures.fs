@@ -318,7 +318,7 @@ module FileExplorerLogic =
         | EnsurePathVisible of itemId: string * includeSelectedItem: bool
         | ShowContextMenu of float * float * ContextMenuItem list
         | HideContextMenu
-        | UpdateItems of FileItem list * selectedItemId: string option * includeSelectedItem: bool
+        | UpdateItems of FileItem list * selectedItemId: string option option * includeSelectedItem: bool
         | AddChild of parentId: string * child: FileItem
         | RemoveItem of string
         | RenameItem of string * string
@@ -402,9 +402,14 @@ module FileExplorerLogic =
                 model.ExpandedIds
                 |> Set.filter (fun id -> validIds.Contains id)
 
+            let persistedSelectedId =
+                model.SelectedId
+                |> Option.filter validIds.Contains
+
             let nextSelectedId =
                 selectedItemId
-                |> Option.orElse model.SelectedId
+                |> Option.map (Option.filter validIds.Contains)
+                |> Option.defaultValue persistedSelectedId
 
             let breadcrumbPath =
                 match nextSelectedId with

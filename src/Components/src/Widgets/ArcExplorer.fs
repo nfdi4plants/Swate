@@ -188,7 +188,7 @@ module ArcExplorer =
                     initialItems = items,
                     onItemClick = openPreview,
                     onContextMenu = contextMenuItems,
-                    ?selectedItemId = selectedItemId,
+                    ?selectedItemId = Some selectedItemId,
                     directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
                     useDirectoryChevronToggle = true
                 )

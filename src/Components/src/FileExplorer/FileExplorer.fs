@@ -36,7 +36,7 @@ type FileExplorer =
             ?initialItems: FileItem list,
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
-            ?selectedItemId: string,
+            ?selectedItemId: string option,
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?useDirectoryChevronToggle: bool
         ) =
@@ -60,22 +60,7 @@ type FileExplorer =
                         includeSelectedDirectoryInVisiblePath
                     )
                 )),
-            [| box initialItems; box includeSelectedDirectoryInVisiblePath |]
-        )
-
-        React.useEffect (
-            (fun () ->
-                match selectedItemId with
-                | Some itemId ->
-                    dispatch (
-                        FileExplorerLogic.EnsurePathVisible(itemId, includeSelectedDirectoryInVisiblePath)
-                    )
-
-                    if model.SelectedId <> Some itemId then
-                        dispatch (FileExplorerLogic.SelectItem itemId)
-                | None -> ()
-            ),
-            [| box selectedItemId; box includeSelectedDirectoryInVisiblePath |]
+            [| box initialItems; box selectedItemId; box includeSelectedDirectoryInVisiblePath |]
         )
 
         let handleItemClick item =

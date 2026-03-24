@@ -142,7 +142,7 @@ let private StoryExample() =
     let treePane =
         Swate.Components.FileExplorer.FileExplorer(
             initialItems = filteredItems,
-            ?selectedItemId = visibleSelectedId,
+            ?selectedItemId = Some visibleSelectedId,
             onItemClick = (fun item -> setSelectedId item.Id),
             useDirectoryChevronToggle = true
         )
