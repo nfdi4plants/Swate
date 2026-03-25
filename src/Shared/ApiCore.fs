@@ -1,7 +1,9 @@
 namespace Swate.Components.Shared
 
-open System
+
 open Database
+open Swate.Components.Shared.DTOs
+
 
 [<AutoOpen>]
 module Regex =
@@ -12,22 +14,6 @@ module Regex =
     let (|Regex|_|) pattern input =
         let m = Regex.Match(input, pattern)
         if m.Success then Some(m) else None
-
-module Route =
-
-    let builder typeName methodName =
-        let prefix =
-            // Why the #if...#else...#endif?
-            // -> We want to keep fable-remoting's flexible for development and production.
-            //      When we publish the components, we want to use the production URL.
-            //      Both for npm and nuget packages.
-#if SWATE_ENVIRONMENT || !FABLE_COMPILER
-            ""
-#else
-            URLs.PRODUCTION_URL
-#endif
-
-        sprintf "%s/api/%s/%s" prefix typeName methodName
 
 module SorensenDice =
 
@@ -51,33 +37,21 @@ module SorensenDice =
             calculateDistance resultSet searchSet
         )
 
-open Swate.Components.Shared.DTOs
+module Route =
 
-type IOntologyAPIv3 = {
-    // Development
-    getTestNumber: unit -> Async<int>
-    searchTerm: TermQuery -> Async<Term[]>
-    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
-    getTermById: string -> Async<Term option>
-    searchChildTerms: ParentTermQuery -> Async<ParentTermQueryResults>
-    searchTermAdvanced: AdvancedSearchQuery -> Async<Term[]>
-}
+    let builder typeName methodName =
+        let prefix =
+            // Why the #if...#else...#endif?
+            // -> We want to keep fable-remoting's flexible for development and production.
+            //      When we publish the components, we want to use the production URL.
+            //      Both for npm and nuget packages.
+#if SWATE_ENVIRONMENT || !FABLE_COMPILER
+            ""
+#else
+            URLs.PRODUCTION_URL
+#endif
 
-/// Development api
-type ITestAPI = {
-    test: unit -> Async<string * string>
-    postTest: string -> Async<string * string>
-}
-
-type IServiceAPIv1 = { getAppVersion: unit -> Async<string> }
-
-
-type ITemplateAPIv1 = {
-    // must return template as string, fable remoting cannot do conversion automatically
-    getTemplates: unit -> Async<string>
-    getTemplateById: string -> Async<string>
-}
-
+        sprintf "%s/api/%s/%s" prefix typeName methodName
 
 /// This module is obsolete, use ARCtrl instead. I only did not add the Obsolete attribute to the module to avoid annoying warnings everywhere.
 [<RequireQualifiedAccess>]
@@ -222,6 +196,7 @@ module SwateObsolete =
         SearchResultTerm: Term option
     }
 
+
 /// <summary>Deprecated</summary>
 type IOntologyAPIv1 = {
     // Development
@@ -293,56 +268,28 @@ type IOntologyAPIv2 = {
     getTreeByAccession: string -> Async<TreeTypes.Tree>
 }
 
-[<RequireQualifiedAccess>]
-type ArcExplorerNodeKind =
-    | Arc
-    | Group
-    | Study
-    | Assay
-    | Workflow
-    | Run
-    | Table
-    | DataMap
-    | Note
-    | Sample
 
-[<RequireQualifiedAccess>]
-type ArcExplorerNodePreviewTarget =
-    | Default
-    | Table of int
+type IOntologyAPIv3 = {
+    // Development
+    getTestNumber: unit -> Async<int>
+    searchTerm: TermQuery -> Async<Term[]>
+    searchTerms: TermQuery[] -> Async<TermQueryResults[]>
+    getTermById: string -> Async<Term option>
+    searchChildTerms: ParentTermQuery -> Async<ParentTermQueryResults>
+    searchTermAdvanced: AdvancedSearchQuery -> Async<Term[]>
+}
 
-type ArcExplorerNode = {
-    id: string
-    name: string
-    kind: ArcExplorerNodeKind
-    path: string option
-    previewTarget: ArcExplorerNodePreviewTarget
-    isSelectable: bool
-    isReference: bool
-    isLfs: bool option
-    children: ArcExplorerNode list
-} with
+/// Development api
+type ITestAPI = {
+    test: unit -> Async<string * string>
+    postTest: string -> Async<string * string>
+}
 
-    static member create
-        (
-            id: string,
-            name: string,
-            kind: ArcExplorerNodeKind,
-            ?path: string option,
-            ?previewTarget: ArcExplorerNodePreviewTarget,
-            ?isSelectable: bool,
-            ?isReference: bool,
-            ?isLfs: bool option,
-            ?children: ArcExplorerNode list
-        ) =
-        {
-            id = id
-            name = name
-            kind = kind
-            path = defaultArg path None
-            previewTarget = defaultArg previewTarget ArcExplorerNodePreviewTarget.Default
-            isSelectable = defaultArg isSelectable true
-            isReference = defaultArg isReference false
-            isLfs = defaultArg isLfs None
-            children = defaultArg children []
-        }
+type IServiceAPIv1 = { getAppVersion: unit -> Async<string> }
+
+
+type ITemplateAPIv1 = {
+    // must return template as string, fable remoting cannot do conversion automatically
+    getTemplates: unit -> Async<string>
+    getTemplateById: string -> Async<string>
+}

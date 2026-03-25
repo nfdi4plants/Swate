@@ -4,6 +4,31 @@ open Fable.Core
 open Feliz
 open Swate.Components.FileExplorerTypes
 
+
+type ARCObjectWidgetHelper =
+
+    static member TryFindItemAndParent(itemId: string, items: FileItem list) =
+        let rec loop (parent: FileItem option) (items: FileItem list) =
+            items
+            |> List.tryPick (fun item ->
+                if item.Id = itemId then
+                    Some(item, parent)
+                else
+                    item.Children |> Option.bind (loop (Some item)))
+
+        loop None items
+
+    static member GetExplorerItems(selectedId: string option, items: FileItem list) =
+        selectedId
+        |> Option.bind (fun itemId -> ARCObjectWidgetHelper.TryFindItemAndParent(itemId, items))
+        |> Option.map (fun (selectedItem, _parentItem) ->
+            let children = selectedItem.Children |> Option.defaultValue []
+
+            if List.isEmpty children then
+                ("Current", selectedItem.Name, selectedItem.Id, [ selectedItem ])
+            else
+                ("Children", selectedItem.Name, selectedItem.Id, children))
+
 [<Erase; Mangle(false)>]
 type ARCObjectWidget =
 
@@ -35,6 +60,7 @@ type ARCObjectWidget =
             |> Option.map (fun option -> option.item))
         |> Set.ofSeq
 
+    [<ReactComponent>]
     static member private KindFilterTrigger(selectedKindIndices: Set<int>) =
         let selectedLabels =
             selectedKindIndices
@@ -177,8 +203,6 @@ type ARCObjectWidget =
             selectedSubtitle: string,
             selectedKindIndices: Set<int>,
             setSelectedKindIndices: Set<int> -> unit,
-            ?badgeLabel: string,
-            ?titleLabel: string,
             ?rightActions: ReactElement
         ) =
 
@@ -231,32 +255,10 @@ type ARCObjectWidget =
             ]
         ]
 
-    static member private TryFindItemAndParent(itemId: string, items: FileItem list) =
-        let rec loop (parent: FileItem option) (items: FileItem list) =
-            items
-            |> List.tryPick (fun item ->
-                if item.Id = itemId then
-                    Some(item, parent)
-                else
-                    item.Children |> Option.bind (loop (Some item)))
-
-        loop None items
-
-    static member private GetExplorerItems(selectedId: string option, items: FileItem list) =
-        selectedId
-        |> Option.bind (fun itemId -> ARCObjectWidget.TryFindItemAndParent(itemId, items))
-        |> Option.map (fun (selectedItem, _parentItem) ->
-            let children = selectedItem.Children |> Option.defaultValue []
-
-            if List.isEmpty children then
-                ("Current", selectedItem.Name, selectedItem.Id, [ selectedItem ])
-            else
-                ("Children", selectedItem.Name, selectedItem.Id, children))
-
     [<ReactComponent>]
     static member ExplorerContent(items: FileItem list, ?selectedItemId: string, ?onItemClick: FileItem -> unit) =
         let onItemClick = defaultArg onItemClick ignore
-        let explorerItems = ARCObjectWidget.GetExplorerItems(selectedItemId, items)
+        let explorerItems = ARCObjectWidgetHelper.GetExplorerItems(selectedItemId, items)
 
         let iconTile (subtitle: string) (item: FileItem) isCurrentTarget =
             Html.button [

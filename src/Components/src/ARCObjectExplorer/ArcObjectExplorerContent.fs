@@ -6,24 +6,6 @@ open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 open ARCtrl
 
-[<RequireQualifiedAccess>]
-type ArcObjectPreviewState =
-    | NoneLoaded
-    | Text of string
-    | Error of string
-
-type ArcObjectExplorerProps = {
-    rootRepoPath: string option
-    nodes: ArcExplorerNode list
-    selectedExplorerItemId: string option
-    selectedTreeItemPath: string option
-    arcFileState: ArcFiles option
-    previewState: ArcObjectPreviewState
-    setArcFileState: ArcFiles option -> unit
-    setSelectedExplorerItemId: string option -> unit
-    setSelectedTreeItemPath: string option -> unit
-    services: ArcExplorerServices
-}
 
 [<RequireQualifiedAccess>]
 type ArcObjectExplorerContent =
@@ -460,13 +442,13 @@ type ArcObjectExplorerContent =
             prop.children [
                 match arcFile with
                 | ArcFiles.Study(study, assays) ->
-                    Swate.Components.MetadataForms.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
+                    MetadataForms.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
                 | ArcFiles.Assay assay ->
-                    Swate.Components.MetadataForms.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
+                    MetadataForms.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
                 | ArcFiles.Workflow workflow ->
-                    Swate.Components.MetadataForms.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
+                    MetadataForms.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
                 | ArcFiles.Run run ->
-                    Swate.Components.MetadataForms.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
+                    MetadataForms.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
                 | _ -> Html.none
             ]
         ]
@@ -545,7 +527,7 @@ type ArcObjectExplorerContent =
             ArcObjectExplorerContent.filterArcExplorerTreeByKinds visibleKinds props.nodes
 
         let treePane =
-            Swate.Components.ArcExplorer.createArcExplorer
+            Swate.Components.ARCExplorer.CreateArcExplorer
                 props.rootRepoPath
                 filteredExplorerTree
                 props.selectedExplorerItemId
@@ -555,13 +537,13 @@ type ArcObjectExplorerContent =
                 props.services
 
         let explorerItems =
-            Swate.Components.ArcExplorer.toFileItems filteredExplorerTree
+            Swate.Components.ARCExplorer.toFileItems filteredExplorerTree
 
         let searchItems =
             ArcObjectExplorerContent.searchableArcExplorerItems filteredExplorerTree explorerItems
 
         let selectedItemId =
-            Swate.Components.ArcExplorer.getSelectedItemId
+            Swate.Components.ARCExplorer.getSelectedItemId
                 filteredExplorerTree
                 props.selectedExplorerItemId
                 props.selectedTreeItemPath
@@ -569,10 +551,10 @@ type ArcObjectExplorerContent =
         let selectedNode =
             selectedItemId
             |> Option.bind (fun nodeId ->
-                Swate.Components.ArcExplorer.tryFindNodeById nodeId filteredExplorerTree)
+                Swate.Components.ARCExplorer.tryFindNodeById nodeId filteredExplorerTree)
 
         let handleExplorerSelection =
-            Swate.Components.ArcExplorer.createOpenPreviewHandler
+            Swate.Components.ARCExplorer.createOpenPreviewHandler
                 props.setSelectedExplorerItemId
                 props.setSelectedTreeItemPath
                 props.services
@@ -593,7 +575,7 @@ type ArcObjectExplorerContent =
             Swate.Components.ARCObjectWidget.SearchAction(
                 searchItems,
                 (fun (name, _, _) -> name),
-                (fun (_, _, item) -> handleExplorerSelection item),
+                (fun (_, _, item) -> promise { handleExplorerSelection item |> Promise.start} |> Promise.start),
                 itemSubtitle = (fun (_, subtitle, _) -> subtitle)
             )
 
@@ -610,23 +592,15 @@ type ArcObjectExplorerContent =
             Swate.Components.ARCObjectWidget.ExplorerContent(
                 explorerItems,
                 ?selectedItemId = selectedItemId,
-                onItemClick = handleExplorerSelection
+                onItemClick = (fun item -> promise { handleExplorerSelection item |> Promise.start} |> Promise.start)
             )
 
         let detailsPane =
             ArcObjectExplorerContent.ARCObjectDetailsContent selectedNode props.previewState props.arcFileState props.setArcFileState
 
-        match treePane with
-        | Some treePane ->
-            Swate.Components.ARCObjectWidget.Main(
-                navbar = navbar,
-                treePane = treePane,
-                explorerPane = explorerPane,
-                detailsPane = detailsPane
-            )
-        | None ->
-            Swate.Components.ARCObjectWidget.Main(
-                navbar = navbar,
-                explorerPane = explorerPane,
-                detailsPane = detailsPane
-            )
+        Swate.Components.ARCObjectWidget.Main(
+            navbar = navbar,
+            treePane = treePane,
+            explorerPane = explorerPane,
+            detailsPane = detailsPane
+        )

@@ -3,7 +3,6 @@ namespace Modals
 open Feliz
 open Model
 open Messages
-open Swate.Components.Shared
 
 open Fable.Core.JsInterop
 open ARCtrl
@@ -271,15 +270,15 @@ type SelectiveImportModal =
     [<ReactComponent>]
     static member Main(import: ArcFiles, model, dispatch, rmv) =
 
-        let tables, disArcfile =
+        let tables, disArcfile  =
             match import with
-            | Assay a -> a.Tables, ArcFilesDiscriminate.Assay
-            | Study(s, _) -> s.Tables, ArcFilesDiscriminate.Study
+            | ArcFiles.Assay a -> a.Tables, ArcFilesDiscriminate.Assay
+            | ArcFiles.Study(s, _) -> s.Tables, ArcFilesDiscriminate.Study
             | Template t -> ResizeArray([ t.Table ]), ArcFilesDiscriminate.Template
             | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-            | Workflow _ -> ResizeArray(), ArcFilesDiscriminate.Workflow
-            | Run r -> r.Tables, ArcFilesDiscriminate.Run
-            | DataMap _ -> ResizeArray(), ArcFilesDiscriminate.DataMap
+            | ArcFiles.Workflow _ -> ResizeArray(), ArcFilesDiscriminate.Workflow
+            | ArcFiles.Run r -> r.Tables, ArcFilesDiscriminate.Run
+            | ArcFiles.DataMap _ -> ResizeArray(), ArcFilesDiscriminate.DataMap
 
         let setMetadataImport =
             fun b ->

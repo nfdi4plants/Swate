@@ -1,18 +1,14 @@
 namespace Swate.Components
 
 open Browser.Dom
-open Fable.Core
-open Swate.Components.FileExplorerTypes
 open Swate.Components.Shared
+open Swate.Components.FileExplorerTypes
+open Fable.Core
+open Feliz
 
-type ArcExplorerServices = {
-    openPreview: string -> JS.Promise<Result<unit, string>>
-    setStatusMessage: string option -> unit
-    runToggleLfsMark: string -> string -> bool -> JS.Promise<Result<unit, string>>
-}
-
+//Replace with ARCtrl
 [<RequireQualifiedAccess>]
-module ArcExplorer =
+module ARCExplorer =
 
     let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
@@ -127,46 +123,44 @@ module ArcExplorer =
     let createOpenPreviewHandler
         (setSelectedExplorerItemId: string option -> unit)
         (setSelectedTreeItemPath: string option -> unit)
-        (services: ArcExplorerServices)
+        (services: ARCExplorerServices)
+        (item: FileItem)
         =
-        let openPreview (item: FileItem) =
-            promise {
-                match item.Path with
-                | None ->
-                    setSelectedTreeItemPath None
-                    setSelectedExplorerItemId (Some item.Id)
-                    services.setStatusMessage None
-                | Some path ->
-                    let selectedPath = normalizePath path
-                    let previewPath = resolvePreviewPath path
+        promise {
+            match item.Path with
+            | None ->
+                setSelectedTreeItemPath None
+                setSelectedExplorerItemId (Some item.Id)
+                services.setStatusMessage None
+            | Some path ->
+                let selectedPath = normalizePath path
+                let previewPath = resolvePreviewPath path
 
-                    if previewPath <> selectedPath then
-                        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
-                    else
-                        console.log ($"[Renderer] Opening file: {previewPath}")
+                if previewPath <> selectedPath then
+                    console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
+                else
+                    console.log ($"[Renderer] Opening file: {previewPath}")
 
-                    setSelectedTreeItemPath (Some selectedPath)
-                    setSelectedExplorerItemId (Some item.Id)
-                    let! result = services.openPreview previewPath
+                setSelectedTreeItemPath (Some selectedPath)
+                setSelectedExplorerItemId (Some item.Id)
+                let! result = services.openPreview previewPath
 
-                    match result with
-                    | Ok () -> ()
-                    | Error errorMessage ->
-                        console.log ($"[Renderer] Error: {errorMessage}")
-                        services.setStatusMessage (Some $"Could not open preview for '{item.Name}': {errorMessage}")
-            }
-            |> Promise.start
+                match result with
+                | Ok () -> ()
+                | Error errorMessage ->
+                    console.log ($"[Renderer] Error: {errorMessage}")
+                    services.setStatusMessage (Some $"Could not open preview for '{item.Name}': {errorMessage}")
+        }
 
-        openPreview
-
-    let createArcExplorer
+    [<ReactComponent>]
+    let CreateArcExplorer
         (rootRepoPath: string option)
         (nodes: ArcExplorerNode list)
         (selectedExplorerItemId: string option)
         (selectedTreeItemPath: string option)
         (setSelectedExplorerItemId: string option -> unit)
         (setSelectedTreeItemPath: string option -> unit)
-        (services: ArcExplorerServices)
+        (services: ARCExplorerServices)
         =
         let selectedItemId = getSelectedItemId nodes selectedExplorerItemId selectedTreeItemPath
 
@@ -176,14 +170,14 @@ module ArcExplorer =
         let contextMenuItems (item: FileItem) =
             FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
 
-        let openPreview = createOpenPreviewHandler setSelectedExplorerItemId setSelectedTreeItemPath services
+        let openPreview item = promise { createOpenPreviewHandler setSelectedExplorerItemId setSelectedTreeItemPath services item |> Promise.start } |> Promise.start
 
         if List.isEmpty nodes then
-            None
+            Html.none
         else
             let items = toFileItems nodes
 
-            Some(
+            (
                 Swate.Components.FileExplorer.FileExplorer(
                     initialItems = items,
                     onItemClick = openPreview,
@@ -193,3 +187,4 @@ module ArcExplorer =
                     useDirectoryChevronToggle = true
                 )
             )
+

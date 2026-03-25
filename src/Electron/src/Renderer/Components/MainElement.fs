@@ -4,7 +4,6 @@ open Feliz
 open Swate.Components
 open Browser.Dom
 open ARCtrl
-open Swate.Components.MetadataForms
 open WidgetRegistry
 
 [<RequireQualifiedAccess>]
@@ -345,16 +344,16 @@ let CreateMetadataPreview (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
         prop.children [
             match arcFile with
             | ArcFiles.Investigation inv ->
-                InvestigationMetadata(inv, fun updated -> setArcFile (ArcFiles.Investigation updated))
+                MetadataForms.InvestigationMetadata(inv, fun updated -> setArcFile (ArcFiles.Investigation updated))
             | ArcFiles.Study(study, assays) ->
-                StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
-            | ArcFiles.Assay assay -> AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
-            | ArcFiles.Run run -> RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
+                MetadataForms.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
+            | ArcFiles.Assay assay -> MetadataForms.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
+            | ArcFiles.Run run -> MetadataForms.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
             | ArcFiles.Workflow workflow ->
-                WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
-            | ArcFiles.DataMap(_, datamap) -> DataMapMetadata(datamap)
+                MetadataForms.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
+            | ArcFiles.DataMap(_, datamap) -> MetadataForms.DataMapMetadata(datamap)
             | ArcFiles.Template template ->
-                TemplateMetadata(template, fun updated -> setArcFile (ArcFiles.Template updated))
+                MetadataForms.TemplateMetadata(template, fun updated -> setArcFile (ArcFiles.Template updated))
         ]
     ]
 

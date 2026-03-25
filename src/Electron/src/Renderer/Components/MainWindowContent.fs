@@ -7,7 +7,6 @@ open Feliz
 open MainElement
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.NoteTypes
 open Swate.Components.Landing
 open Swate.Components.Notes.Editor
 open Swate.Electron.Shared
@@ -315,7 +314,7 @@ let Content
     let selectedExplorerNode =
         workspaceCtx.state.SelectedExplorerItemId
         |> Option.bind (fun nodeId ->
-            Swate.Components.ArcExplorer.tryFindNodeById nodeId workspaceCtx.state.ArcExplorerTree)
+            Swate.Components.ARCExplorer.tryFindNodeById nodeId workspaceCtx.state.ArcExplorerTree)
 
     React.useEffect (
         (fun () ->

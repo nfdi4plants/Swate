@@ -1,7 +1,6 @@
 namespace Swate.Components
 
 open System
-open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop

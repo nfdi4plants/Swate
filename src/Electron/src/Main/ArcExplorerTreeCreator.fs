@@ -2,28 +2,16 @@ module Main.ArcExplorerTreeCreator
 
 open System
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
-type private NoteTarget =
-    | Root
-    | Study of string
-    | Assay of string
-    | Workflow of string
-    | Run of string
-
-type private NoteEntry = {
-    Name: string
-    RelativePath: string
-    AbsolutePath: string
-    Target: NoteTarget
-    IsLfs: bool option
-}
 
 module private ArcExplorerTreeCreator =
 
+    //ToDo
     let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
-
+    //ToDo
     let normalizeRelativePath (path: string) = path.Replace("\\", "/").Trim('/').Trim()
 
     let fileNameFromPath (path: string) =
@@ -60,7 +48,7 @@ module private ArcExplorerTreeCreator =
             (normalizeRelativePath relativePath).Split('/', StringSplitOptions.RemoveEmptyEntries)
 
         if segments.Length < 2 || not (segments.[0].Equals("Notes", StringComparison.OrdinalIgnoreCase)) then
-            Root
+            NoteTarget.Root
         elif
             segments.Length >= 5
             && segments.[1].Equals("studies", StringComparison.OrdinalIgnoreCase)
@@ -236,7 +224,7 @@ module private ArcExplorerTreeCreator =
         notes
         |> List.filter (fun note -> note.Target = target)
 
-    let createNotesGroup parentId notes =
+    let createNotesGroup parentId (notes: NoteEntry list) =
         if List.isEmpty notes then
             None
         else
@@ -450,7 +438,7 @@ module private ArcExplorerTreeCreator =
             runIsLfs
 
     let createTopLevelNotesGroup (notes: NoteEntry list) =
-        let createCanonicalNoteNodes idPrefix noteEntries =
+        let createCanonicalNoteNodes idPrefix (noteEntries: NoteEntry list)  =
             noteEntries
             |> List.sortBy (fun note -> note.RelativePath.ToLowerInvariant (), note.RelativePath)
             |> List.map (fun note ->

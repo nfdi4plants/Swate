@@ -17,19 +17,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Compile Include="Database.fs" />
     <Compile Include="DTOs\AdvancedSearch.fs" />
     <Compile Include="DTOs\ParentTermQuery.fs" />
     <Compile Include="DTOs\TermQuery.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="URLs.fs" />
-    <Compile Include="Shared.fs" />
+    <Compile Include="ApiCore.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Include all files that are compiled with this project -->
     <!-- Include the project file itself as well -->
-    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
   </ItemGroup>
 </Project>

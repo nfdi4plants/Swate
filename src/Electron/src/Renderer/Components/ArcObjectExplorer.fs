@@ -18,7 +18,7 @@ let private toPreviewState =
 
 let private createArcExplorerServices
     (setPageState: PageState option -> unit)
-    : ArcExplorerServices =
+    : ARCExplorerServices =
     let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) = promise {
         let request: GitLfsRequest = {
             RequestId = Guid.NewGuid().ToString()
