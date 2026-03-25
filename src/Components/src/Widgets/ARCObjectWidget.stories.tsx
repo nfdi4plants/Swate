@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, screen, userEvent, within } from 'storybook/test';
-import { Entry as ARCObjectWidgetEntry } from './ARCObjectWidgetStory.fs.js';
+import { ARCObjectFixture_Entry as ARCObjectWidgetEntry } from '../ARCObjectExplorer/ARCObjectFixture.fs.js';
 
 const meta = {
   title: 'Components/Widgets/ARC Object Widget',
