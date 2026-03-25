@@ -223,235 +223,218 @@ module private ArcExplorerTreeCreator =
         notes
         |> List.filter (fun note -> note.Target = target)
 
-    let createNotesGroup parentId (notes: NoteEntry list) =
-        if List.isEmpty notes then
-            None
-        else
-            notes
-            |> List.sortBy (fun note -> note.RelativePath.ToLowerInvariant (), note.RelativePath)
-            |> List.map (fun note ->
-                createNoteNode
-                    $"{parentId}:note-ref:{note.RelativePath.ToLowerInvariant()}"
-                    note.Name
-                    note.AbsolutePath
-                    true
-                    note.IsLfs)
-            |> sortByName
-            |> createGroup $"{parentId}:notes" "Notes"
+    let createGroupIfAny id name (children: ArcExplorerNode list) =
+        match children with
+        | [] -> None
+        | _ -> children |> createGroup id name |> Some
+
+    let createNoteNodes createId isReference (notes: NoteEntry list) =
+        notes
+        |> List.sortBy (fun note ->
+            note.Name.ToLowerInvariant (),
+            note.Name,
+            note.RelativePath.ToLowerInvariant (),
+            note.RelativePath)
+        |> List.map (fun note ->
+            createNoteNode
+                (createId note)
+                note.Name
+                note.AbsolutePath
+                isReference
+                note.IsLfs)
+
+    let createReferenceGroup
+        (lfsByPath: Map<string, bool option>)
+        parentId
+        groupIdSuffix
+        groupName
+        refIdPrefix
+        (kind: ArcExplorerNodeKind)
+        (previewPathForIdentifier: string -> string option)
+        (identifiers: seq<string>)
+        =
+        identifiers
+        |> Seq.distinct
+        |> Seq.sortBy (fun identifier -> identifier.ToLowerInvariant (), identifier)
+        |> Seq.map (fun identifier ->
+            let previewPath = previewPathForIdentifier identifier
+
+            createObjectNode
+                $"{parentId}:{refIdPrefix}:{identifier}"
+                identifier
+                kind
+                previewPath
+                true
+                (tryGetLfsByPath lfsByPath previewPath)
+                [])
+        |> List.ofSeq
+        |> createGroupIfAny $"{parentId}:{groupIdSuffix}" groupName
+
+    let createOptionalDataMapNode lfsByPath parentId dataMapPath hasDataMap =
+        if hasDataMap then
+            createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath))
             |> Some
+        else
+            None
+
+    let createCanonicalObjectNode parentId name kind previewPath isLfs children =
+        children
+        |> List.choose id
+        |> createObjectNode parentId name kind (Some previewPath) false isLfs
+
+    let createNotesGroup parentId (notes: NoteEntry list) =
+        notes
+        |> createNoteNodes (fun note -> $"{parentId}:note-ref:{note.RelativePath.ToLowerInvariant()}")
+            true
+        |> createGroupIfAny $"{parentId}:notes" "Notes"
 
     let createSamplesGroup parentId (isReference: bool) (sampleNames: string list) =
-        if List.isEmpty sampleNames then
-            None
-        else
-            sampleNames
-            |> List.map (fun sampleName ->
-                let nodeIdPart = if isReference then "sample-ref" else "sample"
-                createSampleNode $"{parentId}:{nodeIdPart}:{sampleName.ToLowerInvariant()}" sampleName isReference)
-            |> sortByName
-            |> createGroup $"{parentId}:samples" "Samples"
-            |> Some
+        sampleNames
+        |> List.map (fun sampleName ->
+            let nodeIdPart = if isReference then "sample-ref" else "sample"
+            createSampleNode $"{parentId}:{nodeIdPart}:{sampleName.ToLowerInvariant()}" sampleName isReference)
+        |> sortByName
+        |> createGroupIfAny $"{parentId}:samples" "Samples"
 
     let createTablesGroup parentId previewPath isLfs (tables: ResizeArray<ArcTable>) =
         tables
         |> Seq.mapi (fun tableIndex table -> createTableNode parentId tableIndex table previewPath isLfs)
         |> List.ofSeq
-        |> function
-            | [] -> None
-            | tableNodes -> tableNodes |> createGroup $"{parentId}:tables" "Tables" |> Some
+        |> createGroupIfAny $"{parentId}:tables" "Tables"
 
     let createStudyRelationshipsGroup arcPath lfsByPath parentId (study: ArcStudy) =
-        let assayRefs =
+        createReferenceGroup
+            lfsByPath
+            parentId
+            "assays"
+            "Assays"
+            "assay-ref"
+            ArcExplorerNodeKind.Assay
+            (fun assayIdentifier ->
+                match study.Investigation with
+                | Some investigation when investigation.ContainsAssay assayIdentifier ->
+                    Some(assayPreviewPath arcPath assayIdentifier)
+                | _ -> None)
             study.RegisteredAssayIdentifiers
-            |> Seq.distinct
-            |> Seq.sortBy (fun identifier -> identifier.ToLowerInvariant (), identifier)
-            |> Seq.map (fun assayIdentifier ->
-                let previewPath =
-                    match study.Investigation with
-                    | Some investigation when investigation.ContainsAssay assayIdentifier ->
-                        Some(assayPreviewPath arcPath assayIdentifier)
-                    | _ -> None
-
-                createObjectNode
-                    $"{parentId}:assay-ref:{assayIdentifier}"
-                    assayIdentifier
-                    ArcExplorerNodeKind.Assay
-                    previewPath
-                    true
-                    (tryGetLfsByPath lfsByPath previewPath)
-                    [])
-            |> List.ofSeq
-
-        if List.isEmpty assayRefs then
-            None
-        else
-            assayRefs |> sortByName |> createGroup $"{parentId}:assays" "Assays" |> Some
 
     let createWorkflowRelationshipsGroup arcPath lfsByPath parentId (workflow: ArcWorkflow) =
-        let workflowRefs =
+        createReferenceGroup
+            lfsByPath
+            parentId
+            "workflows"
+            "Subworkflows"
+            "workflow-ref"
+            ArcExplorerNodeKind.Workflow
+            (fun workflowIdentifier ->
+                match workflow.Investigation with
+                | Some investigation when investigation.ContainsWorkflow workflowIdentifier ->
+                    Some(workflowPreviewPath arcPath workflowIdentifier)
+                | _ -> None)
             workflow.SubWorkflowIdentifiers
-            |> Seq.distinct
-            |> Seq.sortBy (fun identifier -> identifier.ToLowerInvariant (), identifier)
-            |> Seq.map (fun workflowIdentifier ->
-                let previewPath =
-                    match workflow.Investigation with
-                    | Some investigation when investigation.ContainsWorkflow workflowIdentifier ->
-                        Some(workflowPreviewPath arcPath workflowIdentifier)
-                    | _ -> None
-
-                createObjectNode
-                    $"{parentId}:workflow-ref:{workflowIdentifier}"
-                    workflowIdentifier
-                    ArcExplorerNodeKind.Workflow
-                    previewPath
-                    true
-                    (tryGetLfsByPath lfsByPath previewPath)
-                    [])
-            |> List.ofSeq
-
-        if List.isEmpty workflowRefs then
-            None
-        else
-            workflowRefs |> sortByName |> createGroup $"{parentId}:workflows" "Subworkflows" |> Some
 
     let createRunRelationshipsGroup arcPath lfsByPath parentId (run: ArcRun) =
-        let workflowRefs =
+        createReferenceGroup
+            lfsByPath
+            parentId
+            "workflows"
+            "Workflows"
+            "workflow-ref"
+            ArcExplorerNodeKind.Workflow
+            (fun workflowIdentifier ->
+                match run.Investigation with
+                | Some investigation when investigation.ContainsWorkflow workflowIdentifier ->
+                    Some(workflowPreviewPath arcPath workflowIdentifier)
+                | _ -> None)
             run.WorkflowIdentifiers
-            |> Seq.distinct
-            |> Seq.sortBy (fun identifier -> identifier.ToLowerInvariant (), identifier)
-            |> Seq.map (fun workflowIdentifier ->
-                let previewPath =
-                    match run.Investigation with
-                    | Some investigation when investigation.ContainsWorkflow workflowIdentifier ->
-                        Some(workflowPreviewPath arcPath workflowIdentifier)
-                    | _ -> None
-
-                createObjectNode
-                    $"{parentId}:workflow-ref:{workflowIdentifier}"
-                    workflowIdentifier
-                    ArcExplorerNodeKind.Workflow
-                    previewPath
-                    true
-                    (tryGetLfsByPath lfsByPath previewPath)
-                    [])
-            |> List.ofSeq
-
-        if List.isEmpty workflowRefs then
-            None
-        else
-            workflowRefs |> sortByName |> createGroup $"{parentId}:workflows" "Workflows" |> Some
 
     let createStudyNode arcPath assaysByIdentifier lfsByPath notes (study: ArcStudy) =
         let parentId = $"study:{study.Identifier}"
-        let previewPath = Some(studyPreviewPath arcPath study.Identifier)
+        let previewPath = studyPreviewPath arcPath study.Identifier
         let dataMapPath = objectDataMapPath arcPath "studies" study.Identifier
         let studyNotes = tryFindNotesForTarget (Study study.Identifier) notes
         let studySamples = extractStudySampleNames assaysByIdentifier study
-        let studyIsLfs = tryGetLfsByPath lfsByPath previewPath
+        let studyIsLfs = tryGetLfsByPath lfsByPath (Some previewPath)
 
         [
             createStudyRelationshipsGroup arcPath lfsByPath parentId study
-            createTablesGroup parentId (previewPath.Value) studyIsLfs study.Tables
-            if study.DataMap.IsSome then
-                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
+            createTablesGroup parentId previewPath studyIsLfs study.Tables
+            createOptionalDataMapNode lfsByPath parentId dataMapPath study.DataMap.IsSome
             createNotesGroup parentId studyNotes
             createSamplesGroup parentId false studySamples
         ]
-        |> List.choose id
-        |> createObjectNode
+        |> createCanonicalObjectNode
             parentId
             study.Identifier
             ArcExplorerNodeKind.Study
             previewPath
-            false
             studyIsLfs
 
     let createAssayNode arcPath lfsByPath notes (assay: ArcAssay) =
         let parentId = $"assay:{assay.Identifier}"
-        let previewPath = Some(assayPreviewPath arcPath assay.Identifier)
+        let previewPath = assayPreviewPath arcPath assay.Identifier
         let dataMapPath = objectDataMapPath arcPath "assays" assay.Identifier
         let assayNotes = tryFindNotesForTarget (Assay assay.Identifier) notes
         let assaySamples = extractSampleNames assay.Tables
-        let assayIsLfs = tryGetLfsByPath lfsByPath previewPath
+        let assayIsLfs = tryGetLfsByPath lfsByPath (Some previewPath)
 
         [
-            createTablesGroup parentId (previewPath.Value) assayIsLfs assay.Tables
-            if assay.DataMap.IsSome then
-                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
+            createTablesGroup parentId previewPath assayIsLfs assay.Tables
+            createOptionalDataMapNode lfsByPath parentId dataMapPath assay.DataMap.IsSome
             createNotesGroup parentId assayNotes
             createSamplesGroup parentId true assaySamples
         ]
-        |> List.choose id
-        |> createObjectNode
+        |> createCanonicalObjectNode
             parentId
             assay.Identifier
             ArcExplorerNodeKind.Assay
             previewPath
-            false
             assayIsLfs
 
     let createWorkflowNode arcPath lfsByPath notes (workflow: ArcWorkflow) =
         let parentId = $"workflow:{workflow.Identifier}"
-        let previewPath = Some(workflowPreviewPath arcPath workflow.Identifier)
+        let previewPath = workflowPreviewPath arcPath workflow.Identifier
         let dataMapPath = objectDataMapPath arcPath "workflows" workflow.Identifier
         let workflowNotes = tryFindNotesForTarget (Workflow workflow.Identifier) notes
+        let workflowIsLfs = tryGetLfsByPath lfsByPath (Some previewPath)
 
         [
             createWorkflowRelationshipsGroup arcPath lfsByPath parentId workflow
-            if workflow.DataMap.IsSome then
-                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
+            createOptionalDataMapNode lfsByPath parentId dataMapPath workflow.DataMap.IsSome
             createNotesGroup parentId workflowNotes
         ]
-        |> List.choose id
-        |> createObjectNode
+        |> createCanonicalObjectNode
             parentId
             workflow.Identifier
             ArcExplorerNodeKind.Workflow
             previewPath
-            false
-            (tryGetLfsByPath lfsByPath previewPath)
+            workflowIsLfs
 
     let createRunNode arcPath lfsByPath notes (run: ArcRun) =
         let parentId = $"run:{run.Identifier}"
-        let previewPath = Some(runPreviewPath arcPath run.Identifier)
+        let previewPath = runPreviewPath arcPath run.Identifier
         let dataMapPath = objectDataMapPath arcPath "runs" run.Identifier
         let runNotes = tryFindNotesForTarget (Run run.Identifier) notes
         let runSamples = extractSampleNames run.Tables
-        let runIsLfs = tryGetLfsByPath lfsByPath previewPath
+        let runIsLfs = tryGetLfsByPath lfsByPath (Some previewPath)
 
         [
             createRunRelationshipsGroup arcPath lfsByPath parentId run
-            createTablesGroup parentId (previewPath.Value) runIsLfs run.Tables
-            if run.DataMap.IsSome then
-                createDataMapNode parentId dataMapPath (tryGetLfsByPath lfsByPath (Some dataMapPath)) |> Some
+            createTablesGroup parentId previewPath runIsLfs run.Tables
+            createOptionalDataMapNode lfsByPath parentId dataMapPath run.DataMap.IsSome
             createNotesGroup parentId runNotes
             createSamplesGroup parentId true runSamples
         ]
-        |> List.choose id
-        |> createObjectNode
+        |> createCanonicalObjectNode
             parentId
             run.Identifier
             ArcExplorerNodeKind.Run
             previewPath
-            false
             runIsLfs
 
     let createTopLevelNotesGroup (notes: NoteEntry list) =
-        let createCanonicalNoteNodes idPrefix (noteEntries: NoteEntry list)  =
-            noteEntries
-            |> List.sortBy (fun note -> note.RelativePath.ToLowerInvariant (), note.RelativePath)
-            |> List.map (fun note ->
-                createNoteNode
-                    $"{idPrefix}:{note.RelativePath.ToLowerInvariant()}"
-                    note.Name
-                    note.AbsolutePath
-                    false
-                    note.IsLfs)
-
         let children =
             notes
-            |> createCanonicalNoteNodes "note"
-            |> sortByName
+            |> createNoteNodes (fun note -> $"note:{note.RelativePath.ToLowerInvariant()}") false
 
         createGroup "group:notes" "Notes" children
 
@@ -477,11 +460,10 @@ module private ArcExplorerTreeCreator =
             |> List.ofSeq
 
         [
-            if not (List.isEmpty studyBuckets) then
-                createGroup "group:samples:studies" "Studies" (studyBuckets |> sortByName)
-            if not (List.isEmpty runBuckets) then
-                createGroup "group:samples:runs" "Runs" (runBuckets |> sortByName)
+            studyBuckets |> sortByName |> createGroupIfAny "group:samples:studies" "Studies"
+            runBuckets |> sortByName |> createGroupIfAny "group:samples:runs" "Runs"
         ]
+        |> List.choose id
         |> createGroup "group:samples" "Samples"
 
 let createArcExplorerTree (arcPath: string) (arc: ARC) (fileEntries: FileEntry seq) =
