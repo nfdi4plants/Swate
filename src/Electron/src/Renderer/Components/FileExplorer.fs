@@ -3,11 +3,12 @@ module Renderer.Components.FileExplorer
 open System
 open Browser.Dom
 open Swate.Components.FileExplorerTypes
+open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 
-let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+let private normalizePath = PathHelpers.normalizePath
 
 let private splitPath (path: string) =
     normalizePath path

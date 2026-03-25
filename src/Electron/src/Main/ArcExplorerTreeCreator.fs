@@ -9,10 +9,9 @@ open Swate.Electron.Shared.FileIOTypes
 
 module private ArcExplorerTreeCreator =
 
-    //ToDo
-    let normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
-    //ToDo
-    let normalizeRelativePath (path: string) = path.Replace("\\", "/").Trim('/').Trim()
+    let normalizePath = PathHelpers.normalizePath
+
+    let normalizeRelativePath = PathHelpers.normalizeRelativePath
 
     let fileNameFromPath (path: string) =
         let normalizedPath = normalizePath path

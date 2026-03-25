@@ -62,6 +62,7 @@
     <Compile Include="Util\FloatingUI.fs" />
     <Compile Include="Util\Constants.fs" />
     <Compile Include="Util\Extensions.fs" />
+    <Compile Include="Util\PathHelpers.fs" />
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\Api.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />

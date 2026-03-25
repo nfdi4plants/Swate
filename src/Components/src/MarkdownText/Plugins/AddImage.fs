@@ -3,6 +3,7 @@ namespace Swate.Components.MarkdownText.Plugins
 open System
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components.Shared
 open Swate.Components.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
@@ -13,7 +14,7 @@ module AddImage =
 
     let private toMarkdownImageLink ((file: MarkdownPromptFile), (path: string)) =
         let fallbackPath = if String.IsNullOrWhiteSpace path then file.Name else path
-        let normalizedPath = fallbackPath.Replace("\\", "/")
+        let normalizedPath = PathHelpers.normalizeSeparators fallbackPath
         let altText = if String.IsNullOrWhiteSpace file.Name then "image" else file.Name
 
         $"![{altText}]({normalizedPath})"

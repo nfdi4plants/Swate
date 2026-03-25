@@ -4,6 +4,7 @@ module Renderer.Components.NoteSearchPage
 open System
 open Feliz
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Components.NoteTypes
 open Swate.Components.Notes.Editor
 open Swate.Electron.Shared
@@ -11,7 +12,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
 
-let private normalizePath (path: string) = path.Normalize()
+let private normalizePath = PathHelpers.normalizeSeparators
 
 let private tryResolveArcRelativePath (appState: AppState) (relativePath: string) =
     match appState with

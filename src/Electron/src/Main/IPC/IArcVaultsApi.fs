@@ -5,6 +5,7 @@ open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Components.Shared
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -18,15 +19,14 @@ open ARCtrl.Json
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
-let private normalizePathForComparison (pathValue: string) =
-    pathValue.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
+let private normalizePathForComparison = PathHelpers.normalizeForComparison
 
 let private containsTraversalSegments (relativePath: string) =
     relativePath.Split('/')
     |> Array.exists (fun segment -> segment = "." || segment = "..")
 
 let private tryResolveArcRelativeWritePath (arcPath: string) (requestedRelativePath: string) =
-    let relativePath = requestedRelativePath.Replace("\\", "/").TrimStart('/').Trim()
+    let relativePath = PathHelpers.normalizeSeparators requestedRelativePath |> fun path -> path.TrimStart('/').Trim()
 
     if String.IsNullOrWhiteSpace relativePath then
         Error(exn "RelativePath must not be empty.")
@@ -142,10 +142,7 @@ let private persistArcChangesAndRefreshVault
             do! arc.UpdateAsync(arcPath)
             afterArcPersist ()
             do! vault.LoadArc()
-
-            let! fileEntries = getFileEntries arcPath
-            let fileTree = createFileEntryTree fileEntries
-            vault.SetFileTree(fileTree)
+            do! vault.RefreshFileTree()
         finally
             vault.isBusyWriting <- false
     }
@@ -220,8 +217,15 @@ let api: IPCTypes.IArcVaultsApi = {
             let windowId = windowIdFromIpcEvent event
             let vault = ARC_VAULTS.TryGetVault(windowId)
 
-            if vault.IsSome then
-                vault.Value.SetFileTree(vault.Value.fileTree)
+            match vault with
+            | Some currentVault ->
+                match ARC_FILE_TREES.TryGet(windowId), currentVault.path with
+                | Some fileTree, _ -> currentVault.PublishWorkspace(fileTree)
+                | None, Some arcPath ->
+                    let! fileTree = ARC_FILE_TREES.Refresh(windowId, arcPath)
+                    currentVault.PublishWorkspace(fileTree)
+                | None, None -> ()
+            | None -> ()
 
             return vault |> Option.bind (fun v -> v.path)
         }
@@ -262,10 +266,10 @@ let api: IPCTypes.IArcVaultsApi = {
                     | None -> return Error(exn "ARC is not loaded.")
                     | Some arcPath ->
                         let! fileEntries =
-                            if vault.fileTree.Count > 0 then
-                                promise { return vault.fileTree.Values |> Seq.toArray }
-                            else
-                                getFileEntries arcPath
+                            match ARC_FILE_TREES.TryGet(windowId) with
+                            | Some fileTree when fileTree.Count > 0 ->
+                                promise { return fileTree.Values |> Seq.toArray }
+                            | _ -> getFileEntries arcPath
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
                         return Ok notes
@@ -312,10 +316,7 @@ let api: IPCTypes.IArcVaultsApi = {
                                 let directoryPath = path.dirname absolutePath
                                 do! mkdirRecursiveAsync directoryPath
                                 do! writeUtf8FileAsync absolutePath request.Content
-
-                                let! fileEntries = getFileEntries arcPath
-                                let fileTree = createFileEntryTree fileEntries
-                                vault.SetFileTree(fileTree)
+                                do! vault.RefreshFileTree()
                                 return Ok()
                             finally
                                 vault.isBusyWriting <- false
@@ -329,7 +330,7 @@ let api: IPCTypes.IArcVaultsApi = {
             match ARC_VAULTS.TryGetVault(windowId) with
             | None -> return Error(exn $"The ARC for window id {windowId} should exist")
             | Some vault ->
-                let normalizedPath = path.Replace("\\", "/")
+                let normalizedPath = PathHelpers.normalizeSeparators path
                 let pathParts = normalizedPath.Split('/')
                 let fileName = pathParts |> Array.last
 
@@ -477,9 +478,7 @@ let api: IPCTypes.IArcVaultsApi = {
                         match enforcedRequest.Command with
                         | Track
                         | Untrack ->
-                            let! fileEntries = getFileEntries arcPath
-                            let fileTree = createFileEntryTree fileEntries
-                            vault.SetFileTree(fileTree)
+                            do! vault.RefreshFileTree()
                         | _ -> ()
 
                         return Ok successResult

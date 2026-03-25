@@ -1,15 +1,10 @@
 module Swate.Electron.Shared.FileIOHelper
 
+open Swate.Components.Shared
 
-let getNameFromPath (path: string) =
-    path
-    |> (fun p -> p.Replace("\\", "/"))
-    |> (fun p -> p.TrimEnd('/'))
-    |> (fun p -> p.Split("/"))
-    |> Array.last
+let getNameFromPath (path: string) = PathHelpers.getNameFromPath path
 
-let normalizePath (path: string) =
-    path.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
+let normalizePath (path: string) = PathHelpers.normalizeForComparison path
 
 let pathsEqual (left: string) (right: string) =
-    normalizePath left = normalizePath right
+    PathHelpers.pathsEqual left right

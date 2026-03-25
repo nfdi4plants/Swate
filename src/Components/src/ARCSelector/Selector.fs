@@ -4,11 +4,12 @@ open Feliz
 open Fable.Core
 
 open SelectorTypes
+open Swate.Components.Shared
 open Swate.Components.Types.Actionbar
 
 module SelectorHelper =
 
-    let normalizePath = fun (path: string) -> path.Replace("\\", "/").TrimEnd('/')
+    let normalizePath = PathHelpers.normalizePath
 
     let comparePaths =
         fun (path1: string) (path2: string) -> normalizePath path1 = normalizePath path2

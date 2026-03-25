@@ -10,7 +10,7 @@ open Feliz
 [<RequireQualifiedAccess>]
 module ARCExplorer =
 
-    let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+    let private normalizePath = PathHelpers.normalizePath
 
     let private resolvePreviewPath (path: string) =
         let normalized = normalizePath path

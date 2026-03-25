@@ -4,13 +4,14 @@ module Main.FileTreeCreator
 
 open System.Collections.Generic
 open Fable.Core.JsInterop
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
 let fs: obj = importAll "fs"
 let pathMod: obj = importAll "path"
 let childProcessDynamic: obj = importAll "node:child_process"
 
-let private normalizePath (path: string) = path.Replace("\\", "/")
+let private normalizePath = PathHelpers.normalizeSeparators
 
 let private normalizeRootPath (path: string) =
     pathMod?resolve (path) |> unbox<string> |> normalizePath

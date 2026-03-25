@@ -4,6 +4,7 @@ open System
 open Browser.Types
 open Fable.Core
 open Fable.Core.JsInterop
+open Swate.Components.Shared
 
 open Swate.Components.MarkdownText.JsBindings
 
@@ -102,7 +103,7 @@ module PluginTextInputHelpers =
         else
             $"Files not allowed: {rejectedNames}. Allowed: {allowed}."
 
-    let normalizePath (path: string) = path.Replace("\\", "/")
+    let normalizePath = PathHelpers.normalizeSeparators
 
     let toPromptFile (file: File) : MarkdownPromptFile =
         {

@@ -13,7 +13,7 @@ open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
-let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
+let private normalizePath = PathHelpers.normalizePath
 
 let private isDataMapPath (path: string) =
     normalizePath path

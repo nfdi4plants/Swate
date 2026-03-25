@@ -1,11 +1,12 @@
 namespace Swate.Components.FileExplorerTypes
 
 open Fable.Core
+open Swate.Components.Shared
 
 [<RequireQualifiedAccess>]
 type FileExplorerGitLfsHelper =
 
-    static member private NormalizePath(path: string) = path.Replace("\\", "/").TrimEnd('/')
+    static member private NormalizePath(path: string) = PathHelpers.normalizePath path
 
     static member private TryToRepoRelativePath(rootRepoPath: string option, filePath: string) =
         match rootRepoPath with

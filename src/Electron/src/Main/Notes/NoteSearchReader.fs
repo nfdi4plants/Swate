@@ -3,13 +3,14 @@ module Main.NoteSearchReader
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Swate.Components.Shared
 open Swate.Components.NoteTypes
 open Swate.Electron.Shared.FileIOTypes
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
-let private normalizePath (path: string) = path.Replace("\\", "/")
+let private normalizePath = PathHelpers.normalizeSeparators
 
 let private tryGetRepoRelativePath (repoRoot: string) (absolutePath: string) =
     let relativePath =
