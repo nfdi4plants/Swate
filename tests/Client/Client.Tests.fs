@@ -4,6 +4,7 @@ open Fable.Mocha
 
 let client =
     testList "Client" [
+        ExplorePanelElmish.Main
         Components.Tests.Table.ContextMenu.Main
         Components.Tests.Table.KeyboardNavigation.Main
         Spreadsheet.Tests.DataAnnotator.Main

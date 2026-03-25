@@ -3,7 +3,10 @@ namespace Swate.Components.Shared
 module URLs =
 
     [<Literal>]
-    let PRODUCTION_URL = @"https://swate-alpha.nfdi4plants.org"
+    let PRODUCTION_URL_ALPHA = @"https://swate-alpha.nfdi4plants.org"
+
+    [<Literal>]
+    let PRODUCTION_URL = @"https://swate.nfdi4plants.org"
 
     module Data =
 
@@ -15,20 +18,8 @@ module URLs =
     [<RequireQualifiedAccessAttribute>]
     module Docs =
 
-        type FileType =
-            | Html
-            | Yaml
-
-            member this.toStr =
-                match this with
-                | Html -> ".html"
-                | Yaml -> ".yaml"
-
-
-        let private Base = "/docs"
-
-        let OntologyApi (filetype: FileType) =
-            Base + "/IOntologyAPIv2" + filetype.toStr
+        [<Literal>]
+        let IOntologyAPIv3 = "/api/IOntologyAPIv3/docs"
 
 
     type Helpdesk =

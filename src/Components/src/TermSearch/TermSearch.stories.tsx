@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import TermSearch from "./TermSearch.fs.js";
 import * as Provider from "./TermSearchConfigProvider.fs.js";
-import { TIBApi } from '../Util/Api.fs.js';
+import { TIBApi } from '../Api/TIBApi.fs.js';
 import React from 'react';
 import type { Term } from '../Util/Types.fs.js';
 
@@ -14,7 +14,7 @@ function renderTermSearch(args: any) {
   const [term, setTerm] = React.useState(undefined as Term | undefined);
 
   return (
-    <div className='swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:h-[400px]'>
+    <div className='swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:h-100'>
       <TermSearch
         {...args}
         term={term}

@@ -102,6 +102,17 @@ let api: IGitApi = {
                 | Ok diffDto -> return Ok(toDiffSummaryDto diffDto)
                 | Error failure -> return Error(exn $"git diff summary failed ({failure.Kind}): {failure.Message}")
         }
+    getGitWordDiff =
+        fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getWordDiff arcPath request.Pathspecs
+
+                match result with
+                | Ok diffText -> return Ok diffText
+                | Error failure -> return Error(exn $"git word diff failed ({failure.Kind}): {failure.Message}")
+        }
     gitFetch =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with

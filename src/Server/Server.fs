@@ -94,19 +94,17 @@ let createIServiceAPIv1 =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue serviceApi
-    //|> Remoting.withDocs Shared.URLs.DocsApiUrl2 DocsServiceAPIvs1.serviceApiDocsv1
     |> Remoting.withDiagnosticsLogger (printfn "%A")
     |> Remoting.withErrorHandler API.Helper.errorHandler
-    |> Remoting.buildHttpHandler
+    |> Remoting.OpenAPI.withDocs Fable.Remoting.OpenAPI.OpenApi.options
 
 let createTestApi =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromContext testApi
-    //|> Remoting.withDocs "/api/IExpertAPIv1/docs" DocsISADotNetAPIvs1.isaDotNetCommonApiDocsv1
     |> Remoting.withDiagnosticsLogger (printfn "%A")
     |> Remoting.withErrorHandler API.Helper.errorHandler
-    |> Remoting.buildHttpHandler
+    |> Remoting.OpenAPI.withDocs Fable.Remoting.OpenAPI.OpenApi.options
 
 let getMessage () = "Hello from SAFE!"
 

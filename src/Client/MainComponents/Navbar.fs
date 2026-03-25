@@ -102,7 +102,7 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                 "Reset",
                 Icons.Delete(),
                 (fun _ -> setOpenReset (not openReset)),
-                color = DaisyUIColors.Error
+                color = DaisyuiColors.Error
             )
 
             NavbarBurger.Main(model, dispatch)

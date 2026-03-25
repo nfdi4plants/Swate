@@ -42,10 +42,10 @@ module NavbarHelper =
 
 type private Selector =
 
-    static member CreateArcActionBtn(onClick: unit -> unit) =
+    static member CreateArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
         Actionbar.ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", onClick)
 
-    static member OpenArcActionBtn(onClick: unit -> unit) =
+    static member OpenArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
         Actionbar.ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
 
     [<ReactComponent>]

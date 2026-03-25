@@ -21,11 +21,13 @@
         <PackageVersion Include="ExcelJS.Fable" Version="0.3.0"/>
         <PackageVersion Include="Fable.Remoting.Client" Version="7.32.0"/>
         <PackageVersion Include="Fable.React.Types" Version="18.4.0"/>
-        <PackageVersion Include="Feliz" Version="3.1.0"/>
+        <PackageVersion Include="Feliz" Version="3.1.1"/>
+        <PackageVersion Include="Feliz.UseElmish" Version="4.1.0" />
         <PackageVersion Include="Fable.Browser.Dom" Version="2.18.0"/>
         <!-- server -->
         <PackageVersion Include="Saturn" Version="0.17.0"/>
-        <PackageVersion Include="Fable.Remoting.Giraffe" Version="5.19.0"/>
+        <PackageVersion Include="Fable.Remoting.Giraffe" Version="5.23.0"/>
+        <PackageVersion Include="Fable.Remoting.OpenAPI.Giraffe" Version="0.0.3" />
         <PackageVersion Include="Neo4j.Driver" Version="5.18.1"/>
         <!-- electron -->
         <PackageVersion Include="Fable.Electron" Version="40.6.0"/>
@@ -34,5 +36,6 @@
         <!-- testing -->
         <PackageVersion Include="Fable.Mocha" Version="2.17.0"/>
         <PackageVersion Include="Expecto" Version="10.2.3"/>
+        <PackageVersion Include="Vitest" Version="1.0.0"/>
     </ItemGroup>
 </Project>

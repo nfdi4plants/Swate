@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="GitService.test.fs" />
+    <Compile Include="SecureAuthStore.test.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Electron\src\Main\Main.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Vitest" />
+  </ItemGroup>
+</Project>
