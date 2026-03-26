@@ -34,8 +34,11 @@ module LayoutContext =
 
         let Empty: LayoutContextType = { state = false; setState = ignore }
 
-    let LeftSidebarContext<'A> =
-        React.createContext<SidebarState<'A>> (SidebarState<'A>.Empty())
+    /// Holds one stable React context instance for left sidebar. Otherwise we run into consistency issues with a generic argument
+    type private LeftSidebarContextHolder<'A>() =
+        static member val Context = React.createContext<SidebarState<'A>> (SidebarState<'A>.Empty()) with get
+
+    let LeftSidebarContext<'A> = LeftSidebarContextHolder<'A>.Context
 
     let RightSidebarContext =
         React.createContext<LayoutContextType> (LayoutContextType.Empty)
