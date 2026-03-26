@@ -2,7 +2,7 @@ module Swate.Electron.Shared.FileIOHelper
 
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
 let normalizePath (path: string) =
-    path.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
+    path.Replace("\\", "/").Trim().TrimEnd('/')
 
 /// normalizes the path and splits it into parts
 let getPathParts (path: string) =

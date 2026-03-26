@@ -219,7 +219,7 @@ function ARCSelectorContainer() {
 
 const App = () => {
     return (
-        <DataHubBrowserContainer />
+        <Layout />
         // <AuthButtonContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
         //     <NoteSearch />

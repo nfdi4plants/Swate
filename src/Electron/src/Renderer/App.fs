@@ -107,32 +107,6 @@ let Main () =
             [| box model.PageState |]
         )
 
-    // let fileExplorer =
-    //     React.useMemo (
-    //         (fun _ ->
-    //             let fileEntries = workspaceCtx.state.FileTree |> List.toArray
-
-    //             let fileTree =
-    //                 if fileEntries.Length > 0 then
-    //                     Some(Renderer.Components.FileExplorer.getFileTree fileEntries)
-    //                 else
-    //                     None
-
-    //             if fileTree.IsSome then
-    //                 Renderer.Components.FileExplorer.createFileTree fileTree workspaceCtx.state.SelectedTreeItemPath {
-    //                     Renderer.Components.FileExplorer.FileExplorerActions.SetSelectedTreeItemPath =
-    //                         setSelectedTreeItemPath
-    //                     SetPageState = setPageState
-    //                 }
-    //             else
-    //                 None
-    //         ),
-    //         [|
-    //             workspaceCtx.state.FileTree
-    //             workspaceCtx.state.SelectedTreeItemPath
-    //         |]
-    //     )
-
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
         pathChange =
             fun pathOption ->
@@ -148,49 +122,7 @@ let Main () =
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     ///Main content module
-    let children =
-        React.useMemo ((fun _ -> Renderer.Components.MainContent.Main.Main(model.AppState)), [||])
-
-    // let actionBar =
-    //     Html.div [
-    //         prop.className "swt:mb-2 swt:flex swt:justify-center"
-    //         prop.children [
-    //             Actionbar.Main(
-    //                 [|
-    //                     Actionbar.ButtonInfo.create (
-    //                         "swt:fluent--document-bullet-list-24-regular swt:size-5",
-    //                         "Labbook View",
-    //                         fun _ -> dispatch OpenLandingPageRequested
-    //                     )
-    //                     Actionbar.ButtonInfo.create (
-    //                         "swt:fluent--document-24-regular swt:size-5",
-    //                         "Create Note",
-    //                         fun _ -> dispatch CreateNewNoteRequested
-    //                     )
-    //                     Actionbar.ButtonInfo.create (
-    //                         "swt:fluent--search-24-regular swt:size-5",
-    //                         "Note Search",
-    //                         fun _ -> dispatch OpenNotesSearchPageRequested
-    //                     )
-    //                 |],
-    //                 4
-    //             )
-    //         ]
-    //     ]
-
-    // let leftSidebar appState (fe: ReactElement) =
-    //     Some(
-    //         Html.div [
-    //             prop.className "swt:p-4"
-    //             prop.children [|
-    //                 match appState with
-    //                 | Some _ -> actionBar
-    //                 | _ -> Html.none
-    //                 Html.h2 [ prop.text "ARC-Tree" ]
-    //                 fe
-    //             |]
-    //         ]
-    //     )
+    let children = Renderer.Components.MainContent.Main.Main(model.AppState)
 
     Context.AppStateCtx.AppStateCtx.Provider(
         appCtx,
@@ -205,10 +137,7 @@ let Main () =
                                 CloseWindowController.CloseWindowController.Subscription()
                             |],
                         navbar = Renderer.Components.Navbar.Main(),
-                        ?leftSidebar = None,
-                        // (match fileExplorer with
-                        //  | Some fe -> leftSidebar model.AppState fe
-                        //  | None -> None),
+                        leftSidebar = Renderer.Components.LeftSidebar.Main.Main(),
                         leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
                     )
                 )
