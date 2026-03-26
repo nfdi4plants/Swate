@@ -45,10 +45,10 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
-    pickPaths: IpcMainEvent -> JS.Promise<Result<string [], exn>>
+    pickPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
 
     openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>
-    readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
+    readNotes: IpcMainEvent -> JS.Promise<Result<Note[], exn>>
     saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PageState, exn>>
     writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
     syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>

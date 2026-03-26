@@ -17,7 +17,9 @@ let private tryResolveArcRelativePath (appState: AppState) (relativePath: string
     match appState with
     | AppState.ARC arcPath ->
         let root = normalizePath arcPath |> fun path -> path.TrimEnd('/')
-        let normalizedRelative = normalizePath relativePath |> fun path -> path.TrimStart('/')
+
+        let normalizedRelative =
+            normalizePath relativePath |> fun path -> path.TrimStart('/')
 
         if String.IsNullOrWhiteSpace normalizedRelative then
             None
@@ -26,12 +28,15 @@ let private tryResolveArcRelativePath (appState: AppState) (relativePath: string
     | AppState.Init -> None
 
 let private tryGetExistingTargetRef (path: string) =
-    let segments = (normalizePath path).Split('/', StringSplitOptions.RemoveEmptyEntries)
+    let segments =
+        (normalizePath path).Split('/', StringSplitOptions.RemoveEmptyEntries)
 
     let tryResolveTarget (folderName: string) (kind: NotesTargetKind) =
         match
             segments
-            |> Array.tryFindIndex (fun segment -> String.Equals(segment, folderName, StringComparison.OrdinalIgnoreCase))
+            |> Array.tryFindIndex (fun segment ->
+                String.Equals(segment, folderName, StringComparison.OrdinalIgnoreCase)
+            )
         with
         | Some index when index + 1 < segments.Length ->
             let name = segments.[index + 1].Trim()
@@ -39,10 +44,7 @@ let private tryGetExistingTargetRef (path: string) =
             if String.IsNullOrWhiteSpace name then
                 None
             else
-                Some {
-                    Name = name
-                    Kind = kind
-                }
+                Some { Name = name; Kind = kind }
         | _ -> None
 
     match tryResolveTarget "studies" NotesTargetKind.Study with
@@ -59,7 +61,7 @@ let createAvailableNotesTargets (fileEntries: FileEntry list) =
             | NotesTargetKind.Study -> 0
             | NotesTargetKind.Assay -> 1
 
-        kindOrder, target.Name.ToLowerInvariant ()
+        kindOrder, target.Name.ToLowerInvariant()
     )
     |> ResizeArray
 
@@ -72,7 +74,7 @@ let CreateNotesSearchPage
         setPreviewData: PageState option -> unit
     ) =
 
-    let notes, setNotes = React.useState ([]: NoteSearch list)
+    let notes, setNotes = React.useState ([]: Note list)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)
 
@@ -105,8 +107,7 @@ let CreateNotesSearchPage
 
     let openNote (relativePath: string) =
         match tryResolveArcRelativePath appState relativePath with
-        | None ->
-            setPreviewData (Some(PageState.Error $"Could not resolve note path '{relativePath}'."))
+        | None -> setPreviewData (Some(PageState.Error $"Could not resolve note path '{relativePath}'."))
         | Some absolutePath ->
             promise {
                 setSelectedTreeItemPath (Some absolutePath)
@@ -115,8 +116,7 @@ let CreateNotesSearchPage
 
                 match result with
                 | Ok previewData -> setPreviewData (Some previewData)
-                | Result.Error exn ->
-                    setPreviewData (Some(PageState.Error $"Could not open note: {exn.Message}"))
+                | Result.Error exn -> setPreviewData (Some(PageState.Error $"Could not open note: {exn.Message}"))
             }
             |> Promise.start
 
@@ -169,4 +169,3 @@ let createFromNotes
             | None -> setPreviewData (Some(PageState.Text payload.Intent.Content))
     }
     |> Promise.start
-
