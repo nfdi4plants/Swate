@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="GitService.test.fs" />
+    <Compile Include="GitValidation.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />
   </ItemGroup>
   <ItemGroup>
