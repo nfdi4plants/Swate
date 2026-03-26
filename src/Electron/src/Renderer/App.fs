@@ -13,46 +13,50 @@ open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Types
 open Browser.Dom
-
-open ARCtrl
-
 open Renderer.Components
-
-type SyncRequestKey = string * ArcFilesDiscriminate * string
 
 type private Model = {
     AppState: ArcRootPath
     PageState: PageState option
-    LeftSidebarState: LeftSidebarState option
-}
+    LeftSidebarIsOpen: bool
+    LeftSidebarTarget: LeftSidebarPage
+} with
+
+    static member Empty = {
+        AppState = None
+        PageState = None
+        LeftSidebarIsOpen = false
+        LeftSidebarTarget = LeftSidebarPage.FileExplorer
+    }
 
 type private Msg =
     | SetArcRootPath of ArcRootPath
     | PageStateChanged of PageState option
-    | GetOpenPathResponse of string option
-    | PathChanged of string option
+    | ToggleLeftSidebarTarget of LeftSidebarPage
+    | SetLeftSidebarIsOpen of bool
 
 let private createGetOpenPathCmd () : Cmd<Msg> =
     Cmd.OfPromise.either
         (fun () -> Api.ipcArcVaultApi.getOpenPath (unbox null))
         ()
-        GetOpenPathResponse
-        (fun _ -> GetOpenPathResponse None)
+        SetArcRootPath
+        (fun _ -> SetArcRootPath None)
 
 let private init () : Model * Cmd<Msg> =
     {
         AppState = None
         PageState = None
-        LeftSidebarState = None
+        LeftSidebarIsOpen = false
+        LeftSidebarTarget = LeftSidebarPage.FileExplorer
     },
     createGetOpenPathCmd ()
 
 let private msgName (msg: Msg) =
     match msg with
-    | SetArcRootPath _ -> "SetAppState"
-    | GetOpenPathResponse _ -> "GetOpenPathResponse"
-    | PathChanged _ -> "PathChanged"
+    | SetArcRootPath _ -> "SetArcRootPath"
     | PageStateChanged _ -> "PageStateChanged"
+    | ToggleLeftSidebarTarget _ -> "ToggleLeftSidebarTarget"
+    | SetLeftSidebarIsOpen _ -> "SetLeftSidebarIsOpen"
 
 let private traceUpdateMsg (msg: Msg) =
     console.log ($"[Renderer.App Elmish] {msgName msg}")
@@ -61,29 +65,54 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     traceUpdateMsg msg
 
     match msg with
-    | SetArcRootPath appState -> { model with AppState = appState }, Cmd.none
-    | GetOpenPathResponse pathOption
-    | PathChanged pathOption ->
-        match pathOption with
-        | Some p -> { model with AppState = Some p }, Cmd.none
-        | None ->
-            {
-                model with
-                    AppState = None
-                    PageState = None
-            },
-            Cmd.none
+    | SetArcRootPath appState ->
+        let nextModel =
+            match appState with
+            | Some path -> { model with AppState = Some path }
+            | None -> Model.Empty
+
+        nextModel, Cmd.none
     | PageStateChanged pageStateOption ->
         {
             model with
                 PageState = pageStateOption
         },
         Cmd.none
+    | ToggleLeftSidebarTarget target ->
+        let nextModel =
+            if model.LeftSidebarTarget = target then
+                {
+                    model with
+                        LeftSidebarIsOpen = not model.LeftSidebarIsOpen
+                }
+            else
+                {
+                    model with
+                        LeftSidebarIsOpen = true
+                        LeftSidebarTarget = target
+                }
+
+        nextModel, Cmd.none
+    | SetLeftSidebarIsOpen isOpen ->
+        {
+            model with
+                LeftSidebarIsOpen = isOpen
+        },
+        Cmd.none
 
 [<ReactComponent>]
-let private LeftActionButtons () =
-    React.Fragment [
+let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget) =
 
+    // let leftSidebarStateCtx =
+    //     React.useContext Swate.Components.LayoutContext.LeftSidebarContext
+
+    React.Fragment [
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--home-24-regular",
+            tooltip = "Home",
+            isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
+            onClick = fun () -> toggleTarget (LeftSidebarPage.FileExplorer)
+        )
     ]
 
 [<ReactComponent>]
@@ -117,18 +146,20 @@ let Main () =
         pathChange =
             fun pathOption ->
                 console.log ("[Swate] CHANGE PATH!")
-                dispatch (PathChanged pathOption)
+                dispatch (SetArcRootPath pathOption)
         recentARCsUpdate = ignore
         authAccountsUpdate = ignore
         fileTreeUpdate = ignore
         gitProgressUpdate = ignore
     }
 
-
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     ///Main content module
     let children = Renderer.Components.MainContent.Main.Main(model.AppState)
+
+    let toggleLeftSidebarTarget =
+        React.useCallback ((fun target -> dispatch (ToggleLeftSidebarTarget target)), [||])
 
     Context.AppStateCtx.AppStateCtx.Provider(
         appCtx,
@@ -144,7 +175,13 @@ let Main () =
                             |],
                         navbar = Renderer.Components.Navbar.Main(),
                         leftSidebar = Renderer.Components.LeftSidebar.Main.Main(),
-                        leftActions = React.Fragment [| Layout.LeftSidebarToggleBtn() |]
+                        leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
+                        leftSidebarState = {
+                            isOpen = model.LeftSidebarIsOpen
+                            setIsOpen = fun isOpen -> dispatch (SetLeftSidebarIsOpen isOpen)
+                            sidebarType = model.LeftSidebarTarget
+                            setSidebarType = fun target -> dispatch (ToggleLeftSidebarTarget target)
+                        }
                     )
                 )
             )

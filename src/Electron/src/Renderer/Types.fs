@@ -7,7 +7,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 
 [<RequireQualifiedAccess>]
-type LeftSidebarState = | FileExplorer
+type LeftSidebarPage = | FileExplorer
 
 [<RequireQualifiedAccess>]
 type PageState =

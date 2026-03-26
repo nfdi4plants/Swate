@@ -3,7 +3,6 @@ namespace Swate.Components
 open Feliz
 open Fable.Core
 
-
 module private Mocks =
 
     [<StringEnum>]
@@ -11,37 +10,6 @@ module private Mocks =
         | Home
         | Settings
         | Info
-
-module LayoutContext =
-
-    type LayoutContextType = StateContext<bool>
-
-    type SidebarState<'A> = {
-        isOpen: bool
-        setIsOpen: bool -> unit
-        sidebarType: 'A
-        setSidebarType: 'A -> unit
-    } with
-
-        static member Empty<'A>() : SidebarState<'A> = {
-            isOpen = false
-            setIsOpen = ignore
-            sidebarType = Unchecked.defaultof<'A>
-            setSidebarType = ignore
-        }
-
-    module LayoutContextType =
-
-        let Empty: LayoutContextType = { state = false; setState = ignore }
-
-    /// Holds one stable React context instance for left sidebar. Otherwise we run into consistency issues with a generic argument
-    type private LeftSidebarContextHolder<'A>() =
-        static member val Context = React.createContext<SidebarState<'A>> (SidebarState<'A>.Empty()) with get
-
-    let LeftSidebarContext<'A> = LeftSidebarContextHolder<'A>.Context
-
-    let RightSidebarContext =
-        React.createContext<LayoutContextType> (LayoutContextType.Empty)
 
 open LayoutContext
 
@@ -272,7 +240,6 @@ type Layout =
         ) =
         let hasNavbar = defaultArg hasNavbar false
         let ctxLeft = React.useContext (LeftSidebarContext)
-        console.log ctxLeft
         let ctxRight = React.useContext (RightSidebarContext)
 
         let widthLeft, setWidthLeft =
@@ -460,7 +427,6 @@ type Layout =
             React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen", sidebarRightDefault)
 
         let leftSidebarState = defaultArg leftSidebarState (SidebarState.Empty())
-        console.log leftSidebarState
 
         let navbar = React.useMemo ((fun () -> navbar), [| box navbar |])
 
@@ -521,16 +487,6 @@ type Layout =
                 className
             ]
             prop.children children
-        ]
-
-    [<ReactComponent>]
-    static member private TestBtn() =
-        let ctx = React.useContext (LeftSidebarContext)
-
-        Html.button [
-            prop.className "swt:btn"
-            prop.onClick (fun _ -> console.log ctx)
-            prop.text "DEBUG"
         ]
 
     [<ReactComponent>]

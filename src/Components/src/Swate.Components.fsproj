@@ -88,6 +88,7 @@
     <Compile Include="GenericComponents\Navbar.fs" />
     <Compile Include="ARCSelector\Types.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
+    <Compile Include="Layout\LayoutContext.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
     <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
