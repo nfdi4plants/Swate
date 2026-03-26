@@ -23,6 +23,7 @@ type SyncRequestKey = string * ArcFilesDiscriminate * string
 type private Model = {
     AppState: ArcRootPath
     PageState: PageState option
+    LeftSidebarState: LeftSidebarState option
 }
 
 type private Msg =
@@ -39,7 +40,12 @@ let private createGetOpenPathCmd () : Cmd<Msg> =
         (fun _ -> GetOpenPathResponse None)
 
 let private init () : Model * Cmd<Msg> =
-    { AppState = None; PageState = None }, createGetOpenPathCmd ()
+    {
+        AppState = None
+        PageState = None
+        LeftSidebarState = None
+    },
+    createGetOpenPathCmd ()
 
 let private msgName (msg: Msg) =
     match msg with

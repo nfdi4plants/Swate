@@ -3,16 +3,39 @@ namespace Swate.Components
 open Feliz
 open Fable.Core
 
+
+module private Mocks =
+
+    [<StringEnum>]
+    type LeftSidebarStateMock =
+        | Home
+        | Settings
+        | Info
+
 module LayoutContext =
 
     type LayoutContextType = StateContext<bool>
+
+    type SidebarState<'A> = {
+        isOpen: bool
+        setIsOpen: bool -> unit
+        sidebarType: 'A
+        setSidebarType: 'A -> unit
+    } with
+
+        static member Empty<'A>() : SidebarState<'A> = {
+            isOpen = false
+            setIsOpen = ignore
+            sidebarType = Unchecked.defaultof<'A>
+            setSidebarType = ignore
+        }
 
     module LayoutContextType =
 
         let Empty: LayoutContextType = { state = false; setState = ignore }
 
-    let LeftSidebarContext =
-        React.createContext<LayoutContextType> (LayoutContextType.Empty)
+    let LeftSidebarContext<'A> =
+        React.createContext<SidebarState<'A>> (SidebarState<'A>.Empty())
 
     let RightSidebarContext =
         React.createContext<LayoutContextType> (LayoutContextType.Empty)
@@ -113,18 +136,18 @@ type Layout =
     [<ReactComponent>]
     static member LeftSidebarToggleBtn(?activeBorderStyle: bool) =
         let ctx = React.useContext (LeftSidebarContext)
-        let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.state)
+        let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.isOpen)
 
         Layout.LayoutBtn(
             iconClassName =
-                (if ctx.state then
+                (if ctx.isOpen then
                      "swt:fluent--panel-left-48-filled"
                  else
                      "swt:fluent--panel-left-48-regular"),
             tooltip = "Toggle left sidebar",
             tooltipClassName = "swt:tooltip-left",
             ?isActive = showIsActive,
-            onClick = fun () -> ctx.setState (not ctx.state)
+            onClick = fun () -> ctx.setIsOpen (not ctx.isOpen)
         )
 
     [<ReactComponent>]
@@ -235,7 +258,7 @@ type Layout =
         ]
 
     [<ReactMemoComponent>]
-    static member Sidebars
+    static member private Sidebars
         (
             children: ReactElement,
             ?leftContent: ReactElement,
@@ -246,6 +269,7 @@ type Layout =
         ) =
         let hasNavbar = defaultArg hasNavbar false
         let ctxLeft = React.useContext (LeftSidebarContext)
+        console.log ctxLeft
         let ctxRight = React.useContext (RightSidebarContext)
 
         let widthLeft, setWidthLeft =
@@ -292,7 +316,7 @@ type Layout =
                 if StartResizeState.current.IsNone then
                     StartResizeState.current <-
                         Some {|
-                            isOpen = ctxLeft.state
+                            isOpen = ctxLeft.isOpen
                             width = widthLeft
                         |}
 
@@ -321,10 +345,10 @@ type Layout =
                     match calcResize newWidth windowX widthRight with
                     | CloseTargetSidebar ->
                         ctxRight.setState StartResizeState.current.Value.isOpen
-                        ctxLeft.setState false
+                        ctxLeft.setIsOpen false
                     | ResizeTarget width ->
                         ctxRight.setState StartResizeState.current.Value.isOpen
-                        ctxLeft.setState true
+                        ctxLeft.setIsOpen true
                         setWidthLeft width
                     | ResizeBoth(leftWidth, rightWidth) ->
                         ctxRight.setState StartResizeState.current.Value.isOpen
@@ -354,19 +378,19 @@ type Layout =
 
                     match calcResize newWidth windowX widthLeft with
                     | CloseTargetSidebar ->
-                        ctxLeft.setState StartResizeState.current.Value.isOpen
+                        ctxLeft.setIsOpen StartResizeState.current.Value.isOpen
                         ctxRight.setState false
                     | ResizeTarget width ->
-                        ctxLeft.setState StartResizeState.current.Value.isOpen
+                        ctxLeft.setIsOpen StartResizeState.current.Value.isOpen
                         ctxRight.setState true
                         setWidthRight width
                     | ResizeBoth(rightWidth, leftWidth) ->
-                        ctxLeft.setState StartResizeState.current.Value.isOpen
+                        ctxLeft.setIsOpen StartResizeState.current.Value.isOpen
                         setWidthRight rightWidth
                         setWidthLeft leftWidth
                     | ResizeTargetCollapseOther width ->
                         setWidthRight width
-                        ctxLeft.setState false
+                        ctxLeft.setIsOpen false
             ),
             [| box throttledRightPointerPosition |]
         )
@@ -386,7 +410,7 @@ type Layout =
                     Layout.SidebarArea(
                         leftContent.Value,
                         widthLeft,
-                        ctxLeft.state,
+                        ctxLeft.isOpen,
                         leftRef,
                         setLeftPointerPositionWrapper,
                         Sidebar.Side.Left
@@ -415,7 +439,7 @@ type Layout =
         ]
 
     [<ReactComponent(true)>]
-    static member Main
+    static member Main<'A>
         (
             children: ReactElement,
             ?navbar: ReactElement,
@@ -423,21 +447,22 @@ type Layout =
             ?rightSidebar: ReactElement,
             ?leftActions: ReactElement,
             ?rightActions: ReactElement,
-            ?sidebarLeftDefault: bool,
+            ?leftSidebarState: SidebarState<'A>,
             ?sidebarRightDefault: bool
         ) =
 
-        let sidebarLeftDefault = defaultArg sidebarLeftDefault false
         let sidebarRightDefault = defaultArg sidebarRightDefault false
-
-        let leftSidebarState, setLeftSidebarState =
-            React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "leftSidebarOpen", sidebarLeftDefault)
 
         let rightSidebarState, setRightSidebarState =
             React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen", sidebarRightDefault)
 
+        let leftSidebarState = defaultArg leftSidebarState (SidebarState.Empty())
+        console.log leftSidebarState
+
         let navbar = React.useMemo ((fun () -> navbar), [| box navbar |])
+
         let leftSidebar = React.useMemo ((fun () -> leftSidebar), [| box leftSidebar |])
+
         let rightSidebar = React.useMemo ((fun () -> rightSidebar), [| box rightSidebar |])
         let leftActions = React.useMemo ((fun () -> leftActions), [| box leftActions |])
         let rightActions = React.useMemo ((fun () -> rightActions), [| box rightActions |])
@@ -460,10 +485,7 @@ type Layout =
                 setState = setRightSidebarState
             },
             LeftSidebarContext.Provider(
-                {
-                    state = leftSidebarState
-                    setState = setLeftSidebarState
-                },
+                leftSidebarState,
                 Html.div [
                     prop.className "swt:flex-1 swt:flex swt:flex-col swt:h-screen swt:overflow-hidden"
                     prop.children [
@@ -489,22 +511,54 @@ type Layout =
 
 
     [<ReactComponent>]
-    static member private Wrapper (txt: string) (className: string) =
+    static member private Wrapper (children: ReactElement) (className: string) =
         Html.div [
             prop.className [
-                "swt:flex swt:grow swt:items-center swt:justify-center"
+                "swt:flex swt:flex-col swt:gap-2 swt:grow swt:items-center swt:justify-center"
                 className
             ]
-            prop.text txt
+            prop.children children
+        ]
+
+    [<ReactComponent>]
+    static member private TestBtn() =
+        let ctx = React.useContext (LeftSidebarContext)
+
+        Html.button [
+            prop.className "swt:btn"
+            prop.onClick (fun _ -> console.log ctx)
+            prop.text "DEBUG"
         ]
 
     [<ReactComponent>]
     static member Entry() =
 
-        let btnActive, setBtnActive = React.useState false
+        let leftSidebarTarget, setLeftSidebarTarget =
+            React.useLocalStorage (
+                Keys.mkLocalStorageKey "layout" "main" "leftSidebarTarget",
+                Mocks.LeftSidebarStateMock.Home
+            )
+
+        let leftSidebarIsOpen, setLeftSidebarIsOpen =
+            React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "leftSidebarIsOpen", true)
+
+        let toggleLeftSidebarTarget =
+            fun target ->
+                if leftSidebarTarget = target then
+                    setLeftSidebarIsOpen (not leftSidebarIsOpen)
+                else
+                    setLeftSidebarIsOpen true
+                    setLeftSidebarTarget target
 
         Layout.Main(
-            children = Layout.Wrapper "Main Content" "swt:bg-base-300 swt:h-full",
+            children =
+                Layout.Wrapper
+                    (React.Fragment [
+                        Html.div "Main Content"
+                        Html.div (string leftSidebarIsOpen)
+                        Html.div (string leftSidebarTarget)
+                    ])
+                    "swt:bg-base-300 swt:h-full",
             navbar = Navbar.Entry(),
             leftSidebar =
                 Html.ul [
@@ -540,20 +594,27 @@ type Layout =
                     Layout.LayoutBtn(
                         iconClassName = "swt:fluent--home-24-regular",
                         tooltip = "Home",
-                        isActive = btnActive,
-                        onClick = fun () -> setBtnActive (not btnActive)
+                        isActive = (leftSidebarTarget = Mocks.LeftSidebarStateMock.Home),
+                        onClick = fun () -> toggleLeftSidebarTarget Mocks.LeftSidebarStateMock.Home
                     )
                     Layout.LayoutBtn(
                         iconClassName = "swt:fluent--settings-24-regular",
                         tooltip = "Settings",
-                        onClick = fun () -> Browser.Dom.window.alert "Settings clicked"
+                        isActive = (leftSidebarTarget = Mocks.LeftSidebarStateMock.Settings),
+                        onClick = fun () -> toggleLeftSidebarTarget Mocks.LeftSidebarStateMock.Settings
                     )
                     Layout.LayoutBtn(
                         iconClassName = "swt:fluent--info-24-regular",
                         tooltip = "Info",
-                        onClick = fun () -> Browser.Dom.window.alert "Info clicked"
+                        isActive = (leftSidebarTarget = Mocks.LeftSidebarStateMock.Info),
+                        onClick = fun () -> toggleLeftSidebarTarget Mocks.LeftSidebarStateMock.Info
                     )
                 ],
-            sidebarLeftDefault = true,
+            leftSidebarState = {
+                isOpen = leftSidebarIsOpen
+                setIsOpen = setLeftSidebarIsOpen
+                sidebarType = leftSidebarTarget
+                setSidebarType = setLeftSidebarTarget
+            },
             sidebarRightDefault = true
         )
