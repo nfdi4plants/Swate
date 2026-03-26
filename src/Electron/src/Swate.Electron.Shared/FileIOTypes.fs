@@ -20,7 +20,7 @@ module FileEntryExtensions =
 
     type FileEntry with
 
-        static member create(name: string, path: string, isDirectory: bool, ?isLfs: bool option) = {
+        static member create(name: string, path: string, isDirectory: bool, ?isLfs: bool option) : FileEntry = {
             name = name
             path = path
             isDirectory = isDirectory

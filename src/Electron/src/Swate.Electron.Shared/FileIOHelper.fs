@@ -1,5 +1,11 @@
 module Swate.Electron.Shared.FileIOHelper
 
+open System
+open System.Collections.Generic
+open ARCtrl
+open Swate.Components.Notes.Editor
+open Swate.Electron.Shared.FileIOTypes
+
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
 let normalizePath (path: string) =
     path.Replace("\\", "/").Trim().TrimEnd('/')
@@ -8,14 +14,175 @@ let normalizePath (path: string) =
 let getPathParts (path: string) =
     normalizePath path |> (fun p -> p.Split("/"))
 
+let getNonEmptyPathParts (path: string) =
+    normalizePath path
+    |> fun p -> p.Split('/', StringSplitOptions.RemoveEmptyEntries)
+
+let getPathDepth (path: string) = path |> getNonEmptyPathParts |> Array.length
+
 let getFileName (path: string) = path |> getPathParts |> Array.last
 
 let pathsEqual (left: string) (right: string) =
     normalizePath left = normalizePath right
 
-let combineMany = ARCtrl.ArcPathHelper.combineMany
+let isSameOrDescendantPath (path: string) (ancestorPath: string) =
+    let normalizedPath = normalizePath path
+    let normalizedAncestorPath = normalizePath ancestorPath
 
-open ARCtrl
+    normalizedPath = normalizedAncestorPath
+    || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.OrdinalIgnoreCase)
+
+let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
+    let segments = getNonEmptyPathParts path
+
+    match
+        segments
+        |> Array.tryFindIndex (fun segment -> String.Equals(segment, folderName, StringComparison.OrdinalIgnoreCase))
+    with
+    | Some index when index + 1 < segments.Length ->
+        let name = segments.[index + 1].Trim()
+
+        if String.IsNullOrWhiteSpace name then
+            None
+        else
+            Some name
+    | _ -> None
+
+let private tryGetParentPath (path: string) =
+    let normalizedPath = normalizePath path
+    let separatorIndex = normalizedPath.LastIndexOf('/')
+
+    if separatorIndex < 0 then
+        None
+    else
+        Some(normalizedPath.Substring(0, separatorIndex))
+
+let private tryResolveDatamapPreviewPath
+    (normalizedPath: string)
+    (folderSegment: string)
+    (targetFileName: string)
+    =
+    let lowered = normalizedPath.ToLowerInvariant()
+
+    if lowered.Contains(folderSegment) && lowered.EndsWith("/isa.datamap.xlsx") then
+        tryGetParentPath normalizedPath
+        |> Option.map (fun folderPath -> $"{folderPath}/{targetFileName}")
+    else
+        None
+
+let resolveArcPreviewPath (path: string) =
+    let normalizedPath = normalizePath path
+
+    [
+        tryResolveDatamapPreviewPath normalizedPath "/assays/" "isa.assay.xlsx"
+        tryResolveDatamapPreviewPath normalizedPath "/studies/" "isa.study.xlsx"
+        tryResolveDatamapPreviewPath normalizedPath "/runs/" "isa.run.xlsx"
+    ]
+    |> List.tryPick id
+    |> Option.defaultValue normalizedPath
+
+let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: FileEntry) =
+    let parts = getNonEmptyPathParts entry.path
+    let rootParts = getNonEmptyPathParts rootPath
+
+    if parts.Length > rootParts.Length then
+        let rec loop (node: FileTreeNode) index =
+            let part = parts[index]
+            let isLast = index = parts.Length - 1
+
+            let child =
+                match node.children.TryGetValue(part) with
+                | true, existing when ((not isLast) || entry.isDirectory) && not existing.isDirectory ->
+                    // A node may first appear via a file path segment; upgrade it to a directory when needed.
+                    let upgraded = { existing with isDirectory = true }
+                    node.children.[part] <- upgraded
+                    upgraded
+                | true, existing -> existing
+                | false, _ ->
+                    let newPath = parts.[0..index] |> String.concat "/"
+
+                    let newNode =
+                        FileTreeNode.create (
+                            part,
+                            (if isLast then entry.isDirectory else true),
+                            newPath,
+                            Dictionary(),
+                            entry.isLfs
+                        )
+
+                    node.children.Add(part, newNode)
+                    newNode
+
+            if not isLast then
+                loop child (index + 1)
+
+        loop root rootParts.Length
+
+let toFileTreeNode (fileEntries: FileEntry[]) =
+
+    if fileEntries.Length = 0 then
+        failwith "toFileTreeNode requires at least one file entry to determine the root path."
+
+    let normalizedPaths =
+        fileEntries |> Array.map (fun fileEntry -> normalizePath fileEntry.path)
+
+    let rootPath =
+        normalizedPaths
+        |> Array.distinct
+        |> Array.sortBy (fun path -> getPathDepth path, path)
+        |> Array.head
+
+    let adaptedFileEntries =
+        fileEntries
+        |> Array.filter (fun fileEntry -> normalizePath fileEntry.path <> rootPath)
+        // Deterministic order avoids creating parents from file entries before their directory entries.
+        |> Array.sortBy (fun fileEntry ->
+            let depth = getPathDepth fileEntry.path
+            depth, (if fileEntry.isDirectory then 0 else 1), normalizePath fileEntry.path
+        )
+
+    let rootElement =
+        let rootEntry =
+            fileEntries
+            |> Array.find (fun fileEntry -> normalizePath fileEntry.path = rootPath)
+
+        FileTreeNode.create (
+            rootEntry.name,
+            rootEntry.isDirectory,
+            rootPath,
+            Dictionary(),
+            rootEntry.isLfs
+        )
+
+    adaptedFileEntries
+    |> Array.iter (fun fileEntry -> insertFileTreeEntry rootElement rootPath fileEntry)
+
+    rootElement
+
+let tryGetExistingNotesTargetRef (path: string) : ExistingTargetRef option =
+    let tryResolveTarget folderName kind =
+        tryGetPathSegmentAfterFolder folderName path
+        |> Option.map (fun name -> { Name = name; Kind = kind })
+
+    match tryResolveTarget "studies" NotesTargetKind.Study with
+    | Some target -> Some target
+    | None -> tryResolveTarget "assays" NotesTargetKind.Assay
+
+let createAvailableNotesTargets (fileEntries: seq<FileEntry>) =
+    fileEntries
+    |> Seq.choose (fun entry -> tryGetExistingNotesTargetRef entry.path)
+    |> Seq.distinctBy (fun target -> target.Kind, target.Name)
+    |> Seq.sortBy (fun target ->
+        let kindOrder =
+            match target.Kind with
+            | NotesTargetKind.Study -> 0
+            | NotesTargetKind.Assay -> 1
+
+        kindOrder, target.Name.ToLowerInvariant()
+    )
+    |> ResizeArray
+
+let combineMany = ARCtrl.ArcPathHelper.combineMany
 
 let tryGetArcFilePath (arcRootPath: ArcRootPath) (arcFile: ArcFiles) =
     let arcRootPath = defaultArg arcRootPath ""

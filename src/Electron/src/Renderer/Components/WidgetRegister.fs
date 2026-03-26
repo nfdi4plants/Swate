@@ -11,7 +11,7 @@ open ARCtrl.Contract
 let private filePickerServices: FilePickerWidgetServices = {
     pickPaths =
         fun () -> promise {
-            let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
+            let! result = Api.ipcArcVaultApi.pickArcPaths (unbox null)
             return result |> Result.mapError (fun error -> error.Message)
         }
 }
@@ -24,15 +24,12 @@ let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
         }
     loadTextFile =
         fun path -> promise {
-            let! result = Api.ipcArcVaultApi.openFile (unbox null) path
+            let! result = Api.ipcArcVaultApi.readExternalTextFile (unbox null) path
 
             return
                 match result with
                 | Error error -> Error error.Message
-                | Ok dto ->
-                    match dto.fileType with
-                    | DTOType.DTOTypeIsPlainTextVariant -> Ok dto.content
-                    | _ -> Error "Selected file could not be loaded as plain text."
+                | Ok content -> Ok content
         }
 }
 

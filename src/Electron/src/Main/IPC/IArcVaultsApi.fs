@@ -26,12 +26,30 @@ let private containsTraversalSegments (relativePath: string) =
     relativePath.Split('/')
     |> Array.exists (fun segment -> segment = "." || segment = "..")
 
+let private tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
+    let arcRoot = pathDynamic?resolve (arcPath) |> unbox<string>
+    let absolutePath = pathDynamic?resolve (requestedAbsolutePath) |> unbox<string>
+
+    let relativePath =
+        pathDynamic?relative (arcRoot, absolutePath)
+        |> unbox<string>
+        |> FileIOHelper.normalizePath
+
+    if String.IsNullOrWhiteSpace relativePath || relativePath = "." then
+        Ok ""
+    elif containsTraversalSegments relativePath then
+        Error(exn $"Path '{requestedAbsolutePath}' is outside the active ARC root.")
+    else
+        Ok relativePath
+
 /// This function resolves a given relative path against the ARC root path and ensures that the resolved absolute path is within the ARC root directory to prevent unauthorized file system access.
 let private tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) =
     let relativePath = FileIOHelper.normalizePath requestedRelativePath
 
     if String.IsNullOrWhiteSpace relativePath then
         Error(exn "RelativePath must not be empty.")
+    elif pathDynamic?isAbsolute (relativePath) |> unbox<bool> then
+        Error(exn "RelativePath must not be absolute.")
     elif containsTraversalSegments relativePath then
         Error(exn "RelativePath must not contain path traversal segments.")
     else
@@ -274,6 +292,45 @@ let api: IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    pickArcPaths =
+        fun event -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        let properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                        |]
+
+                        let! result = dialog.showOpenDialog (properties = properties, defaultPath = arcPath)
+
+                        if result.canceled then
+                            return Error(exn "Cancelled")
+                        else
+                            let relativePaths =
+                                result.filePaths
+                                |> Array.map (tryGetArcRelativePath arcPath)
+
+                            match relativePaths |> Array.tryFind Result.isError with
+                            | Some(Error pathError) -> return Error pathError
+                            | _ ->
+                                return
+                                    relativePaths
+                                    |> Array.choose (function
+                                        | Ok path when String.IsNullOrWhiteSpace path -> None
+                                        | Ok path -> Some path
+                                        | Error _ -> None
+                                    )
+                                    |> Ok
+            with e ->
+                return Error e
+        }
     pickPaths =
         fun _ -> promise {
             let properties = [|
@@ -386,11 +443,23 @@ let api: IPCTypes.IArcVaultsApi = {
                         | Error pathError -> return Error pathError
                         | Ok path ->
                             let content = fs.readFileSync (path, "utf8")
-                            let dto = FileContentDTO.create ARCtrl.Contract.DTOType.PlainText content path
+                            let dto = FileContentDTO.create ARCtrl.Contract.DTOType.PlainText content relativePath
                             return Ok dto
                     with e ->
-                        return Error(exn $"Could not read file {path}: {e.Message}")
+                        return Error(exn $"Could not read file {relativePath}: {e.Message}")
             | _ -> return Error(exn "ARC is not loaded.")
+        }
+    readExternalTextFile =
+        fun _ (path: string) -> promise {
+            try
+                if String.IsNullOrWhiteSpace path then
+                    return Error(exn "Path must not be empty.")
+                else
+                    let absolutePath = pathDynamic?resolve (path) |> unbox<string>
+                    let content = fs.readFileSync (absolutePath, "utf8")
+                    return Ok content
+            with e ->
+                return Error(exn $"Could not read external file: {e.Message}")
         }
     runGitLfs =
         fun (event: IpcMainEvent) (request: GitLfsRequest) -> promise {

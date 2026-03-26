@@ -1,5 +1,6 @@
 module Renderer.Context.FileStateCtx
 
+open System.Collections.Generic
 open Swate.Components
 open Swate.Components.Types
 open Swate.Electron.Shared
@@ -61,7 +62,9 @@ let FileStateCtxProvider (children: ReactElement) =
             (fun _ -> {
                 state = fileState
                 setState = setFileState
-                setFileTree = fun fileTree -> setFileState (fun fs -> { fs with FileTree = fileTree })
+                setFileTree =
+                    fun fileTree ->
+                        setFileState (fun fs -> { fs with FileTree = fileTree })
                 setSelectedTreeItemPath =
                     fun selectedTreeItemPath ->
                         setFileState (fun fs -> {

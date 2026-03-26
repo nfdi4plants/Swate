@@ -204,7 +204,12 @@ module ArcVaultExtensions =
                 |> Remoting.withWindow this.window
                 |> Remoting.buildClient<IMainUpdateRendererApi>
 
-            sendMsg.fileTreeUpdate fileTree
+            let rendererFileTree =
+                match this.path with
+                | Some arcPath -> toRendererFileTree arcPath fileTree.Values
+                | None -> Dictionary<string, FileEntry>()
+
+            sendMsg.fileTreeUpdate rendererFileTree
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
