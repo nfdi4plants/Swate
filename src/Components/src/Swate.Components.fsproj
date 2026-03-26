@@ -4,6 +4,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <DefineConstants>FABLE_COMPILER</DefineConstants>
+    <DefineConstants>FABLE_COMPILER_JAVASCRIPT</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
