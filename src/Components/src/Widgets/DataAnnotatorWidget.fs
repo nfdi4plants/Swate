@@ -231,9 +231,6 @@ type DataAnnotatorWidget =
     static member private WidgetContainerClass =
         "swt:flex swt:flex-col swt:gap-3 swt:p-2 swt:w-fit swt:max-w-[95vw]"
 
-    static member private fileNameFromPath(path: string) =
-        path.Replace("\\", "/").Split('/') |> Array.last
-
     static member private fileTypeFromName(fileName: string) =
         if fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) then
             "text/csv"
@@ -374,7 +371,7 @@ type DataAnnotatorWidget =
         (
             pickFile: unit -> JS.Promise<unit>,
             loading: bool,
-            selectedPath: string option,
+            selectedFileName: string option,
             dataFile: DataAnnotatorWidgetModel.DataFile option,
             reset: unit -> unit
         ) =
@@ -391,11 +388,7 @@ type DataAnnotatorWidget =
                     prop.className "swt:input swt:input-sm swt:grow"
                     prop.readOnly true
                     prop.placeholder "No file selected"
-                    prop.value (
-                        selectedPath
-                        |> Option.map DataAnnotatorWidget.fileNameFromPath
-                        |> Option.defaultValue ""
-                    )
+                    prop.value (selectedFileName |> Option.defaultValue "")
                 ]
                 Html.button [
                     prop.className "swt:btn swt:btn-outline swt:btn-sm"
@@ -426,7 +419,7 @@ type DataAnnotatorWidget =
             React.useStateWithUpdater (Set.empty<DataAnnotatorWidgetModel.DataTarget>)
 
         let separatorInput, setSeparatorInput = React.useState ""
-        let selectedPath, setSelectedPath = React.useState (None: string option)
+        let selectedFileName, setSelectedFileName = React.useState (None: string option)
 
         let targetColumn, setTargetColumn =
             React.useState DataAnnotatorWidgetModel.TargetColumn.Autodetect
@@ -444,52 +437,45 @@ type DataAnnotatorWidget =
             setParsedFile None
             setSelectedTargets (fun _ -> Set.empty)
             setSeparatorInput ""
-            setSelectedPath None
+            setSelectedFileName None
             setTargetColumn DataAnnotatorWidgetModel.TargetColumn.Autodetect
             setStatusMessage None
             setErrorMessage None
 
         let setLoadedFile
-            (path: string)
+            (fileName: string)
             (nextDataFile: DataAnnotatorWidgetModel.DataFile)
             (nextParsedFile: DataAnnotatorWidgetModel.ParsedDataFile option)
             =
-            setSelectedPath (Some path)
+            setSelectedFileName (Some fileName)
             setDataFile (Some nextDataFile)
             setParsedFile nextParsedFile
             setSeparatorInput (DataAnnotatorWidget.separatorToInput nextDataFile.ExpectedSeparator)
             setSelectedTargets (fun _ -> Set.empty)
 
-        let loadFileFromPath (path: string) = promise {
+        let loadImportedFile (importedFile: ImportedTextFile) = promise {
             setLoading true
             setStatusMessage None
             setErrorMessage None
 
             try
-                let! fileResult = services.loadTextFile path
+                let loadedDataFile =
+                    DataAnnotatorWidgetModel.DataFile.create (
+                        importedFile.Name,
+                        DataAnnotatorWidget.fileTypeFromName importedFile.Name,
+                        importedFile.Content,
+                        float importedFile.Content.Length
+                    )
 
-                match fileResult with
-                | Error message -> setErrorMessage (Some $"Failed to open file: {message}")
-                | Ok content ->
-                    let fileName = DataAnnotatorWidget.fileNameFromPath path
-
-                    let loadedDataFile =
-                        DataAnnotatorWidgetModel.DataFile.create (
-                            fileName,
-                            DataAnnotatorWidget.fileTypeFromName fileName,
-                            content,
-                            float content.Length
-                        )
-
-                    match
-                        DataAnnotatorWidget.parseDataFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile
-                    with
-                    | Ok parsed ->
-                        setLoadedFile path loadedDataFile (Some parsed)
-                        setStatusMessage (Some $"Loaded {fileName} ({parsed.BodyRows.Length} rows).")
-                    | Error message ->
-                        setLoadedFile path loadedDataFile None
-                        setErrorMessage (Some message)
+                match
+                    DataAnnotatorWidget.parseDataFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile
+                with
+                | Ok parsed ->
+                    setLoadedFile importedFile.Name loadedDataFile (Some parsed)
+                    setStatusMessage (Some $"Loaded {importedFile.Name} ({parsed.BodyRows.Length} rows).")
+                | Error message ->
+                    setLoadedFile importedFile.Name loadedDataFile None
+                    setErrorMessage (Some message)
             finally
                 setLoading false
         }
@@ -498,17 +484,17 @@ type DataAnnotatorWidget =
             setStatusMessage None
             setErrorMessage None
 
-            let! pathResult = services.pickPaths ()
+            let! importResult = services.pickTextFiles ()
 
-            match pathResult with
+            match importResult with
             | Error message when message <> "Cancelled" -> setErrorMessage (Some $"Failed to pick file: {message}")
             | Error _ -> ()
-            | Ok paths when paths.Length = 0 -> setStatusMessage (Some "No file selected.")
-            | Ok paths ->
-                if paths.Length > 1 then
+            | Ok importedFiles when importedFiles.Length = 0 -> setStatusMessage (Some "No file selected.")
+            | Ok importedFiles ->
+                if importedFiles.Length > 1 then
                     setStatusMessage (Some "Multiple files selected. Using the first one.")
 
-                do! loadFileFromPath paths.[0]
+                do! loadImportedFile importedFiles.[0]
         }
 
         let applySeparator () =
@@ -663,7 +649,13 @@ type DataAnnotatorWidget =
                             ]
                         ]
                     ]
-                    DataAnnotatorWidget.FileControllerElements(pickFile, loading, selectedPath, dataFile, reset)
+                    DataAnnotatorWidget.FileControllerElements(
+                        pickFile,
+                        loading,
+                        selectedFileName,
+                        dataFile,
+                        reset
+                    )
                     if dataFile.IsSome then
                         Html.div [
                             prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:items-center"

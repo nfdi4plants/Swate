@@ -297,10 +297,9 @@ type Widget =
     [<ReactComponent>]
     static member DataAnnotator(model: Model, dispatch, rmv) =
         let inputRef = React.useInputRef ()
-        let selectedFilesRef = React.useRef (Map.empty<string, Browser.Types.File>)
 
         let pendingPickResolve =
-            React.useRef (None: (Result<string[], string> -> unit) option)
+            React.useRef (None: (Result<ImportedTextFile[], string> -> unit) option)
 
         let activeView =
             match model.SpreadsheetModel.ActiveView with
@@ -316,7 +315,7 @@ type Widget =
         let services =
             React.useMemo (
                 (fun _ -> {
-                    pickPaths =
+                    pickTextFiles =
                         fun () ->
                             Promise.create (fun resolve _ ->
                                 pendingPickResolve.current <- Some resolve
@@ -329,15 +328,6 @@ type Widget =
                                     pendingPickResolve.current <- None
                                     resolve (Result.Error "Browser file input is unavailable.")
                             )
-                    loadTextFile =
-                        fun path -> promise {
-                            match selectedFilesRef.current |> Map.tryFind path with
-                            | Some file ->
-                                let! content = file.text ()
-                                return Result.Ok content
-                            | None ->
-                                return Result.Error "Selected file is no longer available. Choose the file again."
-                        }
                 }),
                 [||]
             )
@@ -352,12 +342,17 @@ type Widget =
                         prop.accept ".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
                         prop.ref inputRef
                         prop.onChange (fun (file: Browser.Types.File) ->
-                            selectedFilesRef.current <- selectedFilesRef.current.Add(file.name, file)
+                            promise {
+                                let! content = file.text ()
 
-                            pendingPickResolve.current
-                            |> Option.iter (fun resolve -> resolve (Result.Ok [| file.name |]))
+                                pendingPickResolve.current
+                                |> Option.iter (fun resolve ->
+                                    resolve (Result.Ok [| { Name = file.name; Content = content } |])
+                                )
 
-                            pendingPickResolve.current <- None
+                                pendingPickResolve.current <- None
+                            }
+                            |> Promise.start
                         )
                     ]
                     if model.SpreadsheetModel.ArcFile.IsSome then

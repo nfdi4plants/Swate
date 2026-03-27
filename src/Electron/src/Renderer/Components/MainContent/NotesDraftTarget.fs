@@ -10,49 +10,6 @@ open ARCtrl.Contract
 open Renderer.Components.MainContent.Types
 open Renderer.Types
 
-module private NotesDraftTargetHelper =
-
-    open System
-
-    let tryGetExistingTargetRef (path: string) =
-        let segments = getPathParts path
-
-        let tryResolveTarget (folderName: string) (kind: NotesTargetKind) =
-            match
-                segments
-                |> Array.tryFindIndex (fun segment ->
-                    String.Equals(segment, folderName, StringComparison.OrdinalIgnoreCase)
-                )
-            with
-            | Some index when index + 1 < segments.Length ->
-                let name = segments.[index + 1].Trim()
-
-                if String.IsNullOrWhiteSpace name then
-                    None
-                else
-                    Some { Name = name; Kind = kind }
-            | _ -> None
-
-        match tryResolveTarget "studies" NotesTargetKind.Study with
-        | Some target -> Some target
-        | None -> tryResolveTarget "assays" NotesTargetKind.Assay
-
-    let createAvailableNotesTargets (fileEntries: FileEntry[]) =
-        fileEntries
-        |> Seq.choose (fun entry -> tryGetExistingTargetRef entry.path)
-        |> Seq.distinctBy (fun target -> target.Kind, target.Name)
-        |> Seq.sortBy (fun target ->
-            let kindOrder =
-                match target.Kind with
-                | NotesTargetKind.Study -> 0
-                | NotesTargetKind.Assay -> 1
-
-            kindOrder, target.Name.ToLowerInvariant()
-        )
-        |> ResizeArray
-
-open NotesDraftTargetHelper
-
 [<ReactComponent>]
 let NotesDraftTarget () =
 

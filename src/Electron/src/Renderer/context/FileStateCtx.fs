@@ -1,8 +1,5 @@
 module Renderer.Context.FileStateCtx
 
-open Swate.Components
-open Swate.Components.Types
-open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.FileIOTypes
 open Fable.Electron.Remoting.Renderer
@@ -61,7 +58,9 @@ let FileStateCtxProvider (children: ReactElement) =
             (fun _ -> {
                 state = fileState
                 setState = setFileState
-                setFileTree = fun fileTree -> setFileState (fun fs -> { fs with FileTree = fileTree })
+                setFileTree =
+                    fun fileTree ->
+                        setFileState (fun fs -> { fs with FileTree = fileTree })
                 setSelectedTreeItemPath =
                     fun selectedTreeItemPath ->
                         setFileState (fun fs -> {

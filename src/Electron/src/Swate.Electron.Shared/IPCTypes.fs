@@ -34,8 +34,9 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
-    pickPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
-
+    pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
     readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
