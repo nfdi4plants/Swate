@@ -20,42 +20,38 @@ type TemplateWidget =
     static member private WidgetContainerClass =
         "swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:w-[64rem] swt:max-w-[95vw] swt:h-[70vh] swt:max-h-[80vh]"
 
-    static member private toFullAuthorName (author: Person) =
+    static member private toFullAuthorName(author: Person) =
         [ author.FirstName; author.MidInitials; author.LastName ]
         |> List.choose id
         |> String.concat " "
 
-    static member private tryTrimmed (value: string) =
+    static member private tryTrimmed(value: string) =
         if System.String.IsNullOrWhiteSpace value then
             None
         else
             Some(value.Trim())
 
-    static member private compositeCellPreviewValues (cell: CompositeCell) =
+    static member private compositeCellPreviewValues(cell: CompositeCell) =
         match cell with
-        | CompositeCell.FreeText text ->
-            [| text |]
-        | CompositeCell.Term ontologyAnnotation ->
-            [|
-                ontologyAnnotation.NameText
-                defaultArg ontologyAnnotation.TermSourceREF ""
-                defaultArg ontologyAnnotation.TermAccessionNumber ""
-            |]
-        | CompositeCell.Unitized(value, ontologyAnnotation) ->
-            [|
-                value
-                ontologyAnnotation.NameText
-                defaultArg ontologyAnnotation.TermSourceREF ""
-                defaultArg ontologyAnnotation.TermAccessionNumber ""
-            |]
-        | CompositeCell.Data data ->
-            [|
-                defaultArg data.FilePath ""
-                data.NameText
-                defaultArg data.Selector ""
-                defaultArg data.Format ""
-                defaultArg data.SelectorFormat ""
-            |]
+        | CompositeCell.FreeText text -> [| text |]
+        | CompositeCell.Term ontologyAnnotation -> [|
+            ontologyAnnotation.NameText
+            defaultArg ontologyAnnotation.TermSourceREF ""
+            defaultArg ontologyAnnotation.TermAccessionNumber ""
+          |]
+        | CompositeCell.Unitized(value, ontologyAnnotation) -> [|
+            value
+            ontologyAnnotation.NameText
+            defaultArg ontologyAnnotation.TermSourceREF ""
+            defaultArg ontologyAnnotation.TermAccessionNumber ""
+          |]
+        | CompositeCell.Data data -> [|
+            defaultArg data.FilePath ""
+            data.NameText
+            defaultArg data.Selector ""
+            defaultArg data.Format ""
+            defaultArg data.SelectorFormat ""
+          |]
         |> Array.choose TemplateWidget.tryTrimmed
 
     static member private templateColumnValuePreview (table: ArcTable) (columnIndex: int) =
@@ -70,19 +66,12 @@ type TemplateWidget =
         |> Seq.distinct
         |> Seq.truncate 3
         |> String.concat " | "
-        |> fun preview ->
-            if preview = "" then
-                "No values"
-            else
-                preview
+        |> fun preview -> if preview = "" then "No values" else preview
 
     [<ReactComponent>]
     static member private TemplateRows
-        (
-            templates: Template[],
-            selectedTemplateIds: Set<System.Guid>,
-            toggleTemplateSelection: System.Guid -> unit
-        ) =
+        (templates: Template[], selectedTemplateIds: Set<System.Guid>, toggleTemplateSelection: System.Guid -> unit)
+        =
         if templates.Length = 0 then
             Html.div [
                 prop.className "swt:text-sm swt:opacity-70 swt:text-center"
@@ -110,8 +99,7 @@ type TemplateWidget =
                                 |> Seq.map TemplateWidget.toFullAuthorName
                                 |> String.concat ", "
 
-                            let toggleThisTemplate _ =
-                                toggleTemplateSelection template.Id
+                            let toggleThisTemplate _ = toggleTemplateSelection template.Id
 
                             Html.tr [
                                 prop.key (string template.Id)
@@ -151,7 +139,8 @@ type TemplateWidget =
                                         prop.text template.Version
                                     ]
                                     Html.td [
-                                        prop.className "swt:text-xs swt:opacity-70 swt:whitespace-nowrap swt:overflow-hidden swt:text-ellipsis"
+                                        prop.className
+                                            "swt:text-xs swt:opacity-70 swt:whitespace-nowrap swt:overflow-hidden swt:text-ellipsis"
                                         prop.title authors
                                         prop.text authors
                                     ]
@@ -206,16 +195,14 @@ type TemplateWidget =
                                         prop.isChecked (importAction.Equals action)
                                         prop.onChange (fun (_: bool) -> setTemplateImportAction template.Id action)
                                     ]
-                                    Html.span [
-                                        prop.className "swt:text-xs"
-                                        prop.text label
-                                    ]
+                                    Html.span [ prop.className "swt:text-xs"; prop.text label ]
                                 ]
                             ]
 
                         Html.div [
                             prop.key (string template.Id)
-                            prop.className "swt:border swt:border-base-300 swt:rounded-box swt:p-2 swt:flex swt:flex-col swt:gap-2"
+                            prop.className
+                                "swt:border swt:border-base-300 swt:rounded-box swt:p-2 swt:flex swt:flex-col swt:gap-2"
                             prop.children [
                                 Html.div [
                                     prop.className "swt:text-sm swt:font-medium swt:truncate"
@@ -225,8 +212,12 @@ type TemplateWidget =
                                 Html.div [
                                     prop.className "swt:flex swt:flex-col swt:gap-1"
                                     prop.children [
-                                        renderImportActionOption TemplateImportAction.ImportAsNewTable "Import (new table)"
-                                        renderImportActionOption TemplateImportAction.AppendToActiveTable "Append to active table"
+                                        renderImportActionOption
+                                            TemplateImportAction.ImportAsNewTable
+                                            "Import (new table)"
+                                        renderImportActionOption
+                                            TemplateImportAction.AppendToActiveTable
+                                            "Append to active table"
                                         renderImportActionOption TemplateImportAction.NoImport "No import"
                                     ]
                                 ]
@@ -251,16 +242,21 @@ type TemplateWidget =
                                                             prop.className "swt:flex swt:items-center swt:gap-2"
                                                             prop.children [
                                                                 Html.button [
-                                                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:ml-auto"
+                                                                    prop.className
+                                                                        "swt:btn swt:btn-ghost swt:btn-xs swt:ml-auto"
                                                                     prop.text "Select all"
                                                                     prop.disabled (not canEditColumns)
-                                                                    prop.onClick (fun _ -> selectAllTemplateColumns template.Id)
+                                                                    prop.onClick (fun _ ->
+                                                                        selectAllTemplateColumns template.Id
+                                                                    )
                                                                 ]
                                                                 Html.button [
                                                                     prop.className "swt:btn swt:btn-ghost swt:btn-xs"
                                                                     prop.text "Unselect all"
                                                                     prop.disabled (not canEditColumns)
-                                                                    prop.onClick (fun _ -> unselectAllTemplateColumns template)
+                                                                    prop.onClick (fun _ ->
+                                                                        unselectAllTemplateColumns template
+                                                                    )
                                                                 ]
                                                             ]
                                                         ]
@@ -268,17 +264,23 @@ type TemplateWidget =
                                                             prop.className "swt:overflow-x-auto"
                                                             prop.children [
                                                                 Html.table [
-                                                                    prop.className "swt:table swt:table-xs swt:table-fixed swt:w-max"
+                                                                    prop.className
+                                                                        "swt:table swt:table-xs swt:table-fixed swt:w-max"
                                                                     prop.children [
                                                                         Html.tbody [
                                                                             Html.tr [
                                                                                 prop.children [
-                                                                                    for columnIndex in 0 .. columns.Length - 1 do
-                                                                                        let header = columns.[columnIndex].Header.ToString()
+                                                                                    for columnIndex in
+                                                                                        0 .. columns.Length - 1 do
+                                                                                        let header =
+                                                                                            columns.[columnIndex].Header
+                                                                                                .ToString()
 
                                                                                         Html.td [
-                                                                                            prop.key $"{template.Id}_{columnIndex}_header_card"
-                                                                                            prop.className "swt:w-52 swt:min-w-52 swt:px-2 swt:py-1"
+                                                                                            prop.key
+                                                                                                $"{template.Id}_{columnIndex}_header_card"
+                                                                                            prop.className
+                                                                                                "swt:w-52 swt:min-w-52 swt:px-2 swt:py-1"
                                                                                             prop.children [
                                                                                                 Html.label [
                                                                                                     prop.className
@@ -286,17 +288,34 @@ type TemplateWidget =
                                                                                                     prop.children [
                                                                                                         Html.input [
                                                                                                             prop.type'.checkbox
-                                                                                                            prop.className "swt:checkbox swt:checkbox-xs"
-                                                                                                            prop.isChecked (isColumnSelected template.Id columnIndex)
-                                                                                                            prop.disabled (not canEditColumns)
-                                                                                                            prop.onChange (fun (_: bool) ->
-                                                                                                                toggleColumnSelection template.Id columnIndex
+                                                                                                            prop.className
+                                                                                                                "swt:checkbox swt:checkbox-xs"
+                                                                                                            prop
+                                                                                                                .isChecked (
+                                                                                                                    isColumnSelected
+                                                                                                                        template.Id
+                                                                                                                        columnIndex
+                                                                                                                )
+                                                                                                            prop
+                                                                                                                .disabled (
+                                                                                                                    not
+                                                                                                                        canEditColumns
+                                                                                                                )
+                                                                                                            prop.onChange (fun
+                                                                                                                               (_:
+                                                                                                                                   bool) ->
+                                                                                                                toggleColumnSelection
+                                                                                                                    template.Id
+                                                                                                                    columnIndex
                                                                                                             )
                                                                                                         ]
                                                                                                         Html.span [
-                                                                                                            prop.className "swt:text-xs swt:font-medium swt:truncate"
-                                                                                                            prop.title header
-                                                                                                            prop.text header
+                                                                                                            prop.className
+                                                                                                                "swt:text-xs swt:font-medium swt:truncate"
+                                                                                                            prop.title
+                                                                                                                header
+                                                                                                            prop.text
+                                                                                                                header
                                                                                                         ]
                                                                                                     ]
                                                                                                 ]
@@ -306,19 +325,26 @@ type TemplateWidget =
                                                                             ]
                                                                             Html.tr [
                                                                                 prop.children [
-                                                                                    for columnIndex in 0 .. columns.Length - 1 do
+                                                                                    for columnIndex in
+                                                                                        0 .. columns.Length - 1 do
                                                                                         let valuePreviewText =
-                                                                                            TemplateWidget.templateColumnValuePreview template.Table columnIndex
+                                                                                            TemplateWidget.templateColumnValuePreview
+                                                                                                template.Table
+                                                                                                columnIndex
 
                                                                                         Html.td [
-                                                                                            prop.key $"{template.Id}_{columnIndex}_values_card"
-                                                                                            prop.className "swt:w-52 swt:min-w-52 swt:px-2 swt:pt-0 swt:pb-1"
+                                                                                            prop.key
+                                                                                                $"{template.Id}_{columnIndex}_values_card"
+                                                                                            prop.className
+                                                                                                "swt:w-52 swt:min-w-52 swt:px-2 swt:pt-0 swt:pb-1"
                                                                                             prop.children [
                                                                                                 Html.span [
                                                                                                     prop.className
                                                                                                         "swt:block swt:text-[10px] swt:opacity-70 swt:truncate"
-                                                                                                    prop.title valuePreviewText
-                                                                                                    prop.text valuePreviewText
+                                                                                                    prop.title
+                                                                                                        valuePreviewText
+                                                                                                    prop.text
+                                                                                                        valuePreviewText
                                                                                                 ]
                                                                                             ]
                                                                                         ]
@@ -342,21 +368,25 @@ type TemplateWidget =
     [<ReactComponent>]
     static member Main
         (
-            arcFileState: ArcFiles option,
+            arcFile: ArcFiles,
             activeTableIndex: int option,
-            setArcFileState: ArcFiles option -> unit,
+            setArcFile: ArcFiles -> unit,
             importType: TableJoinOptions,
             setImportType: TableJoinOptions -> unit,
             services: TemplateWidgetServices
         ) =
 
         let templateState, setTemplateState = React.useState (fun _ -> TemplateLoading)
+
         let selectedTemplateIds, setSelectedTemplateIds =
             React.useStateWithUpdater (Set.empty<System.Guid>)
+
         let templateImportDecisions, setTemplateImportDecisions =
             React.useStateWithUpdater (Map.empty<System.Guid, TemplateImportAction>)
+
         let deselectedTemplateColumns, setDeselectedTemplateColumns =
             React.useStateWithUpdater (Set.empty<System.Guid * int>)
+
         let showImportDialog, setShowImportDialog = React.useState false
         let widgetCtx = WidgetContext.useWidgetController ()
 
@@ -364,35 +394,28 @@ type TemplateWidget =
             WidgetArcFile.tryGetActiveTable activeTableIndex arcFile |> Option.map fst
 
         let disabledMessage =
-            match arcFileState with
-            | Some arcFile ->
-                match tryGetActiveTableIndex arcFile with
-                | Some _ -> None
-                | None -> Some "Select a table first to import templates."
-            | None ->
-                Some "Open an ARC file first to import templates."
+            match tryGetActiveTableIndex arcFile with
+            | Some _ -> None
+            | None -> Some "Select a table first to import templates."
 
-        let canAppend =
-            match arcFileState with
-            | Some arcFile -> tryGetActiveTableIndex arcFile |> Option.isSome
-            | None -> false
+        let canAppend = tryGetActiveTableIndex arcFile |> Option.isSome
 
         let syncSelectedTemplateIds (loadedTemplates: Template[]) =
             let templateIds =
                 loadedTemplates |> Seq.map (fun template -> template.Id) |> Set.ofSeq
 
             setSelectedTemplateIds (fun selected -> selected |> Set.intersect templateIds)
+
             setTemplateImportDecisions (fun decisions ->
                 decisions |> Map.filter (fun templateId _ -> templateIds.Contains templateId)
             )
+
             setDeselectedTemplateColumns (fun deselected ->
                 deselected
                 |> Set.filter (fun (templateId, columnIndex) ->
                     loadedTemplates
                     |> Array.tryFind (fun template -> template.Id = templateId)
-                    |> Option.exists (fun template ->
-                        columnIndex >= 0 && columnIndex < template.Table.Columns.Count
-                    )
+                    |> Option.exists (fun template -> columnIndex >= 0 && columnIndex < template.Table.Columns.Count)
                 )
             )
 
@@ -406,8 +429,7 @@ type TemplateWidget =
                     |> Array.sortBy (fun template -> template.Name)
                     |> TemplatesLoaded
                     |> setTemplateState
-                | Error message ->
-                    setTemplateState (TemplateLoadError message)
+                | Error message -> setTemplateState (TemplateLoadError message)
             }
             |> Async.StartImmediate
         )
@@ -425,15 +447,18 @@ type TemplateWidget =
             (fun () ->
                 setTemplateImportDecisions (fun decisions ->
                     let prunedToSelected =
-                        decisions |> Map.filter (fun templateId _ -> selectedTemplateIds.Contains templateId)
+                        decisions
+                        |> Map.filter (fun templateId _ -> selectedTemplateIds.Contains templateId)
 
                     selectedTemplateIds
-                    |> Set.fold (fun state templateId ->
-                        if Map.containsKey templateId state then
-                            state
-                        else
-                            state |> Map.add templateId TemplateImportAction.AppendToActiveTable
-                    ) prunedToSelected
+                    |> Set.fold
+                        (fun state templateId ->
+                            if Map.containsKey templateId state then
+                                state
+                            else
+                                state |> Map.add templateId TemplateImportAction.AppendToActiveTable
+                        )
+                        prunedToSelected
                 )
             ),
             [| box selectedTemplateIds |]
@@ -451,6 +476,7 @@ type TemplateWidget =
 
             if isCurrentlySelected then
                 setTemplateImportDecisions (fun decisions -> decisions.Remove templateId)
+
                 setDeselectedTemplateColumns (fun deselected ->
                     deselected
                     |> Set.filter (fun (candidateTemplateId, _) -> candidateTemplateId <> templateId)
@@ -494,12 +520,9 @@ type TemplateWidget =
             setDeselectedTemplateColumns (fun deselected -> Set.union deselected allTemplateColumns)
 
         let importTemplates () =
-            match arcFileState with
-            | None ->
-                false
-            | Some _ when not canAppend ->
-                false
-            | Some arcFile ->
+            match canAppend with
+            | false -> false
+            | true ->
                 match templateState with
                 | TemplatesLoaded templates ->
                     let selectedTemplates =
@@ -538,12 +561,13 @@ type TemplateWidget =
                                 ({
                                     Index = tableIndex
                                     FullImport = (action = TemplateImportAction.ImportAsNewTable)
-                                }: WidgetTemplateImport.ImportTable)
+                                }
+                                : WidgetTemplateImport.ImportTable)
                             )
                             |> Array.toList
 
                         let importConfig: WidgetTemplateImport.SelectiveImportConfig = {
-                            WidgetTemplateImport.SelectiveImportConfig.init() with
+                            WidgetTemplateImport.SelectiveImportConfig.init () with
                                 ImportType = importType
                                 ImportMetadata = false
                                 ImportTables = importTablesConfig
@@ -557,15 +581,14 @@ type TemplateWidget =
                                 (tryGetActiveTableIndex arcFile)
                                 (Some arcFile)
 
-                        setArcFileState (Some(WidgetArcFile.refreshRef nextArcFileState))
+                        setArcFile (WidgetArcFile.refreshRef nextArcFileState)
                         setSelectedTemplateIds (fun _ -> Set.empty<System.Guid>)
                         setTemplateImportDecisions (fun _ -> Map.empty<System.Guid, TemplateImportAction>)
                         setDeselectedTemplateColumns (fun _ -> Set.empty<System.Guid * int>)
                         true
                     else
                         false
-                | _ ->
-                    false
+                | _ -> false
 
         let openImportDialog () =
             if not showImportDialog then
@@ -583,7 +606,10 @@ type TemplateWidget =
                 prop.className TemplateWidget.WidgetContainerClass
                 prop.children [
                     Html.h3 [ prop.className "swt:font-bold"; prop.text "Add Template" ]
-                    Html.span [ prop.className "swt:text-xs swt:opacity-70"; prop.text message ]
+                    Html.span [
+                        prop.className "swt:text-xs swt:opacity-70"
+                        prop.text message
+                    ]
                 ]
             ]
 
@@ -612,8 +638,7 @@ type TemplateWidget =
             ]
         | TemplatesLoaded templates ->
             match disabledMessage with
-            | Some message ->
-                disabledState message
+            | Some message -> disabledState message
             | None ->
                 let selectedTemplates =
                     templates
@@ -626,7 +651,9 @@ type TemplateWidget =
                     )
 
                 let canImport = selectedTemplates.Length > 0 && disabledMessage.IsNone
-                let canConfirmImport = selectedTemplatesForImport.Length > 0 && disabledMessage.IsNone
+
+                let canConfirmImport =
+                    selectedTemplatesForImport.Length > 0 && disabledMessage.IsNone
 
                 TemplateFilter.TemplateFilterProvider(
                     Html.div [
@@ -669,7 +696,8 @@ type TemplateWidget =
                                             ]
                                             for importMode, _, label in WidgetTemplateImport.TemplateImportMode.options do
                                                 Html.label [
-                                                    prop.className "swt:label swt:cursor-pointer swt:justify-start swt:gap-2"
+                                                    prop.className
+                                                        "swt:label swt:cursor-pointer swt:justify-start swt:gap-2"
                                                     prop.children [
                                                         Html.input [
                                                             prop.type'.radio
@@ -678,10 +706,7 @@ type TemplateWidget =
                                                             prop.isChecked (importType.Equals importMode)
                                                             prop.onChange (fun (_: bool) -> setImportType importMode)
                                                         ]
-                                                        Html.span [
-                                                            prop.className "swt:text-sm"
-                                                            prop.text label
-                                                        ]
+                                                        Html.span [ prop.className "swt:text-sm"; prop.text label ]
                                                     ]
                                                 ]
                                             Html.div [ prop.className "swt:divider swt:my-1" ]

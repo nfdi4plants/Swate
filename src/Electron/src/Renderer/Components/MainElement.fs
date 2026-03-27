@@ -38,13 +38,15 @@ let CreateTablePreview (table: ARCtrl.ArcTable) (setTableInArcFile: ArcTable -> 
 
 [<ReactComponent>]
 let CreateARCitectNavbar
-    (arcFile: ArcFiles option)
+    (arcFile: ArcFiles)
     (activeView: PreviewActiveView)
     (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
-    onSaveClick
+    (setArcFileState: ArcFiles -> unit)
+    (onSaveClick: Browser.Types.MouseEvent -> unit)
     =
-    let workspaceCtx = React.useContext Renderer.Context.WorkspaceStateCtx.WorkspaceStateCtx
+
+    let templateImportType, setTemplateImportType =
+        React.useState (TableJoinOptions.Headers)
 
     let widgetHostView =
         match activeView with
@@ -53,20 +55,8 @@ let CreateARCitectNavbar
         | PreviewActiveView.Metadata -> WidgetHostView.MetadataView
         | PreviewActiveView.Error _ -> WidgetHostView.PreviewErrorView
 
-    let setImportType (nextImportType: TableJoinOptions) =
-        workspaceCtx.setState {
-            workspaceCtx.state with
-                TemplateImportType = nextImportType
-        }
-
     let widgets =
-        createWidgets
-            arcFile
-            widgetHostView
-            activeTableIndex
-            setArcFileState
-            workspaceCtx.state.TemplateImportType
-            setImportType
+        createWidgets arcFile widgetHostView activeTableIndex setArcFileState templateImportType setTemplateImportType
 
     let hasSelectedTable = activeTableIndex.IsSome
 
@@ -76,7 +66,7 @@ let CreateARCitectNavbar
         children = [
             Components.BaseNavbar.Main [
                 NavbarButtons(widgetTypes, hasSelectedTable)
-                QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick, isDisabled = arcFile.IsNone)
+                QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick)
             ]
         ]
     )

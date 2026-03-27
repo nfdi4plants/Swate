@@ -87,13 +87,13 @@ type FileExplorer =
                         Disabled = None
                     }
                 match item.Path with
-                | Some path -> {
+                | Some path when not (System.String.IsNullOrWhiteSpace path) -> {
                     Label = "Copy Path"
                     Icon = "swt:fluent--copy-24-regular"
                     OnClick = fun () -> copyPathToClipboard path
                     Disabled = None
                   }
-                | None -> ()
+                | _ -> ()
                 if item.IsDirectory then
                     let isExpanded = model.ExpandedIds.Contains item.Id
 

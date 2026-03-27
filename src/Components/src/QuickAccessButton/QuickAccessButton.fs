@@ -12,7 +12,7 @@ type QuickAccessButton =
         (
             desc: string,
             children: ReactElement,
-            onclick: Event -> unit,
+            onclick: MouseEvent -> unit,
             ?isDisabled: bool,
             ?props: IReactProperty seq,
             ?color: DaisyuiColors,

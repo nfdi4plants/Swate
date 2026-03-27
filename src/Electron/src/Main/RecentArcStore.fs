@@ -47,7 +47,7 @@ module private Helpers =
 
                 let name =
                     if String.IsNullOrWhiteSpace nameValue then
-                        getNameFromPath path
+                        Swate.Electron.Shared.FileIOHelper.getFileName path
                     else
                         nameValue
 
@@ -92,7 +92,8 @@ type RecentARCStore() =
         if String.IsNullOrWhiteSpace path then
             this.RecentArcsState
         else
-            let arc = Helpers.toPointer (getNameFromPath path) path true
+            let arc =
+                Helpers.toPointer (Swate.Electron.Shared.FileIOHelper.getFileName path) path true
 
             let remainingArcs =
                 this.RecentArcsState |> Array.filter (fun arc -> not (pathsEqual arc.path path))

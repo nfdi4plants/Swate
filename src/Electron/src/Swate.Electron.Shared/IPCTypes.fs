@@ -14,17 +14,6 @@ open FileIOTypes
 
 module IPCTypesHelper =
 
-    /// TODO: This is a pure UI type and should only be used in the renderer process. It is not meant to be sent over IPC, but rather to represent the state of the page after receiving data from the main process.
-    [<RequireQualifiedAccess>]
-    type PageState =
-        | ArcFileData of fileType: ArcFilesDiscriminate * json: string
-        | Text of string
-        | Unknown
-        | LandingDraft
-        | NotesDraft
-        | NotesSearch
-        | Error of string
-
     [<RequireQualifiedAccess>]
     type SaveBeforeQuitDecision =
         | SaveAndClose
@@ -45,13 +34,15 @@ type IArcVaultsApi = {
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
-    pickPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
 
-    openFile: IpcMainEvent -> string -> JS.Promise<Result<PageState, exn>>
-    readNotes: IpcMainEvent -> JS.Promise<Result<Note[], exn>>
-    saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PageState, exn>>
-    writeFile: IpcMainEvent -> WriteFileRequest -> JS.Promise<Result<unit, exn>>
-    syncARC: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<unit, exn>>
+    pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
+    openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
+    readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
+    /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
+    saveArcFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
+    writeFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
     resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
@@ -86,7 +77,15 @@ type IMainUpdateRendererApi = {
     authAccountsUpdate: AuthAccountSummary[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit
-}
+} with
+
+    static member empty = {
+        pathChange = ignore
+        recentARCsUpdate = ignore
+        authAccountsUpdate = ignore
+        fileTreeUpdate = ignore
+        gitProgressUpdate = ignore
+    }
 
 // TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer

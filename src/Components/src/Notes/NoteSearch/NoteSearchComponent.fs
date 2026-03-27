@@ -10,7 +10,7 @@ open ARCtrl
 
 module noteSearchTests =
 
-    let notes: Note list = [
+    let notes: NoteSearch list = [
         {
             RelativePath = "notes/10_02_2026/Grocery_Planning.md"
             Title = "Grocery Planning"
@@ -110,10 +110,13 @@ module noteSearchTests =
 
 module NoteSearchComponent =
 
-    let private containsIgnoreCase (needle: string) (haystack: string) = 
-        haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
+    let private containsIgnoreCase (needle: string) (haystack: string) =
+        if System.String.IsNullOrWhiteSpace haystack then
+            false
+        else
+            haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
 
-    let filterNotes (searchTerm: string) (filterOptions: string list) (notes: Note list) =
+    let filterNotes (searchTerm: string) (filterOptions: string list) (notes: NoteSearch list) =
         notes
         |> List.filter (fun note ->
             let normalizedTerm = searchTerm.ToLower().Trim()
@@ -141,7 +144,7 @@ module NoteSearchComponent =
                 matchesTitle || matchesContent || matchesTags
         )
 
-    let private createContentPreview (note: Note) =
+    let private createContentPreview (note: NoteSearch) =
         if note.Content.Length > 45 then
             note.Content.Substring(0, 45) + "..."
         else
@@ -233,7 +236,7 @@ module NoteSearchComponent =
         ]
 
 
-    let searchSuggestion (note: Note, onOpen: string -> unit) =
+    let searchSuggestion (note: NoteSearch, onOpen: string -> unit) =
         Html.div [
             prop.className "swt:p-3"
             prop.children [
@@ -277,7 +280,7 @@ module NoteSearchComponent =
 type SearchComponent =
 
     [<ReactComponent>]
-    static member Main(notes: Note list, isLoading: bool, error: string option, onOpen: string -> unit) =
+    static member Main(notes: NoteSearch list, isLoading: bool, error: string option, onOpen: string -> unit) =
         let startSearch, setStartSearch = React.useState false
         let searchTerm, setSearchTerm = React.useState ""
         let dropdownOpen, setDropdownOpen = React.useState false

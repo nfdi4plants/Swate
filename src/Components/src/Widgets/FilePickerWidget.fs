@@ -10,17 +10,14 @@ type FilePickerWidget =
     static member private WidgetContainerClass =
         "swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:min-w-80 swt:max-w-[95vw]"
 
-    static member private reindexPathEntries (entries: (int * string) list) =
+    static member private reindexPathEntries(entries: (int * string) list) =
         entries |> List.mapi (fun index (_, path) -> index + 1, path)
 
-    static member private disabledState (message: string) =
+    static member private disabledState(message: string) =
         Html.div [
             prop.className FilePickerWidget.WidgetContainerClass
             prop.children [
-                Html.h3 [
-                    prop.className "swt:font-bold"
-                    prop.text "File Picker"
-                ]
+                Html.h3 [ prop.className "swt:font-bold"; prop.text "File Picker" ]
                 Html.span [
                     prop.className "swt:text-xs swt:opacity-70"
                     prop.text message
@@ -30,11 +27,8 @@ type FilePickerWidget =
 
     [<ReactComponent>]
     static member private Table
-        (
-            pathEntries: seq<int * string>,
-            movePath: int -> string -> float -> unit,
-            removePath: (int * string) -> unit
-        ) =
+        (pathEntries: seq<int * string>, movePath: int -> string -> float -> unit, removePath: (int * string) -> unit)
+        =
         Html.table [
             prop.className "swt:table swt:table-sm swt:table-zebra swt:table-fixed swt:min-w-full"
             prop.children [
@@ -43,10 +37,7 @@ type FilePickerWidget =
                         Html.tr [
                             prop.key $"{id}_{path}"
                             prop.children [
-                                Html.td [
-                                    prop.className "swt:w-12 swt:font-mono"
-                                    prop.text id
-                                ]
+                                Html.td [ prop.className "swt:w-12 swt:font-mono"; prop.text id ]
                                 Html.td [
                                     prop.className "swt:max-w-[28rem] swt:truncate"
                                     prop.title path
@@ -119,46 +110,42 @@ type FilePickerWidget =
     [<ReactComponent>]
     static member Main
         (
-            arcFileState: ArcFiles option,
+            arcFile: ArcFiles,
             activeTableIndex: int option,
-            setArcFileState: ArcFiles option -> unit,
+            setArcFile: ArcFiles -> unit,
             services: FilePickerWidgetServices
         ) =
 
-        let pathEntries, setPathEntries = React.useStateWithUpdater (List.empty<int * string>)
+        let pathEntries, setPathEntries =
+            React.useStateWithUpdater (List.empty<int * string>)
+
         let isPicking, setIsPicking = React.useState false
         let statusMessage, setStatusMessage = React.useState (None: string option)
         let widgetCtx = WidgetContext.useWidgetController ()
-        let annotationCtx = React.useContext Contexts.AnnotationTable.AnnotationTableStateCtx
+
+        let annotationCtx =
+            React.useContext Contexts.AnnotationTable.AnnotationTableStateCtx
 
         let selectedCells =
-            match arcFileState with
-            | Some arcFile ->
-                match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
-                | Some (_, table) ->
-                    annotationCtx.state
-                    |> Map.tryFind table.Name
-                    |> Option.bind (fun tableCtx -> tableCtx.SelectedCells)
-                    |> Option.map (fun selectedRange -> {|
-                        xStart = selectedRange.xStart - 1
-                        xEnd = selectedRange.xEnd - 1
-                        yStart = selectedRange.yStart - 1
-                        yEnd = selectedRange.yEnd - 1
-                    |})
-                    |> unbox<CellCoordinateRange option>
-                | None ->
-                    None
-            | None ->
-                None
+
+            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+            | Some(_, table) ->
+                annotationCtx.state
+                |> Map.tryFind table.Name
+                |> Option.bind (fun tableCtx -> tableCtx.SelectedCells)
+                |> Option.map (fun selectedRange -> {|
+                    xStart = selectedRange.xStart - 1
+                    xEnd = selectedRange.xEnd - 1
+                    yStart = selectedRange.yStart - 1
+                    yEnd = selectedRange.yEnd - 1
+                |})
+                |> unbox<CellCoordinateRange option>
+            | None -> None
 
         let disabledMessage =
-            match arcFileState with
-            | None ->
-                Some "Open an ARC file first."
-            | Some arcFile ->
-                match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
-                | Some _ -> None
-                | None -> Some "Select a table tab first to use the file picker."
+            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+            | Some _ -> None
+            | None -> Some "Select a table tab first to use the file picker."
 
         let canInsert = pathEntries.Length > 0 && disabledMessage.IsNone
 
@@ -192,8 +179,7 @@ type FilePickerWidget =
                             setStatusMessage (Some "No paths selected.")
                     | Error message when message <> "Cancelled" ->
                         setStatusMessage (Some $"Failed to pick paths: {message}")
-                    | Error _ ->
-                        ()
+                    | Error _ -> ()
                 finally
                     setIsPicking false
             }
@@ -204,14 +190,10 @@ type FilePickerWidget =
             setStatusMessage None
 
         let sortAscending () =
-            setPathEntries (fun current ->
-                current |> List.sortBy snd |> FilePickerWidget.reindexPathEntries
-            )
+            setPathEntries (fun current -> current |> List.sortBy snd |> FilePickerWidget.reindexPathEntries)
 
         let sortDescending () =
-            setPathEntries (fun current ->
-                current |> List.sortByDescending snd |> FilePickerWidget.reindexPathEntries
-            )
+            setPathEntries (fun current -> current |> List.sortByDescending snd |> FilePickerWidget.reindexPathEntries)
 
         let movePath (id: int) (path: string) (delta: float) =
             setPathEntries (fun current ->
@@ -227,49 +209,38 @@ type FilePickerWidget =
             )
 
         let removePath (id: int, path: string) =
-            setPathEntries (fun current ->
-                current
-                |> List.except [ id, path ]
-                |> FilePickerWidget.reindexPathEntries
-            )
+            setPathEntries (fun current -> current |> List.except [ id, path ] |> FilePickerWidget.reindexPathEntries)
 
         let insertPaths () =
-            match arcFileState with
-            | None ->
-                setStatusMessage (Some "Open an ARC file first.")
-            | Some arcFile ->
-                match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile, selectedCells with
-                | Some (_, table), Some selection ->
-                    let columnIndex = selection.xStart
-                    let mutable rowIndex = selection.yStart
 
-                    let cellsToInsert =
-                        [|
-                            for _, path in pathEntries do
-                                match table.TryGetCellAt(columnIndex, rowIndex) with
-                                | Some cell ->
-                                    let nextCell = cell.UpdateMainField path
-                                    let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
-                                    coordinate, nextCell
-                                    rowIndex <- rowIndex + 1
-                                | None ->
-                                    ()
-                        |]
+            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile, selectedCells with
+            | Some(_, table), Some selection ->
+                let columnIndex = selection.xStart
+                let mutable rowIndex = selection.yStart
 
-                    if cellsToInsert.Length = 0 then
-                        setStatusMessage (Some "Could not write into the selected column.")
-                    else
-                        table.SetCellsAt cellsToInsert
-                        setArcFileState (Some(WidgetArcFile.refreshRef arcFile))
-                        setPathEntries (fun _ -> [])
-                        setStatusMessage None
-                        widgetCtx.closeWidget WidgetType.FilePicker
-                | _ ->
-                    setStatusMessage (Some "Select a target cell in the table first.")
+                let cellsToInsert = [|
+                    for _, path in pathEntries do
+                        match table.TryGetCellAt(columnIndex, rowIndex) with
+                        | Some cell ->
+                            let nextCell = cell.UpdateMainField path
+                            let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
+                            coordinate, nextCell
+                            rowIndex <- rowIndex + 1
+                        | None -> ()
+                |]
+
+                if cellsToInsert.Length = 0 then
+                    setStatusMessage (Some "Could not write into the selected column.")
+                else
+                    table.SetCellsAt cellsToInsert
+                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setPathEntries (fun _ -> [])
+                    setStatusMessage None
+                    widgetCtx.closeWidget WidgetType.FilePicker
+            | _ -> setStatusMessage (Some "Select a target cell in the table first.")
 
         match disabledMessage with
-        | Some message ->
-            FilePickerWidget.disabledState message
+        | Some message -> FilePickerWidget.disabledState message
         | None ->
             Html.div [
                 prop.className FilePickerWidget.WidgetContainerClass
@@ -310,8 +281,7 @@ type FilePickerWidget =
                             match selectedCells with
                             | Some selection ->
                                 $"Insert starts at column {selection.xStart + 1}, row {selection.yStart + 1}."
-                            | None ->
-                                "Select a target cell in the table to enable insertion."
+                            | None -> "Select a target cell in the table to enable insertion."
                         )
                     ]
                     if statusMessage.IsSome then

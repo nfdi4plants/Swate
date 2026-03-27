@@ -16,13 +16,13 @@ module WidgetArcFile =
 
     let refreshRef (arcFile: ArcFiles) =
         match arcFile with
-        | ArcFiles.Investigation investigation -> ArcFiles.Investigation investigation
-        | ArcFiles.Study(study, assays) -> ArcFiles.Study(study, assays)
-        | ArcFiles.Assay assay -> ArcFiles.Assay assay
-        | ArcFiles.Run run -> ArcFiles.Run run
-        | ArcFiles.Workflow workflow -> ArcFiles.Workflow workflow
-        | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap)
-        | ArcFiles.Template template -> ArcFiles.Template template
+        | ArcFiles.Investigation investigation -> ArcFiles.Investigation <| investigation.Copy()
+        | ArcFiles.Study(study, _) -> ArcFiles.Study(study.Copy(), [])
+        | ArcFiles.Assay assay -> ArcFiles.Assay <| assay.Copy()
+        | ArcFiles.Run run -> ArcFiles.Run <| run.Copy()
+        | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
+        | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
+        | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
 
     let tryGetActiveTable (activeTableIndex: int option) (arcFile: ArcFiles) =
         match activeTableIndex with
@@ -42,9 +42,13 @@ type FilePickerWidgetServices = {
     pickPaths: unit -> JS.Promise<Result<string[], string>>
 }
 
+type ImportedTextFile = {
+    Name: string
+    Content: string
+}
+
 type DataAnnotatorWidgetServices = {
-    pickPaths: unit -> JS.Promise<Result<string[], string>>
-    loadTextFile: string -> JS.Promise<Result<string, string>>
+    pickTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], string>>
 }
 
 type TemplateWidgetServices = {
@@ -54,10 +58,7 @@ type TemplateWidgetServices = {
 [<RequireQualifiedAccess>]
 module WidgetTemplateImport =
 
-    type ImportTable = {
-        Index: int
-        FullImport: bool
-    }
+    type ImportTable = { Index: int; FullImport: bool }
 
     type SelectiveImportConfig = {
         ImportType: ARCtrl.TableJoinOptions
@@ -156,10 +157,8 @@ module WidgetTemplateImport =
                                     match importConfig.ImportType with
                                     | TableJoinOptions.WithUnit ->
                                         CompositeCell.Unitized("", OntologyAnnotation.empty ())
-                                    | _ ->
-                                        CompositeCell.Term(OntologyAnnotation.empty ())
-                                | _ ->
-                                    CompositeCell.FreeText ""
+                                    | _ -> CompositeCell.Term(OntologyAnnotation.empty ())
+                                | _ -> CompositeCell.FreeText ""
                             )
                             |> ResizeArray
 
@@ -189,5 +188,4 @@ module WidgetTemplateImport =
             |> Seq.iter existingTables.Add
 
             existing
-        | None ->
-            failwith "Error! Can only append information if metadata sheet exists!"
+        | None -> failwith "Error! Can only append information if metadata sheet exists!"
