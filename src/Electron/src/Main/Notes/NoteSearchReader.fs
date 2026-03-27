@@ -3,6 +3,7 @@ module Main.NoteSearchReader
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open ARCtrl
 open Swate.Components.NoteTypes
 open Swate.Electron.Shared.FileIOTypes
 
@@ -58,12 +59,14 @@ let private fallbackTitleFromPath (relativePath: string) =
 
 let private parseTags (value: string option) =
     value
-    |> Option.map (fun tagText ->
+    |> Option.bind (fun tagText ->
         tagText.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
         |> Array.map (fun tag -> tag.Trim())
         |> Array.filter (String.IsNullOrWhiteSpace >> not)
+        |> Array.map (fun tag -> OntologyAnnotation(tag, ""))
+        |> ResizeArray
+        |> fun tags -> if tags.Count = 0 then None else Some tags
     )
-    |> Option.defaultValue [||]
 
 let private normalizeNewlines (content: string) = content.Replace("\r\n", "\n").Replace("\r", "\n")
 

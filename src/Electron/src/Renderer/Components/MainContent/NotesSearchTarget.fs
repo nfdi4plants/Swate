@@ -1,24 +1,14 @@
 module Renderer.Components.MainContent.NotesSearchTarget
 
 open Feliz
-open Swate.Electron.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Renderer.Components.MainContent.Types
-open System
 open Feliz
 open Swate.Components
 open Swate.Components.NoteTypes
-open Swate.Components.Notes.Editor
-open Swate.Electron.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.FileIOHelper
 open Renderer
 
 [<ReactComponent>]
 let NotesSearchTarget () =
-    let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
-    let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
 
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
