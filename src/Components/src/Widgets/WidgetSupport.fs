@@ -42,9 +42,13 @@ type FilePickerWidgetServices = {
     pickPaths: unit -> JS.Promise<Result<string[], string>>
 }
 
+type ImportedTextFile = {
+    Name: string
+    Content: string
+}
+
 type DataAnnotatorWidgetServices = {
-    pickPaths: unit -> JS.Promise<Result<string[], string>>
-    loadTextFile: string -> JS.Promise<Result<string, string>>
+    pickTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], string>>
 }
 
 type TemplateWidgetServices = {

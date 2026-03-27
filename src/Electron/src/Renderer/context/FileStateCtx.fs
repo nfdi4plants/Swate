@@ -1,9 +1,5 @@
 module Renderer.Context.FileStateCtx
 
-open System.Collections.Generic
-open Swate.Components
-open Swate.Components.Types
-open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.FileIOTypes
 open Fable.Electron.Remoting.Renderer

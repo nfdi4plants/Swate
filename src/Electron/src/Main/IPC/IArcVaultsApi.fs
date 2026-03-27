@@ -1,6 +1,7 @@
 module Main.IPC.ArcVaultsApi
 
 open System
+open Swate.Components
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
@@ -19,12 +20,37 @@ open ARCtrl.Json
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
-let private normalizePathForComparison (pathValue: string) =
-    pathValue.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
+[<RequireQualifiedAccess>]
+module ArcPathValidation =
 
-let private containsTraversalSegments (relativePath: string) =
-    relativePath.Split('/')
-    |> Array.exists (fun segment -> segment = "." || segment = "..")
+    let normalizePathForComparison (pathValue: string) =
+        pathValue.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
+
+    let containsTraversalSegments (pathValue: string) =
+        pathValue.Split('/')
+        |> Array.exists (fun segment -> segment = "." || segment = "..")
+
+    let isSafeRelativePathCandidate (pathValue: string) =
+        let normalizedPath = FileIOHelper.normalizePath pathValue
+
+        not (String.IsNullOrWhiteSpace normalizedPath)
+        && normalizedPath <> "."
+        && not (pathDynamic?isAbsolute (normalizedPath) |> unbox<bool>)
+        && not (containsTraversalSegments normalizedPath)
+
+    let isWithinRootPath (rootPath: string) (candidatePath: string) =
+        let normalizedRootPath =
+            pathDynamic?resolve (rootPath)
+            |> unbox<string>
+            |> normalizePathForComparison
+
+        let normalizedCandidatePath =
+            pathDynamic?resolve (candidatePath)
+            |> unbox<string>
+            |> normalizePathForComparison
+
+        normalizedCandidatePath = normalizedRootPath
+        || normalizedCandidatePath.StartsWith(normalizedRootPath + "/")
 
 let private tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
     let arcRoot = pathDynamic?resolve (arcPath) |> unbox<string>
@@ -37,7 +63,9 @@ let private tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: stri
 
     if String.IsNullOrWhiteSpace relativePath || relativePath = "." then
         Ok ""
-    elif containsTraversalSegments relativePath then
+    elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
+        Error(exn $"Path '{requestedAbsolutePath}' is outside the active ARC root.")
+    elif not (ArcPathValidation.isWithinRootPath arcRoot absolutePath) then
         Error(exn $"Path '{requestedAbsolutePath}' is outside the active ARC root.")
     else
         Ok relativePath
@@ -48,22 +76,16 @@ let private tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: 
 
     if String.IsNullOrWhiteSpace relativePath then
         Error(exn "RelativePath must not be empty.")
-    elif pathDynamic?isAbsolute (relativePath) |> unbox<bool> then
-        Error(exn "RelativePath must not be absolute.")
-    elif containsTraversalSegments relativePath then
-        Error(exn "RelativePath must not contain path traversal segments.")
+    elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
+        if pathDynamic?isAbsolute (relativePath) |> unbox<bool> then
+            Error(exn "RelativePath must not be absolute.")
+        else
+            Error(exn "RelativePath must not contain path traversal segments.")
     else
         let arcRoot = pathDynamic?resolve (arcPath) |> unbox<string>
         let absolutePath = pathDynamic?resolve (arcRoot, relativePath) |> unbox<string>
 
-        let normalizedArcRoot = normalizePathForComparison arcRoot
-        let normalizedAbsolutePath = normalizePathForComparison absolutePath
-
-        let isWithinArcRoot =
-            normalizedAbsolutePath = normalizedArcRoot
-            || normalizedAbsolutePath.StartsWith(normalizedArcRoot + "/")
-
-        if isWithinArcRoot then
+        if ArcPathValidation.isWithinRootPath arcRoot absolutePath then
             Ok absolutePath
         else
             Error(exn "RelativePath resolves outside the ARC root.")
@@ -85,6 +107,10 @@ let private writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Pro
     let! _ = writePromise
     return ()
 }
+
+let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
+    fsPromisesDynamic?readFile (absolutePath, "utf8")
+    |> unbox<JS.Promise<string>>
 
 open ARCtrl.Contract
 
@@ -331,19 +357,52 @@ let api: IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    pickPaths =
+    pickAbsolutePaths =
         fun _ -> promise {
-            let properties = [|
-                Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-            |]
+            try
+                let properties = [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                |]
 
-            let! result = dialog.showOpenDialog (properties = properties)
+                let! result = dialog.showOpenDialog (properties = properties)
 
-            if result.canceled then
-                return Error(exn "Cancelled")
-            else
-                return Ok result.filePaths
+                if result.canceled then
+                    return Error(exn "Cancelled")
+                else
+                    return Ok result.filePaths
+            with e ->
+                return Error(exn $"Could not pick files: {e.Message}")
+        }
+    pickExternalTextFiles =
+        fun _ -> promise {
+            try
+                let properties = [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                |]
+
+                let filters = [| FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |]) |]
+
+                let! result = dialog.showOpenDialog (properties = properties, filters = filters)
+
+                if result.canceled then
+                    return Error(exn "Cancelled")
+                else
+                    let importedFiles = ResizeArray<ImportedTextFile>()
+
+                    for filePath in result.filePaths do
+                        let absolutePath = pathDynamic?resolve (filePath) |> unbox<string>
+                        let! content = readUtf8FileAsync absolutePath
+
+                        importedFiles.Add {
+                            Name = path.basename absolutePath
+                            Content = content
+                        }
+
+                    return Ok(importedFiles.ToArray())
+            with e ->
+                return Error(exn $"Could not import external text files: {e.Message}")
         }
     readNotes =
         fun event -> promise {
@@ -448,18 +507,6 @@ let api: IPCTypes.IArcVaultsApi = {
                     with e ->
                         return Error(exn $"Could not read file {relativePath}: {e.Message}")
             | _ -> return Error(exn "ARC is not loaded.")
-        }
-    readExternalTextFile =
-        fun _ (path: string) -> promise {
-            try
-                if String.IsNullOrWhiteSpace path then
-                    return Error(exn "Path must not be empty.")
-                else
-                    let absolutePath = pathDynamic?resolve (path) |> unbox<string>
-                    let content = fs.readFileSync (absolutePath, "utf8")
-                    return Ok content
-            with e ->
-                return Error(exn $"Could not read external file: {e.Message}")
         }
     runGitLfs =
         fun (event: IpcMainEvent) (request: GitLfsRequest) -> promise {

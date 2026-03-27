@@ -11,25 +11,16 @@ open ARCtrl.Contract
 let private filePickerServices: FilePickerWidgetServices = {
     pickPaths =
         fun () -> promise {
-            let! result = Api.ipcArcVaultApi.pickArcPaths (unbox null)
+            let! result = Api.ipcArcVaultApi.pickAbsolutePaths (unbox null)
             return result |> Result.mapError (fun error -> error.Message)
         }
 }
 
 let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
-    pickPaths =
+    pickTextFiles =
         fun () -> promise {
-            let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
+            let! result = Api.ipcArcVaultApi.pickExternalTextFiles (unbox null)
             return result |> Result.mapError (fun error -> error.Message)
-        }
-    loadTextFile =
-        fun path -> promise {
-            let! result = Api.ipcArcVaultApi.readExternalTextFile (unbox null) path
-
-            return
-                match result with
-                | Error error -> Error error.Message
-                | Ok content -> Ok content
         }
 }
 

@@ -29,7 +29,8 @@ let isSameOrDescendantPath (path: string) (ancestorPath: string) =
     let normalizedPath = normalizePath path
     let normalizedAncestorPath = normalizePath ancestorPath
 
-    normalizedPath = normalizedAncestorPath
+    String.IsNullOrWhiteSpace normalizedAncestorPath
+    || normalizedPath = normalizedAncestorPath
     || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.OrdinalIgnoreCase)
 
 let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
