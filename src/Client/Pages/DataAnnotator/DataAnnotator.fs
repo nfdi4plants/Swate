@@ -325,7 +325,7 @@ module private DataAnnotatorHelper =
         Html.div [
             prop.className "swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[80%]"
             prop.children [
-                Swate.Components.Table.Table(
+                Table.Table(
                     file.BodyRows.Length,
                     colCount,
                     (fun index ->

@@ -30,6 +30,12 @@ type FileItemConfig = {
     ItemType: string
 }
 
+[<RequireQualifiedAccess>]
+type DirectoryInteractionMode =
+    | SingleClickToggle
+    | OpenOnDoubleClickCloseOnSingleClick
+    | ToggleOnSingleClickSelectOnDoubleClick
+
 
 // ============================================================================
 // FILE TREE OPERATIONS
@@ -253,6 +259,24 @@ type ContextMenuItem = {
 }
 
 module FileExplorerLogic =
+
+    let private expandedIdsFromPath includeSelectedItem itemId items =
+        let pathItems =
+            match FileTree.getPath itemId items [] with
+            | Some pathItems -> pathItems
+            | None -> []
+
+        let expandablePathItems =
+            if includeSelectedItem then
+                pathItems
+            else
+                pathItems
+                |> List.take (max 0 (List.length pathItems - 1))
+
+        expandablePathItems
+        |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
+        |> Set.ofList
+
     let rec private collectExpandedIds acc items =
         items
         |> List.fold
@@ -295,7 +319,7 @@ module FileExplorerLogic =
         | EnsurePathVisible of string
         | ShowContextMenu of float * float * ContextMenuItem list
         | HideContextMenu
-        | UpdateItems of FileItem list
+        | UpdateItems of FileItem list * selectedItemId: string option option * includeSelectedItem: bool
         | AddChild of parentId: string * child: FileItem
         | RemoveItem of string
         | RenameItem of string * string
@@ -379,7 +403,7 @@ module FileExplorerLogic =
                 ContextMenuVisible = false
           }
 
-        | UpdateItems items ->
+        | UpdateItems(items, selectedItemId, includeSelectedItem) ->
             let validIds = collectIds Set.empty items
             let expandedFromItems = collectExpandedIds Set.empty items
 
@@ -387,10 +411,38 @@ module FileExplorerLogic =
                 model.ExpandedIds
                 |> Set.filter (fun id -> validIds.Contains id)
 
+            let persistedSelectedId =
+                model.SelectedId
+                |> Option.filter validIds.Contains
+
+            let nextSelectedId =
+                selectedItemId
+                |> Option.map (Option.filter validIds.Contains)
+                |> Option.defaultValue persistedSelectedId
+
+            let breadcrumbPath =
+                match nextSelectedId with
+                | Some itemId ->
+                    match FileTree.getPath itemId items [] with
+                    | Some path -> path
+                    | None -> []
+                | None -> []
+
+            let expandedFromSelection =
+                nextSelectedId
+                |> Option.map (fun itemId -> expandedIdsFromPath includeSelectedItem itemId items)
+                |> Option.defaultValue Set.empty
+
+
             {
                 model with
                     Items = items
-                    ExpandedIds = Set.union persistedExpanded expandedFromItems
+                    SelectedId = nextSelectedId
+                    BreadcrumbPath = breadcrumbPath
+                    ExpandedIds =
+                        persistedExpanded
+                        |> Set.union expandedFromItems
+                        |> Set.union expandedFromSelection
             }
 
         | AddChild(parentId, child) ->

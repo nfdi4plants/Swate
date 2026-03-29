@@ -273,13 +273,13 @@ type SelectiveImportModal =
 
         let tables, disArcfile =
             match import with
-            | Assay a -> a.Tables, ArcFilesDiscriminate.Assay
-            | Study(s, _) -> s.Tables, ArcFilesDiscriminate.Study
-            | Template t -> ResizeArray([ t.Table ]), ArcFilesDiscriminate.Template
-            | Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
-            | Workflow _ -> ResizeArray(), ArcFilesDiscriminate.Workflow
-            | Run r -> r.Tables, ArcFilesDiscriminate.Run
-            | DataMap _ -> ResizeArray(), ArcFilesDiscriminate.DataMap
+            | ArcFiles.Assay a -> a.Tables, ArcFilesDiscriminate.Assay
+            | ArcFiles.Study(s, _) -> s.Tables, ArcFilesDiscriminate.Study
+            | ArcFiles.Template t -> ResizeArray([ t.Table ]), ArcFilesDiscriminate.Template
+            | ArcFiles.Investigation _ -> ResizeArray(), ArcFilesDiscriminate.Investigation
+            | ArcFiles.Workflow _ -> ResizeArray(), ArcFilesDiscriminate.Workflow
+            | ArcFiles.Run r -> r.Tables, ArcFilesDiscriminate.Run
+            | ArcFiles.DataMap _ -> ResizeArray(), ArcFilesDiscriminate.DataMap
 
         let setMetadataImport =
             fun b ->

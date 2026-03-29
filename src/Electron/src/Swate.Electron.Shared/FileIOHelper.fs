@@ -7,8 +7,7 @@ open Swate.Components.Notes.Editor
 open Swate.Electron.Shared.FileIOTypes
 
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
-let normalizePath (path: string) =
-    path.Replace("\\", "/").Trim().TrimEnd('/')
+let normalizePath (path: string) = Swate.Components.PathHelpers.normalizePath path
 
 /// normalizes the path and splits it into parts
 let getPathParts (path: string) =
@@ -49,38 +48,7 @@ let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
             Some name
     | _ -> None
 
-let private tryGetParentPath (path: string) =
-    let normalizedPath = normalizePath path
-    let separatorIndex = normalizedPath.LastIndexOf('/')
-
-    if separatorIndex < 0 then
-        None
-    else
-        Some(normalizedPath.Substring(0, separatorIndex))
-
-let private tryResolveDatamapPreviewPath
-    (normalizedPath: string)
-    (folderSegment: string)
-    (targetFileName: string)
-    =
-    let lowered = normalizedPath.ToLowerInvariant()
-
-    if lowered.Contains(folderSegment) && lowered.EndsWith("/isa.datamap.xlsx") then
-        tryGetParentPath normalizedPath
-        |> Option.map (fun folderPath -> $"{folderPath}/{targetFileName}")
-    else
-        None
-
-let resolveArcPreviewPath (path: string) =
-    let normalizedPath = normalizePath path
-
-    [
-        tryResolveDatamapPreviewPath normalizedPath "/assays/" "isa.assay.xlsx"
-        tryResolveDatamapPreviewPath normalizedPath "/studies/" "isa.study.xlsx"
-        tryResolveDatamapPreviewPath normalizedPath "/runs/" "isa.run.xlsx"
-    ]
-    |> List.tryPick id
-    |> Option.defaultValue normalizedPath
+let resolveArcPreviewPath (path: string) = Swate.Components.PathHelpers.resolveArcPreviewPath path
 
 let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: FileEntry) =
     let parts = getNonEmptyPathParts entry.path

@@ -72,6 +72,7 @@
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\ReactContexts.fs" />
+    <Compile Include="Util\PathHelpers.fs" />
     <Compile Include="Api\Helper.fs" />
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
@@ -108,6 +109,7 @@
     <Compile Include="Metadata\TextInput.fs" />
     <Compile Include="Metadata\JsBindings\DndKit.fs" />
     <Compile Include="Metadata\Forms.fs" />
+    <Compile Include="Metadata\ArcFileMetadata.fs" />
     <Compile Include="MarkdownText\Types.fs" />
     <Compile Include="MarkdownText\JsBindings\ReactMDEditor.fs" />
     <Compile Include="MarkdownText\JsBindings\Mermaid.fs" />
@@ -146,6 +148,13 @@
     <Compile Include="Widgets\FilePickerWidget.fs" />
     <Compile Include="Widgets\DataAnnotatorWidget.fs" />
     <Compile Include="Widgets\TemplateWidget.fs" />
+    <Compile Include="ARCFileEditor\ArcFileEditor.fs" />
+    <Compile Include="ARCObjectExplorer\Types.fs" />
+    <Compile Include="ARCObjectExplorer\ARCExplorer.fs" />
+    <Compile Include="ARCObjectExplorer\ARCObjectPanel.fs" />
+    <Compile Include="ARCObjectExplorer\ARCObjectWidget.fs" />
+    <Compile Include="ARCObjectExplorer\ArcObjectExplorerContent.fs" />
+    <Compile Include="ARCObjectExplorer\ARCObjectFixture.fs" />
     <Compile Include="Notes\Types.fs" />
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
     <Compile Include="Notes\Editor\Types.fs" />

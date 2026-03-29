@@ -7,7 +7,6 @@
   <ItemGroup>
     <Compile Include="Api.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="MetadataForm.fs" />
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="context\PageStateCtx.fs" />
     <Compile Include="context\FileStateCtx.fs" />
@@ -21,7 +20,6 @@
     <Compile Include="Components\MainElement.fs" />
     <Compile Include="Components\MainContent\Types.fs" />
     <Compile Include="Components\MainContent\Helper.fs" />
-    <Compile Include="Components\MainContent\CreateARCPreview.fs" />
     <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs" />
     <Compile Include="Components\MainContent\TextPreviewTarget.fs" />
     <Compile Include="Components\MainContent\UnknownPreviewTarget.fs" />

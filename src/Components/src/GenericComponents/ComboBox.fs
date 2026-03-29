@@ -58,6 +58,14 @@ type ComboBox =
             ?onFocus: Browser.Types.FocusEvent -> unit,
             ?onBlur: Browser.Types.FocusEvent -> unit,
             ?onOpen: bool -> unit,
+            ?onClick:
+                Browser.Types.MouseEvent
+                    -> {|
+                        isOpen: bool
+                        setIsOpen: bool -> unit
+                        setActiveIndex: int option -> unit
+                    |}
+                    -> unit,
             ?props: obj,
             ?onDoubleClick:
                 Browser.Types.MouseEvent
@@ -228,6 +236,15 @@ type ComboBox =
             Html.label [
                 prop.htmlFor inputId
                 prop.ref (unbox fluiContext.refs.setReference)
+                prop.onClick (fun (ev: Browser.Types.MouseEvent) ->
+                    onClick
+                    |> Option.iter (fun fn ->
+                        fn ev {|
+                            isOpen = isOpen
+                            setIsOpen = setOpen
+                            setActiveIndex = setActiveIndex
+                        |}
+                    ))
                 prop.className [
                     "swt:input swt:group"
                     if labelClassName.IsSome then

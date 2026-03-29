@@ -3,15 +3,13 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 open ARCtrl
 open Feliz
 open Renderer.Components.MainElement
-open Renderer.Components.MainContent.Types
 open Renderer.Components.MainContent.Helper
-open Renderer.Components.MainContent.CreateARCPreview
+open Swate.Components
 open Renderer.Types
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
-    let activeView, setActiveView = React.useState PreviewActiveView.Metadata
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
 
     let setArcFile =
@@ -29,25 +27,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             }
             |> Promise.start
 
-    let activeTableIndex =
-        match activeView with
-        | PreviewActiveView.Table tableIndex -> Some tableIndex
-        | _ -> None
+    let renderHeader editorState =
+        CreateARCitectNavbar editorState setArcFile onSaveArcFile
 
-    Html.div [
-        prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
-        prop.children [
-            Html.div [
-                prop.className "swt:flex-none"
-                prop.children [
-                    CreateARCitectNavbar arcFile activeView activeTableIndex setArcFile onSaveArcFile
-                ]
-            ]
-            Html.div [
-                prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
-                prop.children [
-                    CreateARCPreview arcFile setArcFile activeView setActiveView
-                ]
-            ]
-        ]
-    ]
+    ArcFileEditor.Main(arcFile, setArcFile, header = renderHeader)

@@ -102,28 +102,28 @@ let FileTree () =
                 | None -> pageStateCtx.setState (Some(PageState.ErrorPage $"File '{item.Name}' has no path."))
                 | Some _ when item.IsDirectory -> pageStateCtx.setState (None)
                 | Some path ->
-                    let previewPath = resolveArcPreviewPath path
+                let previewPath = resolveArcPreviewPath path
 
-                    if previewPath <> normalizePath path then
-                        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
-                    else
-                        console.log ($"[Renderer] Opening file: {previewPath}")
+                if previewPath <> normalizePath path then
+                    console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
+                else
+                    console.log ($"[Renderer] Opening file: {previewPath}")
 
-                    fileStateCtx.setSelectedTreeItemPath (Some path)
+                fileStateCtx.setSelectedTreeItemPath (Some path)
 
-                    let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+                let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
 
-                    match result with
-                    | Ok data ->
-                        let pageState = PageState.fromFileContentDTO data
-                        console.log ("[Renderer] Received data, processing...")
-                        pageStateCtx.setState (Some pageState)
-                    | Error exn ->
-                        console.log ($"[Renderer] Error: {exn.Message}")
+                match result with
+                | Ok data ->
+                    let pageState = PageState.fromFileContentDTO data
+                    console.log ("[Renderer] Received data, processing...")
+                    pageStateCtx.setState (Some pageState)
+                | Error exn ->
+                    console.log ($"[Renderer] Error: {exn.Message}")
 
-                        pageStateCtx.setState (
-                            Some(PageState.ErrorPage $"Could not open preview for '{item.Name}': {exn.Message}")
-                        )
+                    pageStateCtx.setState (
+                        Some(PageState.ErrorPage $"Could not open preview for '{item.Name}': {exn.Message}")
+                    )
             }
             |> Promise.start
 
@@ -134,6 +134,6 @@ let FileTree () =
                 initialItems = [ fileItem ],
                 onItemClick = openPreview,
                 onContextMenu = contextMenuItems,
-                ?selectedItemId = fileStateCtx.state.SelectedTreeItemPath
+                selectedItemId = fileStateCtx.state.SelectedTreeItemPath
             )
         | None -> EmptyFileTreePlaceholder()
