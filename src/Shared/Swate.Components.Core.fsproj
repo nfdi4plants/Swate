@@ -22,6 +22,7 @@
     <Compile Include="DTOs\ParentTermQuery.fs" />
     <Compile Include="DTOs\TermQuery.fs" />
     <Compile Include="Extensions.fs" />
+    <Compile Include="PathHelpers.fs" />
     <Compile Include="URLs.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>

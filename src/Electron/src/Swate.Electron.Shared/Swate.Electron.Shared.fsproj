@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Shared\Swate.Components.Core.fsproj" />
     <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
   </ItemGroup>
 

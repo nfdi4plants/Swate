@@ -18,7 +18,7 @@ type private ArcFileTreeState = {
 
 module private ArcFileTreeServiceHelper =
 
-    let normalizeTrackedPath = Swate.Components.PathHelpers.normalizeSeparators
+    let normalizeTrackedPath = Swate.Electron.Shared.FileIOHelper.normalizeSeparators
 
     let createFileWatcher (path: string) =
 

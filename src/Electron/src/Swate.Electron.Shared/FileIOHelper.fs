@@ -7,7 +7,10 @@ open Swate.Components.Notes.Editor
 open Swate.Electron.Shared.FileIOTypes
 
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
-let normalizePath (path: string) = Swate.Components.PathHelpers.normalizePath path
+let normalizeSeparators (path: string) = Swate.Components.Shared.PathHelpers.normalizeSeparators path
+
+/// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
+let normalizePath (path: string) = Swate.Components.Shared.PathHelpers.normalizePath path
 
 /// normalizes the path and splits it into parts
 let getPathParts (path: string) =
@@ -48,7 +51,7 @@ let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
             Some name
     | _ -> None
 
-let resolveArcPreviewPath (path: string) = Swate.Components.PathHelpers.resolveArcPreviewPath path
+let resolveArcPreviewPath (path: string) = Swate.Components.Shared.PathHelpers.resolveArcPreviewPath path
 
 let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: FileEntry) =
     let parts = getNonEmptyPathParts entry.path
