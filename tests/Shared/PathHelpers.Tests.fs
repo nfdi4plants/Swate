@@ -35,26 +35,26 @@ let tests =
 
         testCase "resolveArcPreviewPath redirects assay datamaps" <| fun _ ->
             Expect.equal
-                (PathHelpers.resolveArcPreviewPath "assays/assay_01/isa.datamap.xlsx")
-                "assays/assay_01/isa.assay.xlsx"
+                (PathHelpers.resolveArcPreviewPath "/assays/assay_01/isa.datamap.xlsx")
+                "/assays/assay_01/isa.assay.xlsx"
                 "Assay datamaps should preview the assay workbook."
 
         testCase "resolveArcPreviewPath redirects study datamaps" <| fun _ ->
             Expect.equal
-                (PathHelpers.resolveArcPreviewPath "studies/study_01/isa.datamap.xlsx")
-                "studies/study_01/isa.study.xlsx"
+                (PathHelpers.resolveArcPreviewPath "/studies/study_01/isa.datamap.xlsx")
+                "/studies/study_01/isa.study.xlsx"
                 "Study datamaps should preview the study workbook."
 
         testCase "resolveArcPreviewPath redirects workflow datamaps" <| fun _ ->
             Expect.equal
-                (PathHelpers.resolveArcPreviewPath "workflows/workflow_01/isa.datamap.xlsx")
-                "workflows/workflow_01/isa.workflow.xlsx"
+                (PathHelpers.resolveArcPreviewPath "/workflows/workflow_01/isa.datamap.xlsx")
+                "/workflows/workflow_01/isa.workflow.xlsx"
                 "Workflow datamaps should preview the workflow workbook."
 
         testCase "resolveArcPreviewPath redirects run datamaps" <| fun _ ->
             Expect.equal
-                (PathHelpers.resolveArcPreviewPath "runs/run_01/isa.datamap.xlsx")
-                "runs/run_01/isa.run.xlsx"
+                (PathHelpers.resolveArcPreviewPath "/runs/run_01/isa.datamap.xlsx")
+                "/runs/run_01/isa.run.xlsx"
                 "Run datamaps should preview the run workbook."
 
         testCase "resolveArcPreviewPath leaves non-datamap paths normalized" <| fun _ ->
