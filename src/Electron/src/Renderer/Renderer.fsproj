@@ -11,12 +11,14 @@
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="context\PageStateCtx.fs" />
     <Compile Include="context\FileStateCtx.fs" />
+    <Compile Include="context\GitStateCtx.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\FileExplorer.fs" />
     <Compile Include="Components\WidgetRegister.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorerSidebar.fs" />
+    <Compile Include="Components\LeftSidebar\GitSidebarPanel.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />
     <Compile Include="Components\MainElement.fs" />
     <Compile Include="Components\MainContent\Types.fs" />
@@ -29,6 +31,9 @@
     <Compile Include="Components\MainContent\LandingDraftTarget.fs" />
     <Compile Include="Components\MainContent\NotesDraftTarget.fs" />
     <Compile Include="Components\MainContent\NotesSearchTarget.fs" />
+    <Compile Include="Components\MainContent\GitDiffTarget.fs" />
+    <Compile Include="Components\MainContent\GitMergeConflictTarget.fs" />
+    <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\InitTarget.fs" />
     <Compile Include="Components\MainContent\ArcTarget.fs" />

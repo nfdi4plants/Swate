@@ -13,6 +13,9 @@ open Renderer.Components.MainContent.LandingDraftTarget
 open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
+open Renderer.Components.MainContent.GitDiffTarget
+open Renderer.Components.MainContent.GitMergeConflictTarget
+open Renderer.Components.MainContent.GitUnsupportedTarget
 
 [<ReactComponent>]
 let ArcTarget () =
@@ -34,6 +37,9 @@ let ArcTarget () =
                 | PageState.LandingDraftPage -> LandingDraftTarget()
                 | PageState.NotesDraftPage -> NotesDraftTarget()
                 | PageState.NotesSearchPage -> NotesSearchTarget()
+                | PageState.GitDiffPage diffData -> GitDiffTarget.Main diffData
+                | PageState.GitMergeConflictPage mergeData -> GitMergeConflictTarget.Main mergeData
+                | PageState.GitUnsupportedPage unsupportedPage -> GitUnsupportedTarget.Main unsupportedPage
             | None -> EmptySelectionTarget()
 
         ]
