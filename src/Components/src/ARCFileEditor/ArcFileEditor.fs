@@ -29,7 +29,6 @@ module ArcFileEditorView =
 type ArcFileEditorHeaderProps = {
     arcFile: ArcFiles
     activeView: ArcFileEditorView
-    activeTableIndex: int option
     widgetHostView: WidgetHostView
 }
 
@@ -334,12 +333,9 @@ type ArcFileEditor =
             [| box arcFile; box activeView |]
         )
 
-        let activeTableIndex = ArcFileEditorView.activeTableIndex activeView
-
         let headerProps = {
             arcFile = arcFile
             activeView = activeView
-            activeTableIndex = activeTableIndex
             widgetHostView = ArcFileEditorView.toWidgetHostView activeView
         }
 

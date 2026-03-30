@@ -12,6 +12,8 @@ let CreateARCitectNavbar
     (onSaveClick: Browser.Types.MouseEvent -> unit)
     =
 
+    let activeTableIndex = ArcFileEditorView.activeTableIndex editorState.activeView
+
     let templateImportType, setTemplateImportType =
         React.useState TableJoinOptions.Headers
 
@@ -19,12 +21,14 @@ let CreateARCitectNavbar
         createWidgets
             editorState.arcFile
             editorState.widgetHostView
-            editorState.activeTableIndex
+            activeTableIndex
             setArcFileState
             templateImportType
             setTemplateImportType
 
-    let hasSelectedTable = editorState.activeTableIndex.IsSome
+    let hasSelectedTable =
+        WidgetArcFile.tryGetActiveTable activeTableIndex editorState.arcFile
+        |> Option.isSome
 
     Widget.WidgetController(
         widgets,
