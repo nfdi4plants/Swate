@@ -20,6 +20,7 @@ type private Model = {
     PageState: PageState option
     LeftSidebarIsOpen: bool
     LeftSidebarTarget: LeftSidebarPage
+    ExplorerMode: ExplorerMode
 } with
 
     static member Empty = {
@@ -27,6 +28,7 @@ type private Model = {
         PageState = None
         LeftSidebarIsOpen = false
         LeftSidebarTarget = LeftSidebarPage.FileExplorer
+        ExplorerMode = ExplorerMode.NormalFileTree
     }
 
 type private Msg =
@@ -34,6 +36,7 @@ type private Msg =
     | PageStateChanged of PageState option
     | ToggleLeftSidebarTarget of LeftSidebarPage
     | SetLeftSidebarIsOpen of bool
+    | SetExplorerMode of ExplorerMode
 
 let private createGetOpenPathCmd () : Cmd<Msg> =
     Cmd.OfPromise.either
@@ -48,6 +51,7 @@ let private init () : Model * Cmd<Msg> =
         PageState = None
         LeftSidebarIsOpen = false
         LeftSidebarTarget = LeftSidebarPage.FileExplorer
+        ExplorerMode = ExplorerMode.NormalFileTree
     },
     createGetOpenPathCmd ()
 
@@ -57,6 +61,7 @@ let private msgName (msg: Msg) =
     | PageStateChanged _ -> "PageStateChanged"
     | ToggleLeftSidebarTarget _ -> "ToggleLeftSidebarTarget"
     | SetLeftSidebarIsOpen _ -> "SetLeftSidebarIsOpen"
+    | SetExplorerMode _ -> "SetExplorerMode"
 
 let private traceUpdateMsg (msg: Msg) =
     console.log ($"[Renderer.App Elmish] {msgName msg}")
@@ -99,6 +104,12 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 LeftSidebarIsOpen = isOpen
         },
         Cmd.none
+    | SetExplorerMode explorerMode ->
+        {
+            model with
+                ExplorerMode = explorerMode
+        },
+        Cmd.none
 
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget) =
@@ -114,6 +125,20 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget)
             onClick = fun () -> toggleTarget (LeftSidebarPage.FileExplorer)
         )
     ]
+
+[<ReactComponent>]
+let private RightSidebarSync (explorerMode: ExplorerMode) =
+    let rightSidebarCtx = React.useContext Swate.Components.LayoutContext.RightSidebarContext
+
+    React.useEffect (
+        (fun () ->
+            match explorerMode with
+            | ExplorerMode.ArcObjectTree when not rightSidebarCtx.state -> rightSidebarCtx.setState true
+            | _ -> ()),
+        [| box explorerMode |]
+    )
+
+    Html.none
 
 [<ReactComponent>]
 let Main () =
@@ -156,32 +181,47 @@ let Main () =
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     ///Main content module
-    let children = Renderer.Components.MainContent.Main.Main(model.AppState)
+    let children = Renderer.Components.MainContent.Main.Main(model.AppState, model.ExplorerMode)
 
     let toggleLeftSidebarTarget =
         React.useCallback ((fun target -> dispatch (ToggleLeftSidebarTarget target)), [||])
 
+    let setExplorerMode =
+        React.useCallback ((fun explorerMode -> dispatch (SetExplorerMode explorerMode)), [||])
+
+    let rightSidebar =
+        match model.AppState, model.ExplorerMode with
+        | Some _, ExplorerMode.ArcObjectTree -> Some(Renderer.Components.RightSidebar.ArcObjectDetailsSidebar.Main())
+        | _ -> None
+
     Context.AppStateCtx.AppStateCtx.Provider(
         appCtx,
         Renderer.Context.FileStateCtx.FileStateCtxProvider(
-            Renderer.Context.PageStateCtx.PageStateCtx.Provider(
-                pageCtx,
-                AnnotationTableContextProvider.AnnotationTableContextProvider(
-                    Layout.Main(
-                        children =
-                            React.Fragment [|
-                                children
-                                CloseWindowController.CloseWindowController.Subscription()
-                            |],
-                        navbar = Renderer.Components.Navbar.Main(),
-                        leftSidebar = Renderer.Components.LeftSidebar.Main.Main(),
-                        leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
-                        leftSidebarState = {
-                            isOpen = model.LeftSidebarIsOpen
-                            setIsOpen = fun isOpen -> dispatch (SetLeftSidebarIsOpen isOpen)
-                            sidebarType = model.LeftSidebarTarget
-                            setSidebarType = fun target -> dispatch (ToggleLeftSidebarTarget target)
-                        }
+            Renderer.Context.ArcObjectExplorerCtx.ArcObjectExplorerCtxProvider(
+                Renderer.Context.PageStateCtx.PageStateCtx.Provider(
+                    pageCtx,
+                    AnnotationTableContextProvider.AnnotationTableContextProvider(
+                        Layout.Main(
+                            children =
+                                React.Fragment [|
+                                    RightSidebarSync(model.ExplorerMode)
+                                    children
+                                    CloseWindowController.CloseWindowController.Subscription()
+                                |],
+                            navbar =
+                                Renderer.Components.Navbar.Main(
+                                    showRightSidebarToggle = (model.AppState.IsSome && model.ExplorerMode = ExplorerMode.ArcObjectTree)
+                                ),
+                            leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.ExplorerMode, setExplorerMode),
+                            ?rightSidebar = rightSidebar,
+                            leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
+                            leftSidebarState = {
+                                isOpen = model.LeftSidebarIsOpen
+                                setIsOpen = fun isOpen -> dispatch (SetLeftSidebarIsOpen isOpen)
+                                sidebarType = model.LeftSidebarTarget
+                                setSidebarType = fun target -> dispatch (ToggleLeftSidebarTarget target)
+                            }
+                        )
                     )
                 )
             )

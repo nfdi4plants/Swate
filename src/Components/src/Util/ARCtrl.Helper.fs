@@ -207,6 +207,36 @@ module ARCtrlHelper =
             | Workflow w -> w.Identifier
             | DataMap(d, _) -> if d.IsSome then d.Value.ParentId else ""
 
+        member this.TryMetadataToSpreadsheetValues() : (string * string[][]) option =
+            let normalizeRows rows =
+                rows
+                |> Seq.map (fun row ->
+                    row
+                    |> Seq.map (Option.defaultValue "")
+                    |> Array.ofSeq)
+                |> Array.ofSeq
+
+            match this with
+            | ArcFiles.Assay assay ->
+                Some(ArcAssay.metadataSheetName, normalizeRows (ArcAssay.toMetadataCollection assay))
+            | ArcFiles.Investigation investigation ->
+                Some(
+                    ArcInvestigation.metadataSheetName,
+                    normalizeRows (ArcInvestigation.toMetadataCollection investigation)
+                )
+            | ArcFiles.Study(study, assays) ->
+                Some(
+                    ArcStudy.metadataSheetName,
+                    normalizeRows (ArcStudy.toMetadataCollection study (Option.whereNot List.isEmpty assays))
+                )
+            | ArcFiles.Template template ->
+                Some(Template.metadataSheetName, normalizeRows (Template.toMetadataCollection template))
+            | ArcFiles.Workflow workflow ->
+                Some(ArcWorkflow.metadataSheetName, normalizeRows (ArcWorkflow.toMetadataCollection workflow))
+            | ArcFiles.Run run ->
+                Some(ArcRun.metadataSheetName, normalizeRows (ArcRun.toMetadataCollection run))
+            | ArcFiles.DataMap _ -> None
+
     [<RequireQualifiedAccess>]
     type JsonExportFormat =
         | ARCtrl

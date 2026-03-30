@@ -2,3 +2,96 @@ module Renderer.Components.ARCHelper
 
 open Swate.Electron.Shared
 open ARCtrl
+open System
+open Swate.Components
+open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.GitTypes
+open Renderer.Types
+
+type PreviewLoadResult = {
+    PageState: PageState
+    ArcFileState: ArcFiles option
+    PreviewState: ArcObjectPreviewState
+}
+
+let previewLoadResultOfDto (data: FileContentDTO) =
+    let pageState = PageState.fromFileContentDTO data
+
+    let previewState =
+        match pageState with
+        | PageState.TextPage content -> ArcObjectPreviewState.Text content
+        | PageState.ErrorPage message -> ArcObjectPreviewState.Error message
+        | _ -> ArcObjectPreviewState.NoneLoaded
+
+    {
+        PageState = pageState
+        ArcFileState = FileContentDTO.toArcFile data
+        PreviewState = previewState
+    }
+
+let applyLoadedPreview
+    (setPageState: PageState option -> unit)
+    (setArcFileState: ArcFiles option -> unit)
+    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setStatusMessage: string option -> unit)
+    (loaded: PreviewLoadResult)
+    =
+    setPageState (Some loaded.PageState)
+    setArcFileState loaded.ArcFileState
+    setPreviewState loaded.PreviewState
+    setStatusMessage None
+
+let clearArcObjectPreview
+    (setArcFileState: ArcFiles option -> unit)
+    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setStatusMessage: string option -> unit)
+    =
+    setArcFileState None
+    setPreviewState ArcObjectPreviewState.NoneLoaded
+    setStatusMessage None
+
+let applyPreviewError
+    (setPageState: PageState option -> unit)
+    (setArcFileState: ArcFiles option -> unit)
+    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setStatusMessage: string option -> unit)
+    (errorMessage: string)
+    =
+    setPageState (Some(PageState.ErrorPage errorMessage))
+    setArcFileState None
+    setPreviewState (ArcObjectPreviewState.Error errorMessage)
+    setStatusMessage (Some errorMessage)
+
+let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
+    let request: GitLfsRequest = {
+        RequestId = Guid.NewGuid().ToString()
+        RepoPath = ""
+        Command = if markAsLfs then GitLfsCommand.Track else GitLfsCommand.Untrack
+        FilePath = Some relativePath
+        TimeoutMs = Some 10000
+    }
+
+    let! result = Api.ipcArcVaultApi.runGitLfs (unbox null) request
+
+    return
+        match result with
+        | Ok _ -> Ok()
+        | Error exn -> Error exn.Message
+}
+
+let openPreview (path: string) = promise {
+    let previewPath = resolveArcPreviewPath path
+
+    if previewPath <> normalizePath path then
+        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
+    else
+        console.log ($"[Renderer] Opening file: {previewPath}")
+
+    let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+
+    return
+        match result with
+        | Ok data -> Ok(previewLoadResultOfDto data)
+        | Error exn -> Error exn.Message
+}

@@ -10,11 +10,13 @@
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="context\PageStateCtx.fs" />
     <Compile Include="context\FileStateCtx.fs" />
+    <Compile Include="context\ArcObjectExplorerCtx.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\FileExplorer.fs" />
     <Compile Include="Components\WidgetRegister.fs" />
+    <Compile Include="Components\LeftSidebar\ArcObjectTreeSidebar.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorerSidebar.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />
     <Compile Include="Components\MainElement.fs" />
@@ -30,7 +32,9 @@
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\InitTarget.fs" />
     <Compile Include="Components\MainContent\ArcTarget.fs" />
+    <Compile Include="Components\MainContent\ArcObjectExplorerTarget.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
+    <Compile Include="Components\RightSidebar\ArcObjectDetailsSidebar.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />

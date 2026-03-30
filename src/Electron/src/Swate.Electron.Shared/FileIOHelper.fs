@@ -318,7 +318,14 @@ module FileContentDTO =
                 discFileType <- Some DTOType.ISA_Study
                 let identifier = (Identifier.Study.identifierFromFileName p)
                 let study = arc.TryGetStudy identifier
-                study |> Option.map (fun s -> ArcFiles.Study(s, []))
+                study
+                |> Option.map (fun s ->
+                    let assignedAssays =
+                        s.RegisteredAssayIdentifiers
+                        |> Seq.choose arc.TryGetAssay
+                        |> List.ofSeq
+
+                    ArcFiles.Study(s, assignedAssays))
             | WorkflowPath p ->
                 discFileType <- Some DTOType.ISA_Workflow
 

@@ -11,12 +11,16 @@ open Renderer.Types
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
     let setArcFile =
         fun (arcFile: ArcFiles) ->
             let page = PageState.ArcFilePage arcFile
 
             pageStateCtx.setState (Some page)
+            arcObjectCtx.setArcFileState (Some arcFile)
+            arcObjectCtx.setPreviewState ArcObjectPreviewState.NoneLoaded
+            arcObjectCtx.setStatusMessage None
 
     let onSaveArcFile =
         fun _ ->

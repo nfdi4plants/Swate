@@ -12,6 +12,7 @@ let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
     let notes, setNotes = React.useState ([]: NoteSearch list)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)
@@ -50,12 +51,26 @@ let NotesSearchTarget () =
 
             match result with
             | Ok dto ->
-                match dto.fileType with
-                | DTOType.DTOTypeIsPlainTextVariant ->
-                    pageCtx.setState (Some(PageState.TextPage dto.content))
-                    fileTreeCtx.setSelectedTreeItemPath (Some relativePath)
-                | _ -> pageCtx.setState (Some(PageState.ErrorPage $"Unsupported file type for note: {dto.fileType}"))
-            | Result.Error exn -> pageCtx.setState (Some(PageState.ErrorPage $"Could not open note: {exn.Message}"))
+                let selectedPath = normalizePath relativePath
+                fileTreeCtx.setSelectedTreeItemPath (Some selectedPath)
+                arcObjectCtx.setSelectedExplorerItemId None
+
+                dto
+                |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                |> Renderer.Components.ARCHelper.applyLoadedPreview
+                    pageCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
+            | Result.Error exn ->
+                arcObjectCtx.setSelectedExplorerItemId None
+
+                Renderer.Components.ARCHelper.applyPreviewError
+                    pageCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
+                    $"Could not open note: {exn.Message}"
         }
         |> Promise.start
 

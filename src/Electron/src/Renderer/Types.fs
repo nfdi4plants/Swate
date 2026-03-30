@@ -7,6 +7,11 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 
 [<RequireQualifiedAccess>]
+type ExplorerMode =
+    | NormalFileTree
+    | ArcObjectTree
+
+[<RequireQualifiedAccess>]
 type LeftSidebarPage = | FileExplorer
 
 [<RequireQualifiedAccess>]

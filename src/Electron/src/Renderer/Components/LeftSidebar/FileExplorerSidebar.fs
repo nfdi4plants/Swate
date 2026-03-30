@@ -6,9 +6,14 @@ open Swate.Components
 open Renderer.Types
 
 [<ReactComponent>]
-let Main () =
+let Main (explorerMode: ExplorerMode, setExplorerMode: ExplorerMode -> unit) =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+
+    let toggleExplorerMode () =
+        match explorerMode with
+        | ExplorerMode.NormalFileTree -> setExplorerMode ExplorerMode.ArcObjectTree
+        | ExplorerMode.ArcObjectTree -> setExplorerMode ExplorerMode.NormalFileTree
 
     React.Fragment [
 
@@ -32,10 +37,19 @@ let Main () =
                             "Note Search",
                             fun _ -> pageStateCtx.setState (Some PageState.NotesSearchPage)
                         )
+                        Actionbar.ButtonInfo.create (
+                            "swt:fluent--database-24-regular swt:size-5",
+                            (match explorerMode with
+                             | ExplorerMode.NormalFileTree -> "Show ARC object explorer"
+                             | ExplorerMode.ArcObjectTree -> "Show normal file tree"),
+                            fun _ -> toggleExplorerMode ()
+                        )
                     |],
                     4
                 )
             ]
         ]
-        Renderer.Components.FileExplorer.FileTree()
+        match explorerMode with
+        | ExplorerMode.NormalFileTree -> Renderer.Components.FileExplorer.FileTree()
+        | ExplorerMode.ArcObjectTree -> Renderer.Components.LeftSidebar.ArcObjectTreeSidebar.Main()
     ]

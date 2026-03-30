@@ -12,6 +12,7 @@ let LandingDraftTarget () =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
@@ -19,12 +20,19 @@ let LandingDraftTarget () =
         fun (payload: SubmitPayload) ->
 
             let finishSuccess (response: FileContentDTO) =
+                let selectedPath = normalizePath response.path
 
-                fileStateCtx.setSelectedTreeItemPath (Some response.path)
+                fileStateCtx.setSelectedTreeItemPath (Some selectedPath)
+                arcObjectCtx.setSelectedExplorerItemId None
 
-                let page = PageState.fromFileContentDTO response
+                response
+                |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                |> Renderer.Components.ARCHelper.applyLoadedPreview
+                    pageStateCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
 
-                pageStateCtx.setState (Some page)
                 setLandingDraft LandingDraft.init
                 setLandingUiState LandingUiState.init
 

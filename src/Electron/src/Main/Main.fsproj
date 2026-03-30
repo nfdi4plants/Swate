@@ -15,6 +15,7 @@
     <Compile Include="FileTreeCreator.fs" />
     <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="ArcFileTreeService.fs" />
+    <Compile Include="ArcObjectTreeBuilder.fs" />
     <Compile Include="SettingsStore.fs" />
     <Compile Include="RecentArcStore.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />

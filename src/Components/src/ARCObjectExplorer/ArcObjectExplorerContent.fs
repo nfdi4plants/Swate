@@ -2,7 +2,6 @@ namespace Swate.Components
 
 open System
 open Feliz
-open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 open ARCtrl
 
@@ -252,6 +251,102 @@ type ArcObjectExplorerContent =
             ]
         | _ -> WidgetArcFile.tryGetDataMap arcFile |> Option.map ArcObjectExplorerContent.dataMapSummaryRows
 
+    static member private spreadsheetColumnLabel (index: int) =
+        let rec loop (value: int) (acc: string) =
+            let nextChar = string (char (int 'A' + (value % 26)))
+            let nextAcc = nextChar + acc
+
+            if value < 26 then
+                nextAcc
+            else
+                loop ((value / 26) - 1) nextAcc
+
+        loop index ""
+
+    [<ReactComponent>]
+    static member private ARCObjectSpreadsheetPreview(sheetName: string, rows: string[][]) =
+        let columnCount =
+            rows |> Array.fold (fun currentMax row -> max currentMax row.Length) 0
+
+        let cellValue rowIndex columnIndex =
+            rows
+            |> Array.tryItem rowIndex
+            |> Option.bind (Array.tryItem columnIndex)
+            |> Option.defaultValue ""
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-3"
+            prop.children [
+                Html.div [
+                    prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:text-xs swt:font-semibold swt:uppercase swt:tracking-wide swt:opacity-60"
+                            prop.text "Sheet"
+                        ]
+                        Html.code [
+                            prop.className "swt:text-xs swt:font-mono"
+                            prop.text sheetName
+                        ]
+                    ]
+                ]
+                if rows.Length = 0 || columnCount = 0 then
+                    Html.p [
+                        prop.className "swt:text-sm swt:opacity-70"
+                        prop.text "The metadata worksheet is empty."
+                    ]
+                else
+                    Html.div [
+                        prop.className "swt:overflow-auto swt:rounded-lg swt:border swt:border-base-300"
+                        prop.children [
+                            Html.table [
+                                prop.className "swt:table swt:table-pin-rows swt:table-pin-cols swt:table-xs"
+                                prop.children [
+                                    Html.thead [
+                                        Html.tr [
+                                            Html.th [
+                                                prop.className "swt:bg-base-200 swt:text-center"
+                                                prop.text "#"
+                                            ]
+                                            for columnIndex in 0 .. columnCount - 1 do
+                                                Html.th [
+                                                    prop.className "swt:bg-base-200 swt:text-center swt:font-mono"
+                                                    prop.text (ArcObjectExplorerContent.spreadsheetColumnLabel columnIndex)
+                                                ]
+                                        ]
+                                    ]
+                                    Html.tbody [
+                                        for rowIndex in 0 .. rows.Length - 1 do
+                                            Html.tr [
+                                                Html.th [
+                                                    prop.className "swt:bg-base-200 swt:text-center swt:font-mono"
+                                                    prop.text (string (rowIndex + 1))
+                                                ]
+                                                for columnIndex in 0 .. columnCount - 1 do
+                                                    let value = cellValue rowIndex columnIndex
+
+                                                    Html.td [
+                                                        prop.className
+                                                            "swt:min-w-28 swt:max-w-72 swt:align-top swt:whitespace-pre-wrap swt:break-words swt:font-mono swt:text-xs"
+                                                        prop.children [
+                                                            if String.IsNullOrWhiteSpace value then
+                                                                Html.span [
+                                                                    prop.className "swt:opacity-30"
+                                                                    prop.text " "
+                                                                ]
+                                                            else
+                                                                Html.span [ prop.text value ]
+                                                        ]
+                                                    ]
+                                            ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+            ]
+        ]
+
     static member private noMetadataMessage =
         function
         | ArcExplorerNodeKind.Table -> "Table nodes open a specific ARC table and expose its basic dimensions."
@@ -332,6 +427,41 @@ type ArcObjectExplorerContent =
                     node.name, Some(String.concat " | " subtitleParts), item))
         |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
         |> List.toArray
+
+    static member NodeKindLabel(kind: ArcExplorerNodeKind) = ArcObjectExplorerContent.nodeKindLabel kind
+
+    static member FilterArcExplorerTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) =
+        ArcObjectExplorerContent.filterArcExplorerTreeByKinds visibleKinds nodes
+
+    static member SearchableArcExplorerItems (nodes: ArcExplorerNode list) (items: FileItem list) =
+        ArcObjectExplorerContent.searchableArcExplorerItems nodes items
+
+    static member private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
+        let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
+            nodes
+            |> List.tryPick (fun node ->
+                if node.id = nodeId then
+                    Some(node, List.rev ancestors)
+                else
+                    loop (node :: ancestors) node.children)
+
+        loop [] nodes
+
+    static member TryGetSelectedNode
+        (nodes: ArcExplorerNode list)
+        (selectedExplorerItemId: string option)
+        (selectedTreeItemPath: string option)
+        =
+        Swate.Components.ARCExplorer.getSelectedItemId nodes selectedExplorerItemId selectedTreeItemPath
+        |> Option.bind (fun nodeId -> ArcObjectExplorerContent.tryGetNodeLineageById nodeId nodes |> Option.map fst)
+
+    static member TryGetSelectedNodeLineage
+        (nodes: ArcExplorerNode list)
+        (selectedExplorerItemId: string option)
+        (selectedTreeItemPath: string option)
+        =
+        Swate.Components.ARCExplorer.getSelectedItemId nodes selectedExplorerItemId selectedTreeItemPath
+        |> Option.bind (fun nodeId -> ArcObjectExplorerContent.tryGetNodeLineageById nodeId nodes)
 
     [<ReactComponent>]
     static member private ARCObjectSection(title: string, children: ReactElement list) =
@@ -453,12 +583,36 @@ type ArcObjectExplorerContent =
             ]
         ]
 
+    static member private tryGetArcFilePath (arcFile: ArcFiles) =
+        match arcFile with
+        | ArcFiles.Investigation _ -> Some ARCtrl.ArcPathHelper.InvestigationFileName
+        | ArcFiles.Study(study, _) -> ARCtrl.Helper.Identifier.Study.fileNameFromIdentifier study.Identifier |> Some
+        | ArcFiles.Assay assay -> ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier assay.Identifier |> Some
+        | ArcFiles.Workflow workflow ->
+            ARCtrl.Helper.Identifier.Workflow.fileNameFromIdentifier workflow.Identifier
+            |> Some
+        | ArcFiles.Run run -> ARCtrl.Helper.Identifier.Run.fileNameFromIdentifier run.Identifier |> Some
+        | ArcFiles.DataMap(parentInfo, _) -> parentInfo |> Option.map DatamapParentInfo.toPath
+        | ArcFiles.Template _ -> None
+
+    static member private arcFileMatchesSelectedNodePreviewPath
+        (selectedNode: ArcExplorerNode)
+        (arcFile: ArcFiles)
+        =
+        match selectedNode.path, ArcObjectExplorerContent.tryGetArcFilePath arcFile with
+        | Some nodePath, Some arcFilePath ->
+            let expectedPreviewPath = PathHelpers.resolveArcPreviewPath nodePath
+            PathHelpers.pathsEqual expectedPreviewPath arcFilePath
+        | _ -> false
+
     [<ReactComponent>]
-    static member private ARCObjectDetailsContent
+    static member ARCObjectDetailsContent
         (selectedNode: ArcExplorerNode option)
+        (selectedAncestors: ArcExplorerNode list)
         (previewState: ArcObjectPreviewState)
         (arcFileState: ArcFiles option)
         (setArcFileState: ArcFiles option -> unit)
+        (useDetailedMetadataForms: bool)
         =
         match selectedNode with
         | None ->
@@ -473,45 +627,80 @@ type ArcObjectExplorerContent =
                 ]
             ]
         | Some selectedNode ->
-            let metadataArcFile =
+            let previewArcFile =
                 arcFileState
+                |> Option.filter (ArcObjectExplorerContent.arcFileMatchesSelectedNodePreviewPath selectedNode)
+
+            let metadataArcFile =
+                previewArcFile
                 |> Option.filter (ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind selectedNode.kind)
 
-            let currentPreviewRows =
-                arcFileState |> Option.bind (ArcObjectExplorerContent.currentPreviewRowsForNode selectedNode)
+            let selectedObjectRows =
+                match metadataArcFile with
+                | Some _ -> None
+                | None -> previewArcFile |> Option.bind (ArcObjectExplorerContent.currentPreviewRowsForNode selectedNode)
+
+            let parentMetadataContext =
+                match metadataArcFile, previewArcFile with
+                | Some _, _ -> None
+                | None, Some arcFile ->
+                    selectedAncestors
+                    |> List.rev
+                    |> List.tryFind (fun ancestor -> ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind ancestor.kind arcFile)
+                    |> Option.map (fun parentNode -> parentNode, arcFile)
+                | None, None -> None
 
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-3 swt:h-full"
                 prop.children [
                     ArcObjectExplorerContent.ARCObjectSelectionSection(selectedNode)
+                    match previewState with
+                    | ArcObjectPreviewState.Text content -> ArcObjectExplorerContent.ARCObjectNoteContentSection(content)
+                    | ArcObjectPreviewState.Error message -> ArcObjectExplorerContent.ARCObjectErrorSection("Note Content", message)
+                    | ArcObjectPreviewState.NoneLoaded -> Html.none
+                    match selectedObjectRows with
+                    | Some rows ->
+                        ArcObjectExplorerContent.ARCObjectSection(
+                            "Current Object",
+                            [ ArcObjectExplorerContent.ARCObjectPropertyTable rows ]
+                        )
+                    | None -> Html.none
+                    match metadataArcFile with
+                    | Some arcFile
+                        when useDetailedMetadataForms
+                                && ArcObjectExplorerContent.usesDetailedMetadataForm selectedNode.kind ->
+                        ArcObjectExplorerContent.ARCObjectDetailedMetadataContent arcFile setArcFileState
+                    | Some arcFile ->
+                        ArcObjectExplorerContent.ARCObjectSection(
+                            "Metadata",
+                            [ ArcObjectExplorerContent.ARCObjectPropertyTable (ArcObjectExplorerContent.metadataRows arcFile) ]
+                        )
+                    | None ->
+                        match parentMetadataContext with
+                        | Some(parentNode, arcFile) ->
+                            let parentSubtitle =
+                                Html.div [
+                                    prop.className "swt:flex swt:flex-col swt:gap-1"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
+                                            prop.text (ArcObjectExplorerContent.nodeKindLabel parentNode.kind)
+                                        ]
+                                        Html.h4 [
+                                            prop.className "swt:text-base swt:font-semibold swt:break-words"
+                                            prop.text parentNode.name
+                                        ]
+                                    ]
+                                ]
 
-                    match selectedNode.kind with
-                    | ArcExplorerNodeKind.Note ->
-                        match previewState with
-                        | ArcObjectPreviewState.Text content -> ArcObjectExplorerContent.ARCObjectNoteContentSection(content)
-                        | ArcObjectPreviewState.Error message -> ArcObjectExplorerContent.ARCObjectErrorSection("Note Content", message)
-                        | ArcObjectPreviewState.NoneLoaded -> ArcObjectExplorerContent.ARCObjectStatusSection("Note Content", "Loading note content...")
-                    | kind when kind = ArcExplorerNodeKind.DataMap ->
-                        match previewState with
-                        | ArcObjectPreviewState.Error message -> ArcObjectExplorerContent.ARCObjectErrorSection("Current Preview", message)
-                        | _ ->
-                            match currentPreviewRows with
-                            | Some rows -> ArcObjectExplorerContent.ARCObjectSection("Current Preview", [ ArcObjectExplorerContent.ARCObjectPropertyTable rows ])
-                            | None -> ArcObjectExplorerContent.ARCObjectStatusSection("Current Preview", "No DataMap preview is loaded.")
-                    | kind when ArcObjectExplorerContent.nodeHasMetadata kind ->
-                        match previewState with
-                        | ArcObjectPreviewState.Error message -> ArcObjectExplorerContent.ARCObjectErrorSection("Metadata", message)
-                        | _ ->
-                            match metadataArcFile with
-                            | Some arcFile when ArcObjectExplorerContent.usesDetailedMetadataForm selectedNode.kind ->
-                                ArcObjectExplorerContent.ARCObjectDetailedMetadataContent arcFile setArcFileState
-                            | Some arcFile ->
-                                ArcObjectExplorerContent.ARCObjectSection("Metadata", [ ArcObjectExplorerContent.ARCObjectPropertyTable (ArcObjectExplorerContent.metadataRows arcFile) ])
-                            | None -> ArcObjectExplorerContent.ARCObjectStatusSection("Metadata", "Loading metadata...")
-                    | _ ->
-                        match currentPreviewRows with
-                        | Some rows -> ArcObjectExplorerContent.ARCObjectSection("Current Preview", [ ArcObjectExplorerContent.ARCObjectPropertyTable rows ])
-                        | None -> ArcObjectExplorerContent.ARCObjectStatusSection("Current Preview", ArcObjectExplorerContent.noMetadataMessage selectedNode.kind)
+                            ArcObjectExplorerContent.ARCObjectSection(
+                                "Parent Metadata",
+                                [
+                                    parentSubtitle
+                                    ArcObjectExplorerContent.ARCObjectPropertyTable (ArcObjectExplorerContent.metadataRows arcFile)
+                                ]
+                            )
+                        | None -> Html.none
                 ]
             ]
 
@@ -524,7 +713,7 @@ type ArcObjectExplorerContent =
             Swate.Components.ARCObjectWidget.SelectedKindLabels(selectedKindIndices)
 
         let filteredExplorerTree =
-            ArcObjectExplorerContent.filterArcExplorerTreeByKinds visibleKinds props.nodes
+            ArcObjectExplorerContent.FilterArcExplorerTreeByKinds visibleKinds props.nodes
 
         let treePane =
             if props.rootRepoPath.IsSome then
@@ -543,7 +732,7 @@ type ArcObjectExplorerContent =
             Swate.Components.ARCExplorer.toFileItems filteredExplorerTree
 
         let searchItems =
-            ArcObjectExplorerContent.searchableArcExplorerItems filteredExplorerTree explorerItems
+            ArcObjectExplorerContent.SearchableArcExplorerItems filteredExplorerTree explorerItems
 
         let selectedItemId =
             Swate.Components.ARCExplorer.getSelectedItemId
@@ -551,10 +740,20 @@ type ArcObjectExplorerContent =
                 props.selectedExplorerItemId
                 props.selectedTreeItemPath
 
+        let selectedNodeLineage =
+            ArcObjectExplorerContent.TryGetSelectedNodeLineage
+                filteredExplorerTree
+                props.selectedExplorerItemId
+                props.selectedTreeItemPath
+
         let selectedNode =
-            selectedItemId
-            |> Option.bind (fun nodeId ->
-                Swate.Components.ARCExplorer.tryFindNodeById nodeId filteredExplorerTree)
+            selectedNodeLineage
+            |> Option.map fst
+
+        let selectedAncestors =
+            selectedNodeLineage
+            |> Option.map snd
+            |> Option.defaultValue []
 
         let handleExplorerSelection =
             Swate.Components.ARCExplorer.createOpenPreviewHandler
@@ -571,7 +770,7 @@ type ArcObjectExplorerContent =
             selectedNode
             |> Option.map (fun node ->
                 let role = if node.isReference then "Reference" else "Canonical"
-                $"{ArcObjectExplorerContent.nodeKindLabel node.kind} | {role}")
+                $"{ArcObjectExplorerContent.NodeKindLabel node.kind} | {role}")
             |> Option.defaultValue "Selection"
 
         let searchAction =
@@ -599,7 +798,13 @@ type ArcObjectExplorerContent =
             )
 
         let detailsPane =
-            ArcObjectExplorerContent.ARCObjectDetailsContent selectedNode props.previewState props.arcFileState props.setArcFileState
+            ArcObjectExplorerContent.ARCObjectDetailsContent
+                selectedNode
+                selectedAncestors
+                props.previewState
+                props.arcFileState
+                props.setArcFileState
+                true
 
         Swate.Components.ARCObjectWidget.Main(
             navbar = navbar,

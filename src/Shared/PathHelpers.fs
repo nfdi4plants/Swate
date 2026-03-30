@@ -40,8 +40,12 @@ module PathHelpers =
         (targetFileName: string)
         =
         let lowered = normalizedPath.ToLowerInvariant()
+        let normalizedFolderSegment = folderSegment.Trim('/')
+        let matchesFolderSegment =
+            lowered.StartsWith($"{normalizedFolderSegment}/", StringComparison.Ordinal)
+            || lowered.Contains(folderSegment)
 
-        if lowered.Contains(folderSegment) && lowered.EndsWith("/isa.datamap.xlsx") then
+        if matchesFolderSegment && lowered.EndsWith("/isa.datamap.xlsx") then
             tryGetParentPath normalizedPath
             |> Option.map (fun folderPath -> $"{folderPath}/{targetFileName}")
         else
