@@ -48,6 +48,8 @@ let private toStatusDto (status: GitService.GitStatusDto) : GitStatusDto = {
     Ahead = status.Ahead
     Behind = status.Behind
     IsClean = status.IsClean
+    Conflicted = status.Conflicted
+    IsMergeInProgress = status.IsMergeInProgress
     Files =
         status.Files
         |> Array.map (fun file -> {
@@ -58,10 +60,41 @@ let private toStatusDto (status: GitService.GitStatusDto) : GitStatusDto = {
         })
 }
 
+let private toBranchKind (kind: GitService.GitBranchRefKind) =
+    match kind with
+    | GitService.GitBranchRefKind.Local -> GitBranchRefKind.Local
+    | GitService.GitBranchRefKind.Remote -> GitBranchRefKind.Remote
+
+let private toBranchDto (branch: GitService.GitBranchRefDto) : GitBranchRefDto = {
+    RefName = branch.RefName
+    DisplayLabel = branch.DisplayLabel
+    Kind = toBranchKind branch.Kind
+    IsCurrent = branch.IsCurrent
+    IsTracking = branch.IsTracking
+}
+
 let private toDiffSummaryDto (diff: GitService.GitDiffSummaryDto) : GitDiffSummaryDto = {
     Changed = diff.Changed
     Insertions = diff.Insertions
     Deletions = diff.Deletions
+}
+
+let private toDiffViewDataDto (data: GitService.GitDiffViewDataDto) : GitDiffViewDataDto = {
+    Path = data.Path
+    PreviousContent = data.PreviousContent
+    CurrentContent = data.CurrentContent
+    WordDiffText = data.WordDiffText
+}
+
+let private toMergeConflictViewDataDto (data: GitService.GitMergeConflictViewDataDto) : GitMergeConflictViewDataDto = {
+    Path = data.Path
+    MergeConflictContent = data.MergeConflictContent
+}
+
+let private toConfirmMergeResolutionResult (result: GitService.GitConfirmMergeResolutionResult) : GitConfirmMergeResolutionResult = {
+    UpdatedStatus = toStatusDto result.UpdatedStatus
+    RemainingConflictedPaths = result.RemainingConflictedPaths
+    NextConflictedPath = result.NextConflictedPath
 }
 
 let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgressCallback =
@@ -91,6 +124,17 @@ let api: IGitApi = {
                 | Ok statusDto -> return Ok(toStatusDto statusDto)
                 | Error failure -> return Error(exn $"git status failed ({failure.Kind}): {failure.Message}")
         }
+    getGitBranches =
+        fun (event: IpcMainEvent) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getBranches arcPath
+
+                match result with
+                | Ok branches -> return Ok(branches |> Array.map toBranchDto)
+                | Error failure -> return Error(exn $"git branch list failed ({failure.Kind}): {failure.Message}")
+        }
     getGitDiffSummary =
         fun (event: IpcMainEvent) -> promise {
             match tryGetVaultAndArcPath event with
@@ -112,6 +156,28 @@ let api: IGitApi = {
                 match result with
                 | Ok diffText -> return Ok diffText
                 | Error failure -> return Error(exn $"git word diff failed ({failure.Kind}): {failure.Message}")
+        }
+    getGitDiffViewData =
+        fun (event: IpcMainEvent) (requestedPath: string) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getDiffViewData arcPath requestedPath
+
+                match result with
+                | Ok diffViewData -> return Ok(toDiffViewDataDto diffViewData)
+                | Error failure -> return Error(exn $"git diff view failed ({failure.Kind}): {failure.Message}")
+        }
+    getGitMergeConflictViewData =
+        fun (event: IpcMainEvent) (requestedPath: string) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getMergeConflictViewData arcPath requestedPath
+
+                match result with
+                | Ok mergeViewData -> return Ok(toMergeConflictViewDataDto mergeViewData)
+                | Error failure -> return Error(exn $"git merge conflict view failed ({failure.Kind}): {failure.Message}")
         }
     gitFetch =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
@@ -253,6 +319,30 @@ let api: IGitApi = {
                                     (fun () -> Some $"Checked out branch '{request.Name}'.")
                                     None
                                     result
+                        })
+        }
+    confirmGitMergeResolution =
+        fun (event: IpcMainEvent) (request: GitConfirmMergeResolutionRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result =
+                                GitService.confirmMergeResolution
+                                    arcPath
+                                    request.Path
+                                    request.ExpectedConflictContent
+                                    request.ResolvedContent
+
+                            match result with
+                            | Ok payload ->
+                                do! vault.RefreshFileTree()
+                                return Ok(toConfirmMergeResolutionResult payload)
+                            | Error failure ->
+                                return Error(exn $"confirm merge resolution failed ({failure.Kind}): {failure.Message}")
                         })
         }
 }

@@ -1,5 +1,7 @@
 module Swate.Electron.Shared.GitTypes
 
+open Fable.Core
+
 
 // GIT LFS Types
 type GitLfsCommand =
@@ -33,11 +35,36 @@ type GitFailureKind =
     | Canceled
     | Unknown
 
+[<StringEnum(CaseRules.None)>]
+type GitBranchRefKind =
+    | Local
+    | Remote
+
 type GitFileStatusDto = {
     Path: string
     Index: string
     WorkingDir: string
     OriginalPath: string option
+}
+
+type GitBranchRefDto = {
+    RefName: string
+    DisplayLabel: string
+    Kind: GitBranchRefKind
+    IsCurrent: bool
+    IsTracking: bool
+}
+
+type GitDiffViewDataDto = {
+    Path: string
+    PreviousContent: string
+    CurrentContent: string
+    WordDiffText: string
+}
+
+type GitMergeConflictViewDataDto = {
+    Path: string
+    MergeConflictContent: string
 }
 
 type GitStatusDto = {
@@ -46,6 +73,8 @@ type GitStatusDto = {
     Ahead: int
     Behind: int
     IsClean: bool
+    Conflicted: string[]
+    IsMergeInProgress: bool
     Files: GitFileStatusDto[]
 }
 
@@ -91,3 +120,15 @@ type GitCreateBranchRequest = {
 }
 
 type GitCheckoutBranchRequest = { Name: string }
+
+type GitConfirmMergeResolutionRequest = {
+    Path: string
+    ExpectedConflictContent: string
+    ResolvedContent: string
+}
+
+type GitConfirmMergeResolutionResult = {
+    UpdatedStatus: GitStatusDto
+    RemainingConflictedPaths: string[]
+    NextConflictedPath: string option
+}

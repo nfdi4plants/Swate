@@ -56,8 +56,11 @@ type IGitLfsApi = {
 /// Two Way Bridge: Renderer <-> Main
 type IGitApi = {
     getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
+    getGitBranches: IpcMainEvent -> JS.Promise<Result<GitBranchRefDto[], exn>>
     getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
     getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
+    getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitDiffViewDataDto, exn>>
+    getGitMergeConflictViewData: IpcMainEvent -> string -> JS.Promise<Result<GitMergeConflictViewDataDto, exn>>
     gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
@@ -68,6 +71,8 @@ type IGitApi = {
     gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: IpcMainEvent -> GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    confirmGitMergeResolution:
+        IpcMainEvent -> GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>>
 }
 
 /// One Way Bridge: Main -> Renderer
