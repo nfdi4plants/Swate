@@ -8,26 +8,12 @@ let Main () =
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
-    let visibleKinds =
-        Swate.Components.ARCObjectWidget.SelectedKindLabels arcObjectCtx.state.SelectedKindIndices
-
-    let filteredTree =
-        ArcObjectExplorerContent.FilterArcExplorerTreeByKinds visibleKinds arcObjectCtx.state.Nodes
-
-    let selectedNodeLineage =
-        ArcObjectExplorerContent.TryGetSelectedNodeLineage
-            filteredTree
+    let viewModel =
+        ArcObjectExplorerView.create
+            arcObjectCtx.state.Nodes
             arcObjectCtx.state.SelectedExplorerItemId
             fileStateCtx.state.SelectedTreeItemPath
-
-    let selectedNode =
-        selectedNodeLineage
-        |> Option.map fst
-
-    let selectedAncestors =
-        selectedNodeLineage
-        |> Option.map snd
-        |> Option.defaultValue []
+            arcObjectCtx.state.SelectedKindIndices
 
     Html.div [
         prop.className "swt:p-4 swt:h-full"
@@ -36,8 +22,8 @@ let Main () =
                 "ARC Object Details",
                 content =
                     ArcObjectExplorerContent.ARCObjectDetailsContent
-                        selectedNode
-                        selectedAncestors
+                        viewModel.SelectedNode
+                        viewModel.SelectedAncestors
                         arcObjectCtx.state.PreviewState
                         arcObjectCtx.state.ArcFileState
                         arcObjectCtx.setArcFileState

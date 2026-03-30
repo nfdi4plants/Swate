@@ -160,17 +160,7 @@ let tryGetArcFilePath (arcRootPath: ArcRootPath) (arcFile: ArcFiles) =
     let arcRootPath = defaultArg arcRootPath ""
     let root = normalizePath arcRootPath
 
-    match arcFile with
-    | ArcFiles.Investigation _ -> Some ARCtrl.ArcPathHelper.InvestigationFileName
-    | ArcFiles.Study(study, _) -> ARCtrl.Helper.Identifier.Study.fileNameFromIdentifier study.Identifier |> Some
-    | ArcFiles.Assay assay -> ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier assay.Identifier |> Some
-    | ArcFiles.Run run -> ARCtrl.Helper.Identifier.Run.fileNameFromIdentifier run.Identifier |> Some
-    | ArcFiles.Workflow workflow ->
-        ARCtrl.Helper.Identifier.Workflow.fileNameFromIdentifier workflow.Identifier
-        |> Some
-    | ArcFiles.DataMap(Some dmpi, _) -> DatamapParentInfo.toPath dmpi |> Some
-    | ArcFiles.DataMap(None, _)
-    | ArcFiles.Template _ -> None
+    arcFile.TryGetRelativePath()
     |> Option.map (fun p -> combineMany [| root; p |])
 
 

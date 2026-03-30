@@ -80,6 +80,15 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
         | Error exn -> Error exn.Message
 }
 
+let private loadPreviewResult (previewPath: string) = promise {
+    let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+
+    return
+        match result with
+        | Ok data -> Ok(previewLoadResultOfDto data)
+        | Error exn -> Error exn.Message
+}
+
 let openPreview (path: string) = promise {
     let previewPath = resolveArcPreviewPath path
 
@@ -88,10 +97,33 @@ let openPreview (path: string) = promise {
     else
         console.log ($"[Renderer] Opening file: {previewPath}")
 
-    let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
-
-    return
-        match result with
-        | Ok data -> Ok(previewLoadResultOfDto data)
-        | Error exn -> Error exn.Message
+    return! loadPreviewResult previewPath
 }
+
+let createArcExplorerServices
+    (setPageState: PageState option -> unit)
+    (setArcFileState: ArcFiles option -> unit)
+    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setStatusMessage: string option -> unit)
+    : ARCExplorerServices
+    =
+    let toggleLfsMark = runToggleLfsMark
+
+    {
+        openPreview =
+            fun previewPath -> promise {
+                let! result = loadPreviewResult previewPath
+
+                match result with
+                | Ok loaded ->
+                    applyLoadedPreview setPageState setArcFileState setPreviewState setStatusMessage loaded
+                    return Ok()
+                | Error errorMessage ->
+                    applyPreviewError setPageState setArcFileState setPreviewState setStatusMessage errorMessage
+                    return Error errorMessage
+            }
+        setStatusMessage = setStatusMessage
+        runToggleLfsMark =
+            fun _rootRepoPath relativePath markAsLfs ->
+                toggleLfsMark relativePath markAsLfs
+    }

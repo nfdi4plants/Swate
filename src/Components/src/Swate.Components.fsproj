@@ -72,7 +72,6 @@
     <Compile Include="Util\React.useListener.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\ReactContexts.fs" />
-    <Compile Include="Util\PathHelpers.fs" />
     <Compile Include="Api\Helper.fs" />
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
@@ -153,6 +152,7 @@
     <Compile Include="ARCObjectExplorer\ARCExplorer.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectPanel.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectWidget.fs" />
+    <Compile Include="ARCObjectExplorer\ArcObjectExplorerView.fs" />
     <Compile Include="ARCObjectExplorer\ArcObjectExplorerContent.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectFixture.fs" />
     <Compile Include="Notes\Types.fs" />

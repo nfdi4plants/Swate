@@ -5,6 +5,7 @@ open Fable.Core
 
 open SelectorTypes
 open Swate.Components.Types.Actionbar
+open Swate.Components.Shared
 
 module SelectorHelper =
 

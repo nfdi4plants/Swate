@@ -2,8 +2,8 @@ namespace Swate.Components
 
 open System
 open Feliz
-open Swate.Components.FileExplorerTypes
 open ARCtrl
+open Swate.Components.Shared
 
 
 [<RequireQualifiedAccess>]
@@ -38,19 +38,6 @@ type ArcObjectExplorerContent =
 
     static member private ontologyLabel (annotation: OntologyAnnotation option) =
         annotation |> Option.map _.NameText |> ArcObjectExplorerContent.asOptionalText
-
-    static member private nodeKindLabel =
-        function
-        | ArcExplorerNodeKind.Arc -> "ARC"
-        | ArcExplorerNodeKind.Group -> "Group"
-        | ArcExplorerNodeKind.Study -> "Study"
-        | ArcExplorerNodeKind.Assay -> "Assay"
-        | ArcExplorerNodeKind.Workflow -> "Workflow"
-        | ArcExplorerNodeKind.Run -> "Run"
-        | ArcExplorerNodeKind.Table -> "Table"
-        | ArcExplorerNodeKind.DataMap -> "DataMap"
-        | ArcExplorerNodeKind.Note -> "Note"
-        | ArcExplorerNodeKind.Sample -> "Sample"
 
     static member private nodeHasMetadata =
         function
@@ -354,115 +341,6 @@ type ArcObjectExplorerContent =
         | ArcExplorerNodeKind.Group -> "Select a concrete ARC object to inspect its metadata."
         | _ -> "No additional metadata is available for this selection."
 
-    static member private filterArcExplorerTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) =
-        let rec loop (node: ArcExplorerNode) =
-            let filteredChildren = node.children |> List.choose loop
-            let hasVisibleChildren = filteredChildren |> List.isEmpty |> not
-            let kindLabel = ArcObjectExplorerContent.nodeKindLabel node.kind
-            let isVisibleKind = visibleKinds.Contains kindLabel
-
-            match node.kind with
-            | ArcExplorerNodeKind.Arc ->
-                Some { node with children = filteredChildren }
-            | ArcExplorerNodeKind.Group ->
-                if hasVisibleChildren then
-                    Some { node with children = filteredChildren }
-                else
-                    None
-            | _ ->
-                if isVisibleKind || hasVisibleChildren then
-                    Some { node with children = filteredChildren }
-                else
-                    None
-
-        nodes |> List.choose loop
-
-    static member private flattenFileItems(items: FileItem list) =
-        let rec loop (items: FileItem list) =
-            items
-            |> List.collect (fun item ->
-                item :: (item.Children |> Option.defaultValue [] |> loop))
-
-        loop items
-
-    static member private flattenArcExplorerNodesWithParent(nodes: ArcExplorerNode list) =
-        let rec loop (parent: ArcExplorerNode option) (nodes: ArcExplorerNode list) =
-            nodes
-            |> List.collect (fun node -> (node, parent) :: loop (Some node) node.children)
-
-        loop None nodes
-
-    static member private searchableArcExplorerItems (nodes: ArcExplorerNode list) (items: FileItem list) =
-        let itemsById =
-            items
-            |> ArcObjectExplorerContent.flattenFileItems
-            |> List.map (fun item -> item.Id, item)
-            |> Map.ofList
-
-        nodes
-        |> ArcObjectExplorerContent.flattenArcExplorerNodesWithParent
-        |> List.choose (fun (node, parent) ->
-            if
-                not node.isSelectable
-                || node.kind = ArcExplorerNodeKind.Arc
-                || node.kind = ArcExplorerNodeKind.Group
-            then
-                None
-            else
-                itemsById
-                |> Map.tryFind node.id
-                |> Option.map (fun item ->
-                    let parentPart =
-                        parent
-                        |> Option.map (fun parentNode -> $"Parent: {parentNode.name}")
-                        |> Option.toList
-
-                    let subtitleParts = [
-                        ArcObjectExplorerContent.nodeKindLabel node.kind
-                        if node.isReference then "Reference" else "Canonical"
-                        yield! parentPart
-                        yield! node.path |> Option.toList
-                    ]
-
-                    node.name, Some(String.concat " | " subtitleParts), item))
-        |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
-        |> List.toArray
-
-    static member NodeKindLabel(kind: ArcExplorerNodeKind) = ArcObjectExplorerContent.nodeKindLabel kind
-
-    static member FilterArcExplorerTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) =
-        ArcObjectExplorerContent.filterArcExplorerTreeByKinds visibleKinds nodes
-
-    static member SearchableArcExplorerItems (nodes: ArcExplorerNode list) (items: FileItem list) =
-        ArcObjectExplorerContent.searchableArcExplorerItems nodes items
-
-    static member private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
-        let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
-            nodes
-            |> List.tryPick (fun node ->
-                if node.id = nodeId then
-                    Some(node, List.rev ancestors)
-                else
-                    loop (node :: ancestors) node.children)
-
-        loop [] nodes
-
-    static member TryGetSelectedNode
-        (nodes: ArcExplorerNode list)
-        (selectedExplorerItemId: string option)
-        (selectedTreeItemPath: string option)
-        =
-        Swate.Components.ARCExplorer.getSelectedItemId nodes selectedExplorerItemId selectedTreeItemPath
-        |> Option.bind (fun nodeId -> ArcObjectExplorerContent.tryGetNodeLineageById nodeId nodes |> Option.map fst)
-
-    static member TryGetSelectedNodeLineage
-        (nodes: ArcExplorerNode list)
-        (selectedExplorerItemId: string option)
-        (selectedTreeItemPath: string option)
-        =
-        Swate.Components.ARCExplorer.getSelectedItemId nodes selectedExplorerItemId selectedTreeItemPath
-        |> Option.bind (fun nodeId -> ArcObjectExplorerContent.tryGetNodeLineageById nodeId nodes)
-
     [<ReactComponent>]
     static member private ARCObjectSection(title: string, children: ReactElement list) =
         Html.div [
@@ -501,7 +379,7 @@ type ArcObjectExplorerContent =
     [<ReactComponent>]
     static member private ARCObjectSelectionSection(selectedNode: ArcExplorerNode) =
         let rows = [
-            ArcObjectExplorerContent.textRow "Kind" (ArcObjectExplorerContent.nodeKindLabel selectedNode.kind)
+            ArcObjectExplorerContent.textRow "Kind" (ArcObjectExplorerView.nodeKindLabel selectedNode.kind)
             ArcObjectExplorerContent.textRow "Role" (if selectedNode.isReference then "Reference" else "Canonical")
             if selectedNode.path.IsSome then
                 ArcObjectExplorerContent.codeRow "Path" selectedNode.path.Value
@@ -583,23 +461,11 @@ type ArcObjectExplorerContent =
             ]
         ]
 
-    static member private tryGetArcFilePath (arcFile: ArcFiles) =
-        match arcFile with
-        | ArcFiles.Investigation _ -> Some ARCtrl.ArcPathHelper.InvestigationFileName
-        | ArcFiles.Study(study, _) -> ARCtrl.Helper.Identifier.Study.fileNameFromIdentifier study.Identifier |> Some
-        | ArcFiles.Assay assay -> ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier assay.Identifier |> Some
-        | ArcFiles.Workflow workflow ->
-            ARCtrl.Helper.Identifier.Workflow.fileNameFromIdentifier workflow.Identifier
-            |> Some
-        | ArcFiles.Run run -> ARCtrl.Helper.Identifier.Run.fileNameFromIdentifier run.Identifier |> Some
-        | ArcFiles.DataMap(parentInfo, _) -> parentInfo |> Option.map DatamapParentInfo.toPath
-        | ArcFiles.Template _ -> None
-
     static member private arcFileMatchesSelectedNodePreviewPath
         (selectedNode: ArcExplorerNode)
         (arcFile: ArcFiles)
         =
-        match selectedNode.path, ArcObjectExplorerContent.tryGetArcFilePath arcFile with
+        match selectedNode.path, arcFile.TryGetRelativePath() with
         | Some nodePath, Some arcFilePath ->
             let expectedPreviewPath = PathHelpers.resolveArcPreviewPath nodePath
             PathHelpers.pathsEqual expectedPreviewPath arcFilePath
@@ -684,7 +550,7 @@ type ArcObjectExplorerContent =
                                     prop.children [
                                         Html.span [
                                             prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
-                                            prop.text (ArcObjectExplorerContent.nodeKindLabel parentNode.kind)
+                                            prop.text (ArcObjectExplorerView.nodeKindLabel parentNode.kind)
                                         ]
                                         Html.h4 [
                                             prop.className "swt:text-base swt:font-semibold swt:break-words"
@@ -709,17 +575,18 @@ type ArcObjectExplorerContent =
         let selectedKindIndices, setSelectedKindIndices =
             React.useState (Swate.Components.ARCObjectWidget.DefaultKindFilterIndices())
 
-        let visibleKinds =
-            Swate.Components.ARCObjectWidget.SelectedKindLabels(selectedKindIndices)
-
-        let filteredExplorerTree =
-            ArcObjectExplorerContent.FilterArcExplorerTreeByKinds visibleKinds props.nodes
+        let viewModel =
+            ArcObjectExplorerView.create
+                props.nodes
+                props.selectedExplorerItemId
+                props.selectedTreeItemPath
+                selectedKindIndices
 
         let treePane =
             if props.rootRepoPath.IsSome then
                 Swate.Components.ARCExplorer.CreateArcExplorer
                     props.rootRepoPath.Value
-                    filteredExplorerTree
+                    viewModel.FilteredTree
                     props.selectedExplorerItemId
                     props.selectedTreeItemPath
                     props.setSelectedExplorerItemId
@@ -728,54 +595,15 @@ type ArcObjectExplorerContent =
             else
                 Html.none
 
-        let explorerItems =
-            Swate.Components.ARCExplorer.toFileItems filteredExplorerTree
-
-        let searchItems =
-            ArcObjectExplorerContent.SearchableArcExplorerItems filteredExplorerTree explorerItems
-
-        let selectedItemId =
-            Swate.Components.ARCExplorer.getSelectedItemId
-                filteredExplorerTree
-                props.selectedExplorerItemId
-                props.selectedTreeItemPath
-
-        let selectedNodeLineage =
-            ArcObjectExplorerContent.TryGetSelectedNodeLineage
-                filteredExplorerTree
-                props.selectedExplorerItemId
-                props.selectedTreeItemPath
-
-        let selectedNode =
-            selectedNodeLineage
-            |> Option.map fst
-
-        let selectedAncestors =
-            selectedNodeLineage
-            |> Option.map snd
-            |> Option.defaultValue []
-
         let handleExplorerSelection =
             Swate.Components.ARCExplorer.createOpenPreviewHandler
                 props.setSelectedExplorerItemId
                 props.setSelectedTreeItemPath
                 props.services
 
-        let selectedTitle =
-            selectedNode
-            |> Option.map _.name
-            |> Option.defaultValue "No visible selection"
-
-        let selectedSubtitle =
-            selectedNode
-            |> Option.map (fun node ->
-                let role = if node.isReference then "Reference" else "Canonical"
-                $"{ArcObjectExplorerContent.NodeKindLabel node.kind} | {role}")
-            |> Option.defaultValue "Selection"
-
         let searchAction =
             Swate.Components.ARCObjectWidget.SearchAction(
-                searchItems,
+                viewModel.SearchItems,
                 (fun (name, _, _) -> name),
                 (fun (_, _, item) -> promise { handleExplorerSelection item |> Promise.start} |> Promise.start),
                 itemSubtitle = (fun (_, subtitle, _) -> subtitle)
@@ -783,8 +611,8 @@ type ArcObjectExplorerContent =
 
         let navbar =
             Swate.Components.ARCObjectWidget.Navbar(
-                selectedTitle,
-                selectedSubtitle,
+                viewModel.SelectedTitle,
+                viewModel.SelectedSubtitle,
                 selectedKindIndices,
                 setSelectedKindIndices,
                 rightActions = searchAction
@@ -792,15 +620,15 @@ type ArcObjectExplorerContent =
 
         let explorerPane =
             Swate.Components.ARCObjectWidget.ExplorerContent(
-                explorerItems,
-                ?selectedItemId = selectedItemId,
+                viewModel.ExplorerItems,
+                ?selectedItemId = viewModel.SelectedItemId,
                 onItemClick = (fun item -> promise { handleExplorerSelection item |> Promise.start} |> Promise.start)
             )
 
         let detailsPane =
             ArcObjectExplorerContent.ARCObjectDetailsContent
-                selectedNode
-                selectedAncestors
+                viewModel.SelectedNode
+                viewModel.SelectedAncestors
                 props.previewState
                 props.arcFileState
                 props.setArcFileState
