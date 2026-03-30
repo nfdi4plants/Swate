@@ -99,6 +99,8 @@
     <Compile Include="GitComparison\GitComparisonView.fs" />
     <Compile Include="GitComparison\GitDiffViewer.fs" />
     <Compile Include="GitComparison\GitMergeConflictViewer.fs" />
+    <Compile Include="GitSidebar\Types.fs" />
+    <Compile Include="GitSidebar\GitSidebar.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
@@ -165,6 +167,7 @@
     <Compile Include="Authentication\AccountManager.fs" />
     <Compile Include="Authentication\Authentication.fs" />
     <Compile Include="Style.fs" />
+    <None Include="GitSidebar\GitSidebar.stories.tsx" />
   </ItemGroup>
 
   <PropertyGroup>
