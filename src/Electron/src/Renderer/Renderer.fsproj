@@ -7,10 +7,10 @@
   <ItemGroup>
     <Compile Include="Api.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="context\AppStateCtx.fs" />
-    <Compile Include="context\PageStateCtx.fs" />
-    <Compile Include="context\FileStateCtx.fs" />
-    <Compile Include="context\ArcObjectExplorerCtx.fs" />
+    <Compile Include="Context1\AppStateCtx.fs" />
+    <Compile Include="Context1\PageStateCtx.fs" />
+    <Compile Include="Context1\FileStateCtx.fs" />
+    <Compile Include="Context1\ArcObjectExplorerCtx.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\Navbar.fs" />
