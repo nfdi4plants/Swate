@@ -23,5 +23,6 @@ let Main () =
         onCommitSelection = gitStateCtx.commitSelection,
         onCommitAll = gitStateCtx.commitAll,
         onCreateBranch = gitStateCtx.createBranch,
+        onSwitchBranch = gitStateCtx.switchBranch,
         onSelectChange = gitStateCtx.selectChange
     )

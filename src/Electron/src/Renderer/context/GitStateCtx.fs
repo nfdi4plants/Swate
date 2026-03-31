@@ -47,6 +47,7 @@ type GitStateController = {
     commitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>
     commitAll: string -> JS.Promise<Result<unit, string>>
     createBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>
+    switchBranch: string -> JS.Promise<Result<unit, string>>
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
     confirmMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<unit, string>>
 }
@@ -82,6 +83,9 @@ let private gitPush (request: GitRemoteOperationRequest) : JS.Promise<Result<Git
 
 let private createBranch (request: GitCreateBranchRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     invokeGitApiWithPayload ipcGitApiDynamic "createBranch" request
+
+let private checkoutBranch (request: GitCheckoutBranchRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "checkoutBranch" request
 
 let private gitStagePaths (request: GitPathspecRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     invokeGitApiWithPayload ipcGitApiDynamic "gitStagePaths" request
@@ -166,6 +170,7 @@ let GitStateCtx =
             commitSelection = fun _ -> promise { return Ok() }
             commitAll = fun _ -> promise { return Ok() }
             createBranch = fun _ -> promise { return Ok() }
+            switchBranch = fun _ -> promise { return Ok() }
             selectChange = fun _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> promise { return Ok() }
         }
@@ -523,6 +528,35 @@ let GitStateCtxProvider (children: ReactElement) =
             return Error message
     }
 
+    let switchBranchTo (branchName: string) = promise {
+        let normalizedBranchName = branchName.Trim()
+
+        if String.IsNullOrWhiteSpace normalizedBranchName then
+            return Error "Branch name must not be empty."
+        else
+            setBusyNotice (Some "Switching branch")
+            setErrorNotice None
+
+            let! result =
+                checkoutBranch {
+                    Name = normalizedBranchName
+                }
+
+            setBusyNotice None
+
+            match result with
+            | Error exn ->
+                setErrorNotice (Some exn.Message)
+                return Error exn.Message
+            | Ok operationResult when operationResult.Success ->
+                let! refreshResult = refreshAll ()
+                return refreshResult
+            | Ok operationResult ->
+                let message = operationResult.Message |> Option.defaultValue "Branch switch failed."
+                setErrorNotice (Some message)
+                return Error message
+    }
+
     let selectChange (change: GitSidebarChange) =
         if change.IsConflicted then
             openMergeConflictPage change.Path
@@ -588,6 +622,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 commitSelection = commitSelection
                 commitAll = commitAll
                 createBranch = createBranchFrom
+                switchBranch = switchBranchTo
                 selectChange = selectChange
                 confirmMergeResolution = confirmMergeResolution
             }),

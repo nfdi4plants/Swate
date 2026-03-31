@@ -100,6 +100,7 @@ type GitSidebar =
             onCommitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>,
             onCommitAll: string -> JS.Promise<Result<unit, string>>,
             onCreateBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>,
+            onSwitchBranch: string -> JS.Promise<Result<unit, string>>,
             onSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>,
             ?currentProgress: GitSidebarProgress,
             ?selectedFile: string,
@@ -114,10 +115,12 @@ type GitSidebar =
         let localError, setLocalError = React.useState (None: string option)
         let activeAction, setActiveAction = React.useState (None: string option)
         let isCreateBranchModalOpen, setIsCreateBranchModalOpen = React.useState false
+        let isSwitchBranchModalOpen, setIsSwitchBranchModalOpen = React.useState false
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
         let selectedCommitPaths, setSelectedCommitPaths = React.useStateWithUpdater Set.empty<string>
         let selectedStartPoint, setSelectedStartPoint = React.useState (None: string option)
+        let selectedSwitchBranch, setSelectedSwitchBranch = React.useState (None: string option)
 
         let isBusy =
             activeAction.IsSome || busyNotice.IsSome
@@ -165,6 +168,13 @@ type GitSidebar =
                     )
                 )
 
+        let localBranchOptionsForSwitch =
+            branchOptions
+            |> Array.filter (fun branch ->
+                branch.Kind = GitSidebarBranchKind.Local
+                && not branch.IsCurrent
+            )
+
         let runAction (label: string) (operation: unit -> JS.Promise<Result<unit, string>>) =
             promise {
                 setLocalError None
@@ -193,6 +203,17 @@ type GitSidebar =
 
             setSelectedStartPoint defaultStartPoint
             setIsCreateBranchModalOpen true
+
+        let openSwitchBranchModal () =
+            setLocalError None
+
+            let defaultBranch =
+                localBranchOptionsForSwitch
+                |> Array.tryHead
+                |> Option.map _.RefName
+
+            setSelectedSwitchBranch defaultBranch
+            setIsSwitchBranchModalOpen true
 
         let toggleCommitSelection (path: string) =
             setSelectedCommitPaths (fun current ->
@@ -280,6 +301,28 @@ type GitSidebar =
                         | Ok () ->
                             setIsCreateBranchModalOpen false
                             setBranchName ""
+                        | Error message ->
+                            setLocalError (Some message)
+                    finally
+                        setActiveAction None
+                }
+                |> Promise.start
+
+        let submitSwitchBranch () =
+            match selectedSwitchBranch with
+            | None ->
+                setLocalError (Some "Select a branch to switch to.")
+            | Some branchName ->
+                promise {
+                    setLocalError None
+                    setActiveAction (Some "Switch Branch")
+
+                    try
+                        let! result = onSwitchBranch branchName
+
+                        match result with
+                        | Ok () ->
+                            setIsSwitchBranchModalOpen false
                         | Error message ->
                             setLocalError (Some message)
                     finally
@@ -436,14 +479,23 @@ type GitSidebar =
                 Html.div [
                     prop.className "swt:px-3 swt:pt-2"
                     prop.children [
-                        Html.button [
-                            prop.testId "GitSidebarCreateBranchButton"
-                            prop.className "swt:btn swt:btn-sm swt:btn-primary swt:w-full swt:justify-start swt:gap-2 swt:normal-case"
-                            prop.disabled isBusy
-                            prop.onClick (fun _ -> openCreateBranchModal ())
+                        Html.div [
+                            prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
                             prop.children [
-                                Html.span [ prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-4" ]
-                                Html.span "Create Branch From"
+                                GitSidebar.ActionButton(
+                                    "Create Branch",
+                                    "swt:fluent--branch-fork-24-regular",
+                                    isBusy,
+                                    openCreateBranchModal,
+                                    testId = "GitSidebarCreateBranchButton"
+                                )
+                                GitSidebar.ActionButton(
+                                    "Switch Branch",
+                                    "swt:fluent--arrow-swap-24-regular",
+                                    isBusy || localBranchOptionsForSwitch.Length = 0,
+                                    openSwitchBranchModal,
+                                    testId = "GitSidebarSwitchBranchButton"
+                                )
                             ]
                         ]
                     ]
@@ -806,6 +858,70 @@ type GitSidebar =
                                         "Create Branch"
                                 )
                                 prop.onClick (fun _ -> submitCreateBranch ())
+                            ]
+                        ]
+                )
+
+                BaseModal.Modal(
+                    isOpen = isSwitchBranchModalOpen,
+                    setIsOpen = setIsSwitchBranchModalOpen,
+                    header = Html.text "Switch Branch",
+                    description = Html.text "Switch to an existing local branch.",
+                    debug = "GitSidebarSwitchBranchModal",
+                    children =
+                        Html.div [
+                            prop.testId "GitSidebarSwitchBranchModal"
+                            prop.className "swt:flex swt:flex-col swt:gap-3"
+                            prop.children [
+                                Html.label [
+                                    prop.className "swt:flex swt:flex-col swt:gap-2"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:text-sm swt:font-medium"
+                                            prop.text "Branch"
+                                        ]
+                                        Html.select [
+                                            prop.testId "GitSidebarSwitchBranchSelect"
+                                            prop.className "swt:select swt:select-bordered swt:w-full"
+                                            prop.value (selectedSwitchBranch |> Option.defaultValue "")
+                                            prop.onChange (fun (nextValue: string) ->
+                                                if String.IsNullOrWhiteSpace nextValue then
+                                                    setSelectedSwitchBranch None
+                                                else
+                                                    setSelectedSwitchBranch (Some nextValue)
+                                            )
+                                            prop.children [
+                                                for branch in localBranchOptionsForSwitch do
+                                                    Html.option [
+                                                        prop.key branch.RefName
+                                                        prop.value branch.RefName
+                                                        prop.text branch.DisplayLabel
+                                                    ]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ],
+                    footer =
+                        React.Fragment [
+                            Html.button [
+                                prop.className "swt:btn swt:btn-ghost"
+                                prop.disabled activeAction.IsSome
+                                prop.text "Cancel"
+                                prop.onClick (fun _ -> setIsSwitchBranchModalOpen false)
+                            ]
+                            Html.button [
+                                prop.testId "GitSidebarSwitchBranchSubmit"
+                                prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                                prop.disabled (activeAction.IsSome || localBranchOptionsForSwitch.Length = 0)
+                                prop.text (
+                                    if activeAction = Some "Switch Branch" then
+                                        "Switching..."
+                                    else
+                                        "Switch Branch"
+                                )
+                                prop.onClick (fun _ -> submitSwitchBranch ())
                             ]
                         ]
                 )

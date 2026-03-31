@@ -13,6 +13,7 @@ const fail = (message: string) =>
 const okWithArg = (_arg: unknown) => ok();
 const okWithMessage = (_message: string) => ok();
 const okWithSelection = (_request: unknown) => ok();
+const okWithBranch = (_branchName: string) => ok();
 
 const baseStatus = {
   CurrentBranch: "feature/git-sidebar",
@@ -139,6 +140,7 @@ export const CleanRepo: Story = {
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
@@ -163,6 +165,7 @@ export const ChangedFiles: Story = {
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
@@ -192,6 +195,7 @@ export const ConflictsPresent: Story = {
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
@@ -222,6 +226,7 @@ export const BusyProgressState: Story = {
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
@@ -245,6 +250,7 @@ export const CreateBranchModal: Story = {
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
@@ -264,6 +270,33 @@ export const CreateBranchModal: Story = {
   },
 };
 
+export const SwitchBranchModal: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    onRefresh: ok,
+    onFetch: ok,
+    onPull: ok,
+    onPush: ok,
+    onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
+    onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
+    onSelectChange: okWithArg,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const modal = within(document.body);
+    await userEvent.click(canvas.getByTestId("GitSidebarSwitchBranchButton"));
+    await expect(modal.getByTestId("GitSidebarSwitchBranchSelect")).toHaveTextContent(
+      "main",
+    );
+    await userEvent.click(modal.getByTestId("GitSidebarSwitchBranchSubmit"));
+  },
+};
+
 export const CommitComposer: Story = {
   args: {
     status: baseStatus,
@@ -277,6 +310,7 @@ export const CommitComposer: Story = {
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
@@ -305,6 +339,7 @@ export const CallbackErrorHandling: Story = {
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
