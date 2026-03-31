@@ -49,33 +49,42 @@ type GitStateController = {
     confirmMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<unit, string>>
 }
 
-let private getGitStatus : unit -> JS.Promise<Result<GitStatusDto, exn>> =
-    unbox Api.ipcGitApi.getGitStatus
+let private ipcGitApiDynamic: obj = unbox Api.ipcGitApi
 
-let private getGitBranches : unit -> JS.Promise<Result<GitBranchRefDto[], exn>> =
-    unbox Api.ipcGitApi.getGitBranches
+[<Emit("$0[$1]()")>]
+let private invokeGitApiWithoutPayload<'T> (api: obj) (methodName: string) : 'T = jsNative
 
-let private getGitDiffViewData : string -> JS.Promise<Result<GitDiffViewDataDto, exn>> =
-    unbox Api.ipcGitApi.getGitDiffViewData
+[<Emit("$0[$1](undefined, $2)")>]
+let private invokeGitApiWithPayload<'TArg, 'T> (api: obj) (methodName: string) (arg: 'TArg) : 'T = jsNative
 
-let private getGitMergeConflictViewData : string -> JS.Promise<Result<GitMergeConflictViewDataDto, exn>> =
-    unbox Api.ipcGitApi.getGitMergeConflictViewData
+let private getGitStatus () : JS.Promise<Result<GitStatusDto, exn>> =
+    invokeGitApiWithoutPayload ipcGitApiDynamic "getGitStatus"
 
-let private gitFetch : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox Api.ipcGitApi.gitFetch
+let private getGitBranches () : JS.Promise<Result<GitBranchRefDto[], exn>> =
+    invokeGitApiWithoutPayload ipcGitApiDynamic "getGitBranches"
 
-let private gitPull : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox Api.ipcGitApi.gitPull
+let private getGitDiffViewData (requestedPath: string) : JS.Promise<Result<GitDiffViewDataDto, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "getGitDiffViewData" requestedPath
 
-let private gitPush : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox Api.ipcGitApi.gitPush
+let private getGitMergeConflictViewData (requestedPath: string) : JS.Promise<Result<GitMergeConflictViewDataDto, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "getGitMergeConflictViewData" requestedPath
 
-let private createBranch : GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox Api.ipcGitApi.createBranch
+let private gitFetch (request: GitRemoteOperationRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "gitFetch" request
 
-let private confirmGitMergeResolution :
-    GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>> =
-    unbox Api.ipcGitApi.confirmGitMergeResolution
+let private gitPull (request: GitRemoteOperationRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "gitPull" request
+
+let private gitPush (request: GitRemoteOperationRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "gitPush" request
+
+let private createBranch (request: GitCreateBranchRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "createBranch" request
+
+let private confirmGitMergeResolution
+    (request: GitConfirmMergeResolutionRequest)
+    : JS.Promise<Result<GitConfirmMergeResolutionResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "confirmGitMergeResolution" request
 
 let private unsupportedGitContentToken = "Unsupported git content"
 
