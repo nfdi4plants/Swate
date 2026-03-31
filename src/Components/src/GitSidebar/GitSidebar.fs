@@ -44,6 +44,8 @@ module private GitSidebarInternal =
         |> List.choose id
         |> String.concat " | "
 
+    let formatThresholdInput (thresholdMb: int) = string thresholdMb
+
 [<Erase; Mangle(false)>]
 type GitSidebar =
 
@@ -99,6 +101,8 @@ type GitSidebar =
             onSync: unit -> JS.Promise<Result<unit, string>>,
             onCommitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>,
             onCommitAll: string -> JS.Promise<Result<unit, string>>,
+            lfsAutoTrackThresholdMb: int,
+            onSaveLfsAutoTrackThreshold: int -> JS.Promise<Result<unit, string>>,
             onCreateBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>,
             onSwitchBranch: string -> JS.Promise<Result<unit, string>>,
             onSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>,
@@ -119,6 +123,7 @@ type GitSidebar =
         let isSwitchBranchModalOpen, setIsSwitchBranchModalOpen = React.useState false
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
+        let lfsThresholdInput, setLfsThresholdInput = React.useState (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)
         let selectedCommitPaths, setSelectedCommitPaths = React.useStateWithUpdater Set.empty<string>
         let selectedStartPoint, setSelectedStartPoint = React.useState (None: string option)
         let selectedSwitchBranch, setSelectedSwitchBranch = React.useState (None: string option)
@@ -139,6 +144,11 @@ type GitSidebar =
                     )
                 )),
             [| box changedFiles |]
+        )
+
+        React.useEffect (
+            (fun () -> setLfsThresholdInput (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)),
+            [| box lfsAutoTrackThresholdMb |]
         )
 
         let branchOptionsWithHead =
@@ -281,6 +291,37 @@ type GitSidebar =
                 }
                 |> Promise.start
 
+        let submitLfsThreshold () =
+            let normalizedInput =
+                lfsThresholdInput.Trim()
+
+            let success, parsedThresholdMb =
+                Int32.TryParse normalizedInput
+
+            if not success then
+                setLocalError (Some "Git LFS threshold must be a whole number.")
+            elif parsedThresholdMb < 1 then
+                setLocalError (Some "Git LFS threshold must be at least 1 MB.")
+            elif parsedThresholdMb > 100 then
+                setLocalError (Some "Git LFS threshold must not exceed 100 MB.")
+            else
+                promise {
+                    setLocalError None
+                    setActiveAction (Some "Save Git LFS Threshold")
+
+                    try
+                        let! result = onSaveLfsAutoTrackThreshold parsedThresholdMb
+
+                        match result with
+                        | Ok () ->
+                            setLfsThresholdInput (GitSidebarInternal.formatThresholdInput parsedThresholdMb)
+                        | Error message ->
+                            setLocalError (Some message)
+                    finally
+                        setActiveAction None
+                }
+                |> Promise.start
+
         let submitCreateBranch () =
             let normalizedBranchName = branchName.Trim()
 
@@ -342,6 +383,20 @@ type GitSidebar =
         let canSubmitCommitAll =
             canEditCommit
             && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
+
+        let normalizedLfsThresholdInput =
+            lfsThresholdInput.Trim()
+
+        let canSaveLfsThreshold =
+            not isBusy
+            && not (String.IsNullOrWhiteSpace normalizedLfsThresholdInput)
+            && not (
+                String.Equals(
+                    normalizedLfsThresholdInput,
+                    GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb,
+                    StringComparison.Ordinal
+                )
+            )
 
         Html.div [
             prop.testId "GitSidebar"
@@ -468,43 +523,115 @@ type GitSidebar =
 
                 if isAdvancedActionsOpen then
                     Html.div [
-                        prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3 swt:pt-2"
+                        prop.className "swt:px-3 swt:pt-2"
                         prop.children [
-                            GitSidebar.ActionButton(
-                                "Check for Changes",
-                                "swt:fluent--arrow-download-24-regular",
-                                isBusy,
-                                (fun () -> runAction "Fetch" onFetch),
-                                testId = "GitSidebarFetchButton"
-                            )
-                            GitSidebar.ActionButton(
-                                "Download Changes",
-                                "swt:fluent--arrow-down-24-regular",
-                                isBusy,
-                                (fun () -> runAction "Pull" onPull),
-                                testId = "GitSidebarPullButton"
-                            )
-                            GitSidebar.ActionButton(
-                                "Upload Changes",
-                                "swt:fluent--arrow-up-24-regular",
-                                isBusy,
-                                (fun () -> runAction "Push" onPush),
-                                testId = "GitSidebarPushButton"
-                            )
-                            GitSidebar.ActionButton(
-                                "Create Work Copy",
-                                "swt:fluent--branch-fork-24-regular",
-                                isBusy,
-                                openCreateBranchModal,
-                                testId = "GitSidebarCreateBranchButton"
-                            )
-                            GitSidebar.ActionButton(
-                                "Switch To Work Copy",
-                                "swt:fluent--arrow-swap-24-regular",
-                                isBusy || localBranchOptionsForSwitch.Length = 0,
-                                openSwitchBranchModal,
-                                testId = "GitSidebarSwitchBranchButton"
-                            )
+                            Html.div [
+                                prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
+                                prop.children [
+                                    GitSidebar.ActionButton(
+                                        "Check for Changes",
+                                        "swt:fluent--arrow-download-24-regular",
+                                        isBusy,
+                                        (fun () -> runAction "Fetch" onFetch),
+                                        testId = "GitSidebarFetchButton"
+                                    )
+                                    GitSidebar.ActionButton(
+                                        "Download Changes",
+                                        "swt:fluent--arrow-down-24-regular",
+                                        isBusy,
+                                        (fun () -> runAction "Pull" onPull),
+                                        testId = "GitSidebarPullButton"
+                                    )
+                                    GitSidebar.ActionButton(
+                                        "Upload Changes",
+                                        "swt:fluent--arrow-up-24-regular",
+                                        isBusy,
+                                        (fun () -> runAction "Push" onPush),
+                                        testId = "GitSidebarPushButton"
+                                    )
+                                    GitSidebar.ActionButton(
+                                        "Create Work Copy",
+                                        "swt:fluent--branch-fork-24-regular",
+                                        isBusy,
+                                        openCreateBranchModal,
+                                        testId = "GitSidebarCreateBranchButton"
+                                    )
+                                    GitSidebar.ActionButton(
+                                        "Switch To Work Copy",
+                                        "swt:fluent--arrow-swap-24-regular",
+                                        isBusy || localBranchOptionsForSwitch.Length = 0,
+                                        openSwitchBranchModal,
+                                        testId = "GitSidebarSwitchBranchButton"
+                                    )
+                                ]
+                            ]
+                            Html.div [
+                                prop.className "swt:mt-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-center swt:gap-2"
+                                        prop.children [
+                                            Html.span [
+                                                prop.className "swt:iconify swt:fluent--document-arrow-right-24-regular swt:size-4"
+                                            ]
+                                            Html.span [
+                                                prop.className "swt:text-sm swt:font-medium"
+                                                prop.text "Git LFS auto-track threshold"
+                                            ]
+                                        ]
+                                    ]
+                                    Html.p [
+                                        prop.className "swt:mt-2 swt:text-xs swt:text-base-content/70"
+                                        prop.text "Files larger than this limit are automatically re-staged through Git LFS during save operations."
+                                    ]
+                                    Html.div [
+                                        prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
+                                        prop.children [
+                                            Html.label [
+                                                prop.className "swt:flex swt:min-w-[10rem] swt:flex-1 swt:flex-col swt:gap-2"
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
+                                                        prop.text "Threshold (MB)"
+                                                    ]
+                                                    Html.input [
+                                                        prop.testId "GitSidebarLfsThresholdInput"
+                                                        prop.className "swt:input swt:input-bordered swt:w-full"
+                                                        prop.type'.number
+                                                        prop.custom ("step", "1")
+                                                        prop.custom ("min", "1")
+                                                        prop.custom ("max", "100")
+                                                        prop.disabled isBusy
+                                                        prop.value lfsThresholdInput
+                                                        prop.onChange setLfsThresholdInput
+                                                    ]
+                                                ]
+                                            ]
+                                            Html.button [
+                                                prop.testId "GitSidebarLfsThresholdSaveButton"
+                                                prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:normal-case"
+                                                prop.disabled (not canSaveLfsThreshold)
+                                                prop.onClick (fun _ -> submitLfsThreshold ())
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4"
+                                                    ]
+                                                    Html.span (
+                                                        if activeAction = Some "Save Git LFS Threshold" then
+                                                            "Saving..."
+                                                        else
+                                                            "Save Threshold"
+                                                    )
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                    Html.div [
+                                        prop.className "swt:mt-2 swt:text-xs swt:text-base-content/60"
+                                        prop.text "Threshold setting: 1-100 MB. This does not cap LFS-tracked file size."
+                                    ]
+                                ]
+                            ]
                         ]
                     ]
 

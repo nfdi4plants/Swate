@@ -14,6 +14,7 @@ const okWithArg = (_arg: unknown) => ok();
 const okWithMessage = (_message: string) => ok();
 const okWithSelection = (_request: unknown) => ok();
 const okWithBranch = (_branchName: string) => ok();
+const okWithThreshold = (_thresholdMb: number) => ok();
 
 const baseStatus = {
   CurrentBranch: "feature/git-sidebar",
@@ -139,6 +140,8 @@ export const CleanRepo: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -164,6 +167,8 @@ export const ChangedFiles: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -191,6 +196,8 @@ export const AdvancedActions: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -201,6 +208,7 @@ export const AdvancedActions: Story = {
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarLfsThresholdInput")).toHaveValue(1);
   },
 };
 
@@ -219,6 +227,8 @@ export const ConflictsPresent: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -250,6 +260,8 @@ export const BusyProgressState: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -274,6 +286,8 @@ export const CreateBranchModal: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -308,6 +322,8 @@ export const SwitchBranchModal: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -336,6 +352,8 @@ export const CommitComposer: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
@@ -365,6 +383,8 @@ export const CallbackErrorHandling: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    lfsAutoTrackThresholdMb: 1,
+    onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
     onSwitchBranch: okWithBranch,
     onSelectChange: okWithArg,
