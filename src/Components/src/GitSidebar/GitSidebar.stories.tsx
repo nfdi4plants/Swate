@@ -213,6 +213,8 @@ export const AdvancedActions: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox")).toBeChecked();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
+    await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();

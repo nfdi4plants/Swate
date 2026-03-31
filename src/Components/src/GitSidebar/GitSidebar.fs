@@ -73,13 +73,21 @@ type GitSidebar =
             iconClassName: string,
             isBusy: bool,
             onClick: unit -> unit,
+            ?isActive: bool,
             ?testId: string
         ) =
+        let isActive = defaultArg isActive false
+
         Html.button [
             if testId.IsSome then
                 prop.testId testId.Value
-            prop.className
-                "swt:btn swt:btn-sm swt:justify-start swt:gap-2 swt:normal-case swt:bg-base-100 swt:border-base-300"
+            prop.className [
+                "swt:btn swt:btn-sm swt:justify-start swt:gap-2 swt:normal-case"
+                if isActive then
+                    "swt:btn-primary"
+                else
+                    "swt:bg-base-100 swt:border-base-300"
+            ]
             prop.disabled isBusy
             prop.onClick (fun _ -> onClick ())
             prop.children [
@@ -569,6 +577,7 @@ type GitSidebar =
                                 "swt:fluent--chevron-down-24-regular"),
                             isBusy,
                             (fun () -> setIsAdvancedActionsOpen (not isAdvancedActionsOpen)),
+                            isActive = isAdvancedActionsOpen,
                             testId = "GitSidebarAdvancedActionsButton"
                         )
                     ]
@@ -576,8 +585,12 @@ type GitSidebar =
 
                 if isAdvancedActionsOpen then
                     Html.div [
-                        prop.className "swt:px-3 swt:pt-2"
+                        prop.className "swt:px-3 swt:pt-3"
                         prop.children [
+                            Html.div [
+                                prop.testId "GitSidebarAdvancedActionsDivider"
+                                prop.className "swt:mb-3 swt:border-t swt:border-base-content/10"
+                            ]
                             Html.div [
                                 prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
                                 prop.children [
