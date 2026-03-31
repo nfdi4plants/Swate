@@ -1,9 +1,6 @@
 module Renderer.Components.MainContent.ArcTarget
 
 open Feliz
-open Swate.Electron.Shared
-open Renderer.Components.MainContent.Types
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Renderer.Types
 open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.TextPreviewTarget
@@ -13,6 +10,7 @@ open Renderer.Components.MainContent.LandingDraftTarget
 open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
+open Renderer.Components.MainContent.DataHubBrowserTarget
 
 [<ReactComponent>]
 let ArcTarget () =
@@ -34,6 +32,7 @@ let ArcTarget () =
                 | PageState.LandingDraftPage -> LandingDraftTarget()
                 | PageState.NotesDraftPage -> NotesDraftTarget()
                 | PageState.NotesSearchPage -> NotesSearchTarget()
+                | PageState.DataHubBrowser -> DataHubBrowserTarget()
             | None -> EmptySelectionTarget()
 
         ]

@@ -3,6 +3,7 @@ module Main.Auth.AuthService
 open System
 open Fable.Core
 open Swate.Electron.Shared.AuthTypes
+open Swate.Components.AuthenticationTypes
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -45,12 +46,14 @@ let mutable private activeAccountId: string option = None
 let private getActiveAccount () =
     activeAccountId |> Option.bind (fun id -> accounts |> Map.tryFind id)
 
-let private toSummary (user: AuthUserDto, _token: string) : AuthAccountSummary = {
-    AccountId = user.AccountId
-    Name = user.Name
-    Email = user.Email
-    AvatarUrl = user.AvatarUrl
-    TargetDataHub = user.TargetDataHub
+let private toSummary (user: AuthUserDto, _token: string) : AccountSummary = {
+    User = {
+        AccountId = user.AccountId
+        Name = user.Name
+        Email = user.Email
+        AvatarUrl = user.AvatarUrl
+        TargetDataHub = user.TargetDataHub
+    }
     IsActive = activeAccountId = Some user.AccountId
 }
 
@@ -85,24 +88,20 @@ let getState () : AuthStateDto =
     let allSummaries = accounts |> Map.toArray |> Array.map (fun (_, v) -> toSummary v)
 
     match getActiveAccount () with
-    | Some(user, _) -> {
-        IsAuthenticated = true
-        User = Some user
-        Accounts = allSummaries
-      }
-    | None -> {
-        IsAuthenticated = false
-        User = None
-        Accounts = allSummaries
-      }
+    | Some(user, _) -> { Accounts = allSummaries }
+    | None -> { Accounts = allSummaries }
 
 /// List all stored account summaries.
-let listAccounts () : AuthAccountSummary array =
+let listAccounts () : AccountSummary array =
     accounts |> Map.toArray |> Array.map (fun (_, v) -> toSummary v)
+
+let getAuthStateDto () : AuthStateDto =
+    let summaries = accounts |> Map.toArray |> Array.map (fun (_, v) -> toSummary v)
+    { Accounts = summaries }
 
 // ── Public operations ────────────────────────────────────────────────
 
-let private toAuthResult (result: Result<AuthUserDto, AuthFailure>) : AuthResult =
+let private toAuthResult (result: Result<AuthStateDto, AuthFailure>) : AuthResult =
     match result with
     | Ok user -> {
         Success = true
@@ -156,7 +155,8 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
                 activeAccountId <- Some user.AccountId
                 SecureAuthStore.setActiveAccountId activeAccountId
                 refreshTokenProvider ()
-                return toAuthResult (Ok user)
+                let authStateDto = getAuthStateDto ()
+                return toAuthResult (Ok authStateDto)
 }
 
 /// Sign out: remove active account from memory and disk, pick next or clear.
@@ -215,7 +215,8 @@ let revalidate () : JS.Promise<AuthResult> = promise {
             return toAuthResult (Error failure)
         | Ok updatedUser ->
             accounts <- accounts |> Map.add updatedUser.AccountId (updatedUser, token)
-            return toAuthResult (Ok updatedUser)
+            let authStateDto = getAuthStateDto ()
+            return toAuthResult (Ok authStateDto)
 }
 
 /// Restore all accounts from persisted secure storage on app startup.

@@ -1,7 +1,6 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open Swate.Components
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -18,6 +17,7 @@ type PageState =
     | NotesDraftPage
     | NotesSearchPage
     | ErrorPage of string
+    | DataHubBrowser
 
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with

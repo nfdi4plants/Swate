@@ -1,11 +1,8 @@
 namespace Swate.Components
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
-
-open AuthenticationTypes
-
+open Swate.Components.AuthenticationTypes
 
 type private DataHubInformation = {
     Name: string
@@ -37,7 +34,7 @@ module GitLabAPI =
         | HttpError of int
         | DecodeError of exn
 
-    let getUserAPIRequest (signInInfo: SignInInformation) : JS.Promise<Result<UserInformation, SignInError>> = promise {
+    let getUserAPIRequest (signInInfo: SignInInformation) : JS.Promise<Result<AuthUserDto, SignInError>> = promise {
         let baseUrl = signInInfo.GitLabBaseUrl.TrimEnd('/')
         let pat = signInInfo.PersonalAccessToken
         let url = $"{baseUrl}/api/v4/user"
@@ -65,8 +62,7 @@ module GitLabAPI =
                 try
                     let! gitLabUserInfo = response.json<AuthenticationTypes.GitLabUser> ()
 
-                    let userInfo =
-                        UserInformation.FromGitLabUser gitLabUserInfo signInInfo.GitLabBaseUrl
+                    let userInfo = AuthUserDto.FromGitLabUser gitLabUserInfo signInInfo.GitLabBaseUrl
 
                     return Ok userInfo
 
@@ -147,7 +143,7 @@ type Authentication =
         ]
 
     [<ReactComponent>]
-    static member private UserAvatarIcon(userInformation: UserInformation) =
+    static member private UserAvatarIcon(userInformation: AuthUserDto) =
         Html.img [
             prop.className "swt:w-8 swt:h-8 swt:rounded-full"
             prop.src userInformation.AvatarUrl
@@ -361,12 +357,11 @@ type Authentication =
     [<ReactComponent>]
     static member UserAvatar
         (
-            userInformation: UserInformation option,
+            accounts: AuthStateDto,
             onSignIn: SignInInformation -> unit,
             onLogout: unit -> unit,
             ?isLoading: bool,
             ?dropdownClassName: string,
-            ?accounts: AccountSummary array,
             ?onSwitchAccount: string -> unit,
             ?onRemoveAccount: string -> unit
         ) =
@@ -374,7 +369,8 @@ type Authentication =
         let isOpen, setIsOpen = React.useState false
         let error, setError = React.useState (None: exn option)
         let showAddAccount, setShowAddAccount = React.useState false
-        let accounts = accounts |> Option.defaultValue [||]
+
+        let activeUser = accounts.ActiveAccount()
 
         let onSignIn =
             fun signInInfo ->
@@ -386,7 +382,7 @@ type Authentication =
         let ToggleContent =
             React.useMemo (
                 (fun () ->
-                    match isLoading, userInformation with
+                    match isLoading, activeUser with
                     | Some true, _ ->
                         Html.span [
                             prop.className "swt:loading swt:loading-spinner swt:loading-sm"
@@ -394,13 +390,13 @@ type Authentication =
                     | _, Some userInformation -> Authentication.UserAvatarIcon(userInformation)
                     | _, None -> Authentication.AvatarPlaceholder()
                 ),
-                [| box userInformation; box isLoading; box error |]
+                [| box activeUser; box isLoading; box error |]
             )
 
         let content =
             React.useMemo (
                 (fun () ->
-                    match userInformation with
+                    match activeUser with
                     | Some user ->
                         if showAddAccount then
                             Html.div [
@@ -431,7 +427,7 @@ type Authentication =
                     | None -> Authentication.NotAuthenticatedView(onSignIn, setError)
                 ),
                 [|
-                    box userInformation
+                    box activeUser
                     box error
                     box showAddAccount
                     box accounts
@@ -465,20 +461,28 @@ type Authentication =
 
     [<ReactComponent>]
     static member Entry() =
-
-        let userInformation, setUserInformation =
-            React.useState (None: UserInformation option)
-
-        let accounts, setAccounts = React.useState ([||]: AccountSummary array)
-
-        let isLoading, setIsLoading = React.useState false
-
         let exmpUserInformation = {
+            AccountId = "saödlkalsd"
             Name = "John Doe"
             Email = "john-doe@mail.com"
             AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
             TargetDataHub = AuthenticationHelper.Default_DataHub_Url
         }
+
+        let accounts, setAccounts =
+            React.useState (
+                {
+                    AuthenticationTypes.AuthStateDto.Empty with
+                        Accounts = [|
+                            {
+                                User = exmpUserInformation
+                                IsActive = true
+                            }
+                        |]
+                }
+            )
+
+        let isLoading, setIsLoading = React.useState false
 
         let onSignIn =
             fun (signInInfo: SignInInformation) ->
@@ -493,73 +497,60 @@ type Authentication =
                             TargetDataHub = signInInfo.GitLabBaseUrl
                     }
 
-                    setUserInformation (Some activeUser)
-
-                    setAccounts [|
-                        {
-                            AccountId = "acc-1"
-                            Name = activeUser.Name
-                            Email = activeUser.Email
-                            AvatarUrl = activeUser.AvatarUrl
-                            TargetDataHub = activeUser.TargetDataHub
-                            IsActive = true
-                        }
-                        {
-                            AccountId = "acc-2"
-                            Name = "Max Mustermann"
-                            Email = "max@example.org"
-                            AvatarUrl = "https://www.gravatar.com/avatar/22222222222222222222222222222222?d=mp&f=y"
-                            TargetDataHub = "https://datahub.rz.rptu.de/"
-                            IsActive = false
-                        }
-                    |]
+                    setAccounts {
+                        Accounts = [|
+                            {
+                                User = {
+                                    AccountId = "acc-1"
+                                    Name = activeUser.Name
+                                    Email = activeUser.Email
+                                    AvatarUrl = activeUser.AvatarUrl
+                                    TargetDataHub = activeUser.TargetDataHub
+                                }
+                                IsActive = true
+                            }
+                            {
+                                User = {
+                                    AccountId = "acc-2"
+                                    Name = "Max Mustermann"
+                                    Email = "max@example.org"
+                                    AvatarUrl =
+                                        "https://www.gravatar.com/avatar/22222222222222222222222222222222?d=mp&f=y"
+                                    TargetDataHub = "https://datahub.rz.rptu.de/"
+                                }
+                                IsActive = false
+                            }
+                        |]
+                    }
 
                     setIsLoading false
                 }
                 |> Promise.start
 
-        let onLogout () =
-            setUserInformation None
-            setAccounts [||]
+        let onLogout () = setAccounts AuthStateDto.Empty
 
         let onSwitchAccount (accountId: string) =
-            let next =
-                accounts
-                |> Array.map (fun account -> {
-                    account with
-                        IsActive = account.AccountId = accountId
-                })
+            let next = {
+                AuthStateDto.Empty with
+                    Accounts =
+                        accounts.Accounts
+                        |> Array.map (fun account -> {
+                            account with
+                                IsActive = account.User.AccountId = accountId
+                        })
+            }
 
             setAccounts next
-
-            match next |> Array.tryFind (fun account -> account.IsActive) with
-            | Some active ->
-                setUserInformation (
-                    Some {
-                        Name = active.Name
-                        Email = active.Email
-                        AvatarUrl = active.AvatarUrl
-                        TargetDataHub = active.TargetDataHub
-                    }
-                )
-            | None -> setUserInformation None
 
         let onRemoveAccount (accountId: string) =
-            let next = accounts |> Array.filter (fun account -> account.AccountId <> accountId)
+            let next = {
+                AuthStateDto.Empty with
+                    Accounts =
+                        accounts.Accounts
+                        |> Array.filter (fun account -> account.User.AccountId <> accountId)
+            }
 
             setAccounts next
-
-            match next |> Array.tryFind (fun account -> account.IsActive) with
-            | Some active ->
-                setUserInformation (
-                    Some {
-                        Name = active.Name
-                        Email = active.Email
-                        AvatarUrl = active.AvatarUrl
-                        TargetDataHub = active.TargetDataHub
-                    }
-                )
-            | None -> setUserInformation None
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:m-10 swt:gap-2"
@@ -570,14 +561,13 @@ type Authentication =
                 ]
                 Html.p [
                     prop.testId "SignedInInfo"
-                    prop.textf "Signed In: %b" (Option.isSome userInformation)
+                    prop.textf "Signed In: %b" (accounts.ActiveAccount() |> Option.isSome)
                 ]
                 Authentication.UserAvatar(
-                    userInformation,
+                    accounts,
                     onSignIn,
                     onLogout,
                     isLoading = isLoading,
-                    accounts = accounts,
                     onSwitchAccount = onSwitchAccount,
                     onRemoveAccount = onRemoveAccount
                 )
