@@ -44,6 +44,8 @@ type GitStateController = {
     pull: unit -> JS.Promise<Result<unit, string>>
     push: unit -> JS.Promise<Result<unit, string>>
     sync: unit -> JS.Promise<Result<unit, string>>
+    commitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>
+    commitAll: string -> JS.Promise<Result<unit, string>>
     createBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
     confirmMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<unit, string>>
@@ -80,6 +82,15 @@ let private gitPush (request: GitRemoteOperationRequest) : JS.Promise<Result<Git
 
 let private createBranch (request: GitCreateBranchRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     invokeGitApiWithPayload ipcGitApiDynamic "createBranch" request
+
+let private gitStagePaths (request: GitPathspecRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "gitStagePaths" request
+
+let private gitUnstagePaths (request: GitPathspecRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "gitUnstagePaths" request
+
+let private gitCommit (request: GitCommitRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "gitCommit" request
 
 let private confirmGitMergeResolution
     (request: GitConfirmMergeResolutionRequest)
@@ -152,6 +163,8 @@ let GitStateCtx =
             pull = fun () -> promise { return Ok() }
             push = fun () -> promise { return Ok() }
             sync = fun () -> promise { return Ok() }
+            commitSelection = fun _ -> promise { return Ok() }
+            commitAll = fun _ -> promise { return Ok() }
             createBranch = fun _ -> promise { return Ok() }
             selectChange = fun _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> promise { return Ok() }
@@ -322,6 +335,103 @@ let GitStateCtxProvider (children: ReactElement) =
                 return! completeOperation busyLabel (Error message)
         }
 
+    let normalizeStatusCode (code: string) =
+        let trimmed = code.Trim()
+
+        if String.IsNullOrWhiteSpace trimmed then
+            "."
+        else
+            trimmed
+
+    let isStagedChange (change: GitSidebarChange) =
+        let indexCode = normalizeStatusCode change.IndexStatus
+        indexCode <> "." && indexCode <> "?"
+
+    let runCommitOperation
+        (busyLabel: string)
+        (pathsToCommit: string[])
+        (clearExistingStage: bool)
+        (message: string)
+        =
+        promise {
+            let normalizedMessage = message.Trim()
+
+            if String.IsNullOrWhiteSpace normalizedMessage then
+                return! completeOperation busyLabel (Error "Commit message must not be empty.")
+            elif pathsToCommit.Length = 0 then
+                return! completeOperation busyLabel (Error "No changes available to commit.")
+            else
+                let normalizedPaths = pathsToCommit |> Array.distinct
+                let currentlyStagedPaths =
+                    if clearExistingStage then
+                        gitState.ChangedFiles
+                        |> Array.filter isStagedChange
+                        |> Array.map _.Path
+                        |> Array.distinct
+                    else
+                        [||]
+
+                setBusyNotice (Some busyLabel)
+                setErrorNotice None
+
+                let! prepareStageResult =
+                    if currentlyStagedPaths.Length = 0 then
+                        promise { return Ok() }
+                    else
+                        promise {
+                            let! result =
+                                gitUnstagePaths {
+                                    Pathspecs = currentlyStagedPaths
+                                }
+
+                            return
+                                match result with
+                                | Error exn -> Error exn.Message
+                                | Ok operationResult when not operationResult.Success ->
+                                    Error(
+                                        operationResult.Message
+                                        |> Option.defaultValue "Preparing the selected commit failed."
+                                    )
+                                | Ok _ -> Ok()
+                        }
+
+                match prepareStageResult with
+                | Error message ->
+                    return! completeOperation busyLabel (Error message)
+                | Ok () ->
+                    let! stageResult =
+                        gitStagePaths {
+                            Pathspecs = normalizedPaths
+                        }
+
+                    match stageResult with
+                    | Error exn ->
+                        return! completeOperation busyLabel (Error exn.Message)
+                    | Ok operationResult when not operationResult.Success ->
+                        let message =
+                            operationResult.Message
+                            |> Option.defaultValue "Staging changes before commit failed."
+
+                        return! completeOperation busyLabel (Error message)
+                    | Ok _ ->
+                        let! commitResult =
+                            gitCommit {
+                                Message = normalizedMessage
+                            }
+
+                        match commitResult with
+                        | Error exn ->
+                            return! completeOperation busyLabel (Error exn.Message)
+                        | Ok operationResult when not operationResult.Success ->
+                            let message =
+                                operationResult.Message
+                                |> Option.defaultValue "Commit failed."
+
+                            return! completeOperation busyLabel (Error message)
+                        | Ok _ ->
+                            return! completeOperation busyLabel (Ok())
+        }
+
     let refresh () = refreshAll ()
 
     let fetch () =
@@ -376,6 +486,17 @@ let GitStateCtxProvider (children: ReactElement) =
                 setErrorNotice (Some exn.Message)
                 return Error exn.Message
     }
+
+    let commitSelection (request: GitSidebarCommitSelectionRequest) =
+        runCommitOperation "Committing selected changes" request.Paths true request.Message
+
+    let commitAll (message: string) =
+        let allChangedPaths =
+            gitState.ChangedFiles
+            |> Array.map _.Path
+            |> Array.distinct
+
+        runCommitOperation "Committing all changes" allChangedPaths false message
 
     let createBranchFrom (request: GitSidebarCreateBranchRequest) = promise {
         setBusyNotice (Some "Creating branch")
@@ -464,6 +585,8 @@ let GitStateCtxProvider (children: ReactElement) =
                 pull = pull
                 push = push
                 sync = sync
+                commitSelection = commitSelection
+                commitAll = commitAll
                 createBranch = createBranchFrom
                 selectChange = selectChange
                 confirmMergeResolution = confirmMergeResolution

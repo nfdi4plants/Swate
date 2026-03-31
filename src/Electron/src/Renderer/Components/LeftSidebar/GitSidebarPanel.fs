@@ -20,6 +20,8 @@ let Main () =
         onPull = gitStateCtx.pull,
         onPush = gitStateCtx.push,
         onSync = gitStateCtx.sync,
+        onCommitSelection = gitStateCtx.commitSelection,
+        onCommitAll = gitStateCtx.commitAll,
         onCreateBranch = gitStateCtx.createBranch,
         onSelectChange = gitStateCtx.selectChange
     )
