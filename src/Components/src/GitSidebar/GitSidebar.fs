@@ -116,7 +116,7 @@ type GitSidebar =
         let isCreateBranchModalOpen, setIsCreateBranchModalOpen = React.useState false
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
-        let selectedCommitPaths, setSelectedCommitPaths = React.useState Set.empty<string>
+        let selectedCommitPaths, setSelectedCommitPaths = React.useStateWithUpdater Set.empty<string>
         let selectedStartPoint, setSelectedStartPoint = React.useState (None: string option)
 
         let isBusy =
@@ -228,7 +228,7 @@ type GitSidebar =
                         match result with
                         | Ok () ->
                             setCommitMessage ""
-                            setSelectedCommitPaths Set.empty
+                            setSelectedCommitPaths (fun _ -> Set.empty)
                         | Error message ->
                             setLocalError (Some message)
                     finally
@@ -678,7 +678,7 @@ type GitSidebar =
                                                             prop.disabled (not canEditCommit || change.IsConflicted)
                                                             prop.isChecked isSelectedForCommit
                                                             prop.onClick (fun event -> event.stopPropagation ())
-                                                            prop.onChange (fun _ -> toggleCommitSelection change.Path)
+                                                            prop.onChange (fun (_: bool) -> toggleCommitSelection change.Path)
                                                         ]
                                                         Html.span [
                                                             prop.className [
