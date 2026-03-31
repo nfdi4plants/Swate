@@ -97,6 +97,8 @@ type GitSidebar =
             onPull: unit -> JS.Promise<Result<unit, string>>,
             onPush: unit -> JS.Promise<Result<unit, string>>,
             onSync: unit -> JS.Promise<Result<unit, string>>,
+            onCommitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>,
+            onCommitAll: string -> JS.Promise<Result<unit, string>>,
             onCreateBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>,
             onSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>,
             ?currentProgress: GitSidebarProgress,
@@ -113,6 +115,8 @@ type GitSidebar =
         let activeAction, setActiveAction = React.useState (None: string option)
         let isCreateBranchModalOpen, setIsCreateBranchModalOpen = React.useState false
         let branchName, setBranchName = React.useState ""
+        let commitMessage, setCommitMessage = React.useState ""
+        let selectedCommitPaths, setSelectedCommitPaths = React.useState Set.empty<string>
         let selectedStartPoint, setSelectedStartPoint = React.useState (None: string option)
 
         let isBusy =
@@ -120,6 +124,18 @@ type GitSidebar =
 
         let visibleError =
             errorNotice |> Option.orElse localError
+
+        React.useEffect (
+            (fun () ->
+                setSelectedCommitPaths (fun current ->
+                    current
+                    |> Set.filter (fun path ->
+                        changedFiles
+                        |> Array.exists (fun change -> String.Equals(change.Path, path, StringComparison.Ordinal))
+                    )
+                )),
+            [| box changedFiles |]
+        )
 
         let branchOptionsWithHead =
             if branchOptions.Length = 0 then
@@ -178,6 +194,71 @@ type GitSidebar =
             setSelectedStartPoint defaultStartPoint
             setIsCreateBranchModalOpen true
 
+        let toggleCommitSelection (path: string) =
+            setSelectedCommitPaths (fun current ->
+                if Set.contains path current then
+                    Set.remove path current
+                else
+                    Set.add path current
+            )
+
+        let submitCommitSelection () =
+            let normalizedCommitMessage = commitMessage.Trim()
+            let selectedPaths =
+                selectedCommitPaths
+                |> Set.toArray
+                |> Array.sort
+
+            if String.IsNullOrWhiteSpace normalizedCommitMessage then
+                setLocalError (Some "Commit message must not be empty.")
+            elif selectedPaths.Length = 0 then
+                setLocalError (Some "Select at least one file to commit.")
+            else
+                promise {
+                    setLocalError None
+                    setActiveAction (Some "Commit Selection")
+
+                    try
+                        let! result =
+                            onCommitSelection {
+                                Message = normalizedCommitMessage
+                                Paths = selectedPaths
+                            }
+
+                        match result with
+                        | Ok () ->
+                            setCommitMessage ""
+                            setSelectedCommitPaths Set.empty
+                        | Error message ->
+                            setLocalError (Some message)
+                    finally
+                        setActiveAction None
+                }
+                |> Promise.start
+
+        let submitCommitAll () =
+            let normalizedCommitMessage = commitMessage.Trim()
+
+            if String.IsNullOrWhiteSpace normalizedCommitMessage then
+                setLocalError (Some "Commit message must not be empty.")
+            else
+                promise {
+                    setLocalError None
+                    setActiveAction (Some "Commit All")
+
+                    try
+                        let! result = onCommitAll normalizedCommitMessage
+
+                        match result with
+                        | Ok () ->
+                            setCommitMessage ""
+                        | Error message ->
+                            setLocalError (Some message)
+                    finally
+                        setActiveAction None
+                }
+                |> Promise.start
+
         let submitCreateBranch () =
             let normalizedBranchName = branchName.Trim()
 
@@ -207,6 +288,16 @@ type GitSidebar =
                 |> Promise.start
 
         let hasConflicts = GitSidebarInternal.hasConflicts status changedFiles
+        let canEditCommit = not status.IsClean && not hasConflicts && not isBusy
+        let selectedCommitCount = Set.count selectedCommitPaths
+        let canSubmitCommitSelection =
+            canEditCommit
+            && selectedCommitCount > 0
+            && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
+
+        let canSubmitCommitAll =
+            canEditCommit
+            && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
 
         Html.div [
             prop.testId "GitSidebar"
@@ -358,6 +449,102 @@ type GitSidebar =
                     ]
                 ]
 
+                GitSidebar.SectionHeader("Commit", None)
+
+                Html.div [
+                    prop.className "swt:px-3"
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3"
+                            prop.children [
+                                Html.label [
+                                    prop.className "swt:flex swt:flex-col swt:gap-2"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:text-sm swt:font-medium"
+                                            prop.text "Commit message"
+                                        ]
+                                        Html.textarea [
+                                            prop.testId "GitSidebarCommitMessageInput"
+                                            prop.className
+                                                "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
+                                            prop.disabled (not canEditCommit)
+                                            prop.value commitMessage
+                                            prop.placeholder (
+                                                if hasConflicts then
+                                                    "Resolve merge conflicts before committing."
+                                                elif status.IsClean then
+                                                    "No changes to commit."
+                                                else
+                                                    "Describe your changes"
+                                            )
+                                            prop.onChange setCommitMessage
+                                        ]
+                                    ]
+                                ]
+                                Html.div [
+                                    prop.className "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
+                                    prop.children [
+                                        Html.span (
+                                            if selectedCommitCount = 1 then
+                                                "1 file selected for commit selection"
+                                            else
+                                                $"{selectedCommitCount} files selected for commit selection"
+                                        )
+                                        if not canEditCommit && hasConflicts then
+                                            Html.span "Commit selection is disabled while conflicts remain."
+                                        elif not canEditCommit && status.IsClean then
+                                            Html.span "No changes available to commit."
+                                        else
+                                            Html.none
+                                    ]
+                                ]
+                                Html.div [
+                                    prop.className "swt:mt-3 swt:grid swt:grid-cols-2 swt:gap-2"
+                                    prop.children [
+                                        Html.button [
+                                            prop.testId "GitSidebarCommitSelectionButton"
+                                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:normal-case"
+                                            prop.disabled (not canSubmitCommitSelection)
+                                            prop.onClick (fun _ -> submitCommitSelection ())
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--checkbox-checked-24-regular swt:size-4"
+                                                ]
+                                                Html.span (
+                                                    if activeAction = Some "Commit Selection" then
+                                                        "Committing..."
+                                                    else
+                                                        "Commit Selection"
+                                                )
+                                            ]
+                                        ]
+                                        Html.button [
+                                            prop.testId "GitSidebarCommitAllButton"
+                                            prop.className "swt:btn swt:btn-sm swt:btn-secondary swt:gap-2 swt:normal-case"
+                                            prop.disabled (not canSubmitCommitAll)
+                                            prop.onClick (fun _ -> submitCommitAll ())
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
+                                                ]
+                                                Html.span (
+                                                    if activeAction = Some "Commit All" then
+                                                        "Committing..."
+                                                    else
+                                                        "Commit All"
+                                                )
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+
                 match currentProgress with
                 | Some progress ->
                     Html.div [
@@ -465,6 +652,7 @@ type GitSidebar =
                                         let isSelected =
                                             selectedFile
                                             |> Option.exists (fun selected -> String.Equals(selected, change.Path, StringComparison.Ordinal))
+                                        let isSelectedForCommit = Set.contains change.Path selectedCommitPaths
 
                                         Html.button [
                                             prop.testId ("GitSidebarChangeRow-" + change.Path)
@@ -483,6 +671,15 @@ type GitSidebar =
                                                 Html.div [
                                                     prop.className "swt:flex swt:w-full swt:items-start swt:gap-3"
                                                     prop.children [
+                                                        Html.input [
+                                                            prop.testId ("GitSidebarCommitSelectionCheckbox-" + change.Path)
+                                                            prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
+                                                            prop.type'.checkbox
+                                                            prop.disabled (not canEditCommit || change.IsConflicted)
+                                                            prop.isChecked isSelectedForCommit
+                                                            prop.onClick (fun event -> event.stopPropagation ())
+                                                            prop.onChange (fun _ -> toggleCommitSelection change.Path)
+                                                        ]
                                                         Html.span [
                                                             prop.className [
                                                                 "swt:mt-0.5 swt:font-mono swt:text-[0.7rem] swt:tracking-[0.2em]"

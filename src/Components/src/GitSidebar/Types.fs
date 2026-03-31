@@ -42,3 +42,8 @@ type GitSidebarCreateBranchRequest = {
     BranchName: string
     StartPoint: string option
 }
+
+type GitSidebarCommitSelectionRequest = {
+    Message: string
+    Paths: string[]
+}

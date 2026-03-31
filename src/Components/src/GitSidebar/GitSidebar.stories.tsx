@@ -11,6 +11,8 @@ const ok = () => Promise.resolve(FSharpResult$2_Ok<void, string>(undefined));
 const fail = (message: string) =>
   Promise.resolve(FSharpResult$2_Error$<void, string>(message));
 const okWithArg = (_arg: unknown) => ok();
+const okWithMessage = (_message: string) => ok();
+const okWithSelection = (_request: unknown) => ok();
 
 const baseStatus = {
   CurrentBranch: "feature/git-sidebar",
@@ -134,6 +136,8 @@ export const CleanRepo: Story = {
     onPull: ok,
     onPush: ok,
     onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
     onSelectChange: okWithArg,
   },
@@ -156,6 +160,8 @@ export const ChangedFiles: Story = {
     onPull: ok,
     onPush: ok,
     onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
     onSelectChange: okWithArg,
   },
@@ -183,6 +189,8 @@ export const ConflictsPresent: Story = {
     onPull: ok,
     onPush: ok,
     onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
     onSelectChange: okWithArg,
   },
@@ -211,6 +219,8 @@ export const BusyProgressState: Story = {
     onPull: ok,
     onPush: ok,
     onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
     onSelectChange: okWithArg,
   },
@@ -232,6 +242,8 @@ export const CreateBranchModal: Story = {
     onPull: ok,
     onPush: ok,
     onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
     onSelectChange: okWithArg,
   },
@@ -252,6 +264,33 @@ export const CreateBranchModal: Story = {
   },
 };
 
+export const CommitComposer: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    onRefresh: ok,
+    onFetch: ok,
+    onPull: ok,
+    onPush: ok,
+    onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
+    onCreateBranch: okWithArg,
+    onSelectChange: okWithArg,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const commitMessageInput = canvas.getByTestId("GitSidebarCommitMessageInput");
+    await userEvent.type(commitMessageInput, "Add sidebar commit action");
+    await userEvent.click(
+      canvas.getByTestId("GitSidebarCommitSelectionCheckbox-README.md"),
+    );
+    await userEvent.click(canvas.getByTestId("GitSidebarCommitSelectionButton"));
+    await expect(canvas.getByTestId("GitSidebarCommitMessageInput")).toHaveValue("");
+  },
+};
+
 export const CallbackErrorHandling: Story = {
   args: {
     status: baseStatus,
@@ -263,6 +302,8 @@ export const CallbackErrorHandling: Story = {
     onPull: ok,
     onPush: ok,
     onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
     onCreateBranch: okWithArg,
     onSelectChange: okWithArg,
   },
