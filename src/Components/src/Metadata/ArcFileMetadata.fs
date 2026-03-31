@@ -488,7 +488,7 @@ type ArcFileMetadata =
         ]
 
     [<ReactComponent>]
-    static member Preview(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
+    static member View(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
         Html.div [
             prop.className "swt:p-4 swt:h-full"
             prop.children [

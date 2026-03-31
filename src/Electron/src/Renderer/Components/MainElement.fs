@@ -27,7 +27,7 @@ let CreateARCitectNavbar
             setTemplateImportType
 
     let hasSelectedTable =
-        WidgetArcFile.tryGetActiveTable activeTableIndex editorState.arcFile
+        editorState.arcFile.TryGetActiveTable(activeTableIndex)
         |> Option.isSome
 
     Widget.WidgetController(

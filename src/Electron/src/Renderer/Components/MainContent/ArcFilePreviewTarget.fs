@@ -19,7 +19,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
             pageStateCtx.setState (Some page)
             arcObjectCtx.setArcFileState (Some arcFile)
-            arcObjectCtx.setPreviewState ArcObjectPreviewState.NoneLoaded
+            arcObjectCtx.setPreviewState (Some page)
             arcObjectCtx.setStatusMessage None
 
     let onSaveArcFile =

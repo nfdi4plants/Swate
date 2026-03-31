@@ -2,37 +2,25 @@
 module Renderer.Types
 
 
-open ARCtrl
+open Swate.Components
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 
+
 [<RequireQualifiedAccess>]
-type ExplorerMode =
-    | NormalFileTree
+type LeftSidebarPage =
+    | FileExplorer
     | ArcObjectTree
 
-[<RequireQualifiedAccess>]
-type LeftSidebarPage = | FileExplorer
+let pageStateOfFileContentDTO (dto: FileContentDTO) : PageState =
+    match dto.fileType with
+    | DTOType.DTOTypeIsPlainTextVariant -> PageState.TextPage dto.content
+    | DTOType.DTOTypeIsISAFileVariant ->
+        let arcfile = FileContentDTO.toArcFile dto
 
-[<RequireQualifiedAccess>]
-type PageState =
-    | ArcFilePage of ArcFiles
-    | TextPage of string
-    | UnknownPage
-    | LandingDraftPage
-    | NotesDraftPage
-    | NotesSearchPage
-    | ErrorPage of string
-
-    static member fromFileContentDTO(dto: FileContentDTO) : PageState =
-        match dto.fileType with
-        | DTOType.DTOTypeIsPlainTextVariant -> PageState.TextPage dto.content
-        | DTOType.DTOTypeIsISAFileVariant ->
-            let arcfile = FileContentDTO.toArcFile dto
-
-            match arcfile with
-            | Some arcFile -> PageState.ArcFilePage arcFile
-            | None ->
-                PageState.ErrorPage
-                    $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
-        | _ -> PageState.UnknownPage
+        match arcfile with
+        | Some arcFile -> PageState.ArcFilePage arcFile
+        | None ->
+            PageState.ErrorPage
+                $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
+    | _ -> PageState.UnknownPage

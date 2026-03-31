@@ -24,7 +24,7 @@ let Main () =
                     ArcObjectExplorerContent.ARCObjectDetailsContent
                         viewModel.SelectedNode
                         viewModel.SelectedAncestors
-                        arcObjectCtx.state.PreviewState
+                        arcObjectCtx.state.PageState
                         arcObjectCtx.state.ArcFileState
                         arcObjectCtx.setArcFileState
                         false

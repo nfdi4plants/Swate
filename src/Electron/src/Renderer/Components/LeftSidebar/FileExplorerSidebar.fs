@@ -6,14 +6,14 @@ open Swate.Components
 open Renderer.Types
 
 [<ReactComponent>]
-let Main (explorerMode: ExplorerMode, setExplorerMode: ExplorerMode -> unit) =
+let Main (explorerMode: LeftSidebarPage, setExplorerMode: LeftSidebarPage -> unit) =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
 
     let toggleExplorerMode () =
         match explorerMode with
-        | ExplorerMode.NormalFileTree -> setExplorerMode ExplorerMode.ArcObjectTree
-        | ExplorerMode.ArcObjectTree -> setExplorerMode ExplorerMode.NormalFileTree
+        | LeftSidebarPage.FileExplorer -> setExplorerMode LeftSidebarPage.ArcObjectTree
+        | LeftSidebarPage.ArcObjectTree -> setExplorerMode LeftSidebarPage.FileExplorer
 
     React.Fragment [
 
@@ -40,8 +40,8 @@ let Main (explorerMode: ExplorerMode, setExplorerMode: ExplorerMode -> unit) =
                         Actionbar.ButtonInfo.create (
                             "swt:fluent--database-24-regular swt:size-5",
                             (match explorerMode with
-                             | ExplorerMode.NormalFileTree -> "Show ARC object explorer"
-                             | ExplorerMode.ArcObjectTree -> "Show normal file tree"),
+                             | LeftSidebarPage.FileExplorer -> "Show ARC object explorer"
+                             | LeftSidebarPage.ArcObjectTree -> "Show normal file tree"),
                             fun _ -> toggleExplorerMode ()
                         )
                     |],
@@ -50,6 +50,6 @@ let Main (explorerMode: ExplorerMode, setExplorerMode: ExplorerMode -> unit) =
             ]
         ]
         match explorerMode with
-        | ExplorerMode.NormalFileTree -> Renderer.Components.FileExplorer.FileTree()
-        | ExplorerMode.ArcObjectTree -> Renderer.Components.LeftSidebar.ArcObjectTreeSidebar.Main()
+        | LeftSidebarPage.FileExplorer -> Renderer.Components.FileExplorer.FileTree()
+        | LeftSidebarPage.ArcObjectTree -> Renderer.Components.LeftSidebar.ArcObjectTreeSidebar.Main()
     ]

@@ -24,21 +24,6 @@ module WidgetArcFile =
         | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
         | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
 
-    let tryGetActiveTable (activeTableIndex: int option) (arcFile: ArcFiles) =
-        match activeTableIndex with
-        | Some tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
-            Some(tableIndex, arcFile.Tables().[tableIndex])
-        | _ -> None
-
-    let tryGetDataMap (arcFile: ArcFiles) =
-        match arcFile with
-        | ArcFiles.Assay assay when assay.DataMap.IsSome -> Some assay.DataMap.Value
-        | ArcFiles.Study(study, _) when study.DataMap.IsSome -> Some study.DataMap.Value
-        | ArcFiles.Workflow workflow when workflow.DataMap.IsSome -> Some workflow.DataMap.Value
-        | ArcFiles.Run run when run.DataMap.IsSome -> Some run.DataMap.Value
-        | ArcFiles.DataMap(_, dataMap) -> Some dataMap
-        | _ -> None
-
 type FilePickerWidgetServices = {
     pickPaths: unit -> JS.Promise<Result<string[], string>>
 }

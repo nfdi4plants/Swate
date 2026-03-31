@@ -10,10 +10,15 @@ type ARCExplorerServices = {
 }
 
 [<RequireQualifiedAccess>]
-type ArcObjectPreviewState =
-    | NoneLoaded
-    | Text of string
-    | Error of string
+type PageState =
+    | ArcFilePage of ArcFiles
+    | TextPage of string
+    | UnknownPage
+    | LandingDraftPage
+    | NotesDraftPage
+    | NotesSearchPage
+    | ErrorPage of string
+
 
 [<StringEnum>]
 type ArcExplorerNodeKind =
@@ -75,7 +80,7 @@ type ArcObjectExplorerProps = {
     selectedExplorerItemId: string option
     selectedTreeItemPath: string option
     arcFileState: ArcFiles option
-    previewState: ArcObjectPreviewState
+    previewState: PageState option
     setArcFileState: ArcFiles option -> unit
     setSelectedExplorerItemId: string option -> unit
     setSelectedTreeItemPath: string option -> unit

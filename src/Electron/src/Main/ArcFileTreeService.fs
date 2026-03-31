@@ -6,13 +6,11 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Chokidar
-open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
 type private ArcFileTreeState = {
     mutable FileTree: Dictionary<string, FileEntry>
-    mutable Watcher: IWatcher option
     mutable ReloadTimeout: int option
 }
 
@@ -53,24 +51,11 @@ type ArcFileTreeService() =
         | false, _ ->
             let state = {
                 FileTree = Dictionary<string, FileEntry>()
-                Watcher = None
                 ReloadTimeout = None
             }
 
             this.StateByWindow.Add(windowId, state)
             state
-
-    member private _.ClearReloadTimeout(state: ArcFileTreeState) =
-        match state.ReloadTimeout with
-        | Some timeoutId ->
-            Fable.Core.JS.clearTimeout timeoutId
-            state.ReloadTimeout <- None
-        | None -> ()
-
-    member private this.StopWatcher(state: ArcFileTreeState) =
-        this.ClearReloadTimeout(state)
-        state.Watcher |> Option.iter (fun watcher -> watcher.close () |> Promise.start)
-        state.Watcher <- None
 
     member this.TryGet(windowId: int) =
         match this.StateByWindow.TryGetValue(windowId) with
@@ -98,8 +83,6 @@ type ArcFileTreeService() =
             onFileTreeChanged: Dictionary<string, FileEntry> -> unit
         ) =
         let state = this.EnsureState(windowId)
-
-        this.StopWatcher(state)
 
         let pathUpdater (path: string) =
             ArcPathHelper.combine arcPath path |> ArcFileTreeServiceHelper.normalizeTrackedPath
@@ -175,14 +158,12 @@ type ArcFileTreeService() =
                 state.ReloadTimeout <- Some timeoutId
 
         let watcher = ArcFileTreeServiceHelper.createFileWatcher arcPath
-        state.Watcher <- Some watcher
         watcher.on (Events.All, scheduleReload) |> ignore
 
     member this.Dispose(windowId: int) =
         match this.StateByWindow.TryGetValue(windowId) with
         | false, _ -> ()
-        | true, state ->
-            this.StopWatcher(state)
+        | true, _ ->
             this.StateByWindow.Remove(windowId) |> ignore
 
 let ARC_FILE_TREES = ArcFileTreeService()

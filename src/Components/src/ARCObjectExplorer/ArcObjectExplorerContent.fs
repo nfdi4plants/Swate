@@ -228,7 +228,7 @@ type ArcObjectExplorerContent =
             | ArcExplorerNodePreviewTarget.Table tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
                 arcFile.Tables().[tableIndex] |> ArcObjectExplorerContent.tableSummaryRows |> Some
             | _ -> None
-        | ArcExplorerNodeKind.DataMap -> WidgetArcFile.tryGetDataMap arcFile |> Option.map ArcObjectExplorerContent.dataMapSummaryRows
+        | ArcExplorerNodeKind.DataMap -> arcFile.TryGetDataMap() |> Option.map ArcObjectExplorerContent.dataMapSummaryRows
         | _ when arcFile.Tables().Count > 0 ->
             let tableNames = arcFile.Tables() |> Seq.map _.Name |> ArcObjectExplorerContent.summariseStrings
 
@@ -236,7 +236,7 @@ type ArcObjectExplorerContent =
                 ArcObjectExplorerContent.textRow "Tables" (string (arcFile.Tables().Count))
                 yield! tableNames |> Option.map (fun value -> ArcObjectExplorerContent.textRow "Names" value) |> Option.toList
             ]
-        | _ -> WidgetArcFile.tryGetDataMap arcFile |> Option.map ArcObjectExplorerContent.dataMapSummaryRows
+        | _ -> arcFile.TryGetDataMap() |> Option.map ArcObjectExplorerContent.dataMapSummaryRows
 
     static member private spreadsheetColumnLabel (index: int) =
         let rec loop (value: int) (acc: string) =
@@ -475,7 +475,7 @@ type ArcObjectExplorerContent =
     static member ARCObjectDetailsContent
         (selectedNode: ArcExplorerNode option)
         (selectedAncestors: ArcExplorerNode list)
-        (previewState: ArcObjectPreviewState)
+        (previewState: PageState option)
         (arcFileState: ArcFiles option)
         (setArcFileState: ArcFiles option -> unit)
         (useDetailedMetadataForms: bool)
@@ -521,9 +521,9 @@ type ArcObjectExplorerContent =
                 prop.children [
                     ArcObjectExplorerContent.ARCObjectSelectionSection(selectedNode)
                     match previewState with
-                    | ArcObjectPreviewState.Text content -> ArcObjectExplorerContent.ARCObjectNoteContentSection(content)
-                    | ArcObjectPreviewState.Error message -> ArcObjectExplorerContent.ARCObjectErrorSection("Note Content", message)
-                    | ArcObjectPreviewState.NoneLoaded -> Html.none
+                    | Some(PageState.TextPage content) -> ArcObjectExplorerContent.ARCObjectNoteContentSection(content)
+                    | Some(PageState.ErrorPage message) -> ArcObjectExplorerContent.ARCObjectErrorSection("Note Content", message)
+                    | _ -> Html.none
                     match selectedObjectRows with
                     | Some rows ->
                         ArcObjectExplorerContent.ARCObjectSection(

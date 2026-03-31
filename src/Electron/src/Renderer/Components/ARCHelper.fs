@@ -12,28 +12,22 @@ open Renderer.Types
 type PreviewLoadResult = {
     PageState: PageState
     ArcFileState: ArcFiles option
-    PreviewState: ArcObjectPreviewState
+    PreviewState: PageState option
 }
 
 let previewLoadResultOfDto (data: FileContentDTO) =
-    let pageState = PageState.fromFileContentDTO data
-
-    let previewState =
-        match pageState with
-        | PageState.TextPage content -> ArcObjectPreviewState.Text content
-        | PageState.ErrorPage message -> ArcObjectPreviewState.Error message
-        | _ -> ArcObjectPreviewState.NoneLoaded
+    let pageState = pageStateOfFileContentDTO data
 
     {
         PageState = pageState
         ArcFileState = FileContentDTO.toArcFile data
-        PreviewState = previewState
+        PreviewState = Some pageState
     }
 
 let applyLoadedPreview
     (setPageState: PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setPreviewState: PageState option -> unit)
     (setStatusMessage: string option -> unit)
     (loaded: PreviewLoadResult)
     =
@@ -44,23 +38,23 @@ let applyLoadedPreview
 
 let clearArcObjectPreview
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setPreviewState: PageState option -> unit)
     (setStatusMessage: string option -> unit)
     =
     setArcFileState None
-    setPreviewState ArcObjectPreviewState.NoneLoaded
+    setPreviewState None
     setStatusMessage None
 
 let applyPreviewError
     (setPageState: PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setPreviewState: PageState option -> unit)
     (setStatusMessage: string option -> unit)
     (errorMessage: string)
     =
     setPageState (Some(PageState.ErrorPage errorMessage))
     setArcFileState None
-    setPreviewState (ArcObjectPreviewState.Error errorMessage)
+    setPreviewState (Some(PageState.ErrorPage errorMessage))
     setStatusMessage (Some errorMessage)
 
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
@@ -103,7 +97,7 @@ let openPreview (path: string) = promise {
 let createArcExplorerServices
     (setPageState: PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: ArcObjectPreviewState -> unit)
+    (setPreviewState: PageState option -> unit)
     (setStatusMessage: string option -> unit)
     : ARCExplorerServices
     =

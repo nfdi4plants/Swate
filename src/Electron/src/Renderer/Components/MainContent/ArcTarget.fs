@@ -1,10 +1,7 @@
 module Renderer.Components.MainContent.ArcTarget
 
 open Feliz
-open Swate.Electron.Shared
-open Renderer.Components.MainContent.Types
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
-open Renderer.Types
+open Swate.Components
 open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget

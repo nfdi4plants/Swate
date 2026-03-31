@@ -197,16 +197,6 @@ module ARCtrlHelper =
             | Workflow _ -> ArcFilesDiscriminate.Workflow
             | DataMap _ -> ArcFilesDiscriminate.DataMap
 
-        member this.getIdentifier() : string =
-            match this with
-            | Template t -> t.Id.ToString()
-            | Investigation i -> i.Identifier
-            | Study(s, _) -> s.Identifier
-            | Assay a -> a.Identifier
-            | Run r -> r.Identifier
-            | Workflow w -> w.Identifier
-            | DataMap(d, _) -> if d.IsSome then d.Value.ParentId else ""
-
         member this.TryGetRelativePath() : string option =
             match this with
             | ArcFiles.Investigation _ -> Some ARCtrl.ArcPathHelper.InvestigationFileName
@@ -220,35 +210,30 @@ module ARCtrlHelper =
             | ArcFiles.DataMap(None, _)
             | ArcFiles.Template _ -> None
 
-        member this.TryMetadataToSpreadsheetValues() : (string * string[][]) option =
-            let normalizeRows rows =
-                rows
-                |> Seq.map (fun row ->
-                    row
-                    |> Seq.map (Option.defaultValue "")
-                    |> Array.ofSeq)
-                |> Array.ofSeq
-
+        member this.CanCreateTables() =
             match this with
-            | ArcFiles.Assay assay ->
-                Some(ArcAssay.metadataSheetName, normalizeRows (ArcAssay.toMetadataCollection assay))
-            | ArcFiles.Investigation investigation ->
-                Some(
-                    ArcInvestigation.metadataSheetName,
-                    normalizeRows (ArcInvestigation.toMetadataCollection investigation)
-                )
-            | ArcFiles.Study(study, assays) ->
-                Some(
-                    ArcStudy.metadataSheetName,
-                    normalizeRows (ArcStudy.toMetadataCollection study (Option.whereNot List.isEmpty assays))
-                )
-            | ArcFiles.Template template ->
-                Some(Template.metadataSheetName, normalizeRows (Template.toMetadataCollection template))
-            | ArcFiles.Workflow workflow ->
-                Some(ArcWorkflow.metadataSheetName, normalizeRows (ArcWorkflow.toMetadataCollection workflow))
-            | ArcFiles.Run run ->
-                Some(ArcRun.metadataSheetName, normalizeRows (ArcRun.toMetadataCollection run))
-            | ArcFiles.DataMap _ -> None
+            | ArcFiles.Assay _
+            | ArcFiles.Study _
+            | ArcFiles.Run _ -> true
+            | _ -> false
+
+        member this.TryGetActiveTable (activeTableIndex: int option) =
+            match activeTableIndex with
+            | Some tableIndex when tableIndex >= 0 && tableIndex < this.Tables().Count ->
+                Some(tableIndex, this.Tables().[tableIndex])
+            | _ -> None
+
+        member this.TryGetDataMap() =
+            match this with
+            | ArcFiles.Assay assay when assay.DataMap.IsSome -> Some assay.DataMap.Value
+            | ArcFiles.Study(study, _) when study.DataMap.IsSome -> Some study.DataMap.Value
+            | ArcFiles.Workflow workflow when workflow.DataMap.IsSome -> Some workflow.DataMap.Value
+            | ArcFiles.Run run when run.DataMap.IsSome -> Some run.DataMap.Value
+            | ArcFiles.DataMap(_, dataMap) -> Some dataMap
+            | _ -> None
+
+        member this.CanRenderDataMapView() =
+            this.TryGetDataMap() |> Option.isSome
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =

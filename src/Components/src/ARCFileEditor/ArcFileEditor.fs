@@ -37,15 +37,8 @@ type ArcFileEditor =
 
     static member private NewTablePrefix = "NewTable"
 
-    static member private canCreateTables(arcFile: ArcFiles) =
-        match arcFile with
-        | ArcFiles.Assay _
-        | ArcFiles.Study _
-        | ArcFiles.Run _ -> true
-        | _ -> false
-
     static member private canRenderDataMapView(arcFile: ArcFiles) =
-        WidgetArcFile.tryGetDataMap arcFile |> Option.isSome
+        arcFile.TryGetDataMap() |> Option.isSome
 
     static member private createNewTableName(tables: ResizeArray<ArcTable>) =
         let existingNames = tables |> Seq.map _.Name
@@ -62,33 +55,20 @@ type ArcFileEditor =
 
     [<ReactComponent>]
     static member private TablePreview(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
-        let tableState, setTableState = React.useState table
-
-        let setTable(nextTable: ArcTable) =
-            setTableState nextTable
-            setTableInArcFile nextTable
-
-        React.useEffect (
-            (fun () -> setTableState table),
-            [| box table |]
-        )
 
         Html.div [
             prop.className "swt:w-screen swt:pb-4"
-            prop.children [ AnnotationTable.AnnotationTable(tableState, setTable) ]
+            prop.children [ AnnotationTable.AnnotationTable(table, setTableInArcFile) ]
         ]
 
     [<ReactComponent>]
-    static member private DataMapPreview(datamap: DataMap, setDatamapInArcFile: DataMap -> unit) =
-        DataMapTable.DataMapTable(datamap, setDatamapInArcFile)
-
-    static member private TableView
-        (activeView: ArcFileEditorView)
-        (arcFileState: ArcFiles)
-        (setArcFileState: ArcFiles -> unit)
+    static member private ARCObjectView(
+        activeView: ArcFileEditorView,
+        arcFileState: ArcFiles,
+        setArcFileState: ArcFiles -> unit)
         =
         match activeView with
-        | ArcFileEditorView.Metadata -> ArcFileMetadata.Preview(arcFileState, setArcFileState)
+        | ArcFileEditorView.Metadata -> ArcFileMetadata.View(arcFileState, setArcFileState)
         | ArcFileEditorView.Table index ->
             let tables = arcFileState.Tables()
 
@@ -110,24 +90,24 @@ type ArcFileEditor =
                     assay.DataMap <- Some nextDatamap
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
-                ArcFileEditor.DataMapPreview(assay.DataMap.Value, setDatamap)
+                DataMapTable.DataMapTable(assay.DataMap.Value, setDatamap)
             | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
                 let setDatamap(nextDatamap: DataMap) =
                     study.DataMap <- Some nextDatamap
                     setArcFileState (ArcFiles.Study(study, assays))
 
-                ArcFileEditor.DataMapPreview(study.DataMap.Value, setDatamap)
+                DataMapTable.DataMapTable(study.DataMap.Value, setDatamap)
             | ArcFiles.Run run when run.DataMap.IsSome ->
                 let setDatamap(nextDatamap: DataMap) =
                     run.DataMap <- Some nextDatamap
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
-                ArcFileEditor.DataMapPreview(run.DataMap.Value, setDatamap)
+                DataMapTable.DataMapTable(run.DataMap.Value, setDatamap)
             | ArcFiles.DataMap(parent, datamap) ->
                 let setDatamap(nextDatamap: DataMap) =
                     setArcFileState (ArcFiles.DataMap(parent, nextDatamap))
 
-                ArcFileEditor.DataMapPreview(datamap, setDatamap)
+                DataMapTable.DataMapTable(datamap, setDatamap)
             | _ ->
                 Html.div [
                     prop.className "swt:p-4 swt:text-error"
@@ -140,12 +120,12 @@ type ArcFileEditor =
             ]
 
     [<ReactComponent>]
-    static member private AddRowsFooter
-        (arcFile: ArcFiles)
-        (activeView: ArcFileEditorView)
-        (setArcFile: ArcFiles -> unit)
+    static member private AddRowsFooter(
+        activeView: ArcFileEditorView,
+        arcFileState: ArcFiles,
+        setArcFileState: ArcFiles -> unit)
         =
-        let tables = arcFile.Tables()
+        let tables = arcFileState.Tables()
         let minRowsToAdd = 1
         let rowsToAdd, setRowsToAdd = React.useState minRowsToAdd
         let rowInputRef = React.useInputRef ()
@@ -154,8 +134,8 @@ type ArcFileEditor =
 
         let canAddRows =
             match activeView with
-            | ArcFileEditorView.Table tableIndex -> tableIndex >= 0 && tableIndex < tables.Count
-            | ArcFileEditorView.DataMap -> ArcFileEditor.canRenderDataMapView arcFile
+            | ArcFileEditorView.Table tableIndex -> arcFileState.HasTableAt(tableIndex)
+            | ArcFileEditorView.DataMap -> ArcFileEditor.canRenderDataMapView arcFileState
             | ArcFileEditorView.Metadata
             | ArcFileEditorView.Error _ -> false
 
@@ -163,22 +143,22 @@ type ArcFileEditor =
             let rowCount = clampRowsToAdd rowsToAdd
 
             if canAddRows then
-                match activeView, arcFile with
-                | ArcFileEditorView.Table tableIndex, _ when tableIndex >= 0 && tableIndex < tables.Count ->
+                match activeView, arcFileState with
+                | ArcFileEditorView.Table tableIndex, _ when arcFileState.HasTableAt(tableIndex) ->
                     tables.[tableIndex].AddRowsEmpty rowCount
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
                 | ArcFileEditorView.DataMap, ArcFiles.Assay assay when assay.DataMap.IsSome ->
                     assay.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
                 | ArcFileEditorView.DataMap, ArcFiles.Study(study, _) when study.DataMap.IsSome ->
                     study.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
                 | ArcFileEditorView.DataMap, ArcFiles.Run run when run.DataMap.IsSome ->
                     run.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
                 | ArcFileEditorView.DataMap, ArcFiles.DataMap(_, dataMap) ->
                     dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
                 | _ -> ()
 
         if canAddRows then
@@ -217,14 +197,14 @@ type ArcFileEditor =
             Html.none
 
     [<ReactComponent>]
-    static member private Footer
-        (arcFile: ArcFiles)
-        (activeView: ArcFileEditorView)
-        (setActiveView: ArcFileEditorView -> unit)
-        (setArcFile: ArcFiles -> unit)
+    static member private Footer(
+        arcFile: ArcFiles,
+        activeView: ArcFileEditorView,
+        setActiveView: ArcFileEditorView -> unit,
+        setArcFile: ArcFiles -> unit)
         =
         let tables = arcFile.Tables()
-        let canAddTable = ArcFileEditor.canCreateTables arcFile
+        let canAddTable = arcFile.CanCreateTables()
 
         let addNewTable() =
             if canAddTable then
@@ -327,10 +307,9 @@ type ArcFileEditor =
                         else
                             ArcFileEditorView.Metadata
 
-                if nextActiveView <> activeView then
-                    setActiveView nextActiveView
+                setActiveView nextActiveView
             ),
-            [| box arcFile; box activeView |]
+            [| box arcFile |]
         )
 
         let headerProps = {
@@ -357,10 +336,10 @@ type ArcFileEditor =
                             prop.children [
                                 Html.div [
                                     prop.className "swt:flex-1 swt:overflow-x-hidden swt:overflow-y-auto"
-                                    prop.children [ ArcFileEditor.TableView activeView arcFile setArcFile ]
+                                    prop.children [ ArcFileEditor.ARCObjectView(activeView, arcFile, setArcFile) ]
                                 ]
-                                ArcFileEditor.AddRowsFooter arcFile activeView setArcFile
-                                ArcFileEditor.Footer arcFile activeView setActiveView setArcFile
+                                ArcFileEditor.AddRowsFooter(activeView, arcFile, setArcFile)
+                                ArcFileEditor.Footer(arcFile, activeView, setActiveView, setArcFile)
                             ]
                         ]
                     ]

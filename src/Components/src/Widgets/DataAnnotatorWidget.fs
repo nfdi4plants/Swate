@@ -272,11 +272,11 @@ type DataAnnotatorWidget =
         | WidgetHostView.PreviewErrorView ->
             Some "Data Annotator is unavailable while the preview is in an error state."
         | WidgetHostView.TableView ->
-            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+            match arcFile.TryGetActiveTable(activeTableIndex) with
             | Some _ -> None
             | None -> Some "Select a table tab to use Data Annotator."
         | WidgetHostView.DataMapView ->
-            if WidgetArcFile.tryGetDataMap arcFile |> Option.isSome then
+            if arcFile.TryGetDataMap() |> Option.isSome then
                 None
             else
                 Some "No DataMap available for this ARC file."
@@ -557,14 +557,14 @@ type DataAnnotatorWidget =
 
                     match activeView with
                     | WidgetHostView.TableView ->
-                        match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+                        match arcFile.TryGetActiveTable(activeTableIndex) with
                         | Some(_, table) ->
                             match DataAnnotatorWidgetModel.applyToTable table input with
                             | Ok count -> applySuccess count
                             | Error message -> setErrorMessage (Some message)
                         | None -> setErrorMessage (Some "No active table selected.")
                     | WidgetHostView.DataMapView ->
-                        match WidgetArcFile.tryGetDataMap arcFile with
+                        match arcFile.TryGetDataMap() with
                         | Some dataMap ->
                             match DataAnnotatorWidgetModel.applyToDataMap dataMap input with
                             | Ok count -> applySuccess count

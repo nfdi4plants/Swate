@@ -1,8 +1,6 @@
 module Renderer.Components.FileExplorer
 
-open System
-open Browser.Dom
-open Renderer
+open Swate.Components
 open Swate.Components.FileExplorerTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes

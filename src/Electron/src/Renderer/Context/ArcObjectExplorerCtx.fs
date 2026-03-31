@@ -3,14 +3,14 @@ module Renderer.Context.ArcObjectExplorerCtx
 open ARCtrl
 open Feliz
 open Swate.Components
-open Fable.Electron.Remoting.Renderer
+
 
 type ArcObjectExplorerState = {
     Nodes: ArcExplorerNode list
     SelectedExplorerItemId: string option
     SelectedKindIndices: Set<int>
     ArcFileState: ArcFiles option
-    PreviewState: ArcObjectPreviewState
+    PageState: PageState option
     StatusMessage: string option
 } with
 
@@ -19,7 +19,7 @@ type ArcObjectExplorerState = {
         SelectedExplorerItemId = None
         SelectedKindIndices = Swate.Components.ARCObjectWidget.DefaultKindFilterIndices()
         ArcFileState = None
-        PreviewState = ArcObjectPreviewState.NoneLoaded
+        PageState = None
         StatusMessage = None
     }
 
@@ -30,7 +30,7 @@ type ArcObjectExplorerController = {
     setSelectedExplorerItemId: string option -> unit
     setSelectedKindIndices: Set<int> -> unit
     setArcFileState: ArcFiles option -> unit
-    setPreviewState: ArcObjectPreviewState -> unit
+    setPreviewState: PageState option -> unit
     setStatusMessage: string option -> unit
 }
 
@@ -88,7 +88,7 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                                 Nodes = []
                                 SelectedExplorerItemId = None
                                 ArcFileState = None
-                                PreviewState = ArcObjectPreviewState.Error exn.Message
+                                PageState = Some(PageState.ErrorPage exn.Message)
                                 StatusMessage = Some $"Could not load ARC object explorer: {exn.Message}"
                         })
                 }
@@ -119,7 +119,7 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                         setState (fun currentState -> { currentState with ArcFileState = arcFileState })
                 setPreviewState =
                     fun previewState ->
-                        setState (fun currentState -> { currentState with PreviewState = previewState })
+                        setState (fun currentState -> { currentState with PageState = previewState })
                 setStatusMessage =
                     fun statusMessage ->
                         setState (fun currentState -> {
