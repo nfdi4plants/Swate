@@ -201,6 +201,7 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
+                            do! vault.RefreshFileTree()
                             return toGitOperationResult (fun () -> Some "Pull completed.") None result
                         })
         }
@@ -298,6 +299,7 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.createBranch arcPath request.Name request.StartPoint
+                            do! vault.RefreshFileTree()
 
                             return
                                 toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None result
@@ -313,6 +315,7 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.checkoutBranch arcPath request.Name
+                            do! vault.RefreshFileTree()
 
                             return
                                 toGitOperationResult
