@@ -9,7 +9,6 @@ type ArcFileEditorView =
     | Metadata
     | Table of int
     | DataMap
-    | Error of string option
 
 [<RequireQualifiedAccess>]
 module ArcFileEditorView =
@@ -24,7 +23,6 @@ module ArcFileEditorView =
         | ArcFileEditorView.Table _ -> WidgetHostView.TableView
         | ArcFileEditorView.DataMap -> WidgetHostView.DataMapView
         | ArcFileEditorView.Metadata -> WidgetHostView.MetadataView
-        | ArcFileEditorView.Error _ -> WidgetHostView.PreviewErrorView
 
 type ArcFileEditorHeaderProps = {
     arcFile: ArcFiles
@@ -36,9 +34,6 @@ type ArcFileEditorHeaderProps = {
 type ArcFileEditor =
 
     static member private NewTablePrefix = "NewTable"
-
-    static member private canRenderDataMapView(arcFile: ArcFiles) =
-        arcFile.TryGetDataMap() |> Option.isSome
 
     static member private createNewTableName(tables: ResizeArray<ArcTable>) =
         let existingNames = tables |> Seq.map _.Name
@@ -54,7 +49,7 @@ type ArcFileEditor =
         loop 0
 
     [<ReactComponent>]
-    static member private TablePreview(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
+    static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
 
         Html.div [
             prop.className "swt:w-screen swt:pb-4"
@@ -77,7 +72,7 @@ type ArcFileEditor =
                     tables.[index] <- nextTable
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
-                ArcFileEditor.TablePreview(tables.[index], setTable)
+                ArcFileEditor.TableView(tables.[index], setTable)
             else
                 Html.div [
                     prop.className "swt:p-4 swt:text-error"
@@ -94,7 +89,7 @@ type ArcFileEditor =
             | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
                 let setDatamap(nextDatamap: DataMap) =
                     study.DataMap <- Some nextDatamap
-                    setArcFileState (ArcFiles.Study(study, assays))
+                    setArcFileState (WidgetArcFile.refreshRef (ArcFiles.Study(study, assays)))
 
                 DataMapTable.DataMapTable(study.DataMap.Value, setDatamap)
             | ArcFiles.Run run when run.DataMap.IsSome ->
@@ -103,6 +98,12 @@ type ArcFileEditor =
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
                 DataMapTable.DataMapTable(run.DataMap.Value, setDatamap)
+            | ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
+                let setDatamap(nextDatamap: DataMap) =
+                    workflow.DataMap <- Some nextDatamap
+                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
+
+                DataMapTable.DataMapTable(workflow.DataMap.Value, setDatamap)
             | ArcFiles.DataMap(parent, datamap) ->
                 let setDatamap(nextDatamap: DataMap) =
                     setArcFileState (ArcFiles.DataMap(parent, nextDatamap))
@@ -113,11 +114,6 @@ type ArcFileEditor =
                     prop.className "swt:p-4 swt:text-error"
                     prop.text "No DataMap available"
                 ]
-        | ArcFileEditorView.Error message ->
-            Html.div [
-                prop.className "swt:p-4 swt:text-error"
-                prop.text $"The following error occured: {message}"
-            ]
 
     [<ReactComponent>]
     static member private AddRowsFooter(
@@ -135,9 +131,8 @@ type ArcFileEditor =
         let canAddRows =
             match activeView with
             | ArcFileEditorView.Table tableIndex -> arcFileState.HasTableAt(tableIndex)
-            | ArcFileEditorView.DataMap -> ArcFileEditor.canRenderDataMapView arcFileState
-            | ArcFileEditorView.Metadata
-            | ArcFileEditorView.Error _ -> false
+            | ArcFileEditorView.DataMap -> arcFileState.CanRenderDataMapView()
+            | ArcFileEditorView.Metadata -> false
 
         let addRows() =
             let rowCount = clampRowsToAdd rowsToAdd
@@ -155,6 +150,9 @@ type ArcFileEditor =
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
                 | ArcFileEditorView.DataMap, ArcFiles.Run run when run.DataMap.IsSome ->
                     run.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
+                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
+                | ArcFileEditorView.DataMap, ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
+                    workflow.DataMap.Value.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
                 | ArcFileEditorView.DataMap, ArcFiles.DataMap(_, dataMap) ->
                     dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
@@ -256,7 +254,7 @@ type ArcFileEditor =
                             Html.span [ prop.text table.Name ]
                         ]
                     ]
-                if ArcFileEditor.canRenderDataMapView arcFile then
+                if arcFile.CanRenderDataMapView() then
                     Html.button [
                         prop.className [
                             footerTabBaseClasses
@@ -299,7 +297,7 @@ type ArcFileEditor =
                 let nextActiveView =
                     match activeView with
                     | ArcFileEditorView.Table tableIndex when tableIndex >= 0 && tableIndex < tables.Count -> activeView
-                    | ArcFileEditorView.DataMap when ArcFileEditor.canRenderDataMapView arcFile -> activeView
+                    | ArcFileEditorView.DataMap when arcFile.CanRenderDataMapView() -> activeView
                     | ArcFileEditorView.Metadata -> activeView
                     | _ ->
                         if tables.Count > 0 then

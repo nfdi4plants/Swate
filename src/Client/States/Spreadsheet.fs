@@ -2,7 +2,6 @@ namespace Spreadsheet
 
 open Swate.Components
 open ARCtrl
-open Fable.Core
 open FileImport
 
 type ColumnType =
