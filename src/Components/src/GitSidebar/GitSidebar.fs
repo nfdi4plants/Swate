@@ -114,6 +114,7 @@ type GitSidebar =
 
         let localError, setLocalError = React.useState (None: string option)
         let activeAction, setActiveAction = React.useState (None: string option)
+        let isAdvancedActionsOpen, setIsAdvancedActionsOpen = React.useState false
         let isCreateBranchModalOpen, setIsCreateBranchModalOpen = React.useState false
         let isSwitchBranchModalOpen, setIsSwitchBranchModalOpen = React.useState false
         let branchName, setBranchName = React.useState ""
@@ -446,60 +447,66 @@ type GitSidebar =
                     prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
                     prop.children [
                         GitSidebar.ActionButton(
-                            "Fetch",
-                            "swt:fluent--arrow-download-24-regular",
-                            isBusy,
-                            (fun () -> runAction "Fetch" onFetch),
-                            testId = "GitSidebarFetchButton"
-                        )
-                        GitSidebar.ActionButton(
-                            "Pull",
-                            "swt:fluent--arrow-down-24-regular",
-                            isBusy,
-                            (fun () -> runAction "Pull" onPull),
-                            testId = "GitSidebarPullButton"
-                        )
-                        GitSidebar.ActionButton(
-                            "Push",
-                            "swt:fluent--arrow-up-24-regular",
-                            isBusy,
-                            (fun () -> runAction "Push" onPush),
-                            testId = "GitSidebarPushButton"
-                        )
-                        GitSidebar.ActionButton(
                             "Sync",
                             "swt:fluent--arrow-sync-24-regular",
                             isBusy,
                             (fun () -> runAction "Sync" onSync),
                             testId = "GitSidebarSyncButton"
                         )
+                        GitSidebar.ActionButton(
+                            "Advanced Actions",
+                            (if isAdvancedActionsOpen then
+                                "swt:fluent--chevron-up-24-regular"
+                             else
+                                "swt:fluent--chevron-down-24-regular"),
+                            isBusy,
+                            (fun () -> setIsAdvancedActionsOpen (not isAdvancedActionsOpen)),
+                            testId = "GitSidebarAdvancedActionsButton"
+                        )
                     ]
                 ]
 
-                Html.div [
-                    prop.className "swt:px-3 swt:pt-2"
-                    prop.children [
-                        Html.div [
-                            prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
-                            prop.children [
-                                GitSidebar.ActionButton(
-                                    "Create Branch",
-                                    "swt:fluent--branch-fork-24-regular",
-                                    isBusy,
-                                    openCreateBranchModal,
-                                    testId = "GitSidebarCreateBranchButton"
-                                )
-                                GitSidebar.ActionButton(
-                                    "Switch Branch",
-                                    "swt:fluent--arrow-swap-24-regular",
-                                    isBusy || localBranchOptionsForSwitch.Length = 0,
-                                    openSwitchBranchModal,
-                                    testId = "GitSidebarSwitchBranchButton"
-                                )
-                            ]
+                if isAdvancedActionsOpen then
+                    Html.div [
+                        prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3 swt:pt-2"
+                        prop.children [
+                            GitSidebar.ActionButton(
+                                "Fetch",
+                                "swt:fluent--arrow-download-24-regular",
+                                isBusy,
+                                (fun () -> runAction "Fetch" onFetch),
+                                testId = "GitSidebarFetchButton"
+                            )
+                            GitSidebar.ActionButton(
+                                "Pull",
+                                "swt:fluent--arrow-down-24-regular",
+                                isBusy,
+                                (fun () -> runAction "Pull" onPull),
+                                testId = "GitSidebarPullButton"
+                            )
+                            GitSidebar.ActionButton(
+                                "Push",
+                                "swt:fluent--arrow-up-24-regular",
+                                isBusy,
+                                (fun () -> runAction "Push" onPush),
+                                testId = "GitSidebarPushButton"
+                            )
+                            GitSidebar.ActionButton(
+                                "Create Branch",
+                                "swt:fluent--branch-fork-24-regular",
+                                isBusy,
+                                openCreateBranchModal,
+                                testId = "GitSidebarCreateBranchButton"
+                            )
+                            GitSidebar.ActionButton(
+                                "Switch Branch",
+                                "swt:fluent--arrow-swap-24-regular",
+                                isBusy || localBranchOptionsForSwitch.Length = 0,
+                                openSwitchBranchModal,
+                                testId = "GitSidebarSwitchBranchButton"
+                            )
                         ]
                     ]
-                ]
 
                 GitSidebar.SectionHeader("Commit", None)
 

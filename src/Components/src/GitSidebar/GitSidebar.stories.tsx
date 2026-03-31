@@ -179,6 +179,31 @@ export const ChangedFiles: Story = {
   },
 };
 
+export const AdvancedActions: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    onRefresh: ok,
+    onFetch: ok,
+    onPull: ok,
+    onPush: ok,
+    onSync: ok,
+    onCommitSelection: okWithSelection,
+    onCommitAll: okWithMessage,
+    onCreateBranch: okWithArg,
+    onSwitchBranch: okWithBranch,
+    onSelectChange: okWithArg,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
+  },
+};
+
 export const ConflictsPresent: Story = {
   args: {
     status: {
@@ -256,6 +281,7 @@ export const CreateBranchModal: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const modal = within(document.body);
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await userEvent.click(canvas.getByTestId("GitSidebarCreateBranchButton"));
     const branchNameInput = await modal.findByTestId(
       "GitSidebarBranchNameInput",
@@ -289,6 +315,7 @@ export const SwitchBranchModal: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const modal = within(document.body);
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await userEvent.click(canvas.getByTestId("GitSidebarSwitchBranchButton"));
     await expect(modal.getByTestId("GitSidebarSwitchBranchSelect")).toHaveTextContent(
       "main",
@@ -344,6 +371,7 @@ export const CallbackErrorHandling: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await userEvent.click(canvas.getByTestId("GitSidebarFetchButton"));
     await expect(canvas.getByTestId("GitSidebarErrorNotice")).toHaveTextContent(
       "Fetch failed because the remote rejected the request.",
