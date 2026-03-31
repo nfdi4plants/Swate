@@ -151,6 +151,8 @@ let shouldRetryWithoutAuth (failure: GitService.GitFailure) =
             contains "permission denied" && contains "publickey"
 
         hasHttpAuthSignal || isSshPublicKeyFailure
+    | GitService.GitFailureKind.LfsInstallRequired ->
+        false
     | GitService.GitFailureKind.Network
     | GitService.GitFailureKind.Timeout
     | GitService.GitFailureKind.Canceled
@@ -484,7 +486,7 @@ let cloneRepository
                                             | Some token ->
                                                 let authenticatedGitResult =
                                                     try
-                                                        Ok(applyAuth createGit cloneOptions host token)
+                                                        Ok(applyAuth createGit cloneOptions host token None (Some safeRemoteUrl))
                                                     with authError ->
                                                         Error authError
 

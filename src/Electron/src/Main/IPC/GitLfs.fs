@@ -4,7 +4,7 @@ open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 
-open Main.Git.GitLfsAdapter
+open Main.Git.GitLfsService
 
 
 
@@ -42,28 +42,21 @@ let registerGitLfsIpc: IGitLfsApi =
             fun (event: IpcMainEvent) (request: GitLfsRequest) ->
 
                 promise {
-                    try
-                        cancellations.[request.RequestId] <- false
+                    cancellations.[request.RequestId] <- false
 
-                        let onProgress msg =
-                            event.sender.send (GitLfsProgressChannel, [| box request.RequestId; box msg |])
+                    let onProgress msg =
+                        event.sender.send (GitLfsProgressChannel, [| box request.RequestId; box msg |])
 
-                        let cancelCheck () =
-                            match cancellations.TryGetValue(request.RequestId) with
-                            | true, value -> value
-                            | _ -> false
+                    let cancelCheck () =
+                        match cancellations.TryGetValue(request.RequestId) with
+                        | true, value -> value
+                        | _ -> false
 
-                        let! result = gitLfs.Run request onProgress cancelCheck
+                    let! result = run request onProgress cancelCheck
 
-                        cancellations.Remove(request.RequestId) |> ignore
+                    cancellations.Remove(request.RequestId) |> ignore
 
-                        if result.Success then
-                            return Ok result
-                        else
-                            return Error(System.Exception result.Error)
-
-                    with ex ->
-                        return Error ex
+                    return result
                 }
 
         cancelChannel =

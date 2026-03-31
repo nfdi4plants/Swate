@@ -33,6 +33,7 @@ type GitFailureKind =
     | Network
     | Timeout
     | Canceled
+    | LfsInstallRequired
     | Unknown
 
 [<StringEnum(CaseRules.None)>]
@@ -113,6 +114,8 @@ type GitCloneRepositoryRequest = {
 type GitPathspecRequest = { Pathspecs: string[] }
 
 type GitCommitRequest = { Message: string }
+
+type GitLfsSettingsDto = { AutoTrackThresholdMb: int }
 
 type GitCreateBranchRequest = {
     Name: string

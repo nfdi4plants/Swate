@@ -17,6 +17,7 @@ let private toSharedGitFailureKind (kind: GitService.GitFailureKind) =
     | GitService.GitFailureKind.Network -> GitFailureKind.Network
     | GitService.GitFailureKind.Timeout -> GitFailureKind.Timeout
     | GitService.GitFailureKind.Canceled -> GitFailureKind.Canceled
+    | GitService.GitFailureKind.LfsInstallRequired -> GitFailureKind.LfsInstallRequired
     | GitService.GitFailureKind.Unknown -> GitFailureKind.Unknown
 
 let private toGitOperationResult
@@ -79,6 +80,10 @@ let private toDiffSummaryDto (diff: GitService.GitDiffSummaryDto) : GitDiffSumma
     Deletions = diff.Deletions
 }
 
+let private toLfsSettingsDto (settings: GitService.GitLfsSettingsDto) : GitLfsSettingsDto = {
+    AutoTrackThresholdMb = settings.AutoTrackThresholdMb
+}
+
 let private toDiffViewDataDto (data: GitService.GitDiffViewDataDto) : GitDiffViewDataDto = {
     Path = data.Path
     PreviousContent = data.PreviousContent
@@ -134,6 +139,17 @@ let api: IGitApi = {
                 match result with
                 | Ok branches -> return Ok(branches |> Array.map toBranchDto)
                 | Error failure -> return Error(exn $"git branch list failed ({failure.Kind}): {failure.Message}")
+        }
+    getGitLfsSettings =
+        fun (event: IpcMainEvent) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getLfsSettings arcPath
+
+                match result with
+                | Ok settings -> return Ok(toLfsSettingsDto settings)
+                | Error failure -> return Error(exn $"git lfs settings failed ({failure.Kind}): {failure.Message}")
         }
     getGitDiffSummary =
         fun (event: IpcMainEvent) -> promise {
@@ -255,6 +271,8 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.stagePaths arcPath request.Pathspecs
+                            if Result.isOk result then
+                                do! vault.RefreshFileTree()
                             return toGitOperationResult (fun () -> Some "Files staged.") None result
                         })
         }
@@ -288,6 +306,20 @@ let api: IGitApi = {
                                     None
                                     result
                         })
+        }
+    setGitLfsSettings =
+        fun (event: IpcMainEvent) (settings: GitLfsSettingsDto) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result =
+                    GitService.setLfsSettings
+                        arcPath
+                        {
+                            AutoTrackThresholdMb = settings.AutoTrackThresholdMb
+                        }
+
+                return toGitOperationResult (fun () -> Some "Git LFS threshold updated.") None result
         }
     createBranch =
         fun (event: IpcMainEvent) (request: GitCreateBranchRequest) -> promise {

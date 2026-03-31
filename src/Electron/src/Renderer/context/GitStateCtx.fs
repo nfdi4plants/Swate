@@ -1,6 +1,7 @@
 module Renderer.Context.GitStateCtx
 
 open System
+open Browser.Dom
 open Fable.Core
 open Fable.Electron.Remoting.Renderer
 open Feliz
@@ -14,6 +15,7 @@ type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
     BranchOptions: GitSidebarBranchOption[]
+    LfsAutoTrackThresholdMb: int
     CurrentProgress: GitSidebarProgress option
     SelectedChangePath: string option
     BusyNotice: string option
@@ -31,6 +33,7 @@ type GitState = {
         }
         ChangedFiles = [||]
         BranchOptions = [||]
+        LfsAutoTrackThresholdMb = 1
         CurrentProgress = None
         SelectedChangePath = None
         BusyNotice = None
@@ -46,6 +49,7 @@ type GitStateController = {
     sync: unit -> JS.Promise<Result<unit, string>>
     commitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>
     commitAll: string -> JS.Promise<Result<unit, string>>
+    saveLfsAutoTrackThreshold: int -> JS.Promise<Result<unit, string>>
     createBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>
     switchBranch: string -> JS.Promise<Result<unit, string>>
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
@@ -65,6 +69,9 @@ let private getGitStatus () : JS.Promise<Result<GitStatusDto, exn>> =
 
 let private getGitBranches () : JS.Promise<Result<GitBranchRefDto[], exn>> =
     invokeGitApiWithoutPayload ipcGitApiDynamic "getGitBranches"
+
+let private getGitLfsSettings () : JS.Promise<Result<GitLfsSettingsDto, exn>> =
+    invokeGitApiWithoutPayload ipcGitApiDynamic "getGitLfsSettings"
 
 let private getGitDiffViewData (requestedPath: string) : JS.Promise<Result<GitDiffViewDataDto, exn>> =
     invokeGitApiWithPayload ipcGitApiDynamic "getGitDiffViewData" requestedPath
@@ -95,6 +102,9 @@ let private gitUnstagePaths (request: GitPathspecRequest) : JS.Promise<Result<Gi
 
 let private gitCommit (request: GitCommitRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     invokeGitApiWithPayload ipcGitApiDynamic "gitCommit" request
+
+let private setGitLfsSettings (settings: GitLfsSettingsDto) : JS.Promise<Result<GitOperationResult, exn>> =
+    invokeGitApiWithPayload ipcGitApiDynamic "setGitLfsSettings" settings
 
 let private confirmGitMergeResolution
     (request: GitConfirmMergeResolutionRequest)
@@ -169,6 +179,7 @@ let GitStateCtx =
             sync = fun () -> promise { return Ok() }
             commitSelection = fun _ -> promise { return Ok() }
             commitAll = fun _ -> promise { return Ok() }
+            saveLfsAutoTrackThreshold = fun _ -> promise { return Ok() }
             createBranch = fun _ -> promise { return Ok() }
             switchBranch = fun _ -> promise { return Ok() }
             selectChange = fun _ -> promise { return Ok() }
@@ -207,6 +218,9 @@ let GitStateCtxProvider (children: ReactElement) =
     let applyBranches (branches: GitBranchRefDto[]) =
         setGitState (fun current -> { current with BranchOptions = mapBranches branches })
 
+    let applyLfsSettings (settings: GitLfsSettingsDto) =
+        setGitState (fun current -> { current with LfsAutoTrackThresholdMb = settings.AutoTrackThresholdMb })
+
     let setBusyNotice (busyNotice: string option) =
         setGitState (fun current -> { current with BusyNotice = busyNotice })
 
@@ -237,27 +251,49 @@ let GitStateCtxProvider (children: ReactElement) =
         else
             let! statusResult = getGitStatus ()
             let! branchResult = getGitBranches ()
+            let! lfsSettingsResult = getGitLfsSettings ()
 
-            match statusResult, branchResult with
-            | Ok status, Ok branches ->
+            match statusResult, branchResult, lfsSettingsResult with
+            | Ok status, Ok branches, Ok lfsSettings ->
                 applyStatus status
                 applyBranches branches
+                applyLfsSettings lfsSettings
                 setErrorNotice None
                 return Ok()
-            | Ok status, Error exn ->
+            | Ok status, Error exn, Ok lfsSettings ->
                 applyStatus status
+                applyLfsSettings lfsSettings
                 setGitState (fun current -> {
                     current with
                         BranchOptions = [||]
                         ErrorNotice = Some exn.Message
                 })
                 return Error exn.Message
-            | Error exn, _ ->
+            | Ok status, Ok branches, Error exn ->
+                applyStatus status
+                applyBranches branches
+                setGitState (fun current -> {
+                    current with
+                        LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
+                        ErrorNotice = Some exn.Message
+                })
+                return Error exn.Message
+            | Ok status, Error exn, Error _ ->
+                applyStatus status
+                setGitState (fun current -> {
+                    current with
+                        BranchOptions = [||]
+                        LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
+                        ErrorNotice = Some exn.Message
+                })
+                return Error exn.Message
+            | Error exn, _, _ ->
                 setGitState (fun current -> {
                     current with
                         Status = GitState.Empty.Status
                         ChangedFiles = [||]
                         BranchOptions = [||]
+                        LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
                         ErrorNotice = Some exn.Message
                 })
                 return Error exn.Message
@@ -320,6 +356,82 @@ let GitStateCtxProvider (children: ReactElement) =
                 return Error message
         }
 
+    let promptForGitLfsInstall (message: string) = promise {
+        let shouldInstall = window.confirm message
+
+        if not shouldInstall then
+            return Ok false
+        else
+            setBusyNotice (Some "Installing Git LFS")
+            setErrorNotice None
+
+            let! installResult =
+                Api.ipcArcVaultApi.runGitLfs
+                    (unbox null)
+                    {
+                        RequestId = Guid.NewGuid().ToString()
+                        RepoPath = ""
+                        Command = GitLfsCommand.Install
+                        FilePath = None
+                        TimeoutMs = Some 30000
+                    }
+
+            match installResult with
+            | Error exn ->
+                setBusyNotice None
+                return Error exn.Message
+            | Ok installResult when not installResult.Success ->
+                setBusyNotice None
+                let message =
+                    installResult.Error
+                    |> Option.ofObj
+                    |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
+                    |> Option.defaultValue "Git LFS installation failed."
+
+                return Error message
+            | Ok _ ->
+                setBusyNotice None
+                return Ok true
+    }
+
+    let rec runGitOperationWithLfsInstallRetry
+        (busyLabel: string)
+        (allowRetry: bool)
+        (operation: unit -> JS.Promise<Result<GitOperationResult, exn>>)
+        =
+        promise {
+            let! result = operation ()
+
+            match result with
+            | Ok operationResult when allowRetry && operationResult.FailureKind = Some GitFailureKind.LfsInstallRequired ->
+                let promptMessage =
+                    operationResult.Message
+                    |> Option.defaultValue "Git LFS is required for this operation. Install Git LFS now?"
+
+                let! promptResult = promptForGitLfsInstall promptMessage
+
+                match promptResult with
+                | Error message ->
+                    return
+                        Ok {
+                            Success = false
+                            Message = Some message
+                            FailureKind = Some GitFailureKind.LfsInstallRequired
+                            Path = None
+                        }
+                | Ok false ->
+                    return
+                        Ok {
+                            operationResult with
+                                Message = Some "Git LFS installation is required to continue."
+                        }
+                | Ok true ->
+                    setBusyNotice (Some busyLabel)
+                    return! runGitOperationWithLfsInstallRetry busyLabel false operation
+            | _ ->
+                return result
+        }
+
     let runWriteOperation
         (busyLabel: string)
         (operation: unit -> JS.Promise<Result<GitOperationResult, exn>>)
@@ -328,7 +440,7 @@ let GitStateCtxProvider (children: ReactElement) =
             setBusyNotice (Some busyLabel)
             setErrorNotice None
 
-            let! result = operation ()
+            let! result = runGitOperationWithLfsInstallRetry busyLabel true operation
 
             match result with
             | Error exn ->
@@ -405,9 +517,13 @@ let GitStateCtxProvider (children: ReactElement) =
                     return! completeOperation busyLabel (Error message)
                 | Ok () ->
                     let! stageResult =
-                        gitStagePaths {
-                            Pathspecs = normalizedPaths
-                        }
+                        runGitOperationWithLfsInstallRetry
+                            busyLabel
+                            true
+                            (fun () ->
+                                gitStagePaths {
+                                    Pathspecs = normalizedPaths
+                                })
 
                     match stageResult with
                     | Error exn ->
@@ -420,9 +536,13 @@ let GitStateCtxProvider (children: ReactElement) =
                         return! completeOperation busyLabel (Error message)
                     | Ok _ ->
                         let! commitResult =
-                            gitCommit {
-                                Message = normalizedMessage
-                            }
+                            runGitOperationWithLfsInstallRetry
+                                busyLabel
+                                true
+                                (fun () ->
+                                    gitCommit {
+                                        Message = normalizedMessage
+                                    })
 
                         match commitResult with
                         | Error exn ->
@@ -449,7 +569,11 @@ let GitStateCtxProvider (children: ReactElement) =
         setBusyNotice (Some "Pulling from remote")
         setErrorNotice None
 
-        let! result = gitPull { Remote = None; Branch = None }
+        let! result =
+            runGitOperationWithLfsInstallRetry
+                "Pulling from remote"
+                true
+                (fun () -> gitPull { Remote = None; Branch = None })
         let! refreshResult = refreshAll ()
         setBusyNotice None
         setGitState (fun current -> { current with CurrentProgress = None })
@@ -502,6 +626,30 @@ let GitStateCtxProvider (children: ReactElement) =
             |> Array.distinct
 
         runCommitOperation "Committing all changes" allChangedPaths false message
+
+    let saveLfsAutoTrackThreshold (thresholdMb: int) = promise {
+        setBusyNotice (Some "Saving Git LFS threshold")
+        setErrorNotice None
+
+        let! result =
+            setGitLfsSettings {
+                AutoTrackThresholdMb = thresholdMb
+            }
+
+        setBusyNotice None
+
+        match result with
+        | Error exn ->
+            setErrorNotice (Some exn.Message)
+            return Error exn.Message
+        | Ok operationResult when operationResult.Success ->
+            setGitState (fun current -> { current with LfsAutoTrackThresholdMb = thresholdMb })
+            return Ok()
+        | Ok operationResult ->
+            let message = operationResult.Message |> Option.defaultValue "Updating the Git LFS threshold failed."
+            setErrorNotice (Some message)
+            return Error message
+    }
 
     let createBranchFrom (request: GitSidebarCreateBranchRequest) = promise {
         setBusyNotice (Some "Creating branch")
@@ -621,6 +769,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 sync = sync
                 commitSelection = commitSelection
                 commitAll = commitAll
+                saveLfsAutoTrackThreshold = saveLfsAutoTrackThreshold
                 createBranch = createBranchFrom
                 switchBranch = switchBranchTo
                 selectChange = selectChange
