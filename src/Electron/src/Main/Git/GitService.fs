@@ -458,6 +458,35 @@ let private buildSyntheticWordDiffText (previousPath: string option) (currentPat
     ]
     |> String.concat "\n"
 
+let private ensureDefaultTrackingBranchForPull
+    (remoteName: string)
+    (git: ISimpleGit)
+    : JS.Promise<unit> =
+    promise {
+        let! status = git.status ()
+
+        let hasTrackingBranch =
+            status.tracking
+            |> Option.bind Option.ofObj
+            |> Option.exists (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
+
+        let currentBranch =
+            status.current
+            |> Option.bind Option.ofObj
+            |> Option.map _.Trim()
+            |> Option.filter (fun branch -> not (String.IsNullOrWhiteSpace branch))
+
+        match hasTrackingBranch, status.detached, currentBranch with
+        | true, _, _
+        | _, true, _
+        | _, _, None ->
+            return ()
+        | false, false, Some branchName ->
+            let upstreamRef = $"{remoteName}/{branchName}"
+            let! _ = git.raw [| "branch"; $"--set-upstream-to={upstreamRef}"; branchName |]
+            return ()
+    }
+
 let private runSimpleGit (operation: ISimpleGit -> JS.Promise<'T>) (git: ISimpleGit) : JS.Promise<GitResult<'T>> =
     GitInternals.runSimpleGit toFailure operation git
 
@@ -810,6 +839,7 @@ let pull
                         (fun git -> promise {
                             match safeBranchName with
                             | None ->
+                                do! ensureDefaultTrackingBranchForPull safeRemoteName git
                                 let! _ = git.pull (safeRemoteName)
                                 return ()
                             | Some safeBranch ->
