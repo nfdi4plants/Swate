@@ -8,6 +8,7 @@
     <Compile Include="Server.Tests.fs"/>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Electron\src\Main\Main.fsproj"/>
     <ProjectReference Include="..\..\src\Server\Server.fsproj"/>
     <ProjectReference Include="..\Shared\Shared.Tests.fsproj"/>
   </ItemGroup>

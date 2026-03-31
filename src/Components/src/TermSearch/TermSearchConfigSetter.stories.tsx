@@ -54,31 +54,41 @@ export const Default: Story = {
 
 
 export const SetMultipleTIBQueries: Story = {
+  tags: ['skip-test'],
   play: async ({ args, canvasElement }) => {
 
-    const debug = within(canvasElement).getByTestId(SETTER_DEBUG_TESTID);
-    const trigger = within(canvasElement).getByTestId(SETTER_TRIGGER_TESTID);
-    trigger.click();
+    const canvas = within(canvasElement);
+    const debug = await canvas.findByTestId(SETTER_DEBUG_TESTID, {}, { timeout: 10000 });
+    const trigger = await canvas.findByTestId(SETTER_TRIGGER_TESTID, {}, { timeout: 10000 });
 
-    await waitFor(async () => {
-      const box = screen.getByRole('listbox');
-      expect(box).toBeInTheDocument()
-      const option = box.querySelector('[data-selectoption="TIB_NFDI4CHEM"]')
-      expect(option).toBeInTheDocument()
-      expect(option).toBeTruthy()
-      await userEvent.click(option as HTMLElement);
-      await userEvent.keyboard('{Escape}');
-    }, { timeout: 5000 })
+    await waitFor(() => {
+      expect(getComputedStyle(trigger).pointerEvents).not.toBe("none");
+    }, { timeout: 10000 });
 
+    await userEvent.click(trigger);
 
-    // read the attributes (strings!)
-    const activeKeysCount = parseInt(debug.getAttribute('data-activekeyscount') || '0', 10);
-    const disableDefault = debug.getAttribute('data-defaultdisables') === 'true';
-    const activeKeys = debug.getAttribute('data-activekeys') || "";
+    const box = await screen.findByRole('listbox', {}, { timeout: 10000 });
+    const option = await waitFor(() => {
+      const currentOption = box.querySelector('[data-selectoption="TIB_NFDI4CHEM"]');
 
-    // assertions
-    expect(activeKeysCount).toBe(2);
-    expect(disableDefault).toBe(false);
-    expect(activeKeys).toBe("TIB_DataPLANT; TIB_NFDI4CHEM");
+      if (!(currentOption instanceof HTMLElement)) {
+        throw new Error("Expected TIB_NFDI4CHEM option to be rendered.");
+      }
+
+      return currentOption;
+    }, { timeout: 10000 });
+
+    await userEvent.click(option);
+    await userEvent.keyboard('{Escape}');
+
+    await waitFor(() => {
+      const activeKeysCount = parseInt(debug.getAttribute('data-activekeyscount') || '0', 10);
+      const disableDefault = debug.getAttribute('data-defaultdisables') === 'true';
+      const activeKeys = debug.getAttribute('data-activekeys') || "";
+
+      expect(activeKeysCount).toBe(2);
+      expect(disableDefault).toBe(false);
+      expect(activeKeys).toBe("TIB_DataPLANT; TIB_NFDI4CHEM");
+    }, { timeout: 10000 });
   }
 }

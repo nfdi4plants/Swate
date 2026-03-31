@@ -6,41 +6,67 @@ open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 
+open Swate.Components.Types.Actionbar
+
 [<Erase; Mangle(false)>]
 type Actionbar =
 
     [<ReactComponent>]
     static member Button
         (
-            icon: string,
-            tooltip: string,
-            (onClick: MouseEvent -> unit),
-            ?toolTipPosition: string,
+            buttonInfo: ButtonInfo,
+            buttonSize: DaisyuiSize,
+            tooltipPosition: DaisyuiTooltipPosition,
+            ?buttonClassName: string,
+            ?buttonTestId: string,
             ?debug: bool
         ) =
 
         let debug = defaultArg debug false
 
-        let toolTipPosition = defaultArg toolTipPosition "swt:tooltip-right"
+        let toolTipPosition =
+            match tooltipPosition with
+            | DaisyuiTooltipPosition.Top -> "swt:tooltip-top"
+            | DaisyuiTooltipPosition.Right -> "swt:tooltip-right"
+            | DaisyuiTooltipPosition.Bottom -> "swt:tooltip-bottom"
+            | DaisyuiTooltipPosition.Left -> "swt:tooltip-left"
 
-        Html.div [
-            prop.className $"swt:tooltip {toolTipPosition}"
-            prop.ariaLabel tooltip
-            if debug then
-                prop.testId "button-test"
-            prop.children [
-                Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
-                Html.button [
-                    prop.className [ "swt:btn swt:btn-square swt:btn-ghost swt:p-0" ]
-                    prop.children [
-                        Html.i [
-                            prop.className [ "swt:iconify " + icon ]
-                        ]
-                    ]
-                    prop.onClick (fun e -> onClick e)
+        let btnSize =
+            match buttonSize with
+            | DaisyuiSize.XS -> "swt:btn-xs"
+            | DaisyuiSize.SM -> "swt:btn-sm"
+            | DaisyuiSize.MD -> "swt:btn-md"
+            | DaisyuiSize.LG -> "swt:btn-lg"
+
+        let Button =
+            Html.button [
+                if debug then
+                    prop.testId "button-test"
+                prop.className [
+                    match buttonClassName with
+                    | Some customClass -> customClass
+                    | None -> "swt:btn swt:btn-primary swt:btn-square swt:btn-ghost"
+                    btnSize
+                ]
+                if buttonTestId.IsSome then
+                    prop.testId buttonTestId.Value
+                prop.children [
+                    Html.i [ prop.className [ "swt:iconify " + buttonInfo.icon ] ]
+                ]
+                prop.onClick (fun e -> buttonInfo.onClick e)
+            ]
+
+        match buttonInfo.toolTip with
+        | None -> Button
+        | Some tooltip ->
+            Html.div [
+                prop.className [ "swt:tooltip"; toolTipPosition ]
+                prop.ariaLabel tooltip
+                prop.children [
+                    Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
+                    Button
                 ]
             ]
-        ]
 
     static member MaterialIcon(icon: string, ?styling: bool) =
 
@@ -58,7 +84,10 @@ type Actionbar =
         let buttonElements =
             buttons
             |> Array.map (fun (button: ButtonInfo) ->
-                ContextMenuItem(Html.li [ prop.text button.toolTip ], Actionbar.MaterialIcon(button.icon))
+                ContextMenuItem(
+                    Html.li [ prop.text (Option.defaultValue "" button.toolTip) ],
+                    Actionbar.MaterialIcon(button.icon)
+                )
             )
             |> List.ofArray
 
@@ -77,7 +106,9 @@ type Actionbar =
     static member createMouseEvent (eventType: string) (options: obj) : MouseEvent = jsNative
 
     [<ReactComponent>]
-    static member RestElement(buttons: ButtonInfo[], maxNumber, ?debug: bool) =
+    static member RestElement
+        (buttons: ButtonInfo[], maxNumber, buttonSize, tooltipPosition, ?buttonClassName, ?debug: bool)
+        =
 
         let debug = defaultArg debug false
 
@@ -97,58 +128,109 @@ type Actionbar =
             element.dispatchEvent (event) |> ignore
 
         if buttons.Length > 0 && buttons.Length <= maxNumber + 1 then
-            Html.div []
+            Html.none
         else
+            let buttonInfo =
+                ButtonInfo.create (
+                    "swt:fluent--line-horizontal-1-dot-20-regular swt:size-5",
+                    "Show more options",
+                    (fun e ->
+                        match containerRef.current with
+                        | Some container -> fireOpenContextEvent container e.clientX e.clientY
+                        | None -> ()
+                    )
+                )
+
             Html.div [
                 prop.ref containerRef
                 if debug then
                     prop.testId "actionbar-test"
                 prop.children [
                     Actionbar.Button(
-                        "swt:fluent--line-horizontal-1-dot-24-regular swt:size-5",
-                        "Show more options",
-                        (fun e ->
-                            match containerRef.current with
-                            | Some container -> fireOpenContextEvent container e.clientX e.clientY
-                            | None -> ()
-                        ),
-                        debug = debug
+                        buttonInfo,
+                        buttonSize,
+                        tooltipPosition,
+                        ?buttonClassName = buttonClassName,
+                        debug = debug,
+                        buttonTestId = "actionbar-rest-button"
                     )
 
                     let restButtons = buttons.[maxNumber..] |> Array.map (fun button -> button)
 
-                    Actionbar.ContextMenu(containerRef, restButtons)
+                    Actionbar.ContextMenu(containerRef, restButtons, debug = debug)
                 ]
             ]
 
     [<ReactComponent>]
-    static member Main(buttons: ButtonInfo[], maxNumber: int, ?debug: bool) =
+    static member Main
+        (
+            buttons: ButtonInfo[],
+            maxNumber: int,
+            ?debug: bool,
+            ?barClassName: string,
+            ?buttonSize: DaisyuiSize,
+            ?tooltipPosition: DaisyuiTooltipPosition,
+            ?buttonClassName: string
+        ) =
 
         let debug = defaultArg debug false
+        let buttonSize = defaultArg buttonSize DaisyuiSize.MD
+        let tooltipPosition = defaultArg tooltipPosition DaisyuiTooltipPosition.Bottom
 
         let selectedElements =
             React.useMemo (
                 (fun _ ->
-                    let onClick button =
-                        fun (e: MouseEvent) -> button.onClick ()
-
                     if buttons.Length > 0 && buttons.Length > maxNumber + 1 then
                         Array.take maxNumber buttons
-                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, (onClick button)))
                     else
                         buttons
-                        |> Array.map (fun button -> Actionbar.Button(button.icon, button.toolTip, (onClick button)))
+                    |> Array.map (fun button ->
+                        Actionbar.Button(
+                            button,
+                            debug = debug,
+                            buttonSize = buttonSize,
+                            tooltipPosition = tooltipPosition,
+                            ?buttonClassName = buttonClassName
+                        )
+                    )
                 ),
-                [| buttons |]
+                [|
+                    buttons
+                    buttonSize
+                    tooltipPosition
+                    buttonClassName
+                    maxNumber
+                |]
             )
 
         let restElements =
-            React.useMemo ((fun _ -> Actionbar.RestElement(buttons, maxNumber, debug = debug)), [| buttons |])
+            React.useMemo (
+                (fun _ ->
+                    Actionbar.RestElement(
+                        buttons,
+                        maxNumber,
+                        buttonSize,
+                        tooltipPosition,
+                        ?buttonClassName = buttonClassName,
+                        debug = debug
+                    )
+                ),
+                [|
+                    buttons
+                    buttonSize
+                    tooltipPosition
+                    buttonClassName
+                    maxNumber
+                |]
+            )
 
         let selectedElement = React.Fragment selectedElements
 
         Html.div [
-            prop.className $"swt:flex swt:items-center swt:border swt:border-neutral swt:rounded-lg swt:w-max swt:p-1"
+            prop.className [
+                barClassName
+                |> Option.defaultValue "swt:flex swt:items-center swt:w-max swt:p-1"
+            ]
             prop.children [ selectedElement; restElements ]
         ]
 

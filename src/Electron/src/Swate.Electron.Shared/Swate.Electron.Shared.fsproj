@@ -6,11 +6,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="FileIOTypes.fs" />
+    <Compile Include="AuthTypes.fs" />
+    <Compile Include="GitTypes.fs" />
     <Compile Include="IPCTypes.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="FileIOHelper.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ARCtrl.Javascript" />
     <PackageReference Include="YAMLicious" />
     <PackageReference Include="Fable.Electron" />
     <PackageReference Include="Fable.Electron.Remoting" />

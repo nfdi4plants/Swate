@@ -1,6 +1,9 @@
-﻿namespace Swate.Electron.Shared
+namespace Swate.Electron.Shared
+
+open ARCtrl
+open ARCtrl.Json
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.FileIOTypes
 
 [<RequireQualifiedAccess>]
-type AppState =
-    | Init
-    | ARC of path: string
+type ArcRootPath = string option

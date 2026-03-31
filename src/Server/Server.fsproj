@@ -24,6 +24,7 @@
     <PackageReference Include="ARCtrl.Spreadsheet"/>
     <PackageReference Include="Saturn"/>
     <PackageReference Include="Fable.Remoting.Giraffe"/>
+    <PackageReference Include="Fable.Remoting.OpenAPI.Giraffe" />
     <PackageReference Include="Neo4j.Driver"/>
   </ItemGroup>
 </Project>

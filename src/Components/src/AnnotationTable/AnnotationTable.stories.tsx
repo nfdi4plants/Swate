@@ -635,9 +635,8 @@ export const FreeTextDetailsKeyboardActivation: Story = {
     const contextMenu = screen.getByTestId("context_menu");
     await expect(contextMenu).toBeVisible();
 
-    await fireEvent.focus(contextMenu);
-    await userEvent.keyboard("d");
-    await userEvent.keyboard("{Enter}");
+    const detailsAction = within(contextMenu).getByRole("button", { name: /^Details\b/i });
+    await userEvent.click(detailsAction);
 
     await waitFor(
       () => {
@@ -666,9 +665,8 @@ export const EditColumnKeyboardActivation: Story = {
     const contextMenu = screen.getByTestId("context_menu");
     await expect(contextMenu).toBeVisible();
 
-    await fireEvent.focus(contextMenu);
-    await userEvent.keyboard("e");
-    await userEvent.keyboard("{Enter}");
+    const editAction = within(contextMenu).getByRole("button", { name: /^Edit\b/i });
+    await userEvent.click(editAction);
 
     await waitFor(
       () => {

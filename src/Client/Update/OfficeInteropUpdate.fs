@@ -6,6 +6,8 @@ open Messages
 open OfficeInterop
 open OfficeInterop.Core
 open Model
+open Swate.Components.Shared
+open ARCtrl
 
 module OfficeInterop =
 
@@ -76,7 +78,7 @@ module OfficeInterop =
             //    state, model, nextCmd
 
             | ExportJson(arcfile, jef) ->
-                let jsonExport = UpdateUtil.JsonExportHelper.parseToJsonString (arcfile, jef)
+                let jsonExport = Json.Export.parseToJsonString (arcfile, jef)
                 UpdateUtil.downloadFromString (jsonExport)
                 state, model, Cmd.none
             | AddTemplates(tables, importType) ->

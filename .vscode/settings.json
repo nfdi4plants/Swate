@@ -24,5 +24,11 @@
         "editor.inlayHints.enabled": "off",
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "Ionide.Ionide-fsharp"
+    },
+    "chat.tools.terminal.autoApprove": {
+      "dotnet build": true,
+      "ForEach-Object": true,
+      "npx vitest": true,
+      "npm run test:run": true
     }
 }

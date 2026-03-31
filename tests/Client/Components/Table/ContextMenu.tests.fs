@@ -4,9 +4,29 @@ open Fable.Mocha
 open ARCtrl
 open Swate.Components
 open AnnotationTableContextMenu
+open Browser.Types
 open Fixture
 
 type TestCases =
+
+    static member private NoSelectionHandle() =
+        SelectHandle(
+            (fun _ -> false),
+            (fun _ -> ()),
+            (fun _ -> ()),
+            (fun _ -> None),
+            (fun _ -> ResizeArray()),
+            (fun _ -> 0)
+        )
+
+    static member private TriggerMenuItem (item: Swate.Components.ContextMenuItem) (spawnData: CellCoordinate) =
+        item.onClick
+        |> Option.iter (fun onClick ->
+            onClick {|
+                buttonEvent = unbox<MouseEvent> null
+                spawnData = box spawnData
+            |}
+        )
 
     static member AddColumns(selectHandle: SelectHandle, pasteData: string[][], expectedColumns: CompositeColumn[]) =
 
@@ -118,6 +138,75 @@ type TestCases =
             |})
             "Should predict paste fitted cells behavior"
 
+    static member HeaderDeleteFirstColumn() =
+        let table = Fixture.mkTable ()
+        let selectHandle = TestCases.NoSelectionHandle()
+        let originalColumnCount = table.ColumnCount
+        let mutable updatedTable = table
+
+        let menuItems =
+            AnnotationTableContextMenu.CompositeHeaderContent(
+                1,
+                table,
+                (fun nextTable -> updatedTable <- nextTable),
+                selectHandle,
+                ignore
+            )
+
+        TestCases.TriggerMenuItem menuItems.[6] {| x = 1; y = 0 |}
+
+        Expect.equal updatedTable.ColumnCount (originalColumnCount - 1) "Delete column should remove the first data column"
+        Expect.equal
+            updatedTable.Headers.[0]
+            (CompositeHeader.Output IOType.Data)
+            "After deleting first column, previous second column should become first"
+
+    static member IndexDeleteFirstRow() =
+        let table = Fixture.mkTable ()
+        let selectHandle = TestCases.NoSelectionHandle()
+        let originalRowCount = table.RowCount
+        let expectedFirstCellAfterDelete = table.GetCellAt(0, 1).ToTabStr()
+        let mutable updatedTable = table
+
+        let menuItems =
+            AnnotationTableContextMenu.IndexColumnContent(
+                1,
+                table,
+                (fun nextTable -> updatedTable <- nextTable),
+                selectHandle
+            )
+
+        TestCases.TriggerMenuItem menuItems.[0] {| x = 0; y = 1 |}
+
+        Expect.equal updatedTable.RowCount (originalRowCount - 1) "Delete row should remove the first data row"
+        Expect.equal
+            (updatedTable.GetCellAt(0, 0).ToTabStr())
+            expectedFirstCellAfterDelete
+            "After deleting first row, second row content should become first row"
+
+    static member HeaderMoveColumnUsesSelectedHeaderIndex() =
+        let table = Fixture.mkTable ()
+        let selectHandle = TestCases.NoSelectionHandle()
+        let mutable openedModal: AnnotationTable.ModalTypes option = None
+
+        let menuItems =
+            AnnotationTableContextMenu.CompositeHeaderContent(
+                1,
+                table,
+                ignore,
+                selectHandle,
+                (fun modal -> openedModal <- modal)
+            )
+
+        TestCases.TriggerMenuItem menuItems.[7] {| x = 1; y = 0 |}
+
+        match openedModal with
+        | Some(AnnotationTable.ModalTypes.MoveColumn(_, arcTableIndex)) ->
+            Expect.equal arcTableIndex.x 1 "Move column should target the first header column (1-based UI index)"
+            Expect.equal arcTableIndex.y 0 "Move column target should stay on header row"
+        | _ ->
+            failwith "Move column menu entry should open move-column modal"
+
 let Main =
 
     testList "Context Menu" [
@@ -206,5 +295,13 @@ let Main =
                 )
             testCase $"Add unknown value"
             <| fun _ -> TestCases.AddUnknownPattern([| [| "" |] |])
+        ]
+        testList "Regression" [
+            testCase "Header delete targets first column correctly"
+            <| fun _ -> TestCases.HeaderDeleteFirstColumn()
+            testCase "Index delete targets first row correctly"
+            <| fun _ -> TestCases.IndexDeleteFirstRow()
+            testCase "Header move column keeps 1-based header index"
+            <| fun _ -> TestCases.HeaderMoveColumnUsesSelectedHeaderIndex()
         ]
     ]

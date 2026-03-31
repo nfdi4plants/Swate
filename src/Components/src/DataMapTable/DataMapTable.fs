@@ -39,6 +39,8 @@ module private DatamapMemoComponents =
 [<Erase; Mangle(false)>]
 type DataMapTable =
 
+    static member SelectionContextKey = "__DATAMAP__"
+
     [<ReactComponent>]
     static member private ModalDetails
         (index: CellCoordinate, datamap: DataMap, setDatamap, setModal: Modal option -> unit)
@@ -308,6 +310,18 @@ type DataMapTable =
         let tableRef = React.useRef<TableHandle> (unbox null)
         let containerRef = React.useElementRef ()
         let defaultDebug = defaultArg debug false
+        let annotationTableCtx = React.useContext Contexts.AnnotationTable.AnnotationTableStateCtx
+        let hasAnnotationCtx = isNullOrUndefined annotationTableCtx |> not
+
+        let onSelect: GridSelect.OnSelect =
+            fun _ range ->
+                if hasAnnotationCtx then
+                    let nextDataMapCtx: Contexts.AnnotationTable.AnnotationTableContext = { SelectedCells = range }
+
+                    let nextData =
+                        annotationTableCtx.state.Add(DataMapTable.SelectionContextKey, nextDataMapCtx)
+
+                    annotationTableCtx.setState nextData
 
         let renderCell =
             (fun (index: CellCoordinate) ->
@@ -358,6 +372,7 @@ type DataMapTable =
                         renderActiveCell,
                         ref = tableRef,
                         ?height = height,
+                        onSelect = onSelect,
                         onKeydown =
                             (fun (e, selectedCells, activeCell) ->
                                 if

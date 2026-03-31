@@ -3,18 +3,18 @@ namespace Messages
 open Elmish
 open Model
 open Messages
-open Protocol
+open Messages.Protocol
 
-module Protocol =
+module ProtocolState =
 
     open Swate.Components.Shared
     open Fable.Core
 
     let update
-        (msg: Protocol.Msg)
-        (state: Protocol.Model)
+        (msg: Messages.Protocol.Msg)
+        (state: Model.Protocol.Model)
         (model: Model.Model)
-        : Protocol.Model * Model.Model * Cmd<Messages.Msg> =
+        : Model.Protocol.Model * Model.Model * Cmd<Messages.Msg> =
 
         match msg with
         | UpdateLoading next -> { state with Loading = next }, model, Cmd.none

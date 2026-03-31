@@ -38,76 +38,10 @@ let downloadFromString (filename, content: string) =
 //             datamapParent, datamap
 //         )
 
-module JsonGenericHelper =
-
-    let toFileName (id: string) (fileType: ArcFilesDiscriminate) (jsonType: JsonExportFormat) =
-        let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
-        let formatString = jsonType.ToString()
-        let fileTypeString = fileType.ToString()
-        n + "_" + fileTypeString + "_" + id + "_" + formatString + ".json"
-
-    let tryParseJsonFileName (fileName: string) =
-        if fileName.EndsWith(".json") then
-            let parts = fileName.Substring(0, fileName.Length - 5).Split("_")
-
-            let jsonFormat =
-                parts |> Array.tryPick (fun part -> JsonExportFormat.tryFromString part)
-
-            let arcfile =
-                parts |> Array.tryPick (fun part -> ArcFilesDiscriminate.tryFromString part)
-
-            match jsonFormat, arcfile with
-            | Some jf, Some af -> Some(jf, af)
-            | _ -> None
-        else
-            None
-
 module JsonImportHelper =
 
     open ARCtrl
     open FileImport
-
-    let tryParseFromJsonString
-        (
-            jsonString: string,
-            jsonType: JsonExportFormat option,
-            filetype: ArcFilesDiscriminate option,
-            fileName: string option
-        ) : ArcFiles option =
-        let assumedJsonType =
-            match jsonType, filetype with
-            | Some jt, Some ft -> (jt, ft) |> Some
-            | _, _ ->
-                match fileName with
-                | Some name ->
-                    let resOpt = JsonGenericHelper.tryParseJsonFileName name
-
-                    match resOpt with
-                    | Some(jf, af) -> Some(jf, af)
-                    | None -> None
-                | None -> None
-
-        match assumedJsonType with
-        | Some(jsonFormat, arcfileType) ->
-            let arcfile =
-                Spreadsheet.IO.Json.readFromJsonMap.[(arcfileType, jsonFormat)] jsonString
-
-            Some arcfile
-        | None -> None
-
-    let parseFromJsonString
-        (
-            jsonString: string,
-            jsonType: JsonExportFormat option,
-            filetype: ArcFilesDiscriminate option,
-            fileName: string option
-        ) : ArcFiles =
-        match tryParseFromJsonString (jsonString, jsonType, filetype, fileName) with
-        | Some arcfile -> arcfile
-        | None ->
-            failwith
-                "Error. Unable to find correct JSON format. This function relies on correct naming conventions for the file. We will improve this in the future. The file name must contain the json format, as well as the file type, separated by \"_\". Example: 'ARCtrlCompressed_Assay.json"
-
 
     /// <summary>
     ///
@@ -226,8 +160,8 @@ module JsonImportHelper =
                                     | CompositeHeader.Characteristic _ ->
                                         match importConfig.ImportType with
                                         | TableJoinOptions.WithUnit ->
-                                            CompositeCell.Unitized("", (OntologyAnnotation.empty()))
-                                        | _ -> CompositeCell.Term (OntologyAnnotation.empty())
+                                            CompositeCell.Unitized("", (OntologyAnnotation.empty ()))
+                                        | _ -> CompositeCell.Term(OntologyAnnotation.empty ())
                                     | _ -> CompositeCell.FreeText ""
                                 )
                                 |> ResizeArray
@@ -258,6 +192,7 @@ module JsonImportHelper =
                 )
                 |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
                 |> Seq.iter (fun table -> existingTables.Add table)
+
             existing
         | None -> //
             failwith "Error! Can only append information if metadata sheet exists!"
@@ -287,62 +222,3 @@ module JsonImportHelper =
             | Investigation _ -> ResizeArray()
 
         updateTables importTables importState activeTableIndex existingOpt
-
-module JsonExportHelper =
-    open ARCtrl
-    open ARCtrl.Json
-
-    /// <summary>
-    ///
-    /// </summary>
-    /// <param name="arcfile"></param>
-    /// <param name="jef"></param>
-    let parseToJsonString (arcfile: ArcFiles, jef: JsonExportFormat) =
-        let name, jsonString =
-            let nameFromId (id: string) =
-                JsonGenericHelper.toFileName id arcfile.RelatedArcFilesDiscriminate jef
-
-            match arcfile, jef with
-            | Investigation ai, JsonExportFormat.ARCtrl -> nameFromId ai.Identifier, ArcInvestigation.toJsonString 0 ai
-            | Investigation ai, JsonExportFormat.ARCtrlCompressed ->
-                nameFromId ai.Identifier, ArcInvestigation.toCompressedJsonString 0 ai
-            | Investigation ai, JsonExportFormat.ISA -> nameFromId ai.Identifier, ArcInvestigation.toISAJsonString 0 ai
-            | Investigation ai, JsonExportFormat.ROCrate ->
-                nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
-
-            | Study(as', _), JsonExportFormat.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
-            | Study(as', _), JsonExportFormat.ARCtrlCompressed ->
-                nameFromId as'.Identifier, ArcStudy.toCompressedJsonString 0 (as')
-            | Study(as', aaList), JsonExportFormat.ISA ->
-                nameFromId as'.Identifier, ArcStudy.toISAJsonString (aaList, 0) (as')
-            | Study(as', aaList), JsonExportFormat.ROCrate ->
-                nameFromId as'.Identifier, ArcStudy.toROCrateJsonString (aaList, 0) (as')
-
-            | Assay aa, JsonExportFormat.ARCtrl -> nameFromId aa.Identifier, ArcAssay.toJsonString 0 aa
-            | Assay aa, JsonExportFormat.ARCtrlCompressed ->
-                nameFromId aa.Identifier, ArcAssay.toCompressedJsonString 0 aa
-            | Assay aa, JsonExportFormat.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
-            | Assay aa, JsonExportFormat.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
-
-            | Template t, JsonExportFormat.ARCtrl -> nameFromId t.FileName, Template.toJsonString 0 t
-            | Template t, JsonExportFormat.ARCtrlCompressed ->
-                nameFromId t.FileName, Template.toCompressedJsonString 0 t
-            | Template _, anyElse ->
-                failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
-
-            | Run r, JsonExportFormat.ARCtrl -> nameFromId r.Identifier, ArcRun.toJsonString 0 r
-            | Run r, JsonExportFormat.ARCtrlCompressed -> nameFromId r.Identifier, ArcRun.toCompressedJsonString 0 r
-            | Run _, anyElse -> failwithf "Error. It is not intended to parse Run to %s format." (string anyElse)
-
-            | Workflow w, JsonExportFormat.ARCtrl -> nameFromId w.Identifier, ArcWorkflow.toJsonString 0 w
-            | Workflow w, JsonExportFormat.ARCtrlCompressed ->
-                nameFromId w.Identifier, ArcWorkflow.toCompressedJsonString 0 w
-            | Workflow _, anyElse ->
-                failwithf "Error. It is not intended to parse Workflow to %s format." (string anyElse)
-
-            | DataMap(_, d), JsonExportFormat.ARCtrl -> nameFromId "", DataMap.toJsonString 0 d
-            | DataMap(_), anyElse ->
-                failwithf "Error. It is not intended to parse Datamap to %s format." (string anyElse)
-        // | _ -> failwith $"Error, the selected type {arcfile} is not supported to be exported." //Have to implement the logic for run when toJsonString has been implemented for it
-
-        name, jsonString

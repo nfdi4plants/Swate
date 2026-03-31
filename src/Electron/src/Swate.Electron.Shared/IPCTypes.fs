@@ -1,143 +1,108 @@
+/// This module SHOULD only contain the exact IPC communication types.
 module Swate.Electron.Shared.IPCTypes
 
-open System.Collections.Generic
-open Fable.Core // Promise type
+open Fable.Core
 open Fable.Electron
 
 open Swate.Components
-open ARCtrl
+open Swate.Components.NoteTypes
 
-[<RequireQualifiedAccess>]
-type ArcFileType =
-    | Investigation
-    | Study
-    | Assay
-    | Run
-    | Workflow
-    | DataMap
+open ARCtrl.ARCtrlHelper
+open AuthTypes
+open GitTypes
+open FileIOTypes
 
-type PreviewData =
-    | ArcFileData of fileType: ArcFileType * json: string
-    | Text of string
-    | Unknown
+module IPCTypesHelper =
 
-[<RequireQualifiedAccess>]
-type ExperimentTarget =
-    | Study
-    | Assay
+    [<RequireQualifiedAccess>]
+    type SaveBeforeQuitDecision =
+        | SaveAndClose
+        | CloseWithoutSaving
+        | CancelClose
 
-type ExperimentMetadata =
-    {
-        Identifier: string option
-        Title: string
-        Description: string
-        InvolvedPeople: string []
-        Comments: string []
-        MainText: string option
-        Files: string []
-        Publications: string []
-        SubmissionDate: string option
-        PublicReleaseDate: string option
-        StudyDesignDescriptors: string []
-        MeasurementType: string option
-        TechnologyType: string option
-        TechnologyPlatform: string option
-    }
-
-type CreateExperimentRequest =
-    {
-        Metadata: ExperimentMetadata
-        Target: ExperimentTarget
-    }
-
-type CreateExperimentResponse =
-    {
-        PreviewData: PreviewData
-        CreatedIdentifier: string
-        ProtocolPath: string option
-    }
-
-type SaveArcFileRequest =
-    {
-        FileType: ArcFileType
-        Json: string
-    }
+open IPCTypesHelper
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
-    /// Will open ARC in same window
+    /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
     openARC: IpcMainEvent -> JS.Promise<Result<string, exn>>
+    /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
+    openARCByPath: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    /// Create ARC via folder dialog. Main decides disposition.
     createARC: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
-    focusExistingARCWindow: string -> JS.Promise<Result<unit, exn>>
-    /// Will open ARC in a new window
-    openARCInNewWindow: unit -> JS.Promise<Result<unit, exn>>
-    createARCInNewWindow: string -> JS.Promise<Result<unit, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
-    getRecentARCs: unit -> JS.Promise<Swate.Components.Types.SelectorTypes.ARCPointer []>
-    checkForARC: string -> JS.Promise<bool>
-    openFile: IpcMainEvent -> string -> JS.Promise<Result<PreviewData, exn>>
-    createExperimentFromLanding:
-        IpcMainEvent -> CreateExperimentRequest -> JS.Promise<Result<CreateExperimentResponse, exn>>
-    saveArcFile: IpcMainEvent -> SaveArcFileRequest -> JS.Promise<Result<PreviewData, exn>>
+    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
+    removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
+
+    pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
+    openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
+    readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
+    /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
+    saveArcFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
+    writeFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
+    runGitLfs: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
+    cancelGitLfs: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
 }
 
-type FileEntry =
-    {
-        name: string
-        path: string
-        isDirectory: bool
-    }
+type IGitLfsApi = {
+    runChannel: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
+    cancelChannel: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+}
 
-[<AutoOpen>]
-module FileEntryExtensions =
-
-    let createFileEntryTree(fileEntries: FileEntry []) =
-        let dic = Dictionary<string, FileEntry>()
-        fileEntries
-        |> Array.iter (fun fileEntry -> dic.Add(fileEntry.path, fileEntry))
-        dic
-
-    type FileEntry with
-
-        static member create (name: string, path: string, isDirectory: bool) =
-            {
-                name = name
-                path = path
-                isDirectory = isDirectory
-            }
-
-type FileItemDTO =
-    {
-        name: string
-        isDirectory: bool
-        path: string
-        children: Dictionary<string, FileItemDTO>
-    }
-
-[<AutoOpen>]
-module FileItemDTOExtensions =
-
-    type FileItemDTO with
-
-        static member create (name: string, isDirectory: bool, path: string, children: Dictionary<string, FileItemDTO>) =
-            {
-                name = name
-                isDirectory = isDirectory
-                path = path
-                children = children
-            }
+/// Two Way Bridge: Renderer <-> Main
+type IGitApi = {
+    getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
+    getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
+    getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
+    gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitInitRepository: IpcMainEvent -> string -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCloneRepository: IpcMainEvent -> GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitStagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitUnstagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    createBranch: IpcMainEvent -> GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+}
 
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
-    recentARCsUpdate: ARCPointer [] -> unit
+    recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
+    authAccountsUpdate: AuthAccountSummary[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
-}
+    gitProgressUpdate: GitProgressDto -> unit
+} with
 
-// Todo: What should filewatcher do when detecting changes?
+    static member empty = {
+        pathChange = ignore
+        recentARCsUpdate = ignore
+        authAccountsUpdate = ignore
+        fileTreeUpdate = ignore
+        gitProgressUpdate = ignore
+    }
+
+// TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer
 type IArcFileWatcherApi = {
     /// This function is called when ARC is reloaded due to local file changes.
     IsLoadingChanges: bool -> unit
+}
+
+type IMainSaveBeforeQuitApi = { requestSaveBeforeQuit: unit -> unit }
+
+/// Two Way Bridge: Renderer <-> Main
+type IAuthApi = {
+    signIn: AuthSignInRequest -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
+    getAuthState: unit -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
+    signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
+    revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
+    listAccounts: unit -> Fable.Core.JS.Promise<Result<AuthAccountSummary array, exn>>
+    setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
+    removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
 }

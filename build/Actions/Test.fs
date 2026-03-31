@@ -32,6 +32,21 @@ let Watch () =
                 "--watch"
             ]
             ProjectPaths.clientTestsPath
+        runAsync
+            "electron-core"
+            "dotnet"
+            [
+                "fable"
+                "watch"
+                "-o"
+                "output"
+                "-s"
+                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                "--run"
+                "npx"
+                "vitest"
+            ]
+            ProjectPaths.electronCoreTestsPath
         runAsync "components" "npm" [ "run"; "test" ] ProjectPaths.componentTestsPath
     ]
     |> runParallel
@@ -56,6 +71,21 @@ let WatchJs () =
                 "--parallel"
             ]
             ProjectPaths.clientTestsPath
+        runAsync
+            "electron-core"
+            "dotnet"
+            [
+                "fable"
+                "watch"
+                "-o"
+                "output"
+                "-s"
+                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                "--run"
+                "npx"
+                "vitest"
+            ]
+            ProjectPaths.electronCoreTestsPath
     ]
     |> runParallel
 
@@ -79,32 +109,56 @@ module Run =
             ]
             ProjectPaths.clientTestsPath
 
+    let electronCore =
+        runAsync
+            "electron-core"
+            "dotnet"
+            [
+                "fable"
+                "-o"
+                "output"
+                "-s"
+                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                "--run"
+                "npx"
+                "vitest"
+                "run"
+            ]
+            ProjectPaths.electronCoreTestsPath
+
     let components =
         runAsync "components" "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
 
-    let All () = async {
-        printGreenfn "Running all tests..."
-        printGreenfn "Running server tests..."
-        let! serverResult = server
-        printGreenfn "Running client tests..."
-        let! clientResult = client
-        printGreenfn "Running component tests..."
-        let! componentsResult = components
+    let All () =
+        async {
+            printGreenfn "Running all tests..."
+            printGreenfn "Running server tests..."
+            let! serverResult = server
+            printGreenfn "Running client tests..."
+            let! clientResult = client
+            printGreenfn "Running electron core tests..."
+            let! electronCoreResult = electronCore
+            printGreenfn "Running component tests..."
+            let! componentsResult = components
 
-        match serverResult, clientResult, componentsResult with
-        | Ok(), Ok(), Ok() ->
-            printGreenfn "All tests passed!"
-            exit 0
-        | _ ->
-            if serverResult.IsError then
-                printRedfn "Server tests failed."
+            match serverResult, clientResult, electronCoreResult, componentsResult with
+            | Ok(), Ok(), Ok(), Ok() ->
+                printGreenfn "All tests passed!"
+                exit 0
+            | _ ->
+                if serverResult.IsError then
+                    printRedfn "Server tests failed."
 
-            if clientResult.IsError then
-                printRedfn "Client tests failed."
+                if clientResult.IsError then
+                    printRedfn "Client tests failed."
 
-            if componentsResult.IsError then
-                printRedfn "Component tests failed."
+                if electronCoreResult.IsError then
+                    printRedfn "Electron core tests failed."
 
-            exit 1
+                if componentsResult.IsError then
+                    printRedfn "Component tests failed."
 
-    }
+                exit 1
+
+        }
+        |> Async.RunSynchronously

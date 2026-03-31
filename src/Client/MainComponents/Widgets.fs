@@ -10,7 +10,7 @@ open Swate.Components
 open ARCtrl
 open BuildingBlock.SearchComponent
 
-module private InitExtensions =
+module InitExtensions =
 
     type Rect with
 
@@ -30,8 +30,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Protocol
 open Model
+open Messages
 
-module private MoveEventListener =
+module MoveEventListener =
 
     open Fable.Core.JsInterop
 
@@ -65,7 +66,7 @@ module private MoveEventListener =
             let position = { X = int rect.left; Y = int rect.top }
             Position.write (prefix, position)
 
-module private ResizeEventListener =
+module ResizeEventListener =
 
     open Fable.Core.JsInterop
 
@@ -248,7 +249,7 @@ type Widget =
                         Browser.Dom.document.addEventListener ("mouseup", onmouseup, config)
                     )
                     prop.className
-                        "swt:cursor-move swt:flex swt:justify-end swt:bg-gradient-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
+                        "swt:cursor-move swt:flex swt:justify-end swt:bg-linear-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
                         Components.Components.DeleteButton(
                             className = "swt:btn-ghost swt:bg-primary/30",
@@ -293,11 +294,76 @@ type Widget =
         let prefix = WidgetLiterals.FilePicker
         Widget.Base(content, prefix, rmv, prefix)
 
-    static member DataAnnotator(model, dispatch, rmv) =
+    [<ReactComponent>]
+    static member DataAnnotator(model: Model, dispatch, rmv) =
+        let inputRef = React.useInputRef ()
+
+        let pendingPickResolve =
+            React.useRef (None: (Result<ImportedTextFile[], string> -> unit) option)
+
+        let activeView =
+            match model.SpreadsheetModel.ActiveView with
+            | Spreadsheet.ActivePattern.IsTable -> WidgetHostView.TableView
+            | Spreadsheet.ActivePattern.IsDataMap -> WidgetHostView.DataMapView
+            | Spreadsheet.ActivePattern.IsMetadata -> WidgetHostView.MetadataView
+
+        let setArcFileState nextArcFileState =
+            match nextArcFileState with
+            | Some nextArcFile -> nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
+            | None -> ()
+
+        let services =
+            React.useMemo (
+                (fun _ -> {
+                    pickTextFiles =
+                        fun () ->
+                            Promise.create (fun resolve _ ->
+                                pendingPickResolve.current <- Some resolve
+
+                                match inputRef.current with
+                                | Some input ->
+                                    input.value <- ""
+                                    input.click ()
+                                | None ->
+                                    pendingPickResolve.current <- None
+                                    resolve (Result.Error "Browser file input is unavailable.")
+                            )
+                }),
+                [||]
+            )
+
         let content =
             Html.div [
                 prop.className "swt:min-w-80"
-                prop.children [ Pages.DataAnnotator.Main(model, dispatch) ]
+                prop.children [
+                    Html.input [
+                        prop.type'.file
+                        prop.className "swt:hidden"
+                        prop.accept ".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
+                        prop.ref inputRef
+                        prop.onChange (fun (file: Browser.Types.File) ->
+                            promise {
+                                let! content = file.text ()
+
+                                pendingPickResolve.current
+                                |> Option.iter (fun resolve ->
+                                    resolve (Result.Ok [| { Name = file.name; Content = content } |])
+                                )
+
+                                pendingPickResolve.current <- None
+                            }
+                            |> Promise.start
+                        )
+                    ]
+                    if model.SpreadsheetModel.ArcFile.IsSome then
+                        Swate.Components.DataAnnotatorWidget.Main(
+                            model.SpreadsheetModel.ArcFile.Value,
+                            activeView,
+                            model.SpreadsheetModel.ActiveView.TryTableIndex,
+                            (Some >> setArcFileState),
+                            services
+                        )
+                ]
             ]
 
         let prefix = WidgetLiterals.DataAnnotator

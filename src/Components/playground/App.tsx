@@ -1,20 +1,29 @@
-import React, { Fragment, useEffect } from 'react';
+import React, { Fragment } from 'react';
 import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
 import {Entry as Table} from '../src/Table/Table.fs.ts';
 import {Entry as AnnotationTable} from '../src/AnnotationTable/AnnotationTable.fs.ts';
 import AnnotationTableCtxProvider from '../src/AnnotationTable/AnnotationTableContextProvider.fs.ts';
 import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
-import {TIBApi} from '../src/Util/Api.fs.ts';
+import {TIBApi} from '../src/Api/TIBApi.fs.ts';
 import {Entry as TemplateFilter} from '../src/Template/TemplateFilter.fs.ts';
 import {Entry as ComboBox} from '../src/GenericComponents/ComboBox.fs.ts';
 import {Entry as Select} from '../src/GenericComponents/Select.fs.ts';
 import {Entry as BaseModal} from '../src/GenericComponents/BaseModal.fs.ts';
+import { Wizard as LandingWizard } from '../src/Landing/Landing.fs.ts';
+import { Exports_createLandingDraft as createLandingDraft, Exports_createLandingUiState as createLandingUiState } from '../src/Landing/Types.fs.ts';
 import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/TermSearchConfigProvider.fs.ts';
 import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
 import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
 import {Entry as Layout} from '../src/Layout/Layout.fs.js'
 import {FileExplorerExample_Example} from '../src/FileExplorer/FileExplorer.fs.ts'
+import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
+import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.fs.ts'
+import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
+import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
+// import {Entry as DataHubSidebarEntry} from '../src/DataHub/DataHubSidebar.fs.ts';
+import {GitLabEntry as DataHubBrowser} from '../src/DataHub/DataHubBrowser.fs.ts';
+import {Entry as ARCSelectorEntry} from '../src/ARCSelector/Selector.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -150,20 +159,72 @@ function FileExplorerContainer() {
   </div>
 }
 
+function WidgetControllerContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Widget Controller</h2>
+    <WidgetController />
+  </div>
+}
+
+function LandingContainer() {
+  const [draft, setDraft] = React.useState(createLandingDraft());
+  const [uiState, setUiState] = React.useState(createLandingUiState());
+
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Landing</h2>
+    <LandingWizard
+      draft={draft}
+      setDraft={setDraft}
+      uiState={uiState}
+      setUiState={setUiState}
+      onSubmit={(payload) => console.log('Landing submit payload', payload)}
+    />
+  </div>
+}
+
+function MarkdownTextContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Markdown Editor</h2>
+    <TextInputWithMarkdown />
+  </div>
+}
+
+function AuthButtonContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>Authentication Button</h2>
+    <AuthButton />
+  </div>
+}
+
+// function DataHubSidebarContainer() {
+//   return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+//     <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Sidebar</h2>
+//     <DataHubSidebarEntry />
+//   </div>
+// }
+
+function DataHubBrowserContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Browser</h2>
+    <DataHubBrowser />
+  </div>
+}
+
+function ARCSelectorContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>ARC Selector</h2>
+    <ARCSelectorEntry />
+  </div>
+}
+
 const App = () => {
     return (
         <Layout />
-        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-4 swt:mb-12">
-        //     <h1 className='swt:text-6xl'>Playground</h1>
-        //     <AnnoTableContainer />
-        //     {/* <DataMapTableContainer /> */}
-        //     {/* <TermSearchContainer /> */}
-        //     {/* <BaseModalContainer /> */}
-        //     {/* <ComboBoxContainer /> */}
-        //     {/* <TemplateFilterContainer /> */}
-        //     {/* <SelectContainer /> */}
-        //     {/* <ContextMenuContainer /> */}
-        //     {/* <TableContainer /> */}
+        // <AuthButtonContainer />
+        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
+        //     <NoteSearch />
+        //     <MarkdownTextContainer />
+        //     <LandingContainer />
         // </div>
     );
 };

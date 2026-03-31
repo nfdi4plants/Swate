@@ -1,208 +1,243 @@
-module Main.IPC.IArcVaultsApi
+module Main.IPC.ArcVaultsApi
 
-open Fable.Electron
+open System
+open Swate.Components
+open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
-open Fable.Electron.Main
+open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open Fable.Core
+open Fable.Electron
+open Fable.Electron.Main
 open Fable.Core.JsInterop
 open Main
 open Node.Api
 open ARCtrl
 open ARCtrl.Json
-open System
-open System.Text.RegularExpressions
 
-let private fsDynamic: obj = importAll "fs"
 
-let private toNonEmptyOption (value: string option) =
-    value
-    |> Option.bind (fun s ->
-        let trimmed = s.Trim()
-        if String.IsNullOrWhiteSpace trimmed then None else Some trimmed
-    )
+let private fsPromisesDynamic: obj = importAll "fs/promises"
+let private pathDynamic: obj = importAll "path"
 
-let private normalizeStringArray (values: string []) =
-    values
-    |> Array.map (fun s -> s.Trim())
-    |> Array.filter (String.IsNullOrWhiteSpace >> not)
+[<RequireQualifiedAccess>]
+module ArcPathValidation =
 
-let private sanitizeIdentifierCandidate (candidate: string) =
-    let cleaned = Regex.Replace(candidate, @"[^a-zA-Z0-9_\- ]", " ").Trim()
-    let collapsed = Regex.Replace(cleaned, @"\s+", " ").Trim()
-    if String.IsNullOrWhiteSpace collapsed then
-        "Experiment"
+    let normalizePathForComparison (pathValue: string) =
+        pathValue.Replace("\\", "/").Trim().TrimEnd('/').ToLowerInvariant()
+
+    let containsTraversalSegments (pathValue: string) =
+        pathValue.Split('/')
+        |> Array.exists (fun segment -> segment = "." || segment = "..")
+
+    let isSafeRelativePathCandidate (pathValue: string) =
+        let normalizedPath = FileIOHelper.normalizePath pathValue
+
+        not (String.IsNullOrWhiteSpace normalizedPath)
+        && normalizedPath <> "."
+        && not (pathDynamic?isAbsolute (normalizedPath) |> unbox<bool>)
+        && not (containsTraversalSegments normalizedPath)
+
+    let isWithinRootPath (rootPath: string) (candidatePath: string) =
+        let normalizedRootPath =
+            pathDynamic?resolve (rootPath)
+            |> unbox<string>
+            |> normalizePathForComparison
+
+        let normalizedCandidatePath =
+            pathDynamic?resolve (candidatePath)
+            |> unbox<string>
+            |> normalizePathForComparison
+
+        normalizedCandidatePath = normalizedRootPath
+        || normalizedCandidatePath.StartsWith(normalizedRootPath + "/")
+
+let private tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
+    let arcRoot = pathDynamic?resolve (arcPath) |> unbox<string>
+    let absolutePath = pathDynamic?resolve (requestedAbsolutePath) |> unbox<string>
+
+    let relativePath =
+        pathDynamic?relative (arcRoot, absolutePath)
+        |> unbox<string>
+        |> FileIOHelper.normalizePath
+
+    if String.IsNullOrWhiteSpace relativePath || relativePath = "." then
+        Ok ""
+    elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
+        Error(exn $"Path '{requestedAbsolutePath}' is outside the active ARC root.")
+    elif not (ArcPathValidation.isWithinRootPath arcRoot absolutePath) then
+        Error(exn $"Path '{requestedAbsolutePath}' is outside the active ARC root.")
     else
-        collapsed
+        Ok relativePath
 
-let private generateSafeIdentifierFromTitle (title: string) =
-    let sanitized =
-        title
-        |> sanitizeIdentifierCandidate
-        |> fun value -> Regex.Replace(value, @"\s+", "_").Trim([| '_'; '-' |])
+/// This function resolves a given relative path against the ARC root path and ensures that the resolved absolute path is within the ARC root directory to prevent unauthorized file system access.
+let private tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) =
+    let relativePath = FileIOHelper.normalizePath requestedRelativePath
 
-    let candidate =
-        if String.IsNullOrWhiteSpace sanitized then
-            "Experiment"
+    if String.IsNullOrWhiteSpace relativePath then
+        Error(exn "RelativePath must not be empty.")
+    elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
+        if pathDynamic?isAbsolute (relativePath) |> unbox<bool> then
+            Error(exn "RelativePath must not be absolute.")
         else
-            sanitized
-
-    if ARCtrl.Helper.Identifier.tryCheckValidCharacters candidate then
-        candidate
+            Error(exn "RelativePath must not contain path traversal segments.")
     else
-        "Experiment"
+        let arcRoot = pathDynamic?resolve (arcPath) |> unbox<string>
+        let absolutePath = pathDynamic?resolve (arcRoot, relativePath) |> unbox<string>
 
-let private resolveIdentifier (metadata: ExperimentMetadata) =
-    match toNonEmptyOption metadata.Identifier with
-    | Some id -> id
-    | None -> generateSafeIdentifierFromTitle metadata.Title
+        if ArcPathValidation.isWithinRootPath arcRoot absolutePath then
+            Ok absolutePath
+        else
+            Error(exn "RelativePath resolves outside the ARC root.")
 
-let private parsePersons (values: string []) =
-    values
-    |> normalizeStringArray
-    |> Array.map Person.fromJsonString
-    |> ResizeArray
+let private mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> = promise {
+    let mkdirPromise =
+        fsPromisesDynamic?mkdir (directoryPath, createObj [ "recursive" ==> true ])
+        |> unbox<JS.Promise<obj>>
 
-let private parseComments (values: string []) =
-    values
-    |> normalizeStringArray
-    |> Array.map Comment.fromJsonString
-    |> ResizeArray
+    let! _ = mkdirPromise
+    return ()
+}
 
-let private parsePublications (values: string []) =
-    values
-    |> normalizeStringArray
-    |> Array.map Publication.fromJsonString
-    |> ResizeArray
+let private writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Promise<unit> = promise {
+    let writePromise =
+        fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
+        |> unbox<JS.Promise<obj>>
 
-let private parseOntologyAnnotations (values: string []) =
-    values
-    |> normalizeStringArray
-    |> Array.map OntologyAnnotation.fromJsonString
-    |> ResizeArray
+    let! _ = writePromise
+    return ()
+}
 
-let private parseOntologyOption (value: string option) =
-    value
-    |> toNonEmptyOption
-    |> Option.map OntologyAnnotation.fromJsonString
+let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
+    fsPromisesDynamic?readFile (absolutePath, "utf8")
+    |> unbox<JS.Promise<string>>
 
-let private fillInputColumnIfFilesExist (table: ArcTable) (files: string []) =
-    let normalizedFiles = normalizeStringArray files
+open ARCtrl.Contract
 
-    if normalizedFiles.Length > 0 then
-        if table.TryGetInputColumn().IsNone then
-            table.AddColumn(CompositeHeader.Input IOType.Data)
-
-        let rows =
-            normalizedFiles
-            |> Array.map (fun fileName ->
-                ResizeArray [ CompositeCell.createDataFromString(fileName) ]
-            )
-            |> ResizeArray
-
-        table.AddRows(rows)
-
-let private createProtocolFile
-    (arcRootPath: string)
-    (target: ExperimentTarget)
-    (identifier: string)
-    (mainText: string option)
-    =
-    match toNonEmptyOption mainText with
-    | None -> None
-    | Some content ->
-        let entityFolder =
-            match target with
-            | ExperimentTarget.Study -> "studies"
-            | ExperimentTarget.Assay -> "assays"
-
-        let relativePath = $"{entityFolder}/{identifier}/protocols/{identifier}_protocol.md"
-        let entityPath = path.join (path.join (arcRootPath, entityFolder), identifier)
-        let protocolDir = path.join (entityPath, "protocols")
-        let absolutePath = path.join (protocolDir, $"{identifier}_protocol.md")
-
-        fsDynamic?mkdirSync(protocolDir, createObj [ "recursive" ==> true ]) |> ignore
-        fsDynamic?writeFileSync(absolutePath, content, "utf8") |> ignore
-
-        Some relativePath
-
-let private copyInvestigationMetadata (source: ArcInvestigation) (target: ARC) =
-    target.Title <- source.Title
-    target.Description <- source.Description
-    target.Contacts <- source.Contacts
-    target.Publications <- source.Publications
-    target.SubmissionDate <- source.SubmissionDate
-    target.PublicReleaseDate <- source.PublicReleaseDate
-    target.OntologySourceReferences <- source.OntologySourceReferences
-    target.Comments <- source.Comments
-
-let private applyArcFileSaveRequest (arc: ARC) (request: SaveArcFileRequest) : Result<PreviewData, exn> =
+/// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO. It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
+let setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: DataMap) : Result<unit, exn> =
     try
-        match request.FileType with
-        | ArcFileType.Investigation ->
-            let investigation = ArcInvestigation.fromJsonString request.Json
-            copyInvestigationMetadata investigation arc
-            Ok(ArcFileData(ArcFileType.Investigation, ArcInvestigation.toJsonString 0 arc))
-        | ArcFileType.Study ->
-            let study = ArcStudy.fromJsonString request.Json
+        match dmpi.Parent with
+        | DataMapParent.Study ->
+            arc.TryGetStudy dmpi.ParentId
+            |> Option.iter (fun study ->
+                if study.DataMap.IsSome then
+                    dm.StaticHash <- study.DataMap.Value.StaticHash
 
-            if arc.TryGetStudy(study.Identifier).IsNone then
-                Error(exn $"Study '{study.Identifier}' not found in ARC.")
-            else
-                arc.SetStudy(study.Identifier, study)
-                Ok(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
-        | ArcFileType.Assay ->
-            let assay = ArcAssay.fromJsonString request.Json
+                study.DataMap <- Some dm
+            )
 
-            if arc.TryGetAssay(assay.Identifier).IsNone then
-                Error(exn $"Assay '{assay.Identifier}' not found in ARC.")
-            else
-                arc.SetAssay(assay.Identifier, assay)
-                Ok(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
-        | ArcFileType.Run ->
-            let run = ArcRun.fromJsonString request.Json
+            Ok()
+        | DataMapParent.Assay ->
+            arc.TryGetAssay dmpi.ParentId
+            |> Option.iter (fun assay ->
+                if assay.DataMap.IsSome then
+                    dm.StaticHash <- assay.DataMap.Value.StaticHash
 
-            if arc.TryGetRun(run.Identifier).IsNone then
-                Error(exn $"Run '{run.Identifier}' not found in ARC.")
-            else
-                arc.SetRun(run.Identifier, run)
-                Ok(ArcFileData(ArcFileType.Run, ArcRun.toJsonString 0 run))
-        | ArcFileType.Workflow ->
-            let workflow = ArcWorkflow.fromJsonString request.Json
+                assay.DataMap <- Some dm
+            )
 
-            if arc.TryGetWorkflow(workflow.Identifier).IsNone then
-                Error(exn $"Workflow '{workflow.Identifier}' not found in ARC.")
-            else
-                arc.SetWorkflow(workflow.Identifier, workflow)
-                Ok(ArcFileData(ArcFileType.Workflow, ArcWorkflow.toJsonString 0 workflow))
-        | ArcFileType.DataMap ->
-            Error(exn "Saving DataMap preview is not supported yet in Electron.")
+            Ok()
+        | DataMapParent.Workflow ->
+            arc.TryGetWorkflow dmpi.ParentId
+            |> Option.iter (fun workflow ->
+                if workflow.DataMap.IsSome then
+                    dm.StaticHash <- workflow.DataMap.Value.StaticHash
+
+                workflow.DataMap <- Some dm
+            )
+
+            Ok()
+        | DataMapParent.Run ->
+            arc.TryGetRun dmpi.ParentId
+            |> Option.iter (fun run ->
+                if run.DataMap.IsSome then
+                    dm.StaticHash <- run.DataMap.Value.StaticHash
+
+                run.DataMap <- Some dm
+            )
+
+            Ok()
     with e ->
-        Error e
+        Error(exn $"Failed to set datamap on ARC: {e.Message}")
 
-let private persistArcChangesAndRefreshVault
-    (vault: ArcVault)
-    (arc: ARC)
-    (arcPath: string)
-    (afterArcPersist: unit -> unit)
-    =
-    promise {
-        vault.isBusyWriting <- true
+/// This function should only be used for partial updated to an ARC based on a file content DTO.
+let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, exn> =
+    let arcfile = FileContentDTO.toArcFile dto
 
-        try
-            // Persist only changed ISA contracts (not full filesystem rewrite).
-            do! arc.UpdateAsync(arcPath)
-            afterArcPersist ()
-            do! vault.LoadArc()
+    match arcfile with
+    | None -> Error(exn $"Unsupported file type for saving: {dto.fileType}")
+    | Some arcfile ->
+        match arcfile with
+        // if we get a investigation we are only interested in updating the investigation part of the ARC, so we can avoid deserializing and reserializing the whole ARC which is costly for large ARCs.
+        // This only works under the assumption, that we did not in fact do any changes to assay, study, ... . These reused from the existing Investigation
+        | ArcFiles.Investigation newInvestigation ->
+            newInvestigation.Assays <- oldArc.Assays
+            newInvestigation.Studies <- oldArc.Studies
+            newInvestigation.Runs <- oldArc.Runs
+            newInvestigation.Workflows <- oldArc.Workflows
 
-            let fileTree = getFileEntries arcPath |> createFileEntryTree
-            vault.SetFileTree(fileTree)
-        finally
-            vault.isBusyWriting <- false
-    }
+            let newArc =
+                ARC.fromArcInvestigation (newInvestigation, oldArc.FileSystem, ?license = oldArc.License)
+
+            newArc.StaticHash <- oldArc.StaticHash
+            Ok newArc
+        | ArcFiles.DataMap(dmpiOpt, dm) ->
+            match dmpiOpt with
+            | None -> Error(exn "DataMap file must include datamap parent info in its path for saving.")
+            | Some dmpi ->
+                match setDataMapByParentInfo oldArc dmpi dm with
+                | Ok() -> Ok oldArc
+                | Error e -> Error e
+        | ArcFiles.Assay newAssay ->
+            let oldAssayOpt = oldArc.TryGetAssay newAssay.Identifier
+
+            match oldAssayOpt with
+            | Some oldAssay ->
+                newAssay.StaticHash <- oldAssay.StaticHash
+                oldArc.SetAssay(newAssay.Identifier, newAssay)
+                Ok oldArc
+            | None ->
+                oldArc.AddAssay(newAssay)
+                Ok oldArc
+        | ArcFiles.Study(newStudy, _) ->
+            let oldStudyOpt = oldArc.TryGetStudy newStudy.Identifier
+
+            match oldStudyOpt with
+            | Some oldStudy ->
+                newStudy.StaticHash <- oldStudy.StaticHash
+                oldArc.SetStudy(newStudy.Identifier, newStudy)
+                Ok oldArc
+            | None ->
+                oldArc.AddStudy(newStudy)
+                Ok oldArc
+        | ArcFiles.Workflow newWorkflow ->
+            let oldWorkflowOpt = oldArc.TryGetWorkflow newWorkflow.Identifier
+
+            match oldWorkflowOpt with
+            | Some oldWorkflow ->
+                newWorkflow.StaticHash <- oldWorkflow.StaticHash
+                oldArc.SetWorkflow(newWorkflow.Identifier, newWorkflow)
+                Ok oldArc
+            | None ->
+                oldArc.AddWorkflow(newWorkflow)
+                Ok oldArc
+        | ArcFiles.Run newRun ->
+            let oldRunOpt = oldArc.TryGetRun newRun.Identifier
+
+            match oldRunOpt with
+            | Some oldRun ->
+                newRun.StaticHash <- oldRun.StaticHash
+                oldArc.SetRun(newRun.Identifier, newRun)
+                Ok oldArc
+            | None ->
+                oldArc.AddRun(newRun)
+                Ok oldArc
+        | ArcFiles.Template _ -> Error(exn "Saving of template files is not supported.")
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
-let api: IArcVaultsApi = {
+let api: IPCTypes.IArcVaultsApi = {
     openARC =
         fun event -> promise {
             let! r =
@@ -219,21 +254,20 @@ let api: IArcVaultsApi = {
             else
                 let arcPath = r.filePaths |> Array.exactlyOne
                 let windowId = windowIdFromIpcEvent event
-
-                do! ARC_VAULTS.OpenARCInVault(windowId, arcPath)
-
-                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
-                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
-
-                let fileTree = getFileEntries arcPath |> createFileEntryTree
-
-                ARC_VAULTS.SetFileTree(windowId, fileTree)
-
-                return Ok arcPath
+                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+                return Ok(ArcOpenDisposition.path disposition)
+        }
+    openARCByPath =
+        fun event (arcPath: string) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+                return Ok(ArcOpenDisposition.path disposition)
+            with e ->
+                return Error e
         }
     createARC =
         fun (event: IpcMainEvent) (identifier: string) -> promise {
-
             let! r =
                 dialog.showOpenDialog (
                     properties = [|
@@ -246,75 +280,11 @@ let api: IArcVaultsApi = {
             elif r.filePaths.Length <> 1 then
                 return Error(exn "Not exactly one path")
             else
-                let arcPath = r.filePaths |> Array.exactlyOne
+                let arcContainerPath = r.filePaths |> Array.exactlyOne
+                let arcPath = ARCtrl.ArcPathHelper.combine arcContainerPath identifier
                 let windowId = windowIdFromIpcEvent event
-                do! ARC_VAULTS.CreateARCInVault(windowId, arcPath, identifier)
-
-                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
-                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
-
-                let fileTree = getFileEntries arcPath |> createFileEntryTree
-
-                ARC_VAULTS.SetFileTree(windowId, fileTree)
-                return Ok arcPath
-        }
-    createARCInNewWindow =
-        fun identifier -> promise {
-            let! r =
-                dialog.showOpenDialog (
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
-
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne
-
-                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
-
-                match ARC_VAULTS.TryGetVaultByPath arcPath with
-                | None ->
-                    let! _ = ARC_VAULTS.RegisterVaultWithNewArc(arcPath, identifier)
-                    ARC_VAULTS.BroadcastRecentARCs(recentARCs)
-                    return Ok()
-                | Some vault ->
-                    vault.window.focus ()
-                    ARC_VAULTS.BroadcastRecentARCs(recentARCs)
-                    return Ok()
-        }
-    openARCInNewWindow =
-        fun _ -> promise {
-            let! r =
-                dialog.showOpenDialog (
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
-
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne
-                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
-                match ARC_VAULTS.TryGetVaultByPath arcPath with
-                | None ->
-                    let! windowId = ARC_VAULTS.RegisterVaultWithArc(arcPath)
-                    ARC_VAULTS.BroadcastRecentARCs(recentARCs)
-
-                    let fileTree = getFileEntries arcPath |> createFileEntryTree
-                    ARC_VAULTS.SetFileTree(windowId, fileTree)
-
-                    return Ok()
-                | Some vault ->
-                    vault.window.focus ()
-                    ARC_VAULTS.BroadcastRecentARCs(recentARCs)
-                    return Ok()
+                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
+                return Ok(ArcOpenDisposition.path disposition)
         }
     closeARC =
         fun event -> promise {
@@ -322,137 +292,142 @@ let api: IArcVaultsApi = {
                 let windowId = windowIdFromIpcEvent event
                 let vault = ARC_VAULTS.TryGetVault(windowId)
 
+                // Ensure the ARC stays in recent list before disposal marks it inactive.
                 if vault.IsSome && vault.Value.path.IsSome then
-                    let recentARCs = ARCHolder.updateRecentARCs vault.Value.path.Value maxNumberRecentARCs
-                    ARC_VAULTS.BroadcastRecentARCs(recentARCs)
+                    RECENT_ARCS.Add(vault.Value.path.Value) |> ignore
 
                 ARC_VAULTS.DisposeVault(windowId)
                 return Ok()
             with e ->
                 return Error e
         }
-    focusExistingARCWindow =
-        fun arcPath -> promise {
-            match ARC_VAULTS.TryGetVaultByPath arcPath with
-            | None -> return Error(exn $"The ARC for path {arcPath} should exist")
-            | Some vault ->
-                let recentARCs = ARCHolder.updateRecentARCs arcPath maxNumberRecentARCs
-                vault.window.focus()
-                ARC_VAULTS.BroadcastRecentARCs(recentARCs)
-                return Ok()
-        }
     getOpenPath =
         fun event -> promise {
             let windowId = windowIdFromIpcEvent event
             let vault = ARC_VAULTS.TryGetVault(windowId)
 
-            if vault.IsSome then
-                vault.Value.SetFileTree(vault.Value.fileTree)
-
             return vault |> Option.bind (fun v -> v.path)
         }
-    getRecentARCs =
-        fun _ -> promise {
-            return recentARCs
+    getRecentARCs = fun _ -> promise { return RECENT_ARCS.Get() }
+    removeRecentARC =
+        fun arcpointer -> promise {
+            try
+                RECENT_ARCS.Remove(arcpointer.path) |> ignore
+                ARC_VAULTS.BroadcastRecentARCs()
+                return Ok()
+            with e ->
+                return Error e
         }
-    checkForARC =
-        fun path -> promise {
-            return ARC_VAULTS.TryGetVaultByPath(path).IsSome
-        }
-    createExperimentFromLanding =
-        fun (event: IpcMainEvent) (request: CreateExperimentRequest) -> promise {
+    pickArcPaths =
+        fun event -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
                 match ARC_VAULTS.TryGetVault(windowId) with
                 | None -> return Error(exn $"The ARC for window id {windowId} should exist")
                 | Some vault ->
-                    match vault.path, vault.arc with
-                    | Some arcPath, Some arc ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        let properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                        |]
 
-                        if String.IsNullOrWhiteSpace request.Metadata.Title then
-                            return Error(exn "Title is required.")
-                        elif String.IsNullOrWhiteSpace request.Metadata.Description then
-                            return Error(exn "Description is required.")
+                        let! result = dialog.showOpenDialog (properties = properties, defaultPath = arcPath)
+
+                        if result.canceled then
+                            return Error(exn "Cancelled")
                         else
-                            let identifier = resolveIdentifier request.Metadata
+                            let relativePaths =
+                                result.filePaths
+                                |> Array.map (tryGetArcRelativePath arcPath)
 
-                            if ARCtrl.Helper.Identifier.tryCheckValidCharacters identifier |> not then
+                            match relativePaths |> Array.tryFind Result.isError with
+                            | Some(Error pathError) -> return Error pathError
+                            | _ ->
                                 return
-                                    Error(
-                                        exn
-                                            $"Identifier '{identifier}' contains forbidden characters. Allowed: letters, digits, underscore (_), dash (-), and whitespace."
+                                    relativePaths
+                                    |> Array.choose (function
+                                        | Ok path when String.IsNullOrWhiteSpace path -> None
+                                        | Ok path -> Some path
+                                        | Error _ -> None
                                     )
-                            elif request.Target = ExperimentTarget.Study && arc.TryGetStudy(identifier).IsSome then
-                                return Error(exn $"Study with identifier '{identifier}' already exists.")
-                            elif request.Target = ExperimentTarget.Assay && arc.TryGetAssay(identifier).IsSome then
-                                return Error(exn $"Assay with identifier '{identifier}' already exists.")
+                                    |> Ok
+            with e ->
+                return Error e
+        }
+    pickAbsolutePaths =
+        fun _ -> promise {
+            try
+                let properties = [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                |]
+
+                let! result = dialog.showOpenDialog (properties = properties)
+
+                if result.canceled then
+                    return Error(exn "Cancelled")
+                else
+                    return Ok result.filePaths
+            with e ->
+                return Error(exn $"Could not pick files: {e.Message}")
+        }
+    pickExternalTextFiles =
+        fun _ -> promise {
+            try
+                let properties = [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                |]
+
+                let filters = [| FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |]) |]
+
+                let! result = dialog.showOpenDialog (properties = properties, filters = filters)
+
+                if result.canceled then
+                    return Error(exn "Cancelled")
+                else
+                    let importedFiles = ResizeArray<ImportedTextFile>()
+
+                    for filePath in result.filePaths do
+                        let absolutePath = pathDynamic?resolve (filePath) |> unbox<string>
+                        let! content = readUtf8FileAsync absolutePath
+
+                        importedFiles.Add {
+                            Name = path.basename absolutePath
+                            Content = content
+                        }
+
+                    return Ok(importedFiles.ToArray())
+            with e ->
+                return Error(exn $"Could not import external text files: {e.Message}")
+        }
+    readNotes =
+        fun event -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        let! fileEntries =
+                            if vault.fileTree.Count > 0 then
+                                promise { return vault.fileTree.Values |> Seq.toArray }
                             else
-                                let mutable previewData: PreviewData option = None
-                                let mutable protocolPath: string option = None
+                                getFileEntries arcPath
 
-                                match request.Target with
-                                | ExperimentTarget.Study ->
-                                    let study = arc.InitStudy(identifier)
-                                    arc.RegisterStudy(identifier)
-                                    study.InitTable($"{identifier} Table") |> ignore
-
-                                    study.Title <- Some request.Metadata.Title
-                                    study.Description <- Some request.Metadata.Description
-                                    study.Contacts <- parsePersons request.Metadata.InvolvedPeople
-                                    study.Comments <- parseComments request.Metadata.Comments
-                                    study.Publications <- parsePublications request.Metadata.Publications
-                                    study.SubmissionDate <- toNonEmptyOption request.Metadata.SubmissionDate
-                                    study.PublicReleaseDate <- toNonEmptyOption request.Metadata.PublicReleaseDate
-                                    study.StudyDesignDescriptors <- parseOntologyAnnotations request.Metadata.StudyDesignDescriptors
-
-                                    let firstTable = study.Tables.[0]
-                                    fillInputColumnIfFilesExist firstTable request.Metadata.Files
-
-                                    previewData <- Some(ArcFileData(ArcFileType.Study, ArcStudy.toJsonString 0 study))
-
-                                | ExperimentTarget.Assay ->
-                                    let assay = arc.InitAssay(identifier)
-                                    assay.InitTable($"{identifier} Table") |> ignore
-
-                                    assay.Title <- Some request.Metadata.Title
-                                    assay.Description <- Some request.Metadata.Description
-                                    assay.Performers <- parsePersons request.Metadata.InvolvedPeople
-                                    assay.Comments <- parseComments request.Metadata.Comments
-                                    assay.MeasurementType <- parseOntologyOption request.Metadata.MeasurementType
-                                    assay.TechnologyType <- parseOntologyOption request.Metadata.TechnologyType
-                                    assay.TechnologyPlatform <- parseOntologyOption request.Metadata.TechnologyPlatform
-
-                                    let firstTable = assay.Tables.[0]
-                                    fillInputColumnIfFilesExist firstTable request.Metadata.Files
-
-                                    previewData <- Some(ArcFileData(ArcFileType.Assay, ArcAssay.toJsonString 0 assay))
-
-                                do!
-                                    persistArcChangesAndRefreshVault
-                                        vault
-                                        arc
-                                        arcPath
-                                        (fun () ->
-                                            protocolPath <-
-                                                createProtocolFile arcPath request.Target identifier request.Metadata.MainText
-                                        )
-
-                                let response = {
-                                    PreviewData =
-                                        previewData
-                                        |> Option.defaultWith (fun () -> Text "")
-                                    CreatedIdentifier = identifier
-                                    ProtocolPath = protocolPath
-                                }
-
-                                return Ok response
-                    | _ -> return Error(exn "ARC is not loaded.")
+                        let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
+                        return Ok notes
             with e ->
                 return Error e
         }
     saveArcFile =
-        fun (event: IpcMainEvent) (request: SaveArcFileRequest) -> promise {
+        fun (event: IpcMainEvent) (request: FileContentDTO) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -461,139 +436,113 @@ let api: IArcVaultsApi = {
                 | Some vault ->
                     match vault.path, vault.arc with
                     | Some arcPath, Some arc ->
-                        match applyArcFileSaveRequest arc request with
+                        match updateARCByFileContentDTO arc request with
                         | Error saveError -> return Error saveError
-                        | Ok previewData ->
-                            do!
-                                persistArcChangesAndRefreshVault
-                                    vault
-                                    arc
-                                    arcPath
-                                    (fun () -> ())
-
-                            return Ok previewData
+                        | Ok newArc ->
+                            let! res = vault.SetArc newArc
+                            return res
                     | _ -> return Error(exn "ARC is not loaded.")
             with e ->
                 return Error e
         }
+    writeFile =
+        fun (event: IpcMainEvent) (request: FileContentDTO) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        match tryResolveArcRelativePath arcPath request.path with
+                        | Error pathError -> return Error pathError
+                        | Ok absolutePath ->
+                            vault.isBusyWriting <- true
+
+                            try
+                                match request.fileType with
+                                | DTOType.DTOTypeIsPlainTextVariant ->
+                                    let directoryPath = path.dirname absolutePath
+                                    do! mkdirRecursiveAsync directoryPath
+                                    do! writeUtf8FileAsync absolutePath request.content
+                                    do! vault.RefreshFileTree()
+                                    return Ok()
+                                | DTOType.CLI -> return Error(exn "Direct writing of CLI files is not supported.")
+                                | DTOType.DTOTypeIsISAFileVariant ->
+                                    return
+                                        Error(
+                                            exn
+                                                "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
+                                        )
+                                | _ -> return Error(exn $"Unsupported DTOType for writing: {request.fileType}")
+                            finally
+                                vault.isBusyWriting <- false
+            with e ->
+                return Error e
+        }
     openFile =
-        fun (event: IpcMainEvent) (path: string) -> promise {
+        fun (event: IpcMainEvent) (relativePath: string) -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            match ARC_VAULTS.TryGetVault(windowId) with
+            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+            | Some vault when vault.arc.IsSome ->
+                let arcfileDTO = FileContentDTO.fromArcByPath relativePath vault.arc.Value
+
+                match arcfileDTO with
+                | Some dto -> return Ok dto
+                | _ ->
+                    // Fallback to text preview for unknown file types
+                    try
+                        let absolutePath = tryResolveArcRelativePath vault.path.Value relativePath
+
+                        match absolutePath with
+                        | Error pathError -> return Error pathError
+                        | Ok path ->
+                            let content = fs.readFileSync (path, "utf8")
+                            let dto = FileContentDTO.create ARCtrl.Contract.DTOType.PlainText content relativePath
+                            return Ok dto
+                    with e ->
+                        return Error(exn $"Could not read file {relativePath}: {e.Message}")
+            | _ -> return Error(exn "ARC is not loaded.")
+        }
+    runGitLfs =
+        fun (event: IpcMainEvent) (request: GitLfsRequest) -> promise {
             let windowId = windowIdFromIpcEvent event
 
             match ARC_VAULTS.TryGetVault(windowId) with
             | None -> return Error(exn $"The ARC for window id {windowId} should exist")
             | Some vault ->
-                Swate.Components.console.log ($"openFile path: {path}")
-                let normalizedPath = path.Replace("\\", "/")
-                let pathParts = normalizedPath.Split('/')
-                let fileName = pathParts |> Array.last
+                match vault.path with
+                | None -> return Error(exn "ARC is not loaded.")
+                | Some arcPath ->
+                    // Always enforce the active ARC root to avoid running against arbitrary repos.
+                    let enforcedRequest = { request with RepoPath = arcPath }
+                    let! result = GitLfs.registerGitLfsIpc.runChannel event enforcedRequest
 
-                // For isa.*.xlsx files, the identifier is the parent directory name
-                // e.g., "studies/DilutionSeries/isa.study.xlsx" -> identifier is "DilutionSeries"
-                let isIsaFile = fileName.StartsWith("isa.") && fileName.EndsWith(".xlsx")
-                let hasParentDir = pathParts.Length >= 2
+                    match result with
+                    | Error e ->
+                        Swate.Components.console.log ($"Error: {e.Message}")
+                        return Error e
+                    | Ok successResult ->
+                        match enforcedRequest.Command with
+                        | Track
+                        | Untrack -> do! vault.RefreshFileTree()
+                        | _ -> ()
 
-                let identifier =
-                    if isIsaFile && hasParentDir then
-                        pathParts.[pathParts.Length - 2]
-                    elif fileName.Contains(".") then
-                        fileName.Substring(0, fileName.LastIndexOf("."))
-                    else
-                        fileName
-
-                Swate.Components.console.log (
-                    $"Extracted identifier: {identifier} (isIsaFile={isIsaFile}, hasParentDir={hasParentDir}, fileName={fileName})"
-                )
-
-                // Determine the type based on the filename
-                let fileType =
-                    if fileName = "isa.investigation.xlsx" then "investigation"
-                    elif fileName = "isa.study.xlsx" then "study"
-                    elif fileName = "isa.assay.xlsx" then "assay"
-                    elif fileName = "isa.run.xlsx" then "run"
-                    elif fileName = "isa.workflow.xlsx" then "workflow"
-                    elif fileName = "isa.datamap.xlsx" then "datamap"
-                    else "unknown"
-
-                match fileType with
-                | "investigation" ->
-                    // Return the ARC/Investigation as JSON for proper rendering
-                    Swate.Components.console.log ("Opening investigation file")
-
-                    match vault.arc with
-                    | Some arc ->
-                        // ARC inherits from ArcInvestigation, serialize as investigation
-                        let json = ARCtrl.ArcInvestigation.toJsonString 0 arc
-                        return Ok(ArcFileData(ArcFileType.Investigation, json))
-                    | None -> return Error(exn "ARC not loaded")
-
-                | "study" ->
-                    let study = vault.OpenStudy(identifier)
-
-                    match study with
-                    | Some s ->
-                        Swate.Components.console.log (
-                            "Found study: " + s.Identifier + " with " + string s.Tables.Count + " tables"
-                        )
-
-                        let json = ARCtrl.ArcStudy.toJsonString 0 s
-                        return Ok(ArcFileData(ArcFileType.Study, json))
-                    | None -> return Error(exn ("Study '" + identifier + "' not found in ARC"))
-
-                | "assay" ->
-                    let assay = vault.OpenAssay(identifier)
-
-                    match assay with
-                    | Some a ->
-                        Swate.Components.console.log (
-                            "Found assay: " + a.Identifier + " with " + string a.Tables.Count + " tables"
-                        )
-
-                        let json = ARCtrl.ArcAssay.toJsonString 0 a
-                        return Ok(ArcFileData(ArcFileType.Assay, json))
-                    | None -> return Error(exn ("Assay '" + identifier + "' not found in ARC"))
-
-                | "run" ->
-                    let run = vault.OpenRun(identifier)
-
-                    match run with
-                    | Some r ->
-                        Swate.Components.console.log (
-                            "Found run: " + r.Identifier + " with " + string r.Tables.Count + " tables"
-                        )
-
-                        let json = ARCtrl.ArcRun.toJsonString 0 r
-                        return Ok(ArcFileData(ArcFileType.Run, json))
-                    | None -> return Error(exn ("Run '" + identifier + "' not found in ARC"))
-
-                | "workflow" ->
-                    let workflow = vault.OpenWorkflow(identifier)
-
-                    match workflow with
-                    | Some w ->
-                        Swate.Components.console.log ("Found workflow: " + w.Identifier)
-                        let json = ARCtrl.ArcWorkflow.toJsonString 0 w
-                        return Ok(ArcFileData(ArcFileType.Workflow, json))
-                    | None -> return Error(exn ("Workflow '" + identifier + "' not found in ARC"))
-
-                | "datamap" ->
-                    // For datamap files, we need to read and parse the file directly
-                    Swate.Components.console.log ("Opening datamap file")
-                    // Datamaps need parent context - for now we'll parse just the datamap
-                    try
-                        let json = ARCtrl.DataMap.toJsonString 0 (ARCtrl.DataMap.init ())
-                        return Ok(ArcFileData(ArcFileType.DataMap, json))
-                    with e ->
-                        return Error(exn ("Could not load datamap: " + e.Message))
-
-                | _ ->
-                    // Fallback to text preview for unknown file types
-                    Swate.Components.console.log ("Unknown ISA file type, falling back to text preview")
-
-                    try
-                        let content = fs.readFileSync (path, "utf8")
-                        return Ok(Text content)
-                    with e ->
-                        return Error(exn $"Could not read file {fileName}: {e.Message}")
+                        return Ok successResult
+        }
+    cancelGitLfs =
+        fun (event: IpcMainEvent) (requestId: string) -> GitLfs.registerGitLfsIpc.cancelChannel event requestId
+    resolveCloseRequest =
+        fun (event: IpcMainEvent) (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+                do! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
+                return Ok()
+            with e ->
+                return Error e
         }
 }

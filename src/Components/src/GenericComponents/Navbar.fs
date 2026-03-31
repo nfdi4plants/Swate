@@ -17,7 +17,7 @@ type Navbar =
 
         Html.div [
             prop.className
-                "swt:bg-base-300 swt:text-base-content swt:gap-2 swt:flex swt:items-center swt:w-full swt:h-full swt:p-2"
+                "swt:text-base-content swt:gap-2 swt:flex swt:items-center swt:w-full swt:h-full swt:p-2 swt:shadow-xl"
             prop.role "navigation"
             prop.ariaLabel "arc navigation"
             if debug then

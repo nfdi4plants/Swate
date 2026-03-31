@@ -1,6 +1,7 @@
 module Spreadsheet.IO
 
 open ARCtrl
+open ARCtrl.ARCtrlHelper
 open ARCtrl.Spreadsheet
 open Swate.Components.Shared
 
@@ -95,55 +96,3 @@ module Json =
             (ArcFilesDiscriminate.DataMap, JsonExportFormat.ARCtrl),
             fun json -> ArcFiles.DataMap(None, DataMap.fromJsonString json)
         ]
-
-// let readFromJson (fileType: ArcFilesDiscriminate) (jsonType: JsonExportFormat) (json: string) = promise {
-//     let arcfile =
-//         match fileType, jsonType with
-//         | ArcFilesDiscriminate.Investigation, JsonExportFormat.ARCtrl ->
-//             ArcInvestigation.fromJsonString json |> ArcFiles.Investigation
-//         | ArcFilesDiscriminate.Investigation, JsonExportFormat.ARCtrlCompressed ->
-//             ArcInvestigation.fromCompressedJsonString json |> ArcFiles.Investigation
-//         | ArcFilesDiscriminate.Investigation, JsonExportFormat.ISA ->
-//             ArcInvestigation.fromISAJsonString json |> ArcFiles.Investigation
-//         | ArcFilesDiscriminate.Investigation, JsonExportFormat.ROCrate ->
-//             ArcInvestigation.fromROCrateJsonString json |> ArcFiles.Investigation
-
-//         | ArcFilesDiscriminate.Study, JsonExportFormat.ARCtrl ->
-//             ArcStudy.fromJsonString json |> fun x -> ArcFiles.Study(x, [])
-//         | ArcFilesDiscriminate.Study, JsonExportFormat.ARCtrlCompressed ->
-//             ArcStudy.fromCompressedJsonString json |> fun x -> ArcFiles.Study(x, [])
-//         | ArcFilesDiscriminate.Study, JsonExportFormat.ISA -> ArcStudy.fromISAJsonString json |> ArcFiles.Study
-//         | ArcFilesDiscriminate.Study, JsonExportFormat.ROCrate ->
-//             ArcStudy.fromROCrateJsonString json |> ArcFiles.Study
-
-//         | ArcFilesDiscriminate.Assay, JsonExportFormat.ARCtrl -> ArcAssay.fromJsonString json |> ArcFiles.Assay
-//         | ArcFilesDiscriminate.Assay, JsonExportFormat.ARCtrlCompressed ->
-//             ArcAssay.fromCompressedJsonString json |> ArcFiles.Assay
-//         | ArcFilesDiscriminate.Assay, JsonExportFormat.ISA -> ArcAssay.fromISAJsonString json |> ArcFiles.Assay
-//         | ArcFilesDiscriminate.Assay, JsonExportFormat.ROCrate ->
-//             ArcAssay.fromROCrateJsonString json |> ArcFiles.Assay
-
-//         | ArcFilesDiscriminate.Template, JsonExportFormat.ARCtrl ->
-//             Template.fromJsonString json |> ArcFiles.Template
-//         | ArcFilesDiscriminate.Template, JsonExportFormat.ARCtrlCompressed ->
-//             Template.fromCompressedJsonString json |> ArcFiles.Template
-//         | ArcFilesDiscriminate.Template, anyElse ->
-//             failwithf "Error. It is not intended to parse Template from %s format." (string anyElse)
-
-//         | ArcFilesDiscriminate.DataMap, _ -> failwithf "Error. It is not intended to parse Datamap this way."
-
-//         | ArcFilesDiscriminate.Run, JsonExportFormat.ARCtrl -> ArcRun.fromJsonString json |> ArcFiles.Run
-//         | ArcFilesDiscriminate.Run, JsonExportFormat.ARCtrlCompressed ->
-//             ArcRun.fromCompressedJsonString json |> ArcFiles.Run
-//         | ArcFilesDiscriminate.Run, anyElse ->
-//             failwithf "Error. It is not intended to parse Run from %s format." (string anyElse)
-
-//         | ArcFilesDiscriminate.Workflow, JsonExportFormat.ARCtrl ->
-//             ArcWorkflow.fromJsonString json |> ArcFiles.Workflow
-//         | ArcFilesDiscriminate.Workflow, JsonExportFormat.ARCtrlCompressed ->
-//             ArcWorkflow.fromCompressedJsonString json |> ArcFiles.Workflow
-//         | ArcFilesDiscriminate.Workflow, anyElse ->
-//             failwithf "Error. It is not intended to parse Workflow from %s format." (string anyElse)
-
-//     return arcfile
-// }

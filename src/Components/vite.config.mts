@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
     plugins: [
         react({
-            include: /\.(fs|js|jsx|ts|tsx)$/,
+            include: /\.(js|jsx|ts|tsx)$/,
             babel: {
                 plugins: ['babel-plugin-react-compiler'],
             },
@@ -19,6 +19,10 @@ export default defineConfig({
     ],
     esbuild: {
         jsx: 'automatic', // Enables React 17+ JSX Transform
+    },
+    optimizeDeps: {
+        // Avoid runtime re-optimization reloads during Vitest browser runs in CI.
+        include: ["react-dom/client"],
     },
     build: {
         sourcemap: true,

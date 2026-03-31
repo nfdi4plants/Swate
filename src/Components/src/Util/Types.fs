@@ -20,7 +20,14 @@ type ComboBoxRef = {|
 |}
 
 [<RequireQualifiedAccess>]
-type DaisyUIColors =
+type DaisyuiSize =
+    | XS
+    | SM
+    | MD
+    | LG
+
+[<RequireQualifiedAccess>]
+type DaisyuiColors =
     | Primary
     | Secondary
     | Accent
@@ -29,7 +36,21 @@ type DaisyUIColors =
     | Warning
     | Error
 
+[<RequireQualifiedAccess>]
+type DaisyuiTooltipPosition =
+    | Top
+    | Right
+    | Bottom
+    | Left
+
+
 type StateContext<'T> = { state: 'T; setState: 'T -> unit }
+
+module StateContext =
+    let init initialState = {
+        state = initialState
+        setState = fun _ -> ()
+    }
 
 [<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
 type Theme =
@@ -326,16 +347,16 @@ module AnnotationTable =
         | UnknownPasteCase of PasteCases
         | None
 
-[<AutoOpen>]
-module SelectorTypes =
+module Actionbar =
 
-    type ARCPointer =
-        {name: string; path: string; isActive: bool}
+    type ButtonInfo = {
+        icon: string
+        toolTip: string option
+        onClick: Browser.Types.MouseEvent -> unit
+    } with
 
-        static member create (name: string, path: string, isActive: bool) = { name = name; path = path; isActive = isActive }
-
-    type ButtonInfo =
-        { icon: string; toolTip: string; onClick: unit -> unit }
-
-        static member create (icon: string, toolTip: string, (onClick: unit -> unit)) =
-            { icon = icon; toolTip = toolTip; onClick = onClick }
+        static member create(icon: string, toolTip: string, (onClick: Browser.Types.MouseEvent -> unit)) = {
+            icon = icon
+            toolTip = Some toolTip
+            onClick = onClick
+        }

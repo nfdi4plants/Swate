@@ -227,6 +227,7 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
             prop.onDragLeave <| dragleave_handler (state, setState)
             prop.onDragOver drag_preventdefault
             prop.onDrop <| drop_handler (order, state, setState, dispatch)
+            prop.title "New Table"
             prop.onClick (fun e ->
                 SpreadsheetInterface.CreateAnnotationTable e.ctrlKey
                 |> Messages.InterfaceMsg
@@ -237,7 +238,10 @@ let MainPlus (model: Model, dispatch: Messages.Msg -> unit) =
                 style.height (length.percent 100)
                 style.cursor.pointer
             ]
-            prop.children [ Icons.Plus() ]
+            prop.children [
+                Icons.Plus()
+                Html.span [ prop.text "New Table" ]
+            ]
         ]
     ]
 

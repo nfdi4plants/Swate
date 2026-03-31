@@ -212,10 +212,13 @@ let SelectModalDialog (closeModal: unit -> unit) model (dispatch: Messages.Msg -
         prop.className "swt:modal swt:modal-open"
         prop.children [
             //Daisy.modalBackdrop [ prop.onClick (fun _ -> closeModal ()) ]
-            Html.div [ prop.className "swt:modal-backdrop"; prop.onClick (fun _ -> closeModal ()) ]
+            Html.div [
+                prop.className "swt:modal-backdrop"
+                prop.onClick (fun _ -> closeModal ())
+            ]
             //Daisy.modalBox.div [
             Html.div [
-                prop.className "swt:modal-box swt:overflow-y-auto swt:h-[100%]"
+                prop.className "swt:modal-box swt:overflow-y-auto swt:h-full"
                 prop.children [
                     match excelMetadataType with
                     | { Loading = true } -> Modals.Loading.Component
@@ -257,9 +260,8 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         QuickAccessButton.QuickAccessButton(
             "Create Annotation Table",
             React.Fragment [ Icons.CreateAnnotationTable() ],
-            (fun e ->
+            (fun (e: Browser.Types.MouseEvent) ->
                 e.preventDefault ()
-                let e = e :?> Browser.Types.MouseEvent
                 let ctrl = e.metaKey || e.ctrlKey
                 SpreadsheetInterface.CreateAnnotationTable ctrl |> InterfaceMsg |> dispatch
             )
@@ -269,9 +271,8 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
             QuickAccessButton.QuickAccessButton(
                 "Autoformat Table",
                 React.Fragment [ Icons.AutoformatTable() ],
-                (fun e ->
+                (fun (e: Browser.Types.MouseEvent) ->
                     e.preventDefault ()
-                    let e = e :?> Browser.Types.MouseEvent
                     let ctrl = not (e.metaKey || e.ctrlKey)
                     OfficeInterop.AutoFitTable ctrl |> OfficeInteropMsg |> dispatch
                 )

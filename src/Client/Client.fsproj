@@ -16,7 +16,7 @@
     <Compile Include="Util\SwateHost.fs" />
     <Compile Include="LocalStorage\AutosaveConfig.fs" />
     <Compile Include="LocalStorage\SwateSearchConfig.fs" />
-    <Compile Include="LocalStorage\Widgets.fs" />
+    <Compile Include="SharedComponents\Widgets.fs" />
     <Compile Include="SharedComponents\JsBindings\DndKit.fs" />
     <Compile Include="JsBindings\Cytoscape.fs" />
     <Compile Include="Api.fs" />

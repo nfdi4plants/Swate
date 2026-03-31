@@ -1,6 +1,6 @@
 {
   "name": "swate",
-  "productName": "swate",
+  "productName": "Swate",
   "version": "1.0.0",
   "description": "My Electron application description",
   "main": ".vite/build/main.fs.js",
@@ -9,7 +9,9 @@
   },
   "scripts": {
     "fable": "dotnet fable ./src/Swate.Electron.fsproj -o ./src/fable_output -e fs.jsx --verbose",
+    "fable:watch": "npm run fable -- --watch",
     "start": "npm run fable -- --watch --run electron-forge start",
+    "start:e": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
@@ -24,7 +26,8 @@
   "license": "MIT",
   "dependencies": {
     "chokidar": "^5.0.0",
-    "electron-squirrel-startup": "^1.0.1"
+    "electron-squirrel-startup": "^1.0.1",
+    "simple-git": "^3.32.3"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",
@@ -37,6 +40,6 @@
     "@electron-forge/plugin-vite": "^7.10.2",
     "@electron/fuses": "^1.8.0",
     "@playwright/test": "^1.58.2",
-    "electron": "39.2.5"
+    "electron": "40.6.0"
   }
 }
