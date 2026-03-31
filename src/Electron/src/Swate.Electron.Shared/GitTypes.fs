@@ -115,7 +115,10 @@ type GitPathspecRequest = { Pathspecs: string[] }
 
 type GitCommitRequest = { Message: string }
 
-type GitLfsSettingsDto = { AutoTrackThresholdMb: int }
+type GitLfsSettingsDto = {
+    AutoTrackThresholdMb: int
+    DownloadLargeFiles: bool
+}
 
 type GitCreateBranchRequest = {
     Name: string

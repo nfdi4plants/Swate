@@ -15,6 +15,7 @@ const okWithMessage = (_message: string) => ok();
 const okWithSelection = (_request: unknown) => ok();
 const okWithBranch = (_branchName: string) => ok();
 const okWithThreshold = (_thresholdMb: number) => ok();
+const okWithDownloadPreference = (_downloadLargeFiles: boolean) => ok();
 
 const baseStatus = {
   CurrentBranch: "feature/git-sidebar",
@@ -140,6 +141,8 @@ export const CleanRepo: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -167,6 +170,8 @@ export const ChangedFiles: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -196,6 +201,8 @@ export const AdvancedActions: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -204,6 +211,7 @@ export const AdvancedActions: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox")).toBeChecked();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
@@ -227,6 +235,8 @@ export const ConflictsPresent: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -260,6 +270,8 @@ export const BusyProgressState: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -286,6 +298,8 @@ export const CreateBranchModal: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -322,6 +336,8 @@ export const SwitchBranchModal: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -352,6 +368,8 @@ export const CommitComposer: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,
@@ -383,6 +401,8 @@ export const CallbackErrorHandling: Story = {
     onSync: ok,
     onCommitSelection: okWithSelection,
     onCommitAll: okWithMessage,
+    downloadLargeFiles: true,
+    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
     onSaveLfsAutoTrackThreshold: okWithThreshold,
     onCreateBranch: okWithArg,

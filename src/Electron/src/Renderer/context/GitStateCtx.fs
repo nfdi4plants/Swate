@@ -16,6 +16,7 @@ type GitState = {
     ChangedFiles: GitSidebarChange[]
     BranchOptions: GitSidebarBranchOption[]
     LfsAutoTrackThresholdMb: int
+    DownloadLargeFiles: bool
     CurrentProgress: GitSidebarProgress option
     SelectedChangePath: string option
     BusyNotice: string option
@@ -34,6 +35,7 @@ type GitState = {
         ChangedFiles = [||]
         BranchOptions = [||]
         LfsAutoTrackThresholdMb = 1
+        DownloadLargeFiles = true
         CurrentProgress = None
         SelectedChangePath = None
         BusyNotice = None
@@ -50,6 +52,7 @@ type GitStateController = {
     commitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>
     commitAll: string -> JS.Promise<Result<unit, string>>
     saveLfsAutoTrackThreshold: int -> JS.Promise<Result<unit, string>>
+    saveDownloadLargeFiles: bool -> JS.Promise<Result<unit, string>>
     createBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>
     switchBranch: string -> JS.Promise<Result<unit, string>>
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
@@ -180,6 +183,7 @@ let GitStateCtx =
             commitSelection = fun _ -> promise { return Ok() }
             commitAll = fun _ -> promise { return Ok() }
             saveLfsAutoTrackThreshold = fun _ -> promise { return Ok() }
+            saveDownloadLargeFiles = fun _ -> promise { return Ok() }
             createBranch = fun _ -> promise { return Ok() }
             switchBranch = fun _ -> promise { return Ok() }
             selectChange = fun _ -> promise { return Ok() }
@@ -219,7 +223,11 @@ let GitStateCtxProvider (children: ReactElement) =
         setGitState (fun current -> { current with BranchOptions = mapBranches branches })
 
     let applyLfsSettings (settings: GitLfsSettingsDto) =
-        setGitState (fun current -> { current with LfsAutoTrackThresholdMb = settings.AutoTrackThresholdMb })
+        setGitState (fun current -> {
+            current with
+                LfsAutoTrackThresholdMb = settings.AutoTrackThresholdMb
+                DownloadLargeFiles = settings.DownloadLargeFiles
+        })
 
     let setBusyNotice (busyNotice: string option) =
         setGitState (fun current -> { current with BusyNotice = busyNotice })
@@ -275,6 +283,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 setGitState (fun current -> {
                     current with
                         LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
+                        DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
                         ErrorNotice = Some exn.Message
                 })
                 return Error exn.Message
@@ -284,6 +293,7 @@ let GitStateCtxProvider (children: ReactElement) =
                     current with
                         BranchOptions = [||]
                         LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
+                        DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
                         ErrorNotice = Some exn.Message
                 })
                 return Error exn.Message
@@ -294,6 +304,7 @@ let GitStateCtxProvider (children: ReactElement) =
                         ChangedFiles = [||]
                         BranchOptions = [||]
                         LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
+                        DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
                         ErrorNotice = Some exn.Message
                 })
                 return Error exn.Message
@@ -634,6 +645,7 @@ let GitStateCtxProvider (children: ReactElement) =
         let! result =
             setGitLfsSettings {
                 AutoTrackThresholdMb = thresholdMb
+                DownloadLargeFiles = gitState.DownloadLargeFiles
             }
 
         setBusyNotice None
@@ -647,6 +659,31 @@ let GitStateCtxProvider (children: ReactElement) =
             return Ok()
         | Ok operationResult ->
             let message = operationResult.Message |> Option.defaultValue "Updating the Git LFS threshold failed."
+            setErrorNotice (Some message)
+            return Error message
+    }
+
+    let saveDownloadLargeFiles (downloadLargeFiles: bool) = promise {
+        setBusyNotice (Some "Saving Git LFS download preference")
+        setErrorNotice None
+
+        let! result =
+            setGitLfsSettings {
+                AutoTrackThresholdMb = gitState.LfsAutoTrackThresholdMb
+                DownloadLargeFiles = downloadLargeFiles
+            }
+
+        setBusyNotice None
+
+        match result with
+        | Error exn ->
+            setErrorNotice (Some exn.Message)
+            return Error exn.Message
+        | Ok operationResult when operationResult.Success ->
+            setGitState (fun current -> { current with DownloadLargeFiles = downloadLargeFiles })
+            return Ok()
+        | Ok operationResult ->
+            let message = operationResult.Message |> Option.defaultValue "Updating the Git LFS download preference failed."
             setErrorNotice (Some message)
             return Error message
     }
@@ -770,6 +807,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 commitSelection = commitSelection
                 commitAll = commitAll
                 saveLfsAutoTrackThreshold = saveLfsAutoTrackThreshold
+                saveDownloadLargeFiles = saveDownloadLargeFiles
                 createBranch = createBranchFrom
                 switchBranch = switchBranchTo
                 selectChange = selectChange

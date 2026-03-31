@@ -101,6 +101,8 @@ type GitSidebar =
             onSync: unit -> JS.Promise<Result<unit, string>>,
             onCommitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>,
             onCommitAll: string -> JS.Promise<Result<unit, string>>,
+            downloadLargeFiles: bool,
+            onSaveDownloadLargeFiles: bool -> JS.Promise<Result<unit, string>>,
             lfsAutoTrackThresholdMb: int,
             onSaveLfsAutoTrackThreshold: int -> JS.Promise<Result<unit, string>>,
             onCreateBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>,
@@ -123,6 +125,7 @@ type GitSidebar =
         let isSwitchBranchModalOpen, setIsSwitchBranchModalOpen = React.useState false
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
+        let downloadLargeFilesInput, setDownloadLargeFilesInput = React.useState downloadLargeFiles
         let lfsThresholdInput, setLfsThresholdInput = React.useState (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)
         let selectedCommitPaths, setSelectedCommitPaths = React.useStateWithUpdater Set.empty<string>
         let selectedStartPoint, setSelectedStartPoint = React.useState (None: string option)
@@ -144,6 +147,11 @@ type GitSidebar =
                     )
                 )),
             [| box changedFiles |]
+        )
+
+        React.useEffect (
+            (fun () -> setDownloadLargeFilesInput downloadLargeFiles),
+            [| box downloadLargeFiles |]
         )
 
         React.useEffect (
@@ -316,6 +324,29 @@ type GitSidebar =
                         | Ok () ->
                             setLfsThresholdInput (GitSidebarInternal.formatThresholdInput parsedThresholdMb)
                         | Error message ->
+                            setLocalError (Some message)
+                    finally
+                        setActiveAction None
+                }
+                |> Promise.start
+
+        let submitDownloadLargeFiles (nextValue: bool) =
+            if nextValue = downloadLargeFilesInput then
+                ()
+            else
+                promise {
+                    let previousValue = downloadLargeFilesInput
+                    setLocalError None
+                    setActiveAction (Some "Save Git LFS Download Preference")
+                    setDownloadLargeFilesInput nextValue
+
+                    try
+                        let! result = onSaveDownloadLargeFiles nextValue
+
+                        match result with
+                        | Ok () -> ()
+                        | Error message ->
+                            setDownloadLargeFilesInput previousValue
                             setLocalError (Some message)
                     finally
                         setActiveAction None
@@ -501,6 +532,28 @@ type GitSidebar =
                 Html.div [
                     prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
                     prop.children [
+                        Html.label [
+                            prop.className "swt:col-span-2 swt:flex swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3"
+                            prop.children [
+                                Html.input [
+                                    prop.testId "GitSidebarDownloadLargeFilesCheckbox"
+                                    prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
+                                    prop.type'.checkbox
+                                    prop.disabled isBusy
+                                    prop.isChecked downloadLargeFilesInput
+                                    prop.onChange submitDownloadLargeFiles
+                                ]
+                                Html.div [
+                                    prop.className "swt:flex swt:min-w-0 swt:flex-col"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:text-sm swt:font-medium"
+                                            prop.text "Download Large Files"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
                         GitSidebar.ActionButton(
                             "Synchronize Changes",
                             "swt:fluent--arrow-sync-24-regular",

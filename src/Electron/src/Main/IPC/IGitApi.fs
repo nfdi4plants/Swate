@@ -82,6 +82,7 @@ let private toDiffSummaryDto (diff: GitService.GitDiffSummaryDto) : GitDiffSumma
 
 let private toLfsSettingsDto (settings: GitService.GitLfsSettingsDto) : GitLfsSettingsDto = {
     AutoTrackThresholdMb = settings.AutoTrackThresholdMb
+    DownloadLargeFiles = settings.DownloadLargeFiles
 }
 
 let private toDiffViewDataDto (data: GitService.GitDiffViewDataDto) : GitDiffViewDataDto = {
@@ -317,6 +318,7 @@ let api: IGitApi = {
                         arcPath
                         {
                             AutoTrackThresholdMb = settings.AutoTrackThresholdMb
+                            DownloadLargeFiles = settings.DownloadLargeFiles
                         }
 
                 return toGitOperationResult (fun () -> Some "Git LFS threshold updated.") None result

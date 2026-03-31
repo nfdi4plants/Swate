@@ -78,7 +78,10 @@ type GitDiffSummaryDto = {
     Deletions: int
 }
 
-type GitLfsSettingsDto = { AutoTrackThresholdMb: int }
+type GitLfsSettingsDto = {
+    AutoTrackThresholdMb: int
+    DownloadLargeFiles: bool
+}
 
 type GitConfirmMergeResolutionResult = {
     UpdatedStatus: GitStatusDto
@@ -99,8 +102,10 @@ let private protocolOverridePattern =
 let private remoteNamePattern = Regex("^[A-Za-z0-9._/-]+$")
 let private invalidBranchCharactersPattern = Regex(@"[~^:?*\[\\\s]")
 let private gitLfsThresholdConfigKey = "swate.lfs.autotrackthresholdmb"
+let private gitLfsDownloadLargeFilesConfigKey = "swate.lfs.downloadlargefiles"
 let private gitLfsDefaultThresholdMb = 1
 let private gitLfsMaximumThresholdMb = 100
+let private gitLfsDefaultDownloadLargeFiles = true
 
 let private lfsInstallRequiredTokens =
     [|
@@ -237,12 +242,32 @@ let private tryParseConfiguredThresholdMb (value: string option) =
 
         if success && parsed >= 1 && parsed <= gitLfsMaximumThresholdMb then Some parsed else None
 
+// GitService parses the download preference because pull behavior is part of the git workflow owned here.
+let private tryParseConfiguredDownloadLargeFiles (value: string option) =
+    match value |> Option.bind Option.ofObj with
+    | None -> None
+    | Some text ->
+        match text.Trim().ToLowerInvariant() with
+        | "true"
+        | "1"
+        | "yes"
+        | "on" -> Some true
+        | "false"
+        | "0"
+        | "no"
+        | "off" -> Some false
+        | _ -> None
+
 // GitService converts the threshold to bytes because file-size decisions happen during stage/commit orchestration here.
 let private thresholdMbToBytes (thresholdMb: int) =
     int64 thresholdMb * 1024L * 1024L
 
 // GitService formats the persisted threshold because it owns the config contract for this workflow setting.
 let private formatThresholdConfigValue (thresholdMb: int) = string thresholdMb
+
+// GitService formats the persisted download preference because it owns the config contract for this workflow setting.
+let private formatDownloadLargeFilesConfigValue (downloadLargeFiles: bool) =
+    if downloadLargeFiles then "true" else "false"
 
 let private tryGetFileSizeInBytes (absolutePath: string) : JS.Promise<int64 option> =
     promise {
@@ -613,6 +638,20 @@ let private getConfiguredLfsThresholdMb (git: ISimpleGit) : JS.Promise<int> =
             return gitLfsDefaultThresholdMb
     }
 
+// GitService reads the download preference because pull/sync need it while deciding whether to hydrate LFS content or keep pointers.
+let private getConfiguredLfsDownloadLargeFiles (git: ISimpleGit) : JS.Promise<bool> =
+    promise {
+        try
+            let! configResult = git.getConfig (gitLfsDownloadLargeFilesConfigKey, "local")
+
+            return
+                configResult.value
+                |> tryParseConfiguredDownloadLargeFiles
+                |> Option.defaultValue gitLfsDefaultDownloadLargeFiles
+        with _ ->
+            return gitLfsDefaultDownloadLargeFiles
+    }
+
 // GitService creates this failure because install-required is surfaced as a git workflow error, not as a raw LFS command result.
 let private createLfsInstallRequiredFailure (thresholdMb: int option) (details: string option) : GitFailure = {
     Kind = LfsInstallRequired
@@ -734,6 +773,27 @@ let private ensureLargeStagedFilesUseLfs (arcPath: string) (git: ISimpleGit) : J
                     return Error(createLfsInstallRequiredFailure (Some thresholdMb) None)
                 | Error failure ->
                     return Error failure
+    }
+
+// GitService keeps the pull preference application here because it changes how the authenticated pull workflow checks out the working tree.
+let private applyLfsDownloadPreference (downloadLargeFiles: bool) (git: ISimpleGit) =
+    if downloadLargeFiles then
+        git
+    else
+        git.env ("GIT_LFS_SKIP_SMUDGE", "1")
+
+// GitService keeps explicit post-pull hydration here because it must reuse the authenticated git instance created for the pull workflow.
+let private hydratePulledLfsContent (git: ISimpleGit) : JS.Promise<GitResult<unit>> =
+    promise {
+        let! result =
+            runSimpleGit
+                (fun currentGit -> promise {
+                    let! _ = currentGit.raw [| "lfs"; "pull" |]
+                    return ()
+                })
+                git
+
+        return result
     }
 
 let private createAuthenticatedGit
@@ -875,8 +935,12 @@ let getLfsSettings (arcPath: string) : JS.Promise<GitResult<GitLfsSettingsDto>> 
         arcPath
         (fun git -> promise {
             let! thresholdMb = getConfiguredLfsThresholdMb git
+            let! downloadLargeFiles = getConfiguredLfsDownloadLargeFiles git
 
-            return { AutoTrackThresholdMb = thresholdMb }
+            return {
+                AutoTrackThresholdMb = thresholdMb
+                DownloadLargeFiles = downloadLargeFiles
+            }
         })
 
 let getDiffSummary (arcPath: string) : JS.Promise<GitResult<GitDiffSummaryDto>> =
@@ -1093,13 +1157,25 @@ let pull
                         safeRemoteName
                         progressCallback
                         (fun git -> promise {
+                            let! downloadLargeFiles = getConfiguredLfsDownloadLargeFiles git
+                            let effectiveGit = applyLfsDownloadPreference downloadLargeFiles git
+
                             match safeBranchName with
                             | None ->
-                                do! ensureDefaultTrackingBranchForPull safeRemoteName git
-                                let! _ = git.pull (safeRemoteName)
-                                return ()
+                                do! ensureDefaultTrackingBranchForPull safeRemoteName effectiveGit
+                                let! _ = effectiveGit.pull (safeRemoteName)
+                                ()
                             | Some safeBranch ->
-                                let! _ = git.pull (safeRemoteName, safeBranch)
+                                let! _ = effectiveGit.pull (safeRemoteName, safeBranch)
+                                ()
+
+                            if downloadLargeFiles then
+                                let! lfsPullResult = hydratePulledLfsContent effectiveGit
+
+                                match lfsPullResult with
+                                | Ok () -> return ()
+                                | Error failure -> return raise (exn failure.Message)
+                            else
                                 return ()
                         })
 
@@ -1196,6 +1272,14 @@ let setLfsSettings (arcPath: string) (settings: GitLfsSettingsDto) : JS.Promise<
                                 "--local"
                                 gitLfsThresholdConfigKey
                                 formatThresholdConfigValue thresholdMb
+                            |]
+
+                        let! _ =
+                            git.raw [|
+                                "config"
+                                "--local"
+                                gitLfsDownloadLargeFilesConfigKey
+                                formatDownloadLargeFilesConfigValue settings.DownloadLargeFiles
                             |]
 
                         return ()
