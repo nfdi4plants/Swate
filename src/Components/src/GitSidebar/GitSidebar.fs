@@ -232,9 +232,9 @@ type GitSidebar =
                 |> Array.sort
 
             if String.IsNullOrWhiteSpace normalizedCommitMessage then
-                setLocalError (Some "Commit message must not be empty.")
+                setLocalError (Some "Save message must not be empty.")
             elif selectedPaths.Length = 0 then
-                setLocalError (Some "Select at least one file to commit.")
+                setLocalError (Some "Select at least one file to save.")
             else
                 promise {
                     setLocalError None
@@ -262,7 +262,7 @@ type GitSidebar =
             let normalizedCommitMessage = commitMessage.Trim()
 
             if String.IsNullOrWhiteSpace normalizedCommitMessage then
-                setLocalError (Some "Commit message must not be empty.")
+                setLocalError (Some "Save message must not be empty.")
             else
                 promise {
                     setLocalError None
@@ -447,14 +447,14 @@ type GitSidebar =
                     prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
                     prop.children [
                         GitSidebar.ActionButton(
-                            "Sync",
+                            "Synchronize Changes",
                             "swt:fluent--arrow-sync-24-regular",
                             isBusy,
                             (fun () -> runAction "Sync" onSync),
                             testId = "GitSidebarSyncButton"
                         )
                         GitSidebar.ActionButton(
-                            "Advanced Actions",
+                            "More Git Actions",
                             (if isAdvancedActionsOpen then
                                 "swt:fluent--chevron-up-24-regular"
                              else
@@ -471,35 +471,35 @@ type GitSidebar =
                         prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3 swt:pt-2"
                         prop.children [
                             GitSidebar.ActionButton(
-                                "Fetch",
+                                "Check for Changes",
                                 "swt:fluent--arrow-download-24-regular",
                                 isBusy,
                                 (fun () -> runAction "Fetch" onFetch),
                                 testId = "GitSidebarFetchButton"
                             )
                             GitSidebar.ActionButton(
-                                "Pull",
+                                "Download Changes",
                                 "swt:fluent--arrow-down-24-regular",
                                 isBusy,
                                 (fun () -> runAction "Pull" onPull),
                                 testId = "GitSidebarPullButton"
                             )
                             GitSidebar.ActionButton(
-                                "Push",
+                                "Upload Changes",
                                 "swt:fluent--arrow-up-24-regular",
                                 isBusy,
                                 (fun () -> runAction "Push" onPush),
                                 testId = "GitSidebarPushButton"
                             )
                             GitSidebar.ActionButton(
-                                "Create Branch",
+                                "Create Work Copy",
                                 "swt:fluent--branch-fork-24-regular",
                                 isBusy,
                                 openCreateBranchModal,
                                 testId = "GitSidebarCreateBranchButton"
                             )
                             GitSidebar.ActionButton(
-                                "Switch Branch",
+                                "Switch To Work Copy",
                                 "swt:fluent--arrow-swap-24-regular",
                                 isBusy || localBranchOptionsForSwitch.Length = 0,
                                 openSwitchBranchModal,
@@ -508,7 +508,7 @@ type GitSidebar =
                         ]
                     ]
 
-                GitSidebar.SectionHeader("Commit", None)
+                GitSidebar.SectionHeader("Save", None)
 
                 Html.div [
                     prop.className "swt:px-3"
@@ -521,7 +521,7 @@ type GitSidebar =
                                     prop.children [
                                         Html.span [
                                             prop.className "swt:text-sm swt:font-medium"
-                                            prop.text "Commit message"
+                                            prop.text "Save message"
                                         ]
                                         Html.textarea [
                                             prop.testId "GitSidebarCommitMessageInput"
@@ -531,9 +531,9 @@ type GitSidebar =
                                             prop.value commitMessage
                                             prop.placeholder (
                                                 if hasConflicts then
-                                                    "Resolve merge conflicts before committing."
+                                                    "Resolve merge conflicts before saving."
                                                 elif status.IsClean then
-                                                    "No changes to commit."
+                                                    "No changes to save."
                                                 else
                                                     "Describe your changes"
                                             )
@@ -546,14 +546,14 @@ type GitSidebar =
                                     prop.children [
                                         Html.span (
                                             if selectedCommitCount = 1 then
-                                                "1 file selected for commit selection"
+                                                "1 file selected to save"
                                             else
-                                                $"{selectedCommitCount} files selected for commit selection"
+                                                $"{selectedCommitCount} files selected to save"
                                         )
                                         if not canEditCommit && hasConflicts then
-                                            Html.span "Commit selection is disabled while conflicts remain."
+                                            Html.span "Saving selected files is disabled while conflicts remain."
                                         elif not canEditCommit && status.IsClean then
-                                            Html.span "No changes available to commit."
+                                            Html.span "No changes available to save."
                                         else
                                             Html.none
                                     ]
@@ -575,7 +575,7 @@ type GitSidebar =
                                                     if activeAction = Some "Commit Selection" then
                                                         "Committing..."
                                                     else
-                                                        "Commit Selection"
+                                                        "Save Selected Changes"
                                                 )
                                             ]
                                         ]
@@ -593,7 +593,7 @@ type GitSidebar =
                                                     if activeAction = Some "Commit All" then
                                                         "Committing..."
                                                     else
-                                                        "Commit All"
+                                                        "Save All Changes"
                                                 )
                                             ]
                                         ]
