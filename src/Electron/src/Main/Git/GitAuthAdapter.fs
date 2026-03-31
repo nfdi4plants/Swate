@@ -9,7 +9,7 @@ open Main.Bindings.SimpleGit
 type GitFactory = SimpleGitOptions -> ISimpleGit
 
 let private redactPattern =
-    Regex(@"(Authorization:\s*Bearer\s+)[^\s'""]+", RegexOptions.IgnoreCase)
+    Regex(@"(Authorization:\s*)(Bearer\s+|Basic\s+)[^\s'""]+", RegexOptions.IgnoreCase)
 
 let private credentialUrlPattern =
     Regex("(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)", RegexOptions.IgnoreCase)
@@ -33,9 +33,19 @@ let createNonInteractiveEnv () : obj =
 
 let applyNonInteractiveEnv (git: ISimpleGit) = git.env (createNonInteractiveEnv ())
 
+[<Emit("Buffer.from($0, 'utf8').toString('base64')")>]
+let private toBase64 (value: string) : string = jsNative
+
+let private gitLabBasicAuthUsername = "oauth2"
+
+let private buildBasicAuthorizationValue (username: string) (token: string) =
+    let credentials = $"{username}:{token}"
+    let base64Credentials = toBase64 credentials
+    $"Basic {base64Credentials}"
+
 let buildAuthArgs (_host: string) (token: string) : string[] = [|
     "-c"
-    $"http.extraHeader=Authorization: Bearer {token}"
+    $"http.extraHeader=Authorization: {buildBasicAuthorizationValue gitLabBasicAuthUsername token}"
 |]
 
 let applyAuth (gitFactory: GitFactory) (baseOptions: SimpleGitOptions) (host: string) (token: string) : ISimpleGit =
