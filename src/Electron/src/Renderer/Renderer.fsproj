@@ -12,6 +12,7 @@
     <Compile Include="context\AppStateCtx.fs" />
     <Compile Include="context\PageStateCtx.fs" />
     <Compile Include="context\FileStateCtx.fs" />
+    <Compile Include="context\GitWorkflow.fs" />
     <Compile Include="context\GitStateCtx.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />

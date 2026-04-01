@@ -44,6 +44,7 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
                 currentTitle = mergeData.Path,
                 resolvedTitle = mergeData.Path,
                 onConfirmMerge = confirmMergeResolution,
+                confirmDisabled = isConfirming,
                 testIdPrefix = "renderer-git-merge"
             )
         ]
