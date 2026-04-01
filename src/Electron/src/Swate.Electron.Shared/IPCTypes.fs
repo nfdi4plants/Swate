@@ -62,6 +62,7 @@ type IGitApi = {
     getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
     getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitDiffViewDataDto, exn>>
     getGitMergeConflictViewData: IpcMainEvent -> string -> JS.Promise<Result<GitMergeConflictViewDataDto, exn>>
+    installGitLfs: IpcMainEvent -> JS.Promise<Result<GitOperationResult, exn>>
     gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>

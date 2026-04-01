@@ -196,6 +196,27 @@ let api: IGitApi = {
                 | Ok mergeViewData -> return Ok(toMergeConflictViewDataDto mergeViewData)
                 | Error failure -> return Error(exn $"git merge conflict view failed ({failure.Kind}): {failure.Message}")
         }
+    installGitLfs =
+        fun (_event: IpcMainEvent) -> promise {
+            let! result = GitLfsService.installSystem ()
+
+            return
+                match result with
+                | Ok () ->
+                    Ok {
+                        Success = true
+                        Message = Some "Git LFS installed."
+                        FailureKind = None
+                        Path = None
+                    }
+                | Error message ->
+                    Ok {
+                        Success = false
+                        Message = Some message
+                        FailureKind = Some GitFailureKind.Unknown
+                        Path = None
+                    }
+        }
     gitFetch =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with

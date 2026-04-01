@@ -15,10 +15,10 @@
     <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="SettingsStore.fs" />
     <Compile Include="RecentArcStore.fs" />
+    <Compile Include="Git\GitAuthAdapter.fs" />
     <Compile Include="Git\GitlfsAdapter.fs" />
     <Compile Include="Git\GitLfsService.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />
-    <Compile Include="Git\GitAuthAdapter.fs" />
     <Compile Include="Git\GitInternals.fs" />
     <Compile Include="Git\GitService.fs" />
     <Compile Include="Git\GitProvisioningService.fs" />

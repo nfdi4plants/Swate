@@ -11,6 +11,9 @@ type IGitLfs =
     abstract Run:
         request: GitLfsRequest -> onProgress: (string -> unit) -> cancel: (unit -> bool) -> Promise<GitLfsResult>
 
+    abstract Install:
+        timeoutMs: int option -> onProgress: (string -> unit) -> cancel: (unit -> bool) -> Promise<GitLfsResult>
+
     abstract IsTrackedByAttributes: repoRoot: string -> relativePath: string -> bool
 
 
@@ -50,102 +53,122 @@ type NodeGitLfsAdapter() =
         with _ ->
             false
 
-    let runGitLfs
-        (request: GitLfsRequest)
+    let runProcess
+        (args: string list)
+        (workingDirectory: string option)
+        (timeoutMs: int option)
         (onProgress: string -> unit)
         (cancelCheck: unit -> bool)
         : Promise<GitLfsResult> =
         promise {
-            let runProcess (args: string list) =
-                Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
-                    let proc: obj =
-                        childProcessDynamic?spawn (
-                            "git",
-                            (args |> List.toArray),
-                            createObj [ "cwd" ==> request.RepoPath; "shell" ==> false ]
-                        )
-
-                    let mutable output = ""
-                    let mutable errorOut = ""
-                    let mutable finished = false
-
-                    proc?stdout?on (
-                        "data",
-                        fun d ->
-                            let msg = string d
-                            output <- output + msg
-                            onProgress msg
-                    )
-                    |> ignore
-
-                    proc?stderr?on (
-                        "data",
-                        fun d ->
-                            let msg = string d
-                            errorOut <- errorOut + msg
-                            onProgress msg
-                    )
-                    |> ignore
-
-                    let timeoutId =
-                        request.TimeoutMs
-                        |> Option.map (fun ms ->
-                            Fable.Core.JS.setTimeout
-                                (fun () ->
-                                    if not finished then
-                                        proc?kill ("SIGTERM") |> ignore
-                                )
-                                ms
-                        )
-
-                    let cancelInterval =
-                        Fable.Core.JS.setInterval
-                            (fun () ->
-                                if not finished && cancelCheck () then
-                                    proc?kill ("SIGTERM") |> ignore
-                            )
-                            300
-
-                    proc?on (
-                        "close",
-                        fun code ->
-                            finished <- true
-                            timeoutId |> Option.iter Fable.Core.JS.clearTimeout
-                            Fable.Core.JS.clearInterval cancelInterval
-
-                            let success = if isNull code then false else (unbox<float> code) = 0.
-
-                            resolve {
-                                Success = success
-                                Output = output
-                                Error = errorOut
-                            }
-                    )
-                    |> ignore
-
-                    proc?on (
-                        "error",
-                        fun err ->
-                            finished <- true
-                            timeoutId |> Option.iter Fable.Core.JS.clearTimeout
-                            Fable.Core.JS.clearInterval cancelInterval
-
-                            resolve {
-                                Success = false
-                                Output = ""
-                                Error = string err
-                            }
-                    )
-                    |> ignore
-                )
-
             if isRunning then
                 return {
                     Success = false
                     Output = ""
                     Error = "Another Git process is running"
                 }
-            elif not (validateRepoPath request.RepoPath) then
+            else
+                isRunning <- true
+
+                let! result =
+                    Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+                        let spawnOptions =
+                            createObj [
+                                "shell" ==> false
+
+                                match workingDirectory with
+                                | Some value -> "cwd" ==> value
+                                | None -> ()
+                            ]
+
+                        let proc: obj =
+                            childProcessDynamic?spawn ("git", (args |> List.toArray), spawnOptions)
+
+                        let mutable output = ""
+                        let mutable errorOut = ""
+                        let mutable finished = false
+
+                        proc?stdout?on (
+                            "data",
+                            fun d ->
+                                let msg = string d
+                                output <- output + msg
+                                onProgress msg
+                        )
+                        |> ignore
+
+                        proc?stderr?on (
+                            "data",
+                            fun d ->
+                                let msg = string d
+                                errorOut <- errorOut + msg
+                                onProgress msg
+                        )
+                        |> ignore
+
+                        let timeoutId =
+                            timeoutMs
+                            |> Option.map (fun ms ->
+                                Fable.Core.JS.setTimeout
+                                    (fun () ->
+                                        if not finished then
+                                            proc?kill ("SIGTERM") |> ignore
+                                    )
+                                    ms
+                            )
+
+                        let cancelInterval =
+                            Fable.Core.JS.setInterval
+                                (fun () ->
+                                    if not finished && cancelCheck () then
+                                        proc?kill ("SIGTERM") |> ignore
+                                )
+                                300
+
+                        proc?on (
+                            "close",
+                            fun code ->
+                                finished <- true
+                                timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                                Fable.Core.JS.clearInterval cancelInterval
+
+                                let success = if isNull code then false else (unbox<float> code) = 0.
+
+                                resolve {
+                                    Success = success
+                                    Output = output
+                                    Error = errorOut
+                                }
+                        )
+                        |> ignore
+
+                        proc?on (
+                            "error",
+                            fun err ->
+                                finished <- true
+                                timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                                Fable.Core.JS.clearInterval cancelInterval
+
+                                resolve {
+                                    Success = false
+                                    Output = ""
+                                    Error = string err
+                                }
+                        )
+                        |> ignore
+                    )
+
+                isRunning <- false
+                return result
+        }
+
+    let runGitLfs
+        (request: GitLfsRequest)
+        (onProgress: string -> unit)
+        (cancelCheck: unit -> bool)
+        : Promise<GitLfsResult> =
+        promise {
+            if not (validateRepoPath request.RepoPath) then
                 return {
                     Success = false
                     Output = ""
@@ -160,23 +183,33 @@ type NodeGitLfsAdapter() =
                         Error = err
                     }
                 | Ok args ->
-                    isRunning <- true
-
-                    let! (result: GitLfsResult) = runProcess args
+                    let! (result: GitLfsResult) =
+                        runProcess args (Some request.RepoPath) request.TimeoutMs onProgress cancelCheck
 
                     if not result.Success then
-                        isRunning <- false
                         return result
                     else
                         match request.Command, request.FilePath with
                         | Pull, Some file
                         | Fetch, Some file ->
-                            let! checkoutResult = runProcess [ "checkout"; "--"; file ]
-                            isRunning <- false
-                            return checkoutResult
+                            return!
+                                runProcess
+                                    [ "checkout"; "--"; file ]
+                                    (Some request.RepoPath)
+                                    request.TimeoutMs
+                                    onProgress
+                                    cancelCheck
                         | _ ->
-                            isRunning <- false
                             return result
+        }
+
+    let installGitLfs
+        (timeoutMs: int option)
+        (onProgress: string -> unit)
+        (cancelCheck: unit -> bool)
+        : Promise<GitLfsResult> =
+        promise {
+            return! runProcess [ "lfs"; "install" ] None timeoutMs onProgress cancelCheck
         }
 
     let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
@@ -203,6 +236,9 @@ type NodeGitLfsAdapter() =
 
     interface IGitLfs with
         member _.Run request onProgress cancel = runGitLfs request onProgress cancel
+
+        member _.Install timeoutMs onProgress cancel =
+            installGitLfs timeoutMs onProgress cancel
 
         member _.IsTrackedByAttributes repoRoot relativePath =
             isTrackedByAttributes repoRoot relativePath

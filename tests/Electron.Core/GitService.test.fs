@@ -11,6 +11,7 @@ open Vitest
 module GitService = Main.Git.GitService
 module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
+module GitLfsService = Main.Git.GitLfsService
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
@@ -85,6 +86,23 @@ let private unwrapResultAsync
     promise {
         let! result = resultPromise
         return unwrap result
+    }
+
+let private expectOkResult<'T> (operationName: string) (result: Result<'T, exn>) =
+    match result with
+    | Ok value -> value
+    | Error error -> failwith $"{operationName} failed: {error.Message}"
+
+let private runSimpleGitResult
+    (operation: ISimpleGit -> JS.Promise<'T>)
+    (git: ISimpleGit)
+    : JS.Promise<Result<'T, exn>> =
+    promise {
+        try
+            let! result = operation git
+            return Ok result
+        with error ->
+            return Error error
     }
 
 let private splitNonEmptyLines (text: string) =
@@ -266,6 +284,107 @@ Vitest.describe("GitService local repository workflow", fun () ->
                 Vitest.expect(status.IsClean).toBe(false)
                 Vitest.expect(fileStatus.WorkingDir).toBe("M")
                 Vitest.expect(fileStatus.Index = "M").toBe(false)
+            })
+    })
+
+    Vitest.test("commit keeps the staged version when the working tree changes again before commit", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let filePath = join [| context.RepoPath; "tracked.txt" |]
+
+                do! writeUtf8FileAsync filePath "zero\n"
+                let! initialStageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                expectOk "stage initial tracked file" initialStageResult |> ignore
+                let! initialCommitResult = GitService.commit context.RepoPath "test: initial tracked file"
+                expectOk "commit initial tracked file" initialCommitResult |> ignore
+
+                do! writeUtf8FileAsync filePath "version A\n"
+                let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                expectOk "stage version A" stageResult |> ignore
+
+                do! writeUtf8FileAsync filePath "version B\n"
+
+                let! commitResult = GitService.commit context.RepoPath "test: commit staged version"
+                expectOk "commit staged version" commitResult |> ignore
+
+                let! headContent = context.Git.raw [| "show"; "HEAD:tracked.txt" |]
+                Vitest.expect(headContent).toBe("version A\n")
+
+                let! workingTreeStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after divergent commit")
+
+                let trackedFileStatus =
+                    workingTreeStatus.Files
+                    |> Microsoft.FSharp.Collections.Array.find (fun file -> file.Path = "tracked.txt")
+
+                Vitest.expect(trackedFileStatus.WorkingDir).toBe("M")
+            })
+    })
+
+    Vitest.test("planOutboundPush skips LFS upload when outbound commits do not contain LFS pointers", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let remotePath = join [| context.RootPath; "remote.git" |]
+                let filePath = join [| context.RepoPath; "plain.txt" |]
+
+                let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+
+                do! writeUtf8FileAsync filePath "plain text\n"
+
+                let! stageResult = GitService.stagePaths context.RepoPath [| "plain.txt" |]
+                expectOk "stage plain text file" stageResult |> ignore
+
+                let! commitResult = GitService.commit context.RepoPath "test: plain text commit"
+                expectOk "commit plain text file" commitResult |> ignore
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        runSimpleGitResult
+                        (fun git -> runSimpleGitResult (fun currentGit -> currentGit.status ()) git)
+                        "origin"
+                        None
+                        context.Git
+
+                let actualPlan = expectOkResult "plan outbound push without lfs" plan
+                Vitest.expect(actualPlan).toEqual(GitLfsService.OutboundPushPlan.SkipLfsUpload)
+            })
+    })
+
+    Vitest.test("planOutboundPush requires LFS upload when outbound commits contain staged LFS pointers", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let remotePath = join [| context.RootPath; "remote-lfs.git" |]
+                let filePath = join [| context.RepoPath; "artifact.bin" |]
+
+                let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                let! _ = context.Git.raw [| "lfs"; "install"; "--local" |]
+                let! _ = context.Git.raw [| "lfs"; "track"; "*.bin" |]
+
+                do! writeUtf8FileAsync filePath "binary-ish content\n"
+
+                let! stageResult = GitService.stagePaths context.RepoPath [| ".gitattributes"; "artifact.bin" |]
+                expectOk "stage lfs-managed file" stageResult |> ignore
+
+                let! commitResult = GitService.commit context.RepoPath "test: lfs pointer commit"
+                expectOk "commit lfs-managed file" commitResult |> ignore
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        runSimpleGitResult
+                        (fun git -> runSimpleGitResult (fun currentGit -> currentGit.status ()) git)
+                        "origin"
+                        None
+                        context.Git
+
+                let actualPlan = expectOkResult "plan outbound push with lfs" plan
+
+                match actualPlan with
+                | GitLfsService.OutboundPushPlan.UploadLfsObjects refSpec ->
+                    Vitest.expect(String.IsNullOrWhiteSpace refSpec).toBe(false)
+                | GitLfsService.OutboundPushPlan.SkipLfsUpload ->
+                    failwith "Expected outbound LFS upload to be required."
             })
     })
 

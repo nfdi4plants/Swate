@@ -6,15 +6,19 @@ open Fable.Core
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.SimpleGit
 open Main.Git.GitLfsAdapter
+open Main.Git.GitAuthAdapter
 
 [<Literal>]
 let DefaultTimeoutMs = 30000
 
-let private redactPattern =
-    Regex(@"(Authorization:\s*)(Bearer\s+|Basic\s+)[^\s'""]+", RegexOptions.IgnoreCase)
+[<RequireQualifiedAccess>]
+type OutboundPushPlan =
+    | SkipLfsUpload
+    | UploadLfsObjects of refSpec: string
 
-let private credentialUrlPattern =
-    Regex("(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)", RegexOptions.IgnoreCase)
+let private lfsPointerOidPattern = Regex("^oid sha256:[0-9a-f]{64}$", RegexOptions.Multiline)
+let private lfsPointerSizePattern = Regex("^size \\d+$", RegexOptions.Multiline)
+let private maxLfsPointerProbeBytes = 1024L
 
 let extractFailureMessage (result: GitLfsResult) =
     let errorText = result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
@@ -31,9 +35,7 @@ let private redactDiagnosticText (text: string) =
     if String.IsNullOrWhiteSpace text then
         text
     else
-        text
-        |> fun value -> redactPattern.Replace(value, "$1[REDACTED]")
-        |> fun value -> credentialUrlPattern.Replace(value, "$1[REDACTED]@")
+        redactToken text
 
 let createRequest
     (repoPath: string)
@@ -91,6 +93,20 @@ let install (repoPath: string) : JS.Promise<Result<unit, string>> =
             match result with
             | Ok _ -> Ok()
             | Error exn -> Error exn.Message
+    }
+
+let installSystem () : JS.Promise<Result<unit, string>> =
+    promise {
+        try
+            let! result = gitLfs.Install (Some DefaultTimeoutMs) ignore (fun () -> false)
+
+            return
+                if result.Success then
+                    Ok()
+                else
+                    Error(extractFailureMessage result)
+        with ex ->
+            return Error ex.Message
     }
 
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
@@ -184,16 +200,161 @@ let private resolvePushRefSpec
                 return "HEAD"
     }
 
-let pushObjects
+let private splitNonEmptyLines (text: string) =
+    text.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+    |> Array.map _.Trim()
+    |> Array.filter (fun line -> not (String.IsNullOrWhiteSpace line))
+
+let private getKnownRemoteRefs
+    (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
+    (remoteName: string)
+    (git: ISimpleGit)
+    : JS.Promise<Result<string[], 'Failure>> =
+    promise {
+        let! result =
+            runSimpleGitRaw
+                (fun currentGit -> currentGit.raw [| "for-each-ref"; "--format=%(refname)"; $"refs/remotes/{remoteName}" |])
+                git
+
+        return
+            result
+            |> Result.map (fun output ->
+                output
+                |> splitNonEmptyLines
+                |> Array.filter (fun refName -> not (refName.EndsWith("/HEAD", StringComparison.Ordinal)))
+            )
+    }
+
+let private getOutboundObjectIds
+    (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
+    (refSpec: string)
+    (remoteRefs: string[])
+    (git: ISimpleGit)
+    : JS.Promise<Result<string[], 'Failure>> =
+    promise {
+        let args =
+            [|
+                "rev-list"
+                "--objects"
+                refSpec
+                yield!
+                    remoteRefs
+                    |> Array.map (fun remoteRef -> $"^{remoteRef}")
+            |]
+
+        let! result = runSimpleGitRaw (fun currentGit -> currentGit.raw args) git
+
+        return
+            result
+            |> Result.map (fun output ->
+                output
+                |> splitNonEmptyLines
+                |> Array.choose (fun line ->
+                    let separatorIndex = line.IndexOf(' ')
+
+                    if separatorIndex <= 0 then
+                        None
+                    else
+                        Some(line.Substring(0, separatorIndex))
+                )
+                |> Array.distinct
+            )
+    }
+
+let private isLfsPointerContent (content: string) =
+    let normalized =
+        content.Replace("\r\n", "\n").Trim()
+
+    normalized.StartsWith("version https://git-lfs.github.com/spec/v1", StringComparison.Ordinal)
+    && lfsPointerOidPattern.IsMatch normalized
+    && lfsPointerSizePattern.IsMatch normalized
+
+let private containsOutboundLfsPointerObjects
+    (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
+    (objectIds: string[])
+    (git: ISimpleGit)
+    : JS.Promise<Result<bool, 'Failure>> =
+    promise {
+        let mutable hasLfsPointer = false
+        let mutable failure: 'Failure option = None
+
+        for objectId in objectIds do
+            if not hasLfsPointer && failure.IsNone then
+                let! objectTypeResult = runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-t"; objectId |]) git
+
+                match objectTypeResult with
+                | Error currentFailure ->
+                    failure <- Some currentFailure
+                | Ok objectType when objectType.Trim().Equals("blob", StringComparison.Ordinal) ->
+                    let! objectSizeResult = runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-s"; objectId |]) git
+
+                    match objectSizeResult with
+                    | Error currentFailure ->
+                        failure <- Some currentFailure
+                    | Ok objectSizeText ->
+                        let success, objectSize = Int64.TryParse(objectSizeText.Trim())
+
+                        if (not success) || objectSize <= maxLfsPointerProbeBytes then
+                            let! contentResult = runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-p"; objectId |]) git
+
+                            match contentResult with
+                            | Error currentFailure ->
+                                failure <- Some currentFailure
+                            | Ok content when isLfsPointerContent content ->
+                                hasLfsPointer <- true
+                            | Ok _ ->
+                                ()
+                | Ok _ ->
+                    ()
+
+        match failure with
+        | Some currentFailure -> return Error currentFailure
+        | None -> return Ok hasLfsPointer
+    }
+
+let planOutboundPush
     (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
     (runStatus: ISimpleGit -> JS.Promise<Result<StatusResult, 'Failure>>)
     (remoteName: string)
     (branchName: string option)
     (git: ISimpleGit)
-    : JS.Promise<Result<unit, 'Failure>> =
+    : JS.Promise<Result<OutboundPushPlan, 'Failure>> =
     promise {
         let! refSpec = resolvePushRefSpec runStatus branchName git
+        let! remoteRefsResult = getKnownRemoteRefs runSimpleGitRaw remoteName git
 
+        match remoteRefsResult with
+        | Error failure ->
+            return Error failure
+        | Ok remoteRefs ->
+            let! outboundObjectIdsResult = getOutboundObjectIds runSimpleGitRaw refSpec remoteRefs git
+
+            match outboundObjectIdsResult with
+            | Error failure ->
+                return Error failure
+            | Ok objectIds when objectIds.Length = 0 ->
+                return Ok OutboundPushPlan.SkipLfsUpload
+            | Ok objectIds ->
+                let! hasOutboundLfsPointersResult =
+                    containsOutboundLfsPointerObjects runSimpleGitRaw objectIds git
+
+                return
+                    hasOutboundLfsPointersResult
+                    |> Result.map (fun hasOutboundLfsPointers ->
+                        if hasOutboundLfsPointers then
+                            OutboundPushPlan.UploadLfsObjects refSpec
+                        else
+                            OutboundPushPlan.SkipLfsUpload
+                    )
+    }
+
+let uploadObjects
+    (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
+    (remoteName: string)
+    (refSpec: string)
+    (git: ISimpleGit)
+    : JS.Promise<Result<unit, 'Failure>> =
+    promise {
         return!
             runSimpleGitRaw
                 (fun currentGit -> promise {
