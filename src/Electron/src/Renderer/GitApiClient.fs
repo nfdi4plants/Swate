@@ -11,9 +11,14 @@ type GitPageLoadResult<'T> =
 
 let private gitApi = Api.ipcGitApi
 
-let private getGitStatusRaw: unit -> JS.Promise<Result<GitStatusDto, exn>> = unbox gitApi.getGitStatus
-let private getGitBranchesRaw: unit -> JS.Promise<Result<GitBranchRefDto[], exn>> = unbox gitApi.getGitBranches
-let private getGitLfsSettingsRaw: unit -> JS.Promise<Result<GitLfsSettingsDto, exn>> = unbox gitApi.getGitLfsSettings
+let private getGitStatusRaw () : JS.Promise<Result<GitStatusDto, exn>> =
+    gitApi.getGitStatus (unbox null)
+
+let private getGitBranchesRaw () : JS.Promise<Result<GitBranchRefDto[], exn>> =
+    gitApi.getGitBranches (unbox null)
+
+let private getGitLfsSettingsRaw () : JS.Promise<Result<GitLfsSettingsDto, exn>> =
+    gitApi.getGitLfsSettings (unbox null)
 let private getGitDiffViewDataRaw (requestedPath: string) : JS.Promise<Result<GitDiffViewDataDto, exn>> =
     gitApi.getGitDiffViewData (unbox null) requestedPath
 
@@ -22,7 +27,8 @@ let private getGitMergeConflictViewDataRaw
     : JS.Promise<Result<GitMergeConflictViewDataDto, exn>> =
     gitApi.getGitMergeConflictViewData (unbox null) requestedPath
 
-let private installGitLfsRaw: unit -> JS.Promise<Result<GitOperationResult, exn>> = unbox gitApi.installGitLfs
+let private installGitLfsRaw () : JS.Promise<Result<GitOperationResult, exn>> =
+    gitApi.installGitLfs (unbox null)
 
 let private gitFetchRaw (request: GitRemoteOperationRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     gitApi.gitFetch (unbox null) request

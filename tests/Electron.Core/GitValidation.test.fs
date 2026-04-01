@@ -94,6 +94,9 @@ let private extractSingleLineBlock (startPattern: string) (endPattern: string) (
 let private expectSourceContains (sourceText: string) (snippet: string) =
     Vitest.expect(sourceText.Contains(snippet), $"Expected source to contain: {snippet}").toBe(true)
 
+let private expectSourceNotContains (sourceText: string) (snippet: string) =
+    Vitest.expect(sourceText.Contains(snippet), $"Expected source not to contain: {snippet}").toBe(false)
+
 Vitest.beforeAll(fun () -> promise {
     let! sourceText = readUtf8FileAsync simpleGitSourcePath
     let! gitApiClientText = readUtf8FileAsync gitApiClientSourcePath
@@ -456,9 +459,16 @@ Vitest.describe("Git renderer workflow contracts", fun () ->
         Vitest.expect(argumentTypes.[0]).toEqual(typeof<IpcMainEvent>)
         Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe(true))
 
-    Vitest.test("GitApiClient binds installGitLfs from the typed git bridge", fun () ->
+    Vitest.test("GitApiClient calls no-payload endpoints through explicit typed wrappers", fun () ->
         let sourceText = getGitApiClientSource ()
-        expectSourceContains sourceText "unbox gitApi.installGitLfs")
+        expectSourceContains sourceText "gitApi.getGitStatus (unbox null)"
+        expectSourceContains sourceText "gitApi.getGitBranches (unbox null)"
+        expectSourceContains sourceText "gitApi.getGitLfsSettings (unbox null)"
+        expectSourceContains sourceText "gitApi.installGitLfs (unbox null)"
+        expectSourceNotContains sourceText "unbox gitApi.getGitStatus"
+        expectSourceNotContains sourceText "unbox gitApi.getGitBranches"
+        expectSourceNotContains sourceText "unbox gitApi.getGitLfsSettings"
+        expectSourceNotContains sourceText "unbox gitApi.installGitLfs")
 
     Vitest.test("GitStateCtx uses the typed git client and no longer uses dynamic IPC dispatch", fun () ->
         let sourceText = getGitStateCtxSource ()
