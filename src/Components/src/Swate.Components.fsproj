@@ -147,6 +147,7 @@
     <Compile Include="Widgets\FilePickerWidget.fs" />
     <Compile Include="Widgets\DataAnnotatorWidget.fs" />
     <Compile Include="Widgets\TemplateWidget.fs" />
+    <Compile Include="ARCFileEditor\ActiveView.fs" />
     <Compile Include="ARCFileEditor\ArcFileEditor.fs" />
     <Compile Include="ARCObjectExplorer\Types.fs" />
     <Compile Include="ARCObjectExplorer\ARCExplorer.fs" />

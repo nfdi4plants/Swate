@@ -101,6 +101,11 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget) =
 
+    let toggleArcObjectExplorer () =
+        match leftSidebarTarget with
+        | LeftSidebarPage.ArcObjectTree -> toggleTarget LeftSidebarPage.FileExplorer
+        | LeftSidebarPage.FileExplorer -> toggleTarget LeftSidebarPage.ArcObjectTree
+
     // let leftSidebarStateCtx =
     //     React.useContext Swate.Components.LayoutContext.LeftSidebarContext
 
@@ -110,6 +115,12 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget)
             tooltip = "Home",
             isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
             onClick = fun () -> toggleTarget (LeftSidebarPage.FileExplorer)
+        )
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--database-24-regular",
+            tooltip = "ARC object explorer",
+            isActive = (leftSidebarTarget = LeftSidebarPage.ArcObjectTree),
+            onClick = toggleArcObjectExplorer
         )
     ]
 
@@ -173,9 +184,6 @@ let Main () =
     let toggleLeftSidebarTarget =
         React.useCallback ((fun target -> dispatch (ToggleLeftSidebarTarget target)), [||])
 
-    let setLeftSidebarPage =
-        React.useCallback ((fun leftSidebarPage -> dispatch (ToggleLeftSidebarTarget leftSidebarPage)), [||])
-
     let rightSidebar =
         match model.AppState, model.LeftSidebarTarget with
         | Some _, LeftSidebarPage.ArcObjectTree -> Some(Renderer.Components.RightSidebar.ArcObjectDetailsSidebar.Main())
@@ -199,7 +207,7 @@ let Main () =
                                 Renderer.Components.Navbar.Main(
                                     showRightSidebarToggle = (model.AppState.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectTree)
                                 ),
-                            leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget, setLeftSidebarPage),
+                            leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
                             ?rightSidebar = rightSidebar,
                             leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
                             leftSidebarState = {

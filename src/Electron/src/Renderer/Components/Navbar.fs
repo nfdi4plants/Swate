@@ -287,11 +287,12 @@ type Navbar =
                 prop.className "swt:flex swt:items-center"
                 prop.children [
                     Authentication.UserAvatar()
-                    if showRightSidebarToggle then
-                        Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                        Layout.RightSidebarToggleBtn()
                     Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                    Layout.LeftSidebarToggleBtn(activeBorderStyle = true)
+                    if showRightSidebarToggle then
+                        //Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
+                        Layout.RightSidebarToggleBtn()
+                    //Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
+                    Layout.LeftSidebarToggleBtn(activeBorderStyle = false)
                 ]
             ]
 

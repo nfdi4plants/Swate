@@ -106,23 +106,6 @@ type Layout =
 
     [<ReactComponent>]
     static member LeftSidebarToggleBtn(?activeBorderStyle: bool) =
-        let ctx = React.useContext (LeftSidebarContext)
-        let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.isOpen)
-
-        Layout.LayoutBtn(
-            iconClassName =
-                (if ctx.isOpen then
-                     "swt:fluent--panel-left-48-filled"
-                 else
-                     "swt:fluent--panel-left-48-regular"),
-            tooltip = "Toggle left sidebar",
-            tooltipClassName = "swt:tooltip-left",
-            ?isActive = showIsActive,
-            onClick = fun () -> ctx.setIsOpen (not ctx.isOpen)
-        )
-
-    [<ReactComponent>]
-    static member RightSidebarToggleBtn(?activeBorderStyle: bool) =
         let ctx = React.useContext RightSidebarContext
         let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.state)
 
@@ -136,6 +119,23 @@ type Layout =
             onClick = (fun () -> ctx.setState (not ctx.state)),
             tooltipClassName = "swt:tooltip-left",
             ?isActive = showIsActive
+        )
+
+    [<ReactComponent>]
+    static member RightSidebarToggleBtn(?activeBorderStyle: bool) =
+        let ctx = React.useContext (LeftSidebarContext)
+        let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.isOpen)
+
+        Layout.LayoutBtn(
+            iconClassName =
+                (if ctx.isOpen then
+                     "swt:fluent--panel-left-48-filled"
+                 else
+                     "swt:fluent--panel-left-48-regular"),
+            tooltip = "Toggle left sidebar",
+            tooltipClassName = "swt:tooltip-left",
+            ?isActive = showIsActive,
+            onClick = fun () -> ctx.setIsOpen (not ctx.isOpen)
         )
 
     [<ReactComponent>]

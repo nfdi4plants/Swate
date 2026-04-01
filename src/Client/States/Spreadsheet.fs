@@ -4,6 +4,16 @@ open Swate.Components
 open ARCtrl
 open FileImport
 
+type ActiveView = Swate.Components.ActiveView
+
+module ActivePattern =
+
+    let (|IsTable|IsDataMap|IsMetadata|) (input: ActiveView) =
+        match input with
+        | Swate.Components.ActiveView.Table _ -> IsTable
+        | Swate.Components.ActiveView.DataMap -> IsDataMap
+        | Swate.Components.ActiveView.Metadata -> IsMetadata
+
 type ColumnType =
     | Main
     | Unit
@@ -40,42 +50,6 @@ type ColumnType =
         | _ -> false
 
     member this.IsRefColumn = not this.IsMainColumn
-
-[<RequireQualifiedAccess>]
-type ActiveView =
-    | Table of index: int
-    | DataMap
-    | Metadata
-
-    /// <summary>
-    /// A identifier that returns an integer based on the ActiveView type.
-    /// </summary>
-    member this.ViewIndex =
-        match this with
-        | Table i -> i
-        | DataMap -> -1
-        | Metadata -> -2
-
-    member this.TryTableIndex =
-        match this with
-        | Table i -> Some i
-        | _ -> None
-
-    /// This function is used to verify if the current arcfile supports the active view type.
-    member this.ArcFileHasView(arcfile: ArcFiles) =
-        match this with
-        | Table i -> arcfile.HasTableAt(i)
-        | DataMap -> arcfile.HasTableAt(-1)
-        | Metadata -> arcfile.HasMetadata()
-
-[<AutoOpen>]
-module ActivePattern =
-
-    let (|IsTable|IsDataMap|IsMetadata|) (input: ActiveView) =
-        match input with
-        | ActiveView.Table _ -> IsTable
-        | ActiveView.DataMap -> IsDataMap
-        | ActiveView.Metadata -> IsMetadata
 
 ///<summary>If you change this model, it will kill caching for users! if you apply changes to it, make sure to keep a version
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>

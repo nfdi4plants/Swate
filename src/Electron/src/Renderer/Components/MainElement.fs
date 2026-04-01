@@ -12,7 +12,7 @@ let CreateARCitectNavbar
     (onSaveClick: Browser.Types.MouseEvent -> unit)
     =
 
-    let activeTableIndex = ArcFileEditorView.activeTableIndex editorState.activeView
+    let activeTableIndex = editorState.activeView.TryTableIndex
 
     let templateImportType, setTemplateImportType =
         React.useState TableJoinOptions.Headers

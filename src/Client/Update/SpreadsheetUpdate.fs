@@ -92,32 +92,16 @@ module Spreadsheet =
 
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
-                let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
-
                 let nextState =
-                    let baseState =
-                        if reset then
-                            Spreadsheet.Model.init (arcFile)
-                        else
-                            { state with ArcFile = Some arcFile }
-
-                    match arcFile with
-                    | ArcFiles.Workflow _ -> {
-                        baseState with
-                            ActiveView = ActiveView.Metadata
-                      }
-                    | ArcFiles.DataMap _ -> {
-                        baseState with
-                            ActiveView = ActiveView.DataMap
-                      }
-                    | _ -> baseState
+                    {
+                        state with
+                            ArcFile = Some arcFile
+                            ActiveView = ActiveView.Normalize(arcFile, state.ActiveView)
+                    }
 
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState =
-                    match arcFile with
-                    | ArcFiles.DataMap _ -> Spreadsheet.Model.init (arcFile, ActiveView.DataMap)
-                    | _ -> Spreadsheet.Model.init (arcFile)
+                let nextState = Spreadsheet.Model.init (arcFile, ActiveView.Normalize(arcFile, ActiveView.Metadata))
 
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation(range, oa) ->
