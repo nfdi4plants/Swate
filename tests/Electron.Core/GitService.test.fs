@@ -497,6 +497,23 @@ Vitest.describe("GitService local repository workflow", fun () ->
 
                 Vitest.expect(featureStatus.Current).toEqual(Some featureBranchName)
                 Vitest.expect(featureStatus.Tracking).toEqual(Some $"origin/{featureBranchName}")
+
+                let! branchOptions =
+                    unwrapResultAsync (GitService.getBranches context.RepoPath) (expectOk "git branches after checkout feature branch")
+
+                let localFeatureBranch =
+                    branchOptions
+                    |> Microsoft.FSharp.Collections.Array.find (fun branch -> branch.RefName = featureBranchName)
+
+                let remoteFeatureBranch =
+                    branchOptions
+                    |> Microsoft.FSharp.Collections.Array.find (fun branch -> branch.RefName = $"origin/{featureBranchName}")
+
+                Vitest.expect(localFeatureBranch.Kind).toEqual(GitService.GitBranchRefKind.Local)
+                Vitest.expect(localFeatureBranch.IsCurrent).toBe(true)
+                Vitest.expect(localFeatureBranch.IsTracking).toBe(true)
+                Vitest.expect(remoteFeatureBranch.Kind).toEqual(GitService.GitBranchRefKind.Remote)
+                Vitest.expect(remoteFeatureBranch.IsTracking).toBe(true)
             })
     })
 

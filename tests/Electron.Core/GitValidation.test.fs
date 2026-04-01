@@ -127,6 +127,47 @@ Vitest.describe("GitService.classifyFailureKind", fun () ->
             Vitest.expect(GitService.classifyFailureKind message).toEqual(expected))
 )
 
+Vitest.describe("GitService.resolvePushTarget", fun () ->
+    let cases = [|
+        "pushes the current local branch and sets upstream when no upstream is configured",
+        None,
+        Some "feature/local-only",
+        None,
+        false,
+        ("feature/local-only", "feature/local-only", true)
+
+        "uses the current local branch without setting upstream when tracking already exists",
+        None,
+        Some "feature/tracked",
+        Some "origin/feature/tracked",
+        false,
+        ("feature/tracked", "feature/tracked", false)
+
+        "keeps an explicitly requested non-current branch as-is",
+        Some "feature/other",
+        Some "feature/current",
+        None,
+        false,
+        ("feature/other", "feature/other", false)
+
+        "falls back to HEAD for detached checkouts",
+        None,
+        Some "feature/detached",
+        None,
+        true,
+        ("HEAD", "HEAD", false)
+    |]
+
+    for testName, requestedBranch, currentBranch, trackingBranch, isDetached, (expectedRefSpec, expectedPushBranch, expectedSetUpstream) in cases do
+        Vitest.test(testName, fun () ->
+            let pushTarget =
+                GitService.resolvePushTarget requestedBranch currentBranch trackingBranch isDetached
+
+            Vitest.expect(pushTarget.RefSpec).toBe(expectedRefSpec)
+            Vitest.expect(pushTarget.PushBranch).toBe(expectedPushBranch)
+            Vitest.expect(pushTarget.SetUpstream).toBe(expectedSetUpstream))
+)
+
 Vitest.describe("GitService.ensureValidBranchLikeName", fun () ->
     let validCases = [|
         "accepts main", "main"
@@ -469,6 +510,10 @@ Vitest.describe("Git renderer workflow contracts", fun () ->
         expectSourceNotContains sourceText "unbox gitApi.getGitBranches"
         expectSourceNotContains sourceText "unbox gitApi.getGitLfsSettings"
         expectSourceNotContains sourceText "unbox gitApi.installGitLfs")
+
+    Vitest.test("GitApiClient no longer depends on unsupported-content message text", fun () ->
+        let sourceText = getGitApiClientSource ()
+        Vitest.expect(sourceText.Contains("Unsupported git content for '")).toBe(false))
 
     Vitest.test("GitStateCtx uses the typed git client and no longer uses dynamic IPC dispatch", fun () ->
         let sourceText = getGitStateCtxSource ()

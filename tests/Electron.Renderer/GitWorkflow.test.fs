@@ -5,6 +5,7 @@ open Browser.Types
 open Fable.Core
 open Feliz
 open Renderer.Context.GitWorkflow
+open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Vitest
 
@@ -41,6 +42,12 @@ let private cleanStatus = {
     Files = [||]
 }
 
+let private statusForBranch branchName = {
+    cleanStatus with
+        Current = Some branchName
+        Tracking = Some $"origin/{branchName}"
+}
+
 let private conflictedStatus conflictedPaths = {
     Current = Some "main"
     Tracking = Some "origin/main"
@@ -64,6 +71,35 @@ let private okOperationResult = {
     Message = None
     FailureKind = None
     Path = None
+}
+
+let private localBranch refName isCurrent isTracking = {
+    RefName = refName
+    DisplayLabel = refName
+    Kind = GitBranchRefKind.Local
+    IsCurrent = isCurrent
+    IsTracking = isTracking
+}
+
+let private sidebarLocalBranch refName isCurrent isTracking : GitSidebarBranchOption = {
+    RefName = refName
+    DisplayLabel = refName
+    Kind = GitSidebarBranchKind.Local
+    IsCurrent = isCurrent
+    IsTracking = isTracking
+}
+
+let private sidebarRemoteBranch refName isTracking : GitSidebarBranchOption = {
+    RefName = refName
+    DisplayLabel = refName
+    Kind = GitSidebarBranchKind.Remote
+    IsCurrent = false
+    IsTracking = isTracking
+}
+
+let private lfsSettings thresholdMb downloadLargeFiles = {
+    AutoTrackThresholdMb = thresholdMb
+    DownloadLargeFiles = downloadLargeFiles
 }
 
 let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>> =
@@ -165,6 +201,40 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(store.State.MergeResolutionPendingPath).toEqual(None)
     })
 
+    Vitest.test("confirmMergeResolution ignores a second request while another conflict is still confirming", fun () -> promise {
+        let store = WorkflowStore {
+            GitState.Empty with
+                BusyOperation = Some(GitBusyOperation.ConfirmingMergeResolution "conflict-a.txt")
+                MergeResolutionPendingPath = Some "conflict-a.txt"
+        }
+
+        let mutable confirmCallCount = 0
+
+        let deps = {
+            defaultDependencies with
+                confirmGitMergeResolution =
+                    fun _ ->
+                        confirmCallCount <- confirmCallCount + 1
+                        unexpectedPromise "confirmGitMergeResolution"
+        }
+
+        let! result =
+            confirmMergeResolution
+                deps
+                (fun () -> true)
+                store.GetState
+                store.Dispatch
+                {
+                    Path = "conflict-b.txt"
+                    ExpectedConflictContent = "<<<<<<< HEAD\nB\n=======\nC\n>>>>>>> branch\n"
+                    ResolvedContent = "resolved"
+                }
+
+        Vitest.expect(result).toEqual(Ok())
+        Vitest.expect(confirmCallCount).toBe(0)
+        Vitest.expect(store.State.MergeResolutionPendingPath).toEqual(Some "conflict-a.txt")
+    })
+
     Vitest.test("loadPage ignores stale responses from older requests", fun () -> promise {
         let store = WorkflowStore GitState.Empty
         let deferredA, resolveA = createDeferred<Result<GitPage, string>> ()
@@ -196,6 +266,65 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(resultA).toEqual(Ok())
         Vitest.expect(store.State.SelectedChangePath).toEqual(Some "B.txt")
         Vitest.expect(store.State.ActivePage).toEqual(Some pageB)
+    })
+
+    Vitest.test("refreshAll ignores stale responses from older requests", fun () -> promise {
+        let store = WorkflowStore GitState.Empty
+        let statusDeferredA, resolveStatusA = createDeferred<Result<GitStatusDto, string>> ()
+        let statusDeferredB, resolveStatusB = createDeferred<Result<GitStatusDto, string>> ()
+        let mutable statusCalls = 0
+        let branchProfiles = ResizeArray<string>()
+        let lfsProfiles = ResizeArray<string>()
+
+        let deps = {
+            defaultDependencies with
+                getGitStatus =
+                    fun () ->
+                        statusCalls <- statusCalls + 1
+
+                        match statusCalls with
+                        | 1 -> statusDeferredA
+                        | 2 -> statusDeferredB
+                        | _ -> unexpectedPromise "getGitStatus"
+                getGitBranches =
+                    fun () ->
+                        let profile = branchProfiles.[0]
+                        branchProfiles.RemoveAt 0
+
+                        match profile with
+                        | "A" -> promise { return Ok [| localBranch "feature/a" true true |] }
+                        | "B" -> promise { return Ok [| localBranch "feature/b" true true |] }
+                        | _ -> unexpectedPromise $"getGitBranches:{profile}"
+                getGitLfsSettings =
+                    fun () ->
+                        let profile = lfsProfiles.[0]
+                        lfsProfiles.RemoveAt 0
+
+                        match profile with
+                        | "A" -> promise { return Ok(lfsSettings 3 true) }
+                        | "B" -> promise { return Ok(lfsSettings 9 false) }
+                        | _ -> unexpectedPromise $"getGitLfsSettings:{profile}"
+        }
+
+        let refreshA = refreshAll deps (fun () -> true) store.GetState store.Dispatch
+        let refreshB = refreshAll deps (fun () -> true) store.GetState store.Dispatch
+
+        branchProfiles.Add "B"
+        lfsProfiles.Add "B"
+        resolveStatusB (Ok(statusForBranch "feature/b"))
+        let! resultB = refreshB
+
+        branchProfiles.Add "A"
+        lfsProfiles.Add "A"
+        resolveStatusA (Ok(statusForBranch "feature/a"))
+        let! resultA = refreshA
+
+        Vitest.expect(resultB).toEqual(Ok(Some(statusForBranch "feature/b")))
+        Vitest.expect(resultA).toEqual(Ok None)
+        Vitest.expect(store.State.Status.CurrentBranch).toEqual(Some "feature/b")
+        Vitest.expect(store.State.BranchOptions |> Array.map _.RefName).toEqual([| "feature/b" |])
+        Vitest.expect(store.State.LfsAutoTrackThresholdMb).toBe(9)
+        Vitest.expect(store.State.DownloadLargeFiles).toBe(false)
     })
 
     Vitest.test("confirmMergeResolution opens the next conflicted file and clears pending state", fun () -> promise {
@@ -281,6 +410,80 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(store.State.ActivePage).toEqual(None)
     })
 
+    Vitest.test("shouldPublishCurrentBranchFirst is true when the current branch has no upstream or matching remote", fun () ->
+        let state = {
+            GitState.Empty with
+                Status = {
+                    GitState.Empty.Status with
+                        CurrentBranch = Some "feature/local-only"
+                        TrackingBranch = None
+                }
+                BranchOptions = [| sidebarLocalBranch "feature/local-only" true false |]
+        }
+
+        Vitest.expect(shouldPublishCurrentBranchFirst state).toBe(true))
+
+    Vitest.test("runSyncWorkflow publishes a new local-only branch before attempting pull", fun () -> promise {
+        let store =
+            WorkflowStore {
+                GitState.Empty with
+                    Status = {
+                        GitState.Empty.Status with
+                            CurrentBranch = Some "feature/local-only"
+                            TrackingBranch = None
+                    }
+                    BranchOptions = [| sidebarLocalBranch "feature/local-only" true false |]
+            }
+
+        let mutable pullCalls = 0
+        let mutable pushCalls = 0
+
+        let deps = {
+            defaultDependencies with
+                gitPull =
+                    fun _ ->
+                        pullCalls <- pullCalls + 1
+                        unexpectedPromise "gitPull"
+                gitPush =
+                    fun _ ->
+                        pushCalls <- pushCalls + 1
+                        promise { return Ok okOperationResult }
+                getGitStatus =
+                    fun () ->
+                        promise {
+                            return
+                                Ok {
+                                    statusForBranch "feature/local-only" with
+                                        Tracking = Some "origin/feature/local-only"
+                                }
+                        }
+                getGitBranches =
+                    fun () ->
+                        promise {
+                            return
+                                Ok [|
+                                    localBranch "feature/local-only" true true
+                                    {
+                                        RefName = "origin/feature/local-only"
+                                        DisplayLabel = "origin/feature/local-only"
+                                        Kind = GitBranchRefKind.Remote
+                                        IsCurrent = false
+                                        IsTracking = true
+                                    }
+                                |]
+                        }
+                getGitLfsSettings =
+                    fun () -> promise { return Ok(lfsSettings 5 true) }
+        }
+
+        let! result = runSyncWorkflow deps (fun () -> true) store.GetState store.Dispatch
+
+        Vitest.expect(result).toEqual(Ok())
+        Vitest.expect(pullCalls).toBe(0)
+        Vitest.expect(pushCalls).toBe(1)
+        Vitest.expect(store.State.Status.TrackingBranch).toEqual(Some "origin/feature/local-only")
+    })
+
     Vitest.test("runGitOperationWithLfsInstallRetry retries the original operation exactly once after install", fun () -> promise {
         let store = WorkflowStore GitState.Empty
         let mutable operationCalls = 0
@@ -351,6 +554,44 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(confirmButton.disabled).toBe(true)
         confirmButton.click ()
         Vitest.expect(confirmCalls).toBe(0)
+
+        cleanup ()
+    })
+
+    Vitest.test("GitSidebar shows when the current local branch has no upstream yet", fun () -> promise {
+        let status: GitSidebarStatus = {
+            CurrentBranch = Some "feature/local-only"
+            TrackingBranch = None
+            Ahead = 0
+            Behind = 0
+            IsClean = true
+            IsMergeInProgress = false
+        }
+
+        let! container, cleanup =
+            renderToBody (
+                Swate.Components.GitSidebar.Main(
+                    status = status,
+                    changedFiles = [||],
+                    branchOptions = [| sidebarLocalBranch "feature/local-only" true false |],
+                    onRefresh = (fun () -> promise { return Ok() }),
+                    onFetch = (fun () -> promise { return Ok() }),
+                    onPull = (fun () -> promise { return Ok() }),
+                    onPush = (fun () -> promise { return Ok() }),
+                    onSync = (fun () -> promise { return Ok() }),
+                    onCommitSelection = (fun _ -> promise { return Ok() }),
+                    onCommitAll = (fun _ -> promise { return Ok() }),
+                    downloadLargeFiles = true,
+                    onSaveDownloadLargeFiles = (fun _ -> promise { return Ok() }),
+                    lfsAutoTrackThresholdMb = 5,
+                    onSaveLfsAutoTrackThreshold = (fun _ -> promise { return Ok() }),
+                    onCreateBranch = (fun _ -> promise { return Ok() }),
+                    onSwitchBranch = (fun _ -> promise { return Ok() }),
+                    onSelectChange = (fun _ -> promise { return Ok() })
+                )
+            )
+
+        Vitest.expect(container.textContent.Contains("No upstream configured yet. Push will publish and track origin/feature/local-only.")).toBe(true)
 
         cleanup ()
     })
