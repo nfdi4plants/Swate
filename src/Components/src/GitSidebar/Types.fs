@@ -1,5 +1,6 @@
 namespace Swate.Components.GitSidebarTypes
 
+open System
 open Fable.Core
 
 [<StringEnum(CaseRules.None)>]
@@ -47,3 +48,22 @@ type GitSidebarCommitSelectionRequest = {
     Message: string
     Paths: string[]
 }
+
+[<RequireQualifiedAccess>]
+module GitStatusCode =
+
+    let normalize (code: string) =
+        let trimmed =
+            code
+            |> Option.ofObj
+            |> Option.defaultValue String.Empty
+            |> _.Trim()
+
+        if String.IsNullOrWhiteSpace trimmed then
+            "."
+        else
+            trimmed
+
+    let isStagedIndexStatus (code: string) =
+        let normalized = normalize code
+        normalized <> "." && normalized <> "?"

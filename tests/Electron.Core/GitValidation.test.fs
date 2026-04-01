@@ -50,7 +50,16 @@ let private getRecordField (recordType: Type) (fieldName: string) : PropertyInfo
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private simpleGitSourcePath = join [| ".."; ".."; "src"; "Electron"; "src"; "Main"; "Bindings"; "SimpleGit.fs" |]
+let private gitApiClientSourcePath = join [| ".."; ".."; "src"; "Electron"; "src"; "Renderer"; "GitApiClient.fs" |]
+let private gitStateCtxSourcePath = join [| ".."; ".."; "src"; "Electron"; "src"; "Renderer"; "context"; "GitStateCtx.fs" |]
+
+let private gitMergeConflictTargetSourcePath =
+    join [| ".."; ".."; "src"; "Electron"; "src"; "Renderer"; "Components"; "MainContent"; "GitMergeConflictTarget.fs" |]
+
 let mutable private simpleGitSourceText: string option = None
+let mutable private gitApiClientSourceText: string option = None
+let mutable private gitStateCtxSourceText: string option = None
+let mutable private gitMergeConflictTargetSourceText: string option = None
 
 let private readUtf8FileAsync (path: string) : JS.Promise<string> = promise {
     let! text = fsPromisesDynamic?readFile(path, "utf8") |> unbox<JS.Promise<string>>
@@ -60,6 +69,18 @@ let private readUtf8FileAsync (path: string) : JS.Promise<string> = promise {
 let private getSimpleGitSource () =
     simpleGitSourceText
     |> Option.defaultWith (fun () -> failwith "Expected SimpleGit source text to be loaded before running tests.")
+
+let private getGitApiClientSource () =
+    gitApiClientSourceText
+    |> Option.defaultWith (fun () -> failwith "Expected GitApiClient source text to be loaded before running tests.")
+
+let private getGitStateCtxSource () =
+    gitStateCtxSourceText
+    |> Option.defaultWith (fun () -> failwith "Expected GitStateCtx source text to be loaded before running tests.")
+
+let private getGitMergeConflictTargetSource () =
+    gitMergeConflictTargetSourceText
+    |> Option.defaultWith (fun () -> failwith "Expected GitMergeConflictTarget source text to be loaded before running tests.")
 
 let private extractSingleLineBlock (startPattern: string) (endPattern: string) (text: string) =
     let blockMatch =
@@ -75,7 +96,13 @@ let private expectSourceContains (sourceText: string) (snippet: string) =
 
 Vitest.beforeAll(fun () -> promise {
     let! sourceText = readUtf8FileAsync simpleGitSourcePath
+    let! gitApiClientText = readUtf8FileAsync gitApiClientSourcePath
+    let! gitStateCtxText = readUtf8FileAsync gitStateCtxSourcePath
+    let! gitMergeConflictTargetText = readUtf8FileAsync gitMergeConflictTargetSourcePath
     simpleGitSourceText <- Some sourceText
+    gitApiClientSourceText <- Some gitApiClientText
+    gitStateCtxSourceText <- Some gitStateCtxText
+    gitMergeConflictTargetSourceText <- Some gitMergeConflictTargetText
 })
 
 Vitest.describe("GitService.classifyFailureKind", fun () ->
@@ -191,10 +218,10 @@ Vitest.describe("GitAuthAdapter.redactToken and redactArgs", fun () ->
     let tokenCases = [|
         "redacts bearer token",
         "Authorization: Bearer abc123",
-        "Authorization: Bearer [REDACTED]"
+        "Authorization: [REDACTED]"
         "redacts lowercase bearer token",
         "authorization:bearer XYZ",
-        "authorization:bearer [REDACTED]"
+        "authorization:[REDACTED]"
         "keeps clean message unchanged",
         "clean message",
         "clean message"
@@ -206,13 +233,13 @@ Vitest.describe("GitAuthAdapter.redactToken and redactArgs", fun () ->
         "fatal: unable to access 'https://[REDACTED]@github.com/user/repo.git/'"
         "redacts multiple bearer tokens in one string",
         "Authorization: Bearer a and Authorization: Bearer b",
-        "Authorization: Bearer [REDACTED] and Authorization: Bearer [REDACTED]"
+        "Authorization: [REDACTED] and Authorization: [REDACTED]"
         "redacts bearer token at start and end of string",
         "prefix Authorization: Bearer xyz789",
-        "prefix Authorization: Bearer [REDACTED]"
+        "prefix Authorization: [REDACTED]"
         "redacts bearer tokens across multiple lines",
         "line1 Authorization: Bearer first\nline2 Authorization: Bearer second",
-        "line1 Authorization: Bearer [REDACTED]\nline2 Authorization: Bearer [REDACTED]"
+        "line1 Authorization: [REDACTED]\nline2 Authorization: [REDACTED]"
         "does not redact partial authorization field names",
         "Authorizatio: Bearer token123",
         "Authorizatio: Bearer token123"
@@ -233,11 +260,11 @@ Vitest.describe("GitAuthAdapter.redactToken and redactArgs", fun () ->
                 "http.extraHeader=Authorization: Bearer topsecret"
             |]
 
-        Vitest.expect(redacted.[1]).toBe("http.extraHeader=Authorization: Bearer [REDACTED]"))
+        Vitest.expect(redacted.[1]).toBe("http.extraHeader=Authorization: [REDACTED]"))
 
     Vitest.test("redacts bearer token at the start of the string", fun () ->
         let redacted = GitAuthAdapter.redactToken "Authorization: Bearer abc123"
-        Vitest.expect(redacted).toBe("Authorization: Bearer [REDACTED]"))
+        Vitest.expect(redacted).toBe("Authorization: [REDACTED]"))
 )
 
 Vitest.describe("GitTokenProvider.tryExtractHostFromRemoteUrl", fun () ->
@@ -275,8 +302,8 @@ Vitest.describe("GitAuthAdapter.toConfigEntries and buildAuthArgs", fun () ->
             Vitest.expect(GitAuthAdapter.toConfigEntries args).toEqual(expected))
 
     Vitest.test("buildAuthArgs returns -c header tuple", fun () ->
-        let args = GitAuthAdapter.buildAuthArgs "github.com" "abc123"
-        Vitest.expect(args).toEqual([| "-c"; "http.extraHeader=Authorization: Bearer abc123" |]))
+        let args = GitAuthAdapter.buildAuthArgs "github.com" "abc123" None None
+        Vitest.expect(args).toEqual([| "-c"; "http.extraHeader=Authorization: Basic b2F1dGgyOmFiYzEyMw==" |]))
 )
 
 Vitest.describe("GitService.validateRemoteName", fun () ->
@@ -418,6 +445,34 @@ Vitest.describe("GitProvisioningService validation helpers", fun () ->
             let options = GitProvisioningService.buildCloneBranchOptions (Some "feature/clone-flow")
             Vitest.expect(options).toEqual([| "--branch"; "feature/clone-flow" |]))
     )
+)
+
+Vitest.describe("Git renderer workflow contracts", fun () ->
+    Vitest.test("IGitApi exposes installGitLfs as a typed no-payload endpoint", fun () ->
+        let installField = getRecordField typeof<IGitApi> "installGitLfs"
+        let argumentTypes, returnType = flattenFunctionSignature installField.PropertyType
+
+        Vitest.expect(argumentTypes.Length).toBe(1)
+        Vitest.expect(argumentTypes.[0]).toEqual(typeof<IpcMainEvent>)
+        Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe(true))
+
+    Vitest.test("GitApiClient binds installGitLfs from the typed git bridge", fun () ->
+        let sourceText = getGitApiClientSource ()
+        expectSourceContains sourceText "unbox gitApi.installGitLfs")
+
+    Vitest.test("GitStateCtx uses the typed git client and no longer uses dynamic IPC dispatch", fun () ->
+        let sourceText = getGitStateCtxSource ()
+        expectSourceContains sourceText "React.useElmish"
+        Vitest.expect(sourceText.Contains("ipcGitApiDynamic")).toBe(false)
+        Vitest.expect(sourceText.Contains("invokeGitApiWithoutPayload")).toBe(false)
+        Vitest.expect(sourceText.Contains("invokeGitApiWithPayload")).toBe(false)
+        Vitest.expect(sourceText.Contains("Api.ipcArcVaultApi.runGitLfs")).toBe(false))
+
+    Vitest.test("GitMergeConflictTarget does not keep a sticky local merge-confirm latch", fun () ->
+        let sourceText = getGitMergeConflictTargetSource ()
+        Vitest.expect(sourceText.Contains("React.useState")).toBe(false)
+        Vitest.expect(sourceText.Contains("React.useRef")).toBe(false)
+        expectSourceContains sourceText "gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path")
 )
 
 Vitest.describe("Git IPC provisioning contract reflection", fun () ->

@@ -8,16 +8,12 @@ open Swate.Electron.Shared.GitTypes
 let Main (mergeData: GitMergeConflictViewDataDto) =
 
     let gitStateCtx = Renderer.Context.GitStateCtx.useGitState ()
-    let isConfirming, setIsConfirming = React.useState false
-    let isConfirmingRef = React.useRef false
+    let isConfirming = gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path
 
     let confirmMergeResolution resolvedContent =
-        if isConfirmingRef.current then
+        if isConfirming then
             ()
         else
-            isConfirmingRef.current <- true
-            setIsConfirming true
-
             promise {
                 let! result =
                     gitStateCtx.confirmMergeResolution {
@@ -30,8 +26,7 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
                 | Ok() ->
                     ()
                 | Error _ ->
-                    isConfirmingRef.current <- false
-                    setIsConfirming false
+                    ()
             }
             |> Promise.start
 

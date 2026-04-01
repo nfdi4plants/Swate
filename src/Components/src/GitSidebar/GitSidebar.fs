@@ -11,17 +11,9 @@ module private GitSidebarInternal =
     let hasConflicts (status: GitSidebarStatus) (changedFiles: GitSidebarChange[]) =
         status.IsMergeInProgress || (changedFiles |> Array.exists _.IsConflicted)
 
-    let normalizeStatusCode (code: string) =
-        let trimmed = code.Trim()
-
-        if String.IsNullOrWhiteSpace trimmed then
-            "."
-        else
-            trimmed
-
     let describeChange (change: GitSidebarChange) =
-        let indexCode = normalizeStatusCode change.IndexStatus
-        let worktreeCode = normalizeStatusCode change.WorkingTreeStatus
+        let indexCode = GitStatusCode.normalize change.IndexStatus
+        let worktreeCode = GitStatusCode.normalize change.WorkingTreeStatus
         $"{indexCode}{worktreeCode}"
 
     let changeBadgeClasses (change: GitSidebarChange) =
