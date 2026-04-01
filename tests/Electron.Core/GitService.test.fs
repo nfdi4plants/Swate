@@ -449,4 +449,92 @@ Vitest.describe("GitService local repository workflow", fun () ->
                 Vitest.expect(failure.Message.Contains("does not exist in the local repository")).toBe(true)
             })
     })
+
+    Vitest.test("checkoutBranch switches tracking from origin/main to the matching remote branch", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let filePath = join [| context.RepoPath; "tracked.txt" |]
+                let remotePath = join [| context.RootPath; "remote.git" |]
+
+                do! writeUtf8FileAsync filePath "content\n"
+
+                let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                expectOk "stage tracked file" stageResult |> ignore
+
+                let! commitResult = GitService.commit context.RepoPath "test: base commit"
+                expectOk "commit tracked file" commitResult |> ignore
+
+                let! baseStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after base commit")
+
+                let initialBranch =
+                    baseStatus.Current
+                    |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
+
+                let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                let! _ = context.Git.raw [| "push"; "-u"; "origin"; initialBranch |]
+
+                let! createBranchResult = GitService.createBranch context.RepoPath featureBranchName None
+                expectOk "create feature branch" createBranchResult |> ignore
+
+                let! _ = context.Git.raw [| "push"; "-u"; "origin"; featureBranchName |]
+                let! _ = context.Git.raw [| "branch"; $"--set-upstream-to=origin/{initialBranch}"; featureBranchName |]
+
+                let! poisonedStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after poisoning tracking")
+
+                Vitest.expect(poisonedStatus.Tracking).toEqual(Some $"origin/{initialBranch}")
+
+                let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath initialBranch
+                expectOk "checkout base branch" checkoutBaseResult |> ignore
+
+                let! checkoutFeatureResult = GitService.checkoutBranch context.RepoPath featureBranchName
+                expectOk "checkout feature branch" checkoutFeatureResult |> ignore
+
+                let! featureStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after checkout feature branch")
+
+                Vitest.expect(featureStatus.Current).toEqual(Some featureBranchName)
+                Vitest.expect(featureStatus.Tracking).toEqual(Some $"origin/{featureBranchName}")
+            })
+    })
+
+    Vitest.test("createBranch clears inherited origin/main tracking when the new remote branch does not exist yet", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let filePath = join [| context.RepoPath; "tracked.txt" |]
+                let remotePath = join [| context.RootPath; "remote.git" |]
+
+                do! writeUtf8FileAsync filePath "content\n"
+
+                let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                expectOk "stage tracked file" stageResult |> ignore
+
+                let! commitResult = GitService.commit context.RepoPath "test: base commit"
+                expectOk "commit tracked file" commitResult |> ignore
+
+                let! baseStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after base commit")
+
+                let initialBranch =
+                    baseStatus.Current
+                    |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
+
+                let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                let! _ = context.Git.raw [| "push"; "-u"; "origin"; initialBranch |]
+
+                let! createBranchResult =
+                    GitService.createBranch context.RepoPath featureBranchName (Some $"origin/{initialBranch}")
+
+                expectOk "create feature branch from origin/main" createBranchResult |> ignore
+
+                let! featureStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after branch creation")
+
+                Vitest.expect(featureStatus.Current).toEqual(Some featureBranchName)
+                Vitest.expect(featureStatus.Tracking |> Option.isNone).toBe(true)
+            })
+    })
 )

@@ -582,12 +582,8 @@ let private ensureDefaultTrackingBranchForPull
     (git: ISimpleGit)
     : JS.Promise<unit> =
     promise {
+        let! remoteBranchText = git.raw [| "branch"; "-r"; "--no-color" |]
         let! status = git.status ()
-
-        let hasTrackingBranch =
-            status.tracking
-            |> Option.bind Option.ofObj
-            |> Option.exists (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
 
         let currentBranch =
             status.current
@@ -595,14 +591,80 @@ let private ensureDefaultTrackingBranchForPull
             |> Option.map _.Trim()
             |> Option.filter (fun branch -> not (String.IsNullOrWhiteSpace branch))
 
-        match hasTrackingBranch, status.detached, currentBranch with
-        | true, _, _
-        | _, true, _
-        | _, _, None ->
+        let currentTracking =
+            status.tracking
+            |> Option.bind Option.ofObj
+            |> Option.map _.Trim()
+            |> Option.filter (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
+
+        let remoteRefs =
+            remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            |> Array.map _.Trim()
+            |> Array.filter (fun branchName ->
+                not (String.IsNullOrWhiteSpace branchName)
+                && not (branchName.Contains " -> ")
+            )
+
+        match status.detached, currentBranch with
+        | true, _
+        | _, None ->
             return ()
-        | false, false, Some branchName ->
-            let upstreamRef = $"{remoteName}/{branchName}"
-            let! _ = git.raw [| "branch"; $"--set-upstream-to={upstreamRef}"; branchName |]
+        | false, Some branchName ->
+            let desiredUpstreamRef = $"{remoteName}/{branchName}"
+
+            let desiredTracking =
+                remoteRefs
+                |> Array.tryFind (fun branchRef -> String.Equals(branchRef, desiredUpstreamRef, StringComparison.Ordinal))
+
+            match desiredTracking, currentTracking with
+            | None, _ ->
+                return ()
+            | Some desired, Some current when String.Equals(current, desired, StringComparison.Ordinal) ->
+                return ()
+            | Some desired, _ ->
+                let! _ = git.raw [| "branch"; $"--set-upstream-to={desired}"; branchName |]
+                return ()
+    }
+
+let private reconcileTrackingBranchForCheckout
+    (remoteName: string)
+    (branchName: string)
+    (git: ISimpleGit)
+    : JS.Promise<unit> =
+    promise {
+        let! remoteBranchText = git.raw [| "branch"; "-r"; "--no-color" |]
+        let! status = git.status ()
+
+        let currentTracking =
+            status.tracking
+            |> Option.bind Option.ofObj
+            |> Option.map _.Trim()
+            |> Option.filter (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
+
+        let remoteRefs =
+            remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            |> Array.map _.Trim()
+            |> Array.filter (fun branchRef ->
+                not (String.IsNullOrWhiteSpace branchRef)
+                && not (branchRef.Contains " -> ")
+            )
+
+        let desiredUpstreamRef = $"{remoteName}/{branchName}"
+
+        let desiredTracking =
+            remoteRefs
+            |> Array.tryFind (fun branchRef -> String.Equals(branchRef, desiredUpstreamRef, StringComparison.Ordinal))
+
+        match desiredTracking, currentTracking with
+        | Some desired, Some current when String.Equals(current, desired, StringComparison.Ordinal) ->
+            return ()
+        | Some desired, _ ->
+            let! _ = git.raw [| "branch"; $"--set-upstream-to={desired}"; branchName |]
+            return ()
+        | None, Some _ ->
+            let! _ = git.raw [| "branch"; "--unset-upstream"; branchName |]
+            return ()
+        | None, None ->
             return ()
     }
 
@@ -1506,6 +1568,7 @@ let createBranch (arcPath: string) (branchName: string) (startPoint: string opti
                     arcPath
                     (fun git -> promise {
                         let! _ = git.checkoutLocalBranch (safeBranchName)
+                        do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                         return ()
                     })
         | Some value ->
@@ -1517,6 +1580,7 @@ let createBranch (arcPath: string) (branchName: string) (startPoint: string opti
                         arcPath
                         (fun git -> promise {
                             let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
+                            do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                             return ()
                         })
 }
@@ -1542,6 +1606,7 @@ let checkoutBranch (arcPath: string) (branchName: string) : JS.Promise<GitResult
                         return raise (exn $"Branch '{safeBranchName}' does not exist in the local repository.")
 
                     let! _ = git.checkout (safeBranchName)
+                    do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                     return ()
                 })
 }
