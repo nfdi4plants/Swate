@@ -99,6 +99,23 @@ let getAuthStateDto () : AuthStateDto =
     let summaries = accounts |> Map.toArray |> Array.map (fun (_, v) -> toSummary v)
     { Accounts = summaries }
 
+/// Main-process only helper to read the active account and token.
+let tryGetActiveAccountWithToken () : (AuthUserDto * string) option =
+    getActiveAccount ()
+
+/// Main-process helper to resolve a DataHub endpoint for unauthenticated/public browsing.
+let tryGetPreferredDataHub () : string option =
+    match getActiveAccount () with
+    | Some(user, _) -> Some user.TargetDataHub
+    | None ->
+        accounts
+        |> Map.tryPick (fun _ (user, _) ->
+            if String.IsNullOrWhiteSpace user.TargetDataHub then
+                None
+            else
+                Some user.TargetDataHub
+        )
+
 // ── Public operations ────────────────────────────────────────────────
 
 let private toAuthResult (result: Result<AuthStateDto, AuthFailure>) : AuthResult =

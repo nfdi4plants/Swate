@@ -7,6 +7,8 @@ open Fable.Electron
 open Swate.Components
 open Swate.Components.NoteTypes
 open Swate.Components.AuthenticationTypes
+open Swate.Components.DataHubTypes
+open Swate.Components.Api.GitLabApi
 
 open AuthTypes
 open GitTypes
@@ -68,6 +70,18 @@ type IGitApi = {
     gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: IpcMainEvent -> GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
+type IGitLabApi = {
+    loadAllRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadMostStarredRepos:
+        IpcMainEvent -> ExploreMostStarredQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadUserRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadOrganisationGroups:
+        IpcMainEvent -> ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
+    loadOrganisationRepos:
+        IpcMainEvent -> ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
 }
 
 /// One Way Bridge: Main -> Renderer
