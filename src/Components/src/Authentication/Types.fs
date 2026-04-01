@@ -1,4 +1,4 @@
-module Swate.Components.AuthenticationTypes
+module Swate.Components.Authentication.Types
 
 type SignInInformation = {
     GitLabBaseUrl: string
@@ -76,14 +76,21 @@ type AuthUserDto = {
     }
 
 /// Platform-agnostic account summary for multi-account UI.
-type AccountSummary = { User: AuthUserDto; IsActive: bool }
+type AccountSummary = {
+    User: AuthUserDto
+    DateAdded: string
+    TokenInvalid: bool
+}
 
 /// Current auth state returned by getAuthState.
 type AuthStateDto = {
-    Accounts: AccountSummary array
+    ActiveAccount: AccountSummary option
+    StoredAccounts: AccountSummary array
 } with
 
-    static member Empty = { Accounts = [||] }
+    static member Empty = {
+        ActiveAccount = None
+        StoredAccounts = [||]
+    }
 
-    member this.ActiveAccount() =
-        this.Accounts |> Array.tryFind (fun x -> x.IsActive) |> Option.map _.User
+    member this.ActiveUser() = this.ActiveAccount |> Option.map _.User

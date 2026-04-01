@@ -152,7 +152,8 @@ let Main () =
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     ///Main content module
-    let children = Renderer.Components.MainContent.Main.Main(model.AppState)
+    let children =
+        Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState)
 
     let toggleLeftSidebarTarget =
         React.useCallback ((fun target -> dispatch (ToggleLeftSidebarTarget target)), [||])

@@ -1,6 +1,6 @@
 module Swate.Electron.Shared.AuthTypes
 
-open Swate.Components.AuthenticationTypes
+open Swate.Components.Authentication.Types
 
 /// Request sent from Renderer to Main to sign in.
 type AuthSignInRequest = {
@@ -22,7 +22,7 @@ type AuthFailureKind =
 /// Result returned by auth sign-in / revalidate operations.
 type AuthResult = {
     Success: bool
-    User: Swate.Components.AuthenticationTypes.AuthStateDto option
+    User: Swate.Components.Authentication.Types.AuthStateDto option
     FailureKind: AuthFailureKind option
     Message: string option
 }

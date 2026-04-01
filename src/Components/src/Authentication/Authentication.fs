@@ -1,127 +1,11 @@
-namespace Swate.Components
+namespace Swate.Components.Authentication
 
 open Fable.Core
 open Feliz
-open Swate.Components.AuthenticationTypes
+open Swate.Components
+open Swate.Components.Authentication.Types
+open Swate.Components.Authentication.Helper
 
-type private DataHubInformation = {
-    Name: string
-    Url: string
-    Description: string option
-} with
-
-    member this.GetDescription() =
-        match this.Description with
-        | Some description -> description
-        | None -> this.Url
-
-
-type private DataHubCollection = {
-    Default: DataHubInformation
-    Supported: DataHubInformation list
-}
-
-module GitLabAPI =
-
-    open Fetch
-
-    [<RequireQualifiedAccess>]
-    type SignInError =
-        | NetworkError of exn
-        | Unauthorized
-        | Forbidden
-        | NotFound
-        | HttpError of int
-        | DecodeError of exn
-
-    let getUserAPIRequest (signInInfo: SignInInformation) : JS.Promise<Result<AuthUserDto, SignInError>> = promise {
-        let baseUrl = signInInfo.GitLabBaseUrl.TrimEnd('/')
-        let pat = signInInfo.PersonalAccessToken
-        let url = $"{baseUrl}/api/v4/user"
-
-        let requestOptions = [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat) ]
-        ]
-
-        try
-            console.log ($"Making API request to {url} with PAT")
-            let! response = fetchUnsafe url requestOptions
-
-            // ---- HTTP STATUS HANDLING ----
-            if not response.Ok then
-                return
-                    match response.Status with
-                    | 401 -> Result.Error SignInError.Unauthorized
-                    | 403 -> Result.Error SignInError.Forbidden
-                    | 404 -> Result.Error SignInError.NotFound
-                    | code -> Result.Error(SignInError.HttpError code)
-            else
-
-                // ---- JSON PARSE ----
-                try
-                    let! gitLabUserInfo = response.json<AuthenticationTypes.GitLabUser> ()
-
-                    let userInfo = AuthUserDto.FromGitLabUser gitLabUserInfo signInInfo.GitLabBaseUrl
-
-                    return Ok userInfo
-
-                with ex ->
-                    return Error(SignInError.DecodeError ex)
-
-        // ---- NETWORK ERROR ----
-        with ex ->
-            return Error(SignInError.NetworkError ex)
-    }
-
-module private AuthenticationHelper =
-
-    let prefillGitLabPATScopes (gitlabBaseUrl: string) =
-        let gitlabBaseUrl = gitlabBaseUrl.TrimEnd('/')
-
-        let scopes = [
-            "read_user"
-            "read_repository"
-            "read_api"
-            "write_repository"
-        ]
-
-        let scopeParam = scopes |> String.concat ","
-
-        let description =
-            "Swate Electron App. Gives access to your repositories and allows Swate to read your user information. This is used to authenticate you and access your ARCs. You can revoke this token at any time without affecting any other tokens or your account."
-                .Replace(" ", "%20")
-
-        sprintf
-            "%s/-/user_settings/personal_access_tokens?name=swate-electron&description=%s&scopes=%s"
-            gitlabBaseUrl
-            description
-            scopeParam
-
-    [<Literal>]
-    let Default_DataHub_Url = "https://git.nfdi4plants.org/"
-
-    let Default_DataHub = {
-        Name = "PLANTdataHUB (official)"
-        Url = Default_DataHub_Url
-        Description = Some "The official PLANTdataHUB instance, hosted by the nfdi4plants. Recommended for most users."
-    }
-
-    let Default_DataHub_Collection = {
-        Default = Default_DataHub
-        Supported = [
-            {
-                Name = "gitlab.plantmicrobe.de"
-                Url = "https://gitlab.plantmicrobe.de/"
-                Description = None
-            }
-            {
-                Name = "datahub.rz.rptu.de"
-                Url = "https://datahub.rz.rptu.de/"
-                Description = None
-            }
-        ]
-    }
 
 [<Erase; Mangle(false)>]
 type Authentication =
@@ -254,11 +138,11 @@ type Authentication =
                                         Authentication.DataHubRadioItem(
                                             dataHub,
                                             radioid,
-                                            AuthenticationHelper.Default_DataHub_Collection.Default,
+                                            Authentication.Helper.Default_DataHub_Collection.Default,
                                             setDataHub,
                                             radioClassName = "swt:radio swt:radio-sm swt:radio-primary"
                                         )
-                                        for dataHubI in AuthenticationHelper.Default_DataHub_Collection.Supported do
+                                        for dataHubI in Authentication.Helper.Default_DataHub_Collection.Supported do
                                             Authentication.DataHubRadioItem(dataHub, radioid, dataHubI, setDataHub)
                                         Authentication.CustomDataHubRadioItem(dataHub, radioid, setDataHub)
                                     ]
@@ -273,7 +157,7 @@ type Authentication =
     [<ReactComponent>]
     static member private NotAuthenticatedView(onSignIn: SignInInformation -> unit, setError: exn option -> unit) =
 
-        let datahubUrl, setDataHubUrl = React.useState AuthenticationHelper.Default_DataHub
+        let datahubUrl, setDataHubUrl = React.useState Authentication.Helper.Default_DataHub
         let pat, setPat = React.useState ""
 
         Html.div [
@@ -309,7 +193,7 @@ type Authentication =
                     prop.testId "GeneratePatLink"
                     prop.className "swt:link swt:link-info swt:text-sm swt:text-center swt:py-2"
                     prop.text "Click here to generate a new GitLab Personal Access Token"
-                    prop.href (AuthenticationHelper.prefillGitLabPATScopes datahubUrl.Url)
+                    prop.href (Authentication.Helper.GitLabUrls.prefillGitLabPATScopes datahubUrl.Url)
                     prop.target.blank
                     prop.rel "noopener noreferrer"
                 ]
@@ -370,7 +254,7 @@ type Authentication =
         let error, setError = React.useState (None: exn option)
         let showAddAccount, setShowAddAccount = React.useState false
 
-        let activeUser = accounts.ActiveAccount()
+        let activeUser = accounts.ActiveUser()
 
         let onSignIn =
             fun signInInfo ->
@@ -466,17 +350,24 @@ type Authentication =
             Name = "John Doe"
             Email = "john-doe@mail.com"
             AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
-            TargetDataHub = AuthenticationHelper.Default_DataHub_Url
+            TargetDataHub = Authentication.Helper.Default_DataHub_Url
         }
 
         let accounts, setAccounts =
             React.useState (
                 {
-                    AuthenticationTypes.AuthStateDto.Empty with
-                        Accounts = [|
+                    Authentication.Types.AuthStateDto.Empty with
+                        ActiveAccount =
+                            Some {
+                                User = exmpUserInformation
+                                DateAdded = "2026-01-01T00:00:00.0000000Z"
+                                TokenInvalid = false
+                            }
+                        StoredAccounts = [|
                             {
                                 User = exmpUserInformation
-                                IsActive = true
+                                DateAdded = "2026-01-01T00:00:00.0000000Z"
+                                TokenInvalid = false
                             }
                         |]
                 }
@@ -498,7 +389,19 @@ type Authentication =
                     }
 
                     setAccounts {
-                        Accounts = [|
+                        ActiveAccount =
+                            Some {
+                                User = {
+                                    AccountId = "acc-1"
+                                    Name = activeUser.Name
+                                    Email = activeUser.Email
+                                    AvatarUrl = activeUser.AvatarUrl
+                                    TargetDataHub = activeUser.TargetDataHub
+                                }
+                                DateAdded = "2026-01-01T00:00:00.0000000Z"
+                                TokenInvalid = false
+                            }
+                        StoredAccounts = [|
                             {
                                 User = {
                                     AccountId = "acc-1"
@@ -507,7 +410,8 @@ type Authentication =
                                     AvatarUrl = activeUser.AvatarUrl
                                     TargetDataHub = activeUser.TargetDataHub
                                 }
-                                IsActive = true
+                                DateAdded = "2026-01-01T00:00:00.0000000Z"
+                                TokenInvalid = false
                             }
                             {
                                 User = {
@@ -518,7 +422,8 @@ type Authentication =
                                         "https://www.gravatar.com/avatar/22222222222222222222222222222222?d=mp&f=y"
                                     TargetDataHub = "https://datahub.rz.rptu.de/"
                                 }
-                                IsActive = false
+                                DateAdded = "2026-01-02T00:00:00.0000000Z"
+                                TokenInvalid = false
                             }
                         |]
                     }
@@ -530,24 +435,34 @@ type Authentication =
         let onLogout () = setAccounts AuthStateDto.Empty
 
         let onSwitchAccount (accountId: string) =
+            let nextActive =
+                accounts.StoredAccounts
+                |> Array.tryFind (fun account -> account.User.AccountId = accountId)
+                |> Option.orElse accounts.ActiveAccount
+                |> Option.orElse (accounts.StoredAccounts |> Array.tryHead)
+
             let next = {
-                AuthStateDto.Empty with
-                    Accounts =
-                        accounts.Accounts
-                        |> Array.map (fun account -> {
-                            account with
-                                IsActive = account.User.AccountId = accountId
-                        })
+                ActiveAccount = nextActive
+                StoredAccounts = accounts.StoredAccounts
             }
 
             setAccounts next
 
         let onRemoveAccount (accountId: string) =
+            let filteredAccounts =
+                accounts.StoredAccounts
+                |> Array.filter (fun account -> account.User.AccountId <> accountId)
+
+            let nextActive =
+                match accounts.ActiveAccount with
+                | Some activeAccount when activeAccount.User.AccountId <> accountId ->
+                    filteredAccounts
+                    |> Array.tryFind (fun account -> account.User.AccountId = activeAccount.User.AccountId)
+                | _ -> filteredAccounts |> Array.tryHead
+
             let next = {
-                AuthStateDto.Empty with
-                    Accounts =
-                        accounts.Accounts
-                        |> Array.filter (fun account -> account.User.AccountId <> accountId)
+                ActiveAccount = nextActive
+                StoredAccounts = filteredAccounts
             }
 
             setAccounts next
@@ -561,7 +476,7 @@ type Authentication =
                 ]
                 Html.p [
                     prop.testId "SignedInInfo"
-                    prop.textf "Signed In: %b" (accounts.ActiveAccount() |> Option.isSome)
+                    prop.textf "Signed In: %b" (accounts.ActiveUser() |> Option.isSome)
                 ]
                 Authentication.UserAvatar(
                     accounts,

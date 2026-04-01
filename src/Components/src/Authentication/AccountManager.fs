@@ -1,22 +1,26 @@
-namespace Swate.Components
+namespace Swate.Components.Authentication
 
 open Fable.Core
 open Feliz
 
-open AuthenticationTypes
+open Types
 
 [<Erase; Mangle(false)>]
 type AccountManager =
 
     [<ReactComponent>]
-    static member private AccountRow(account: AccountSummary, ?onSwitch: string -> unit, ?onRemove: string -> unit) =
+    static member private AccountRow
+        (account: AccountSummary, isActive: bool, ?onSwitch: string -> unit, ?onRemove: string -> unit)
+        =
         Html.div [
             prop.key account.User.AccountId
             prop.testId $"AccountRow-{account.User.AccountId}"
             prop.className [
                 "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:p-1.5 swt:rounded swt:text-sm"
-                if account.IsActive then
+                if isActive then
                     "swt:bg-primary/10"
+                if account.TokenInvalid then
+                    "swt:ring-1 swt:ring-error/40"
             ]
             prop.children [
                 Html.div [
@@ -38,6 +42,26 @@ type AccountManager =
                                     prop.className "swt:truncate swt:text-xs swt:text-base-content/60"
                                     prop.text account.User.TargetDataHub
                                 ]
+                                if account.TokenInvalid then
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-center swt:gap-1 swt:text-xs swt:text-error"
+                                        prop.children [
+                                            Html.span [
+                                                prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4"
+                                            ]
+                                            Html.span [ prop.text "Token invalid" ]
+                                            Html.a [
+                                                prop.testId $"RegenerateTokenLink-{account.User.AccountId}"
+                                                prop.className "swt:link swt:link-error"
+                                                prop.href (
+                                                    Helper.GitLabUrls.regenerateTokenUrl account.User.TargetDataHub
+                                                )
+                                                prop.target.blank
+                                                prop.rel "noopener noreferrer"
+                                                prop.text "Regenerate token"
+                                            ]
+                                        ]
+                                    ]
                             ]
                         ]
                     ]
@@ -46,7 +70,7 @@ type AccountManager =
                     prop.className "swt:flex swt:gap-0.5 swt:shrink-0"
                     prop.children [
                         match onSwitch with
-                        | Some switchFn when not account.IsActive ->
+                        | Some switchFn when not isActive ->
                             Html.button [
                                 prop.testId $"UseAccountButton-{account.User.AccountId}"
                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost"
@@ -72,16 +96,21 @@ type AccountManager =
 
     [<ReactComponent>]
     static member Main(accounts: AuthStateDto, ?onSwitchAccount: string -> unit, ?onRemoveAccount: string -> unit) =
+        let activeAccountId =
+            accounts.ActiveAccount |> Option.map (fun account -> account.User.AccountId)
+
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-1 swt:mt-1 swt:pt-1 swt:border-t swt:border-base-content/10"
             prop.children [
-                if accounts.Accounts.Length > 1 then
+                if accounts.StoredAccounts.Length > 1 then
                     Html.div [
                         prop.className "swt:text-xs swt:text-base-content/60 swt:px-1"
-                        prop.textf "Accounts (%d)" accounts.Accounts.Length
+                        prop.textf "Accounts (%d)" accounts.StoredAccounts.Length
                     ]
 
-                for acct in accounts.Accounts do
-                    AccountManager.AccountRow(acct, ?onSwitch = onSwitchAccount, ?onRemove = onRemoveAccount)
+                for acct in accounts.StoredAccounts do
+                    let isActive = activeAccountId = Some acct.User.AccountId
+
+                    AccountManager.AccountRow(acct, isActive, ?onSwitch = onSwitchAccount, ?onRemove = onRemoveAccount)
             ]
         ]

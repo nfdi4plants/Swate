@@ -6,7 +6,7 @@ open Fable.Electron
 
 open Swate.Components
 open Swate.Components.NoteTypes
-open Swate.Components.AuthenticationTypes
+open Swate.Components.Authentication.Types
 open Swate.Components.DataHubTypes
 open Swate.Components.Api.GitLabApi
 
@@ -38,6 +38,7 @@ type IArcVaultsApi = {
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
 
     pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickDirectory: IpcMainEvent -> JS.Promise<Result<string, exn>>
     pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
     pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<Swate.Components.ImportedTextFile[], exn>>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
@@ -88,7 +89,7 @@ type IGitLabApi = {
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
-    authAccountsUpdate: AccountSummary[] -> unit
+    authAccountsUpdate: AuthStateDto -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit
 } with

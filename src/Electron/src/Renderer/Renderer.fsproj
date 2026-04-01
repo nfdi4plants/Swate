@@ -32,8 +32,6 @@
     <Compile Include="Components\MainContent\NotesSearchTarget.fs"/>
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs"/>
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs"/>
-    <Compile Include="Components\MainContent\InitTarget.fs"/>
-    <Compile Include="Components\MainContent\ArcTarget.fs"/>
     <Compile Include="Components\MainContent\Main.fs"/>
     <Compile Include="Components\CloseWindowController.fs"/>
     <Compile Include="App.fs"/>

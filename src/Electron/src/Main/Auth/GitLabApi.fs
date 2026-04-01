@@ -3,7 +3,7 @@ module Main.Auth.GitLabApi
 open Fable.Core
 open Fetch
 open Swate.Electron.Shared.AuthTypes
-open Swate.Components.AuthenticationTypes
+open Swate.Components.Authentication.Types
 
 type GitLabAuthFailure = {
     Kind: AuthFailureKind

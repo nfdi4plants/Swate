@@ -17,6 +17,8 @@ type AuthMetadata = {
     Email: string
     AvatarUrl: string
     TargetDataHub: string
+    DateAdded: string
+    TokenInvalid: bool
 }
 
 /// In-memory representation of a full auth credential set.
@@ -42,7 +44,7 @@ let private createHash (algorithm: string) : CryptoHash = jsNative
 
 let private sha256Hex (input: string) : string =
     let hash = createHash "sha256"
-    hash.update(input, "utf8").digest("hex")
+    hash.update(input, "utf8").digest ("hex")
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -89,8 +91,7 @@ let private normalizeAccountIdentity (targetDataHub: string) (email: string) : s
 
 /// Generate a deterministic filesystem-safe account ID from host and email.
 let generateAccountId (targetDataHub: string) (email: string) : string =
-    normalizeAccountIdentity targetDataHub email
-    |> sha256Hex
+    normalizeAccountIdentity targetDataHub email |> sha256Hex
 
 // ── public API ───────────────────────────────────────────────────────
 
@@ -121,6 +122,8 @@ let store (credential: StoredCredential) : Result<unit, string> =
                     email = credential.Metadata.Email
                     avatarUrl = credential.Metadata.AvatarUrl
                     targetDataHub = credential.Metadata.TargetDataHub
+                    dateAdded = credential.Metadata.DateAdded
+                    tokenInvalid = credential.Metadata.TokenInvalid
                 |}
 
             let tmpMeta = metaFilePath accountId + ".tmp"
@@ -154,6 +157,24 @@ let tryLoad (accountId: string) : StoredCredential option =
                     let targetDataHub: string = meta?targetDataHub
                     let storedAccountId: string = meta?accountId
 
+                    let dateAdded: string =
+                        try
+                            let value: string = meta?dateAdded
+
+                            if String.IsNullOrWhiteSpace value then
+                                DateTime.UtcNow.ToString()
+                            else
+                                value
+                        with _ ->
+                            DateTime.UtcNow.ToString()
+
+                    let tokenInvalid: bool =
+                        try
+                            let value: bool = meta?tokenInvalid
+                            value
+                        with _ ->
+                            false
+
                     if not (isSafeAccountId storedAccountId) then
                         None
                     else
@@ -164,6 +185,8 @@ let tryLoad (accountId: string) : StoredCredential option =
                                 Email = email
                                 AvatarUrl = avatarUrl
                                 TargetDataHub = targetDataHub
+                                DateAdded = dateAdded
+                                TokenInvalid = tokenInvalid
                             }
                             Token = token
                         }

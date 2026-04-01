@@ -157,6 +157,7 @@
     <Compile Include="Notes\Editor\Actions.fs"/>
     <Compile Include="Notes\Editor\Notes.fs"/>
     <Compile Include="Authentication\Types.fs"/>
+    <Compile Include="Authentication\Helper.fs"/>
     <Compile Include="Authentication\AccountManager.fs"/>
     <Compile Include="Authentication\Authentication.fs"/>
     <Compile Include="DataHub\Types.fs"/>

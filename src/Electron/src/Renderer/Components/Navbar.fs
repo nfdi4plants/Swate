@@ -50,7 +50,7 @@ type private Selector =
 
     static member DownloadArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
         Actionbar.ButtonInfo.create (
-            "swt:fluent--cloud-beaker-24-filled swt:size-5",
+            "swt:fluent--cloud-beaker-24-regular swt:size-5",
             "Download ARC from DataHub",
             onClick
         )
@@ -150,7 +150,7 @@ type private Selector =
 
 module private Authentication =
 
-    open AuthenticationTypes
+    open Authentication.Types
     open Swate.Electron.Shared.AuthTypes
 
     [<ReactComponent>]
@@ -191,7 +191,10 @@ module private Authentication =
         let onSwitchAccount (accountId: string) =
             promise {
                 match! Api.ipcAuthApi.setActiveAccount accountId with
-                | Ok _ -> ()
+                | Ok _ ->
+                    match! Api.ipcAuthApi.revalidate () with
+                    | Ok _ -> ()
+                    | Error _ -> ()
                 | Error _ -> ()
 
             }
@@ -205,9 +208,7 @@ module private Authentication =
             }
             |> Promise.start
 
-        let user = authStateCtx.ActiveAccount()
-
-        Authentication.UserAvatar(
+        Authentication.Authentication.UserAvatar(
             authStateCtx,
             onSignIn,
             onLogout,

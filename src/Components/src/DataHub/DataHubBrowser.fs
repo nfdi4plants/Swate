@@ -4,7 +4,7 @@ open Fable.Core
 open Elmish
 open Feliz
 open Feliz.UseElmish
-open Swate.Components.AuthenticationTypes
+open Swate.Components.Authentication.Types
 open Swate.Components.Types.Actionbar
 open DataHubTypes
 open Swate.Components.Api.GitLabApi
@@ -54,7 +54,7 @@ module DatahubBrowserModel =
         IsAuthenticated = state.IsAuthenticated
     }
 
-    let init (user: AuthenticationTypes.AuthUserDto option) =
+    let init (user: Authentication.Types.AuthUserDto option) =
         let state = {
             LatestReposFetchID = None
             Tab = ExploreTab.All
@@ -612,14 +612,16 @@ type DataHubBrowser =
     [<ReactComponent>]
     static member ExplorePanel
         (
-            accounts: Swate.Components.AuthenticationTypes.AuthStateDto,
+            accounts: Swate.Components.Authentication.Types.AuthStateDto,
             loaders: ExploreLoaders,
             ?reloadTrigger: int,
             ?onRender: (ExploreProjectDto -> unit),
-            ?projectActionBtns: (ExploreProjectDto -> ButtonInfo[])
+            ?projectActionBtns: (ExploreProjectDto -> ButtonInfo[]),
+            ?classNames: string,
+            ?onClose: Browser.Types.MouseEvent -> unit
         ) =
 
-        let user = accounts.ActiveAccount()
+        let user = accounts.ActiveUser()
 
         let emptyPagination (page: int) (perPage: int) : PaginationMetadata = {
             Link = None
@@ -748,9 +750,26 @@ type DataHubBrowser =
 
         Html.div [
             prop.testId "GitLabExplorePanel"
-            prop.className "swt:flex swt:flex-col swt:gap-2 swt:p-2"
+            prop.className [
+                classNames
+                |> Option.defaultValue "swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:grow swt:overflow-hidden"
+            ]
             prop.children [
-                DataHubComponents.DataHubComponents.SectionHeading("GitLab Explore")
+                Html.div [
+                    prop.className "swt:flex swt:items-center swt:gap-2"
+                    prop.children [
+                        DataHubComponents.DataHubComponents.SectionHeading("GitLab Explore")
+                        match onClose with
+                        | Some closeFn ->
+                            Html.div [
+                                prop.className "swt:ml-auto"
+                                prop.children [
+                                    Components.DeleteButton(props = [ prop.onClick closeFn ])
+                                ]
+                            ]
+                        | None -> Html.none
+                    ]
+                ]
                 // tabs
                 DataHubBrowser.Tabs(
                     model.Tab,
@@ -825,7 +844,8 @@ type DataHubBrowser =
                 elif model.Repos.Length > 0 then
                     Html.ul [
                         prop.testId "GitLabExploreRepoList"
-                        prop.className "swt:list swt:bg-base-100 swt:rounded-box swt:shadow-md"
+                        prop.className
+                            "swt:list swt:bg-base-100 swt:rounded-box swt:shadow-md swt:overflow-x-auto swt:grow-2"
                         prop.children [
                             for repo in model.Repos do
                                 DataHubBrowser.RepoListRow(repo, ?extraButtons = projectActionBtns)
@@ -840,7 +860,7 @@ type DataHubBrowser =
     [<ReactComponent>]
     static member Entry() =
         let accounts, setAccounts =
-            React.useState (AuthenticationTypes.AuthStateDto.Empty: AuthenticationTypes.AuthStateDto)
+            React.useState (Authentication.Types.AuthStateDto.Empty: Authentication.Types.AuthStateDto)
 
         let mockUser: AccountSummary = {
             User = {
@@ -850,19 +870,21 @@ type DataHubBrowser =
                 AvatarUrl = ""
                 TargetDataHub = ""
             }
-            IsActive = true
+            DateAdded = "2026-01-01T00:00:00.0000000Z"
+            TokenInvalid = false
         }
 
         let login () =
             setAccounts (
                 {
-                    AuthenticationTypes.AuthStateDto.Empty with
-                        Accounts = [| mockUser |]
+                    Authentication.Types.AuthStateDto.Empty with
+                        ActiveAccount = Some mockUser
+                        StoredAccounts = [| mockUser |]
                 }
             )
 
         let logout () =
-            setAccounts AuthenticationTypes.AuthStateDto.Empty
+            setAccounts Authentication.Types.AuthStateDto.Empty
 
         let reloadTrigger = 0
 
@@ -1107,7 +1129,7 @@ type DataHubBrowser =
             LoadOrganisationRepos = loadOrganisationRepos
         }
 
-        let currentUser = accounts.ActiveAccount()
+        let currentUser = accounts.ActiveUser()
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2"
@@ -1181,7 +1203,7 @@ type DataHubBrowser =
     [<ReactComponent>]
     static member GitLabEntry() =
         let accounts, setAccounts = React.useState (AuthStateDto.Empty)
-        let currentUser = accounts.ActiveAccount()
+        let currentUser = accounts.ActiveUser()
         let baseUrl, setBaseUrl = React.useState "https://git.nfdi4plants.org"
         let pat, setPat = React.useState ""
         let reloadTrigger, setReloadTrigger = React.useState 0
@@ -1217,12 +1239,13 @@ type DataHubBrowser =
                             Email = ""
                             TargetDataHub = baseUrl
                         }
-                        IsActive = true
+                        DateAdded = "2026-01-01T00:00:00.0000000Z"
+                        TokenInvalid = false
                     }
 
                     setAccounts {
-                        AuthStateDto.Empty with
-                            Accounts = [| userDTO |]
+                        ActiveAccount = Some userDTO
+                        StoredAccounts = [| userDTO |]
                     }
                 | Error err ->
                     Browser.Dom.console.error (

@@ -3,7 +3,7 @@ module Renderer.Context.AuthStateCtx
 open Feliz
 open Swate.Electron.Shared.AuthTypes
 open Fable.Electron.Remoting.Renderer
-open Swate.Components.AuthenticationTypes
+open Swate.Components.Authentication.Types
 
 
 module private AuthStateHelper =
@@ -35,7 +35,7 @@ let Provider (children: ReactElement) =
 
     let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
         Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi.empty with
-            authAccountsUpdate = fun accounts -> setAuthState ({ Accounts = accounts }: AuthStateDto)
+            authAccountsUpdate = fun state -> setAuthState state
     }
 
     React.useEffectOnce (fun _ ->
@@ -45,13 +45,10 @@ let Provider (children: ReactElement) =
         promise {
             match! Api.ipcAuthApi.revalidate () with
             | Ok response ->
-                match response with
-                | { Success = true } -> do! refreshState setAuthState ignore
-                | {
-                      Success = false
-                      Message = msg
-                      FailureKind = err
-                  } -> console.error (err, Fable.Core.JS.JSON.stringify msg)
+                do! refreshState setAuthState ignore
+
+                if not response.Success then
+                    console.error (response.FailureKind, Fable.Core.JS.JSON.stringify response.Message)
             | Error ex -> console.error (Fable.Core.JS.JSON.stringify ex.Message)
 
         }
