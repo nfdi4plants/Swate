@@ -162,11 +162,11 @@ let tryLoad (accountId: string) : StoredCredential option =
                             let value: string = meta?dateAdded
 
                             if String.IsNullOrWhiteSpace value then
-                                DateTime.UtcNow.ToString()
+                                Swate.Components.DateTimeExtensions.getUtcNowISO ()
                             else
                                 value
                         with _ ->
-                            DateTime.UtcNow.ToString()
+                            Swate.Components.DateTimeExtensions.getUtcNowISO ()
 
                     let tokenInvalid: bool =
                         try

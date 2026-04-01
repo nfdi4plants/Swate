@@ -1,13 +1,11 @@
 module Renderer.Components.MainContent.DataHubBrowserTarget
 
 open System
-open System.IO
 open Feliz
 open Swate.Components
 open Swate.Components.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Types.Actionbar
-open Swate.Electron.Shared.GitTypes
 
 module DataHubBrowserHelper =
     let private isCancelError (error: exn) =

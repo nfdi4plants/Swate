@@ -193,7 +193,7 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
                     accounts
                     |> Map.tryFind user.AccountId
                     |> Option.map (fun accountState -> accountState.Summary.DateAdded)
-                    |> Option.defaultValue (DateTime.UtcNow.ToString())
+                    |> Option.defaultValue (Swate.Components.DateTimeExtensions.getUtcNowISO ())
 
                 let accountState = {
                     Summary = {

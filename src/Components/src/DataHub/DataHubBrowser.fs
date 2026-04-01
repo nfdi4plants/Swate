@@ -1312,7 +1312,14 @@ type DataHubBrowser =
                 GitLabApi.ListUserPersonalProjects(
                     baseUrl,
                     pat,
-                    ?userId = (currentUser |> Option.map (fun u -> int u.AccountId)),
+                    ?userId =
+                        (currentUser
+                         |> Option.bind (fun u ->
+                             System.Int32.TryParse(u.AccountId)
+                             |> function
+                                 | true, id -> Some id
+                                 | _ -> None
+                         )),
                     page = query.Page,
                     perPage = query.PerPage,
                     search = query.SearchTerm,

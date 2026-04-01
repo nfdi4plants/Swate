@@ -28,7 +28,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
                     prop.children [ Renderer.Components.InitState.InitState() ]
                 ]
-            | Some path, pageState ->
+            | Some _, pageState ->
                 match pageState with
                 | Some page ->
                     match page with
