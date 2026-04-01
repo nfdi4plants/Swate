@@ -47,6 +47,7 @@ type GitState = {
     LfsAutoTrackThresholdMb: int
     DownloadLargeFiles: bool
     RefreshState: GitRefreshState
+    RefreshRequestId: int
     BusyOperation: GitBusyOperation option
     BusyNotice: string option
     CurrentProgress: GitSidebarProgress option
@@ -72,6 +73,7 @@ type GitState = {
         LfsAutoTrackThresholdMb = 1
         DownloadLargeFiles = true
         RefreshState = GitRefreshState.Idle
+        RefreshRequestId = 0
         BusyOperation = None
         BusyNotice = None
         CurrentProgress = None
@@ -83,9 +85,14 @@ type GitState = {
         PageLoadRequestId = 0
     }
 
+type GitRefreshResult = {
+    Status: Result<GitStatusDto, string>
+    Branches: Result<GitBranchRefDto[], string>
+    LfsSettings: Result<GitLfsSettingsDto, string>
+}
+
 type Msg =
     | ResetWorkflow
-    | SetRefreshState of GitRefreshState
     | SetBusyOperation of GitBusyOperation option
     | SetCurrentProgress of GitSidebarProgress option
     | SetErrorNotice of string option
@@ -96,6 +103,8 @@ type Msg =
     | SetActivePage of GitPage option
     | SetMergeResolutionPendingPath of string option
     | SetInstallRetryState of GitInstallRetryState
+    | StartRefreshRequest of requestId: int
+    | FinishRefreshRequest of requestId: int * refreshResult: GitRefreshResult
     | StartPageLoad of path: string * isConflicted: bool
     | FinishPageLoad of requestId: int * path: string * result: Result<GitPage, string>
 
@@ -185,6 +194,18 @@ let mapProgress (progress: GitProgressDto) : GitSidebarProgress = {
     ProgressPercent = progress.Progress
 }
 
+let private hasMatchingOriginBranch (branchName: string) (model: GitState) =
+    model.BranchOptions
+    |> Array.exists (fun branch ->
+        branch.Kind = GitSidebarBranchKind.Remote
+        && String.Equals(branch.RefName, $"origin/{branchName}", StringComparison.Ordinal)
+    )
+
+let shouldPublishCurrentBranchFirst (model: GitState) =
+    match model.Status.CurrentBranch, model.Status.TrackingBranch with
+    | Some currentBranch, None -> not (hasMatchingOriginBranch currentBranch model)
+    | _ -> false
+
 let currentGitPagePath (page: GitPage option) =
     match page with
     | Some(GitPage.Diff data) -> Some data.Path
@@ -193,20 +214,17 @@ let currentGitPagePath (page: GitPage option) =
     | None -> None
 
 let private withActivePage (activePage: GitPage option) (model: GitState) =
-    let nextMergePendingPath =
-        match model.MergeResolutionPendingPath, currentGitPagePath activePage with
-        | Some pendingPath, Some activePath when String.Equals(pendingPath, activePath, StringComparison.Ordinal) ->
-            Some pendingPath
-        | Some _, _ ->
-            None
-        | None, _ ->
-            None
-
     {
         model with
             ActivePage = activePage
-            MergeResolutionPendingPath = nextMergePendingPath
     }
+
+let private refreshErrorMessage (refreshResult: GitRefreshResult) =
+    match refreshResult.Status, refreshResult.Branches, refreshResult.LfsSettings with
+    | Ok _, Ok _, Ok _ -> None
+    | Ok _, Error message, _ -> Some message
+    | Ok _, _, Error message -> Some message
+    | Error message, _, _ -> Some message
 
 let applyStatus (status: GitStatusDto) (model: GitState) =
     let mappedChanges = mapChanges status
@@ -229,6 +247,49 @@ let applyStatus (status: GitStatusDto) (model: GitState) =
     }
     |> withActivePage nextActivePage
 
+let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitState) =
+    let modelWithStatus =
+        match refreshResult.Status with
+        | Ok status -> applyStatus status model
+        | Error _ ->
+            {
+                model with
+                    Status = GitState.Empty.Status
+                    ChangedFiles = [||]
+                    SelectedChangePath = None
+            }
+            |> withActivePage None
+
+    let modelWithBranches =
+        match refreshResult.Status, refreshResult.Branches with
+        | Ok _, Ok branches ->
+            { modelWithStatus with BranchOptions = mapBranches branches }
+        | _ ->
+            { modelWithStatus with BranchOptions = [||] }
+
+    let modelWithSettings =
+        match refreshResult.Status, refreshResult.LfsSettings with
+        | Ok _, Ok settings ->
+            {
+                modelWithBranches with
+                    LfsAutoTrackThresholdMb = settings.AutoTrackThresholdMb
+                    DownloadLargeFiles = settings.DownloadLargeFiles
+            }
+        | _ ->
+            {
+                modelWithBranches with
+                    LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
+                    DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
+            }
+
+    {
+        modelWithSettings with
+            RefreshState = GitRefreshState.Idle
+            ErrorNotice = refreshErrorMessage refreshResult
+    }
+
+let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
+
 let nextPageLoadRequestId (model: GitState) = model.PageLoadRequestId + 1
 
 let init (_appState: Swate.Electron.Shared.ArcRootPath) : GitState * Cmd<Msg> =
@@ -238,8 +299,6 @@ let transition (msg: Msg) (model: GitState) =
     match msg with
     | ResetWorkflow ->
         GitState.Empty
-    | SetRefreshState refreshState ->
-        { model with RefreshState = refreshState }
     | SetBusyOperation busyOperation ->
         {
             model with
@@ -283,6 +342,17 @@ let transition (msg: Msg) (model: GitState) =
         { model with MergeResolutionPendingPath = mergeResolutionPendingPath }
     | SetInstallRetryState installRetryState ->
         { model with InstallRetryState = installRetryState }
+    | StartRefreshRequest requestId ->
+        {
+            model with
+                RefreshRequestId = requestId
+                RefreshState = GitRefreshState.Loading
+        }
+    | FinishRefreshRequest(requestId, refreshResult) ->
+        if requestId <> model.RefreshRequestId then
+            model
+        else
+            applyRefreshResult refreshResult model
     | StartPageLoad _ ->
         {
             model with
@@ -309,6 +379,7 @@ let update (msg: Msg) (model: GitState) : GitState * Cmd<Msg> =
 let refreshAll
     (deps: GitDependencies)
     (isArcLoaded: unit -> bool)
+    (getState: unit -> GitState)
     (dispatch: Msg -> unit)
     =
     promise {
@@ -316,40 +387,29 @@ let refreshAll
             dispatch ResetWorkflow
             return Ok None
         else
-            dispatch (SetRefreshState GitRefreshState.Loading)
+            let requestId = nextRefreshRequestId (getState ())
+            dispatch (StartRefreshRequest requestId)
 
             let! statusResult = deps.getGitStatus ()
             let! branchResult = deps.getGitBranches ()
             let! lfsSettingsResult = deps.getGitLfsSettings ()
 
-            dispatch (SetRefreshState GitRefreshState.Idle)
+            let refreshResult = {
+                Status = statusResult
+                Branches = branchResult
+                LfsSettings = lfsSettingsResult
+            }
 
-            match statusResult with
-            | Ok status -> dispatch (SetStatus(Some status))
-            | Error _ -> dispatch (SetStatus None)
-
-            match statusResult, branchResult with
-            | Ok _, Ok branches -> dispatch (SetBranches(Some branches))
-            | _ -> dispatch (SetBranches None)
-
-            match statusResult, lfsSettingsResult with
-            | Ok _, Ok lfsSettings -> dispatch (SetLfsSettings(Some lfsSettings))
-            | _ -> dispatch (SetLfsSettings None)
-
-            let errorMessage =
-                match statusResult, branchResult, lfsSettingsResult with
-                | Ok _, Ok _, Ok _ -> None
-                | Ok _, Error message, _ -> Some message
-                | Ok _, _, Error message -> Some message
-                | Error message, _, _ -> Some message
-
-            dispatch (SetErrorNotice errorMessage)
+            dispatch (FinishRefreshRequest(requestId, refreshResult))
 
             return
-                match statusResult, errorMessage with
-                | Ok status, None -> Ok(Some status)
-                | Ok _, Some message -> Error message
-                | Error message, _ -> Error message
+                if (getState ()).RefreshRequestId <> requestId then
+                    Ok None
+                else
+                    match statusResult, refreshErrorMessage refreshResult with
+                    | Ok status, None -> Ok(Some status)
+                    | Ok _, Some message -> Error message
+                    | Error message, _ -> Error message
     }
 
 let loadPage
@@ -457,6 +517,7 @@ let rec runGitOperationWithLfsInstallRetry
 let runWriteOperation
     (deps: GitDependencies)
     (isArcLoaded: unit -> bool)
+    (getState: unit -> GitState)
     (dispatch: Msg -> unit)
     (busyOperation: GitBusyOperation)
     (operation: unit -> JS.Promise<Result<GitOperationResult, string>>)
@@ -486,19 +547,39 @@ let runWriteOperation
                 dispatch (SetErrorNotice(Some message))
                 return Error message
             | Ok _ ->
-                let! refreshResult = refreshAll deps isArcLoaded dispatch
+                let! refreshResult = refreshAll deps isArcLoaded getState dispatch
 
                 dispatch (SetBusyOperation None)
                 dispatch (SetCurrentProgress None)
 
                 match refreshResult with
-                | Ok _ ->
+                | Ok(Some _) ->
                     dispatch (SetErrorNotice None)
+                    return Ok()
+                | Ok None ->
                     return Ok()
                 | Error message ->
                     dispatch (SetErrorNotice(Some message))
                     return Error message
     }
+
+let runPushWorkflow
+    (deps: GitDependencies)
+    (isArcLoaded: unit -> bool)
+    (getState: unit -> GitState)
+    (dispatch: Msg -> unit)
+    =
+    runWriteOperation
+        deps
+        isArcLoaded
+        getState
+        dispatch
+        GitBusyOperation.PushingToRemote
+        (fun () ->
+            deps.gitPush {
+                Remote = None
+                Branch = None
+            })
 
 let runPullWorkflow
     (deps: GitDependencies)
@@ -538,7 +619,7 @@ let runPullWorkflow
                 dispatch (SetErrorNotice(Some message))
                 return Error message
             | Ok _ ->
-                let! refreshResult = refreshAll deps isArcLoaded dispatch
+                let! refreshResult = refreshAll deps isArcLoaded getState dispatch
 
                 dispatch (SetBusyOperation None)
                 dispatch (SetCurrentProgress None)
@@ -558,9 +639,34 @@ let runPullWorkflow
                     | Error message ->
                         dispatch (SetErrorNotice(Some message))
                         return Error message
-                | Ok latestStatusOption ->
+                | Ok(Some latestStatus) ->
                     dispatch (SetErrorNotice None)
-                    return Ok latestStatusOption
+                    return Ok(Some latestStatus)
+                | Ok None ->
+                    return Ok None
+    }
+
+let runSyncWorkflow
+    (deps: GitDependencies)
+    (isArcLoaded: unit -> bool)
+    (getState: unit -> GitState)
+    (dispatch: Msg -> unit)
+    =
+    promise {
+        if shouldPublishCurrentBranchFirst (getState ()) then
+            return! runPushWorkflow deps isArcLoaded getState dispatch
+        else
+            let! pullResult = runPullWorkflow deps isArcLoaded getState dispatch
+
+            match pullResult with
+            | Error message ->
+                return Error message
+            | Ok None ->
+                return Ok()
+            | Ok(Some latestStatus) when latestStatus.Conflicted.Length > 0 || latestStatus.IsMergeInProgress ->
+                return Ok()
+            | Ok(Some _) ->
+                return! runPushWorkflow deps isArcLoaded getState dispatch
     }
 
 let runCommitOperation
@@ -681,14 +787,16 @@ let runCommitOperation
                         dispatch (SetErrorNotice(Some message))
                         return Error message
                     | Ok _ ->
-                        let! refreshResult = refreshAll deps isArcLoaded dispatch
+                        let! refreshResult = refreshAll deps isArcLoaded getState dispatch
 
                         dispatch (SetBusyOperation None)
                         dispatch (SetCurrentProgress None)
 
                         match refreshResult with
-                        | Ok _ ->
+                        | Ok(Some _) ->
                             dispatch (SetErrorNotice None)
+                            return Ok()
+                        | Ok None ->
                             return Ok()
                         | Error message ->
                             dispatch (SetErrorNotice(Some message))
@@ -705,47 +813,53 @@ let confirmMergeResolution
     promise {
         if not (isArcLoaded ()) then
             return Error "No ARC is loaded."
-        elif (getState ()).MergeResolutionPendingPath = Some request.Path then
-            return Ok()
         else
-            dispatch (SetBusyOperation(Some(GitBusyOperation.ConfirmingMergeResolution request.Path)))
-            dispatch (SetMergeResolutionPendingPath(Some request.Path))
-            dispatch (SetErrorNotice None)
+            let currentState = getState ()
 
-            let! result = deps.confirmGitMergeResolution request
+            match currentState.BusyOperation with
+            | Some(GitBusyOperation.ConfirmingMergeResolution _) ->
+                return Ok()
+            | _ when currentState.MergeResolutionPendingPath = Some request.Path ->
+                return Ok()
+            | _ ->
+                dispatch (SetBusyOperation(Some(GitBusyOperation.ConfirmingMergeResolution request.Path)))
+                dispatch (SetMergeResolutionPendingPath(Some request.Path))
+                dispatch (SetErrorNotice None)
 
-            dispatch (SetBusyOperation None)
-            dispatch (SetCurrentProgress None)
+                let! result = deps.confirmGitMergeResolution request
 
-            match result with
-            | Error message ->
-                dispatch (SetMergeResolutionPendingPath None)
+                dispatch (SetBusyOperation None)
+                dispatch (SetCurrentProgress None)
 
-                if isStaleMergeConflictError message then
-                    let! _ = refreshAll deps isArcLoaded dispatch
-                    dispatch (SetSelectedChangePath None)
-                    dispatch (SetActivePage None)
+                match result with
+                | Error message ->
+                    dispatch (SetMergeResolutionPendingPath None)
 
-                dispatch (SetErrorNotice(Some message))
-                return Error message
-            | Ok payload ->
-                dispatch (SetStatus(Some payload.UpdatedStatus))
-                dispatch (SetMergeResolutionPendingPath None)
+                    if isStaleMergeConflictError message then
+                        let! _ = refreshAll deps isArcLoaded getState dispatch
+                        dispatch (SetSelectedChangePath None)
+                        dispatch (SetActivePage None)
 
-                match payload.NextConflictedPath with
-                | Some nextConflictPath ->
-                    let! openResult = loadPage deps getState dispatch nextConflictPath true
+                    dispatch (SetErrorNotice(Some message))
+                    return Error message
+                | Ok payload ->
+                    dispatch (SetStatus(Some payload.UpdatedStatus))
+                    dispatch (SetMergeResolutionPendingPath None)
 
-                    match openResult with
-                    | Ok () ->
+                    match payload.NextConflictedPath with
+                    | Some nextConflictPath ->
+                        let! openResult = loadPage deps getState dispatch nextConflictPath true
+
+                        match openResult with
+                        | Ok () ->
+                            dispatch (SetErrorNotice None)
+                            return Ok()
+                        | Error message ->
+                            dispatch (SetErrorNotice(Some message))
+                            return Error message
+                    | None ->
+                        dispatch (SetSelectedChangePath None)
+                        dispatch (SetActivePage None)
                         dispatch (SetErrorNotice None)
                         return Ok()
-                    | Error message ->
-                        dispatch (SetErrorNotice(Some message))
-                        return Error message
-                | None ->
-                    dispatch (SetSelectedChangePath None)
-                    dispatch (SetActivePage None)
-                    dispatch (SetErrorNotice None)
-                    return Ok()
     }

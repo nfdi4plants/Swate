@@ -8,10 +8,15 @@ open Swate.Electron.Shared.GitTypes
 let Main (mergeData: GitMergeConflictViewDataDto) =
 
     let gitStateCtx = Renderer.Context.GitStateCtx.useGitState ()
-    let isConfirming = gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path
+    let isConfirmingCurrentPath = gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path
+
+    let isMergeResolutionBusy =
+        match gitStateCtx.state.BusyOperation with
+        | Some(Renderer.Context.GitWorkflow.GitBusyOperation.ConfirmingMergeResolution _) -> true
+        | _ -> false
 
     let confirmMergeResolution resolvedContent =
-        if isConfirming then
+        if isMergeResolutionBusy then
             ()
         else
             promise {
@@ -33,7 +38,7 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
     Html.div [
         prop.className "swt:h-full swt:w-full swt:min-h-0"
         prop.children [
-            if isConfirming then
+            if isConfirmingCurrentPath then
                 Html.div [
                     prop.className "swt:border-b swt:border-base-content/10 swt:bg-base-200/70 swt:px-4 swt:py-2 swt:text-sm swt:text-base-content/70"
                     prop.text "Applying merge resolution..."
@@ -44,7 +49,7 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
                 currentTitle = mergeData.Path,
                 resolvedTitle = mergeData.Path,
                 onConfirmMerge = confirmMergeResolution,
-                confirmDisabled = isConfirming,
+                confirmDisabled = isMergeResolutionBusy,
                 testIdPrefix = "renderer-git-merge"
             )
         ]

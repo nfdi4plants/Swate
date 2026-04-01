@@ -68,6 +68,16 @@ type GitMergeConflictViewDataDto = {
     MergeConflictContent: string
 }
 
+type GitUnsupportedContentDto = {
+    Path: string
+    Reason: string option
+}
+
+[<RequireQualifiedAccess>]
+type GitPageLoadResultDto<'T> =
+    | Loaded of 'T
+    | Unsupported of GitUnsupportedContentDto
+
 type GitStatusDto = {
     Current: string option
     Tracking: string option

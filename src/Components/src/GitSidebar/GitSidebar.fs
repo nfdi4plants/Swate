@@ -521,7 +521,17 @@ type GitSidebar =
                                         ]
                                     ]
                                 | None ->
-                                    Html.none
+                                    match status.CurrentBranch with
+                                    | Some currentBranch ->
+                                        Html.div [
+                                            prop.className "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                                            prop.children [
+                                                Html.span [ prop.className "swt:iconify swt:fluent--branch-request-20-regular swt:size-4" ]
+                                                Html.span $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                            ]
+                                        ]
+                                    | None ->
+                                        Html.none
                             ]
                         ]
                     ]
@@ -901,6 +911,7 @@ type GitSidebar =
                                         Html.button [
                                             prop.testId ("GitSidebarChangeRow-" + change.Path)
                                             prop.key change.Path
+                                            prop.disabled isBusy
                                             prop.className [
                                                 "swt:flex swt:w-full swt:flex-col swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-3 swt:py-2 swt:text-left swt:transition-colors"
                                                 if change.IsConflicted then

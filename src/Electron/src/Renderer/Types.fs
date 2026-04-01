@@ -12,10 +12,7 @@ type LeftSidebarPage =
     | FileExplorer
     | Git
 
-type GitUnsupportedPageData = {
-    Path: string
-    Reason: string option
-}
+type GitUnsupportedPageData = GitUnsupportedContentDto
 
 [<RequireQualifiedAccess>]
 type PageState =

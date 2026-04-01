@@ -32,13 +32,13 @@ type GitStateController = {
 }
 
 let private mapDiffPageResult (_requestedPath: string) = function
-    | Ok(Renderer.GitApiClient.Loaded diffData) -> Ok(GitPage.Diff diffData)
-    | Ok(Renderer.GitApiClient.Unsupported unsupportedPage) -> Ok(GitPage.Unsupported unsupportedPage)
+    | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(GitPage.Diff diffData)
+    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(GitPage.Unsupported unsupportedPage)
     | Error message -> Error message
 
 let private mapMergeConflictPageResult (_requestedPath: string) = function
-    | Ok(Renderer.GitApiClient.Loaded mergeData) -> Ok(GitPage.MergeConflict mergeData)
-    | Ok(Renderer.GitApiClient.Unsupported unsupportedPage) -> Ok(GitPage.Unsupported unsupportedPage)
+    | Ok(GitPageLoadResultDto.Loaded mergeData) -> Ok(GitPage.MergeConflict mergeData)
+    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(GitPage.Unsupported unsupportedPage)
     | Error message -> Error message
 
 let private dependencies: GitDependencies = {
@@ -114,7 +114,7 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let refresh () = promise {
         dispatch (SetBusyOperation(Some GitBusyOperation.Refreshing))
-        let! result = refreshAll dependencies isArcLoaded dispatch
+        let! result = refreshAll dependencies isArcLoaded getState dispatch
         dispatch (SetBusyOperation None)
         return result |> Result.map ignore
     }
@@ -123,6 +123,7 @@ let GitStateCtxProvider (children: ReactElement) =
         runWriteOperation
             dependencies
             isArcLoaded
+            getState
             dispatch
             GitBusyOperation.FetchingFromRemote
             (fun () ->
@@ -137,27 +138,10 @@ let GitStateCtxProvider (children: ReactElement) =
     }
 
     let push () =
-        runWriteOperation
-            dependencies
-            isArcLoaded
-            dispatch
-            GitBusyOperation.PushingToRemote
-            (fun () ->
-                dependencies.gitPush {
-                    Remote = None
-                    Branch = None
-                })
+        runPushWorkflow dependencies isArcLoaded getState dispatch
 
     let sync () = promise {
-        let! pullResult = runPullWorkflow dependencies isArcLoaded getState dispatch
-
-        match pullResult with
-        | Error message ->
-            return Error message
-        | Ok(Some latestStatus) when latestStatus.Conflicted.Length > 0 || latestStatus.IsMergeInProgress ->
-            return Ok()
-        | Ok _ ->
-            return! push ()
+        return! runSyncWorkflow dependencies isArcLoaded getState dispatch
     }
 
     let commitSelection (request: GitSidebarCommitSelectionRequest) =
@@ -194,6 +178,7 @@ let GitStateCtxProvider (children: ReactElement) =
             runWriteOperation
                 dependencies
                 isArcLoaded
+                getState
                 dispatch
                 GitBusyOperation.SavingGitLfsThreshold
                 (fun () ->
@@ -223,6 +208,7 @@ let GitStateCtxProvider (children: ReactElement) =
             runWriteOperation
                 dependencies
                 isArcLoaded
+                getState
                 dispatch
                 GitBusyOperation.SavingGitLfsDownloadPreference
                 (fun () ->
@@ -251,6 +237,7 @@ let GitStateCtxProvider (children: ReactElement) =
         runWriteOperation
             dependencies
             isArcLoaded
+            getState
             dispatch
             GitBusyOperation.CreatingBranch
             (fun () ->
@@ -268,6 +255,7 @@ let GitStateCtxProvider (children: ReactElement) =
             runWriteOperation
                 dependencies
                 isArcLoaded
+                getState
                 dispatch
                 GitBusyOperation.SwitchingBranch
                 (fun () ->
@@ -307,7 +295,7 @@ let GitStateCtxProvider (children: ReactElement) =
     React.useEffect (
         (fun () ->
             if appStateCtx.state.IsSome then
-                refreshAll dependencies isArcLoaded dispatch |> Promise.start
+                refreshAll dependencies isArcLoaded getState dispatch |> Promise.start
             else
                 dispatch ResetWorkflow),
         [| box appStateCtx.state |]

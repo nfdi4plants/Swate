@@ -50,6 +50,12 @@ type GitBranchRefDto = {
     IsTracking: bool
 }
 
+type GitPushTarget = {
+    RefSpec: string
+    PushBranch: string
+    SetUpstream: bool
+}
+
 type GitDiffViewDataDto = {
     Path: string
     PreviousContent: string
@@ -373,6 +379,15 @@ let private unsupportedGitContentResult<'T> (path: string) : GitResult<'T> =
         Message = unsupportedGitContentMessage path
     }
 
+let tryGetUnsupportedGitContent (requestedPath: string) (failure: GitFailure) : GitUnsupportedContentDto option =
+    if String.Equals(failure.Message, unsupportedGitContentMessage requestedPath, StringComparison.Ordinal) then
+        Some {
+            Path = requestedPath
+            Reason = Some failure.Message
+        }
+    else
+        None
+
 [<Emit("$0.length")>]
 let private bufferLength (buffer: obj) : int = jsNative
 
@@ -625,6 +640,47 @@ let private ensureDefaultTrackingBranchForPull
                 let! _ = git.raw [| "branch"; $"--set-upstream-to={desired}"; branchName |]
                 return ()
     }
+
+let private normalizeOptionalGitRef (value: string option) =
+    value
+    |> Option.bind Option.ofObj
+    |> Option.map _.Trim()
+    |> Option.filter (fun item -> not (String.IsNullOrWhiteSpace item))
+
+let resolvePushTarget
+    (requestedBranchName: string option)
+    (currentBranch: string option)
+    (trackingBranch: string option)
+    (isDetached: bool)
+    : GitPushTarget =
+    let normalizedCurrentBranch = normalizeOptionalGitRef currentBranch
+    let normalizedTrackingBranch = normalizeOptionalGitRef trackingBranch
+
+    match requestedBranchName with
+    | Some branchName ->
+        {
+            RefSpec = branchName
+            PushBranch = branchName
+            SetUpstream =
+                not isDetached
+                && normalizedCurrentBranch = Some branchName
+                && normalizedTrackingBranch.IsNone
+        }
+    | None ->
+        match isDetached, normalizedCurrentBranch with
+        | true, _
+        | _, None ->
+            {
+                RefSpec = "HEAD"
+                PushBranch = "HEAD"
+                SetUpstream = false
+            }
+        | false, Some branchName ->
+            {
+                RefSpec = branchName
+                PushBranch = branchName
+                SetUpstream = normalizedTrackingBranch.IsNone
+            }
 
 let private reconcileTrackingBranchForCheckout
     (remoteName: string)
@@ -1039,13 +1095,18 @@ let getBranches (arcPath: string) : JS.Promise<GitResult<GitBranchRefDto[]>> =
 
             let localRefs =
                 valueOrEmptyArray localBranchSummary.all
-                |> Array.map (fun branchName -> {
-                    RefName = branchName
-                    DisplayLabel = branchName
-                    Kind = GitBranchRefKind.Local
-                    IsCurrent = statusDto.Current = Some branchName
-                    IsTracking = false
-                })
+                |> Array.map (fun branchName ->
+                    let isCurrent = statusDto.Current = Some branchName
+
+                    {
+                        RefName = branchName
+                        DisplayLabel = branchName
+                        Kind = GitBranchRefKind.Local
+                        IsCurrent = isCurrent
+                        // Mark the active local branch when it already tracks an upstream so the sidebar can represent the switched branch itself.
+                        IsTracking = isCurrent && statusDto.Tracking.IsSome
+                    }
+                )
 
             let remoteRefs =
                 remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -1347,61 +1408,75 @@ let push
                 match gitResult with
                 | Error failure -> return Error failure
                 | Ok git ->
-                    let! lfsPlanResult =
-                        planOutboundPush
-                            runSimpleGit
-                            (fun currentGit -> runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit)
-                            safeRemoteName
-                            safeBranchName
-                            git
+                    let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
-                    match lfsPlanResult with
+                    match pushStatusResult with
                     | Error failure ->
                         return Error failure
-                    | Ok lfsPlan ->
-                        let! lfsUploadResult =
-                            match lfsPlan with
-                            | OutboundPushPlan.SkipLfsUpload ->
-                                promise { return Ok false }
-                            | OutboundPushPlan.UploadLfsObjects refSpec ->
-                                promise {
-                                    let! uploadResult = uploadObjects runSimpleGit safeRemoteName refSpec git
+                    | Ok pushStatus ->
+                        let pushTarget =
+                            resolvePushTarget safeBranchName pushStatus.current pushStatus.tracking pushStatus.detached
 
-                                    return
-                                        match uploadResult with
-                                        | Ok () -> Ok true
-                                        | Error failure -> Error failure
-                                }
-
-                        match lfsUploadResult with
-                        | Error failure ->
-                            let! diagnostics =
-                                collectPushDiagnostics
-                                    runSimpleGit
-                                    (fun currentFailure -> Some currentFailure.Message)
-                                    safeRemoteName
-                                    git
-
-                            return
-                                Error {
-                                    failure with
-                                        Message = appendPushDiagnostics failure.Message diagnostics
-                                }
-                        | Ok _ ->
-                            let! pushResult =
+                        let! lfsPlanResult =
+                            planOutboundPush
                                 runSimpleGit
-                                    (fun currentGit -> promise {
-                                        match safeBranchName with
-                                        | None ->
-                                            let! _ = currentGit.push (safeRemoteName, "HEAD")
-                                            return ()
-                                        | Some safeBranch ->
-                                            let! _ = currentGit.push (safeRemoteName, safeBranch)
-                                            return ()
-                                    })
-                                    git
+                                (fun currentGit -> runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit)
+                                safeRemoteName
+                                (Some pushTarget.RefSpec)
+                                git
 
-                            return pushResult
+                        match lfsPlanResult with
+                        | Error failure ->
+                            return Error failure
+                        | Ok lfsPlan ->
+                            let! lfsUploadResult =
+                                match lfsPlan with
+                                | OutboundPushPlan.SkipLfsUpload ->
+                                    promise { return Ok false }
+                                | OutboundPushPlan.UploadLfsObjects refSpec ->
+                                    promise {
+                                        let! uploadResult = uploadObjects runSimpleGit safeRemoteName refSpec git
+
+                                        return
+                                            match uploadResult with
+                                            | Ok () -> Ok true
+                                            | Error failure -> Error failure
+                                    }
+
+                            match lfsUploadResult with
+                            | Error failure ->
+                                let! diagnostics =
+                                    collectPushDiagnostics
+                                        runSimpleGit
+                                        (fun currentFailure -> Some currentFailure.Message)
+                                        safeRemoteName
+                                        git
+
+                                return
+                                    Error {
+                                        failure with
+                                            Message = appendPushDiagnostics failure.Message diagnostics
+                                    }
+                            | Ok _ ->
+                                let! pushResult =
+                                    runSimpleGit
+                                        (fun currentGit -> promise {
+                                            if pushTarget.SetUpstream then
+                                                let! _ =
+                                                    currentGit.push (
+                                                        safeRemoteName,
+                                                        pushTarget.PushBranch,
+                                                        !^[| "--set-upstream" |]
+                                                    )
+
+                                                return ()
+                                            else
+                                                let! _ = currentGit.push (safeRemoteName, pushTarget.PushBranch)
+                                                return ()
+                                        })
+                                        git
+
+                                return pushResult
     }
 
 // GitService writes LFS settings because the threshold is a git workflow policy setting owned by this service.

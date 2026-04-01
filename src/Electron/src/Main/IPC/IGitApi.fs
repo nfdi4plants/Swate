@@ -97,6 +97,22 @@ let private toMergeConflictViewDataDto (data: GitService.GitMergeConflictViewDat
     MergeConflictContent = data.MergeConflictContent
 }
 
+let private toGitPageLoadResultDto
+    (requestedPath: string)
+    (mapPayload: 'TSource -> 'TTarget)
+    (operationName: string)
+    (result: GitService.GitResult<'TSource>)
+    : Result<GitPageLoadResultDto<'TTarget>, exn> =
+    match result with
+    | Ok payload ->
+        Ok(GitPageLoadResultDto.Loaded(mapPayload payload))
+    | Error failure ->
+        match GitService.tryGetUnsupportedGitContent requestedPath failure with
+        | Some unsupported ->
+            Ok(GitPageLoadResultDto.Unsupported unsupported)
+        | None ->
+            Error(exn $"{operationName} failed ({failure.Kind}): {failure.Message}")
+
 let private toConfirmMergeResolutionResult (result: GitService.GitConfirmMergeResolutionResult) : GitConfirmMergeResolutionResult = {
     UpdatedStatus = toStatusDto result.UpdatedStatus
     RemainingConflictedPaths = result.RemainingConflictedPaths
@@ -180,10 +196,7 @@ let api: IGitApi = {
             | Error error -> return Error error
             | Ok(_, arcPath) ->
                 let! result = GitService.getDiffViewData arcPath requestedPath
-
-                match result with
-                | Ok diffViewData -> return Ok(toDiffViewDataDto diffViewData)
-                | Error failure -> return Error(exn $"git diff view failed ({failure.Kind}): {failure.Message}")
+                return toGitPageLoadResultDto requestedPath toDiffViewDataDto "git diff view" result
         }
     getGitMergeConflictViewData =
         fun (event: IpcMainEvent) (requestedPath: string) -> promise {
@@ -191,10 +204,7 @@ let api: IGitApi = {
             | Error error -> return Error error
             | Ok(_, arcPath) ->
                 let! result = GitService.getMergeConflictViewData arcPath requestedPath
-
-                match result with
-                | Ok mergeViewData -> return Ok(toMergeConflictViewDataDto mergeViewData)
-                | Error failure -> return Error(exn $"git merge conflict view failed ({failure.Kind}): {failure.Message}")
+                return toGitPageLoadResultDto requestedPath toMergeConflictViewDataDto "git merge conflict view" result
         }
     installGitLfs =
         fun (_event: IpcMainEvent) -> promise {

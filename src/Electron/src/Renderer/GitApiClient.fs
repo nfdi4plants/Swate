@@ -1,13 +1,7 @@
 module Renderer.GitApiClient
 
-open System
 open Fable.Core
-open Renderer.Types
 open Swate.Electron.Shared.GitTypes
-
-type GitPageLoadResult<'T> =
-    | Loaded of 'T
-    | Unsupported of GitUnsupportedPageData
 
 let private gitApi = Api.ipcGitApi
 
@@ -19,12 +13,14 @@ let private getGitBranchesRaw () : JS.Promise<Result<GitBranchRefDto[], exn>> =
 
 let private getGitLfsSettingsRaw () : JS.Promise<Result<GitLfsSettingsDto, exn>> =
     gitApi.getGitLfsSettings (unbox null)
-let private getGitDiffViewDataRaw (requestedPath: string) : JS.Promise<Result<GitDiffViewDataDto, exn>> =
+let private getGitDiffViewDataRaw
+    (requestedPath: string)
+    : JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>> =
     gitApi.getGitDiffViewData (unbox null) requestedPath
 
 let private getGitMergeConflictViewDataRaw
     (requestedPath: string)
-    : JS.Promise<Result<GitMergeConflictViewDataDto, exn>> =
+    : JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>> =
     gitApi.getGitMergeConflictViewData (unbox null) requestedPath
 
 let private installGitLfsRaw () : JS.Promise<Result<GitOperationResult, exn>> =
@@ -65,28 +61,6 @@ let private confirmGitMergeResolutionRaw
 let private mapExnResult (result: Result<'T, exn>) =
     result |> Result.mapError _.Message
 
-let private tryDecodeUnsupportedContent (requestedPath: string) (message: string) =
-    let expectedMessage = $"Unsupported git content for '{requestedPath}'."
-
-    if String.Equals(message, expectedMessage, StringComparison.Ordinal) then
-        Some {
-            Path = requestedPath
-            Reason = Some message
-        }
-    else
-        None
-
-let private mapGitPageLoadResult<'T>
-    (requestedPath: string)
-    (result: Result<'T, exn>)
-    : Result<GitPageLoadResult<'T>, string> =
-    match result with
-    | Ok payload -> Ok(Loaded payload)
-    | Error exn ->
-        match tryDecodeUnsupportedContent requestedPath exn.Message with
-        | Some unsupportedPage -> Ok(Unsupported unsupportedPage)
-        | None -> Error exn.Message
-
 let getGitStatus () = promise {
     let! result = getGitStatusRaw ()
     return mapExnResult result
@@ -104,12 +78,12 @@ let getGitLfsSettings () = promise {
 
 let getGitDiffViewData (requestedPath: string) = promise {
     let! result = getGitDiffViewDataRaw requestedPath
-    return mapGitPageLoadResult requestedPath result
+    return mapExnResult result
 }
 
 let getGitMergeConflictViewData (requestedPath: string) = promise {
     let! result = getGitMergeConflictViewDataRaw requestedPath
-    return mapGitPageLoadResult requestedPath result
+    return mapExnResult result
 }
 
 let installGitLfs () = promise {
