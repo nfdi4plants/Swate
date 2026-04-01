@@ -21,13 +21,15 @@ let Main () =
             Swate.Components.ARCObjectPanel.Main(
                 "ARC Object Details",
                 content =
-                    ArcObjectExplorerContent.ARCObjectDetailsContent
-                        viewModel.SelectedNode
-                        viewModel.SelectedAncestors
-                        arcObjectCtx.state.PageState
-                        arcObjectCtx.state.ArcFileState
-                        arcObjectCtx.setArcFileState
+                    ArcObjectExplorerContent.ARCObjectDetailsContent(
+                        viewModel.SelectedNode,
+                        viewModel.SelectedAncestors,
+                        arcObjectCtx.state.PageState,
+                        arcObjectCtx.state.ArcFileState,
+                        arcObjectCtx.setArcFileState,
+                        (fun nodeId -> arcObjectCtx.setSelectedExplorerItemId (Some nodeId)),
                         false
+                    )
             )
         ]
     ]

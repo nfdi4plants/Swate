@@ -28,6 +28,16 @@ type ArcObjectExplorerContent =
             | [ first; second ] -> Some $"{first}; {second}"
             | first :: second :: rest -> Some $"{first}; {second}; +{rest.Length} more"
 
+    static member private summariseStringList (values: string list) =
+        values
+        |> List.filter (fun value -> String.IsNullOrWhiteSpace value |> not)
+        |> List.distinct
+        |> function
+            | [] -> None
+            | [ single ] -> Some single
+            | [ first; second ] -> Some $"{first}; {second}"
+            | first :: second :: rest -> Some $"{first}; {second}; +{rest.Length} more"
+
     static member private personDisplayName (person: Person) =
         [ person.FirstName; person.MidInitials; person.LastName ]
         |> List.choose id
@@ -48,8 +58,8 @@ type ArcObjectExplorerContent =
         | _ -> false
 
     static member private arcFileMatchesMetadataNodeKind
-        (selectedNodeKind: ArcExplorerNodeKind)
-        (arcFile: ArcFiles)
+        (selectedNodeKind: ArcExplorerNodeKind,
+        arcFile: ArcFiles)
         =
         match selectedNodeKind, arcFile with
         | ArcExplorerNodeKind.Arc, ArcFiles.Investigation _
@@ -103,6 +113,98 @@ type ArcObjectExplorerContent =
             ArcObjectExplorerContent.TextRow "Columns" (string table.ColumnCount)
             yield! headers |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Headers" value) |> Option.toList
         ]
+
+    static member private SampleSummaryRows (sampleName: string, sampleSummary: ArcExplorerSampleSummary) =
+        [
+            ArcObjectExplorerContent.TextRow "Name" sampleName
+            ArcObjectExplorerContent.TextRow "Characteristics" (string sampleSummary.Characteristics.Length)
+            yield!
+                ArcObjectExplorerContent.summariseStringList sampleSummary.Characteristics
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Characteristic Fields" value)
+                |> Option.toList
+            ArcObjectExplorerContent.TextRow "Factors" (string sampleSummary.Factors.Length)
+            yield!
+                ArcObjectExplorerContent.summariseStringList sampleSummary.Factors
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Factor Fields" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summariseStringList sampleSummary.DerivesFrom
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Derives From" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summariseStringList sampleSummary.SourceTables
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Source Tables" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summariseStringList sampleSummary.Studies
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Studies" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summariseStringList sampleSummary.Assays
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Assays" value)
+                |> Option.toList
+        ]
+
+    [<ReactComponent>]
+    static member private AssociatedSampleLinksSection(
+        links: ArcExplorerNodeLink list,
+        onSelectNodeId: string -> unit)
+        =
+        ArcObjectExplorerContent.ARCObjectSection(
+            "Associated Samples",
+            [
+                Html.div [
+                    prop.className "swt:flex swt:flex-col swt:gap-2"
+                    prop.children [
+                        Html.p [
+                            prop.className "swt:text-sm swt:opacity-70"
+                            prop.text (
+                                if links.Length = 1 then
+                                    "This table is associated with 1 sample."
+                                else
+                                    $"This table is associated with {links.Length} samples."
+                            )
+                        ]
+                        Html.div [
+                            prop.className "swt:flex swt:flex-col swt:gap-2"
+                            prop.children (
+                                links
+                                |> List.map (fun link ->
+                                    Html.button [
+                                        prop.key link.targetId
+                                        prop.type'.button
+                                        prop.className
+                                            "swt:flex swt:w-full swt:items-start swt:justify-between swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:px-3 swt:py-2 swt:text-left hover:swt:border-primary/60 hover:swt:bg-base-200/60"
+                                        prop.onClick (fun _ -> onSelectNodeId link.targetId)
+                                        prop.children [
+                                            Html.div [
+                                                prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-1"
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "swt:text-sm swt:font-medium swt:break-words"
+                                                        prop.text link.name
+                                                    ]
+                                                    match link.subtitle with
+                                                    | Some subtitle ->
+                                                        Html.span [
+                                                            prop.className "swt:text-xs swt:opacity-60"
+                                                            prop.text subtitle
+                                                        ]
+                                                    | None -> Html.none
+                                                ]
+                                            ]
+                                            Html.span [
+                                                prop.className "swt:text-xs swt:font-mono swt:opacity-50"
+                                                prop.text "Open"
+                                            ]
+                                        ]
+                                    ])
+                            )
+                        ]
+                    ]
+                ]
+            ]
+        )
 
     static member private MetadataRows (arcFile: ArcFiles) =
         match arcFile with
@@ -210,8 +312,11 @@ type ArcObjectExplorerContent =
                     |> Option.toList
             ]
 
-    static member private CurrentPreviewRowsForNode (selectedNode: ArcExplorerNode) (arcFile: ArcFiles) =
+    static member private CurrentPreviewRowsForNode (selectedNode: ArcExplorerNode, arcFile: ArcFiles) =
         match selectedNode.kind with
+        | ArcExplorerNodeKind.Sample ->
+            selectedNode.sampleSummary
+            |> Option.map (fun summary -> ArcObjectExplorerContent.SampleSummaryRows(selectedNode.name, summary))
         | ArcExplorerNodeKind.Table ->
             match selectedNode.previewTarget with
             | ArcExplorerNodePreviewTarget.Table tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
@@ -313,9 +418,9 @@ type ArcObjectExplorerContent =
         )
 
     [<ReactComponent>]
-    static member private ARCObjectDetailedMetadataContent
-        (arcFile: ArcFiles)
-        (setArcFileState: ArcFiles option -> unit)
+    static member private ARCObjectDetailedMetadataContent(
+        arcFile: ArcFiles,
+        setArcFileState: ArcFiles option -> unit)
         =
         let setArcFile arcFile = setArcFileState (Some arcFile)
 
@@ -335,9 +440,9 @@ type ArcObjectExplorerContent =
             ]
         ]
 
-    static member private arcFileMatchesSelectedNodePreviewPath
-        (selectedNode: ArcExplorerNode)
-        (arcFile: ArcFiles)
+    static member private arcFileMatchesSelectedNodePreviewPath(
+        selectedNode: ArcExplorerNode,
+        arcFile: ArcFiles)
         =
         match selectedNode.path, arcFile.TryGetRelativePath() with
         | Some nodePath, Some arcFilePath ->
@@ -346,13 +451,14 @@ type ArcObjectExplorerContent =
         | _ -> false
 
     [<ReactComponent>]
-    static member ARCObjectDetailsContent
-        (selectedNode: ArcExplorerNode option)
-        (selectedAncestors: ArcExplorerNode list)
-        (previewState: PageState option)
-        (arcFileState: ArcFiles option)
-        (setArcFileState: ArcFiles option -> unit)
-        (useDetailedMetadataForms: bool)
+    static member ARCObjectDetailsContent(
+        selectedNode: ArcExplorerNode option,
+        selectedAncestors: ArcExplorerNode list,
+        previewState: PageState option,
+        arcFileState: ArcFiles option,
+        setArcFileState: ArcFiles option -> unit,
+        onSelectNodeId: string -> unit,
+        useDetailedMetadataForms: bool)
         =
         match selectedNode with
         | None ->
@@ -369,16 +475,19 @@ type ArcObjectExplorerContent =
         | Some selectedNode ->
             let previewArcFile =
                 arcFileState
-                |> Option.filter (ArcObjectExplorerContent.arcFileMatchesSelectedNodePreviewPath selectedNode)
+                |> Option.filter (fun state -> ArcObjectExplorerContent.arcFileMatchesSelectedNodePreviewPath(selectedNode, state))
 
             let metadataArcFile =
                 previewArcFile
-                |> Option.filter (ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind selectedNode.kind)
+                |> Option.filter (fun file -> ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind(selectedNode.kind, file))
 
             let selectedObjectRows =
-                match metadataArcFile with
-                | Some _ -> None
-                | None -> previewArcFile |> Option.bind (ArcObjectExplorerContent.CurrentPreviewRowsForNode selectedNode)
+                match selectedNode.kind, metadataArcFile with
+                | ArcExplorerNodeKind.Sample, _ ->
+                    selectedNode.sampleSummary
+                    |> Option.map (fun summary -> ArcObjectExplorerContent.SampleSummaryRows(selectedNode.name, summary))
+                | _, Some _ -> None
+                | _, None -> previewArcFile |> Option.bind (fun file -> ArcObjectExplorerContent.CurrentPreviewRowsForNode(selectedNode, file))
 
             let parentMetadataContext =
                 match metadataArcFile, previewArcFile with
@@ -386,7 +495,7 @@ type ArcObjectExplorerContent =
                 | None, Some arcFile ->
                     selectedAncestors
                     |> List.rev
-                    |> List.tryFind (fun ancestor -> ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind ancestor.kind arcFile)
+                    |> List.tryFind (fun ancestor -> ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind(ancestor.kind, arcFile))
                     |> Option.map (fun parentNode -> parentNode, arcFile)
                 | None, None -> None
 
@@ -405,11 +514,15 @@ type ArcObjectExplorerContent =
                             [ ArcObjectExplorerContent.ARCObjectPropertyTable rows ]
                         )
                     | None -> Html.none
+                    match selectedNode.kind, selectedNode.relatedSamples with
+                    | ArcExplorerNodeKind.Table, relatedSamples when List.isEmpty relatedSamples |> not ->
+                        ArcObjectExplorerContent.AssociatedSampleLinksSection(relatedSamples, onSelectNodeId)
+                    | _ -> Html.none
                     match metadataArcFile with
                     | Some arcFile
                         when useDetailedMetadataForms
                                 && ArcObjectExplorerContent.usesDetailedMetadataForm selectedNode.kind ->
-                        ArcObjectExplorerContent.ARCObjectDetailedMetadataContent arcFile setArcFileState
+                        ArcObjectExplorerContent.ARCObjectDetailedMetadataContent(arcFile, setArcFileState)
                     | Some arcFile ->
                         ArcObjectExplorerContent.ARCObjectSection(
                             "Metadata",

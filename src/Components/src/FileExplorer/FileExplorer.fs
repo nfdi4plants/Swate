@@ -38,13 +38,15 @@ type FileExplorer =
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
             ?selectedItemId: string option,
             ?directoryInteractionMode: DirectoryInteractionMode,
-            ?useDirectoryChevronToggle: bool
+            ?useDirectoryChevronToggle: bool,
+            ?showBreadcrumbs: bool
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
         let initialModel = FileExplorerLogic.init (defaultArg initialItems [])
         let directoryInteractionMode = defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
         let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
+        let showBreadcrumbs = defaultArg showBreadcrumbs true
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
 
@@ -409,7 +411,7 @@ type FileExplorer =
             prop.ref containerRef
             prop.className "swt:w-full"
             prop.children [
-                if not (List.isEmpty model.BreadcrumbPath) then
+                if showBreadcrumbs && not (List.isEmpty model.BreadcrumbPath) then
                     Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
                 Html.ul [
                     prop.testId "file-explorer-container"

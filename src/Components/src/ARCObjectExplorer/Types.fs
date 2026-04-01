@@ -34,9 +34,42 @@ type ArcExplorerNodeKind =
     | Sample
 
 [<RequireQualifiedAccess>]
+module ArcExplorerNodeKind =
+
+    let label =
+        function
+        | ArcExplorerNodeKind.Arc -> "ARC"
+        | ArcExplorerNodeKind.Group -> "Group"
+        | ArcExplorerNodeKind.Study -> "Study"
+        | ArcExplorerNodeKind.Assay -> "Assay"
+        | ArcExplorerNodeKind.Workflow -> "Workflow"
+        | ArcExplorerNodeKind.Run -> "Run"
+        | ArcExplorerNodeKind.Table -> "Table"
+        | ArcExplorerNodeKind.DataMap -> "DataMap"
+        | ArcExplorerNodeKind.Note -> "Note"
+        | ArcExplorerNodeKind.Sample -> "Sample"
+
+[<RequireQualifiedAccess>]
 type ArcExplorerNodePreviewTarget =
     | Default
     | Table of int
+
+type ArcExplorerSampleSummary = {
+    Characteristics: string list
+    Factors: string list
+    DerivesFrom: string list
+    SourceTables: string list
+    Studies: string list
+    Assays: string list
+}
+
+type ArcExplorerNodeLink = {
+    targetId: string
+    name: string
+    kind: ArcExplorerNodeKind
+    subtitle: string option
+    path: string option
+}
 
 type ArcExplorerNode = {
     id: string
@@ -46,6 +79,8 @@ type ArcExplorerNode = {
     previewTarget: ArcExplorerNodePreviewTarget
     isSelectable: bool
     isReference: bool
+    sampleSummary: ArcExplorerSampleSummary option
+    relatedSamples: ArcExplorerNodeLink list
     isLfs: bool option
     children: ArcExplorerNode list
 } with
@@ -59,6 +94,8 @@ type ArcExplorerNode = {
             ?previewTarget: ArcExplorerNodePreviewTarget,
             ?isSelectable: bool,
             ?isReference: bool,
+            ?sampleSummary: ArcExplorerSampleSummary option,
+            ?relatedSamples: ArcExplorerNodeLink list,
             ?isLfs: bool option,
             ?children: ArcExplorerNode list
         ) =
@@ -70,6 +107,8 @@ type ArcExplorerNode = {
             previewTarget = defaultArg previewTarget ArcExplorerNodePreviewTarget.Default
             isSelectable = defaultArg isSelectable true
             isReference = defaultArg isReference false
+            sampleSummary = defaultArg sampleSummary None
+            relatedSamples = defaultArg relatedSamples []
             isLfs = defaultArg isLfs None
             children = defaultArg children []
         }

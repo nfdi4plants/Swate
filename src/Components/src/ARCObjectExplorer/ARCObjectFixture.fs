@@ -60,62 +60,87 @@ type ARCObjectFixture =
     static member StoryItemIdSample3 = "sample:soil-core-a"
 
     static member StoryItems() : FileItem list =
-        let folder iconPath id name isExpanded children =
+        let folder iconPath id name isExpanded children selectable =
             {
                 FileTree.createFolder name None iconPath with
                     Id = id
                     IsExpanded = isExpanded
                     Children = Some children
+                    Selectable = selectable
             }
 
         let group id name children =
-            folder "swt:fluent--folder-24-regular" id name false children
+            {
+                folder "swt:fluent--folder-24-regular" id name false children false with
+                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Group
+            }
 
-        let objectNode id name children =
-            folder "swt:fluent--document-24-regular" id name false children
+        let objectNode kind id name children =
+            {
+                folder "swt:fluent--document-24-regular" id name false children true with
+                    ItemType = ArcExplorerNodeKind.label kind
+            }
 
-        let document id name =
+        let document kind id name =
             {
                 FileTree.createFile name None "swt:fluent--document-24-regular" with
                     Id = id
+                    ItemType = ArcExplorerNodeKind.label kind
+                    Selectable = true
             }
 
         let tag id name =
             {
                 FileTree.createFile name None "swt:fluent--tag-24-regular" with
                     Id = id
+                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Sample
+                    Selectable = true
             }
 
         let note id name =
             {
                 FileTree.createFile name None "swt:fluent--document-24-regular" with
                     Id = id
+                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Note
+                    Selectable = true
             }
 
         let datamap id =
             {
                 FileTree.createFile "DataMap" None "swt:fluent--database-24-regular" with
                     Id = id
+                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.DataMap
+                    Selectable = true
             }
 
         let table id name =
             {
                 FileTree.createFile name None "swt:fluent--table-24-regular" with
                     Id = id
+                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Table
+                    Selectable = true
+            }
+
+        let tableWithSamples id name children =
+            {
+                folder "swt:fluent--table-24-regular" id name false children true with
+                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Table
             }
 
         [
-            folder
-                "swt:fluent--folder-24-regular"
-                ARCObjectFixture.StoryItemIdRoot
-                "MyArc"
-                false
-                [
+            {
+                folder
+                    "swt:fluent--folder-24-regular"
+                    ARCObjectFixture.StoryItemIdRoot
+                    "MyArc"
+                    false
+                    [
                     group
                         "group:studies"
                         "Studies"
                         [
                             objectNode
+                                ArcExplorerNodeKind.Study
                                 ARCObjectFixture.StoryItemIdStudy
                                 "PlantStressStudy"
                                 [
@@ -124,15 +149,21 @@ type ARCObjectFixture =
                                         "study:plant-stress:tables"
                                         "Tables"
                                         [
-                                            table ARCObjectFixture.StoryItemIdStudyTable1 "Study Design Matrix"
+                                            tableWithSamples
+                                                ARCObjectFixture.StoryItemIdStudyTable1
+                                                "Study Design Matrix"
+                                                [
+                                                    tag ARCObjectFixture.StoryItemIdSample "Leaf-01"
+                                                    tag ARCObjectFixture.StoryItemIdSample2 "Leaf-02"
+                                                ]
                                             table ARCObjectFixture.StoryItemIdStudyTable2 "Phenotype Scoring Table"
                                         ]
                                     group
                                         "study:plant-stress:assays"
                                         "Assays"
                                         [
-                                            document ARCObjectFixture.StoryItemIdStudyAssayRef "MetabolomicsAssay"
-                                            document ARCObjectFixture.StoryItemIdStudyAssayRef2 "TranscriptomicsAssay"
+                                            document ArcExplorerNodeKind.Assay ARCObjectFixture.StoryItemIdStudyAssayRef "MetabolomicsAssay"
+                                            document ArcExplorerNodeKind.Assay ARCObjectFixture.StoryItemIdStudyAssayRef2 "TranscriptomicsAssay"
                                         ]
                                     group
                                         "study:plant-stress:notes"
@@ -141,15 +172,9 @@ type ARCObjectFixture =
                                             note ARCObjectFixture.StoryItemIdNote "Sampling protocol"
                                             note ARCObjectFixture.StoryItemIdNote2 "Leaf scoring rubric"
                                         ]
-                                    group
-                                        "study:plant-stress:samples"
-                                        "Samples"
-                                        [
-                                            tag ARCObjectFixture.StoryItemIdSample "Leaf-01"
-                                            tag ARCObjectFixture.StoryItemIdSample2 "Leaf-02"
-                                        ]
                                 ]
                             objectNode
+                                ArcExplorerNodeKind.Study
                                 ARCObjectFixture.StoryItemIdStudy2
                                 "SoilMicrobiomeStudy"
                                 [
@@ -157,19 +182,20 @@ type ARCObjectFixture =
                                     group
                                         "study:soil-microbiome:tables"
                                         "Tables"
-                                        [ table ARCObjectFixture.StoryItemIdStudy2Table1 "Plot Sampling Schedule" ]
+                                        [
+                                            tableWithSamples
+                                                ARCObjectFixture.StoryItemIdStudy2Table1
+                                                "Plot Sampling Schedule"
+                                                [ tag ARCObjectFixture.StoryItemIdSample3 "SoilCore-A" ]
+                                        ]
                                     group
                                         "study:soil-microbiome:assays"
                                         "Assays"
-                                        [ document ARCObjectFixture.StoryItemIdStudy2AssayRef "AmpliconSequencingAssay" ]
+                                        [ document ArcExplorerNodeKind.Assay ARCObjectFixture.StoryItemIdStudy2AssayRef "AmpliconSequencingAssay" ]
                                     group
                                         "study:soil-microbiome:notes"
                                         "Notes"
                                         [ note ARCObjectFixture.StoryItemIdNote3 "Field observations" ]
-                                    group
-                                        "study:soil-microbiome:samples"
-                                        "Samples"
-                                        [ tag ARCObjectFixture.StoryItemIdSample3 "SoilCore-A" ]
                                 ]
                         ]
                     group
@@ -177,6 +203,7 @@ type ARCObjectFixture =
                         "Assays"
                         [
                             objectNode
+                                ArcExplorerNodeKind.Assay
                                 ARCObjectFixture.StoryItemIdAssay
                                 "MetabolomicsAssay"
                                 [
@@ -185,19 +212,19 @@ type ARCObjectFixture =
                                         "assay:metabolomics:tables"
                                         "Tables"
                                         [
-                                            table ARCObjectFixture.StoryItemIdAssayTable1 "Metabolite Measurements"
+                                            tableWithSamples
+                                                ARCObjectFixture.StoryItemIdAssayTable1
+                                                "Metabolite Measurements"
+                                                [
+                                                    tag ARCObjectFixture.StoryItemIdAssaySample1 "Leaf-01"
+                                                    tag ARCObjectFixture.StoryItemIdAssaySample2 "Leaf-02"
+                                                ]
                                             table ARCObjectFixture.StoryItemIdAssayTable2 "Peak Annotation"
                                             table ARCObjectFixture.StoryItemIdAssayTable3 "QC Injection Summary"
                                         ]
-                                    group
-                                        "assay:metabolomics:samples"
-                                        "Samples"
-                                        [
-                                            tag ARCObjectFixture.StoryItemIdAssaySample1 "Leaf-01"
-                                            tag ARCObjectFixture.StoryItemIdAssaySample2 "Leaf-02"
-                                        ]
                                 ]
                             objectNode
+                                ArcExplorerNodeKind.Assay
                                 ARCObjectFixture.StoryItemIdAssay2
                                 "TranscriptomicsAssay"
                                 [
@@ -206,18 +233,18 @@ type ARCObjectFixture =
                                         "assay:transcriptomics:tables"
                                         "Tables"
                                         [
-                                            table ARCObjectFixture.StoryItemIdAssay2Table1 "RNA Sample Sheet"
+                                            tableWithSamples
+                                                ARCObjectFixture.StoryItemIdAssay2Table1
+                                                "RNA Sample Sheet"
+                                                [
+                                                    tag ARCObjectFixture.StoryItemIdAssay2Sample1 "Leaf-01"
+                                                    tag ARCObjectFixture.StoryItemIdAssay2Sample2 "Leaf-02"
+                                                ]
                                             table ARCObjectFixture.StoryItemIdAssay2Table2 "Differential Expression Matrix"
-                                        ]
-                                    group
-                                        "assay:transcriptomics:samples"
-                                        "Samples"
-                                        [
-                                            tag ARCObjectFixture.StoryItemIdAssay2Sample1 "Leaf-01"
-                                            tag ARCObjectFixture.StoryItemIdAssay2Sample2 "Leaf-02"
                                         ]
                                 ]
                             objectNode
+                                ArcExplorerNodeKind.Assay
                                 ARCObjectFixture.StoryItemIdAssay3
                                 "AmpliconSequencingAssay"
                                 [
@@ -225,25 +252,27 @@ type ARCObjectFixture =
                                     group
                                         "assay:amplicon-sequencing:tables"
                                         "Tables"
-                                        [ table ARCObjectFixture.StoryItemIdAssay3Table1 "ASV Abundance Table" ]
-                                    group
-                                        "assay:amplicon-sequencing:samples"
-                                        "Samples"
-                                        [ tag ARCObjectFixture.StoryItemIdAssay3Sample1 "SoilCore-A" ]
+                                        [
+                                            tableWithSamples
+                                                ARCObjectFixture.StoryItemIdAssay3Table1
+                                                "ASV Abundance Table"
+                                                [ tag ARCObjectFixture.StoryItemIdAssay3Sample1 "SoilCore-A" ]
+                                        ]
                                 ]
                         ]
                     group
                         "group:workflows"
                         "Workflows"
                         [
-                            objectNode ARCObjectFixture.StoryItemIdWorkflow "ExtractionWorkflow" [ datamap ARCObjectFixture.StoryItemIdWorkflowDataMap ]
-                            objectNode ARCObjectFixture.StoryItemIdWorkflow2 "CleanupWorkflow" [ datamap ARCObjectFixture.StoryItemIdWorkflow2DataMap ]
+                            objectNode ArcExplorerNodeKind.Workflow ARCObjectFixture.StoryItemIdWorkflow "ExtractionWorkflow" [ datamap ARCObjectFixture.StoryItemIdWorkflowDataMap ]
+                            objectNode ArcExplorerNodeKind.Workflow ARCObjectFixture.StoryItemIdWorkflow2 "CleanupWorkflow" [ datamap ARCObjectFixture.StoryItemIdWorkflow2DataMap ]
                         ]
                     group
                         "group:runs"
                         "Runs"
                         [
                             objectNode
+                                ArcExplorerNodeKind.Run
                                 ARCObjectFixture.StoryItemIdRun
                                 "Run-2026-04-01"
                                 [
@@ -257,6 +286,7 @@ type ARCObjectFixture =
                                         ]
                                 ]
                             objectNode
+                                ArcExplorerNodeKind.Run
                                 ARCObjectFixture.StoryItemIdRun2
                                 "Run-2026-04-08"
                                 [
@@ -280,7 +310,10 @@ type ARCObjectFixture =
                             note ARCObjectFixture.StoryItemIdCanonicalStudyNote2 "Leaf scoring rubric"
                             note ARCObjectFixture.StoryItemIdCanonicalStudyNote3 "Field observations"
                         ]
-                ]
+                    ]
+                    true with
+                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
+            }
         ]
 
     static member StoryMeta =
@@ -801,6 +834,7 @@ type ARCObjectFixture =
                 initialItems = filteredItems,
                 ?selectedItemId = Some visibleSelectedId,
                 onItemClick = (fun item -> setSelectedId item.Id),
+                showBreadcrumbs = false,
                 useDirectoryChevronToggle = true
             )
 

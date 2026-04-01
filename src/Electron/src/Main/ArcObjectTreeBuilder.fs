@@ -4,6 +4,7 @@ module Main.ArcObjectTreeBuilder
 open System
 open System.Collections.Generic
 open ARCtrl
+open ARCtrl.Process.Conversion
 open Swate.Components
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -57,19 +58,6 @@ let private isNoteMarkdownPath (relativePath: string) =
 let private createGroupNode nodeId name children =
     ArcExplorerNode.create (nodeId, name, ArcExplorerNodeKind.Group, isSelectable = false, children = children)
 
-let private createTableNodes parentId parentPath isLfs (tables: ResizeArray<ArcTable>) =
-    tables
-    |> Seq.mapi (fun index table ->
-        ArcExplorerNode.create (
-            $"{parentId}:table:{index}",
-            fallbackTableName index table,
-            ArcExplorerNodeKind.Table,
-            path = Some parentPath,
-            previewTarget = ArcExplorerNodePreviewTarget.Table index,
-            isLfs = isLfs
-        ))
-    |> List.ofSeq
-
 let private createDataMapChild parentId parentPath (entries: Dictionary<string, FileEntry>) hasDataMap =
     if not hasDataMap then
         []
@@ -86,35 +74,273 @@ let private createDataMapChild parentId parentPath (entries: Dictionary<string, 
             )
         ]
 
-let private createStudyNode (entries: Dictionary<string, FileEntry>) (study: ArcStudy) =
+type private SampleAccumulator = {
+    DisplayName: string
+    LookupKey: string
+    Characteristics: Set<string>
+    Factors: Set<string>
+    DerivesFrom: Set<string>
+    SourceTables: Set<string>
+    Studies: Set<string>
+    Assays: Set<string>
+}
+
+type private TableSampleProjection = {
+    Index: int
+    Name: string
+    Samples: Map<string, SampleAccumulator>
+}
+
+let private sortedByName (nodes: ArcExplorerNode list) =
+    nodes |> List.sortBy (fun node -> node.name.ToLowerInvariant())
+
+let private sortLinksByName (links: ArcExplorerNodeLink list) =
+    links |> List.sortBy (fun link -> link.name.ToLowerInvariant())
+
+let private normalizeSampleName (name: string) =
+    name.Trim()
+
+let private tryNormalizeSampleName (name: string) =
+    let normalized = normalizeSampleName name
+
+    if String.IsNullOrWhiteSpace normalized then
+        None
+    else
+        Some normalized
+
+let private sampleLookupKey (name: string) =
+    normalizeSampleName name |> fun normalized -> normalized.ToLowerInvariant()
+
+let private sampleNodeId parentId isReference lookupKey =
+    if isReference then
+        $"{parentId}:sample-ref:{lookupKey}"
+    else
+        $"{parentId}:sample:{lookupKey}"
+
+let private addDistinctTexts (existing: Set<string>) (values: seq<string>) =
+    values
+    |> Seq.fold (fun state value ->
+        match tryNormalizeSampleName value with
+        | Some normalized -> Set.add normalized state
+        | None -> state) existing
+
+let private createSampleAccumulator displayName lookupKey =
+    {
+        DisplayName = displayName
+        LookupKey = lookupKey
+        Characteristics = Set.empty
+        Factors = Set.empty
+        DerivesFrom = Set.empty
+        SourceTables = Set.empty
+        Studies = Set.empty
+        Assays = Set.empty
+    }
+
+let private mergeSampleAccumulator (left: SampleAccumulator) (right: SampleAccumulator) =
+    {
+        DisplayName =
+            if String.IsNullOrWhiteSpace left.DisplayName then
+                right.DisplayName
+            else
+                left.DisplayName
+        LookupKey = left.LookupKey
+        Characteristics = Set.union left.Characteristics right.Characteristics
+        Factors = Set.union left.Factors right.Factors
+        DerivesFrom = Set.union left.DerivesFrom right.DerivesFrom
+        SourceTables = Set.union left.SourceTables right.SourceTables
+        Studies = Set.union left.Studies right.Studies
+        Assays = Set.union left.Assays right.Assays
+    }
+
+let private mergeSampleMaps (sampleMaps: seq<Map<string, SampleAccumulator>>) =
+    sampleMaps
+    |> Seq.collect Map.toList
+    |> Seq.fold (fun state (lookupKey, sample) ->
+        let merged =
+            match state |> Map.tryFind lookupKey with
+            | Some existing -> mergeSampleAccumulator existing sample
+            | None -> sample
+
+        state |> Map.add lookupKey merged) Map.empty
+
+let private sampleSummaryOfAccumulator (sample: SampleAccumulator) : ArcExplorerSampleSummary =
+    let toSortedList (values: Set<string>) =
+        values |> Set.toList |> List.sortBy (fun value -> value.ToLowerInvariant())
+
+    {
+        Characteristics = toSortedList sample.Characteristics
+        Factors = toSortedList sample.Factors
+        DerivesFrom = toSortedList sample.DerivesFrom
+        SourceTables = toSortedList sample.SourceTables
+        Studies = toSortedList sample.Studies
+        Assays = toSortedList sample.Assays
+    }
+
+let private factorDisplayName (factorValue: ARCtrl.Process.FactorValue) =
+    factorValue.Category
+    |> Option.bind (fun factor -> factor.FactorType |> Option.map (fun factorType -> factorType.NameText))
+    |> Option.defaultValue factorValue.NameText
+
+let private extractSamplesFromTable
+    (tableName: string)
+    (studyIdentifiers: seq<string>)
+    (assayIdentifiers: seq<string>)
+    (table: ArcTable)
+    =
+    let processes = table.GetProcesses()
+
+    processes
+    |> ARCtrl.Process.ProcessSequence.getSamples
+    |> List.fold (fun state sample ->
+        match tryNormalizeSampleName sample.NameAsString with
+        | None -> state
+        | Some displayName ->
+            let lookupKey = sampleLookupKey displayName
+
+            let existing =
+                state
+                |> Map.tryFind lookupKey
+                |> Option.defaultValue (createSampleAccumulator displayName lookupKey)
+
+            let updated =
+                {
+                    existing with
+                        Characteristics =
+                            addDistinctTexts
+                                existing.Characteristics
+                                (sample.Characteristics |> Option.defaultValue [] |> Seq.map _.NameText)
+                        Factors =
+                            addDistinctTexts
+                                existing.Factors
+                                (sample.FactorValues |> Option.defaultValue [] |> Seq.map factorDisplayName)
+                        DerivesFrom =
+                            addDistinctTexts
+                                existing.DerivesFrom
+                                (sample.DerivesFrom |> Option.defaultValue [] |> Seq.map _.NameAsString)
+                        SourceTables = addDistinctTexts existing.SourceTables [ tableName ]
+                        Studies = addDistinctTexts existing.Studies studyIdentifiers
+                        Assays = addDistinctTexts existing.Assays assayIdentifiers
+                }
+
+            state |> Map.add lookupKey updated) Map.empty
+
+let private extractTableSampleProjections
+    (studyIdentifiers: seq<string>)
+    (assayIdentifiers: seq<string>)
+    (tables: ResizeArray<ArcTable>)
+    =
+    tables
+    |> Seq.mapi (fun index table ->
+        let tableName = fallbackTableName index table
+
+        {
+            Index = index
+            Name = tableName
+            Samples = extractSamplesFromTable tableName studyIdentifiers assayIdentifiers table
+        })
+    |> List.ofSeq
+
+let private createSampleNodes
+    parentId
+    parentPath
+    isReference
+    isLfs
+    (samples: Map<string, SampleAccumulator>)
+    =
+    samples
+    |> Map.toList
+    |> List.map (fun (_, sample) ->
+        ArcExplorerNode.create (
+            sampleNodeId parentId isReference sample.LookupKey,
+            sample.DisplayName,
+            ArcExplorerNodeKind.Sample,
+            path = Some parentPath,
+            isReference = isReference,
+            sampleSummary = Some(sampleSummaryOfAccumulator sample),
+            isLfs = isLfs
+        ))
+    |> sortedByName
+
+let private createRelatedSampleLinks parentId parentPath isReference (samples: Map<string, SampleAccumulator>) =
+    let subtitle =
+        if isReference then
+            Some "Reference sample"
+        else
+            Some "Canonical sample"
+
+    samples
+    |> Map.toList
+    |> List.map (fun (_, sample) ->
+        {
+            targetId = sampleNodeId parentId isReference sample.LookupKey
+            name = sample.DisplayName
+            kind = ArcExplorerNodeKind.Sample
+            subtitle = subtitle
+            path = Some parentPath
+        })
+    |> sortLinksByName
+
+let private createTableNodes parentId parentPath isReference isLfs (tableProjections: TableSampleProjection list) =
+    tableProjections
+    |> List.map (fun projection ->
+        let tableNodeId = $"{parentId}:table:{projection.Index}"
+
+        ArcExplorerNode.create (
+            tableNodeId,
+            projection.Name,
+            ArcExplorerNodeKind.Table,
+            path = Some parentPath,
+            previewTarget = ArcExplorerNodePreviewTarget.Table projection.Index,
+            relatedSamples = createRelatedSampleLinks tableNodeId parentPath isReference projection.Samples,
+            children =
+                createSampleNodes
+                    tableNodeId
+                    parentPath
+                    isReference
+                    isLfs
+                    projection.Samples,
+            isLfs = isLfs
+        ))
+
+let private createStudyNode
+    (entries: Dictionary<string, FileEntry>)
+    (tableProjections: TableSampleProjection list)
+    (study: ArcStudy)
+    =
     let studyPath = ARCtrl.Helper.Identifier.Study.fileNameFromIdentifier study.Identifier
     let nodeId = $"study:{study.Identifier}"
+    let studyIsLfs = tryGetIsLfs entries studyPath
     let children =
         createDataMapChild nodeId studyPath entries study.DataMap.IsSome
-        @ createTableNodes nodeId studyPath (tryGetIsLfs entries studyPath) study.Tables
+        @ createTableNodes nodeId studyPath false studyIsLfs tableProjections
 
     ArcExplorerNode.create (
         nodeId,
         study.Identifier,
         ArcExplorerNodeKind.Study,
         path = Some studyPath,
-        isLfs = tryGetIsLfs entries studyPath,
+        isLfs = studyIsLfs,
         children = children
     )
 
-let private createAssayNode (entries: Dictionary<string, FileEntry>) (assay: ArcAssay) =
+let private createAssayNode
+    (entries: Dictionary<string, FileEntry>)
+    (tableProjections: TableSampleProjection list)
+    (assay: ArcAssay)
+    =
     let assayPath = ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier assay.Identifier
     let nodeId = $"assay:{assay.Identifier}"
+    let assayIsLfs = tryGetIsLfs entries assayPath
     let children =
         createDataMapChild nodeId assayPath entries assay.DataMap.IsSome
-        @ createTableNodes nodeId assayPath (tryGetIsLfs entries assayPath) assay.Tables
+        @ createTableNodes nodeId assayPath true assayIsLfs tableProjections
 
     ArcExplorerNode.create (
         nodeId,
         assay.Identifier,
         ArcExplorerNodeKind.Assay,
         path = Some assayPath,
-        isLfs = tryGetIsLfs entries assayPath,
+        isLfs = assayIsLfs,
         children = children
     )
 
@@ -135,16 +361,18 @@ let private createWorkflowNode (entries: Dictionary<string, FileEntry>) (workflo
 let private createRunNode (entries: Dictionary<string, FileEntry>) (run: ArcRun) =
     let runPath = ARCtrl.Helper.Identifier.Run.fileNameFromIdentifier run.Identifier
     let nodeId = $"run:{run.Identifier}"
+    let runIsLfs = tryGetIsLfs entries runPath
+    let tableProjections = extractTableSampleProjections [] [] run.Tables
     let children =
         createDataMapChild nodeId runPath entries run.DataMap.IsSome
-        @ createTableNodes nodeId runPath (tryGetIsLfs entries runPath) run.Tables
+        @ createTableNodes nodeId runPath false runIsLfs tableProjections
 
     ArcExplorerNode.create (
         nodeId,
         run.Identifier,
         ArcExplorerNodeKind.Run,
         path = Some runPath,
-        isLfs = tryGetIsLfs entries runPath,
+        isLfs = runIsLfs,
         children = children
     )
 
@@ -164,18 +392,38 @@ let private createNoteNodes (entries: Dictionary<string, FileEntry>) =
         ))
     |> List.ofSeq
 
-let private sortedByName (nodes: ArcExplorerNode list) =
-    nodes |> List.sortBy (fun node -> node.name.ToLowerInvariant())
-
 let create (arcRootPath: string) (arc: ARC) (fileEntries: seq<FileEntry>) =
     let rendererEntries = toRendererFileTree arcRootPath fileEntries
     let investigationPath = ARCtrl.ArcPathHelper.InvestigationFileName
+    let studyTableSamplesByIdentifier =
+        arc.Studies
+        |> Seq.map (fun study ->
+            study.Identifier, extractTableSampleProjections [ study.Identifier ] [] study.Tables)
+        |> Map.ofSeq
+
+    let assayTableSamplesByIdentifier =
+        arc.Assays
+        |> Seq.map (fun assay ->
+            let owningStudies =
+                arc.Studies
+                |> Seq.filter (fun study -> study.RegisteredAssayIdentifiers |> Seq.contains assay.Identifier)
+                |> Seq.map _.Identifier
+                |> Seq.toList
+
+            assay.Identifier, extractTableSampleProjections owningStudies [ assay.Identifier ] assay.Tables)
+        |> Map.ofSeq
 
     let groups =
         [
             let studies =
                 arc.Studies
-                |> Seq.map (createStudyNode rendererEntries)
+                |> Seq.map (fun study ->
+                    let tableProjections =
+                        studyTableSamplesByIdentifier
+                        |> Map.tryFind study.Identifier
+                        |> Option.defaultValue []
+
+                    createStudyNode rendererEntries tableProjections study)
                 |> List.ofSeq
                 |> sortedByName
 
@@ -184,7 +432,13 @@ let create (arcRootPath: string) (arc: ARC) (fileEntries: seq<FileEntry>) =
 
             let assays =
                 arc.Assays
-                |> Seq.map (createAssayNode rendererEntries)
+                |> Seq.map (fun assay ->
+                    let tableProjections =
+                        assayTableSamplesByIdentifier
+                        |> Map.tryFind assay.Identifier
+                        |> Option.defaultValue []
+
+                    createAssayNode rendererEntries tableProjections assay)
                 |> List.ofSeq
                 |> sortedByName
 

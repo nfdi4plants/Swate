@@ -19,17 +19,7 @@ type ArcObjectExplorerViewModel = {
 module ArcObjectExplorerView =
 
     let nodeKindLabel =
-        function
-        | ArcExplorerNodeKind.Arc -> "ARC"
-        | ArcExplorerNodeKind.Group -> "Group"
-        | ArcExplorerNodeKind.Study -> "Study"
-        | ArcExplorerNodeKind.Assay -> "Assay"
-        | ArcExplorerNodeKind.Workflow -> "Workflow"
-        | ArcExplorerNodeKind.Run -> "Run"
-        | ArcExplorerNodeKind.Table -> "Table"
-        | ArcExplorerNodeKind.DataMap -> "DataMap"
-        | ArcExplorerNodeKind.Note -> "Note"
-        | ArcExplorerNodeKind.Sample -> "Sample"
+        ArcExplorerNodeKind.label
 
     let filterTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) =
         let rec loop (node: ArcExplorerNode) =
@@ -62,12 +52,14 @@ module ArcObjectExplorerView =
 
         loop items
 
-    let private flattenNodesWithParent (nodes: ArcExplorerNode list) =
-        let rec loop (parent: ArcExplorerNode option) (nodes: ArcExplorerNode list) =
+    let private flattenNodesWithAncestors (nodes: ArcExplorerNode list) =
+        let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
             nodes
-            |> List.collect (fun node -> (node, parent) :: loop (Some node) node.children)
+            |> List.collect (fun node ->
+                let orderedAncestors = List.rev ancestors
+                (node, orderedAncestors) :: loop (node :: ancestors) node.children)
 
-        loop None nodes
+        loop [] nodes
 
     let searchableItems (nodes: ArcExplorerNode list) (items: FileItem list) =
         let itemsById =
@@ -77,8 +69,8 @@ module ArcObjectExplorerView =
             |> Map.ofList
 
         nodes
-        |> flattenNodesWithParent
-        |> List.choose (fun (node, parent) ->
+        |> flattenNodesWithAncestors
+        |> List.choose (fun (node, ancestors) ->
             if
                 not node.isSelectable
                 || node.kind = ArcExplorerNodeKind.Arc
@@ -89,15 +81,21 @@ module ArcObjectExplorerView =
                 itemsById
                 |> Map.tryFind node.id
                 |> Option.map (fun item ->
-                    let parentPart =
-                        parent
-                        |> Option.map (fun parentNode -> $"Parent: {parentNode.name}")
+                    let lineagePart =
+                        ancestors
+                        |> List.filter (fun ancestor -> ancestor.kind <> ArcExplorerNodeKind.Arc)
+                        |> List.map _.name
+                        |> function
+                            | [] -> None
+                            | lineage ->
+                                let lineageText = String.concat " / " lineage
+                                Some $"In: {lineageText}"
                         |> Option.toList
 
                     let subtitleParts = [
                         nodeKindLabel node.kind
                         if node.isReference then "Reference" else "Canonical"
-                        yield! parentPart
+                        yield! lineagePart
                         yield! node.path |> Option.toList
                     ]
 

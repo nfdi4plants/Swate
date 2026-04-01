@@ -65,6 +65,7 @@ module ARCExplorer =
             {
                 FileTree.createFolder node.name node.path (iconForNode node) with
                     Id = node.id
+                    ItemType = ArcExplorerNodeKind.label node.kind
                     IsExpanded = node.kind = ArcExplorerNodeKind.Arc
                     IsLFS = node.isLfs
                     Selectable = node.isSelectable
@@ -74,6 +75,7 @@ module ARCExplorer =
             {
                 FileTree.createFile node.name node.path (iconForNode node) with
                     Id = node.id
+                    ItemType = ArcExplorerNodeKind.label node.kind
                     IsLFS = node.isLfs
                     Selectable = node.isSelectable
             }
@@ -152,6 +154,7 @@ module ARCExplorer =
                     onItemClick = openPreview,
                     onContextMenu = contextMenuItems,
                     ?selectedItemId = Some selectedItemId,
+                    showBreadcrumbs = false,
                     directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
                     useDirectoryChevronToggle = true
                 )
