@@ -388,6 +388,131 @@ Vitest.describe("GitService local repository workflow", fun () ->
             })
     })
 
+    Vitest.test("planOutboundPush skips LFS upload when the remote is already up to date but local origin refs are stale", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let remotePath = join [| context.RootPath; "remote-stale-lfs.git" |]
+                let filePath = join [| context.RepoPath; "artifact.bin" |]
+                let branchName = "feature/stale-lfs-plan"
+
+                let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                let! _ = context.Git.raw [| "lfs"; "install"; "--local" |]
+                let! _ = context.Git.raw [| "lfs"; "track"; "*.bin" |]
+
+                do! writeUtf8FileAsync filePath "binary-ish content\n"
+
+                let! stageResult = GitService.stagePaths context.RepoPath [| ".gitattributes"; "artifact.bin" |]
+                expectOk "stage lfs-managed file for stale remote ref test" stageResult |> ignore
+
+                let! commitResult = GitService.commit context.RepoPath "test: lfs pointer commit for stale remote ref test"
+                expectOk "commit lfs-managed file for stale remote ref test" commitResult |> ignore
+
+                let! _ = context.Git.raw [| "branch"; "-M"; branchName |]
+                let! _ = context.Git.raw [| "push"; "--set-upstream"; "origin"; branchName |]
+                let! _ = context.Git.raw [| "update-ref"; "-d"; $"refs/remotes/origin/{branchName}" |]
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        runSimpleGitResult
+                        (fun git -> runSimpleGitResult (fun currentGit -> currentGit.status ()) git)
+                        "origin"
+                        None
+                        context.Git
+
+                let actualPlan = expectOkResult "plan outbound push with stale local remote refs" plan
+                Vitest.expect(actualPlan).toEqual(GitLfsService.OutboundPushPlan.SkipLfsUpload)
+            })
+    })
+
+    Vitest.test("executePushWorkflow skips the LFS upload step when the plan does not require it", fun () -> promise {
+        let events = ResizeArray<string>()
+
+        let pushTarget: GitService.GitPushTarget = {
+            RefSpec = "feature/skip-lfs"
+            PushBranch = "feature/skip-lfs"
+            SetUpstream = false
+        }
+
+        let! result =
+            GitService.executePushWorkflow
+                pushTarget
+                (fun () ->
+                    events.Add "plan"
+                    promise { return Ok GitLfsService.OutboundPushPlan.SkipLfsUpload })
+                (fun refSpec ->
+                    events.Add $"upload:{refSpec}"
+                    promise { return Ok() })
+                (fun _ ->
+                    events.Add "push"
+                    promise { return Ok() })
+                (fun _ -> promise { return None })
+
+        expectOk "execute push workflow without lfs upload" result |> ignore
+        Vitest.expect(events.ToArray()).toEqual([| "plan"; "push" |])
+    })
+
+    Vitest.test("executePushWorkflow uploads LFS objects before pushing when the plan requires it", fun () -> promise {
+        let events = ResizeArray<string>()
+
+        let pushTarget: GitService.GitPushTarget = {
+            RefSpec = "feature/upload-lfs"
+            PushBranch = "feature/upload-lfs"
+            SetUpstream = true
+        }
+
+        let! result =
+            GitService.executePushWorkflow
+                pushTarget
+                (fun () ->
+                    events.Add "plan"
+                    promise { return Ok(GitLfsService.OutboundPushPlan.UploadLfsObjects "refs/heads/feature/upload-lfs") })
+                (fun refSpec ->
+                    events.Add $"upload:{refSpec}"
+                    promise { return Ok() })
+                (fun _ ->
+                    events.Add "push"
+                    promise { return Ok() })
+                (fun _ -> promise { return None })
+
+        expectOk "execute push workflow with lfs upload" result |> ignore
+
+        Vitest.expect(events.ToArray()).toEqual(
+            [|
+                "plan"
+                "upload:refs/heads/feature/upload-lfs"
+                "push"
+            |]
+        )
+    })
+
+    Vitest.test("executePushWorkflow appends diagnostics when the LFS upload step fails", fun () -> promise {
+        let uploadFailure: GitService.GitFailure = {
+            Kind = GitService.GitFailureKind.Network
+            Message = "lfs upload failed"
+        }
+
+        let pushTarget: GitService.GitPushTarget = {
+            RefSpec = "feature/diagnostics"
+            PushBranch = "feature/diagnostics"
+            SetUpstream = false
+        }
+
+        let! result =
+            GitService.executePushWorkflow
+                pushTarget
+                (fun () ->
+                    promise { return Ok(GitLfsService.OutboundPushPlan.UploadLfsObjects "refs/heads/feature/diagnostics") })
+                (fun _ -> promise { return Error uploadFailure })
+                (fun _ -> promise { return Ok() })
+                (fun _ -> promise { return Some "Git LFS Env:\n[REDACTED]" })
+
+        let failure = expectError result
+        Vitest.expect(failure.Kind).toEqual(GitService.GitFailureKind.Network)
+        Vitest.expect(failure.Message.Contains("lfs upload failed")).toBe(true)
+        Vitest.expect(failure.Message.Contains("LFS diagnostics")).toBe(true)
+    })
+
     Vitest.test("rejects invalid diff pathspecs before invoking git", fun () -> promise {
         do!
             withTempRepository (fun context -> promise {

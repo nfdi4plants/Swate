@@ -205,6 +205,20 @@ let private splitNonEmptyLines (text: string) =
     |> Array.map _.Trim()
     |> Array.filter (fun line -> not (String.IsNullOrWhiteSpace line))
 
+let private shouldSkipLfsUploadFromPushDryRun (output: string) =
+    let statusLines =
+        output
+        |> splitNonEmptyLines
+        |> Array.filter (fun line ->
+            not (line.StartsWith("To ", StringComparison.Ordinal))
+            && not (line.Equals("Done", StringComparison.OrdinalIgnoreCase))
+        )
+
+    statusLines.Length = 0
+    || statusLines |> Array.forall (fun line -> line.StartsWith("=", StringComparison.Ordinal))
+    // Rejected dry runs still mean there is no successful outbound push to upload LFS objects for.
+    || statusLines |> Array.exists (fun line -> line.StartsWith("!", StringComparison.Ordinal))
+
 let private getKnownRemoteRefs
     (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
     (remoteName: string)
@@ -321,31 +335,42 @@ let planOutboundPush
     : JS.Promise<Result<OutboundPushPlan, 'Failure>> =
     promise {
         let! refSpec = resolvePushRefSpec runStatus branchName git
-        let! remoteRefsResult = getKnownRemoteRefs runSimpleGitRaw remoteName git
+        let! dryRunResult =
+            runSimpleGitRaw
+                (fun currentGit -> currentGit.raw [| "push"; "--porcelain"; "--dry-run"; remoteName; refSpec |])
+                git
 
-        match remoteRefsResult with
+        match dryRunResult with
         | Error failure ->
             return Error failure
-        | Ok remoteRefs ->
-            let! outboundObjectIdsResult = getOutboundObjectIds runSimpleGitRaw refSpec remoteRefs git
+        | Ok dryRunOutput when shouldSkipLfsUploadFromPushDryRun dryRunOutput ->
+            return Ok OutboundPushPlan.SkipLfsUpload
+        | Ok _ ->
+            let! remoteRefsResult = getKnownRemoteRefs runSimpleGitRaw remoteName git
 
-            match outboundObjectIdsResult with
+            match remoteRefsResult with
             | Error failure ->
                 return Error failure
-            | Ok objectIds when objectIds.Length = 0 ->
-                return Ok OutboundPushPlan.SkipLfsUpload
-            | Ok objectIds ->
-                let! hasOutboundLfsPointersResult =
-                    containsOutboundLfsPointerObjects runSimpleGitRaw objectIds git
+            | Ok remoteRefs ->
+                let! outboundObjectIdsResult = getOutboundObjectIds runSimpleGitRaw refSpec remoteRefs git
 
-                return
-                    hasOutboundLfsPointersResult
-                    |> Result.map (fun hasOutboundLfsPointers ->
-                        if hasOutboundLfsPointers then
-                            OutboundPushPlan.UploadLfsObjects refSpec
-                        else
-                            OutboundPushPlan.SkipLfsUpload
-                    )
+                match outboundObjectIdsResult with
+                | Error failure ->
+                    return Error failure
+                | Ok objectIds when objectIds.Length = 0 ->
+                    return Ok OutboundPushPlan.SkipLfsUpload
+                | Ok objectIds ->
+                    let! hasOutboundLfsPointersResult =
+                        containsOutboundLfsPointerObjects runSimpleGitRaw objectIds git
+
+                    return
+                        hasOutboundLfsPointersResult
+                        |> Result.map (fun hasOutboundLfsPointers ->
+                            if hasOutboundLfsPointers then
+                                OutboundPushPlan.UploadLfsObjects refSpec
+                            else
+                                OutboundPushPlan.SkipLfsUpload
+                        )
     }
 
 let uploadObjects

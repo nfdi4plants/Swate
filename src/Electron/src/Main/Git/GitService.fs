@@ -1389,6 +1389,39 @@ let pull
                 return result
     }
 
+let executePushWorkflow
+    (pushTarget: GitPushTarget)
+    (buildOutboundPlan: unit -> JS.Promise<Result<OutboundPushPlan, GitFailure>>)
+    (uploadLfsObjects: string -> JS.Promise<GitResult<unit>>)
+    (pushToRemote: GitPushTarget -> JS.Promise<GitResult<unit>>)
+    (collectLfsDiagnostics: GitFailure -> JS.Promise<string option>)
+    : JS.Promise<GitResult<unit>> =
+    promise {
+        let! lfsPlanResult = buildOutboundPlan ()
+
+        match lfsPlanResult with
+        | Error failure ->
+            return Error failure
+        | Ok lfsPlan ->
+            match lfsPlan with
+            | OutboundPushPlan.SkipLfsUpload ->
+                return! pushToRemote pushTarget
+            | OutboundPushPlan.UploadLfsObjects refSpec ->
+                let! lfsUploadResult = uploadLfsObjects refSpec
+
+                match lfsUploadResult with
+                | Ok () ->
+                    return! pushToRemote pushTarget
+                | Error failure ->
+                    let! diagnostics = collectLfsDiagnostics failure
+
+                    return
+                        Error {
+                            failure with
+                                Message = appendPushDiagnostics failure.Message diagnostics
+                        }
+    }
+
 // Push keeps LFS planning and optional upload here because they are part of the repository push workflow.
 let push
     (arcPath: string)
@@ -1417,66 +1450,40 @@ let push
                         let pushTarget =
                             resolvePushTarget safeBranchName pushStatus.current pushStatus.tracking pushStatus.detached
 
-                        let! lfsPlanResult =
-                            planOutboundPush
-                                runSimpleGit
-                                (fun currentGit -> runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit)
-                                safeRemoteName
-                                (Some pushTarget.RefSpec)
-                                git
-
-                        match lfsPlanResult with
-                        | Error failure ->
-                            return Error failure
-                        | Ok lfsPlan ->
-                            let! lfsUploadResult =
-                                match lfsPlan with
-                                | OutboundPushPlan.SkipLfsUpload ->
-                                    promise { return Ok false }
-                                | OutboundPushPlan.UploadLfsObjects refSpec ->
-                                    promise {
-                                        let! uploadResult = uploadObjects runSimpleGit safeRemoteName refSpec git
-
-                                        return
-                                            match uploadResult with
-                                            | Ok () -> Ok true
-                                            | Error failure -> Error failure
-                                    }
-
-                            match lfsUploadResult with
-                            | Error failure ->
-                                let! diagnostics =
-                                    collectPushDiagnostics
+                        return!
+                            executePushWorkflow
+                                pushTarget
+                                (fun () ->
+                                    planOutboundPush
                                         runSimpleGit
-                                        (fun currentFailure -> Some currentFailure.Message)
+                                        (fun currentGit -> runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit)
                                         safeRemoteName
-                                        git
-
-                                return
-                                    Error {
-                                        failure with
-                                            Message = appendPushDiagnostics failure.Message diagnostics
-                                    }
-                            | Ok _ ->
-                                let! pushResult =
+                                        (Some pushTarget.RefSpec)
+                                        git)
+                                (fun refSpec -> uploadObjects runSimpleGit safeRemoteName refSpec git)
+                                (fun currentPushTarget ->
                                     runSimpleGit
                                         (fun currentGit -> promise {
-                                            if pushTarget.SetUpstream then
+                                            if currentPushTarget.SetUpstream then
                                                 let! _ =
                                                     currentGit.push (
                                                         safeRemoteName,
-                                                        pushTarget.PushBranch,
+                                                        currentPushTarget.PushBranch,
                                                         !^[| "--set-upstream" |]
                                                     )
 
                                                 return ()
                                             else
-                                                let! _ = currentGit.push (safeRemoteName, pushTarget.PushBranch)
+                                                let! _ = currentGit.push (safeRemoteName, currentPushTarget.PushBranch)
                                                 return ()
                                         })
-                                        git
-
-                                return pushResult
+                                        git)
+                                (fun _failure ->
+                                    collectPushDiagnostics
+                                        runSimpleGit
+                                        (fun currentFailure -> Some currentFailure.Message)
+                                        safeRemoteName
+                                        git)
     }
 
 // GitService writes LFS settings because the threshold is a git workflow policy setting owned by this service.
