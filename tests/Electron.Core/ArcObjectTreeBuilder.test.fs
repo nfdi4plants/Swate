@@ -2,6 +2,7 @@ module ElectronCore.ArcObjectTreeBuilderTests
 
 open ARCtrl
 open Swate.Components
+open Swate.Components.Shared
 open Vitest
 
 module ArcObjectTreeBuilder = Main.ArcObjectTreeBuilder
