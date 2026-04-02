@@ -5,9 +5,10 @@ open System
 open System.Collections.Generic
 open ARCtrl
 open ARCtrl.Process.Conversion
-open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+
 
 let private dataMapFileName = "isa.datamap.xlsx"
 

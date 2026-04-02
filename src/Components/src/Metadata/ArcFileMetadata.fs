@@ -5,6 +5,8 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components.Metadata
+open Swate.Components.Shared
+
 
 [<Erase; Mangle(false)>]
 type ArcFileMetadata =

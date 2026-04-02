@@ -1,12 +1,9 @@
 module Renderer.Components.MainContent.Helper
 
-open ARCtrl
+
 open Fable.Core
-open Swate.Components.Landing
-open Swate.Electron.Shared
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
-open Renderer
 
 module MainContentHelper =
 

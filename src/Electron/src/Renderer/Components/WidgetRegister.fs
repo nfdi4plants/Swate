@@ -2,11 +2,9 @@ module Renderer.Components.WidgetRegistry
 
 open Feliz
 open Swate.Components
+open Swate.Components.Shared
 open ARCtrl
 open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOHelper
-open ARCtrl.Contract
 
 let private filePickerServices: FilePickerWidgetServices = {
     pickPaths =

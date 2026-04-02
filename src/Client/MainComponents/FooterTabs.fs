@@ -4,6 +4,8 @@ open Feliz
 open ARCtrl
 open Model
 open Swate.Components
+open Swate.Components.Shared
+
 
 type private FooterTab = {
     IsEditable: bool

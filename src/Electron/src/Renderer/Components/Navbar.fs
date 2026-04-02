@@ -1,11 +1,10 @@
 namespace Renderer.Components
 
-open Fable.Core
+
 open Feliz
 
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Components
+open Swate.Components.Shared
 open Fable.Electron.Remoting.Renderer
 
 module NavbarHelper =
@@ -25,7 +24,7 @@ module NavbarHelper =
                 |> Promise.start
 
         /// Click on a recent ARC: main process decides open-or-focus.
-        let openArcByPath (clickedARC: SelectorTypes.ARCPointer) =
+        let openArcByPath (clickedARC: ARCPointer) =
             promise {
                 match! Api.ipcArcVaultApi.openARCByPath (unbox null) clickedARC.path with
                 | Ok _ -> ()
@@ -33,7 +32,7 @@ module NavbarHelper =
             }
             |> Promise.start
 
-        let rmvRecentArc (pointer: SelectorTypes.ARCPointer) =
+        let rmvRecentArc (pointer: ARCPointer) =
             promise {
                 match! Api.ipcArcVaultApi.removeRecentARC pointer with
                 | Ok _ -> ()
@@ -79,7 +78,7 @@ type private Selector =
 
     [<ReactComponent>]
     static member Main() =
-        let recentArc, setRecentArc = React.useState ([||]: SelectorTypes.ARCPointer[])
+        let recentArc, setRecentArc = React.useState ([||]: ARCPointer[])
         let isLoading, setIsLoading = React.useState true
 
         let currentlyOpenArcPath, setCurrentlyOpenArcPath =
@@ -110,7 +109,7 @@ type private Selector =
         )
 
         let selectorControlRef =
-            React.useRef ({ toggle = ignore }: SelectorTypes.SelectorRef)
+            React.useRef ({ toggle = ignore }: SelectorRef)
 
         let onOpen =
             fun (b: bool) ->

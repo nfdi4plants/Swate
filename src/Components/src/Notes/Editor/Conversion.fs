@@ -2,6 +2,7 @@ namespace Swate.Components.Notes.Editor
 
 open System
 open ARCtrl
+open Swate.Components.Shared
 open Swate.Components.Landing
 
 [<RequireQualifiedAccess>]

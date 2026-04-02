@@ -4,10 +4,7 @@ module Swate.Electron.Shared.IPCTypes
 open Fable.Core
 open Fable.Electron
 
-open Swate.Components
-open Swate.Components.NoteTypes
-
-open ARCtrl.ARCtrlHelper
+open Swate.Components.Shared
 open AuthTypes
 open GitTypes
 open FileIOTypes
@@ -32,8 +29,8 @@ type IArcVaultsApi = {
     createARC: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
-    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
-    removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
+    getRecentARCs: unit -> JS.Promise<ARCPointer[]>
+    removeRecentARC: ARCPointer -> JS.Promise<Result<unit, exn>>
 
     pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
     pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
@@ -74,7 +71,7 @@ type IGitApi = {
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
-    recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
+    recentARCsUpdate: ARCPointer[] -> unit
     authAccountsUpdate: AuthAccountSummary[] -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit

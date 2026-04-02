@@ -1,9 +1,8 @@
 module Renderer.Components.ARCHelper
 
-open Swate.Electron.Shared
-open ARCtrl
 open System
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes

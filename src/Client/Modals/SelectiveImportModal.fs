@@ -9,6 +9,8 @@ open Fable.Core.JsInterop
 open ARCtrl
 open FileImport
 open Swate.Components
+open Swate.Components.Shared
+
 
 type SelectiveImportModal =
 

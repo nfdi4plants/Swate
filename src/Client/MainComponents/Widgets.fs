@@ -4,11 +4,11 @@ open Feliz
 open Browser.Types
 open LocalStorage.Widgets
 open Swate
-open Modals
-open Types.FileImport
 open Swate.Components
 open ARCtrl
 open BuildingBlock.SearchComponent
+open Swate.Components.Shared
+
 
 module InitExtensions =
 

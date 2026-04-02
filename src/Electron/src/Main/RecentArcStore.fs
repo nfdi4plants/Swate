@@ -4,7 +4,7 @@ module Main.RecentArcStore
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 
 [<Literal>]
@@ -13,9 +13,9 @@ let maxNumberRecentArcs = 5
 module private Helpers =
 
     let toPointer (name: string) (path: string) (isActive: bool) =
-        SelectorTypes.ARCPointer.create (name, path, isActive)
+        ARCPointer.create (name, path, isActive)
 
-    let sanitize (arcs: SelectorTypes.ARCPointer[]) =
+    let sanitize (arcs: ARCPointer[]) =
         arcs
         |> Array.filter (fun arc -> not (String.IsNullOrWhiteSpace arc.path))
         |> Array.distinctBy (fun arc -> normalizePath arc.path)
@@ -55,7 +55,7 @@ module private Helpers =
         with _ ->
             None
 
-    let persist (arcs: SelectorTypes.ARCPointer[]) =
+    let persist (arcs: ARCPointer[]) =
         let serializable =
             arcs
             |> Array.map (fun arc ->
@@ -79,9 +79,9 @@ module private Helpers =
 
 type RecentARCStore() =
 
-    member val private RecentArcsState: SelectorTypes.ARCPointer[] = Helpers.load () |> Helpers.sanitize with get, set
+    member val private RecentArcsState: ARCPointer[] = Helpers.load () |> Helpers.sanitize with get, set
 
-    member private this.SetState(newArcs: SelectorTypes.ARCPointer[]) =
+    member private this.SetState(newArcs: ARCPointer[]) =
         this.RecentArcsState <- Helpers.sanitize newArcs
         Helpers.persist this.RecentArcsState
 

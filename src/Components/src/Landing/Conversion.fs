@@ -1,6 +1,8 @@
 namespace Swate.Components.Landing
 
 open ARCtrl
+open Swate.Components.Shared
+
 
 [<RequireQualifiedAccess>]
 module Conversion =

@@ -1,11 +1,12 @@
 module Renderer.Components.MainContent.ArcFilePreviewTarget
 
-open ARCtrl
+
 open Feliz
 open Renderer.Components.MainElement
 open Renderer.Components.MainContent.Helper
 open Swate.Components
-open Renderer.Types
+open Swate.Components.Shared
+
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =

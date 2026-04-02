@@ -1,7 +1,7 @@
 module Main.IPC.ArcVaultsApi
 
 open System
-open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes

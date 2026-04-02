@@ -1,5 +1,6 @@
 namespace Swate.Components
 
+open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 
 type ArcObjectExplorerViewModel = {

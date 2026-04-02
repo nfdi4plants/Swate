@@ -30,8 +30,8 @@ type private Model = {
 type private Msg =
     | SetArcRootPath of ArcRootPath
     | PageStateChanged of PageState option
-    | ToggleLeftSidebarTarget of LeftSidebarPage
-    | SetLeftSidebarIsOpen of bool
+    | ToggleRightSidebarTarget of LeftSidebarPage
+    | SetRightSidebarIsOpen of bool
 
 let private createGetOpenPathCmd () : Cmd<Msg> =
     Cmd.OfPromise.either
@@ -53,8 +53,8 @@ let private msgName (msg: Msg) =
     match msg with
     | SetArcRootPath _ -> "SetArcRootPath"
     | PageStateChanged _ -> "PageStateChanged"
-    | SetLeftSidebarIsOpen _ -> "SetLeftSidebarIsOpen"
-    | ToggleLeftSidebarTarget _ -> "ToggleLeftSidebarTarget"
+    | SetRightSidebarIsOpen _ -> "SetLeftSidebarIsOpen"
+    | ToggleRightSidebarTarget _ -> "ToggleLeftSidebarTarget"
 
 let private traceUpdateMsg (msg: Msg) =
     console.log ($"[Renderer.App Elmish] {msgName msg}")
@@ -76,7 +76,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 PageState = pageStateOption
         },
         Cmd.none
-    | ToggleLeftSidebarTarget target ->
+    | ToggleRightSidebarTarget target ->
         let nextModel =
             if model.LeftSidebarTarget = target then
                 {
@@ -91,7 +91,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 }
 
         nextModel, Cmd.none
-    | SetLeftSidebarIsOpen isOpen ->
+    | SetRightSidebarIsOpen isOpen ->
         {
             model with
                 LeftSidebarIsOpen = isOpen
@@ -105,9 +105,6 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget)
         match leftSidebarTarget with
         | LeftSidebarPage.ArcObjectTree -> toggleTarget LeftSidebarPage.FileExplorer
         | LeftSidebarPage.FileExplorer -> toggleTarget LeftSidebarPage.ArcObjectTree
-
-    // let leftSidebarStateCtx =
-    //     React.useContext Swate.Components.LayoutContext.LeftSidebarContext
 
     React.Fragment [
         Layout.LayoutBtn(
@@ -125,13 +122,13 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget)
     ]
 
 [<ReactComponent>]
-let private RightSidebarSync (explorerMode: LeftSidebarPage) =
-    let rightSidebarCtx = React.useContext Swate.Components.LayoutContext.RightSidebarContext
+let private LeftSidebarSync (explorerMode: LeftSidebarPage) =
+    let leftSidebarCtx = React.useContext Swate.Components.LayoutContext.LeftSidebarContext
 
     React.useEffect (
         (fun () ->
             match explorerMode with
-            | LeftSidebarPage.ArcObjectTree when not rightSidebarCtx.state -> rightSidebarCtx.setState true
+            | LeftSidebarPage.ArcObjectTree when not leftSidebarCtx.state -> leftSidebarCtx.setState true
             | _ -> ()),
         [| box explorerMode |]
     )
@@ -182,7 +179,7 @@ let Main () =
     let children = Renderer.Components.MainContent.Main.Main(model.AppState, model.LeftSidebarTarget)
 
     let toggleLeftSidebarTarget =
-        React.useCallback ((fun target -> dispatch (ToggleLeftSidebarTarget target)), [||])
+        React.useCallback ((fun target -> dispatch (ToggleRightSidebarTarget target)), [||])
 
     let rightSidebar =
         match model.AppState, model.LeftSidebarTarget with
@@ -199,7 +196,7 @@ let Main () =
                         Layout.Main(
                             children =
                                 React.Fragment [|
-                                    RightSidebarSync(model.LeftSidebarTarget)
+                                    LeftSidebarSync(model.LeftSidebarTarget)
                                     children
                                     CloseWindowController.CloseWindowController.Subscription()
                                 |],
@@ -210,11 +207,11 @@ let Main () =
                             leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
                             ?rightSidebar = rightSidebar,
                             leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
-                            leftSidebarState = {
+                            rightSidebarState = {
                                 isOpen = model.LeftSidebarIsOpen
-                                setIsOpen = fun isOpen -> dispatch (SetLeftSidebarIsOpen isOpen)
+                                setIsOpen = fun isOpen -> dispatch (SetRightSidebarIsOpen isOpen)
                                 sidebarType = model.LeftSidebarTarget
-                                setSidebarType = fun target -> dispatch (ToggleLeftSidebarTarget target)
+                                setSidebarType = fun target -> dispatch (ToggleRightSidebarTarget target)
                             }
                         )
                     )

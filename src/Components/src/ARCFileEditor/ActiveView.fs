@@ -2,6 +2,7 @@ namespace Swate.Components
 
 open ARCtrl
 open Swate.Components
+open Swate.Components.Shared
 
 [<RequireQualifiedAccess>]
 type ActiveView =

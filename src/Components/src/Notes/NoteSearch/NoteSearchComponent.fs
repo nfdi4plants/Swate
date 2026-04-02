@@ -5,7 +5,7 @@ open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.NoteTypes
+open Swate.Components.Shared
 open ARCtrl
 
 module noteSearchTests =

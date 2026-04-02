@@ -3,6 +3,8 @@ namespace Spreadsheet
 open Swate.Components
 open ARCtrl
 open FileImport
+open Swate.Components.Shared
+
 
 type ActiveView = Swate.Components.ActiveView
 

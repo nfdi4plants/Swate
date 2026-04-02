@@ -9,6 +9,7 @@ open MainComponents
 open Model
 open Swate.Components
 open ARCtrl
+open Swate.Components.Shared
 
 open LocalStorage.AutosaveConfig
 

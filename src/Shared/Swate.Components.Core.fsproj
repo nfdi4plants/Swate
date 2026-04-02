@@ -17,15 +17,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="PathHelpers.fs" />
     <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
+    <Compile Include="PathHelpers.fs" />
     <Compile Include="Database.fs" />
     <Compile Include="DTOs\AdvancedSearch.fs" />
     <Compile Include="DTOs\ParentTermQuery.fs" />
     <Compile Include="DTOs\TermQuery.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="URLs.fs" />
+    <Compile Include="Types.fs" />
+    <Compile Include="ArcExplorerNode.fs" />
+    <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="Shared.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Javascript" />
+    <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="Fable.Core" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,9 +1,8 @@
 module Renderer.Context.ArcObjectExplorerCtx
 
-open ARCtrl
 open Feliz
 open Swate.Components
-
+open Swate.Components.Shared
 
 type ArcObjectExplorerState = {
     Nodes: ArcExplorerNode list
@@ -63,36 +62,44 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
 
     React.useEffect (
         (fun () ->
+            let mutable isCurrent = true
+
             match appStateCtx.state with
             | None -> setState (fun _ -> ArcObjectExplorerState.init ())
             | Some _ ->
                 promise {
                     let! result = Api.ipcArcVaultApi.getArcObjectTree (unbox null)
 
-                    match result with
-                    | Ok nodes ->
-                        setState (fun currentState ->
-                            let selectedExplorerItemId =
-                                currentState.SelectedExplorerItemId
-                                |> Option.filter (fun nodeId -> containsNodeId nodeId nodes)
+                    if isCurrent then
+                        match result with
+                        | Ok nodes ->
+                            setState (fun currentState ->
+                                let selectedExplorerItemId =
+                                    currentState.SelectedExplorerItemId
+                                    |> Option.filter (fun nodeId -> containsNodeId nodeId nodes)
 
-                            {
+                                {
+                                    currentState with
+                                        Nodes = nodes
+                                        SelectedExplorerItemId = selectedExplorerItemId
+                                        StatusMessage = None
+                                })
+                        | Error exn ->
+                            setState (fun currentState -> {
                                 currentState with
-                                    Nodes = nodes
-                                    SelectedExplorerItemId = selectedExplorerItemId
-                                    StatusMessage = None
+                                    Nodes = []
+                                    SelectedExplorerItemId = None
+                                    ArcFileState = None
+                                    PageState = Some(PageState.ErrorPage exn.Message)
+                                    StatusMessage = Some $"Could not load ARC object explorer: {exn.Message}"
                             })
-                    | Error exn ->
-                        setState (fun currentState -> {
-                            currentState with
-                                Nodes = []
-                                SelectedExplorerItemId = None
-                                ArcFileState = None
-                                PageState = Some(PageState.ErrorPage exn.Message)
-                                StatusMessage = Some $"Could not load ARC object explorer: {exn.Message}"
-                        })
                 }
-                |> Promise.start),
+                |> Promise.start
+
+            Some
+                { new System.IDisposable with
+                    member _.Dispose() = isCurrent <- false
+                }),
         [| box appStateCtx.state; box fileStateCtx.state.FileTree |]
     )
 

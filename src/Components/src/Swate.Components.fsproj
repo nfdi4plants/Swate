@@ -86,7 +86,6 @@
     <Compile Include="GenericComponents\Dropdown.fs" />
     <Compile Include="GenericComponents\Actionbar.fs" />
     <Compile Include="GenericComponents\Navbar.fs" />
-    <Compile Include="ARCSelector\Types.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
     <Compile Include="Layout\LayoutContext.fs" />
     <Compile Include="Layout\Layout.fs" />
@@ -156,7 +155,6 @@
     <Compile Include="ARCObjectExplorer\ArcObjectExplorerView.fs" />
     <Compile Include="ARCObjectExplorer\ArcObjectExplorerContent.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectFixture.fs" />
-    <Compile Include="Notes\Types.fs" />
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
     <Compile Include="Notes\Editor\Types.fs" />
     <Compile Include="Notes\Editor\State.fs" />

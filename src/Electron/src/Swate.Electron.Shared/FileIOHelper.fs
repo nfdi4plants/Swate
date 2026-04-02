@@ -3,7 +3,7 @@ module Swate.Electron.Shared.FileIOHelper
 open System
 open System.Collections.Generic
 open ARCtrl
-open Swate.Components.Notes.Editor
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes

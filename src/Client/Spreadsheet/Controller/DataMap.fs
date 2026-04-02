@@ -1,7 +1,9 @@
 module Spreadsheet.Controller.DataMap
 
-open Swate.Components.Shared
+
 open ARCtrl
+open Swate.Components.Shared
+
 
 let updateDatamap (dataMapOpt: DataMap option) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let nextArcFile =

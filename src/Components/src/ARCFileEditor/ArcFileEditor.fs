@@ -3,6 +3,8 @@ namespace Swate.Components
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components.Shared
+
 
 type ArcFileEditorHeaderProps = {
     arcFile: ArcFiles

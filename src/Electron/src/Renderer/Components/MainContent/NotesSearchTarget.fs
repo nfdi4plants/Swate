@@ -3,9 +3,8 @@ module Renderer.Components.MainContent.NotesSearchTarget
 open Feliz
 open Feliz
 open Swate.Components
-open Swate.Components.NoteTypes
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
-open Renderer
 
 [<ReactComponent>]
 let NotesSearchTarget () =

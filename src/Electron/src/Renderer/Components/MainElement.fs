@@ -2,6 +2,7 @@ module Renderer.Components.MainElement
 
 open Feliz
 open Swate.Components
+open Swate.Components.Shared
 open ARCtrl
 open WidgetRegistry
 

@@ -2,16 +2,7 @@ namespace Swate.Components.Notes.Editor
 
 open ARCtrl
 open Fable.Core
-
-[<RequireQualifiedAccess>]
-type NotesTargetKind =
-    | Study
-    | Assay
-
-type ExistingTargetRef = {
-    Name: string
-    Kind: NotesTargetKind
-}
+open Swate.Components.Shared
 
 [<RequireQualifiedAccess>]
 type NotesTarget =

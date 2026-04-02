@@ -3,7 +3,6 @@ namespace Swate.Components
 open Feliz
 open Fable.Core
 
-open SelectorTypes
 open Swate.Components.Types.Actionbar
 open Swate.Components.Shared
 

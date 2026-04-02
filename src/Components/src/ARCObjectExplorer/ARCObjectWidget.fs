@@ -356,9 +356,9 @@ type ARCObjectWidget =
                                 ]
                             ]
                         ],
-                    middle =
+                    right =
                         Html.div [
-                            prop.className "swt:flex swt:w-full swt:items-center swt:justify-center swt:gap-2"
+                            prop.className "swt:flex swt:flex-wrap swt:items-center swt:justify-end swt:gap-2"
                             prop.children [
                                 Select.Select(
                                     ARCObjectWidget.KindFilterOptions,
@@ -372,12 +372,7 @@ type ARCObjectWidget =
                                     |],
                                     dropdownPlacement = FloatingUI.Placement.BottomEnd
                                 )
-                            ]
-                        ],
-                    right =
-                        Html.div [
-                            prop.className "swt:flex swt:flex-wrap swt:items-center swt:justify-end swt:gap-2"
-                            prop.children [
+
                                 match rightActions with
                                 | Some actions -> actions
                                 | None -> Html.none

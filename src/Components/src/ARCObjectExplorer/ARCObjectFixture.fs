@@ -1,7 +1,8 @@
 namespace Swate.Components
 
-open Fable.Core
+
 open Feliz
+open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 
 [<ReactComponent>]

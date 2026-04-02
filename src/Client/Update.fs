@@ -277,7 +277,7 @@ module History =
                         None
                     )
                     |> Promise.start
-                | Some(Run run) ->
+                | Some(ArcFiles.Run run) ->
                     ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Run, ArcRun.toJsonString 0 run, None)
                     |> Promise.start
                 | Some(Workflow workflow) ->
