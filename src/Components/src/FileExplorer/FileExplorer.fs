@@ -39,7 +39,8 @@ type FileExplorer =
             ?selectedItemId: string option,
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?useDirectoryChevronToggle: bool,
-            ?showBreadcrumbs: bool
+            ?showBreadcrumbs: bool,
+            ?getItemIconClass: FileItem -> string option
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
@@ -47,6 +48,7 @@ type FileExplorer =
         let directoryInteractionMode = defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
         let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
         let showBreadcrumbs = defaultArg showBreadcrumbs true
+        let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
 
@@ -150,6 +152,13 @@ type FileExplorer =
 
             defaultContextMenuItems item @ customItems
 
+        let iconClassName (baseClasses: string list) (item: FileItem) =
+            [
+                yield! baseClasses
+                yield item.IconPath
+                yield! getItemIconClass item |> Option.toList
+            ]
+
         let toComponentMenuItem (item: Swate.Components.FileExplorerTypes.ContextMenuItem) =
             let isDisabled = defaultArg item.Disabled false
             let className = if isDisabled then "swt:opacity-50" else ""
@@ -251,7 +260,7 @@ type FileExplorer =
                                                                 prop.onClick (handleDirectorySelection item)
                                                                 prop.children [
                                                                     Html.i [
-                                                                        prop.className [ "swt:iconify swt:shrink-0 " + item.IconPath ]
+                                                                        prop.className (iconClassName [ "swt:iconify"; "swt:shrink-0" ] item)
                                                                     ]
                                                                     Html.span [
                                                                         prop.className "swt:truncate"
@@ -316,7 +325,7 @@ type FileExplorer =
                                                     Html.div [
                                                         prop.className "swt:flex swt:items-center swt:gap-2"
                                                         prop.children [
-                                                            Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
+                                                            Html.i [ prop.className (iconClassName [ "swt:iconify" ] item) ]
                                                             Html.span item.Name
                                                         ]
                                                     ]
@@ -377,7 +386,7 @@ type FileExplorer =
                                 Html.div [
                                     prop.className "swt:flex swt:items-center swt:gap-2"
                                     prop.children [
-                                        Html.i [ prop.className [ "swt:iconify " + item.IconPath ] ]
+                                        Html.i [ prop.className (iconClassName [ "swt:iconify" ] item) ]
                                         Html.span item.Name
                                     ]
                                 ]

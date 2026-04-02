@@ -835,7 +835,8 @@ type ARCObjectFixture =
                 ?selectedItemId = Some visibleSelectedId,
                 onItemClick = (fun item -> setSelectedId item.Id),
                 showBreadcrumbs = false,
-                useDirectoryChevronToggle = true
+                useDirectoryChevronToggle = true,
+                getItemIconClass = ARCExplorer.iconColorClass
             )
 
         let explorerPane =

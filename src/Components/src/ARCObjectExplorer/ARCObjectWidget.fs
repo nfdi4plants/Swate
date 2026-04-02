@@ -160,6 +160,13 @@ type ARCObjectWidget =
     static member private WidgetContainerClass =
         "swt:flex swt:flex-col swt:gap-3 swt:p-2 swt:w-[72rem] swt:max-w-[95vw] swt:h-[70vh] swt:max-h-[80vh]"
 
+    static member private IconClassName(baseClasses: string list, item: FileItem) =
+        [
+            yield! baseClasses
+            yield item.IconPath
+            yield! ARCExplorer.iconColorClass item |> Option.toList
+        ]
+
     static member private KindFilterOptions: SelectItem<string>[] = [|
         {| label = "Study"; item = "Study" |}
         {| label = "Assay"; item = "Assay" |}
@@ -412,7 +419,7 @@ type ARCObjectWidget =
                 prop.onClick (fun _ -> onItemClick item)
                 prop.children [
                     Html.i [
-                        prop.className [ "swt:iconify swt:text-4xl swt:text-primary"; item.IconPath ]
+                        prop.className (ARCObjectWidget.IconClassName([ "swt:iconify"; "swt:text-4xl" ], item))
                     ]
                     Html.div [
                         prop.className "swt:flex swt:flex-col swt:gap-1"
@@ -430,7 +437,7 @@ type ARCObjectWidget =
         let contextItem (entry: ARCObjectExplorerContextItem) =
             let sharedChildren = [
                 Html.i [
-                    prop.className [ "swt:iconify swt:text-base"; entry.Item.IconPath ]
+                    prop.className (ARCObjectWidget.IconClassName([ "swt:iconify"; "swt:text-base" ], entry.Item))
                 ]
                 Html.span [
                     prop.className "swt:truncate"
@@ -444,7 +451,7 @@ type ARCObjectWidget =
                     prop.className [
                         "swt:flex swt:min-w-0 swt:max-w-[14rem] swt:flex-none swt:items-center swt:gap-2 swt:rounded-full swt:border swt:px-3 swt:py-2 swt:text-sm swt:transition-colors"
                         if entry.IsCurrent then
-                            "swt:border-primary swt:bg-primary/10 swt:text-primary"
+                            "swt:border-primary swt:bg-primary/10"
                         else
                             "swt:border-base-300 swt:bg-base-100 hover:swt:border-primary/60 hover:swt:bg-base-200/60"
                     ]
@@ -456,7 +463,7 @@ type ARCObjectWidget =
                     prop.className [
                         "swt:flex swt:min-w-0 swt:max-w-[14rem] swt:flex-none swt:items-center swt:gap-2 swt:rounded-full swt:border swt:px-3 swt:py-2 swt:text-sm"
                         if entry.IsCurrent then
-                            "swt:border-primary swt:bg-primary/10 swt:text-primary"
+                            "swt:border-primary swt:bg-primary/10"
                         else
                             "swt:border-base-300 swt:bg-base-100 swt:opacity-80"
                     ]

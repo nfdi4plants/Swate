@@ -12,6 +12,23 @@ module ARCExplorer =
 
     let private normalizePath = PathHelpers.normalizePath
 
+    let iconColorClassForItemType =
+        function
+        | "ARC" -> Some "swt:text-base-content/70"
+        | "Group" -> Some "swt:text-base-content/60"
+        | "Study" -> Some "swt:text-secondary"
+        | "Assay" -> Some "swt:text-success"
+        | "Workflow" -> Some "swt:text-primary"
+        | "Run" -> Some "swt:text-warning"
+        | "Table" -> Some "swt:text-info"
+        | "DataMap" -> Some "swt:text-accent"
+        | "Note" -> Some "swt:text-error"
+        | "Sample" -> Some "swt:text-base-content/70"
+        | _ -> None
+
+    let iconColorClass (item: FileItem) =
+        iconColorClassForItemType item.ItemType
+
     let private iconForNode (node: ArcExplorerNode) =
         match node.kind with
         | ArcExplorerNodeKind.Arc
@@ -156,6 +173,7 @@ module ARCExplorer =
                     ?selectedItemId = Some selectedItemId,
                     showBreadcrumbs = false,
                     directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
-                    useDirectoryChevronToggle = true
+                    useDirectoryChevronToggle = true,
+                    getItemIconClass = iconColorClass
                 )
             )
