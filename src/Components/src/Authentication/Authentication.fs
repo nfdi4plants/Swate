@@ -343,9 +343,8 @@ type Authentication =
             )
         ]
 
-    [<ReactComponent>]
-    static member Entry() =
-        let exmpUserInformation = {
+    static member ExmpUserInformation =
+        {
             AccountId = "saödlkalsd"
             Name = "John Doe"
             Email = "john-doe@mail.com"
@@ -353,25 +352,27 @@ type Authentication =
             TargetDataHub = Authentication.Helper.Default_DataHub_Url
         }
 
-        let accounts, setAccounts =
-            React.useState (
-                {
-                    Authentication.Types.AuthStateDto.Empty with
-                        ActiveAccount =
-                            Some {
-                                User = exmpUserInformation
-                                DateAdded = "2026-01-01T00:00:00.0000000Z"
-                                TokenInvalid = false
-                            }
-                        StoredAccounts = [|
-                            {
-                                User = exmpUserInformation
-                                DateAdded = "2026-01-01T00:00:00.0000000Z"
-                                TokenInvalid = false
-                            }
-                        |]
-                }
-            )
+    static member User =
+        {
+            Authentication.Types.AuthStateDto.Empty with
+                ActiveAccount =
+                    Some {
+                        User = Authentication.ExmpUserInformation
+                        DateAdded = "2026-01-01T00:00:00.0000000Z"
+                        TokenInvalid = false
+                    }
+                StoredAccounts = [|
+                    {
+                        User = Authentication.ExmpUserInformation
+                        DateAdded = "2026-01-01T00:00:00.0000000Z"
+                        TokenInvalid = false
+                    }
+                |]
+        }
+
+    [<ReactComponent>]
+    static member Entry(?user) =
+        let accounts, setAccounts = React.useState (defaultArg user AuthStateDto.Empty)
 
         let isLoading, setIsLoading = React.useState false
 
@@ -384,7 +385,7 @@ type Authentication =
                     // let! userInformation = GitLabAPI.getUserAPIRequest signInInfo
                     // Here should be try get user information from the DataHub using the provided signInInfo and handle possible errors by calling signInInfo.OnErrorCallback with the error message. For now we just simulate a successful sign in with example user information and a delay.
                     let activeUser = {
-                        exmpUserInformation with
+                        Authentication.ExmpUserInformation with
                             TargetDataHub = signInInfo.GitLabBaseUrl
                     }
 
