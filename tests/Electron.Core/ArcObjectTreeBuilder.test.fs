@@ -109,7 +109,7 @@ Vitest.describe("ArcObjectTreeBuilder sample projection", fun () ->
         let assayTableLink = expectRelatedSample assaySampleNode.id assayTableNode
 
         Vitest.expect(studySampleNode.isReference).toBe(false)
-        Vitest.expect(studySampleNode.id).toBe("study:PlantStressStudy:table:0:sample:leaf-01")
+        Vitest.expect(studySampleNode.id).toBe("study:PlantStressStudy:table:0:sample:Leaf-01")
         Vitest.expect(studySampleNode.path).toEqual(Some(ARCtrl.Helper.Identifier.Study.fileNameFromIdentifier study.Identifier))
         Vitest.expect(studySummary.Studies).toEqual([ study.Identifier ])
         Vitest.expect(studySummary.Assays).toEqual([])
@@ -117,7 +117,7 @@ Vitest.describe("ArcObjectTreeBuilder sample projection", fun () ->
         Vitest.expect(studyTableLink.subtitle).toEqual(Some "Canonical sample")
 
         Vitest.expect(assaySampleNode.isReference).toBe(true)
-        Vitest.expect(assaySampleNode.id).toBe("assay:MetabolomicsAssay:table:0:sample-ref:leaf-01")
+        Vitest.expect(assaySampleNode.id).toBe("assay:MetabolomicsAssay:table:0:sample-ref:Leaf-01")
         Vitest.expect(assaySampleNode.path).toEqual(Some(ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier assay.Identifier))
         Vitest.expect(assaySummary.Studies).toEqual([ study.Identifier ])
         Vitest.expect(assaySummary.Assays).toEqual([ assay.Identifier ])
@@ -147,6 +147,40 @@ Vitest.describe("ArcObjectTreeBuilder sample projection", fun () ->
         Vitest.expect(factorSummary.Characteristics).toEqual([])
         Vitest.expect(factorSummary.Factors).toEqual([ "Treatment" ])
         Vitest.expect(factorSummary.SourceTables).toEqual([ "Factors Table" ]))
+
+    Vitest.test("keeps case-distinct sample names separate within the same table", fun () ->
+        let study = ArcStudy.init "CaseSensitiveStudy"
+
+        study.Tables.Add(createOutputSampleTable "Case Samples" [ "Leaf-01"; "leaf-01" ])
+
+        let tree = ArcObjectTreeBuilder.create "C:/repo" (createArc [ study ] []) Seq.empty
+        let tableNode = expectNode (fun node -> node.id = "study:CaseSensitiveStudy:table:0") tree
+        let upperCaseSampleNode = expectSampleNode "Leaf-01" tableNode
+        let lowerCaseSampleNode = expectSampleNode "leaf-01" tableNode
+        let upperCaseSummary = expectSampleSummary upperCaseSampleNode
+        let lowerCaseSummary = expectSampleSummary lowerCaseSampleNode
+
+        Vitest.expect(upperCaseSampleNode.id).toBe("study:CaseSensitiveStudy:table:0:sample:Leaf-01")
+        Vitest.expect(lowerCaseSampleNode.id).toBe("study:CaseSensitiveStudy:table:0:sample:leaf-01")
+        Vitest.expect(upperCaseSampleNode.id = lowerCaseSampleNode.id).toBe(false)
+        Vitest.expect(upperCaseSummary.SourceTables).toEqual([ "Case Samples" ])
+        Vitest.expect(lowerCaseSummary.SourceTables).toEqual([ "Case Samples" ]))
+
+    Vitest.test("merges repeated exact-name duplicates within the same table", fun () ->
+        let study = ArcStudy.init "ExactDuplicateStudy"
+
+        study.Tables.Add(createOutputSampleTable "Duplicate Samples" [ "Leaf-01"; "Leaf-01" ])
+
+        let tree = ArcObjectTreeBuilder.create "C:/repo" (createArc [ study ] []) Seq.empty
+        let tableNode = expectNode (fun node -> node.id = "study:ExactDuplicateStudy:table:0") tree
+        let sampleChildren =
+            tableNode.children |> List.filter (fun child -> child.kind = ArcExplorerNodeKind.Sample)
+        let sampleNode = expectSampleNode "Leaf-01" tableNode
+        let summary = expectSampleSummary sampleNode
+
+        Vitest.expect(sampleChildren.Length).toBe(1)
+        Vitest.expect(sampleNode.id).toBe("study:ExactDuplicateStudy:table:0:sample:Leaf-01")
+        Vitest.expect(summary.SourceTables).toEqual([ "Duplicate Samples" ]))
 
     Vitest.test("ignores blank sample names", fun () ->
         let assay = ArcAssay.init "BlankFilterAssay"

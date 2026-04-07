@@ -110,7 +110,7 @@ let private tryNormalizeSampleName (name: string) =
         Some normalized
 
 let private sampleLookupKey (name: string) =
-    normalizeSampleName name |> fun normalized -> normalized.ToLowerInvariant()
+    normalizeSampleName name
 
 let private sampleNodeId parentId isReference lookupKey =
     if isReference then
