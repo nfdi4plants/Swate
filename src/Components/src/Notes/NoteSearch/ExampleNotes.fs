@@ -6,7 +6,7 @@ open ARCtrl
 
 module noteSearchTests =
 
-    let notes: Note list = [
+    let notes: Swate.Components.NoteTypes.Note list = [
         {
             RelativePath = "notes/10_02_2026/Grocery_Planning.md"
             Title = "Grocery Planning"
