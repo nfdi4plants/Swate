@@ -371,7 +371,7 @@ let api: IGitApi = {
                             DownloadLargeFiles = settings.DownloadLargeFiles
                         }
 
-                return toGitOperationResult (fun () -> Some "Git LFS threshold updated.") None None result
+                return toGitOperationResult (fun () -> Some "Git LFS settings updated.") None None result
         }
     createBranch =
         fun (event: IpcMainEvent) (request: GitCreateBranchRequest) -> promise {
