@@ -59,11 +59,3 @@ type NoteTarget =
     | Assay of string
     | Workflow of string
     | Run of string
-
-type NoteEntry = {
-    Name: string
-    RelativePath: string
-    Path: string
-    Target: NoteTarget
-    IsLfs: bool option
-}
