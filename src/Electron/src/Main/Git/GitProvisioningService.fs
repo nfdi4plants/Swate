@@ -10,6 +10,7 @@ open Main.Git.GitTokenProvider
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
+let private gitLfsDownloadLargeFilesConfigKey = "swate.lfs.downloadlargefiles"
 
 type ExistingPathKind =
     | Directory
@@ -183,6 +184,9 @@ let private resolveAbsolutePath (pathValue: string) =
 
 let private dirname (pathValue: string) =
     pathDynamic?dirname(pathValue) |> unbox<string>
+
+let private formatDownloadLargeFilesConfigValue (downloadLargeFiles: bool) =
+    if downloadLargeFiles then "true" else "false"
 
 let private mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> =
     promise {
@@ -359,6 +363,27 @@ let private hydrateClonedLfsContent (git: ISimpleGit) : JS.Promise<GitService.Gi
         })
         git
 
+let private persistCloneDownloadPreference
+    (repoPath: string)
+    (downloadLargeFiles: bool)
+    : JS.Promise<GitService.GitResult<unit>> =
+    let repoOptions = createOptions repoPath standardTimeout None
+    let repoGit = createGit repoOptions
+
+    runSimpleGit
+        (fun currentGit -> promise {
+            let! _ =
+                currentGit.raw [|
+                    "config"
+                    "--local"
+                    gitLfsDownloadLargeFilesConfigKey
+                    formatDownloadLargeFilesConfigValue downloadLargeFiles
+                |]
+
+            return ()
+        })
+        repoGit
+
 let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string>> =
     promise {
         match validateAndNormalizeTargetPathWithResolver resolveAbsolutePath targetPath with
@@ -508,38 +533,48 @@ let cloneRepository
                                                     match cloneResult with
                                                     | Error _ ->
                                                         return cloneResult
-                                                    | Ok _ when not downloadLargeFiles ->
-                                                        return cloneResult
                                                     | Ok _ ->
-                                                        let hydrateGitResult =
-                                                            try
-                                                                let repoOptions = createOptions normalizedTargetPath syncTimeout progress
+                                                        let! persistResult =
+                                                            persistCloneDownloadPreference normalizedTargetPath downloadLargeFiles
 
-                                                                match tokenOption |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token)) with
-                                                                | Some token ->
-                                                                    Ok(
-                                                                        applyAuth
-                                                                            createGit
-                                                                            repoOptions
-                                                                            host
-                                                                            token
-                                                                            (Some "origin")
-                                                                            (Some safeRemoteUrl)
-                                                                    )
-                                                                | None ->
-                                                                    Ok(createGit repoOptions)
-                                                            with authError ->
-                                                                Error authError
+                                                        match persistResult with
+                                                        | Error failure ->
+                                                            return Error failure
+                                                        | Ok () when not downloadLargeFiles ->
+                                                            return cloneResult
+                                                        | Ok () ->
+                                                            let hydrateGitResult =
+                                                                try
+                                                                    let repoOptions = createOptions normalizedTargetPath syncTimeout progress
 
-                                                        match hydrateGitResult with
-                                                        | Error authError ->
-                                                            return errorResult authError
-                                                        | Ok hydrateGit ->
-                                                            let! hydrateResult = hydrateClonedLfsContent hydrateGit
+                                                                    match
+                                                                        tokenOption
+                                                                        |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token))
+                                                                    with
+                                                                    | Some token ->
+                                                                        Ok(
+                                                                            applyAuth
+                                                                                createGit
+                                                                                repoOptions
+                                                                                host
+                                                                                token
+                                                                                (Some "origin")
+                                                                                (Some safeRemoteUrl)
+                                                                        )
+                                                                    | None ->
+                                                                        Ok(createGit repoOptions)
+                                                                with authError ->
+                                                                    Error authError
 
-                                                            match hydrateResult with
-                                                            | Ok () -> return cloneResult
-                                                            | Error failure -> return Error failure
+                                                            match hydrateGitResult with
+                                                            | Error authError ->
+                                                                return errorResult authError
+                                                            | Ok hydrateGit ->
+                                                                let! hydrateResult = hydrateClonedLfsContent hydrateGit
+
+                                                                match hydrateResult with
+                                                                | Ok () -> return cloneResult
+                                                                | Error failure -> return Error failure
                                                 }
 
                                             match tokenResult with
