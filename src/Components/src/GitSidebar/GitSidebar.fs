@@ -221,7 +221,7 @@ type GitSidebar =
             prop.disabled isBusy
             prop.onClick (fun _ -> onClick ())
             prop.children [
-                Html.span [ prop.className ("swt:iconify " + iconClassName + " swt:size-4") ]
+                Html.span [ prop.className [ "swt:iconify"; iconClassName; "swt:size-4" ] ]
                 Html.span label
             ]
         ]
