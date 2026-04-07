@@ -67,23 +67,10 @@ let api: IGitLabApi = {
             match tryGetActiveGitLabContext () with
             | Error err -> return Error err
             | Ok(baseUrl, token) ->
-                let userId =
-                    AuthService.tryGetActiveAccountWithToken ()
-                    |> Option.map fst
-                    |> Option.bind (fun user ->
-                        let mutable parsed = 0
-
-                        if Int32.TryParse(user.AccountId, &parsed) then
-                            Some parsed
-                        else
-                            None
-                    )
-
                 return!
                     GitLabApi.ListUserPersonalProjects(
                         baseUrl,
                         token,
-                        ?userId = userId,
                         page = query.Page,
                         perPage = query.PerPage,
                         search = query.SearchTerm,

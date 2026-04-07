@@ -93,12 +93,17 @@ let private getAuthStateDto () : AuthStateDto = {
     StoredAccounts = accounts |> Map.toArray |> Array.map (fun (_, v) -> v.Summary)
 }
 
+let private canUseToken (accountState: AccountState) =
+    not accountState.Summary.TokenInvalid
+
 /// Try to get token for a given host (used by GitTokenProvider).
 /// Policy: active account first, then any account matching the host.
 let tryGetTokenForHost (host: string) : string option =
     // 1. Check active account
     match getActiveAccountState () with
     | Some accountState when
+        canUseToken accountState
+        &&
         String.Equals(
             SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
             host,
@@ -111,6 +116,8 @@ let tryGetTokenForHost (host: string) : string option =
         accounts
         |> Map.tryPick (fun _ accountState ->
             if
+                canUseToken accountState
+                &&
                 String.Equals(
                     SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
                     host,
@@ -138,6 +145,7 @@ let listAccounts () : AccountSummary array = (getState ()).StoredAccounts
 /// Main-process only helper to read the active account and token.
 let tryGetActiveAccountWithToken () : (AuthUserDto * string) option =
     getActiveAccountState ()
+    |> Option.filter canUseToken
     |> Option.map (fun accountState -> accountState.Summary.User, accountState.Token)
 
 /// Main-process helper to resolve a DataHub endpoint for unauthenticated/public browsing.
@@ -286,11 +294,17 @@ let revalidate () : JS.Promise<AuthResult> = promise {
                 if firstFailure.IsNone then
                     firstFailure <- Some failure
 
+                let tokenInvalid =
+                    match failure.Kind with
+                    | AuthFailureKind.Unauthorized
+                    | AuthFailureKind.Forbidden -> true
+                    | _ -> accountState.Summary.TokenInvalid
+
                 let updatedAccountState = {
                     accountState with
                         Summary = {
                             accountState.Summary with
-                                TokenInvalid = true
+                                TokenInvalid = tokenInvalid
                         }
                 }
 
