@@ -167,8 +167,17 @@ let tryGetActiveAccountWithToken () : (AuthUserDto * string) option =
 /// Main-process helper to resolve a DataHub endpoint for unauthenticated/public browsing.
 let tryGetPreferredDataHub () : string option =
     match getActiveAccountState () with
-    | Some accountState -> Some accountState.Summary.User.TargetDataHub
+    | Some accountState when not (String.IsNullOrWhiteSpace accountState.Summary.User.TargetDataHub) ->
+        Some accountState.Summary.User.TargetDataHub
     | None ->
+        accounts
+        |> Map.tryPick (fun _ accountState ->
+            if String.IsNullOrWhiteSpace accountState.Summary.User.TargetDataHub then
+                None
+            else
+                Some accountState.Summary.User.TargetDataHub
+        )
+    | _ ->
         accounts
         |> Map.tryPick (fun _ accountState ->
             if String.IsNullOrWhiteSpace accountState.Summary.User.TargetDataHub then

@@ -94,3 +94,5 @@ type AuthStateDto = {
     }
 
     member this.ActiveUser() = this.ActiveAccount |> Option.map _.User
+    member this.UsableActiveAccount() = this.ActiveAccount |> Option.filter (fun account -> not account.TokenInvalid)
+    member this.UsableActiveUser() = this.UsableActiveAccount() |> Option.map _.User

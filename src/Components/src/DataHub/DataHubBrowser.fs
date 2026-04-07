@@ -621,7 +621,7 @@ type DataHubBrowser =
             ?onClose: Browser.Types.MouseEvent -> unit
         ) =
 
-        let user = accounts.ActiveUser()
+        let user = accounts.UsableActiveUser()
 
         let emptyPagination (page: int) (perPage: int) : PaginationMetadata = {
             Link = None

@@ -6,7 +6,10 @@ open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
 open Swate.Components.DataHubTypes
 open Swate.Components.Api.GitLabApi
+open Swate.Components.Authentication.Helper
 open Main.Auth
+
+let private defaultPublicDataHubBaseUrl = Default_DataHub_Url
 
 let private tryGetActiveGitLabContext () : Result<string * string, GitLabError> =
     match AuthService.tryGetActiveAccountWithToken () with
@@ -15,15 +18,17 @@ let private tryGetActiveGitLabContext () : Result<string * string, GitLabError> 
     | None -> Error GitLabError.Unauthorized
 
 let private tryGetBrowseContext () : Result<string * string, GitLabError> =
-    match AuthService.tryGetPreferredDataHub () with
-    | Some baseUrl when not (String.IsNullOrWhiteSpace baseUrl) ->
-        let activeToken =
-            AuthService.tryGetActiveAccountWithToken ()
-            |> Option.map snd
-            |> Option.defaultValue ""
+    let baseUrl =
+        AuthService.tryGetPreferredDataHub ()
+        |> Option.filter (fun current -> not (String.IsNullOrWhiteSpace current))
+        |> Option.defaultValue defaultPublicDataHubBaseUrl
 
-        Ok(baseUrl, activeToken)
-    | _ -> Error(GitLabError.InvalidRequest "No DataHub endpoint available. Sign in to a DataHub first.")
+    let activeToken =
+        AuthService.tryGetActiveAccountWithToken ()
+        |> Option.map snd
+        |> Option.defaultValue ""
+
+    Ok(baseUrl, activeToken)
 
 let api: IGitLabApi = {
     loadAllRepos =
