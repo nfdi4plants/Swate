@@ -10,6 +10,7 @@ open Fable.Electron
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
 open Microsoft.FSharp.Reflection
+open Swate.Components.Authentication.Types
 open Swate.Electron.Shared.AuthTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
@@ -268,6 +269,15 @@ Vitest.describe("GitAuthAdapter.redactToken and redactArgs", fun () ->
         "redacts lowercase bearer token",
         "authorization:bearer XYZ",
         "authorization:[REDACTED]"
+        "redacts bearer token without whitespace after the scheme",
+        "Authorization:Bearerabc123",
+        "Authorization:[REDACTED]"
+        "redacts gitlab private-token header",
+        "PRIVATE-TOKEN: abc123",
+        "PRIVATE-TOKEN: [REDACTED]"
+        "redacts x-access-token header",
+        "X-Access-Token: abc123",
+        "X-Access-Token: [REDACTED]"
         "keeps clean message unchanged",
         "clean message",
         "clean message"
@@ -311,6 +321,29 @@ Vitest.describe("GitAuthAdapter.redactToken and redactArgs", fun () ->
     Vitest.test("redacts bearer token at the start of the string", fun () ->
         let redacted = GitAuthAdapter.redactToken "Authorization: Bearer abc123"
         Vitest.expect(redacted).toBe("Authorization: [REDACTED]"))
+)
+
+Vitest.describe("AuthStateDto helpers", fun () ->
+    Vitest.test("UsableActiveUser excludes invalidated active accounts", fun () ->
+        let invalidActiveAccount: AccountSummary = {
+            User = {
+                AccountId = "acc-1"
+                Name = "Invalid User"
+                Email = "invalid@example.org"
+                AvatarUrl = "https://example.org/avatar.png"
+                TargetDataHub = "https://git.nfdi4plants.org/"
+            }
+            DateAdded = "2026-01-01T00:00:00.0000000Z"
+            TokenInvalid = true
+        }
+
+        let authState: AuthStateDto = {
+            ActiveAccount = Some invalidActiveAccount
+            StoredAccounts = [| invalidActiveAccount |]
+        }
+
+        Vitest.expect(authState.ActiveUser().IsSome).toBe(true)
+        Vitest.expect(authState.UsableActiveUser()).toEqual(None))
 )
 
 Vitest.describe("GitTokenProvider.tryExtractHostFromRemoteUrl", fun () ->
@@ -553,9 +586,9 @@ Vitest.describe("Git renderer workflow contracts", fun () ->
         Vitest.expect(sourceText.Contains("React.useRef")).toBe(false)
         expectSourceContains sourceText "gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path")
 
-    Vitest.test("GitMergeConflictTarget opts out of auto-commit after the final conflict is resolved", fun () ->
+    Vitest.test("GitMergeConflictTarget opts into auto-commit after the final conflict is resolved", fun () ->
         let sourceText = getGitMergeConflictTargetSource ()
-        expectSourceContains sourceText "AutoCommit = false")
+        expectSourceContains sourceText "AutoCommit = true")
 )
 
 Vitest.describe("Git IPC provisioning contract reflection", fun () ->
