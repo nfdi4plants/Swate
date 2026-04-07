@@ -17,6 +17,16 @@ type private AccountState = {
 let private revalidationCooldown = TimeSpan.FromSeconds 30.0
 let mutable private lastRevalidationStartedAtUtc: DateTime option = None
 
+let shouldSkipRevalidation (lastStartedAtUtc: DateTime option) (now: DateTime) =
+    lastStartedAtUtc
+    |> Option.exists (fun lastStart -> (now - lastStart) < revalidationCooldown)
+
+let nextTokenInvalidState (currentTokenInvalid: bool) (failureKind: AuthFailureKind) =
+    match failureKind with
+    | AuthFailureKind.Unauthorized
+    | AuthFailureKind.Forbidden -> true
+    | _ -> currentTokenInvalid
+
 /// Normalize and validate a GitLab base URL. HTTPS only.
 let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
     let trimmed = baseUrl.Trim().TrimEnd('/')
@@ -278,10 +288,7 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
     else
         let now = DateTime.UtcNow
 
-        if
-            lastRevalidationStartedAtUtc
-            |> Option.exists (fun lastStart -> (now - lastStart) < revalidationCooldown)
-        then
+        if shouldSkipRevalidation lastRevalidationStartedAtUtc now then
             let authStateDto = getState ()
 
             return
@@ -327,10 +334,7 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
                         firstFailure <- Some failure
 
                     let tokenInvalid =
-                        match failure.Kind with
-                        | AuthFailureKind.Unauthorized
-                        | AuthFailureKind.Forbidden -> true
-                        | _ -> accountState.Summary.TokenInvalid
+                        nextTokenInvalidState accountState.Summary.TokenInvalid failure.Kind
 
                     let updatedAccountState = {
                         accountState with

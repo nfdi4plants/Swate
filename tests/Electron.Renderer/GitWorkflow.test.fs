@@ -70,6 +70,8 @@ let private okOperationResult = {
     Success = true
     Message = None
     FailureKind = None
+    WarningMessage = None
+    WarningKind = None
     Path = None
 }
 
@@ -115,6 +117,7 @@ let private defaultDependencies: GitDependencies = {
     gitFetch = fun _ -> unexpectedPromise "gitFetch"
     gitPull = fun _ -> unexpectedPromise "gitPull"
     gitPush = fun _ -> unexpectedPromise "gitPush"
+    gitCloneRepository = fun _ -> unexpectedPromise "gitCloneRepository"
     createBranch = fun _ -> unexpectedPromise "createBranch"
     checkoutBranch = fun _ -> unexpectedPromise "checkoutBranch"
     gitStagePaths = fun _ -> unexpectedPromise "gitStagePaths"
@@ -173,6 +176,7 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
             Path = "conflict-a.txt"
             ExpectedConflictContent = "<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> branch\n"
             ResolvedContent = "resolved"
+            AutoCommit = false
         }
 
         let firstResultPromise =
@@ -228,6 +232,7 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
                     Path = "conflict-b.txt"
                     ExpectedConflictContent = "<<<<<<< HEAD\nB\n=======\nC\n>>>>>>> branch\n"
                     ResolvedContent = "resolved"
+                    AutoCommit = false
                 }
 
         Vitest.expect(result).toEqual(Ok())
@@ -327,6 +332,27 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(store.State.DownloadLargeFiles).toBe(false)
     })
 
+    Vitest.test("applyStatus keeps the active page open when the viewed file disappears from changed files", fun () ->
+        let model = {
+            GitState.Empty with
+                SelectedChangePath = Some "tracked.txt"
+                ActivePage = Some(diffPage "tracked.txt")
+                ChangedFiles = [|
+                    {
+                        Path = "tracked.txt"
+                        OriginalPath = None
+                        IndexStatus = "M"
+                        WorkingTreeStatus = " "
+                        IsConflicted = false
+                    }
+                |]
+        }
+
+        let nextModel = applyStatus cleanStatus model
+
+        Vitest.expect(nextModel.SelectedChangePath).toEqual(None)
+        Vitest.expect(nextModel.ActivePage).toEqual(model.ActivePage))
+
     Vitest.test("confirmMergeResolution opens the next conflicted file and clears pending state", fun () -> promise {
         let initialState = {
             GitState.Empty with
@@ -366,6 +392,7 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
                     Path = "conflict-a.txt"
                     ExpectedConflictContent = "<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> branch\n"
                     ResolvedContent = "resolved"
+                    AutoCommit = false
                 }
 
         Vitest.expect(result).toEqual(Ok())
@@ -409,6 +436,38 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(store.State.ErrorNotice).toEqual(Some "Pull failed.")
         Vitest.expect(store.State.ActivePage).toEqual(None)
     })
+
+    Vitest.test("runPullWorkflow keeps pull successful when only LFS hydration reports a warning", fun () -> promise {
+        let store = WorkflowStore GitState.Empty
+        let warningMessage = "Git pull completed, but Git LFS download failed: hydration failed."
+
+        let deps = {
+            defaultDependencies with
+                gitPull =
+                    fun _ ->
+                        promise {
+                            return
+                                Ok {
+                                    okOperationResult with
+                                        Message = Some "Pull completed."
+                                        WarningMessage = Some warningMessage
+                                        WarningKind = Some GitFailureKind.Network
+                                }
+                        }
+                getGitStatus = fun () -> promise { return Ok cleanStatus }
+                getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 false) }
+        }
+
+        let! result = runPullWorkflow deps (fun () -> true) store.GetState store.Dispatch
+
+        Vitest.expect(result).toEqual(Ok(Some cleanStatus))
+        Vitest.expect(store.State.ErrorNotice).toEqual(None)
+        Vitest.expect(store.State.WarningNotice).toEqual(Some warningMessage)
+    })
+
+    Vitest.test("GitState.Empty defaults DownloadLargeFiles to false until settings load", fun () ->
+        Vitest.expect(GitState.Empty.DownloadLargeFiles).toBe(false))
 
     Vitest.test("shouldPublishCurrentBranchFirst is true when the current branch has no upstream or matching remote", fun () ->
         let state = {
@@ -482,6 +541,39 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(pullCalls).toBe(0)
         Vitest.expect(pushCalls).toBe(1)
         Vitest.expect(store.State.Status.TrackingBranch).toEqual(Some "origin/feature/local-only")
+    })
+
+    Vitest.test("runSyncWorkflow stops after pull when the pull completed with a warning", fun () -> promise {
+        let store = WorkflowStore GitState.Empty
+        let mutable pushCalls = 0
+
+        let deps = {
+            defaultDependencies with
+                gitPull =
+                    fun _ ->
+                        promise {
+                            return
+                                Ok {
+                                    okOperationResult with
+                                        Message = Some "Pull completed."
+                                        WarningMessage = Some "Git pull completed, but Git LFS download failed: hydration failed."
+                                        WarningKind = Some GitFailureKind.Network
+                                }
+                        }
+                gitPush =
+                    fun _ ->
+                        pushCalls <- pushCalls + 1
+                        promise { return Ok okOperationResult }
+                getGitStatus = fun () -> promise { return Ok cleanStatus }
+                getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 false) }
+        }
+
+        let! result = runSyncWorkflow deps (fun () -> true) store.GetState store.Dispatch
+
+        Vitest.expect(result).toEqual(Ok())
+        Vitest.expect(pushCalls).toBe(0)
+        Vitest.expect(store.State.WarningNotice.IsSome).toBe(true)
     })
 
     Vitest.test("runGitOperationWithLfsInstallRetry retries the original operation exactly once after install", fun () -> promise {

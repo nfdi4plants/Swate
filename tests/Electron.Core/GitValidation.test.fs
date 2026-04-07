@@ -10,6 +10,7 @@ open Fable.Electron
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
 open Microsoft.FSharp.Reflection
+open Swate.Electron.Shared.AuthTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
 open Vitest
@@ -18,6 +19,7 @@ module GitService = Main.Git.GitService
 module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
 module GitTokenProvider = Main.Git.GitTokenProvider
+module AuthService = Main.Auth.AuthService
 
 let private expectOk expected (result: Result<'T, exn>) =
     match result with
@@ -368,6 +370,28 @@ Vitest.describe("GitService.validateRemoteName", fun () ->
         |> expectError)
 )
 
+Vitest.describe("AuthService revalidation helpers", fun () ->
+    Vitest.test("shouldSkipRevalidation is true while the cooldown window is still active", fun () ->
+        let now = DateTime.UtcNow
+        let lastStarted = now - TimeSpan.FromSeconds 5.0
+
+        Vitest.expect(AuthService.shouldSkipRevalidation (Some lastStarted) now).toBe(true))
+
+    Vitest.test("shouldSkipRevalidation is false once the cooldown window has elapsed", fun () ->
+        let now = DateTime.UtcNow
+        let lastStarted = now - TimeSpan.FromSeconds 45.0
+
+        Vitest.expect(AuthService.shouldSkipRevalidation (Some lastStarted) now).toBe(false))
+
+    Vitest.test("nextTokenInvalidState marks unauthorized and forbidden failures as invalid", fun () ->
+        Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Unauthorized).toBe(true)
+        Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Forbidden).toBe(true))
+
+    Vitest.test("nextTokenInvalidState preserves the existing invalid flag for non-auth failures", fun () ->
+        Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Network).toBe(false)
+        Vitest.expect(AuthService.nextTokenInvalidState true AuthFailureKind.Network).toBe(true))
+)
+
 Vitest.describe("GitProvisioningService validation helpers", fun () ->
     Vitest.describe("target path normalization", fun () ->
         Vitest.test("rejects empty target path", fun () ->
@@ -528,12 +552,20 @@ Vitest.describe("Git renderer workflow contracts", fun () ->
         Vitest.expect(sourceText.Contains("React.useState")).toBe(false)
         Vitest.expect(sourceText.Contains("React.useRef")).toBe(false)
         expectSourceContains sourceText "gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path")
+
+    Vitest.test("GitMergeConflictTarget opts out of auto-commit after the final conflict is resolved", fun () ->
+        let sourceText = getGitMergeConflictTargetSource ()
+        expectSourceContains sourceText "AutoCommit = false")
 )
 
 Vitest.describe("Git IPC provisioning contract reflection", fun () ->
     Vitest.test("GitOperationResult exposes Path as string option", fun () ->
         let pathField = getRecordField typeof<GitOperationResult> "Path"
         Vitest.expect(pathField.PropertyType).toEqual(typeof<string option>))
+
+    Vitest.test("GitOperationResult exposes warning fields for partial-success outcomes", fun () ->
+        Vitest.expect((getRecordField typeof<GitOperationResult> "WarningMessage").PropertyType.FullName).toBe(typeof<string option>.FullName)
+        Vitest.expect((getRecordField typeof<GitOperationResult> "WarningKind").PropertyType.FullName).toBe(typeof<GitFailureKind option>.FullName))
 
     Vitest.test("IGitApi.gitInitRepository uses target path string argument", fun () ->
         let initField = getRecordField typeof<IGitApi> "gitInitRepository"
@@ -564,6 +596,16 @@ Vitest.describe("Git IPC provisioning contract reflection", fun () ->
         Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "TargetPath").PropertyType).toEqual(typeof<string>)
         Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "Branch").PropertyType).toEqual(typeof<string option>)
         Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "DownloadLargeFiles").PropertyType).toEqual(typeof<bool>))
+
+    Vitest.test("GitConfirmMergeResolutionRequest exposes AutoCommit as a bool", fun () ->
+        let fields = FSharpType.GetRecordFields(typeof<GitConfirmMergeResolutionRequest>)
+        let fieldNames =
+            fields
+            |> Microsoft.FSharp.Collections.Array.map (fun field -> field.Name)
+            |> Microsoft.FSharp.Collections.Array.sort
+
+        Vitest.expect(fieldNames).toEqual([| "AutoCommit"; "ExpectedConflictContent"; "Path"; "ResolvedContent" |])
+        Vitest.expect((getRecordField typeof<GitConfirmMergeResolutionRequest> "AutoCommit").PropertyType).toEqual(typeof<bool>))
 )
 
 Vitest.describe("SimpleGit binding surface parity", fun () ->
