@@ -149,7 +149,7 @@ let private parseNote (relativePath: string) (content: string) (modifiedAt: Date
         Content = body
     }
 
-let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<NoteSearch[]> = promise {
+let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<Note[]> = promise {
     let noteEntries =
         fileEntries
         |> Array.filter (fun entry -> not entry.isDirectory)
@@ -178,7 +178,7 @@ let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<NoteSear
 
     return
         notesWithOptions
-        |> fun notesWithOptions -> notesWithOptions :?> NoteSearch option []
+        |> fun notesWithOptions -> notesWithOptions :?> Note option []
         |> Array.choose id
         |> Array.sortByDescending (fun note -> note.Date)
 }

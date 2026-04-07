@@ -10,8 +10,12 @@ let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
+<<<<<<< HEAD
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
     let notes, setNotes = React.useState ([]: NoteSearch list)
+=======
+    let notes, setNotes = React.useState ([]: Note list)
+>>>>>>> 6ceb666f (update name type)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)
 
