@@ -6,16 +6,16 @@ open Vitest
 
 let private folder id name itemType selectable children =
     {
-        FileTree.createFolder name None "swt:fluent--folder-24-regular" with
+        FileTree.createFolder name None FileItemIcon.Folder with
             Id = id
             Children = Some children
             ItemType = itemType
             Selectable = selectable
     }
 
-let private file id name iconPath itemType selectable =
+let private file id name icon itemType selectable =
     {
-        FileTree.createFile name None iconPath with
+        FileTree.createFile name None icon with
             Id = id
             ItemType = itemType
             Selectable = selectable
@@ -38,10 +38,10 @@ let private expectEntry itemId (result: ARCObjectExplorerItems) =
 
 Vitest.describe("ARCObjectWidgetHelper.GetExplorerItems", fun () ->
     Vitest.test("returns selectable descendants recursively and skips structural groups", fun () ->
-        let sample = file "sample" "Leaf-01" "swt:fluent--tag-24-regular" "Sample" true
+        let sample = file "sample" "Leaf-01" FileItemIcon.Tag "Sample" true
         let table = folder "table" "Metabolite Measurements" "Table" true [ sample ]
         let tablesGroup = folder "tables-group" "Tables" "Group" false [ table ]
-        let note = file "note" "Sampling protocol" "swt:fluent--document-24-regular" "Note" true
+        let note = file "note" "Sampling protocol" FileItemIcon.Document "Note" true
         let study = folder "study" "PlantStressStudy" "Study" true [ tablesGroup; note ]
 
         let result = ARCObjectWidgetHelper.GetExplorerItems(Some "study", [ study ]) |> expectSome
@@ -66,7 +66,7 @@ Vitest.describe("ARCObjectWidgetHelper.GetExplorerItems", fun () ->
         Vitest.expect(noteEntry.Lineage).toEqual([]))
 
     Vitest.test("builds a parent chain for nested leaf selections", fun () ->
-        let sample = file "sample" "Leaf-01" "swt:fluent--tag-24-regular" "Sample" true
+        let sample = file "sample" "Leaf-01" FileItemIcon.Tag "Sample" true
         let table = folder "table" "Metabolite Measurements" "Table" true [ sample ]
         let tablesGroup = folder "tables-group" "Tables" "Group" false [ table ]
         let study = folder "study" "PlantStressStudy" "Study" true [ tablesGroup ]
@@ -78,7 +78,7 @@ Vitest.describe("ARCObjectWidgetHelper.GetExplorerItems", fun () ->
         Vitest.expect(result.Sections |> List.map (fun section -> section.Label)).toEqual([ "Sample" ]))
 
     Vitest.test("returns the selected item when it has no visible descendants", fun () ->
-        let note = file "note" "Sampling protocol" "swt:fluent--document-24-regular" "Note" true
+        let note = file "note" "Sampling protocol" FileItemIcon.Document "Note" true
 
         let result = ARCObjectWidgetHelper.GetExplorerItems(Some "note", [ note ]) |> expectSome
 

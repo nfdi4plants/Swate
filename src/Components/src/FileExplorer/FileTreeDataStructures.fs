@@ -2,10 +2,61 @@ namespace Swate.Components.FileExplorerTypes
 
 open System
 
+[<RequireQualifiedAccess>]
+type FileItemIconTone =
+    | BaseMuted
+    | BaseSubtle
+    | Secondary
+    | Success
+    | Primary
+    | Warning
+    | Info
+    | Accent
+    | Error
+
+[<RequireQualifiedAccess>]
+module FileItemIconTone =
+
+    let className =
+        function
+        | FileItemIconTone.BaseMuted -> "swt:text-base-content/70"
+        | FileItemIconTone.BaseSubtle -> "swt:text-base-content/60"
+        | FileItemIconTone.Secondary -> "swt:text-secondary"
+        | FileItemIconTone.Success -> "swt:text-success"
+        | FileItemIconTone.Primary -> "swt:text-primary"
+        | FileItemIconTone.Warning -> "swt:text-warning"
+        | FileItemIconTone.Info -> "swt:text-info"
+        | FileItemIconTone.Accent -> "swt:text-accent"
+        | FileItemIconTone.Error -> "swt:text-error"
+
+[<RequireQualifiedAccess>]
+type FileItemIcon =
+    | Folder
+    | Document
+    | Table
+    | Database
+    | Tag
+    | Block
+    | MoreHorizontal
+
+[<RequireQualifiedAccess>]
+module FileItemIcon =
+
+    let className =
+        function
+        | FileItemIcon.Folder -> "swt:fluent--folder-24-regular"
+        | FileItemIcon.Document -> "swt:fluent--document-24-regular"
+        | FileItemIcon.Table -> "swt:fluent--table-24-regular"
+        | FileItemIcon.Database -> "swt:fluent--database-24-regular"
+        | FileItemIcon.Tag -> "swt:fluent--tag-24-regular"
+        | FileItemIcon.Block -> "swt:fluent--prohibited-24-regular"
+        | FileItemIcon.MoreHorizontal -> "swt:fluent--more-horizontal-24-regular"
+
 type FileItem = {
     Id: string
     Name: string
-    IconPath: string
+    Icon: FileItemIcon
+    IconTone: FileItemIconTone option
     IsExpanded: bool
     Children: FileItem list option
     IdRel: string option
@@ -25,7 +76,8 @@ type FileItem = {
 // Helper type for file tree creation using a predefined config
 type FileItemConfig = {
     Name: string
-    IconPath: string
+    Icon: FileItemIcon
+    IconTone: FileItemIconTone option
     IsDirectory: bool
     ItemType: string
 }
@@ -50,10 +102,11 @@ module FileTree =
         let divisor = Math.Pow(1024.0, float log)
         sprintf "%.0f %s" (float size / divisor) suffixes.[log]
 
-    let createFile (name: string) path (iconPath: string) : FileItem = {
+    let createFile (name: string) path (icon: FileItemIcon) : FileItem = {
         Id = generateId ()
         Name = name
-        IconPath = iconPath
+        Icon = icon
+        IconTone = None
         IsExpanded = false
         Children = None
         IdRel = None
@@ -70,10 +123,11 @@ module FileTree =
         Path = path
     }
 
-    let createFolder (name: string) path (iconPath: string) : FileItem = {
+    let createFolder (name: string) path (icon: FileItemIcon) : FileItem = {
         Id = generateId ()
         Name = name
-        IconPath = iconPath
+        Icon = icon
+        IconTone = None
         IsExpanded = false
         Children = Some []
         IdRel = None
@@ -93,7 +147,8 @@ module FileTree =
     let createFromConfig (config: FileItemConfig) path (id: string) : FileItem = {
         Id = id
         Name = config.Name
-        IconPath = config.IconPath
+        Icon = config.Icon
+        IconTone = config.IconTone
         IsExpanded = false
         Children = if config.IsDirectory then Some [] else None
         IdRel = None
@@ -234,7 +289,8 @@ module FileTree =
     let createEmptyPlaceholder (parentId: string) : FileItem = {
         Id = sprintf "%s/empty$%s" parentId (generateId ())
         Name = "empty"
-        IconPath = "block"
+        Icon = FileItemIcon.Block
+        IconTone = None
         IsExpanded = false
         Children = None
         IdRel = None

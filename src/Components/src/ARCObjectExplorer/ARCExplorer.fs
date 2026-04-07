@@ -12,35 +12,95 @@ module ARCExplorer =
 
     let private normalizePath = PathHelpers.normalizePath
 
-    let iconColorClassForItemType =
+    type ArcExplorerAppearance = {
+        Icon: FileItemIcon
+        IconTone: FileItemIconTone option
+    }
+
+    let appearanceForNodeKind =
         function
-        | "ARC" -> Some "swt:text-base-content/70"
-        | "Group" -> Some "swt:text-base-content/60"
-        | "Study" -> Some "swt:text-secondary"
-        | "Assay" -> Some "swt:text-success"
-        | "Workflow" -> Some "swt:text-primary"
-        | "Run" -> Some "swt:text-warning"
-        | "Table" -> Some "swt:text-info"
-        | "DataMap" -> Some "swt:text-accent"
-        | "Note" -> Some "swt:text-error"
-        | "Sample" -> Some "swt:text-base-content/70"
-        | _ -> None
+        | ArcExplorerNodeKind.Arc ->
+            {
+                Icon = FileItemIcon.Folder
+                IconTone = Some FileItemIconTone.BaseMuted
+            }
+        | ArcExplorerNodeKind.Group ->
+            {
+                Icon = FileItemIcon.Folder
+                IconTone = Some FileItemIconTone.BaseSubtle
+            }
+        | ArcExplorerNodeKind.Table ->
+            {
+                Icon = FileItemIcon.Table
+                IconTone = Some FileItemIconTone.Info
+            }
+        | ArcExplorerNodeKind.DataMap ->
+            {
+                Icon = FileItemIcon.Database
+                IconTone = Some FileItemIconTone.Accent
+            }
+        | ArcExplorerNodeKind.Sample ->
+            {
+                Icon = FileItemIcon.Tag
+                IconTone = Some FileItemIconTone.BaseMuted
+            }
+        | ArcExplorerNodeKind.Note ->
+            {
+                Icon = FileItemIcon.Document
+                IconTone = Some FileItemIconTone.Error
+            }
+        | ArcExplorerNodeKind.Study ->
+            {
+                Icon = FileItemIcon.Document
+                IconTone = Some FileItemIconTone.Secondary
+            }
+        | ArcExplorerNodeKind.Assay ->
+            {
+                Icon = FileItemIcon.Document
+                IconTone = Some FileItemIconTone.Success
+            }
+        | ArcExplorerNodeKind.Workflow ->
+            {
+                Icon = FileItemIcon.Document
+                IconTone = Some FileItemIconTone.Primary
+            }
+        | ArcExplorerNodeKind.Run ->
+            {
+                Icon = FileItemIcon.Document
+                IconTone = Some FileItemIconTone.Warning
+            }
 
-    let iconColorClass (item: FileItem) =
-        iconColorClassForItemType item.ItemType
+    let private fileItemForNode
+        (createItem: string -> string option -> FileItemIcon -> FileItem)
+        (node: ArcExplorerNode)
+        =
+        let appearance = appearanceForNodeKind node.kind
 
-    let private iconForNode (node: ArcExplorerNode) =
-        match node.kind with
-        | ArcExplorerNodeKind.Arc
-        | ArcExplorerNodeKind.Group -> "swt:fluent--folder-24-regular"
-        | ArcExplorerNodeKind.Table -> "swt:fluent--table-24-regular"
-        | ArcExplorerNodeKind.DataMap -> "swt:fluent--database-24-regular"
-        | ArcExplorerNodeKind.Sample -> "swt:fluent--tag-24-regular"
-        | ArcExplorerNodeKind.Note
-        | ArcExplorerNodeKind.Study
-        | ArcExplorerNodeKind.Assay
-        | ArcExplorerNodeKind.Workflow
-        | ArcExplorerNodeKind.Run -> "swt:fluent--document-24-regular"
+        {
+            createItem node.name node.path appearance.Icon with
+                Id = node.id
+                ItemType = ArcExplorerNodeKind.label node.kind
+                IconTone = appearance.IconTone
+                IsLFS = node.isLfs
+                Selectable = node.isSelectable
+        }
+
+    let rec private toFileItem (node: ArcExplorerNode) =
+        let children = node.children |> List.map toFileItem
+
+        let isDirectory =
+            node.kind = ArcExplorerNodeKind.Arc
+            || node.kind = ArcExplorerNodeKind.Group
+            || not (List.isEmpty children)
+
+        if isDirectory then
+            {
+                fileItemForNode FileTree.createFolder node with
+                    IsExpanded = node.kind = ArcExplorerNodeKind.Arc
+                    Children = Some children
+            }
+        else
+            fileItemForNode FileTree.createFile node
 
     let rec private tryFindNodeIdByPath (path: string) (nodes: ArcExplorerNode list) =
         let normalizedTargetPath = normalizePath path
@@ -69,33 +129,6 @@ module ARCExplorer =
                 Some node
             else
                 tryFindNodeById nodeId node.children)
-
-    let rec private toFileItem (node: ArcExplorerNode) =
-        let children = node.children |> List.map toFileItem
-
-        let isDirectory =
-            node.kind = ArcExplorerNodeKind.Arc
-            || node.kind = ArcExplorerNodeKind.Group
-            || not (List.isEmpty children)
-
-        if isDirectory then
-            {
-                FileTree.createFolder node.name node.path (iconForNode node) with
-                    Id = node.id
-                    ItemType = ArcExplorerNodeKind.label node.kind
-                    IsExpanded = node.kind = ArcExplorerNodeKind.Arc
-                    IsLFS = node.isLfs
-                    Selectable = node.isSelectable
-                    Children = Some children
-            }
-        else
-            {
-                FileTree.createFile node.name node.path (iconForNode node) with
-                    Id = node.id
-                    ItemType = ArcExplorerNodeKind.label node.kind
-                    IsLFS = node.isLfs
-                    Selectable = node.isSelectable
-            }
 
     let toFileItems (nodes: ArcExplorerNode list) = nodes |> List.map toFileItem
 
@@ -165,7 +198,6 @@ module ARCExplorer =
                     ?selectedItemId = Some selectedItemId,
                     showBreadcrumbs = false,
                     directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
-                    useDirectoryChevronToggle = true,
-                    getItemIconClass = iconColorClass
+                    useDirectoryChevronToggle = true
                 )
             )

@@ -61,77 +61,87 @@ type ARCObjectFixture =
     static member StoryItemIdSample3 = "sample:soil-core-a"
 
     static member StoryItems() : FileItem list =
-        let folder iconPath id name isExpanded children selectable =
+        let folder kind id name isExpanded children selectable =
+            let appearance = ARCExplorer.appearanceForNodeKind kind
+
             {
-                FileTree.createFolder name None iconPath with
+                FileTree.createFolder name None appearance.Icon with
                     Id = id
+                    ItemType = ArcExplorerNodeKind.label kind
+                    IconTone = appearance.IconTone
                     IsExpanded = isExpanded
                     Children = Some children
                     Selectable = selectable
             }
 
         let group id name children =
-            {
-                folder "swt:fluent--folder-24-regular" id name false children false with
-                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Group
-            }
+            folder ArcExplorerNodeKind.Group id name false children false
 
         let objectNode kind id name children =
-            {
-                folder "swt:fluent--document-24-regular" id name false children true with
-                    ItemType = ArcExplorerNodeKind.label kind
-            }
+            folder kind id name false children true
 
         let document kind id name =
+            let appearance = ARCExplorer.appearanceForNodeKind kind
+
             {
-                FileTree.createFile name None "swt:fluent--document-24-regular" with
+                FileTree.createFile name None appearance.Icon with
                     Id = id
                     ItemType = ArcExplorerNodeKind.label kind
+                    IconTone = appearance.IconTone
                     Selectable = true
             }
 
         let tag id name =
+            let appearance = ARCExplorer.appearanceForNodeKind ArcExplorerNodeKind.Sample
+
             {
-                FileTree.createFile name None "swt:fluent--tag-24-regular" with
+                FileTree.createFile name None appearance.Icon with
                     Id = id
                     ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Sample
+                    IconTone = appearance.IconTone
                     Selectable = true
             }
 
         let note id name =
+            let appearance = ARCExplorer.appearanceForNodeKind ArcExplorerNodeKind.Note
+
             {
-                FileTree.createFile name None "swt:fluent--document-24-regular" with
+                FileTree.createFile name None appearance.Icon with
                     Id = id
                     ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Note
+                    IconTone = appearance.IconTone
                     Selectable = true
             }
 
         let datamap id =
+            let appearance = ARCExplorer.appearanceForNodeKind ArcExplorerNodeKind.DataMap
+
             {
-                FileTree.createFile "DataMap" None "swt:fluent--database-24-regular" with
+                FileTree.createFile "DataMap" None appearance.Icon with
                     Id = id
                     ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.DataMap
+                    IconTone = appearance.IconTone
                     Selectable = true
             }
 
         let table id name =
+            let appearance = ARCExplorer.appearanceForNodeKind ArcExplorerNodeKind.Table
+
             {
-                FileTree.createFile name None "swt:fluent--table-24-regular" with
+                FileTree.createFile name None appearance.Icon with
                     Id = id
                     ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Table
+                    IconTone = appearance.IconTone
                     Selectable = true
             }
 
         let tableWithSamples id name children =
-            {
-                folder "swt:fluent--table-24-regular" id name false children true with
-                    ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Table
-            }
+            folder ArcExplorerNodeKind.Table id name false children true
 
         [
             {
                 folder
-                    "swt:fluent--folder-24-regular"
+                    ArcExplorerNodeKind.Arc
                     ARCObjectFixture.StoryItemIdRoot
                     "MyArc"
                     false
@@ -836,8 +846,7 @@ type ARCObjectFixture =
                 ?selectedItemId = Some visibleSelectedId,
                 onItemClick = (fun item -> setSelectedId item.Id),
                 showBreadcrumbs = false,
-                useDirectoryChevronToggle = true,
-                getItemIconClass = ARCExplorer.iconColorClass
+                useDirectoryChevronToggle = true
             )
 
         let explorerPane =

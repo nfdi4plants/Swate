@@ -163,8 +163,8 @@ type ARCObjectWidget =
     static member private IconClassName(baseClasses: string list, item: FileItem) =
         [
             yield! baseClasses
-            yield item.IconPath
-            yield! ARCExplorer.iconColorClass item |> Option.toList
+            yield item.Icon |> FileItemIcon.className
+            yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
         ]
 
     static member private KindFilterOptions: SelectItem<string>[] = [|

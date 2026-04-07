@@ -22,7 +22,7 @@ module private FileExplorerHelper =
                 |> List.ofArray
 
             Some {
-                FileTree.createFolder parent.name (Some parent.path) "swt:fluent--folder-24-regular" with
+                FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
                     Id = parent.path
                     IsExpanded =
                         selectedTreeItemPath
@@ -32,7 +32,7 @@ module private FileExplorerHelper =
             }
         | false ->
             Some {
-                FileTree.createFile parent.name (Some parent.path) "swt:fluent--document-24-regular" with
+                FileTree.createFile parent.name (Some parent.path) FileItemIcon.Document with
                     Id = parent.path
                     IsLFS = parent.isLfs
             }
