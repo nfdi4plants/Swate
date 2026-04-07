@@ -129,7 +129,7 @@ module private API =
 
     let callSearch =
         fun (query: string) ->
-            Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10))
+            Api.SwateApi.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
             |> Promise.catch (fun exn ->
@@ -139,7 +139,9 @@ module private API =
 
     let callParentSearch =
         fun (parent: string, query: string) ->
-            Api.SwateApi.searchTerm (Swate.Components.Shared.DTOs.TermQuery.create (query, 10, parentTermId = parent))
+            Api.SwateApi.SwateApi.searchTerm (
+                Swate.Components.Shared.DTOs.TermQuery.create (query, 10, parentTermId = parent)
+            )
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
             |> Promise.catch (fun exn ->
@@ -149,7 +151,7 @@ module private API =
 
     let callAllChildSearch =
         fun (parent: string) ->
-            Api.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create (parent, 300))
+            Api.SwateApi.SwateApi.searchChildTerms (Swate.Components.Shared.DTOs.ParentTermQuery.create (parent, 300))
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results.results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
             |> Promise.catch (fun exn ->
@@ -159,7 +161,7 @@ module private API =
 
     let callAdvancedSearch =
         fun dto ->
-            Api.SwateApi.searchTermAdvanced dto
+            Api.SwateApi.SwateApi.searchTermAdvanced dto
             |> Async.StartAsPromise
             |> Promise.map (fun results -> results |> Array.map (fun t0 -> t0.ToComponentTerm()) |> ResizeArray)
             |> Promise.catch (fun exn ->
@@ -587,7 +589,9 @@ type TermSearch =
 
                     Html.pre [
                         prop.className "swt:text-xs"
-                        prop.children [ Html.code (Fable.Core.JS.JSON.stringify (tempTerm.data.Value, space = '\t')) ]
+                        prop.children [
+                            Html.code (Fable.Core.JS.JSON.stringify (tempTerm.data.Value, space = '\t'))
+                        ]
                     ]
                 if tempTerm.isObsolete.IsSome && tempTerm.isObsolete.Value then
                     Html.div [ prop.className "swt:text-error"; prop.text "obsolete" ]
@@ -1079,7 +1083,9 @@ type TermSearch =
                 prop.children [
                     Html.div [
                         prop.className "swt:swap-on"
-                        prop.children [ Html.kbd [ prop.className [ "swt:kbd swt:kbd-sm" ]; prop.text "F2" ] ]
+                        prop.children [
+                            Html.kbd [ prop.className [ "swt:kbd swt:kbd-sm" ]; prop.text "F2" ]
+                        ]
                     ]
                     Html.div [
                         prop.className "swt:swap-off swt:flex swt:items-center swt:justify-center"
@@ -1099,7 +1105,9 @@ type TermSearch =
             React.Fragment [
                 Html.div [
                     if isLoading then
-                        Html.span [ prop.className "swt:loading swt:loading-spinner swt:loading-sm" ]
+                        Html.span [
+                            prop.className "swt:loading swt:loading-spinner swt:loading-sm"
+                        ]
                     else
                         Icons.Check(
                             [

@@ -6,9 +6,7 @@ open Swate.Electron.Shared
 open Feliz
 
 let AppStateCtx =
-    React.createContext<StateContext<AppState>> (
-        {
-            state = AppState.Init
-            setState = ignore
-        }
-    )
+    React.createContext<StateContext<ArcRootPath>> ({ state = None; setState = ignore })
+
+[<Hook>]
+let useAppState () = React.useContext AppStateCtx

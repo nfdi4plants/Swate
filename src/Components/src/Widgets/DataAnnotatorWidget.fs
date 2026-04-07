@@ -86,8 +86,7 @@ module private DataAnnotatorWidgetModel =
                 | "\\v" -> "\v"
                 | _ -> separator
 
-            let rows =
-                file.DataContent.Split([| '\n' |], StringSplitOptions.RemoveEmptyEntries)
+            let rows = file.DataContent.Split([| '\n' |], StringSplitOptions.RemoveEmptyEntries)
 
             let splitRows =
                 rows
@@ -106,20 +105,17 @@ module private DataAnnotatorWidgetModel =
 
         member this.ToggleHeader() =
             match this.HeaderRow with
-            | Some header ->
-                {
-                    this with
-                        HeaderRow = None
-                        BodyRows = Array.insertAt 0 header this.BodyRows
-                }
-            | None when this.BodyRows.Length > 1 ->
-                {
-                    this with
-                        HeaderRow = Some this.BodyRows.[0]
-                        BodyRows = this.BodyRows.[1..]
-                }
-            | _ ->
-                this
+            | Some header -> {
+                this with
+                    HeaderRow = None
+                    BodyRows = Array.insertAt 0 header this.BodyRows
+              }
+            | None when this.BodyRows.Length > 1 -> {
+                this with
+                    HeaderRow = Some this.BodyRows.[0]
+                    BodyRows = this.BodyRows.[1..]
+              }
+            | _ -> this
 
     type AnnotationInput = {
         Selectors: string[]
@@ -156,19 +152,14 @@ module private DataAnnotatorWidgetModel =
 
     let tryGetTargetHeader (table: ArcTable) (targetColumn: TargetColumn) =
         match targetColumn with
-        | TargetColumn.Input ->
-            Ok(CompositeHeader.Input IOType.Data)
-        | TargetColumn.Output ->
-            Ok(CompositeHeader.Output IOType.Data)
+        | TargetColumn.Input -> Ok(CompositeHeader.Input IOType.Data)
+        | TargetColumn.Output -> Ok(CompositeHeader.Output IOType.Data)
         | TargetColumn.Autodetect ->
             match table.TryGetInputColumn(), table.TryGetOutputColumn() with
             | Some _, None
-            | None, None ->
-                Ok(CompositeHeader.Output IOType.Data)
-            | None, Some _ ->
-                Ok(CompositeHeader.Input IOType.Data)
-            | Some _, Some _ ->
-                Error "Both Input and Output columns already exist. Select Input or Output explicitly."
+            | None, None -> Ok(CompositeHeader.Output IOType.Data)
+            | None, Some _ -> Ok(CompositeHeader.Input IOType.Data)
+            | Some _, Some _ -> Error "Both Input and Output columns already exist. Select Input or Output explicitly."
 
     let private mkDataCell (fileName: string) (fileType: string) (selector: string) =
         let data = Data()
@@ -184,8 +175,7 @@ module private DataAnnotatorWidgetModel =
 
     let applyToTable (table: ArcTable) (input: AnnotationInput) =
         match tryGetTargetHeader table input.TargetColumn with
-        | Error errorMessage ->
-            Error errorMessage
+        | Error errorMessage -> Error errorMessage
         | Ok header ->
             try
                 if table.ColumnCount > 0 && input.Selectors.Length > table.RowCount then
@@ -241,10 +231,7 @@ type DataAnnotatorWidget =
     static member private WidgetContainerClass =
         "swt:flex swt:flex-col swt:gap-3 swt:p-2 swt:w-fit swt:max-w-[95vw]"
 
-    static member private fileNameFromPath (path: string) =
-        path.Replace("\\", "/").Split('/') |> Array.last
-
-    static member private fileTypeFromName (fileName: string) =
+    static member private fileTypeFromName(fileName: string) =
         if fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) then
             "text/csv"
         elif fileName.EndsWith(".tsv", StringComparison.OrdinalIgnoreCase) then
@@ -254,7 +241,7 @@ type DataAnnotatorWidget =
         else
             "text/plain"
 
-    static member private separatorToInput (separator: string) =
+    static member private separatorToInput(separator: string) =
         match separator with
         | "\t" -> "\\t"
         | "\n" -> "\\n"
@@ -264,13 +251,9 @@ type DataAnnotatorWidget =
         | "\v" -> "\\v"
         | _ -> separator
 
-    static member private parseDataFileBySeparator
-        (separator: string)
-        (dataFile: DataAnnotatorWidgetModel.DataFile)
-        =
+    static member private parseDataFileBySeparator (separator: string) (dataFile: DataAnnotatorWidgetModel.DataFile) =
         match DataAnnotatorWidgetModel.tryParseDataFile separator dataFile with
-        | Ok parsed ->
-            Ok parsed
+        | Ok parsed -> Ok parsed
         | Error errorMessage ->
             let fallbackSeparator = dataFile.ExpectedSeparator
 
@@ -280,28 +263,23 @@ type DataAnnotatorWidget =
                 Error errorMessage
 
     static member private inferDisabledMessage
-        (arcFileState: ArcFiles option)
+        (arcFile: ArcFiles)
         (activeView: WidgetHostView)
         (activeTableIndex: int option)
         =
-        match arcFileState with
-        | None ->
-            Some "Open an ARC file first."
-        | Some arcFile ->
-            match activeView with
-            | WidgetHostView.MetadataView ->
-                Some "Switch to a table or datamap tab to use Data Annotator."
-            | WidgetHostView.PreviewErrorView ->
-                Some "Data Annotator is unavailable while the preview is in an error state."
-            | WidgetHostView.TableView ->
-                match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
-                | Some _ -> None
-                | None -> Some "Select a table tab to use Data Annotator."
-            | WidgetHostView.DataMapView ->
-                if WidgetArcFile.tryGetDataMap arcFile |> Option.isSome then
-                    None
-                else
-                    Some "No DataMap available for this ARC file."
+        match activeView with
+        | WidgetHostView.MetadataView -> Some "Switch to a table or datamap tab to use Data Annotator."
+        | WidgetHostView.PreviewErrorView ->
+            Some "Data Annotator is unavailable while the preview is in an error state."
+        | WidgetHostView.TableView ->
+            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+            | Some _ -> None
+            | None -> Some "Select a table tab to use Data Annotator."
+        | WidgetHostView.DataMapView ->
+            if WidgetArcFile.tryGetDataMap arcFile |> Option.isSome then
+                None
+            else
+                Some "No DataMap available for this ARC file."
 
     [<ReactComponent>]
     static member private Table
@@ -316,10 +294,7 @@ type DataAnnotatorWidget =
             prop.children [
                 Html.thead [
                     Html.tr [
-                        Html.th [
-                            prop.className "swt:w-24"
-                            prop.text "#"
-                        ]
+                        Html.th [ prop.className "swt:w-24"; prop.text "#" ]
                         for columnIndex in 0 .. columnCount - 1 do
                             let target = DataAnnotatorWidgetModel.DataTarget.Column columnIndex
                             let isSelected = selectedTargets.Contains target
@@ -362,8 +337,7 @@ type DataAnnotatorWidget =
                                     prop.text (string (rowIndex + 1))
                                 ]
                                 for columnIndex in 0 .. columnCount - 1 do
-                                    let cellTarget =
-                                        DataAnnotatorWidgetModel.DataTarget.Cell(columnIndex, rowIndex)
+                                    let cellTarget = DataAnnotatorWidgetModel.DataTarget.Cell(columnIndex, rowIndex)
 
                                     let isDirectSelection = selectedTargets.Contains cellTarget
 
@@ -373,8 +347,7 @@ type DataAnnotatorWidget =
 
                                     let isSelected = isDirectSelection || isInheritedSelection
 
-                                    let value =
-                                        if columnIndex < row.Length then row.[columnIndex] else ""
+                                    let value = if columnIndex < row.Length then row.[columnIndex] else ""
 
                                     Html.td [
                                         prop.key (cellTarget.ToReactKey())
@@ -385,12 +358,7 @@ type DataAnnotatorWidget =
                                         ]
                                         prop.title "Toggle cell selector"
                                         prop.onClick (fun _ -> toggleTarget cellTarget)
-                                        prop.text (
-                                            if String.IsNullOrWhiteSpace value then
-                                                " "
-                                            else
-                                                value
-                                        )
+                                        prop.text (if String.IsNullOrWhiteSpace value then " " else value)
                                     ]
                             ]
                         ]
@@ -403,7 +371,7 @@ type DataAnnotatorWidget =
         (
             pickFile: unit -> JS.Promise<unit>,
             loading: bool,
-            selectedPath: string option,
+            selectedFileName: string option,
             dataFile: DataAnnotatorWidgetModel.DataFile option,
             reset: unit -> unit
         ) =
@@ -420,11 +388,7 @@ type DataAnnotatorWidget =
                     prop.className "swt:input swt:input-sm swt:grow"
                     prop.readOnly true
                     prop.placeholder "No file selected"
-                    prop.value (
-                        selectedPath
-                        |> Option.map DataAnnotatorWidget.fileNameFromPath
-                        |> Option.defaultValue ""
-                    )
+                    prop.value (selectedFileName |> Option.defaultValue "")
                 ]
                 Html.button [
                     prop.className "swt:btn swt:btn-outline swt:btn-sm"
@@ -438,108 +402,104 @@ type DataAnnotatorWidget =
     [<ReactComponent>]
     static member Main
         (
-            arcFileState: ArcFiles option,
+            arcFile: ArcFiles,
             activeView: WidgetHostView,
             activeTableIndex: int option,
-            setArcFileState: ArcFiles option -> unit,
+            setArcFile: ArcFiles -> unit,
             services: DataAnnotatorWidgetServices
         ) =
 
-        let dataFile, setDataFile = React.useState (None: DataAnnotatorWidgetModel.DataFile option)
-        let parsedFile, setParsedFile = React.useState (None: DataAnnotatorWidgetModel.ParsedDataFile option)
+        let dataFile, setDataFile =
+            React.useState (None: DataAnnotatorWidgetModel.DataFile option)
+
+        let parsedFile, setParsedFile =
+            React.useState (None: DataAnnotatorWidgetModel.ParsedDataFile option)
+
         let selectedTargets, setSelectedTargets =
             React.useStateWithUpdater (Set.empty<DataAnnotatorWidgetModel.DataTarget>)
+
         let separatorInput, setSeparatorInput = React.useState ""
-        let selectedPath, setSelectedPath = React.useState (None: string option)
-        let targetColumn, setTargetColumn = React.useState DataAnnotatorWidgetModel.TargetColumn.Autodetect
+        let selectedFileName, setSelectedFileName = React.useState (None: string option)
+
+        let targetColumn, setTargetColumn =
+            React.useState DataAnnotatorWidgetModel.TargetColumn.Autodetect
+
         let loading, setLoading = React.useState false
         let statusMessage, setStatusMessage = React.useState (None: string option)
         let errorMessage, setErrorMessage = React.useState (None: string option)
         let widgetCtx = WidgetContext.useWidgetController ()
 
         let disabledMessage =
-            DataAnnotatorWidget.inferDisabledMessage arcFileState activeView activeTableIndex
+            DataAnnotatorWidget.inferDisabledMessage arcFile activeView activeTableIndex
 
         let reset () =
             setDataFile None
             setParsedFile None
             setSelectedTargets (fun _ -> Set.empty)
             setSeparatorInput ""
-            setSelectedPath None
+            setSelectedFileName None
             setTargetColumn DataAnnotatorWidgetModel.TargetColumn.Autodetect
             setStatusMessage None
             setErrorMessage None
 
         let setLoadedFile
-            (path: string)
+            (fileName: string)
             (nextDataFile: DataAnnotatorWidgetModel.DataFile)
             (nextParsedFile: DataAnnotatorWidgetModel.ParsedDataFile option)
             =
-            setSelectedPath (Some path)
+            setSelectedFileName (Some fileName)
             setDataFile (Some nextDataFile)
             setParsedFile nextParsedFile
             setSeparatorInput (DataAnnotatorWidget.separatorToInput nextDataFile.ExpectedSeparator)
             setSelectedTargets (fun _ -> Set.empty)
 
-        let loadFileFromPath (path: string) =
-            promise {
-                setLoading true
-                setStatusMessage None
-                setErrorMessage None
+        let loadImportedFile (importedFile: ImportedTextFile) = promise {
+            setLoading true
+            setStatusMessage None
+            setErrorMessage None
 
-                try
-                    let! fileResult = services.loadTextFile path
+            try
+                let loadedDataFile =
+                    DataAnnotatorWidgetModel.DataFile.create (
+                        importedFile.Name,
+                        DataAnnotatorWidget.fileTypeFromName importedFile.Name,
+                        importedFile.Content,
+                        float importedFile.Content.Length
+                    )
 
-                    match fileResult with
-                    | Error message ->
-                        setErrorMessage (Some $"Failed to open file: {message}")
-                    | Ok content ->
-                        let fileName = DataAnnotatorWidget.fileNameFromPath path
+                match
+                    DataAnnotatorWidget.parseDataFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile
+                with
+                | Ok parsed ->
+                    setLoadedFile importedFile.Name loadedDataFile (Some parsed)
+                    setStatusMessage (Some $"Loaded {importedFile.Name} ({parsed.BodyRows.Length} rows).")
+                | Error message ->
+                    setLoadedFile importedFile.Name loadedDataFile None
+                    setErrorMessage (Some message)
+            finally
+                setLoading false
+        }
 
-                        let loadedDataFile =
-                            DataAnnotatorWidgetModel.DataFile.create (
-                                fileName,
-                                DataAnnotatorWidget.fileTypeFromName fileName,
-                                content,
-                                float content.Length
-                            )
+        let pickFile () = promise {
+            setStatusMessage None
+            setErrorMessage None
 
-                        match DataAnnotatorWidget.parseDataFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile with
-                        | Ok parsed ->
-                            setLoadedFile path loadedDataFile (Some parsed)
-                            setStatusMessage (Some $"Loaded {fileName} ({parsed.BodyRows.Length} rows).")
-                        | Error message ->
-                            setLoadedFile path loadedDataFile None
-                            setErrorMessage (Some message)
-                finally
-                    setLoading false
-            }
+            let! importResult = services.pickTextFiles ()
 
-        let pickFile () =
-            promise {
-                setStatusMessage None
-                setErrorMessage None
+            match importResult with
+            | Error message when message <> "Cancelled" -> setErrorMessage (Some $"Failed to pick file: {message}")
+            | Error _ -> ()
+            | Ok importedFiles when importedFiles.Length = 0 -> setStatusMessage (Some "No file selected.")
+            | Ok importedFiles ->
+                if importedFiles.Length > 1 then
+                    setStatusMessage (Some "Multiple files selected. Using the first one.")
 
-                let! pathResult = services.pickPaths ()
-
-                match pathResult with
-                | Error message when message <> "Cancelled" ->
-                    setErrorMessage (Some $"Failed to pick file: {message}")
-                | Error _ ->
-                    ()
-                | Ok paths when paths.Length = 0 ->
-                    setStatusMessage (Some "No file selected.")
-                | Ok paths ->
-                    if paths.Length > 1 then
-                        setStatusMessage (Some "Multiple files selected. Using the first one.")
-
-                    do! loadFileFromPath paths.[0]
-            }
+                do! loadImportedFile importedFiles.[0]
+        }
 
         let applySeparator () =
             match dataFile with
-            | None ->
-                ()
+            | None -> ()
             | Some loadedDataFile ->
                 if String.IsNullOrWhiteSpace separatorInput then
                     setErrorMessage (Some "Separator must not be empty.")
@@ -556,8 +516,7 @@ type DataAnnotatorWidget =
 
         let toggleHeader () =
             match parsedFile with
-            | None ->
-                ()
+            | None -> ()
             | Some currentParsedFile ->
                 setParsedFile (Some(currentParsedFile.ToggleHeader()))
                 setSelectedTargets (fun _ -> Set.empty)
@@ -578,12 +537,10 @@ type DataAnnotatorWidget =
             if selectedTargets.IsEmpty then
                 setErrorMessage (Some "Select at least one target in the preview table.")
             else
-                match arcFileState, dataFile, parsedFile with
-                | Some arcFile, Some loadedDataFile, Some currentParsedFile ->
+                match dataFile, parsedFile with
+                | Some loadedDataFile, Some currentParsedFile ->
                     let selectors =
-                        DataAnnotatorWidgetModel.selectorsFromTargets
-                            currentParsedFile.HeaderRow.IsSome
-                            selectedTargets
+                        DataAnnotatorWidgetModel.selectorsFromTargets currentParsedFile.HeaderRow.IsSome selectedTargets
 
                     let input: DataAnnotatorWidgetModel.AnnotationInput = {
                         Selectors = selectors
@@ -593,7 +550,7 @@ type DataAnnotatorWidget =
                     }
 
                     let applySuccess count =
-                        setArcFileState (Some(WidgetArcFile.refreshRef arcFile))
+                        setArcFile (WidgetArcFile.refreshRef arcFile)
                         setErrorMessage None
                         setStatusMessage (Some $"Applied {count} data annotation(s).")
                         widgetCtx.closeWidget WidgetType.DataAnnotator
@@ -601,26 +558,23 @@ type DataAnnotatorWidget =
                     match activeView with
                     | WidgetHostView.TableView ->
                         match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
-                        | Some (_, table) ->
+                        | Some(_, table) ->
                             match DataAnnotatorWidgetModel.applyToTable table input with
                             | Ok count -> applySuccess count
                             | Error message -> setErrorMessage (Some message)
-                        | None ->
-                            setErrorMessage (Some "No active table selected.")
+                        | None -> setErrorMessage (Some "No active table selected.")
                     | WidgetHostView.DataMapView ->
                         match WidgetArcFile.tryGetDataMap arcFile with
                         | Some dataMap ->
                             match DataAnnotatorWidgetModel.applyToDataMap dataMap input with
                             | Ok count -> applySuccess count
                             | Error message -> setErrorMessage (Some message)
-                        | None ->
-                            setErrorMessage (Some "No DataMap available.")
+                        | None -> setErrorMessage (Some "No DataMap available.")
                     | WidgetHostView.MetadataView ->
                         setErrorMessage (Some "Data annotation cannot be applied in metadata view.")
                     | WidgetHostView.PreviewErrorView ->
                         setErrorMessage (Some "Data annotation cannot be applied while preview is in error state.")
-                | _ ->
-                    setErrorMessage (Some "Load a file first.")
+                | _ -> setErrorMessage (Some "Load a file first.")
 
         let previewSection =
             match parsedFile with
@@ -632,9 +586,7 @@ type DataAnnotatorWidget =
                 ]
             | Some currentParsedFile ->
                 let headerCount =
-                    currentParsedFile.HeaderRow
-                    |> Option.map _.Length
-                    |> Option.defaultValue 0
+                    currentParsedFile.HeaderRow |> Option.map _.Length |> Option.defaultValue 0
 
                 let bodyCount =
                     currentParsedFile.BodyRows
@@ -643,8 +595,7 @@ type DataAnnotatorWidget =
                 let columnCount = max headerCount bodyCount
 
                 Html.div [
-                    prop.className
-                        "swt:overflow-auto swt:rounded-box swt:border swt:border-base-300 swt:max-h-[55vh]"
+                    prop.className "swt:overflow-auto swt:rounded-box swt:border swt:border-base-300 swt:max-h-[55vh]"
                     prop.children [
                         if currentParsedFile.BodyRows.Length = 0 || columnCount = 0 then
                             Html.div [
@@ -698,7 +649,13 @@ type DataAnnotatorWidget =
                             ]
                         ]
                     ]
-                    DataAnnotatorWidget.FileControllerElements(pickFile, loading, selectedPath, dataFile, reset)
+                    DataAnnotatorWidget.FileControllerElements(
+                        pickFile,
+                        loading,
+                        selectedFileName,
+                        dataFile,
+                        reset
+                    )
                     if dataFile.IsSome then
                         Html.div [
                             prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:items-center"
@@ -721,12 +678,10 @@ type DataAnnotatorWidget =
                                             ]
 
                                         for separator, label in DataAnnotatorWidget.DefaultSeparatorOptions do
-                                            Html.option [
-                                                prop.value separator
-                                                prop.text label
-                                            ]
+                                            Html.option [ prop.value separator; prop.text label ]
                                     ]
                                 ]
+
                                 Html.input [
                                     prop.className "swt:input swt:input-sm swt:w-32"
                                     prop.placeholder "separator"
@@ -734,12 +689,14 @@ type DataAnnotatorWidget =
                                     prop.onChange setSeparatorInput
                                     prop.onKeyDown (key.enter, fun _ -> applySeparator ())
                                 ]
+
                                 Html.button [
                                     prop.className "swt:btn swt:btn-sm"
                                     prop.text "Apply Separator"
                                     prop.onClick (fun _ -> applySeparator ())
                                     prop.disabled (String.IsNullOrWhiteSpace separatorInput)
                                 ]
+
                                 Html.button [
                                     prop.className "swt:btn swt:btn-sm"
                                     prop.text (
@@ -750,6 +707,7 @@ type DataAnnotatorWidget =
                                     prop.onClick (fun _ -> toggleHeader ())
                                     prop.disabled parsedFile.IsNone
                                 ]
+
                                 if activeView = WidgetHostView.TableView then
                                     Html.select [
                                         prop.className "swt:select swt:select-sm"

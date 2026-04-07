@@ -38,25 +38,25 @@ module ARCitect =
 
                 let resolvedArcFile = // if the fable transpiled string from ARCitect.Interop.InteropTypes.ARCFile does not exactly match any available here it will somehow fallback to "ARCitect.Interop.InteropTypes.ARCFile.Assay"
                     match arcFile with
-                    | ARCitect.Interop.InteropTypes.ARCFile.Assay ->
+                    | ArcFilesDiscriminateStringEnum.Assay ->
                         let assay = ArcAssay.fromJsonString json
                         ArcFiles.Assay assay
-                    | ARCitect.Interop.InteropTypes.ARCFile.Study ->
+                    | ArcFilesDiscriminateStringEnum.Study ->
                         let study = ArcStudy.fromJsonString json
                         ArcFiles.Study(study, [])
-                    | ARCitect.Interop.InteropTypes.ARCFile.Investigation ->
+                    | ArcFilesDiscriminateStringEnum.Investigation ->
                         let inv = ArcInvestigation.fromJsonString json
                         ArcFiles.Investigation inv
-                    | ARCitect.Interop.InteropTypes.ARCFile.Run ->
+                    | ArcFilesDiscriminateStringEnum.Run ->
                         let run = ArcRun.fromJsonString json
                         ArcFiles.Run run
-                    | ARCitect.Interop.InteropTypes.ARCFile.Workflow ->
+                    | ArcFilesDiscriminateStringEnum.Workflow ->
                         let workflow = ArcWorkflow.fromJsonString json
                         ArcFiles.Workflow workflow
-                    | ARCitect.Interop.InteropTypes.ARCFile.Template ->
+                    | ArcFilesDiscriminateStringEnum.Template ->
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
-                    | ARCitect.Interop.InteropTypes.ARCFile.DataMap ->
+                    | ArcFilesDiscriminateStringEnum.DataMap ->
                         if dataMapParent.IsNone then
                             failwith "No parent for datamap is available!"
 
@@ -72,19 +72,17 @@ module ARCitect =
         | ARCitect.Save arcFile ->
             let arcFileEnum, json, datamapParent =
                 match arcFile with
-                | ArcFiles.Assay assay ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Assay, ArcAssay.toJsonString 0 assay, None
-                | ArcFiles.Study(study, _) ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Study, ArcStudy.toJsonString 0 study, None
+                | ArcFiles.Assay assay -> ArcFilesDiscriminateStringEnum.Assay, ArcAssay.toJsonString 0 assay, None
+                | ArcFiles.Study(study, _) -> ArcFilesDiscriminateStringEnum.Study, ArcStudy.toJsonString 0 study, None
                 | ArcFiles.Investigation inv ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Investigation, ArcInvestigation.toJsonString 0 inv, None
-                | ArcFiles.Run run -> ARCitect.Interop.InteropTypes.ARCFile.Run, ArcRun.toJsonString 0 run, None
+                    ArcFilesDiscriminateStringEnum.Investigation, ArcInvestigation.toJsonString 0 inv, None
+                | ArcFiles.Run run -> ArcFilesDiscriminateStringEnum.Run, ArcRun.toJsonString 0 run, None
                 | ArcFiles.Workflow workflow ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Workflow, ArcWorkflow.toJsonString 0 workflow, None
+                    ArcFilesDiscriminateStringEnum.Workflow, ArcWorkflow.toJsonString 0 workflow, None
                 | ArcFiles.Template template ->
-                    ARCitect.Interop.InteropTypes.ARCFile.Template, Template.toJsonString 0 template, None
+                    ArcFilesDiscriminateStringEnum.Template, Template.toJsonString 0 template, None
                 | ArcFiles.DataMap(datamapParent, datamap) ->
-                    ARCitect.Interop.InteropTypes.ARCFile.DataMap, DataMap.toJsonString 0 datamap, datamapParent
+                    ArcFilesDiscriminateStringEnum.DataMap, DataMap.toJsonString 0 datamap, datamapParent
 
             let cmd =
                 Cmd.OfPromise.attempt

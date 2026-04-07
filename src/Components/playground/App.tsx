@@ -4,7 +4,7 @@ import {Entry as Table} from '../src/Table/Table.fs.ts';
 import {Entry as AnnotationTable} from '../src/AnnotationTable/AnnotationTable.fs.ts';
 import AnnotationTableCtxProvider from '../src/AnnotationTable/AnnotationTableContextProvider.fs.ts';
 import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
-import {TIBApi} from '../src/Util/Api.fs.ts';
+import {TIBApi} from '../src/Api/TIBApi.fs.ts';
 import {Entry as TemplateFilter} from '../src/Template/TemplateFilter.fs.ts';
 import {Entry as ComboBox} from '../src/GenericComponents/ComboBox.fs.ts';
 import {Entry as Select} from '../src/GenericComponents/Select.fs.ts';
@@ -21,7 +21,8 @@ import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
 import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.fs.ts'
 import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
 import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
-import {Entry as DataHubSidebarEntry} from '../src/DataHubSidebar/DataHubSidebar.fs.ts';
+// import {Entry as DataHubSidebarEntry} from '../src/DataHub/DataHubSidebar.fs.ts';
+import {GitLabEntry as DataHubBrowser} from '../src/DataHub/DataHubBrowser.fs.ts';
 import {Entry as ARCSelectorEntry} from '../src/ARCSelector/Selector.fs.ts';
 
 function TermSearchContainer() {
@@ -195,10 +196,17 @@ function AuthButtonContainer() {
   </div>
 }
 
-function DataHubSidebarContainer() {
+// function DataHubSidebarContainer() {
+//   return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
+//     <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Sidebar</h2>
+//     <DataHubSidebarEntry />
+//   </div>
+// }
+
+function DataHubBrowserContainer() {
   return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
-    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Sidebar</h2>
-    <DataHubSidebarEntry />
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Browser</h2>
+    <DataHubBrowser />
   </div>
 }
 
@@ -211,7 +219,7 @@ function ARCSelectorContainer() {
 
 const App = () => {
     return (
-        <AnnoTableContainer />
+        <Layout />
         // <AuthButtonContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
         //     <NoteSearch />

@@ -6,15 +6,32 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         react({
-            babel: {
-                // plugins: ['babel-plugin-react-compiler'],
-            }
+            include: /\.(js|jsx|ts|tsx)$/,
         }),
         tailwindcss()
     ],
     server: {
         watch: {
-            ignored: ["./src/**/*.fs", "./src/**/*.fsproj"]
+            // Ignore raw F# source and non-renderer generated outputs to avoid unnecessary full reloads.
+            ignored: (watchPath) => {
+                const p = watchPath.replace(/\\/g, '/');
+
+                const isFSharpSource =
+                    p.endsWith('.fs') ||
+                    p.endsWith('.fsx') ||
+                    p.endsWith('.fsi') ||
+                    p.endsWith('.fsproj');
+
+                const isMainOrPreloadOutput =
+                    p.includes('/src/fable_output/Main/') ||
+                    p.includes('/src/fable_output/Preload/');
+
+                return isFSharpSource || isMainOrPreloadOutput;
+            },
+            awaitWriteFinish: {
+                stabilityThreshold: 150,
+                pollInterval: 25,
+            },
         },
     }
 });

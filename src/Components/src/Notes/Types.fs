@@ -1,7 +1,7 @@
 namespace Swate.Components.NoteTypes
 open ARCtrl
 
-type Note = {
+type NoteSearch = {
     RelativePath: string
     Title: string
     Date: System.DateTime

@@ -1,8 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DefineConstants>FABLE_COMPILER</DefineConstants>
+    <!-- DefineConstants is required to hotfix an ARCtrl issue, remove if the issue below is resolved and ARCtrl is updated to a version that fixes it -->
+    <!-- https://github.com/nfdi4plants/ARCtrl/issues/603 -->
+    <DefineConstants>FABLE_COMPILER_JAVASCRIPT</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -19,13 +23,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="YAMLicious" />
     <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Javascript" />
     <PackageReference Include="ARCtrl.Spreadsheet" />
     <PackageReference Include="Fable.Remoting.Client" />
     <PackageReference Include="Fable.Fetch" />
     <PackageReference Include="Fable.React.Types" />
     <PackageReference Include="Fable.Core" />
     <PackageReference Include="Feliz" />
+    <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
   </ItemGroup>
 
@@ -63,9 +70,12 @@
     <Compile Include="Util\Constants.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
-    <Compile Include="Util\Api.fs" />
     <Compile Include="Util\ARCtrl.Helper.fs" />
     <Compile Include="Util\ReactContexts.fs" />
+    <Compile Include="Api\Helper.fs" />
+    <Compile Include="Api\SwateApi.fs" />
+    <Compile Include="Api\GitLabApi.fs" />
+    <Compile Include="Api\TIBApi.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
@@ -78,6 +88,7 @@
     <Compile Include="GenericComponents\Navbar.fs" />
     <Compile Include="ARCSelector\Types.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
+    <Compile Include="Layout\LayoutContext.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
     <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
@@ -147,8 +158,11 @@
     <Compile Include="Notes\Editor\TargetSelector.fs" />
     <Compile Include="Notes\Editor\Actions.fs" />
     <Compile Include="Notes\Editor\Notes.fs" />
-    <Compile Include="DataHubSidebar\Types.fs" />
-    <Compile Include="DataHubSidebar\DataHubSidebar.fs" />
+    <Compile Include="DataHub\Types.fs" />
+    <Compile Include="DataHub\MockData.fs" />
+    <Compile Include="DataHub\GenericComponents.fs" />
+    <Compile Include="DataHub\DataHubBrowser.fs" />
+    <Compile Include="DataHub\DataHubSidebar.fs" />
     <Compile Include="Authentication\Types.fs" />
     <Compile Include="Authentication\AccountManager.fs" />
     <Compile Include="Authentication\Authentication.fs" />

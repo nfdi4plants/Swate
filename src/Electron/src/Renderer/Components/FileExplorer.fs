@@ -2,234 +2,138 @@ module Renderer.Components.FileExplorer
 
 open System
 open Browser.Dom
+open Renderer
 open Swate.Components.FileExplorerTypes
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
+open Feliz
 
-let private normalizePath (path: string) = path.Replace("\\", "/").TrimEnd('/')
 
-let private splitPath (path: string) =
-    normalizePath path
-    |> fun normalizedPath -> normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries)
+module private FileExplorerHelper =
 
-let private resolvePreviewPath (path: string) =
-    let normalized = normalizePath path
-    let lowered = normalized.ToLowerInvariant()
+    let rec loopPaths (selectedTreeItemPath: string option) (parent: FileTreeNode) =
+        match parent.isDirectory with
+        | true ->
+            let tmp =
+                let ra = ResizeArray(parent.children.Values)
 
-    let isAssayDatamapFile =
-        lowered.Contains("/assays/") && lowered.EndsWith("/isa.datamap.xlsx")
+                ra.ToArray()
+                |> Array.map (fun entry -> loopPaths selectedTreeItemPath entry)
+                |> Array.choose id
+                |> List.ofArray
 
-    let isStudyDatamapFile =
-        lowered.Contains("/studies/") && lowered.EndsWith("/isa.datamap.xlsx")
+            Some {
+                FileTree.createFolder parent.name (Some parent.path) "swt:fluent--folder-24-regular" with
+                    Id = parent.path
+                    IsExpanded =
+                        selectedTreeItemPath
+                        |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath parent.path)
+                    IsLFS = parent.isLfs
+                    Children = Some tmp
+            }
+        | false ->
+            Some {
+                FileTree.createFile parent.name (Some parent.path) "swt:fluent--document-24-regular" with
+                    Id = parent.path
+                    IsLFS = parent.isLfs
+            }
 
-    let isRunDatamapFile =
-        lowered.Contains("/runs/") && lowered.EndsWith("/isa.datamap.xlsx")
+open FileExplorerHelper
 
-    if isAssayDatamapFile then
-        let folderPath = normalized.Substring(0, normalized.LastIndexOf('/'))
-        $"{folderPath}/isa.assay.xlsx"
-    elif isStudyDatamapFile then
-        let folderPath = normalized.Substring(0, normalized.LastIndexOf('/'))
-        $"{folderPath}/isa.study.xlsx"
-    elif isRunDatamapFile then
-        let folderPath = normalized.Substring(0, normalized.LastIndexOf('/'))
-        $"{folderPath}/isa.run.xlsx"
-    else
-        normalized
+[<ReactComponent>]
+let EmptyFileTreePlaceholder () =
+    Html.div [
+        prop.className "swt:p-4 swt:text-center swt:text-gray-500"
+        prop.text "No files found."
+    ]
 
-let createFileTree
-    (parent: FileItemDTO option)
-    (selectedTreeItemPath: string option)
-    (setSelectedTreeItemPath: string option -> unit)
-    (setPageState: PageState option -> unit)
-    =
-    let rootRepoPath = parent |> Option.map (fun p -> normalizePath p.path)
+[<ReactComponent>]
+let FileTree () =
 
-    let isFocusedPathOrAncestor (nodePath: string) =
-        match selectedTreeItemPath with
-        | Some focusedPath ->
-            let normalizedNode = normalizePath nodePath
-            let normalizedFocused = normalizePath focusedPath
+    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
 
-            normalizedFocused = normalizedNode
-            || normalizedFocused.StartsWith(normalizedNode + "/", StringComparison.OrdinalIgnoreCase)
-        | None -> false
+    match fileStateCtx.state.FileTree with
+    | [||] -> EmptyFileTreePlaceholder()
+    | _ ->
 
-    let rec loop (parent: FileItemDTO option) =
-        if parent.IsSome then
-            match parent.Value.isDirectory with
-            | true ->
-                let tmp =
-                    let ra = ResizeArray(parent.Value.children.Values)
+        let fileTree = fileStateCtx.state.FileTree |> toFileTreeNode
 
-                    ra.ToArray()
-                    |> Array.map (fun entry -> loop (Some entry))
-                    |> Array.choose id
-                    |> List.ofArray
+        let fileItem = loopPaths fileStateCtx.state.SelectedTreeItemPath fileTree
 
-                Some {
-                    FileTree.createFolder parent.Value.name (Some parent.Value.path) "swt:fluent--folder-24-regular" with
-                        Id = parent.Value.path
-                        IsExpanded = isFocusedPathOrAncestor parent.Value.path
-                        IsLFS = parent.Value.isLfs
-                        Children = Some tmp
-                }
-            | false ->
-                Some {
-                    FileTree.createFile parent.Value.name (Some parent.Value.path) "swt:fluent--document-24-regular" with
-                        Id = parent.Value.path
-                        IsLFS = parent.Value.isLfs
-                }
-        else
-            None
+        let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
+            let request: GitLfsRequest = {
+                RequestId = Guid.NewGuid().ToString()
+                RepoPath = ""
+                Command =
+                    if markAsLfs then
+                        GitLfsCommand.Track
+                    else
+                        GitLfsCommand.Untrack
+                FilePath = Some relativePath
+                TimeoutMs = Some 10000
+            }
 
-    let fileItem = loop parent
 
-    let runToggleLfsMark (repoPath: string) (relativePath: string) (markAsLfs: bool) = promise {
-        let request: GitLfsRequest = {
-            RequestId = Guid.NewGuid().ToString()
-            RepoPath = repoPath
-            Command =
-                if markAsLfs then
-                    GitLfsCommand.Track
-                else
-                    GitLfsCommand.Untrack
-            FilePath = Some relativePath
-            TimeoutMs = Some 10000
-        }
+            // This seems to behave oddly. It runs some git lfs command and then refreshes filetree in arcvault. But it does it with a type that does not track lfs?
+            let! result = Api.ipcArcVaultApi.runGitLfs (unbox null) request
 
-        let! result = Api.ipcArcVaultApi.runGitLfs (unbox null) request
-
-        return
-            match result with
-            | Ok _ -> Ok()
-            | Error exn -> Error exn.Message
-    }
-
-    let setError (errorMsg: string option) =
-        match errorMsg with
-        | Some msg -> setPageState (Some(PageState.Error msg))
-        | None -> setPageState None
-
-    let toggleLfsMark =
-        FileExplorerGitLfsHelper.ToggleLfsMark(rootRepoPath, setError, runToggleLfsMark)
-
-    let contextMenuItems (item: FileItem) =
-        FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
-
-    let openPreview (item: FileItem) =
-        promise {
-            match item.Path with
-            | None -> setPageState (Some(PageState.Error $"File '{item.Name}' has no path."))
-            | Some path when item.IsDirectory -> setPageState None
-            | Some path ->
-                let previewPath = resolvePreviewPath path
-
-                if previewPath <> normalizePath path then
-                    console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
-                else
-                    console.log ($"[Renderer] Opening file: {previewPath}")
-
-                setSelectedTreeItemPath (Some previewPath)
-                let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
-
+            return
                 match result with
-                | Ok data ->
-                    console.log ("[Renderer] Received data, processing...")
-                    setPageState (Some data)
-                | Error exn ->
-                    console.log ($"[Renderer] Error: {exn.Message}")
-                    setPageState (Some(PageState.Error $"Could not open preview for '{item.Name}': {exn.Message}"))
+                | Ok _ -> Ok()
+                | Error exn -> Error exn.Message
         }
-        |> Promise.start
 
-    if fileItem.IsSome then
-        Some(
+        let setError (errorMsg: string option) =
+            match errorMsg with
+            | Some msg -> pageStateCtx.setState (Some(PageState.ErrorPage msg))
+            | None -> pageStateCtx.setState (None)
+
+        let toggleLfsMark =
+            FileExplorerGitLfsHelper.ToggleLfsMark(setError, runToggleLfsMark)
+
+        let contextMenuItems (item: FileItem) =
+            FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+
+        let openPreview (item: FileItem) =
+            promise {
+                match item.Path with
+                | None -> pageStateCtx.setState (Some(PageState.ErrorPage $"File '{item.Name}' has no path."))
+                | Some _ when item.IsDirectory -> pageStateCtx.setState (None)
+                | Some path ->
+                    let previewPath = resolveArcPreviewPath path
+
+                    if previewPath <> normalizePath path then
+                        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
+                    else
+                        console.log ($"[Renderer] Opening file: {previewPath}")
+
+                    fileStateCtx.setSelectedTreeItemPath (Some path)
+
+                    let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+
+                    match result with
+                    | Ok data ->
+                        let pageState = PageState.fromFileContentDTO data
+                        console.log ("[Renderer] Received data, processing...")
+                        pageStateCtx.setState (Some pageState)
+                    | Error exn ->
+                        console.log ($"[Renderer] Error: {exn.Message}")
+
+                        pageStateCtx.setState (
+                            Some(PageState.ErrorPage $"Could not open preview for '{item.Name}': {exn.Message}")
+                        )
+            }
+            |> Promise.start
+
+        match fileItem with
+
+        | Some fileItem ->
             Swate.Components.FileExplorer.FileExplorer(
-                initialItems = [ fileItem.Value ],
+                initialItems = [ fileItem ],
                 onItemClick = openPreview,
                 onContextMenu = contextMenuItems,
-                ?selectedItemId = selectedTreeItemPath
+                ?selectedItemId = fileStateCtx.state.SelectedTreeItemPath
             )
-        )
-    else
-        None
-
-let private insertEntry (root: FileItemDTO) (rootPath: string) (entry: FileEntry) =
-    let parts = splitPath entry.path
-    let rootParts = splitPath rootPath
-
-    if parts.Length > rootParts.Length then
-        let rec loop (node: FileItemDTO) index =
-            let part = parts[index]
-            let isLast = index = parts.Length - 1
-
-            let child =
-                match node.children.TryGetValue(part) with
-                | true, existing when ((not isLast) || entry.isDirectory) && not existing.isDirectory ->
-                    // A node may first appear via a file path segment; upgrade it to a directory when needed.
-                    let upgraded = { existing with isDirectory = true }
-                    node.children.[part] <- upgraded
-                    upgraded
-                | true, existing -> existing
-                | false, _ ->
-                    let newPath = parts.[0..index] |> String.concat "/"
-
-                    let newNode =
-                        FileItemDTO.create (
-                            part,
-                            (if isLast then entry.isDirectory else true),
-                            newPath,
-                            System.Collections.Generic.Dictionary(),
-                            entry.isLfs
-                        )
-
-                    node.children.Add(part, newNode)
-                    newNode
-
-            if not isLast then
-                loop child (index + 1)
-
-        loop root rootParts.Length
-
-let getFileTree (fileEntries: FileEntry[]) =
-
-    if fileEntries.Length = 0 then
-        invalidArg "fileEntries" "fileEntries must not be empty."
-
-    let normalizedPaths =
-        fileEntries |> Array.map (fun fileEntry -> normalizePath fileEntry.path)
-
-    let rootPath =
-        normalizedPaths
-        |> Array.distinct
-        |> Array.sortBy (fun path -> splitPath path |> Array.length, path)
-        |> Array.head
-
-    let adaptedFileEntries =
-        fileEntries
-        |> Array.filter (fun fileEntry -> normalizePath fileEntry.path <> rootPath)
-        // Deterministic order avoids creating parents from file entries before their directory entries.
-        |> Array.sortBy (fun fileEntry ->
-            let depth = splitPath fileEntry.path |> Array.length
-            depth, (if fileEntry.isDirectory then 0 else 1), normalizePath fileEntry.path
-        )
-
-    let rootElement =
-        let rootEntry =
-            fileEntries
-            |> Array.find (fun fileEntry -> normalizePath fileEntry.path = rootPath)
-
-        FileItemDTO.create (
-            rootEntry.name,
-            rootEntry.isDirectory,
-            rootPath,
-            System.Collections.Generic.Dictionary(),
-            rootEntry.isLfs
-        )
-
-    adaptedFileEntries
-    |> Array.iter (fun fileEntry -> insertEntry rootElement rootPath fileEntry)
-
-    rootElement
+        | None -> EmptyFileTreePlaceholder()
