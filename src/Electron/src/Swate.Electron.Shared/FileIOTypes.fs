@@ -1,7 +1,6 @@
 module Swate.Electron.Shared.FileIOTypes
 
 open System.Collections.Generic
-open Swate.Components.Shared
 
 type FileEntry = {
     name: string
@@ -53,43 +52,6 @@ type FileContentDTO = {|
     content: string
     path: string
 |}
-
-
-[<RequireQualifiedAccess>]
-module ArcExplorerNodeKind =
-
-    let label =
-        function
-        | ArcExplorerNodeKind.Arc -> "ARC"
-        | ArcExplorerNodeKind.Group -> "Group"
-        | ArcExplorerNodeKind.Study -> "Study"
-        | ArcExplorerNodeKind.Assay -> "Assay"
-        | ArcExplorerNodeKind.Workflow -> "Workflow"
-        | ArcExplorerNodeKind.Run -> "Run"
-        | ArcExplorerNodeKind.Table -> "Table"
-        | ArcExplorerNodeKind.DataMap -> "DataMap"
-        | ArcExplorerNodeKind.Note -> "Note"
-        | ArcExplorerNodeKind.Sample -> "Sample"
-
-type ArcSelection = {
-    TreePath: string option
-    ExplorerNodeId: string option
-} with
-    static member Empty = {
-        TreePath = None
-        ExplorerNodeId = None
-    }
-
-type ArcObjectExplorerProps = {
-    rootRepoPath: string option
-    nodes: ArcExplorerNode list
-    selection: ArcSelection
-    arcFileState: ArcFiles option
-    previewState: PageState option
-    setArcFileState: ArcFiles option -> unit
-    setSelection: ArcSelection -> unit
-    services: ARCExplorerServices
-}
 
 type NoteTarget =
     | Root
