@@ -44,26 +44,28 @@ let registerGitLfsIpc: IGitLfsApi =
                 promise {
                     cancellations.[request.RequestId] <- false
 
-                    let onProgress msg =
-                        event.sender.send (GitLfsProgressChannel, [| box request.RequestId; box msg |])
+                    try
+                        let onProgress msg =
+                            event.sender.send (GitLfsProgressChannel, [| box request.RequestId; box msg |])
 
-                    let cancelCheck () =
-                        match cancellations.TryGetValue(request.RequestId) with
-                        | true, value -> value
-                        | _ -> false
+                        let cancelCheck () =
+                            match cancellations.TryGetValue(request.RequestId) with
+                            | true, value -> value
+                            | _ -> false
 
-                    let! result = run request onProgress cancelCheck
-
-                    cancellations.Remove(request.RequestId) |> ignore
-
-                    return result
+                        let! result = run request onProgress cancelCheck
+                        return result
+                    finally
+                        cancellations.Remove(request.RequestId) |> ignore
                 }
 
         cancelChannel =
             fun (_: IpcMainEvent) (requestId: string) ->
 
                 promise {
-                    cancellations.[requestId] <- true
+                    if cancellations.ContainsKey requestId then
+                        cancellations.[requestId] <- true
+
                     return Ok "Cancellation requested"
                 }
     }

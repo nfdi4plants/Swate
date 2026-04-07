@@ -436,7 +436,13 @@ let cloneRepository
             | Error hostError ->
                 return errorResult hostError
             | Ok host ->
-                if downloadLargeFiles && not (GitLfsService.isSystemInstalled ()) then
+                let! isLfsInstalled =
+                    if downloadLargeFiles then
+                        GitLfsService.isSystemInstalled ()
+                    else
+                        promise { return true }
+
+                if downloadLargeFiles && not isLfsInstalled then
                     return
                         Error {
                             Kind = GitService.GitFailureKind.LfsInstallRequired

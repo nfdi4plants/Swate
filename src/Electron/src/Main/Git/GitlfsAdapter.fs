@@ -5,6 +5,8 @@ open Fable.Core.JS
 open Swate.Electron.Shared.GitTypes
 
 let private childProcessDynamic: obj = importAll "node:child_process"
+[<Literal>]
+let private repoValidationTimeoutMs = 5000
 
 
 type IGitLfs =
@@ -18,7 +20,7 @@ type IGitLfs =
 
 
 type NodeGitLfsAdapter() =
-    let mutable isRunning = false
+    let activeLockKeys = System.Collections.Generic.HashSet<string>()
 
     let toArgs (request: GitLfsRequest) =
         match request.Command, request.FilePath with
@@ -34,7 +36,66 @@ type NodeGitLfsAdapter() =
         | Untrack, None
         | Status, None -> Error "FilePath is required for this Git LFS command"
 
-    let validateRepoPath (repoPath: string) =
+    let normalizeLockKey (workingDirectory: string option) =
+        workingDirectory
+        |> Option.defaultValue "__system__"
+        |> _.Trim()
+        |> _.ToLowerInvariant()
+
+    let tryExecGitText
+        (workingDirectory: string option)
+        (timeoutMs: int)
+        (args: string[])
+        : Promise<string option> =
+        promise {
+            let! output =
+                Fable.Core.JS.Constructors.Promise.Create(fun resolve _reject ->
+                    let options =
+                        createObj [
+                            "encoding" ==> "utf8"
+                            "stdio" ==> "pipe"
+                            "shell" ==> false
+                            "timeout" ==> timeoutMs
+
+                            match workingDirectory with
+                            | Some value -> "cwd" ==> value
+                            | None -> ()
+                        ]
+
+                    childProcessDynamic?execFile (
+                        "git",
+                        args,
+                        options,
+                        fun (error: obj) (stdout: obj) (_stderr: obj) ->
+                            if error |> Option.ofObj |> Option.isSome then
+                                resolve None
+                            else
+                                stdout
+                                |> Option.ofObj
+                                |> Option.map string
+                                |> resolve
+                    )
+                    |> ignore)
+
+            return output
+        }
+
+    let validateRepoPath (repoPath: string) : Promise<bool> =
+        promise {
+            let! output =
+                tryExecGitText
+                    (Some repoPath)
+                    repoValidationTimeoutMs
+                    [| "rev-parse"; "--is-inside-work-tree" |]
+
+            return
+                output
+                |> Option.exists (fun text ->
+                    text.Trim().Equals("true", System.StringComparison.OrdinalIgnoreCase)
+                )
+        }
+
+    let validateRepoPathSync (repoPath: string) =
         try
             let output: string =
                 childProcessDynamic?execFileSync (
@@ -61,105 +122,109 @@ type NodeGitLfsAdapter() =
         (cancelCheck: unit -> bool)
         : Promise<GitLfsResult> =
         promise {
-            if isRunning then
+            let lockKey = normalizeLockKey workingDirectory
+
+            if activeLockKeys.Contains lockKey then
                 return {
                     Success = false
                     Output = ""
-                    Error = "Another Git process is running"
+                    Error = "Another Git LFS process is running for this repository."
                 }
             else
-                isRunning <- true
+                activeLockKeys.Add lockKey |> ignore
 
-                let! result =
-                    Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
-                        let spawnOptions =
-                            createObj [
-                                "shell" ==> false
+                try
+                    let! result =
+                        Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+                            let spawnOptions =
+                                createObj [
+                                    "shell" ==> false
 
-                                match workingDirectory with
-                                | Some value -> "cwd" ==> value
-                                | None -> ()
-                            ]
+                                    match workingDirectory with
+                                    | Some value -> "cwd" ==> value
+                                    | None -> ()
+                                ]
 
-                        let proc: obj =
-                            childProcessDynamic?spawn ("git", (args |> List.toArray), spawnOptions)
+                            let proc: obj =
+                                childProcessDynamic?spawn ("git", (args |> List.toArray), spawnOptions)
 
-                        let mutable output = ""
-                        let mutable errorOut = ""
-                        let mutable finished = false
+                            let mutable output = ""
+                            let mutable errorOut = ""
+                            let mutable finished = false
 
-                        proc?stdout?on (
-                            "data",
-                            fun d ->
-                                let msg = string d
-                                output <- output + msg
-                                onProgress msg
-                        )
-                        |> ignore
+                            proc?stdout?on (
+                                "data",
+                                fun d ->
+                                    let msg = string d
+                                    output <- output + msg
+                                    onProgress msg
+                            )
+                            |> ignore
 
-                        proc?stderr?on (
-                            "data",
-                            fun d ->
-                                let msg = string d
-                                errorOut <- errorOut + msg
-                                onProgress msg
-                        )
-                        |> ignore
+                            proc?stderr?on (
+                                "data",
+                                fun d ->
+                                    let msg = string d
+                                    errorOut <- errorOut + msg
+                                    onProgress msg
+                            )
+                            |> ignore
 
-                        let timeoutId =
-                            timeoutMs
-                            |> Option.map (fun ms ->
-                                Fable.Core.JS.setTimeout
+                            let timeoutId =
+                                timeoutMs
+                                |> Option.map (fun ms ->
+                                    Fable.Core.JS.setTimeout
+                                        (fun () ->
+                                            if not finished then
+                                                proc?kill ("SIGTERM") |> ignore
+                                        )
+                                        ms
+                                )
+
+                            let cancelInterval =
+                                Fable.Core.JS.setInterval
                                     (fun () ->
-                                        if not finished then
+                                        if not finished && cancelCheck () then
                                             proc?kill ("SIGTERM") |> ignore
                                     )
-                                    ms
+                                    300
+
+                            proc?on (
+                                "close",
+                                fun code ->
+                                    finished <- true
+                                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                                    Fable.Core.JS.clearInterval cancelInterval
+
+                                    let success = if isNull code then false else (unbox<float> code) = 0.
+
+                                    resolve {
+                                        Success = success
+                                        Output = output
+                                        Error = errorOut
+                                    }
                             )
+                            |> ignore
 
-                        let cancelInterval =
-                            Fable.Core.JS.setInterval
-                                (fun () ->
-                                    if not finished && cancelCheck () then
-                                        proc?kill ("SIGTERM") |> ignore
-                                )
-                                300
+                            proc?on (
+                                "error",
+                                fun err ->
+                                    finished <- true
+                                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                                    Fable.Core.JS.clearInterval cancelInterval
 
-                        proc?on (
-                            "close",
-                            fun code ->
-                                finished <- true
-                                timeoutId |> Option.iter Fable.Core.JS.clearTimeout
-                                Fable.Core.JS.clearInterval cancelInterval
-
-                                let success = if isNull code then false else (unbox<float> code) = 0.
-
-                                resolve {
-                                    Success = success
-                                    Output = output
-                                    Error = errorOut
-                                }
+                                    resolve {
+                                        Success = false
+                                        Output = ""
+                                        Error = string err
+                                    }
+                            )
+                            |> ignore
                         )
-                        |> ignore
 
-                        proc?on (
-                            "error",
-                            fun err ->
-                                finished <- true
-                                timeoutId |> Option.iter Fable.Core.JS.clearTimeout
-                                Fable.Core.JS.clearInterval cancelInterval
-
-                                resolve {
-                                    Success = false
-                                    Output = ""
-                                    Error = string err
-                                }
-                        )
-                        |> ignore
-                    )
-
-                isRunning <- false
-                return result
+                    return result
+                finally
+                    activeLockKeys.Remove lockKey |> ignore
         }
 
     let runGitLfs
@@ -168,7 +233,9 @@ type NodeGitLfsAdapter() =
         (cancelCheck: unit -> bool)
         : Promise<GitLfsResult> =
         promise {
-            if not (validateRepoPath request.RepoPath) then
+            let! isValidRepo = validateRepoPath request.RepoPath
+
+            if not isValidRepo then
                 return {
                     Success = false
                     Output = ""
@@ -213,7 +280,7 @@ type NodeGitLfsAdapter() =
         }
 
     let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
-        if not (validateRepoPath repoRoot) || System.String.IsNullOrWhiteSpace relativePath then
+        if not (validateRepoPathSync repoRoot) || System.String.IsNullOrWhiteSpace relativePath then
             false
         else
             try

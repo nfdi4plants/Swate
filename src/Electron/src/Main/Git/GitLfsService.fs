@@ -21,6 +21,45 @@ let private lfsPointerOidPattern = Regex("^oid sha256:[0-9a-f]{64}$", RegexOptio
 let private lfsPointerSizePattern = Regex("^size \\d+$", RegexOptions.Multiline)
 let private maxLfsPointerProbeBytes = 1024L
 let private childProcessDynamic: obj = importAll "node:child_process"
+let mutable private cachedSystemInstalled = false
+
+let private tryExecGitText
+    (workingDirectory: string option)
+    (timeoutMs: int)
+    (args: string[])
+    : JS.Promise<string option> =
+    promise {
+        let! output =
+            JS.Constructors.Promise.Create(fun resolve _reject ->
+                let options =
+                    createObj [
+                        "encoding" ==> "utf8"
+                        "stdio" ==> "pipe"
+                        "shell" ==> false
+                        "timeout" ==> timeoutMs
+
+                        match workingDirectory with
+                        | Some value -> "cwd" ==> value
+                        | None -> ()
+                    ]
+
+                childProcessDynamic?execFile (
+                    "git",
+                    args,
+                    options,
+                    fun (error: obj) (stdout: obj) (_stderr: obj) ->
+                        if error |> Option.ofObj |> Option.isSome then
+                            resolve None
+                        else
+                            stdout
+                            |> Option.ofObj
+                            |> Option.map string
+                            |> resolve
+                )
+                |> ignore)
+
+        return output
+    }
 
 let extractFailureMessage (result: GitLfsResult) =
     let errorText = result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
@@ -104,6 +143,7 @@ let installSystem () : JS.Promise<Result<unit, string>> =
 
             return
                 if result.Success then
+                    cachedSystemInstalled <- true
                     Ok()
                 else
                     Error(extractFailureMessage result)
@@ -111,23 +151,19 @@ let installSystem () : JS.Promise<Result<unit, string>> =
             return Error ex.Message
     }
 
-let isSystemInstalled () : bool =
-    try
-        let output: string =
-            childProcessDynamic?execFileSync (
-                "git",
-                [| "lfs"; "version" |],
-                createObj [
-                    "encoding" ==> "utf8"
-                    "stdio" ==> "pipe"
-                    "shell" ==> false
-                ]
-            )
-            |> unbox<string>
+let isSystemInstalled () : JS.Promise<bool> =
+    promise {
+        if cachedSystemInstalled then
+            return true
+        else
+            let! output = tryExecGitText None DefaultTimeoutMs [| "lfs"; "version" |]
+            let isInstalled = output |> Option.exists (fun text -> not (String.IsNullOrWhiteSpace text))
 
-        not (String.IsNullOrWhiteSpace output)
-    with _ ->
-        false
+            if isInstalled then
+                cachedSystemInstalled <- true
+
+            return isInstalled
+    }
 
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
     gitLfs.IsTrackedByAttributes repoRoot relativePath
