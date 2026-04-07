@@ -52,7 +52,7 @@ module suggestionSnippet =
         else
             note.Content
 
-    let searchSuggestion (note: NoteSearch, onOpen: string -> unit) =
+    let searchSuggestion (note: Note, onOpen: string -> unit) =
         Html.div [
             prop.className "swt:p-3"
             prop.children [
@@ -96,7 +96,7 @@ module suggestionSnippet =
 type SearchComponent =
 
     [<ReactComponent>]
-    static member Main(notes: NoteSearch list, isLoading: bool, error: string option, onOpen: string -> unit) =
+    static member Main(notes: Note list, isLoading: bool, error: string option, onOpen: string -> unit) =
         let startSearch, setStartSearch = React.useState false
         let searchTerm, setSearchTerm = React.useState ""
         let selectedOptIndices, setSelectedOptIndices = React.useState (Set [])
