@@ -2,7 +2,7 @@
 module Renderer.Types
 
 
-open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 

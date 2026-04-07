@@ -119,7 +119,7 @@ module ArcObjectExplorerView =
         (selection: ArcSelection)
         (selectedKindIndices: Set<int>)
         : Model =
-        let visibleKinds = ARCObjectWidget.SelectedKindLabels selectedKindIndices
+        let visibleKinds = ARCObjectWidget.selectedKindLabels selectedKindIndices
         let filteredTree = filterTreeByKinds visibleKinds nodes
         let explorerItems = ARCExplorer.toFileItems filteredTree
         let searchItems = searchableItems filteredTree explorerItems

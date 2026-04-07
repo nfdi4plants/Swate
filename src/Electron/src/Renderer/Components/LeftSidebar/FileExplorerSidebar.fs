@@ -1,8 +1,8 @@
 module Renderer.Components.LeftSidebar.FileExplorerSidebar
 
 open Feliz
-open Swate.Electron.Shared
 open Swate.Components
+open Swate.Components.Shared
 open Renderer.Types
 
 [<ReactComponent>]

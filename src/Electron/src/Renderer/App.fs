@@ -6,6 +6,7 @@ open Feliz.UseElmish
 open Fable.Electron.Remoting.Renderer
 
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Types

@@ -183,7 +183,7 @@ type ARCObjectWidget =
         |> Array.mapi (fun index _ -> index)
         |> Set.ofArray
 
-    static member SelectedKindLabels(selectedKindIndices: Set<int>) =
+    static member selectedKindLabels(selectedKindIndices: Set<int>) =
         selectedKindIndices
         |> Seq.sort
         |> Seq.choose (fun index ->

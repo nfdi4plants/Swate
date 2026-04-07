@@ -15,21 +15,21 @@ module Xlsx =
             let arcfile =
                 match ws with
                 | _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcAssay.isMetadataSheetName ws.Name) ->
-                    ArcAssay.fromFsWorkbook fswb |> Assay
+                    ArcAssay.fromFsWorkbook fswb |> ArcFiles.Assay
                 | _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcStudy.isMetadataSheetName ws.Name) ->
-                    ArcStudy.fromFsWorkbook fswb |> Study
+                    ArcStudy.fromFsWorkbook fswb |> ArcFiles.Study
                 | _ when ws.Exists(fun ws -> ARCtrl.Spreadsheet.ArcInvestigation.isMetadataSheetName ws.Name) ->
-                    ArcInvestigation.fromFsWorkbook fswb |> Investigation
+                    ArcInvestigation.fromFsWorkbook fswb |> ArcFiles.Investigation
                 | _ when
                     ws.Exists(fun ws ->
                         ARCtrl.Spreadsheet.Template.metadataSheetName = ws.Name
                         || ARCtrl.Spreadsheet.Template.obsoleteMetadataSheetName = ws.Name
                     )
                     ->
-                    ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> Template
+                    ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> ArcFiles.Template
                 | _ when ws.Exists(fun ws -> ws.Name.ToLower().Contains("datamap")) ->
                     let datamap = DataMap.fromFsWorkbook fswb
-                    DataMap(Some(DatamapParentInfo.create "default" DataMapParent.Assay), datamap)
+                    ArcFiles.DataMap(Some(DatamapParentInfo.create "default" DataMapParent.Assay), datamap)
 
                 //Adapt to FSWorkBook and FromFSWorkbook of ARCtrl to include DatamapParentInfo
                 //match ws with

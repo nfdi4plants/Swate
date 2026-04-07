@@ -5,7 +5,6 @@ open Swate.Components.Landing
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Renderer
 open ARCtrl.Contract
 
 [<ReactComponent>]

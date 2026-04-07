@@ -785,7 +785,7 @@ type ARCObjectFixture =
         let items =
             React.useMemo ((fun () -> ARCObjectFixture.StoryItems()), [||])
 
-        let visibleKinds = ARCObjectWidget.SelectedKindLabels(selectedKindIndices)
+        let visibleKinds = ARCObjectWidget.selectedKindLabels(selectedKindIndices)
 
         let filteredItems = ARCObjectFixture.filterStoryItemsByKinds(visibleKinds, items)
 

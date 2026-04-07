@@ -2,6 +2,7 @@ module Renderer.Components.MainContent.ArcTarget
 
 open Feliz
 open Swate.Components
+open Swate.Components.Shared
 open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
@@ -15,7 +16,6 @@ open Renderer.Components.MainContent.EmptySelectionTarget
 let ArcTarget () =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    // let arcFileCts = Renderer.Context.
 
     Html.div [
         prop.id "arc-page-target"
@@ -32,6 +32,5 @@ let ArcTarget () =
                 | PageState.NotesDraftPage -> NotesDraftTarget()
                 | PageState.NotesSearchPage -> NotesSearchTarget()
             | None -> EmptySelectionTarget()
-
         ]
     ]

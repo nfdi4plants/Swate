@@ -1,10 +1,11 @@
 module Renderer.Components.CloseWindowController
 
-open Renderer
+
 open Feliz
 open Fable.Core
 open Fable.Electron.Remoting.Renderer
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 

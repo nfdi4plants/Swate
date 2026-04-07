@@ -2,6 +2,22 @@ namespace Swate.Components.Shared
 
 open Fable.Core
 
+type ARCExplorerServices = {
+    openView: string -> JS.Promise<Result<unit, string>>
+    setStatusMessage: string option -> unit
+    runToggleLfsMark: string -> string -> bool -> JS.Promise<Result<unit, string>>
+}
+
+[<RequireQualifiedAccess>]
+type PageState =
+    | ArcFilePage of ArcFiles
+    | TextPage of string
+    | UnknownPage
+    | LandingDraftPage
+    | NotesDraftPage
+    | NotesSearchPage
+    | ErrorPage of string
+
 [<StringEnum>]
 type ArcExplorerNodeKind =
     | Arc
