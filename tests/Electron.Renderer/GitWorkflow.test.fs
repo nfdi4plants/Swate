@@ -437,7 +437,7 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(store.State.ActivePage).toEqual(None)
     })
 
-    Vitest.test("runPullWorkflow keeps pull successful when only LFS hydration reports a warning", fun () -> promise {
+    Vitest.test("runPullWorkflow fails when LFS hydration fails after pull", fun () -> promise {
         let store = WorkflowStore GitState.Empty
         let warningMessage = "Git pull completed, but Git LFS download failed: hydration failed."
 
@@ -449,21 +449,18 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
                             return
                                 Ok {
                                     okOperationResult with
-                                        Message = Some "Pull completed."
-                                        WarningMessage = Some warningMessage
-                                        WarningKind = Some GitFailureKind.Network
+                                        Success = false
+                                        Message = Some warningMessage
+                                        FailureKind = Some GitFailureKind.Network
                                 }
                         }
-                getGitStatus = fun () -> promise { return Ok cleanStatus }
-                getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
-                getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 false) }
         }
 
         let! result = runPullWorkflow deps (fun () -> true) store.GetState store.Dispatch
 
-        Vitest.expect(result).toEqual(Ok(Some cleanStatus))
-        Vitest.expect(store.State.ErrorNotice).toEqual(None)
-        Vitest.expect(store.State.WarningNotice).toEqual(Some warningMessage)
+        Vitest.expect(result).toEqual(Error warningMessage)
+        Vitest.expect(store.State.ErrorNotice).toEqual(Some warningMessage)
+        Vitest.expect(store.State.WarningNotice).toEqual(None)
     })
 
     Vitest.test("GitState.Empty defaults DownloadLargeFiles to false until settings load", fun () ->
@@ -543,9 +540,10 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
         Vitest.expect(store.State.Status.TrackingBranch).toEqual(Some "origin/feature/local-only")
     })
 
-    Vitest.test("runSyncWorkflow stops after pull when the pull completed with a warning", fun () -> promise {
+    Vitest.test("runSyncWorkflow stops when pull fails after LFS hydration failure", fun () -> promise {
         let store = WorkflowStore GitState.Empty
         let mutable pushCalls = 0
+        let hydrationFailureMessage = "Git pull completed, but Git LFS download failed: hydration failed."
 
         let deps = {
             defaultDependencies with
@@ -555,9 +553,9 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
                             return
                                 Ok {
                                     okOperationResult with
-                                        Message = Some "Pull completed."
-                                        WarningMessage = Some "Git pull completed, but Git LFS download failed: hydration failed."
-                                        WarningKind = Some GitFailureKind.Network
+                                        Success = false
+                                        Message = Some hydrationFailureMessage
+                                        FailureKind = Some GitFailureKind.Network
                                 }
                         }
                 gitPush =
@@ -571,9 +569,10 @@ Vitest.describe("GitWorkflow renderer behavior", fun () ->
 
         let! result = runSyncWorkflow deps (fun () -> true) store.GetState store.Dispatch
 
-        Vitest.expect(result).toEqual(Ok())
+        Vitest.expect(result).toEqual(Error hydrationFailureMessage)
         Vitest.expect(pushCalls).toBe(0)
-        Vitest.expect(store.State.WarningNotice.IsSome).toBe(true)
+        Vitest.expect(store.State.ErrorNotice).toEqual(Some hydrationFailureMessage)
+        Vitest.expect(store.State.WarningNotice).toEqual(None)
     })
 
     Vitest.test("runGitOperationWithLfsInstallRetry retries the original operation exactly once after install", fun () -> promise {

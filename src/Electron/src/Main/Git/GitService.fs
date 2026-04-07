@@ -1402,7 +1402,7 @@ let pull
                                 | Ok () -> return { Warning = None }
                                 | Error failure ->
                                     let hydrationFailure = createPullHydrationFailure failure
-                                    return { Warning = Some hydrationFailure }
+                                    return abortGitPromise hydrationFailure.Message
                             else
                                 return { Warning = None }
                         })
