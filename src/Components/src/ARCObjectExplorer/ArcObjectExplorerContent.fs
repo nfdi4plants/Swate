@@ -322,7 +322,7 @@ type ArcObjectExplorerContent =
             |> Option.map (fun summary -> ArcObjectExplorerContent.SampleSummaryRows(selectedNode.name, summary))
         | ArcExplorerNodeKind.Table ->
             match selectedNode.previewTarget with
-            | ArcExplorerNodePreviewTarget.Table tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
+            | ArcExplorerNodeViewTarget.Table tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
                 arcFile.Tables().[tableIndex] |> ArcObjectExplorerContent.TableSummaryRows |> Some
             | _ -> None
         | ArcExplorerNodeKind.DataMap -> arcFile.TryGetDataMap() |> Option.map ArcObjectExplorerContent.DataMapSummaryRows

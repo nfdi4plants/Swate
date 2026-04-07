@@ -6,6 +6,7 @@ open Feliz
 [<Erase; Mangle(false)>]
 type ARCObjectPanel =
 
+    // Reuseable panel for displaying ARC objects in the object explorer
     [<ReactComponent>]
     static member Main(name: string, ?content: ReactElement) =
         let content =

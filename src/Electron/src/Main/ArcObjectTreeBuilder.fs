@@ -291,7 +291,7 @@ let private createTableNodes parentId parentPath isReference isLfs (tableProject
             projection.Name,
             ArcExplorerNodeKind.Table,
             path = Some parentPath,
-            previewTarget = ArcExplorerNodePreviewTarget.Table projection.Index,
+            previewTarget = ArcExplorerNodeViewTarget.Table projection.Index,
             relatedSamples = createRelatedSampleLinks tableNodeId parentPath isReference projection.Samples,
             children =
                 createSampleNodes

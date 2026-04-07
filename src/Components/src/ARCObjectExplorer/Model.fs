@@ -3,21 +3,20 @@ namespace Swate.Components
 open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 
-type ArcObjectExplorerViewModel = {
-    VisibleKinds: Set<string>
-    FilteredTree: ArcExplorerNode list
-    ExplorerItems: FileItem list
-    SearchItems: (string * string option * FileItem) array
-    SelectedItemId: string option
-    SelectedNodeLineage: (ArcExplorerNode * ArcExplorerNode list) option
-    SelectedNode: ArcExplorerNode option
-    SelectedAncestors: ArcExplorerNode list
-    SelectedTitle: string
-    SelectedSubtitle: string
-}
-
-[<RequireQualifiedAccess>]
 module ArcObjectExplorerView =
+
+    type Model = {
+        VisibleKinds: Set<string>
+        FilteredTree: ArcExplorerNode list
+        ExplorerItems: FileItem list
+        SearchItems: (string * string option * FileItem) array
+        SelectedItemId: string option
+        SelectedNodeLineage: (ArcExplorerNode * ArcExplorerNode list) option
+        SelectedNode: ArcExplorerNode option
+        SelectedAncestors: ArcExplorerNode list
+        SelectedTitle: string
+        SelectedSubtitle: string
+    }
 
     let nodeKindLabel =
         ArcExplorerNodeKind.label
@@ -119,7 +118,7 @@ module ArcObjectExplorerView =
         (nodes: ArcExplorerNode list)
         (selection: ArcSelection)
         (selectedKindIndices: Set<int>)
-        =
+        : Model =
         let visibleKinds = ARCObjectWidget.SelectedKindLabels selectedKindIndices
         let filteredTree = filterTreeByKinds visibleKinds nodes
         let explorerItems = ARCExplorer.toFileItems filteredTree

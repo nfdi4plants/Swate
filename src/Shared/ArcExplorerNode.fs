@@ -32,7 +32,7 @@ module ArcExplorerNodeKind =
         | ArcExplorerNodeKind.Sample -> "Sample"
 
 [<RequireQualifiedAccess>]
-type ArcExplorerNodePreviewTarget =
+type ArcExplorerNodeViewTarget =
     | Default
     | Table of int
 
@@ -99,7 +99,7 @@ type ArcExplorerNode = {
     name: string
     kind: ArcExplorerNodeKind
     path: string option
-    previewTarget: ArcExplorerNodePreviewTarget
+    previewTarget: ArcExplorerNodeViewTarget
     isSelectable: bool
     isReference: bool
     sampleSummary: ArcExplorerSampleSummary option
@@ -114,7 +114,7 @@ type ArcExplorerNode = {
             name: string,
             kind: ArcExplorerNodeKind,
             ?path: string option,
-            ?previewTarget: ArcExplorerNodePreviewTarget,
+            ?previewTarget: ArcExplorerNodeViewTarget,
             ?isSelectable: bool,
             ?isReference: bool,
             ?sampleSummary: ArcExplorerSampleSummary option,
@@ -127,7 +127,7 @@ type ArcExplorerNode = {
             name = name
             kind = kind
             path = defaultArg path None
-            previewTarget = defaultArg previewTarget ArcExplorerNodePreviewTarget.Default
+            previewTarget = defaultArg previewTarget ArcExplorerNodeViewTarget.Default
             isSelectable = defaultArg isSelectable true
             isReference = defaultArg isReference false
             sampleSummary = defaultArg sampleSummary None
