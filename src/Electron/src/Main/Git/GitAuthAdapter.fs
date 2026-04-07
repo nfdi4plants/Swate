@@ -8,8 +8,11 @@ open Main.Bindings.SimpleGit
 
 type GitFactory = SimpleGitOptions -> ISimpleGit
 
-let private redactPattern =
-    Regex(@"(Authorization:\s*)(Bearer\s+|Basic\s+)[^\s'""]+", RegexOptions.IgnoreCase)
+let private authorizationRedactPattern =
+    Regex(@"(Authorization:\s*)(?:Bearer\s*|Basic\s*)[^\s'""]+", RegexOptions.IgnoreCase)
+
+let private tokenHeaderRedactPattern =
+    Regex(@"((?:Private-Token|X-Access-Token)\s*:\s*)[^\s'""]+", RegexOptions.IgnoreCase)
 
 let private credentialUrlPattern =
     Regex("(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)", RegexOptions.IgnoreCase)
@@ -109,7 +112,16 @@ let redactToken (text: string) : string =
         text
     else
         text
-        |> fun t -> redactPattern.Replace(t, "$1[REDACTED]")
+        |> fun t ->
+            authorizationRedactPattern.Replace(
+                t,
+                MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
+            )
+        |> fun t ->
+            tokenHeaderRedactPattern.Replace(
+                t,
+                MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
+            )
         |> fun t -> credentialUrlPattern.Replace(t, "$1[REDACTED]@")
 
 let redactArgs (args: string[]) : string[] = args |> Array.map redactToken
