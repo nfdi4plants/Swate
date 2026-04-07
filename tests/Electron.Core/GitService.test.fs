@@ -769,6 +769,93 @@ Vitest.describe("GitService local repository workflow", fun () ->
             })
     })
 
+    Vitest.test("confirmMergeResolution commits the merge when auto-commit is enabled and the last conflict is resolved", fun () -> promise {
+        do!
+            withTempRepository (fun context -> promise {
+                let filePath = join [| context.RepoPath; "conflict.txt" |]
+                let featureBranch = "feature/merge-resolution-autocommit"
+
+                do! writeUtf8FileAsync filePath "base\n"
+
+                let! initialStageResult = GitService.stagePaths context.RepoPath [| "conflict.txt" |]
+                expectOk "stage base file" initialStageResult |> ignore
+
+                let! initialCommitResult = GitService.commit context.RepoPath "test: base commit"
+                expectOk "commit base file" initialCommitResult |> ignore
+
+                let! baseStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after base commit")
+
+                let baseBranch =
+                    baseStatus.Current
+                    |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
+
+                let! createBranchResult = GitService.createBranch context.RepoPath featureBranch None
+                expectOk "create merge branch" createBranchResult |> ignore
+
+                do! writeUtf8FileAsync filePath "feature change\n"
+
+                let! featureStageResult = GitService.stagePaths context.RepoPath [| "conflict.txt" |]
+                expectOk "stage feature change" featureStageResult |> ignore
+
+                let! featureCommitResult = GitService.commit context.RepoPath "test: feature change"
+                expectOk "commit feature change" featureCommitResult |> ignore
+
+                let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath baseBranch
+                expectOk "checkout base branch" checkoutBaseResult |> ignore
+
+                do! writeUtf8FileAsync filePath "main change\n"
+
+                let! mainStageResult = GitService.stagePaths context.RepoPath [| "conflict.txt" |]
+                expectOk "stage main change" mainStageResult |> ignore
+
+                let! mainCommitResult = GitService.commit context.RepoPath "test: main change"
+                expectOk "commit main change" mainCommitResult |> ignore
+
+                try
+                    let! _ = context.Git.raw [| "merge"; featureBranch |]
+                    ()
+                with _ ->
+                    ()
+
+                let! mergeView =
+                    unwrapResultAsync
+                        (GitService.getMergeConflictViewData context.RepoPath "conflict.txt")
+                        (expectOk "load merge conflict view")
+
+                let! resolutionResult =
+                    unwrapResultAsync
+                        (GitService.confirmMergeResolution
+                            context.RepoPath
+                            "conflict.txt"
+                            mergeView.MergeConflictContent
+                            "resolved content\n"
+                            true)
+                        (expectOk "confirm merge resolution with auto-commit")
+
+                Vitest.expect(resolutionResult.RemainingConflictedPaths).toEqual([||])
+                Vitest.expect(resolutionResult.NextConflictedPath).toEqual(None)
+                Vitest.expect(resolutionResult.UpdatedStatus.IsMergeInProgress).toBe(false)
+                Vitest.expect(resolutionResult.UpdatedStatus.Conflicted).toEqual([||])
+
+                let! refreshedStatus =
+                    unwrapResultAsync (GitService.getStatus context.RepoPath) (expectOk "git status after auto-commit")
+
+                Vitest.expect(refreshedStatus.IsMergeInProgress).toBe(false)
+                Vitest.expect(refreshedStatus.Conflicted).toEqual([||])
+
+                let! latestCommitMessage = context.Git.raw [| "log"; "-1"; "--pretty=%s" |]
+                Vitest.expect(latestCommitMessage.Trim()).toBe("Resolve merge conflicts")
+
+                let! mergeHeadResult =
+                    runSimpleGitResult (fun git -> git.raw [| "rev-parse"; "--verify"; "MERGE_HEAD" |]) context.Git
+
+                match mergeHeadResult with
+                | Ok _ -> failwith "Expected MERGE_HEAD to be cleared after the merge commit."
+                | Error _ -> ()
+            })
+    })
+
     Vitest.test("getDiffViewData reports explicitly unsupported paths through the unsupported-content sentinel", fun () -> promise {
         do!
             withTempRepository (fun context -> promise {

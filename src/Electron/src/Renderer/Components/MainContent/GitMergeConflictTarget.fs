@@ -25,7 +25,7 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
                         Path = mergeData.Path
                         ExpectedConflictContent = mergeData.MergeConflictContent
                         ResolvedContent = resolvedContent
-                        AutoCommit = false
+                        AutoCommit = true
                     }
 
                 match result with
