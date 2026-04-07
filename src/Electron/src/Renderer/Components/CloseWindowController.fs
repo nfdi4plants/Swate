@@ -1,5 +1,6 @@
 module Renderer.Components.CloseWindowController
 
+open Renderer
 open Feliz
 open Fable.Core
 open Fable.Electron.Remoting.Renderer
@@ -12,12 +13,21 @@ type CloseWindowController =
     [<ReactComponent>]
     static member Subscription
         (
-            onConfirmSave: unit -> JS.Promise<Result<unit, string>>,
+            ?onConfirmSave: unit -> JS.Promise<Result<unit, exn>>,
             ?onConfirmClose: unit -> unit,
             ?onCancelClose: unit -> unit
         ) =
 
         let modalIsOpen, setModalIsOpen = React.useState false
+        let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
+
+        let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
+            match pageCtx.state with
+            | Some(PageState.ArcFilePage arcFile) ->
+                return! Renderer.Components.MainContent.Helper.MainContentHelper.saveArcFile arcFile
+
+            | _ -> return Ok()
+        }
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
             Api.ipcArcVaultApi.resolveCloseRequest (unbox null) decision
@@ -39,7 +49,12 @@ type CloseWindowController =
 
         let handleSaveAndClose () =
             promise {
-                let! saveResult = onConfirmSave ()
+                let! saveResult =
+                    if onConfirmSave.IsNone then
+                        // If no custom save function is provided, we use the default one that saves the current arc file.
+                        saveBeforeClose ()
+                    else
+                        onConfirmSave.Value()
 
                 match saveResult with
                 | Ok() ->

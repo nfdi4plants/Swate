@@ -4,75 +4,55 @@ open Feliz
 open Swate.Components
 open ARCtrl
 open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
+open ARCtrl.Contract
 
 let private filePickerServices: FilePickerWidgetServices = {
     pickPaths =
-        fun () ->
-            promise {
-                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
-                return result |> Result.mapError (fun error -> error.Message)
-            }
+        fun () -> promise {
+            let! result = Api.ipcArcVaultApi.pickAbsolutePaths (unbox null)
+            return result |> Result.mapError (fun error -> error.Message)
+        }
 }
 
 let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
-    pickPaths =
-        fun () ->
-            promise {
-                let! result = Api.ipcArcVaultApi.pickPaths (unbox null)
-                return result |> Result.mapError (fun error -> error.Message)
-            }
-    loadTextFile =
-        fun path ->
-            promise {
-                let! result = Api.ipcArcVaultApi.openFile (unbox null) path
-
-                return
-                    match result with
-                    | Error error -> Error error.Message
-                    | Ok(PageState.Text content) -> Ok content
-                    | Ok _ -> Error "Selected file could not be loaded as plain text. Only csv/tsv/txt are supported."
-            }
+    pickTextFiles =
+        fun () -> promise {
+            let! result = Api.ipcArcVaultApi.pickExternalTextFiles (unbox null)
+            return result |> Result.mapError (fun error -> error.Message)
+        }
 }
 
 let private templateServices: TemplateWidgetServices = {
     loadTemplates =
-        fun () ->
-            async {
-                try
-                    let! templatesJson = Api.templateApi.getTemplates()
+        fun () -> async {
+            try
+                let! templatesJson = Api.templateApi.getTemplates ()
 
-                    let templates =
-                        templatesJson
-                        |> ARCtrl.Json.Templates.fromJsonString
-                        |> Array.ofSeq
+                let templates = templatesJson |> ARCtrl.Json.Templates.fromJsonString |> Array.ofSeq
 
-                    return Ok templates
-                with error ->
-                    return Error error.Message
-            }
+                return Ok templates
+            with error ->
+                return Error error.Message
+        }
 }
 
 let BuildingBlockWidget
-    (arcFileState: ArcFiles option)
+    (arcFileState: ArcFiles)
     (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
+    (setArcFileState: ArcFiles -> unit)
     : WidgetType * WidgetDefinition =
     WidgetType.BuildingBlock,
     {|
         prefix = "ADD_BUILDINGBLOCK"
-        content =
-            Swate.Components.BuildingBlockWidget.Main(
-                arcFileState,
-                activeTableIndex,
-                setArcFileState
-            )
+        content = Swate.Components.BuildingBlockWidget.Main(arcFileState, activeTableIndex, setArcFileState)
     |}
 
 let TemplateWidget
-    (arcFileState: ArcFiles option)
+    (arcFileState: ArcFiles)
     (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
+    (setArcFileState: ArcFiles -> unit)
     (importType: TableJoinOptions)
     (setImportType: TableJoinOptions -> unit)
     : WidgetType * WidgetDefinition =
@@ -91,27 +71,22 @@ let TemplateWidget
     |}
 
 let FilePickerWidget
-    (arcFileState: ArcFiles option)
+    (arcFileState: ArcFiles)
     (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
+    (setArcFileState: ArcFiles -> unit)
     : WidgetType * WidgetDefinition =
     WidgetType.FilePicker,
-        {|
-            prefix = "FILEPICKER"
-            content =
-                Swate.Components.FilePickerWidget.Main(
-                    arcFileState,
-                    activeTableIndex,
-                    setArcFileState,
-                    filePickerServices
-                )
-        |}
+    {|
+        prefix = "FILEPICKER"
+        content =
+            Swate.Components.FilePickerWidget.Main(arcFileState, activeTableIndex, setArcFileState, filePickerServices)
+    |}
 
 let DataAnnotatorWidget
-    (arcFileState: ArcFiles option)
+    (arcFileState: ArcFiles)
     (activeView: WidgetHostView)
     (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
+    (setArcFileState: ArcFiles -> unit)
     : WidgetType * WidgetDefinition =
     WidgetType.DataAnnotator,
     {|
@@ -127,10 +102,10 @@ let DataAnnotatorWidget
     |}
 
 let createWidgets
-    (arcFileState: ArcFiles option)
+    (arcFileState: ArcFiles)
     (activeView: WidgetHostView)
     (activeTableIndex: int option)
-    (setArcFileState: ArcFiles option -> unit)
+    (setArcFileState: ArcFiles -> unit)
     (importType: TableJoinOptions)
     (setImportType: TableJoinOptions -> unit)
     : Map<WidgetType, WidgetDefinition> =
@@ -144,7 +119,7 @@ let createWidgets
 
 
 [<ReactComponent>]
-let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
+let NavbarButtons (widgetTypes: WidgetType list, isEnabled: bool) =
     let context = WidgetContext.useWidgetController ()
 
     let widgetInfo (widgetType: WidgetType) =
@@ -158,13 +133,11 @@ let NavbarButtons(widgetTypes: WidgetType list, isEnabled: bool) =
     let controlButton (widgetType: WidgetType) =
         let isActive = context.isActive widgetType
         let label, icon = widgetInfo widgetType
+
         let tooltip =
-            if not isEnabled then
-                "Select a table to open widgets"
-            elif isActive then
-                $"Close {label}"
-            else
-                $"Open {label}"
+            if not isEnabled then "Select a table to open widgets"
+            elif isActive then $"Close {label}"
+            else $"Open {label}"
 
         QuickAccessButton.QuickAccessButton(
             tooltip,

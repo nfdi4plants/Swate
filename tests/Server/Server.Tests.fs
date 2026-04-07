@@ -17,7 +17,6 @@ let server =
 let all =
     testList "All" [
         Tests.shared
-        // GitValidationTests.tests
         server
     ]
 

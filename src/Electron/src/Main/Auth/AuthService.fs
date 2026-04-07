@@ -2,17 +2,11 @@ module Main.Auth.AuthService
 
 open System
 open Fable.Core
-open Fetch
 open Swate.Electron.Shared.AuthTypes
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type internal AuthFailure = {
-    Kind: AuthFailureKind
-    Message: string
-}
-
-// ── GitLab API verification (Fable.Fetch) ────────────────────────────
+type internal AuthFailure = GitLabApi.GitLabAuthFailure
 
 /// Normalize and validate a GitLab base URL. HTTPS only.
 let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
@@ -34,70 +28,6 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
                 Message = "DataHub URL must be a valid HTTPS URL."
             }
 
-/// Call GitLab /api/v4/user with the provided PAT to verify the token.
-/// Uses Fable.Fetch following the pattern in Authentication.fs.
-let private verifyToken (baseUrl: string) (pat: string) : JS.Promise<Result<AuthUserDto, AuthFailure>> = promise {
-    let url = $"{baseUrl}/api/v4/user"
-
-    let requestOptions = [
-        RequestProperties.Method HttpMethod.GET
-        requestHeaders [ HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat) ]
-    ]
-
-    try
-        let! response = fetchUnsafe url requestOptions
-
-        if not response.Ok then
-            return
-                match response.Status with
-                | 401 ->
-                    Error {
-                        Kind = AuthFailureKind.Unauthorized
-                        Message = "Personal Access Token is invalid or expired."
-                    }
-                | 403 ->
-                    Error {
-                        Kind = AuthFailureKind.Forbidden
-                        Message = "Access forbidden. The token may lack required scopes."
-                    }
-                | 404 ->
-                    Error {
-                        Kind = AuthFailureKind.EndpointInvalid
-                        Message = "GitLab API endpoint not found. Check the DataHub URL."
-                    }
-                | code ->
-                    Error {
-                        Kind = AuthFailureKind.Unknown
-                        Message = $"Unexpected HTTP status {code}."
-                    }
-        else
-            let! json =
-                response.json<
-                    {|
-                        name: string
-                        email: string
-                        avatar_url: string
-                    |}
-                 > ()
-
-            let accountId = SecureAuthStore.generateAccountId baseUrl json.email
-
-            let user: AuthUserDto = {
-                AccountId = accountId
-                Name = json.name
-                Email = json.email
-                AvatarUrl = json.avatar_url
-                TargetDataHub = baseUrl
-            }
-
-            return Ok user
-    with _ ->
-        return
-            Error {
-                Kind = AuthFailureKind.Network
-                Message = "Network error contacting the DataHub. Check your connection."
-            }
-}
 
 // ── Mutable in-memory state (multi-account) ──────────────────────────
 //
@@ -201,7 +131,7 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
         match normalizeBaseUrl request.GitLabBaseUrl with
         | Error failure -> return toAuthResult (Error failure)
         | Ok baseUrl ->
-            let! verifyResult = verifyToken baseUrl request.PersonalAccessToken
+            let! verifyResult = GitLabApi.verifyToken baseUrl request.PersonalAccessToken
 
             match verifyResult with
             | Error failure -> return toAuthResult (Error failure)
@@ -276,7 +206,7 @@ let revalidate () : JS.Promise<AuthResult> = promise {
             Message = Some "No active account."
         }
     | Some(user, token) ->
-        let! verifyResult = verifyToken user.TargetDataHub token
+        let! verifyResult = GitLabApi.verifyToken user.TargetDataHub token
 
         match verifyResult with
         | Error failure ->

@@ -303,7 +303,7 @@ type BuildingBlockWidget =
 
     [<ReactComponent>]
     static member Main
-        (arcFileState: ArcFiles option, activeTableIndex: int option, setArcFileState: ArcFiles option -> unit)
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
         =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
@@ -313,133 +313,130 @@ type BuildingBlockWidget =
 
         let widgetCtx = WidgetContext.useWidgetController ()
 
-        match arcFileState with
-        | None -> BuildingBlockWidget.disabledState "Open an ARC first."
-        | Some arcFile ->
-            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
-            | None -> BuildingBlockWidget.disabledState "Switch to a table tab to add a building block."
-            | Some(_, table) ->
-                let selectedColumnIndex =
-                    annotationCtx.state
-                    |> Map.tryFind table.Name
-                    |> Option.bind (fun tableCtx -> tableCtx.SelectedCells)
-                    |> Option.map (fun selectedCells -> selectedCells.xEnd - 2)
+        match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+        | None -> BuildingBlockWidget.disabledState "Switch to a table tab to add a building block."
+        | Some(_, table) ->
+            let selectedColumnIndex =
+                annotationCtx.state
+                |> Map.tryFind table.Name
+                |> Option.bind (fun tableCtx -> tableCtx.SelectedCells)
+                |> Option.map (fun selectedCells -> selectedCells.xEnd - 2)
 
-                let setHeaderCellType (nextHeaderType: CompositeHeaderDiscriminate) =
-                    let nextState =
-                        if
-                            BuildingBlockWidgetState.isSameMajorCompositeHeaderDiscriminate
-                                state.HeaderCellType
-                                nextHeaderType
-                        then
-                            {
-                                state with
-                                    HeaderCellType = nextHeaderType
-                            }
-                        else
-                            let nextBodyCellType =
-                                if nextHeaderType.IsTermColumn() then
-                                    CompositeCellDiscriminate.Term
-                                else
-                                    CompositeCellDiscriminate.Text
+            let setHeaderCellType (nextHeaderType: CompositeHeaderDiscriminate) =
+                let nextState =
+                    if
+                        BuildingBlockWidgetState.isSameMajorCompositeHeaderDiscriminate
+                            state.HeaderCellType
+                            nextHeaderType
+                    then
+                        {
+                            state with
+                                HeaderCellType = nextHeaderType
+                        }
+                    else
+                        let nextBodyCellType =
+                            if nextHeaderType.IsTermColumn() then
+                                CompositeCellDiscriminate.Term
+                            else
+                                CompositeCellDiscriminate.Text
 
-                            {
-                                state with
-                                    HeaderCellType = nextHeaderType
-                                    BodyCellType = nextBodyCellType
-                                    HeaderArg = None
-                                    BodyArg = None
-                            }
+                        {
+                            state with
+                                HeaderCellType = nextHeaderType
+                                BodyCellType = nextBodyCellType
+                                HeaderArg = None
+                                BodyArg = None
+                        }
 
-                    setState nextState
+                setState nextState
 
-                let setHeaderIOType (headerType: CompositeHeaderDiscriminate) (ioType: IOType) =
-                    setState {
-                        state with
-                            HeaderCellType = headerType
-                            HeaderArg = Some(U2.Case2 ioType)
-                            BodyArg = None
-                            BodyCellType = CompositeCellDiscriminate.Text
-                    }
+            let setHeaderIOType (headerType: CompositeHeaderDiscriminate) (ioType: IOType) =
+                setState {
+                    state with
+                        HeaderCellType = headerType
+                        HeaderArg = Some(U2.Case2 ioType)
+                        BodyArg = None
+                        BodyCellType = CompositeCellDiscriminate.Text
+                }
 
-                let setHeaderTerm (termOpt: Term option) =
-                    let nextHeaderArg =
-                        termOpt |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case1)
+            let setHeaderTerm (termOpt: Term option) =
+                let nextHeaderArg =
+                    termOpt |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case1)
 
-                    setState { state with HeaderArg = nextHeaderArg }
+                setState { state with HeaderArg = nextHeaderArg }
 
-                let setBodyTerm (termOpt: Term option) =
-                    let nextBodyArg =
-                        termOpt |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case2)
+            let setBodyTerm (termOpt: Term option) =
+                let nextBodyArg =
+                    termOpt |> Option.map (fun term -> term |> OntologyAnnotation.from |> U2.Case2)
 
-                    setState { state with BodyArg = nextBodyArg }
+                setState { state with BodyArg = nextBodyArg }
 
-                let addBuildingBlock () =
-                    let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
-
-                    let cells =
-                        match BuildingBlockWidgetState.tryCreateCompositeCellFromState state with
-                        | Some bodyCell ->
-                            let rowCount = System.Math.Max(1, table.RowCount)
-                            Array.init rowCount (fun _ -> bodyCell.Copy()) |> ResizeArray
-                        | None -> state.HeaderCellType.CreateEmptyDefaultCells table.RowCount
-
-                    let cells =
-                        match header with
-                        | CompositeHeader.Output _ ->
-                            match table.TryGetOutputColumn() with
-                            | Some outputColumn -> outputColumn.Cells
-                            | None -> cells
-                        | CompositeHeader.Input _ ->
-                            match table.TryGetInputColumn() with
-                            | Some inputColumn -> inputColumn.Cells
-                            | None -> cells
-                        | _ -> cells
-
-                    let insertionIndex =
-                        match selectedColumnIndex with
-                        | Some columnIndex -> System.Math.Min(columnIndex + 1, table.ColumnCount)
-                        | None -> table.ColumnCount
-
-                    table.AddColumn(header, cells, insertionIndex, true)
-                    setArcFileState (Some(WidgetArcFile.refreshRef arcFile))
-                    widgetCtx.closeWidget WidgetType.BuildingBlock
-
+            let addBuildingBlock () =
                 let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
-                let isValid = BuildingBlockWidgetState.isValidColumn header
 
-                Html.div [
-                    Html.form [
-                        prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-2 swt:min-w-80"
-                        prop.onSubmit (fun event ->
-                            event.preventDefault ()
+                let cells =
+                    match BuildingBlockWidgetState.tryCreateCompositeCellFromState state with
+                    | Some bodyCell ->
+                        let rowCount = System.Math.Max(1, table.RowCount)
+                        Array.init rowCount (fun _ -> bodyCell.Copy()) |> ResizeArray
+                    | None -> state.HeaderCellType.CreateEmptyDefaultCells table.RowCount
 
-                            if isValid then
-                                addBuildingBlock ()
+                let cells =
+                    match header with
+                    | CompositeHeader.Output _ ->
+                        match table.TryGetOutputColumn() with
+                        | Some outputColumn -> outputColumn.Cells
+                        | None -> cells
+                    | CompositeHeader.Input _ ->
+                        match table.TryGetInputColumn() with
+                        | Some inputColumn -> inputColumn.Cells
+                        | None -> cells
+                    | _ -> cells
+
+                let insertionIndex =
+                    match selectedColumnIndex with
+                    | Some columnIndex -> System.Math.Min(columnIndex + 1, table.ColumnCount)
+                    | None -> table.ColumnCount
+
+                table.AddColumn(header, cells, insertionIndex, true)
+                setArcFile (WidgetArcFile.refreshRef arcFile)
+                widgetCtx.closeWidget WidgetType.BuildingBlock
+
+            let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
+            let isValid = BuildingBlockWidgetState.isValidColumn header
+
+            Html.div [
+                Html.form [
+                    prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-2 swt:min-w-80"
+                    prop.onSubmit (fun event ->
+                        event.preventDefault ()
+
+                        if isValid then
+                            addBuildingBlock ()
+                    )
+                    prop.children [
+                        BuildingBlockWidget.HeaderControls(
+                            state,
+                            setState,
+                            setHeaderTerm,
+                            setHeaderIOType,
+                            setHeaderCellType
                         )
-                        prop.children [
-                            BuildingBlockWidget.HeaderControls(
-                                state,
-                                setState,
-                                setHeaderTerm,
-                                setHeaderIOType,
-                                setHeaderCellType
-                            )
-                            BuildingBlockWidget.TermSearchComponent(state, setState, setBodyTerm)
-                            Html.div [
-                                prop.className "swt:flex swt:justify-center"
-                                prop.children [
-                                    Html.button [
-                                        prop.type'.submit
-                                        prop.className [
-                                            "swt:btn swt:btn-wide"
-                                            if isValid then "swt:btn-primary" else "swt:btn-error"
-                                        ]
-                                        prop.disabled (not isValid)
-                                        prop.text "Add Column"
+                        BuildingBlockWidget.TermSearchComponent(state, setState, setBodyTerm)
+                        Html.div [
+                            prop.className "swt:flex swt:justify-center"
+                            prop.children [
+                                Html.button [
+                                    prop.type'.submit
+                                    prop.className [
+                                        "swt:btn swt:btn-wide"
+                                        if isValid then "swt:btn-primary" else "swt:btn-error"
                                     ]
+                                    prop.disabled (not isValid)
+                                    prop.text "Add Column"
                                 ]
                             ]
                         ]
                     ]
                 ]
+            ]

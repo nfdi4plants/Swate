@@ -12,8 +12,11 @@ let childProcessDynamic: obj = importAll "node:child_process"
 
 let private normalizePath (path: string) = path.Replace("\\", "/")
 
-let private normalizeRootPath (path: string) =
+let normalizeRootPath (path: string) =
     pathMod?resolve (path) |> unbox<string> |> normalizePath
+
+let private containsTraversalSegments (path: string) =
+    path.Split('/') |> Array.exists (fun segment -> segment = "." || segment = "..")
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
@@ -22,14 +25,37 @@ let private shouldIgnorePath (path: string) =
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
 
-let private tryGetRepoRelativePath (repoRoot: string) (absolutePath: string) =
+let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string) (allowRoot: bool) =
     let relativePath =
-        pathMod?relative (repoRoot, absolutePath) |> unbox<string> |> normalizePath
+        pathMod?relative (normalizeRootPath repoRoot, normalizeRootPath absolutePath)
+        |> unbox<string>
+        |> normalizePath
 
     if System.String.IsNullOrWhiteSpace relativePath || relativePath = "." then
+        if allowRoot then Some "" else None
+    elif containsTraversalSegments relativePath then
         None
     else
         Some relativePath
+
+let tryGetRepoRelativePath (repoRoot: string) (absolutePath: string) =
+    tryGetRepoRelativePathCore repoRoot absolutePath false
+
+let tryGetRepoRelativePathOrRoot (repoRoot: string) (absolutePath: string) =
+    tryGetRepoRelativePathCore repoRoot absolutePath true
+
+/// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
+let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
+    let rendererFileTree = Dictionary<string, FileEntry>()
+
+    entries
+    |> Seq.iter (fun entry ->
+        match tryGetRepoRelativePathOrRoot repoRoot entry.path with
+        | Some relativePath -> rendererFileTree.[relativePath] <- { entry with path = relativePath }
+        | None -> ()
+    )
+
+    rendererFileTree
 
 let private tryGetLfsTrackedByAttributes
     (repoRoot: string)
@@ -117,6 +143,7 @@ let private tryGetLfsTrackedByAttributes
                             resolve results
                     )
     }
+
 
 let getFileEntry (path: string) = promise {
     let! stats = fs?promises?stat (path)
