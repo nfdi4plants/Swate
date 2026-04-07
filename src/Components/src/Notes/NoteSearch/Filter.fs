@@ -23,16 +23,20 @@ module FilterLogic = //filters the note list based on the search term and the se
         static member fuse(filterOption, notes) =
             Fuse(notes |> List.toArray |> Array.map (fun x -> x :> obj), FuzzySearch.fuseOptions (filterOption))
 
-        static member search(searchPattern: string, filterOption: string, notes) : Note list =
+        static member search
+            (searchPattern: string, filterOption: string, notes)
+            : Swate.Components.NoteTypes.Note list =
             FuzzySearch.fuse(filterOption, notes).search (searchPattern)
-            |> Array.map (fun (result: obj) -> unbox<Note> (result?item))
+            |> Array.map (fun (result: obj) -> unbox<Swate.Components.NoteTypes.Note> (result?item))
             |> Array.toList
 
     type ExactMatchSearch =
         static member private containsIgnoreCase (needle: string) (haystack: string) = //
             haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
 
-        static member search(searchTerm: string, selectedIndices: Set<int>, notes: Note list) : Note list =
+        static member search
+            (searchTerm: string, selectedIndices: Set<int>, notes: Swate.Components.NoteTypes.Note list)
+            : Swate.Components.NoteTypes.Note list =
             notes
             |> List.filter (fun note ->
 
@@ -63,7 +67,7 @@ module FilterLogic = //filters the note list based on the search term and the se
             )
 
 module FilterComponents =
-    let noteSuggestions (searchTerm: string) (selectedIndices: Set<int>) (notes: Note list) =
+    let noteSuggestions (searchTerm: string) (selectedIndices: Set<int>) (notes: Swate.Components.NoteTypes.Note list) =
         let notesFilteredAfterTitle =
             if Set.contains 0 selectedIndices || selectedIndices.IsEmpty then
                 FilterLogic.FuzzySearch.search (searchTerm, "Title", notes)
