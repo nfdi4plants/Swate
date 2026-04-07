@@ -3,13 +3,13 @@ module Main.Git.GitProvisioningService
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Swate.Electron.Shared.GitTypes
+open Main.Bindings.Node
 open Main.Bindings.SimpleGit
 open Main.Git.GitAuthAdapter
 open Main.Git.GitInternals
 open Main.Git.GitTokenProvider
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private pathDynamic: obj = importAll "path"
 let private gitLfsDownloadLargeFilesConfigKey = "swate.lfs.downloadlargefiles"
 
 type ExistingPathKind =
@@ -136,9 +136,9 @@ let shouldRetryWithoutAuth (failure: GitService.GitFailure) =
     let contains (term: string) = message.Contains(term)
 
     match failure.Kind with
-    | GitService.GitFailureKind.Forbidden ->
+    | GitFailureKind.Forbidden ->
         true
-    | GitService.GitFailureKind.Unauthorized ->
+    | GitFailureKind.Unauthorized ->
         // Treat generic local filesystem permission errors conservatively (no cleanup+retry).
         // Allow SSH publickey failures, and common HTTP 401 auth signals.
         let hasHttpAuthSignal =
@@ -152,12 +152,12 @@ let shouldRetryWithoutAuth (failure: GitService.GitFailure) =
             contains "permission denied" && contains "publickey"
 
         hasHttpAuthSignal || isSshPublicKeyFailure
-    | GitService.GitFailureKind.LfsInstallRequired ->
+    | GitFailureKind.LfsInstallRequired ->
         false
-    | GitService.GitFailureKind.Network
-    | GitService.GitFailureKind.Timeout
-    | GitService.GitFailureKind.Canceled
-    | GitService.GitFailureKind.Unknown ->
+    | GitFailureKind.Network
+    | GitFailureKind.Timeout
+    | GitFailureKind.Canceled
+    | GitFailureKind.Unknown ->
         false
 
 let buildCloneBranchOptions (branch: string option) : string[] =
@@ -322,13 +322,13 @@ let private validateOptionalBranch (branch: string option) : Result<string optio
 
 let private createNonEmptyTargetFailure () : GitService.GitResult<'T> =
     Error {
-        Kind = GitService.GitFailureKind.Unknown
+        Kind = GitFailureKind.Unknown
         Message = "Target path already exists and is not empty."
     }
 
 let private createExistingRepositoryFailure () : GitService.GitResult<'T> =
     Error {
-        Kind = GitService.GitFailureKind.Unknown
+        Kind = GitFailureKind.Unknown
         Message = "Target path is already a git repository."
     }
 
@@ -352,8 +352,11 @@ let private cloneWithGit
         })
         git
 
+// Skip the LFS smudge filter during clone to avoid downloading all LFS objects upfront.
+// The user's "Download Large Files" preference controls whether LFS content is hydrated
+// after clone via a separate `git lfs pull` step (see hydrateClonedLfsContent).
 let private applyCloneSkipSmudge (git: ISimpleGit) =
-    git.env ("GIT_LFS_SKIP_SMUDGE", "1")
+    git.env (GitLfsSkipSmudgeEnvKey, "1")
 
 let private hydrateClonedLfsContent (git: ISimpleGit) : JS.Promise<GitService.GitResult<unit>> =
     runSimpleGit
@@ -470,7 +473,7 @@ let cloneRepository
                 if downloadLargeFiles && not isLfsInstalled then
                     return
                         Error {
-                            Kind = GitService.GitFailureKind.LfsInstallRequired
+                            Kind = GitFailureKind.LfsInstallRequired
                             Message = "Git LFS is required for this operation. Install Git LFS now?"
                         }
                 else

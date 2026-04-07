@@ -3,10 +3,48 @@ module Main.Git.GitLfsAdapter
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Swate.Electron.Shared.GitTypes
+open Main.Bindings.Node
 
-let private childProcessDynamic: obj = importAll "node:child_process"
 [<Literal>]
 let private repoValidationTimeoutMs = 5000
+
+let tryExecGitText
+    (workingDirectory: string option)
+    (timeoutMs: int)
+    (args: string[])
+    : Promise<string option> =
+    promise {
+        let! output =
+            Fable.Core.JS.Constructors.Promise.Create(fun resolve _reject ->
+                let options =
+                    createObj [
+                        "encoding" ==> "utf8"
+                        "stdio" ==> "pipe"
+                        "shell" ==> false
+                        "timeout" ==> timeoutMs
+
+                        match workingDirectory with
+                        | Some value -> "cwd" ==> value
+                        | None -> ()
+                    ]
+
+                childProcessDynamic?execFile (
+                    "git",
+                    args,
+                    options,
+                    fun (error: obj) (stdout: obj) (_stderr: obj) ->
+                        if error |> Option.ofObj |> Option.isSome then
+                            resolve None
+                        else
+                            stdout
+                            |> Option.ofObj
+                            |> Option.map string
+                            |> resolve
+                )
+                |> ignore)
+
+        return output
+    }
 
 
 type IGitLfs =
@@ -41,44 +79,6 @@ type NodeGitLfsAdapter() =
         |> Option.defaultValue "__system__"
         |> _.Trim()
         |> _.ToLowerInvariant()
-
-    let tryExecGitText
-        (workingDirectory: string option)
-        (timeoutMs: int)
-        (args: string[])
-        : Promise<string option> =
-        promise {
-            let! output =
-                Fable.Core.JS.Constructors.Promise.Create(fun resolve _reject ->
-                    let options =
-                        createObj [
-                            "encoding" ==> "utf8"
-                            "stdio" ==> "pipe"
-                            "shell" ==> false
-                            "timeout" ==> timeoutMs
-
-                            match workingDirectory with
-                            | Some value -> "cwd" ==> value
-                            | None -> ()
-                        ]
-
-                    childProcessDynamic?execFile (
-                        "git",
-                        args,
-                        options,
-                        fun (error: obj) (stdout: obj) (_stderr: obj) ->
-                            if error |> Option.ofObj |> Option.isSome then
-                                resolve None
-                            else
-                                stdout
-                                |> Option.ofObj
-                                |> Option.map string
-                                |> resolve
-                    )
-                    |> ignore)
-
-            return output
-        }
 
     let validateRepoPath (repoPath: string) : Promise<bool> =
         promise {

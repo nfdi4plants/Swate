@@ -20,46 +20,7 @@ type OutboundPushPlan =
 let private lfsPointerOidPattern = Regex("^oid sha256:[0-9a-f]{64}$", RegexOptions.Multiline)
 let private lfsPointerSizePattern = Regex("^size \\d+$", RegexOptions.Multiline)
 let private maxLfsPointerProbeBytes = 1024L
-let private childProcessDynamic: obj = importAll "node:child_process"
 let mutable private cachedSystemInstalled = false
-
-let private tryExecGitText
-    (workingDirectory: string option)
-    (timeoutMs: int)
-    (args: string[])
-    : JS.Promise<string option> =
-    promise {
-        let! output =
-            JS.Constructors.Promise.Create(fun resolve _reject ->
-                let options =
-                    createObj [
-                        "encoding" ==> "utf8"
-                        "stdio" ==> "pipe"
-                        "shell" ==> false
-                        "timeout" ==> timeoutMs
-
-                        match workingDirectory with
-                        | Some value -> "cwd" ==> value
-                        | None -> ()
-                    ]
-
-                childProcessDynamic?execFile (
-                    "git",
-                    args,
-                    options,
-                    fun (error: obj) (stdout: obj) (_stderr: obj) ->
-                        if error |> Option.ofObj |> Option.isSome then
-                            resolve None
-                        else
-                            stdout
-                            |> Option.ofObj
-                            |> Option.map string
-                            |> resolve
-                )
-                |> ignore)
-
-        return output
-    }
 
 let extractFailureMessage (result: GitLfsResult) =
     let errorText = result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
@@ -339,6 +300,10 @@ let private isLfsPointerContent (content: string) =
     && lfsPointerOidPattern.IsMatch normalized
     && lfsPointerSizePattern.IsMatch normalized
 
+/// Checks whether any of the given git object IDs (from a push dry-run) are LFS pointer files.
+/// This determines if `git lfs push` is needed before the actual `git push`.
+/// Uses `git cat-file -t` to check blob type and `git cat-file -s` to check size,
+/// then reads small blobs to detect LFS pointer content (version + oid + size headers).
 let private containsOutboundLfsPointerObjects
     (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
     (objectIds: string[])
@@ -356,6 +321,9 @@ let private containsOutboundLfsPointerObjects
                 | Error currentFailure ->
                     failure <- Some currentFailure
                 | Ok objectType when objectType.Trim().Equals("blob", StringComparison.Ordinal) ->
+                    // Use `git cat-file -s` instead of fs.statSync because we need the size of the staged blob
+                    // in git's object store, not the working tree file. The on-disk file may differ from what is
+                    // staged (partial staging, .gitattributes filters, CRLF normalization).
                     let! objectSizeResult = runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-s"; objectId |]) git
 
                     match objectSizeResult with

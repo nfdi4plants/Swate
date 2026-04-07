@@ -7,21 +7,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
+open Main.Bindings.Node
 open Main.Bindings.Filesystem
 open Main.Bindings.SimpleGit
 open Main.Git.GitLfsService
 open Main.Git.GitTokenProvider
 open Main.Git.GitAuthAdapter
 open Main.Git.GitInternals
-
-type GitFailureKind =
-    | Unauthorized
-    | Forbidden
-    | Network
-    | Timeout
-    | Canceled
-    | LfsInstallRequired
-    | Unknown
 
 type GitFailure = {
     Kind: GitFailureKind
@@ -30,78 +22,15 @@ type GitFailure = {
 
 type GitResult<'T> = Result<'T, GitFailure>
 
-[<RequireQualifiedAccess>]
-type GitBranchRefKind =
-    | Local
-    | Remote
-
-type GitFileStatusDto = {
-    Path: string
-    Index: string
-    WorkingDir: string
-    OriginalPath: string option
-}
-
-type GitBranchRefDto = {
-    RefName: string
-    DisplayLabel: string
-    Kind: GitBranchRefKind
-    IsCurrent: bool
-    IsTracking: bool
-}
-
 type GitPushTarget = {
     RefSpec: string
     PushBranch: string
     SetUpstream: bool
 }
 
-type GitDiffViewDataDto = {
-    Path: string
-    PreviousContent: string
-    CurrentContent: string
-    WordDiffText: string
-}
-
-type GitMergeConflictViewDataDto = {
-    Path: string
-    MergeConflictContent: string
-}
-
-type GitStatusDto = {
-    Current: string option
-    Tracking: string option
-    Ahead: int
-    Behind: int
-    IsClean: bool
-    Conflicted: string[]
-    IsMergeInProgress: bool
-    Files: GitFileStatusDto[]
-}
-
-type GitDiffSummaryDto = {
-    Changed: int
-    Insertions: int
-    Deletions: int
-}
-
-type GitLfsSettingsDto = {
-    AutoTrackThresholdMb: int
-    DownloadLargeFiles: bool
-}
-
-type GitConfirmMergeResolutionResult = {
-    UpdatedStatus: GitStatusDto
-    RemainingConflictedPaths: string[]
-    NextConflictedPath: string option
-}
-
 type GitPullResult = { Warning: GitFailure option }
 
 type GitProgressCallback = GitInternals.GitProgressCallback
-
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private pathDynamic: obj = importAll "path"
 
 let private disallowedRemotePrefixes = [| "file://"; "ext::"; "fd::" |]
 
@@ -140,13 +69,13 @@ let classifyFailureKind (message: string) =
         |> Array.exists normalizedMessage.Contains
 
     if containsAny lfsInstallRequiredTokens then
-        LfsInstallRequired
+        GitFailureKind.LfsInstallRequired
     elif containsAny [| "abort"; "cancelled"; "canceled"; "aborterror" |] then
-        Canceled
+        GitFailureKind.Canceled
     elif containsAny [| "timed out"; "timeout"; "time out" |] then
-        Timeout
+        GitFailureKind.Timeout
     elif containsAny [| "forbidden"; "403" |] then
-        Forbidden
+        GitFailureKind.Forbidden
     elif
         containsAny [|
             "unauthorized"
@@ -157,7 +86,7 @@ let classifyFailureKind (message: string) =
             "permission denied"
         |]
     then
-        Unauthorized
+        GitFailureKind.Unauthorized
     elif
         containsAny [|
             "network"
@@ -168,9 +97,9 @@ let classifyFailureKind (message: string) =
             "unable to access"
         |]
     then
-        Network
+        GitFailureKind.Network
     else
-        Unknown
+        GitFailureKind.Unknown
 
 // GitService owns threshold formatting because the threshold is part of git workflow policy, not raw LFS command execution.
 let private formatThresholdMb (thresholdMb: int) = $"{thresholdMb} MB"
@@ -189,7 +118,7 @@ let private buildLfsInstallPromptMessage (thresholdMb: int option) (details: str
 // GitService shapes the final failure because LFS install-required errors need workflow-specific wording.
 let private createFailure kind (message: string) : GitFailure =
     match kind with
-    | LfsInstallRequired ->
+    | GitFailureKind.LfsInstallRequired ->
         let finalMessage =
             if message.IndexOf("Install Git LFS now?", StringComparison.OrdinalIgnoreCase) >= 0 then
                 message
@@ -383,7 +312,7 @@ let private unsupportedGitContentMessage (path: string) = $"Unsupported git cont
 
 let private unsupportedGitContentResult<'T> (path: string) : GitResult<'T> =
     Error {
-        Kind = Unknown
+        Kind = GitFailureKind.Unknown
         Message = unsupportedGitContentMessage path
     }
 
@@ -396,15 +325,9 @@ let tryGetUnsupportedGitContent (requestedPath: string) (failure: GitFailure) : 
     else
         None
 
-[<Emit("$0.length")>]
-let private bufferLength (buffer: obj) : int = jsNative
-
-[<Emit("$0[$1]")>]
-let private bufferByteAt (buffer: obj) (index: int) : int = jsNative
-
-[<Emit("$0.toString('utf8')")>]
-let private bufferToUtf8String (buffer: obj) : string = jsNative
-
+// Read file as a raw buffer for binary detection during merge conflict and diff view loading.
+// Binary files cannot be displayed in the text-based diff/merge viewers and need to be routed
+// to the unsupported content page instead.
 let private readFileBufferAsync (absolutePath: string) : JS.Promise<obj> =
     fsPromisesDynamic?readFile (absolutePath)
     |> unbox<JS.Promise<obj>>
@@ -765,7 +688,7 @@ let private getConfiguredLfsDownloadLargeFiles (git: ISimpleGit) : JS.Promise<bo
 
 // GitService creates this failure because install-required is surfaced as a git workflow error, not as a raw LFS command result.
 let private createLfsInstallRequiredFailure (thresholdMb: int option) (details: string option) : GitFailure = {
-    Kind = LfsInstallRequired
+    Kind = GitFailureKind.LfsInstallRequired
     Message = buildLfsInstallPromptMessage thresholdMb details
 }
 
@@ -781,10 +704,10 @@ let private runGitLfsTrackCommand
         return
             match result with
             | Ok () -> Ok()
-            | Error message when classifyFailureKind message = LfsInstallRequired ->
+            | Error message when classifyFailureKind message = GitFailureKind.LfsInstallRequired ->
                 Error(createLfsInstallRequiredFailure (Some thresholdMb) (Some message))
             | Error message ->
-                Error(createFailure Unknown message)
+                Error(createFailure GitFailureKind.Unknown message)
     }
 
 let private getOversizedWorkingTreePaths
@@ -864,7 +787,7 @@ let private enforceStageTimeLfsTrackingForPaths
                     match restageResult with
                     | Ok _ ->
                         return Ok()
-                    | Error failure when failure.Kind = LfsInstallRequired ->
+                    | Error failure when failure.Kind = GitFailureKind.LfsInstallRequired ->
                         return Error(createLfsInstallRequiredFailure (Some thresholdMb) None)
                     | Error failure ->
                         return Error failure
@@ -938,7 +861,7 @@ let private createCommitLfsValidationFailure (thresholdMb: int) (oversizedPaths:
             String.Empty
 
     {
-        Kind = Unknown
+        Kind = GitFailureKind.Unknown
         Message =
             $"Staged content larger than {formatThresholdMb thresholdMb} must already be staged as Git LFS pointers before commit. Re-stage the affected paths after tracking them with Git LFS or use Swate staging. Affected paths: {listedPaths}{suffix}"
     }
@@ -990,7 +913,7 @@ let private applyLfsDownloadPreference (downloadLargeFiles: bool) (git: ISimpleG
     if downloadLargeFiles then
         git
     else
-        git.env ("GIT_LFS_SKIP_SMUDGE", "1")
+        git.env (GitLfsSkipSmudgeEnvKey, "1")
 
 // GitService keeps explicit post-pull hydration here because it must reuse the authenticated git instance created for the pull workflow.
 let private hydratePulledLfsContent (git: ISimpleGit) : JS.Promise<GitResult<unit>> =
@@ -1050,7 +973,7 @@ let private createAuthenticatedGit
                     | _ ->
                         return
                             Error {
-                                Kind = Unauthorized
+                                Kind = GitFailureKind.Unauthorized
                                 Message = $"No access token available for remote host '{host}'."
                             }
     }

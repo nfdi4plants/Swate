@@ -10,16 +10,6 @@ open Fable.Electron.Remoting.Main
 open Main
 open Main.Git
 
-let private toSharedGitFailureKind (kind: GitService.GitFailureKind) =
-    match kind with
-    | GitService.GitFailureKind.Unauthorized -> GitFailureKind.Unauthorized
-    | GitService.GitFailureKind.Forbidden -> GitFailureKind.Forbidden
-    | GitService.GitFailureKind.Network -> GitFailureKind.Network
-    | GitService.GitFailureKind.Timeout -> GitFailureKind.Timeout
-    | GitService.GitFailureKind.Canceled -> GitFailureKind.Canceled
-    | GitService.GitFailureKind.LfsInstallRequired -> GitFailureKind.LfsInstallRequired
-    | GitService.GitFailureKind.Unknown -> GitFailureKind.Unknown
-
 let private toGitOperationResult
     (successMessage: 'T -> string option)
     (successPath: ('T -> string option) option)
@@ -36,94 +26,33 @@ let private toGitOperationResult
             Message = successMessage payload
             FailureKind = None
             WarningMessage = warning |> Option.map _.Message
-            WarningKind = warning |> Option.map (fun current -> toSharedGitFailureKind current.Kind)
+            WarningKind = warning |> Option.map _.Kind
             Path = path
         }
     | Error failure ->
         Ok {
             Success = false
             Message = Some failure.Message
-            FailureKind = Some(toSharedGitFailureKind failure.Kind)
+            FailureKind = Some failure.Kind
             WarningMessage = None
             WarningKind = None
             Path = None
         }
 
-let private toStatusDto (status: GitService.GitStatusDto) : GitStatusDto = {
-    Current = status.Current
-    Tracking = status.Tracking
-    Ahead = status.Ahead
-    Behind = status.Behind
-    IsClean = status.IsClean
-    Conflicted = status.Conflicted
-    IsMergeInProgress = status.IsMergeInProgress
-    Files =
-        status.Files
-        |> Array.map (fun file -> {
-            Path = file.Path
-            Index = file.Index
-            WorkingDir = file.WorkingDir
-            OriginalPath = file.OriginalPath
-        })
-}
-
-let private toBranchKind (kind: GitService.GitBranchRefKind) =
-    match kind with
-    | GitService.GitBranchRefKind.Local -> GitBranchRefKind.Local
-    | GitService.GitBranchRefKind.Remote -> GitBranchRefKind.Remote
-
-let private toBranchDto (branch: GitService.GitBranchRefDto) : GitBranchRefDto = {
-    RefName = branch.RefName
-    DisplayLabel = branch.DisplayLabel
-    Kind = toBranchKind branch.Kind
-    IsCurrent = branch.IsCurrent
-    IsTracking = branch.IsTracking
-}
-
-let private toDiffSummaryDto (diff: GitService.GitDiffSummaryDto) : GitDiffSummaryDto = {
-    Changed = diff.Changed
-    Insertions = diff.Insertions
-    Deletions = diff.Deletions
-}
-
-let private toLfsSettingsDto (settings: GitService.GitLfsSettingsDto) : GitLfsSettingsDto = {
-    AutoTrackThresholdMb = settings.AutoTrackThresholdMb
-    DownloadLargeFiles = settings.DownloadLargeFiles
-}
-
-let private toDiffViewDataDto (data: GitService.GitDiffViewDataDto) : GitDiffViewDataDto = {
-    Path = data.Path
-    PreviousContent = data.PreviousContent
-    CurrentContent = data.CurrentContent
-    WordDiffText = data.WordDiffText
-}
-
-let private toMergeConflictViewDataDto (data: GitService.GitMergeConflictViewDataDto) : GitMergeConflictViewDataDto = {
-    Path = data.Path
-    MergeConflictContent = data.MergeConflictContent
-}
-
 let private toGitPageLoadResultDto
     (requestedPath: string)
-    (mapPayload: 'TSource -> 'TTarget)
     (operationName: string)
-    (result: GitService.GitResult<'TSource>)
-    : Result<GitPageLoadResultDto<'TTarget>, exn> =
+    (result: GitService.GitResult<'T>)
+    : Result<GitPageLoadResultDto<'T>, exn> =
     match result with
     | Ok payload ->
-        Ok(GitPageLoadResultDto.Loaded(mapPayload payload))
+        Ok(GitPageLoadResultDto.Loaded payload)
     | Error failure ->
         match GitService.tryGetUnsupportedGitContent requestedPath failure with
         | Some unsupported ->
             Ok(GitPageLoadResultDto.Unsupported unsupported)
         | None ->
             Error(exn $"{operationName} failed ({failure.Kind}): {failure.Message}")
-
-let private toConfirmMergeResolutionResult (result: GitService.GitConfirmMergeResolutionResult) : GitConfirmMergeResolutionResult = {
-    UpdatedStatus = toStatusDto result.UpdatedStatus
-    RemainingConflictedPaths = result.RemainingConflictedPaths
-    NextConflictedPath = result.NextConflictedPath
-}
 
 let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgressCallback =
     let rendererApi =
@@ -149,7 +78,7 @@ let api: IGitApi = {
                 let! result = GitService.getStatus arcPath
 
                 match result with
-                | Ok statusDto -> return Ok(toStatusDto statusDto)
+                | Ok statusDto -> return Ok statusDto
                 | Error failure -> return Error(exn $"git status failed ({failure.Kind}): {failure.Message}")
         }
     getGitBranches =
@@ -160,7 +89,7 @@ let api: IGitApi = {
                 let! result = GitService.getBranches arcPath
 
                 match result with
-                | Ok branches -> return Ok(branches |> Array.map toBranchDto)
+                | Ok branches -> return Ok branches
                 | Error failure -> return Error(exn $"git branch list failed ({failure.Kind}): {failure.Message}")
         }
     getGitLfsSettings =
@@ -171,7 +100,7 @@ let api: IGitApi = {
                 let! result = GitService.getLfsSettings arcPath
 
                 match result with
-                | Ok settings -> return Ok(toLfsSettingsDto settings)
+                | Ok settings -> return Ok settings
                 | Error failure -> return Error(exn $"git lfs settings failed ({failure.Kind}): {failure.Message}")
         }
     getGitDiffSummary =
@@ -182,7 +111,7 @@ let api: IGitApi = {
                 let! result = GitService.getDiffSummary arcPath
 
                 match result with
-                | Ok diffDto -> return Ok(toDiffSummaryDto diffDto)
+                | Ok diffDto -> return Ok diffDto
                 | Error failure -> return Error(exn $"git diff summary failed ({failure.Kind}): {failure.Message}")
         }
     getGitWordDiff =
@@ -202,7 +131,7 @@ let api: IGitApi = {
             | Error error -> return Error error
             | Ok(_, arcPath) ->
                 let! result = GitService.getDiffViewData arcPath requestedPath
-                return toGitPageLoadResultDto requestedPath toDiffViewDataDto "git diff view" result
+                return toGitPageLoadResultDto requestedPath "git diff view" result
         }
     getGitMergeConflictViewData =
         fun (event: IpcMainEvent) (requestedPath: string) -> promise {
@@ -210,7 +139,7 @@ let api: IGitApi = {
             | Error error -> return Error error
             | Ok(_, arcPath) ->
                 let! result = GitService.getMergeConflictViewData arcPath requestedPath
-                return toGitPageLoadResultDto requestedPath toMergeConflictViewDataDto "git merge conflict view" result
+                return toGitPageLoadResultDto requestedPath "git merge conflict view" result
         }
     installGitLfs =
         fun (_event: IpcMainEvent) -> promise {
@@ -429,7 +358,7 @@ let api: IGitApi = {
                             match result with
                             | Ok payload ->
                                 do! vault.RefreshFileTree()
-                                return Ok(toConfirmMergeResolutionResult payload)
+                                return Ok payload
                             | Error failure ->
                                 return Error(exn $"confirm merge resolution failed ({failure.Kind}): {failure.Message}")
                         })

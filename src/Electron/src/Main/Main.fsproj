@@ -10,6 +10,7 @@
     <Compile Include="Bindings\Chokidar.fs" />
     <Compile Include="Bindings\Filesystem.fs" />
     <Compile Include="Bindings\Path.fs" />
+    <Compile Include="Bindings\NodeBindings.fs" />
     <Compile Include="Bindings\SimpleGit.fs" />
     <Compile Include="FileTreeCreator.fs" />
     <Compile Include="Notes\NoteSearchReader.fs" />

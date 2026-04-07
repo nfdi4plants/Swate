@@ -2,6 +2,8 @@ module Swate.Electron.Shared.GitTypes
 
 open Fable.Core
 
+[<Literal>]
+let GitLfsSkipSmudgeEnvKey = "GIT_LFS_SKIP_SMUDGE"
 
 // GIT LFS Types
 type GitLfsCommand =
