@@ -6,6 +6,7 @@ open Swate.Components
 open Swate.Components.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Types.Actionbar
+open Swate.Electron.Shared.GitTypes
 
 module DataHubBrowserHelper =
     let private isCancelError (error: exn) =
@@ -17,7 +18,16 @@ module DataHubBrowserHelper =
         |> Option.filter (fun segment -> not (String.IsNullOrWhiteSpace segment))
         |> Option.defaultValue projectInfo.name
 
-    let private cloneAndOpenRepo (projectInfo: ExploreProjectDto) =
+    let private logCloneFailure (result: GitOperationResult) =
+        let failureKind =
+            result.FailureKind
+            |> Option.map string
+            |> Option.defaultValue "Unknown"
+
+        let failureMessage = result.Message |> Option.defaultValue "Clone failed."
+        Browser.Dom.console.error ($"[Swate] Clone failed ({failureKind}): {failureMessage}")
+
+    let private cloneAndOpenRepo (projectInfo: ExploreProjectDto) (onSuccess: unit -> unit) =
         promise {
             let! destinationResult = Api.ipcArcVaultApi.pickDirectory (unbox null)
 
@@ -28,45 +38,33 @@ module DataHubBrowserHelper =
                 let targetPath =
                     ARCtrl.ArcPathHelper.combine destinationFolder (toRepositoryFolderName projectInfo)
 
-                Browser.Dom.window.alert targetPath
+                let cloneRequest: GitCloneRepositoryRequest = {
+                    RemoteUrl = projectInfo.http_url_to_repo
+                    TargetPath = targetPath
+                    Branch = None
+                }
 
-        // ----
-        // TODO: Wire up actual git call for cloning, waiting for git branch from @caro
-        // ----
+                let! cloneResult = Api.ipcGitApi.gitCloneRepository (unbox null) cloneRequest
 
-        // let cloneRequest: GitCloneRepositoryRequest = {
-        //     // Let main-process git services own remote validation/auth handling.
-        //     RemoteUrl = projectInfo.web_url
-        //     TargetPath = targetPath
-        //     Branch = None
-        // }
+                match cloneResult with
+                | Error error -> Browser.Dom.console.error ($"[Swate] Clone IPC failed: {error.Message}")
+                | Ok result when result.Success ->
+                    let clonedPath = result.Path |> Option.defaultValue targetPath
+                    let! openResult = Api.ipcArcVaultApi.openARCByPath (unbox null) clonedPath
 
-        // let! cloneResult = Api.ipcGitApi.gitCloneRepository (unbox null) cloneRequest
-
-        // match cloneResult with
-        // | Error error -> Browser.Dom.console.error ($"[Swate] Clone IPC failed: {error.Message}")
-        // | Ok result when result.Success ->
-        //     match result.Path with
-        //     | Some clonedPath ->
-        //         let! openResult = Api.ipcArcVaultApi.openARCByPath (unbox null) clonedPath
-
-        //         match openResult with
-        //         | Ok _ -> ()
-        //         | Error error ->
-        //             Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
-        //     | None -> Browser.Dom.console.error ("[Swate] Clone finished but no path was returned.")
-        // | Ok result ->
-        //     let failureMessage = result.Message |> Option.defaultValue ""
-
-        //     Browser.Dom.console.error ($"[Swate] Clone failed: {result.FailureKind} {failureMessage}")
+                    match openResult with
+                    | Ok _ -> onSuccess ()
+                    | Error error ->
+                        Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
+                | Ok result -> logCloneFailure result
         }
         |> Promise.start
 
-    let createActionBtns (projectInfo: ExploreProjectDto) : ButtonInfo[] = [|
+    let createActionBtns (onSuccess: unit -> unit) (projectInfo: ExploreProjectDto) : ButtonInfo[] = [|
         ButtonInfo.create (
             "swt:fluent--arrow-download-24-regular swt:size-5",
             "Download repository",
-            (fun _ -> cloneAndOpenRepo projectInfo)
+            (fun _ -> cloneAndOpenRepo projectInfo onSuccess)
         )
     |]
 
@@ -99,12 +97,13 @@ let DataHubBrowserTarget () =
         LoadOrganisationRepos = loadOrganisationRepos
     }
 
-    let closePage = fun _ -> pageCtx.setState None
+    let closePage _ = pageCtx.setState None
+    let closeBrowser () = pageCtx.setState None
 
     DataHubBrowser.ExplorePanel(
         accounts = authCtx,
         loaders = loaders,
-        projectActionBtns = DataHubBrowserHelper.createActionBtns,
+        projectActionBtns = DataHubBrowserHelper.createActionBtns closeBrowser,
         classNames = "swt:grow swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:pb-4",
         onClose = closePage
     )
