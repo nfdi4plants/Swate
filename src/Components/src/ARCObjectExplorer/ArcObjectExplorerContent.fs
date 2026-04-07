@@ -5,6 +5,15 @@ open Feliz
 open ARCtrl
 open Swate.Components.Shared
 
+type private ArcObjectPropertyValue =
+    | Text of string
+    | Code of string
+
+type private ArcObjectPropertyRow = {
+    Label: string
+    Value: ArcObjectPropertyValue
+}
+
 
 [<RequireQualifiedAccess>]
 type ArcObjectExplorerContent =
@@ -69,26 +78,20 @@ type ArcObjectExplorerContent =
         | ArcExplorerNodeKind.Run, ArcFiles.Run _ -> true
         | _ -> false
 
-    [<ReactComponent>]
-    static member private TextValue (value: string) =
-        Html.span [
-            prop.className "swt:text-sm swt:whitespace-pre-wrap swt:break-words"
-            prop.text value
-        ]
+    static member private TextRow label value : ArcObjectPropertyRow = {
+        Label = label
+        Value = ArcObjectPropertyValue.Text value
+    }
 
-    [<ReactComponent>]
-    static member private CodeValue (value: string) =
-        Html.code [
-            prop.className "swt:text-xs swt:font-mono swt:break-all"
-            prop.text value
-        ]
-
-    static member private TextRow label value = label, ArcObjectExplorerContent.TextValue value
-
-    static member private CodeRow label value = label, ArcObjectExplorerContent.CodeValue value
+    static member private CodeRow label value : ArcObjectPropertyRow = {
+        Label = label
+        Value = ArcObjectPropertyValue.Code value
+    }
 
     static member private OptionalTextRow label value =
-        value |> Option.map (fun text -> ArcObjectExplorerContent.TextRow label text)
+        value
+        |> ArcObjectExplorerContent.asOptionalText
+        |> Option.map (fun text -> ArcObjectExplorerContent.TextRow label text)
 
     static member private DataMapSummaryRows (dataMap: DataMap) =
         let headers =
@@ -346,21 +349,35 @@ type ArcObjectExplorerContent =
         ]
 
     [<ReactComponent>]
-    static member private ARCObjectPropertyTable(rows: (string * ReactElement) list) =
+    static member private ARCObjectPropertyValueView(value: ArcObjectPropertyValue) =
+        match value with
+        | ArcObjectPropertyValue.Text value ->
+            Html.span [
+                prop.className "swt:text-sm swt:whitespace-pre-wrap swt:break-words"
+                prop.text value
+            ]
+        | ArcObjectPropertyValue.Code value ->
+            Html.code [
+                prop.className "swt:text-xs swt:font-mono swt:break-all"
+                prop.text value
+            ]
+
+    [<ReactComponent>]
+    static member private ARCObjectPropertyTable(rows: ArcObjectPropertyRow list) =
         Html.dl [
             prop.className "swt:grid swt:grid-cols-1 swt:gap-y-3"
             prop.children [
-                for label, value in rows do
+                for row in rows do
                     Html.div [
                         prop.className "swt:flex swt:flex-col swt:gap-1"
                         prop.children [
                             Html.dt [
                                 prop.className "swt:text-xs swt:font-semibold swt:uppercase swt:tracking-wide swt:opacity-60"
-                                prop.text label
+                                prop.text row.Label
                             ]
                             Html.dd [
                                 prop.className "swt:min-w-0"
-                                prop.children [ value ]
+                                prop.children [ ArcObjectExplorerContent.ARCObjectPropertyValueView(row.Value) ]
                             ]
                         ]
                     ]
