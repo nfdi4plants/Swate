@@ -14,6 +14,9 @@ type private AccountState = {
     Token: string
 }
 
+let private revalidationCooldown = TimeSpan.FromSeconds 30.0
+let mutable private lastRevalidationStartedAtUtc: DateTime option = None
+
 /// Normalize and validate a GitLab base URL. HTTPS only.
 let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
     let trimmed = baseUrl.Trim().TrimEnd('/')
@@ -53,6 +56,9 @@ let private getActiveAccountState () =
 
 let private persistActiveSelection () =
     SecureAuthStore.setActiveAccountId activeAccountId
+
+let private invalidateRevalidationWindow () =
+    lastRevalidationStartedAtUtc <- None
 
 let private reconcileActiveAccountInvariant () =
     let nextActive =
@@ -217,6 +223,7 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
                 accounts <- accounts |> Map.add user.AccountId accountState
                 activeAccountId <- Some user.AccountId
                 persistActiveSelection ()
+                invalidateRevalidationWindow ()
                 refreshTokenProvider ()
                 let authStateDto = getState ()
                 return toAuthResult (Ok authStateDto)
@@ -229,6 +236,7 @@ let signOut () : unit =
         SecureAuthStore.remove id
         accounts <- accounts |> Map.remove id
         reconcileActiveAccountInvariant ()
+        invalidateRevalidationWindow ()
         refreshTokenProvider ()
     | None -> ()
 
@@ -238,6 +246,7 @@ let setActiveAccount (accountId: string) : AuthStateDto =
     | Some _ ->
         activeAccountId <- Some accountId
         persistActiveSelection ()
+        invalidateRevalidationWindow ()
         refreshTokenProvider ()
     | None -> ()
 
@@ -249,89 +258,116 @@ let removeAccount (accountId: string) : unit =
     accounts <- accounts |> Map.remove accountId
 
     reconcileActiveAccountInvariant ()
+    invalidateRevalidationWindow ()
     refreshTokenProvider ()
 
 /// Revalidate all stored accounts and mark invalid tokens without removing accounts.
-let revalidate () : JS.Promise<AuthResult> = promise {
+/// The boolean indicates whether a network-backed revalidation actually ran.
+let revalidate () : JS.Promise<AuthResult * bool> = promise {
     if accounts.IsEmpty then
         let authStateDto = getState ()
 
-        return {
-            Success = false
-            User = Some authStateDto
-            FailureKind = Some AuthFailureKind.Unauthorized
-            Message = Some "No stored accounts."
-        }
-    else
-        let mutable nextAccounts = accounts
-        let mutable firstFailure: AuthFailure option = None
-
-        for accountId, accountState in accounts |> Map.toArray do
-            let currentUser = accountState.Summary.User
-            let! verifyResult = GitLabApi.verifyToken currentUser.TargetDataHub accountState.Token
-
-            match verifyResult with
-            | Ok verifiedUser ->
-                // Keep the persisted account id stable to avoid file renames on profile changes.
-                let stableUser = {
-                    verifiedUser with
-                        AccountId = accountId
-                }
-
-                let updatedAccountState = {
-                    accountState with
-                        Summary = {
-                            accountState.Summary with
-                                User = stableUser
-                                TokenInvalid = false
-                        }
-                }
-
-                nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
-                persistAccountState accountId updatedAccountState
-
-            | Error failure ->
-                if firstFailure.IsNone then
-                    firstFailure <- Some failure
-
-                let tokenInvalid =
-                    match failure.Kind with
-                    | AuthFailureKind.Unauthorized
-                    | AuthFailureKind.Forbidden -> true
-                    | _ -> accountState.Summary.TokenInvalid
-
-                let updatedAccountState = {
-                    accountState with
-                        Summary = {
-                            accountState.Summary with
-                                TokenInvalid = tokenInvalid
-                        }
-                }
-
-                nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
-                persistAccountState accountId updatedAccountState
-
-        accounts <- nextAccounts
-        reconcileActiveAccountInvariant ()
-        refreshTokenProvider ()
-
-        let authStateDto = getState ()
-
-        match firstFailure with
-        | Some failure ->
-            return {
+        return
+            ({
                 Success = false
                 User = Some authStateDto
-                FailureKind = Some failure.Kind
-                Message = Some failure.Message
-            }
-        | None ->
-            return {
-                Success = true
-                User = Some authStateDto
-                FailureKind = None
-                Message = None
-            }
+                FailureKind = Some AuthFailureKind.Unauthorized
+                Message = Some "No stored accounts."
+             },
+             false)
+    else
+        let now = DateTime.UtcNow
+
+        if
+            lastRevalidationStartedAtUtc
+            |> Option.exists (fun lastStart -> (now - lastStart) < revalidationCooldown)
+        then
+            let authStateDto = getState ()
+
+            return
+                ({
+                    Success = true
+                    User = Some authStateDto
+                    FailureKind = None
+                    Message = None
+                 },
+                 false)
+        else
+            lastRevalidationStartedAtUtc <- Some now
+
+            let mutable nextAccounts = accounts
+            let mutable firstFailure: AuthFailure option = None
+
+            for accountId, accountState in accounts |> Map.toArray do
+                let currentUser = accountState.Summary.User
+                let! verifyResult = GitLabApi.verifyToken currentUser.TargetDataHub accountState.Token
+
+                match verifyResult with
+                | Ok verifiedUser ->
+                    // Keep the persisted account id stable to avoid file renames on profile changes.
+                    let stableUser = {
+                        verifiedUser with
+                            AccountId = accountId
+                    }
+
+                    let updatedAccountState = {
+                        accountState with
+                            Summary = {
+                                accountState.Summary with
+                                    User = stableUser
+                                    TokenInvalid = false
+                            }
+                    }
+
+                    nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
+                    persistAccountState accountId updatedAccountState
+
+                | Error failure ->
+                    if firstFailure.IsNone then
+                        firstFailure <- Some failure
+
+                    let tokenInvalid =
+                        match failure.Kind with
+                        | AuthFailureKind.Unauthorized
+                        | AuthFailureKind.Forbidden -> true
+                        | _ -> accountState.Summary.TokenInvalid
+
+                    let updatedAccountState = {
+                        accountState with
+                            Summary = {
+                                accountState.Summary with
+                                    TokenInvalid = tokenInvalid
+                            }
+                    }
+
+                    nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
+                    persistAccountState accountId updatedAccountState
+
+            accounts <- nextAccounts
+            reconcileActiveAccountInvariant ()
+            refreshTokenProvider ()
+
+            let authStateDto = getState ()
+
+            match firstFailure with
+            | Some failure ->
+                return
+                    ({
+                        Success = false
+                        User = Some authStateDto
+                        FailureKind = Some failure.Kind
+                        Message = Some failure.Message
+                     },
+                     true)
+            | None ->
+                return
+                    ({
+                        Success = true
+                        User = Some authStateDto
+                        FailureKind = None
+                        Message = None
+                     },
+                     true)
 }
 
 /// Restore all accounts from persisted secure storage on app startup.

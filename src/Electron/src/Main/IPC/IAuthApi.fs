@@ -51,8 +51,11 @@ let api: IAuthApi = {
     revalidate =
         fun () -> promise {
             try
-                let! result = AuthService.revalidate ()
-                broadcastAccountsUpdate ()
+                let! result, didRevalidate = AuthService.revalidate ()
+
+                if didRevalidate then
+                    broadcastAccountsUpdate ()
+
                 return Ok result
             with _ ->
                 return Error(exn "Token revalidation failed due to an unexpected error.")
