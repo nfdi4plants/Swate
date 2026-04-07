@@ -6,28 +6,30 @@ open Feliz
 let Main () =
 
     let gitStateCtx = Renderer.Context.GitStateCtx.useGitState ()
+    let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
 
     Swate.Components.GitSidebar.Main(
         status = gitStateCtx.state.Status,
         changedFiles = gitStateCtx.state.ChangedFiles,
         branchOptions = gitStateCtx.state.BranchOptions,
-        ?currentProgress = gitStateCtx.state.CurrentProgress,
+        ?runStatus = runStatus,
         ?selectedFile = gitStateCtx.state.SelectedChangePath,
-        ?busyNotice = gitStateCtx.state.BusyNotice,
         ?errorNotice = gitStateCtx.state.ErrorNotice,
         ?warningNotice = gitStateCtx.state.WarningNotice,
-        onRefresh = gitStateCtx.refresh,
-        onFetch = gitStateCtx.fetch,
-        onPull = gitStateCtx.pull,
-        onPush = gitStateCtx.push,
-        onSync = gitStateCtx.sync,
-        onCommitSelection = gitStateCtx.commitSelection,
-        onCommitAll = gitStateCtx.commitAll,
+        callbacks = {
+            OnRefresh = gitStateCtx.refresh
+            OnFetch = gitStateCtx.fetch
+            OnPull = gitStateCtx.pull
+            OnPush = gitStateCtx.push
+            OnSync = gitStateCtx.sync
+            OnCommitSelection = gitStateCtx.commitSelection
+            OnCommitAll = gitStateCtx.commitAll
+            OnSaveDownloadLargeFiles = gitStateCtx.saveDownloadLargeFiles
+            OnSaveLfsAutoTrackThreshold = gitStateCtx.saveLfsAutoTrackThreshold
+            OnCreateBranch = gitStateCtx.createBranch
+            OnSwitchBranch = gitStateCtx.switchBranch
+            OnSelectChange = gitStateCtx.selectChange
+        },
         downloadLargeFiles = gitStateCtx.state.DownloadLargeFiles,
-        onSaveDownloadLargeFiles = gitStateCtx.saveDownloadLargeFiles,
-        lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb,
-        onSaveLfsAutoTrackThreshold = gitStateCtx.saveLfsAutoTrackThreshold,
-        onCreateBranch = gitStateCtx.createBranch,
-        onSwitchBranch = gitStateCtx.switchBranch,
-        onSelectChange = gitStateCtx.selectChange
+        lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb
     )

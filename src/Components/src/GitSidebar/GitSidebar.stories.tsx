@@ -17,6 +17,44 @@ const okWithBranch = (_branchName: string) => ok();
 const okWithThreshold = (_thresholdMb: number) => ok();
 const okWithDownloadPreference = (_downloadLargeFiles: boolean) => ok();
 
+const baseCallbacks = {
+  OnRefresh: ok,
+  OnFetch: ok,
+  OnPull: ok,
+  OnPush: ok,
+  OnSync: ok,
+  OnCommitSelection: okWithSelection,
+  OnCommitAll: okWithMessage,
+  OnSaveDownloadLargeFiles: okWithDownloadPreference,
+  OnSaveLfsAutoTrackThreshold: okWithThreshold,
+  OnCreateBranch: okWithArg,
+  OnSwitchBranch: okWithBranch,
+  OnSelectChange: okWithArg,
+};
+
+const buildCallbacks = (
+  overrides: Partial<typeof baseCallbacks> = {},
+) => ({
+  ...baseCallbacks,
+  ...overrides,
+});
+
+const buildBusyRunStatus = (notice: string) => ({
+  // Fable DU: GitSidebarRunStatus.Busy
+  tag: 1,
+  fields: [notice],
+});
+
+const buildProgressRunStatus = (progress: {
+  Method: string;
+  Stage: string;
+  ProgressPercent: number;
+}) => ({
+  // Fable DU: GitSidebarRunStatus.Progress
+  tag: 2,
+  fields: [progress],
+});
+
 const baseStatus = {
   CurrentBranch: "feature/git-sidebar",
   TrackingBranch: "origin/feature/git-sidebar",
@@ -96,9 +134,12 @@ function StatefulSidebar(
     <GitSidebarComponent
       {...props}
       selectedFile={selectedFile}
-      onSelectChange={(change) => {
-        setSelectedFile(change.Path);
-        return props.onSelectChange(change);
+      callbacks={{
+        ...props.callbacks,
+        OnSelectChange: (change) => {
+          setSelectedFile(change.Path);
+          return props.callbacks.OnSelectChange(change);
+        },
       }}
     />
   );
@@ -134,20 +175,9 @@ export const CleanRepo: Story = {
     },
     changedFiles: [],
     branchOptions: branchOptions.slice(),
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -163,20 +193,9 @@ export const ChangedFiles: Story = {
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
     selectedFile: "README.md",
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -194,20 +213,9 @@ export const AdvancedActions: Story = {
     status: baseStatus,
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -230,20 +238,9 @@ export const ConflictsPresent: Story = {
     },
     changedFiles: conflictedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -259,26 +256,32 @@ export const BusyProgressState: Story = {
     status: baseStatus,
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    busyNotice: "Pulling from origin/main",
-    currentProgress: {
+    runStatus: buildProgressRunStatus({
       Method: "pull",
       Stage: "Receiving objects",
       ProgressPercent: 54,
-    },
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    }),
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
+      "pull | Receiving objects | 54%",
+    );
+  },
+};
+
+export const BusyNoticeState: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    runStatus: buildBusyRunStatus("Pulling from origin/main"),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -293,20 +296,9 @@ export const CreateBranchModal: Story = {
     status: baseStatus,
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -331,20 +323,9 @@ export const SwitchBranchModal: Story = {
     status: baseStatus,
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -363,20 +344,9 @@ export const CommitComposer: Story = {
     status: baseStatus,
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    onRefresh: ok,
-    onFetch: ok,
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks(),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -395,21 +365,12 @@ export const CallbackErrorHandling: Story = {
     status: baseStatus,
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    onRefresh: ok,
-    onFetch: () =>
-      fail("Fetch failed because the remote rejected the request."),
-    onPull: ok,
-    onPush: ok,
-    onSync: ok,
-    onCommitSelection: okWithSelection,
-    onCommitAll: okWithMessage,
+    callbacks: buildCallbacks({
+      OnFetch: () =>
+        fail("Fetch failed because the remote rejected the request."),
+    }),
     downloadLargeFiles: true,
-    onSaveDownloadLargeFiles: okWithDownloadPreference,
     lfsAutoTrackThresholdMb: 1,
-    onSaveLfsAutoTrackThreshold: okWithThreshold,
-    onCreateBranch: okWithArg,
-    onSwitchBranch: okWithBranch,
-    onSelectChange: okWithArg,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

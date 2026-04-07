@@ -59,6 +59,7 @@ let DataHubBrowserTarget () =
     let closePage _ = pageCtx.setState None
     let closeBrowser () = pageCtx.setState None
     let isCloneBusy = gitStateCtx.state.BusyOperation.IsSome
+    let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
 
     let cloneAndOpenRepo (projectInfo: ExploreProjectDto) =
         promise {
@@ -92,8 +93,7 @@ let DataHubBrowserTarget () =
         prop.className "swt:size-full swt:flex swt:flex-col"
         prop.children [
             GitSidebar.OperationStatusNotice(
-                ?currentProgress = gitStateCtx.state.CurrentProgress,
-                ?busyNotice = gitStateCtx.state.BusyNotice,
+                ?runStatus = runStatus,
                 ?errorNotice = gitStateCtx.state.ErrorNotice,
                 ?warningNotice = gitStateCtx.state.WarningNotice,
                 busyTestId = "DataHubCloneProgressNotice",

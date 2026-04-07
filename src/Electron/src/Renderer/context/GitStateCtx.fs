@@ -31,14 +31,16 @@ type GitStateController = {
     confirmMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<unit, string>>
 }
 
-let private mapDiffPageResult (_requestedPath: string) = function
-    | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(GitPage.Diff diffData)
-    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(GitPage.Unsupported unsupportedPage)
+let private mapDiffPageResult (_requestedPath: string) =
+    function
+    | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(PageState.GitDiffPage diffData)
+    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
     | Error message -> Error message
 
-let private mapMergeConflictPageResult (_requestedPath: string) = function
-    | Ok(GitPageLoadResultDto.Loaded mergeData) -> Ok(GitPage.MergeConflict mergeData)
-    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(GitPage.Unsupported unsupportedPage)
+let private mapMergeConflictPageResult (_requestedPath: string) =
+    function
+    | Ok(GitPageLoadResultDto.Loaded mergeData) -> Ok(PageState.GitMergeConflictPage mergeData)
+    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
     | Error message -> Error message
 
 let private dependencies: GitDependencies = {
@@ -46,17 +48,15 @@ let private dependencies: GitDependencies = {
     getGitBranches = Renderer.GitApiClient.getGitBranches
     getGitLfsSettings = Renderer.GitApiClient.getGitLfsSettings
     loadDiffPage =
-        fun requestedPath ->
-            promise {
-                let! result = Renderer.GitApiClient.getGitDiffViewData requestedPath
-                return mapDiffPageResult requestedPath result
-            }
+        fun requestedPath -> promise {
+            let! result = Renderer.GitApiClient.getGitDiffViewData requestedPath
+            return mapDiffPageResult requestedPath result
+        }
     loadMergeConflictPage =
-        fun requestedPath ->
-            promise {
-                let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
-                return mapMergeConflictPageResult requestedPath result
-            }
+        fun requestedPath -> promise {
+            let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
+            return mapMergeConflictPageResult requestedPath result
+        }
     installGitLfs = Renderer.GitApiClient.installGitLfs
     gitFetch = Renderer.GitApiClient.gitFetch
     gitPull = Renderer.GitApiClient.gitPull
@@ -101,16 +101,16 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let gitState, elmishDispatch = React.useElmish ((fun () -> init appStateCtx.state), update, [| box appStateCtx.state |])
+    let gitState, elmishDispatch = React.useElmish (init, update, subscribe, [||])
     let gitStateRef = React.useRef gitState
+    let previousArcPathRef = React.useRef appStateCtx.state
 
-    // Async git workflows need an immediate getState escape hatch for promise callbacks.
-    // Keep the ref on the same transition table as Elmish so async reads and render state
-    // stay aligned without introducing a second source of truth.
+    // Keep the ref in sync with Elmish's latest render state.
     gitStateRef.current <- gitState
 
+    // Eager-write dispatch: update the ref synchronously before handing the message to Elmish,
+    // so that async workflows reading getState() within the same tick see the latest state.
     let dispatch msg =
-        // Update the ref first for async closures, then hand the same message to Elmish for rendering.
         let nextState = transition msg gitStateRef.current
         gitStateRef.current <- nextState
         elmishDispatch msg
@@ -118,11 +118,24 @@ let GitStateCtxProvider (children: ReactElement) =
     let getState () = gitStateRef.current
     let isArcLoaded () = appStateCtx.state.IsSome
 
+    let applyPageChange =
+        function
+        | GitPageChange.NoChange -> ()
+        | GitPageChange.Set page -> pageStateCtx.setState (Some page)
+        | GitPageChange.Clear -> pageStateCtx.setState None
+
     let refresh () = promise {
         dispatch (SetBusyOperation(Some GitBusyOperation.Refreshing))
         let! result = refreshAll dependencies isArcLoaded getState dispatch
         dispatch (SetBusyOperation None)
-        return result |> Result.map ignore
+
+        match result with
+        | Ok _ -> return Ok()
+        | Error message ->
+            // Clear the page viewer when refresh fails, so stale diff/merge content
+            // does not remain visible while the sidebar shows an error state.
+            pageStateCtx.setState None
+            return Error message
     }
 
     let fetch () =
@@ -132,15 +145,17 @@ let GitStateCtxProvider (children: ReactElement) =
             getState
             dispatch
             GitBusyOperation.FetchingFromRemote
-            (fun () ->
-                dependencies.gitFetch {
-                    Remote = None
-                    Branch = None
-                })
+            (fun () -> dependencies.gitFetch { Remote = None; Branch = None })
 
     let pull () = promise {
         let! result = runPullWorkflow dependencies isArcLoaded getState dispatch
-        return result |> Result.map ignore
+
+        return
+            match result with
+            | Ok pullResult ->
+                applyPageChange pullResult.PageChange
+                Ok()
+            | Error message -> Error message
     }
 
     let push () =
@@ -150,7 +165,14 @@ let GitStateCtxProvider (children: ReactElement) =
         runCloneWorkflow dependencies dispatch request
 
     let sync () = promise {
-        return! runSyncWorkflow dependencies isArcLoaded getState dispatch
+        let! result = runSyncWorkflow dependencies isArcLoaded getState dispatch
+
+        return
+            match result with
+            | Ok pageChange ->
+                applyPageChange pageChange
+                Ok()
+            | Error message -> Error message
     }
 
     let commitSelection (request: GitSidebarCommitSelectionRequest) =
@@ -167,10 +189,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let commitAll (message: string) =
         let state = getState ()
 
-        let allChangedPaths =
-            state.ChangedFiles
-            |> Array.map _.Path
-            |> Array.distinct
+        let allChangedPaths = state.ChangedFiles |> Array.map _.Path |> Array.distinct
 
         runCommitOperation
             dependencies
@@ -196,30 +215,38 @@ let GitStateCtxProvider (children: ReactElement) =
                     dependencies.setGitLfsSettings {
                         AutoTrackThresholdMb = thresholdMb
                         DownloadLargeFiles = state.DownloadLargeFiles
-                    })
+                    }
+                )
 
         match result with
-        | Ok () ->
+        | Ok() ->
             let state = getState ()
 
-            dispatch (SetLfsSettings(Some {
-                AutoTrackThresholdMb = thresholdMb
-                DownloadLargeFiles = state.DownloadLargeFiles
-            }))
+            dispatch (
+                SetLfsSettings(
+                    Some {
+                        AutoTrackThresholdMb = thresholdMb
+                        DownloadLargeFiles = state.DownloadLargeFiles
+                    }
+                )
+            )
 
             return Ok()
-        | Error message ->
-            return Error message
+        | Error message -> return Error message
     }
 
     let saveDownloadLargeFiles (downloadLargeFiles: bool) = promise {
         if not (isArcLoaded ()) then
             let state = getState ()
 
-            dispatch (SetLfsSettings(Some {
-                AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
-                DownloadLargeFiles = downloadLargeFiles
-            }))
+            dispatch (
+                SetLfsSettings(
+                    Some {
+                        AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
+                        DownloadLargeFiles = downloadLargeFiles
+                    }
+                )
+            )
 
             return Ok()
         else
@@ -236,20 +263,24 @@ let GitStateCtxProvider (children: ReactElement) =
                         dependencies.setGitLfsSettings {
                             AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
                             DownloadLargeFiles = downloadLargeFiles
-                        })
+                        }
+                    )
 
             match result with
-            | Ok () ->
+            | Ok() ->
                 let state = getState ()
 
-                dispatch (SetLfsSettings(Some {
-                    AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
-                    DownloadLargeFiles = downloadLargeFiles
-                }))
+                dispatch (
+                    SetLfsSettings(
+                        Some {
+                            AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
+                            DownloadLargeFiles = downloadLargeFiles
+                        }
+                    )
+                )
 
                 return Ok()
-            | Error message ->
-                return Error message
+            | Error message -> return Error message
     }
 
     let createBranchFrom (request: GitSidebarCreateBranchRequest) =
@@ -263,7 +294,8 @@ let GitStateCtxProvider (children: ReactElement) =
                 dependencies.createBranch {
                     Name = request.BranchName
                     StartPoint = request.StartPoint
-                })
+                }
+            )
 
     let switchBranchTo (branchName: string) =
         let normalizedBranchName = branchName.Trim()
@@ -277,44 +309,53 @@ let GitStateCtxProvider (children: ReactElement) =
                 getState
                 dispatch
                 GitBusyOperation.SwitchingBranch
-                (fun () ->
-                    dependencies.checkoutBranch {
-                        Name = normalizedBranchName
-                    })
+                (fun () -> dependencies.checkoutBranch { Name = normalizedBranchName })
 
-    let selectChange (change: GitSidebarChange) =
-        loadPage dependencies getState dispatch change.Path change.IsConflicted
+    let selectChange (change: GitSidebarChange) = promise {
+        let! result = loadPage dependencies getState dispatch change.Path change.IsConflicted
 
-    let confirmMergeResolutionAction request =
-        Renderer.Context.GitWorkflow.confirmMergeResolution dependencies isArcLoaded getState dispatch request
+        return
+            match result with
+            | Ok pageChange ->
+                applyPageChange pageChange
+                Ok()
+            | Error message -> Error message
+    }
 
-    React.useEffectOnce (fun () ->
-        Renderer.MainUpdateRendererBridge.subscribeGitProgressUpdate (fun progress ->
-            dispatch (SetCurrentProgress(Some(mapProgress progress)))
-        ))
+    let confirmMergeResolutionAction request = promise {
+        let! result =
+            Renderer.Context.GitWorkflow.confirmMergeResolution dependencies isArcLoaded getState dispatch request
 
-    React.useEffect (
-        (fun () ->
-            // GitState owns git-specific pages; PageState mirrors them so the app shell can route
-            // shared main-content rendering without reimplementing git page ownership elsewhere.
-            match gitState.ActivePage with
-            | Some(GitPage.Diff diffData) ->
-                pageStateCtx.setState (Some(PageState.GitDiffPage diffData))
-            | Some(GitPage.MergeConflict mergeData) ->
-                pageStateCtx.setState (Some(PageState.GitMergeConflictPage mergeData))
-            | Some(GitPage.Unsupported unsupportedPage) ->
-                pageStateCtx.setState (Some(PageState.GitUnsupportedPage unsupportedPage))
-            | None ->
-                pageStateCtx.setState None),
-        [| box gitState.ActivePage |]
-    )
+        return
+            match result with
+            | Ok pageChange ->
+                applyPageChange pageChange
+                Ok()
+            | Error message ->
+                if isStaleMergeConflictError message then
+                    pageStateCtx.setState None
+
+                Error message
+    }
 
     React.useEffect (
         (fun () ->
-            if appStateCtx.state.IsSome then
+            let previousArcPath = previousArcPathRef.current
+            previousArcPathRef.current <- appStateCtx.state
+
+            match appStateCtx.state with
+            | Some _ ->
+                if previousArcPath <> appStateCtx.state then
+                    // Switching to a different ARC should dismiss any git page opened for the
+                    // previous repository before the next refresh repopulates git state.
+                    pageStateCtx.setState None
+                    dispatch ResetWorkflow
+
                 refreshAll dependencies isArcLoaded getState dispatch |> Promise.start
-            else
-                dispatch ResetWorkflow),
+            | None ->
+                pageStateCtx.setState None
+                dispatch ResetWorkflow
+        ),
         [| box appStateCtx.state |]
     )
 
