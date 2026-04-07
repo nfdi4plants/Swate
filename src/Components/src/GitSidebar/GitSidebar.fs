@@ -43,7 +43,15 @@ type GitSidebar =
 
     [<ReactComponent>]
     static member OperationStatusNotice
-        (?currentProgress: GitSidebarProgress, ?busyNotice: string, ?errorNotice: string, ?busyTestId: string, ?errorTestId: string)
+        (
+            ?currentProgress: GitSidebarProgress,
+            ?busyNotice: string,
+            ?errorNotice: string,
+            ?warningNotice: string,
+            ?busyTestId: string,
+            ?errorTestId: string,
+            ?warningTestId: string
+        )
         =
         React.Fragment [
             match currentProgress with
@@ -101,6 +109,25 @@ type GitSidebar =
                             prop.className "swt:alert swt:alert-error swt:px-3 swt:py-2 swt:text-sm"
                             prop.children [
                                 Html.span [ prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4" ]
+                                Html.span message
+                            ]
+                        ]
+                    ]
+                ]
+            | None ->
+                Html.none
+
+            match warningNotice with
+            | Some message ->
+                Html.div [
+                    prop.className "swt:px-3 swt:pt-3"
+                    prop.children [
+                        Html.div [
+                            if warningTestId.IsSome then
+                                prop.testId warningTestId.Value
+                            prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                            prop.children [
+                                Html.span [ prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4" ]
                                 Html.span message
                             ]
                         ]
@@ -222,11 +249,13 @@ type GitSidebar =
             ?currentProgress: GitSidebarProgress,
             ?selectedFile: string,
             ?busyNotice: string,
-            ?errorNotice: string
+            ?errorNotice: string,
+            ?warningNotice: string
         ) =
 
         let busyNotice = busyNotice
         let errorNotice = errorNotice
+        let warningNotice = warningNotice
         let selectedFile = selectedFile
 
         let localError, setLocalError = React.useState (None: string option)
@@ -903,6 +932,7 @@ type GitSidebar =
                     ?currentProgress = currentProgress,
                     ?busyNotice = busyNotice,
                     ?errorNotice = visibleError,
+                    ?warningNotice = warningNotice,
                     busyTestId = "GitSidebarProgressNotice",
                     errorTestId = "GitSidebarErrorNotice"
                 )

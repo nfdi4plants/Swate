@@ -15,6 +15,7 @@ let Main () =
         ?selectedFile = gitStateCtx.state.SelectedChangePath,
         ?busyNotice = gitStateCtx.state.BusyNotice,
         ?errorNotice = gitStateCtx.state.ErrorNotice,
+        ?warningNotice = gitStateCtx.state.WarningNotice,
         onRefresh = gitStateCtx.refresh,
         onFetch = gitStateCtx.fetch,
         onPull = gitStateCtx.pull,

@@ -53,6 +53,7 @@ type GitState = {
     BusyNotice: string option
     CurrentProgress: GitSidebarProgress option
     ErrorNotice: string option
+    WarningNotice: string option
     SelectedChangePath: string option
     ActivePage: GitPage option
     MergeResolutionPendingPath: string option
@@ -72,13 +73,14 @@ type GitState = {
         ChangedFiles = [||]
         BranchOptions = [||]
         LfsAutoTrackThresholdMb = 1
-        DownloadLargeFiles = true
+        DownloadLargeFiles = false
         RefreshState = GitRefreshState.Idle
         RefreshRequestId = 0
         BusyOperation = None
         BusyNotice = None
         CurrentProgress = None
         ErrorNotice = None
+        WarningNotice = None
         SelectedChangePath = None
         ActivePage = None
         MergeResolutionPendingPath = None
@@ -97,6 +99,7 @@ type Msg =
     | SetBusyOperation of GitBusyOperation option
     | SetCurrentProgress of GitSidebarProgress option
     | SetErrorNotice of string option
+    | SetWarningNotice of string option
     | SetSelectedChangePath of string option
     | SetStatus of GitStatusDto option
     | SetBranches of GitBranchRefDto[] option
@@ -236,19 +239,13 @@ let applyStatus (status: GitStatusDto) (model: GitState) =
         model.SelectedChangePath
         |> Option.filter (fun selectedPath -> mappedChanges |> Array.exists (fun change -> change.Path = selectedPath))
 
-    let nextActivePage =
-        match currentGitPagePath model.ActivePage with
-        | Some pagePath when nextSelectedPath = Some pagePath -> model.ActivePage
-        | Some _ -> None
-        | None -> model.ActivePage
-
     {
         model with
             Status = mapStatus status
             ChangedFiles = mappedChanges
             SelectedChangePath = nextSelectedPath
     }
-    |> withActivePage nextActivePage
+    |> withActivePage model.ActivePage
 
 let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitState) =
     let modelWithStatus =
@@ -312,6 +309,8 @@ let transition (msg: Msg) (model: GitState) =
         { model with CurrentProgress = currentProgress }
     | SetErrorNotice errorNotice ->
         { model with ErrorNotice = errorNotice }
+    | SetWarningNotice warningNotice ->
+        { model with WarningNotice = warningNotice }
     | SetSelectedChangePath selectedChangePath ->
         { model with SelectedChangePath = selectedChangePath }
     | SetStatus None ->
@@ -502,6 +501,8 @@ let rec runGitOperationWithLfsInstallRetry
                         Success = false
                         Message = Some message
                         FailureKind = Some GitFailureKind.LfsInstallRequired
+                        WarningMessage = None
+                        WarningKind = None
                         Path = None
                     }
             | Ok false ->
@@ -531,6 +532,7 @@ let runWriteOperation
         else
             dispatch (SetBusyOperation(Some busyOperation))
             dispatch (SetErrorNotice None)
+            dispatch (SetWarningNotice None)
 
             let! result = runGitOperationWithLfsInstallRetry deps dispatch busyOperation true operation
 
@@ -539,6 +541,7 @@ let runWriteOperation
                 dispatch (SetBusyOperation None)
                 dispatch (SetCurrentProgress None)
                 dispatch (SetErrorNotice(Some message))
+                dispatch (SetWarningNotice None)
                 return Error message
             | Ok operationResult when not operationResult.Success ->
                 let message =
@@ -548,8 +551,9 @@ let runWriteOperation
                 dispatch (SetBusyOperation None)
                 dispatch (SetCurrentProgress None)
                 dispatch (SetErrorNotice(Some message))
+                dispatch (SetWarningNotice None)
                 return Error message
-            | Ok _ ->
+            | Ok operationResult ->
                 let! refreshResult = refreshAll deps isArcLoaded getState dispatch
 
                 dispatch (SetBusyOperation None)
@@ -558,11 +562,14 @@ let runWriteOperation
                 match refreshResult with
                 | Ok(Some _) ->
                     dispatch (SetErrorNotice None)
+                    dispatch (SetWarningNotice operationResult.WarningMessage)
                     return Ok()
                 | Ok None ->
+                    dispatch (SetWarningNotice operationResult.WarningMessage)
                     return Ok()
                 | Error message ->
                     dispatch (SetErrorNotice(Some message))
+                    dispatch (SetWarningNotice None)
                     return Error message
     }
 
@@ -596,6 +603,7 @@ let runPullWorkflow
         else
             dispatch (SetBusyOperation(Some GitBusyOperation.PullingFromRemote))
             dispatch (SetErrorNotice None)
+            dispatch (SetWarningNotice None)
 
             let! result =
                 runGitOperationWithLfsInstallRetry
@@ -614,14 +622,16 @@ let runPullWorkflow
                 dispatch (SetBusyOperation None)
                 dispatch (SetCurrentProgress None)
                 dispatch (SetErrorNotice(Some message))
+                dispatch (SetWarningNotice None)
                 return Error message
             | Ok operationResult when not operationResult.Success ->
                 let message = operationResult.Message |> Option.defaultValue "Pull failed."
                 dispatch (SetBusyOperation None)
                 dispatch (SetCurrentProgress None)
                 dispatch (SetErrorNotice(Some message))
+                dispatch (SetWarningNotice None)
                 return Error message
-            | Ok _ ->
+            | Ok operationResult ->
                 let! refreshResult = refreshAll deps isArcLoaded getState dispatch
 
                 dispatch (SetBusyOperation None)
@@ -630,6 +640,7 @@ let runPullWorkflow
                 match refreshResult with
                 | Error message ->
                     dispatch (SetErrorNotice(Some message))
+                    dispatch (SetWarningNotice None)
                     return Error message
                 | Ok(Some latestStatus) when latestStatus.Conflicted.Length > 0 ->
                     let firstConflictPath = latestStatus.Conflicted.[0]
@@ -638,14 +649,18 @@ let runPullWorkflow
                     match openResult with
                     | Ok () ->
                         dispatch (SetErrorNotice None)
+                        dispatch (SetWarningNotice operationResult.WarningMessage)
                         return Ok(Some latestStatus)
                     | Error message ->
                         dispatch (SetErrorNotice(Some message))
+                        dispatch (SetWarningNotice None)
                         return Error message
                 | Ok(Some latestStatus) ->
                     dispatch (SetErrorNotice None)
+                    dispatch (SetWarningNotice operationResult.WarningMessage)
                     return Ok(Some latestStatus)
                 | Ok None ->
+                    dispatch (SetWarningNotice operationResult.WarningMessage)
                     return Ok None
     }
 
@@ -666,6 +681,8 @@ let runSyncWorkflow
                 return Error message
             | Ok None ->
                 return Ok()
+            | Ok(Some _) when (getState ()).WarningNotice.IsSome ->
+                return Ok()
             | Ok(Some latestStatus) when latestStatus.Conflicted.Length > 0 || latestStatus.IsMergeInProgress ->
                 return Ok()
             | Ok(Some _) ->
@@ -676,6 +693,7 @@ let runCloneWorkflow (deps: GitDependencies) (dispatch: Msg -> unit) (request: G
     promise {
         dispatch (SetBusyOperation(Some GitBusyOperation.CloningRepository))
         dispatch (SetErrorNotice None)
+        dispatch (SetWarningNotice None)
 
         let! result =
             runGitOperationWithLfsInstallRetry
@@ -691,13 +709,16 @@ let runCloneWorkflow (deps: GitDependencies) (dispatch: Msg -> unit) (request: G
         match result with
         | Error message ->
             dispatch (SetErrorNotice(Some message))
+            dispatch (SetWarningNotice None)
             return Error message
         | Ok operationResult when not operationResult.Success ->
             let message = operationResult.Message |> Option.defaultValue "Clone failed."
             dispatch (SetErrorNotice(Some message))
+            dispatch (SetWarningNotice None)
             return Error message
         | Ok operationResult ->
             dispatch (SetErrorNotice None)
+            dispatch (SetWarningNotice operationResult.WarningMessage)
             return Ok(operationResult.Path |> Option.defaultValue request.TargetPath)
     }
 
@@ -736,6 +757,7 @@ let runCommitOperation
 
             dispatch (SetBusyOperation(Some busyOperation))
             dispatch (SetErrorNotice None)
+            dispatch (SetWarningNotice None)
 
             let! prepareStageResult =
                 if currentlyStagedPaths.Length = 0 then
@@ -763,6 +785,7 @@ let runCommitOperation
                 dispatch (SetBusyOperation None)
                 dispatch (SetCurrentProgress None)
                 dispatch (SetErrorNotice(Some message))
+                dispatch (SetWarningNotice None)
                 return Error message
             | Ok () ->
                 let! stageResult =
@@ -781,6 +804,7 @@ let runCommitOperation
                     dispatch (SetBusyOperation None)
                     dispatch (SetCurrentProgress None)
                     dispatch (SetErrorNotice(Some message))
+                    dispatch (SetWarningNotice None)
                     return Error message
                 | Ok operationResult when not operationResult.Success ->
                     let message =
@@ -790,6 +814,7 @@ let runCommitOperation
                     dispatch (SetBusyOperation None)
                     dispatch (SetCurrentProgress None)
                     dispatch (SetErrorNotice(Some message))
+                    dispatch (SetWarningNotice None)
                     return Error message
                 | Ok _ ->
                     let! commitResult =
@@ -808,6 +833,7 @@ let runCommitOperation
                         dispatch (SetBusyOperation None)
                         dispatch (SetCurrentProgress None)
                         dispatch (SetErrorNotice(Some message))
+                        dispatch (SetWarningNotice None)
                         return Error message
                     | Ok operationResult when not operationResult.Success ->
                         let message =
@@ -817,6 +843,7 @@ let runCommitOperation
                         dispatch (SetBusyOperation None)
                         dispatch (SetCurrentProgress None)
                         dispatch (SetErrorNotice(Some message))
+                        dispatch (SetWarningNotice None)
                         return Error message
                     | Ok _ ->
                         let! refreshResult = refreshAll deps isArcLoaded getState dispatch
@@ -827,11 +854,14 @@ let runCommitOperation
                         match refreshResult with
                         | Ok(Some _) ->
                             dispatch (SetErrorNotice None)
+                            dispatch (SetWarningNotice None)
                             return Ok()
                         | Ok None ->
+                            dispatch (SetWarningNotice None)
                             return Ok()
                         | Error message ->
                             dispatch (SetErrorNotice(Some message))
+                            dispatch (SetWarningNotice None)
                             return Error message
     }
 
@@ -857,6 +887,7 @@ let confirmMergeResolution
                 dispatch (SetBusyOperation(Some(GitBusyOperation.ConfirmingMergeResolution request.Path)))
                 dispatch (SetMergeResolutionPendingPath(Some request.Path))
                 dispatch (SetErrorNotice None)
+                dispatch (SetWarningNotice None)
 
                 let! result = deps.confirmGitMergeResolution request
 
@@ -873,6 +904,7 @@ let confirmMergeResolution
                         dispatch (SetActivePage None)
 
                     dispatch (SetErrorNotice(Some message))
+                    dispatch (SetWarningNotice None)
                     return Error message
                 | Ok payload ->
                     dispatch (SetStatus(Some payload.UpdatedStatus))
@@ -885,13 +917,16 @@ let confirmMergeResolution
                         match openResult with
                         | Ok () ->
                             dispatch (SetErrorNotice None)
+                            dispatch (SetWarningNotice None)
                             return Ok()
                         | Error message ->
                             dispatch (SetErrorNotice(Some message))
+                            dispatch (SetWarningNotice None)
                             return Error message
                     | None ->
                         dispatch (SetSelectedChangePath None)
                         dispatch (SetActivePage None)
                         dispatch (SetErrorNotice None)
+                        dispatch (SetWarningNotice None)
                         return Ok()
     }

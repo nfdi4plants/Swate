@@ -95,6 +95,7 @@ let DataHubBrowserTarget () =
                 ?currentProgress = gitStateCtx.state.CurrentProgress,
                 ?busyNotice = gitStateCtx.state.BusyNotice,
                 ?errorNotice = gitStateCtx.state.ErrorNotice,
+                ?warningNotice = gitStateCtx.state.WarningNotice,
                 busyTestId = "DataHubCloneProgressNotice",
                 errorTestId = "DataHubCloneErrorNotice"
             )
