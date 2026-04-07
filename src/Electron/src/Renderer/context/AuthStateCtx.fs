@@ -2,7 +2,6 @@ module Renderer.Context.AuthStateCtx
 
 open Feliz
 open Swate.Electron.Shared.AuthTypes
-open Fable.Electron.Remoting.Renderer
 open Swate.Components.Authentication.Types
 
 
@@ -33,13 +32,8 @@ open AuthStateHelper
 let Provider (children: ReactElement) =
     let authState, setAuthState = React.useState AuthStateDto.Empty
 
-    let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-        Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi.empty with
-            authAccountsUpdate = fun state -> setAuthState state
-    }
-
-    React.useEffectOnce (fun _ ->
-        Remoting.init |> Remoting.buildHandler ipcHandler
+    React.useEffectOnce (fun () ->
+        let disposeAuthSubscription = Renderer.MainUpdateRendererBridge.subscribeAuthAccountsUpdate setAuthState
 
         // TODO: Add error handling.
         promise {
@@ -53,6 +47,8 @@ let Provider (children: ReactElement) =
 
         }
         |> Promise.start
+
+        disposeAuthSubscription
     )
 
 

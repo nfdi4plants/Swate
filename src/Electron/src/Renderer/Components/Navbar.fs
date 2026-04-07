@@ -4,7 +4,6 @@ open Feliz
 
 open Renderer
 open Swate.Components
-open Fable.Electron.Remoting.Renderer
 
 module NavbarHelper =
 
@@ -100,16 +99,8 @@ type private Selector =
 
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
 
-        let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-            pathChange = setCurrentlyOpenArcPath
-            recentARCsUpdate = fun arcs -> setRecentArc arcs
-            authAccountsUpdate = ignore
-            fileTreeUpdate = ignore
-            gitProgressUpdate = ignore
-        }
-
         // Get remote recent ARCs on first load before rendering the selector
-        React.useLayoutEffectOnce (fun _ ->
+        React.useLayoutEffectOnce (fun () ->
             promise {
                 let! arcs = Api.ipcArcVaultApi.getRecentARCs ()
                 let! currentlyOpenArcPath = Api.ipcArcVaultApi.getOpenPath (unbox null)
@@ -119,7 +110,12 @@ type private Selector =
             }
             |> Promise.start
 
-            Remoting.init |> Remoting.buildHandler ipcHandler
+            let disposePathChange = Renderer.MainUpdateRendererBridge.subscribePathChange setCurrentlyOpenArcPath
+            let disposeRecentArcs = Renderer.MainUpdateRendererBridge.subscribeRecentArcsUpdate setRecentArc
+
+            fun () ->
+                disposePathChange ()
+                disposeRecentArcs ()
         )
 
         let selectorControlRef =

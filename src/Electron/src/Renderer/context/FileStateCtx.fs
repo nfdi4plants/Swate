@@ -2,7 +2,6 @@ module Renderer.Context.FileStateCtx
 
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.FileIOTypes
-open Fable.Electron.Remoting.Renderer
 
 open Feliz
 
@@ -42,16 +41,11 @@ let FileStateCtxProvider (children: ReactElement) =
 
     let (fileState, setFileState) = React.useStateWithUpdater (FileState.init ())
 
-    let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-        IMainUpdateRendererApi.empty with
-            fileTreeUpdate =
-                fun fileTreeDict ->
-                    let fileTree = fileTreeDict.Values |> Seq.toArray
-                    setFileState (fun fs -> { fs with FileTree = fileTree })
-    }
-
-
-    React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
+    React.useEffectOnce (fun () ->
+        Renderer.MainUpdateRendererBridge.subscribeFileTreeUpdate (fun fileTreeDict ->
+            let fileTree = fileTreeDict.Values |> Seq.toArray
+            setFileState (fun fs -> { fs with FileTree = fileTree })
+        ))
 
     let fileStateCtx: FileStateController =
         React.useMemo (

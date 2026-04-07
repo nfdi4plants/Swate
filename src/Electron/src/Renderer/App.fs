@@ -3,10 +3,8 @@ module Renderer.App
 open Elmish
 open Feliz
 open Feliz.UseElmish
-open Fable.Electron.Remoting.Renderer
 open Swate.Components
 open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes
 open Types
 open Browser.Dom
 open Renderer.Components
@@ -144,18 +142,11 @@ let Main () =
             [| box model.PageState |]
         )
 
-    let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-        pathChange =
-            fun pathOption ->
-                console.log ("[Swate] CHANGE PATH!")
-                dispatch (SetArcRootPath pathOption)
-        recentARCsUpdate = ignore
-        authAccountsUpdate = ignore
-        fileTreeUpdate = ignore
-        gitProgressUpdate = ignore
-    }
-
-    React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
+    React.useEffectOnce (fun () ->
+        Renderer.MainUpdateRendererBridge.subscribePathChange (fun pathOption ->
+            console.log ("[Swate] CHANGE PATH!")
+            dispatch (SetArcRootPath pathOption)
+        ))
 
     ///Main content module
     let children =

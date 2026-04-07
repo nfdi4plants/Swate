@@ -2,7 +2,6 @@ module Renderer.Context.GitStateCtx
 
 open Browser.Dom
 open Fable.Core
-open Fable.Electron.Remoting.Renderer
 open Feliz
 open Feliz.UseElmish
 
@@ -105,9 +104,13 @@ let GitStateCtxProvider (children: ReactElement) =
     let gitState, elmishDispatch = React.useElmish ((fun () -> init appStateCtx.state), update, [| box appStateCtx.state |])
     let gitStateRef = React.useRef gitState
 
+    // Async git workflows need an immediate getState escape hatch for promise callbacks.
+    // Keep the ref on the same transition table as Elmish so async reads and render state
+    // stay aligned without introducing a second source of truth.
     gitStateRef.current <- gitState
 
     let dispatch msg =
+        // Update the ref first for async closures, then hand the same message to Elmish for rendering.
         let nextState = transition msg gitStateRef.current
         gitStateRef.current <- nextState
         elmishDispatch msg
@@ -285,17 +288,15 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction request =
         Renderer.Context.GitWorkflow.confirmMergeResolution dependencies isArcLoaded getState dispatch request
 
-    let ipcHandler: IMainUpdateRendererApi = {
-        IMainUpdateRendererApi.empty with
-            gitProgressUpdate =
-                fun progress ->
-                    dispatch (SetCurrentProgress(Some(mapProgress progress)))
-    }
-
-    React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
+    React.useEffectOnce (fun () ->
+        Renderer.MainUpdateRendererBridge.subscribeGitProgressUpdate (fun progress ->
+            dispatch (SetCurrentProgress(Some(mapProgress progress)))
+        ))
 
     React.useEffect (
         (fun () ->
+            // GitState owns git-specific pages; PageState mirrors them so the app shell can route
+            // shared main-content rendering without reimplementing git page ownership elsewhere.
             match gitState.ActivePage with
             | Some(GitPage.Diff diffData) ->
                 pageStateCtx.setState (Some(PageState.GitDiffPage diffData))
