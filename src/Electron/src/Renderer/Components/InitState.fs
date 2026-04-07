@@ -88,6 +88,7 @@ let CreateNewArcModalContent (close: unit -> unit) =
 let InitState () =
 
     let modalIsOpen, setModalIsOpen = React.useState (false)
+    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
 
     React.Fragment [
         BaseModal.BaseModal(modalIsOpen, setModalIsOpen, CreateNewArcModalContent(fun () -> setModalIsOpen false))
@@ -108,6 +109,14 @@ let InitState () =
                     "New ARC",
                     "Create a new ARC!",
                     (fun _ -> setModalIsOpen (not modalIsOpen))
+                )
+                CardGrid.CardGridButton(
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--cloud-beaker-24-filled swt:size-5"
+                    ],
+                    "Download ARC",
+                    "Download an existing ARC from DataHub!",
+                    (fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser))
                 )
             ],
             gridClassName = "swt:grid swt:grid-cols-2"

@@ -8,7 +8,7 @@ open Swate.Electron.Shared.AuthTypes
 open Main.Auth
 
 let private broadcastAccountsUpdate () =
-    let accounts = AuthService.listAccounts ()
+    let authState = AuthService.getState ()
 
     ARC_VAULTS.Vaults.Values
     |> Array.ofSeq
@@ -16,7 +16,7 @@ let private broadcastAccountsUpdate () =
         Remoting.init
         |> Remoting.withWindow window.window
         |> Remoting.buildClient<IMainUpdateRendererApi>
-        |> fun client -> client.authAccountsUpdate accounts
+        |> fun client -> client.authAccountsUpdate authState
     )
 
 let api: IAuthApi = {

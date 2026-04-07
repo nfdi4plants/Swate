@@ -29,6 +29,7 @@
     <Compile Include="IPC\GitLfs.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
     <Compile Include="IPC\IGitApi.fs" />
+    <Compile Include="IPC\IGitLabApi.fs" />
     <Compile Include="IPC\IArcVaultsApi.fs" />
     <Compile Include="IPC\IAuthApi.fs" />
     <Compile Include="main.fs" />

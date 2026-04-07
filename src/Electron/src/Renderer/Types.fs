@@ -1,7 +1,6 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open Swate.Components
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -26,6 +25,7 @@ type PageState =
     | GitMergeConflictPage of GitMergeConflictViewDataDto
     | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
+    | DataHubBrowser
 
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with

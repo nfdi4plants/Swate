@@ -16,6 +16,7 @@ open Renderer.Components.MainContent.EmptySelectionTarget
 open Renderer.Components.MainContent.GitDiffTarget
 open Renderer.Components.MainContent.GitMergeConflictTarget
 open Renderer.Components.MainContent.GitUnsupportedTarget
+open Renderer.Components.MainContent.DataHubBrowserTarget
 
 [<ReactComponent>]
 let ArcTarget () =
@@ -40,6 +41,7 @@ let ArcTarget () =
                 | PageState.GitDiffPage diffData -> GitDiffTarget.Main diffData
                 | PageState.GitMergeConflictPage mergeData -> GitMergeConflictTarget.Main mergeData
                 | PageState.GitUnsupportedPage unsupportedPage -> GitUnsupportedTarget.Main unsupportedPage
+                | PageState.DataHubBrowser -> DataHubBrowserTarget()
             | None -> EmptySelectionTarget()
 
         ]

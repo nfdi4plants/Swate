@@ -6,8 +6,10 @@ open Fable.Electron
 
 open Swate.Components
 open Swate.Components.NoteTypes
+open Swate.Components.Authentication.Types
+open Swate.Components.DataHubTypes
+open Swate.Components.Api.GitLabApi
 
-open ARCtrl.ARCtrlHelper
 open AuthTypes
 open GitTypes
 open FileIOTypes
@@ -36,8 +38,9 @@ type IArcVaultsApi = {
     removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
 
     pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickDirectory: IpcMainEvent -> JS.Promise<Result<string, exn>>
     pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
-    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
+    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<Swate.Components.ImportedTextFile[], exn>>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
     readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
@@ -78,11 +81,23 @@ type IGitApi = {
         IpcMainEvent -> GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>>
 }
 
+/// Two Way Bridge: Renderer <-> Main
+type IGitLabApi = {
+    loadAllRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadMostStarredRepos:
+        IpcMainEvent -> ExploreMostStarredQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadUserRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadOrganisationGroups:
+        IpcMainEvent -> ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
+    loadOrganisationRepos:
+        IpcMainEvent -> ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+}
+
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
-    authAccountsUpdate: AuthAccountSummary[] -> unit
+    authAccountsUpdate: AuthStateDto -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit
 } with
@@ -110,7 +125,7 @@ type IAuthApi = {
     getAuthState: unit -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
     revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
-    listAccounts: unit -> Fable.Core.JS.Promise<Result<AuthAccountSummary array, exn>>
+    listAccounts: unit -> Fable.Core.JS.Promise<Result<AccountSummary array, exn>>
     setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
 }

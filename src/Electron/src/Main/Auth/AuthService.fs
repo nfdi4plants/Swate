@@ -3,10 +3,16 @@ module Main.Auth.AuthService
 open System
 open Fable.Core
 open Swate.Electron.Shared.AuthTypes
+open Swate.Components.Authentication.Types
 
 // ── Types ────────────────────────────────────────────────────────────
 
 type internal AuthFailure = GitLabApi.GitLabAuthFailure
+
+type private AccountState = {
+    Summary: AccountSummary
+    Token: string
+}
 
 /// Normalize and validate a GitLab base URL. HTTPS only.
 let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
@@ -36,41 +42,82 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
 //   2. If no match, search all accounts for a host match.
 //   3. If still no match, return None.
 
-/// Map of accountId → (AuthUserDto, token)
-let mutable private accounts: Map<string, AuthUserDto * string> = Map.empty
+/// Map of accountId → account state (summary + PAT).
+let mutable private accounts: Map<string, AccountState> = Map.empty
 
 /// Currently active account ID.
 let mutable private activeAccountId: string option = None
 
-let private getActiveAccount () =
+let private getActiveAccountState () =
     activeAccountId |> Option.bind (fun id -> accounts |> Map.tryFind id)
 
-let private toSummary (user: AuthUserDto, _token: string) : AuthAccountSummary = {
-    AccountId = user.AccountId
-    Name = user.Name
-    Email = user.Email
-    AvatarUrl = user.AvatarUrl
-    TargetDataHub = user.TargetDataHub
-    IsActive = activeAccountId = Some user.AccountId
+let private persistActiveSelection () =
+    SecureAuthStore.setActiveAccountId activeAccountId
+
+let private reconcileActiveAccountInvariant () =
+    let nextActive =
+        if accounts.IsEmpty then
+            None
+        else
+            match activeAccountId with
+            | Some id when accounts |> Map.containsKey id -> Some id
+            | _ -> accounts |> Map.tryPick (fun id _ -> Some id)
+
+    if activeAccountId <> nextActive then
+        activeAccountId <- nextActive
+        persistActiveSelection ()
+
+let private toMetadata (accountId: string) (summary: AccountSummary) : SecureAuthStore.AuthMetadata = {
+    AccountId = accountId
+    Name = summary.User.Name
+    Email = summary.User.Email
+    AvatarUrl = summary.User.AvatarUrl
+    TargetDataHub = summary.User.TargetDataHub
+    DateAdded = summary.DateAdded
+    TokenInvalid = summary.TokenInvalid
+}
+
+let private persistAccountState (accountId: string) (accountState: AccountState) : unit =
+    let storeResult =
+        SecureAuthStore.store {
+            Metadata = toMetadata accountId accountState.Summary
+            Token = accountState.Token
+        }
+
+    match storeResult with
+    | Error msg -> Browser.Dom.console.warn $"Auth storage warning: {msg}"
+    | Ok() -> ()
+
+let private getAuthStateDto () : AuthStateDto = {
+    ActiveAccount = getActiveAccountState () |> Option.map _.Summary
+    StoredAccounts = accounts |> Map.toArray |> Array.map (fun (_, v) -> v.Summary)
 }
 
 /// Try to get token for a given host (used by GitTokenProvider).
 /// Policy: active account first, then any account matching the host.
 let tryGetTokenForHost (host: string) : string option =
     // 1. Check active account
-    match getActiveAccount () with
-    | Some(user, token) when
-        String.Equals(SecureAuthStore.extractHost user.TargetDataHub, host, StringComparison.OrdinalIgnoreCase)
+    match getActiveAccountState () with
+    | Some accountState when
+        String.Equals(
+            SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
+            host,
+            StringComparison.OrdinalIgnoreCase
+        )
         ->
-        Some token
+        Some accountState.Token
     | _ ->
         // 2. Search all accounts
         accounts
-        |> Map.tryPick (fun _ (user, token) ->
+        |> Map.tryPick (fun _ accountState ->
             if
-                String.Equals(SecureAuthStore.extractHost user.TargetDataHub, host, StringComparison.OrdinalIgnoreCase)
+                String.Equals(
+                    SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
+                    host,
+                    StringComparison.OrdinalIgnoreCase
+                )
             then
-                Some token
+                Some accountState.Token
             else
                 None
         )
@@ -82,27 +129,33 @@ let private refreshTokenProvider () =
 
 /// Get the current in-memory auth state for the active account.
 let getState () : AuthStateDto =
-    let allSummaries = accounts |> Map.toArray |> Array.map (fun (_, v) -> toSummary v)
-
-    match getActiveAccount () with
-    | Some(user, _) -> {
-        IsAuthenticated = true
-        User = Some user
-        Accounts = allSummaries
-      }
-    | None -> {
-        IsAuthenticated = false
-        User = None
-        Accounts = allSummaries
-      }
+    reconcileActiveAccountInvariant ()
+    getAuthStateDto ()
 
 /// List all stored account summaries.
-let listAccounts () : AuthAccountSummary array =
-    accounts |> Map.toArray |> Array.map (fun (_, v) -> toSummary v)
+let listAccounts () : AccountSummary array = (getState ()).StoredAccounts
+
+/// Main-process only helper to read the active account and token.
+let tryGetActiveAccountWithToken () : (AuthUserDto * string) option =
+    getActiveAccountState ()
+    |> Option.map (fun accountState -> accountState.Summary.User, accountState.Token)
+
+/// Main-process helper to resolve a DataHub endpoint for unauthenticated/public browsing.
+let tryGetPreferredDataHub () : string option =
+    match getActiveAccountState () with
+    | Some accountState -> Some accountState.Summary.User.TargetDataHub
+    | None ->
+        accounts
+        |> Map.tryPick (fun _ accountState ->
+            if String.IsNullOrWhiteSpace accountState.Summary.User.TargetDataHub then
+                None
+            else
+                Some accountState.Summary.User.TargetDataHub
+        )
 
 // ── Public operations ────────────────────────────────────────────────
 
-let private toAuthResult (result: Result<AuthUserDto, AuthFailure>) : AuthResult =
+let private toAuthResult (result: Result<AuthStateDto, AuthFailure>) : AuthResult =
     match result with
     | Ok user -> {
         Success = true
@@ -136,27 +189,29 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
             match verifyResult with
             | Error failure -> return toAuthResult (Error failure)
             | Ok user ->
-                let storeResult =
-                    SecureAuthStore.store {
-                        Metadata = {
-                            AccountId = user.AccountId
-                            Name = user.Name
-                            Email = user.Email
-                            AvatarUrl = user.AvatarUrl
-                            TargetDataHub = user.TargetDataHub
-                        }
-                        Token = request.PersonalAccessToken
+                let dateAdded =
+                    accounts
+                    |> Map.tryFind user.AccountId
+                    |> Option.map (fun accountState -> accountState.Summary.DateAdded)
+                    |> Option.defaultValue (Swate.Components.DateTimeExtensions.getUtcNowISO ())
+
+                let accountState = {
+                    Summary = {
+                        User = user
+                        DateAdded = dateAdded
+                        TokenInvalid = false
                     }
+                    Token = request.PersonalAccessToken
+                }
 
-                match storeResult with
-                | Error msg -> Browser.Dom.console.warn $"Auth storage warning: {msg}"
-                | Ok() -> ()
+                persistAccountState user.AccountId accountState
 
-                accounts <- accounts |> Map.add user.AccountId (user, request.PersonalAccessToken)
+                accounts <- accounts |> Map.add user.AccountId accountState
                 activeAccountId <- Some user.AccountId
-                SecureAuthStore.setActiveAccountId activeAccountId
+                persistActiveSelection ()
                 refreshTokenProvider ()
-                return toAuthResult (Ok user)
+                let authStateDto = getState ()
+                return toAuthResult (Ok authStateDto)
 }
 
 /// Sign out: remove active account from memory and disk, pick next or clear.
@@ -165,10 +220,7 @@ let signOut () : unit =
     | Some id ->
         SecureAuthStore.remove id
         accounts <- accounts |> Map.remove id
-        // Pick the next available account as active, or None
-        let nextActive = accounts |> Map.tryPick (fun k _ -> Some k)
-        activeAccountId <- nextActive
-        SecureAuthStore.setActiveAccountId activeAccountId
+        reconcileActiveAccountInvariant ()
         refreshTokenProvider ()
     | None -> ()
 
@@ -177,7 +229,7 @@ let setActiveAccount (accountId: string) : AuthStateDto =
     match accounts |> Map.tryFind accountId with
     | Some _ ->
         activeAccountId <- Some accountId
-        SecureAuthStore.setActiveAccountId activeAccountId
+        persistActiveSelection ()
         refreshTokenProvider ()
     | None -> ()
 
@@ -188,34 +240,84 @@ let removeAccount (accountId: string) : unit =
     SecureAuthStore.remove accountId
     accounts <- accounts |> Map.remove accountId
 
-    if activeAccountId = Some accountId then
-        let nextActive = accounts |> Map.tryPick (fun k _ -> Some k)
-        activeAccountId <- nextActive
-        SecureAuthStore.setActiveAccountId activeAccountId
-
+    reconcileActiveAccountInvariant ()
     refreshTokenProvider ()
 
-/// Revalidate: re-verify the active account's token with GitLab.
+/// Revalidate all stored accounts and mark invalid tokens without removing accounts.
 let revalidate () : JS.Promise<AuthResult> = promise {
-    match getActiveAccount () with
-    | None ->
+    if accounts.IsEmpty then
+        let authStateDto = getState ()
+
         return {
             Success = false
-            User = None
+            User = Some authStateDto
             FailureKind = Some AuthFailureKind.Unauthorized
-            Message = Some "No active account."
+            Message = Some "No stored accounts."
         }
-    | Some(user, token) ->
-        let! verifyResult = GitLabApi.verifyToken user.TargetDataHub token
+    else
+        let mutable nextAccounts = accounts
+        let mutable firstFailure: AuthFailure option = None
 
-        match verifyResult with
-        | Error failure ->
-            // Token is no longer valid — remove only this account
-            removeAccount user.AccountId
-            return toAuthResult (Error failure)
-        | Ok updatedUser ->
-            accounts <- accounts |> Map.add updatedUser.AccountId (updatedUser, token)
-            return toAuthResult (Ok updatedUser)
+        for accountId, accountState in accounts |> Map.toArray do
+            let currentUser = accountState.Summary.User
+            let! verifyResult = GitLabApi.verifyToken currentUser.TargetDataHub accountState.Token
+
+            match verifyResult with
+            | Ok verifiedUser ->
+                // Keep the persisted account id stable to avoid file renames on profile changes.
+                let stableUser = {
+                    verifiedUser with
+                        AccountId = accountId
+                }
+
+                let updatedAccountState = {
+                    accountState with
+                        Summary = {
+                            accountState.Summary with
+                                User = stableUser
+                                TokenInvalid = false
+                        }
+                }
+
+                nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
+                persistAccountState accountId updatedAccountState
+
+            | Error failure ->
+                if firstFailure.IsNone then
+                    firstFailure <- Some failure
+
+                let updatedAccountState = {
+                    accountState with
+                        Summary = {
+                            accountState.Summary with
+                                TokenInvalid = true
+                        }
+                }
+
+                nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
+                persistAccountState accountId updatedAccountState
+
+        accounts <- nextAccounts
+        reconcileActiveAccountInvariant ()
+        refreshTokenProvider ()
+
+        let authStateDto = getState ()
+
+        match firstFailure with
+        | Some failure ->
+            return {
+                Success = false
+                User = Some authStateDto
+                FailureKind = Some failure.Kind
+                Message = Some failure.Message
+            }
+        | None ->
+            return {
+                Success = true
+                User = Some authStateDto
+                FailureKind = None
+                Message = None
+            }
 }
 
 /// Restore all accounts from persisted secure storage on app startup.
@@ -231,17 +333,21 @@ let tryRestoreFromStorage () : unit =
             TargetDataHub = credential.Metadata.TargetDataHub
         }
 
-        accounts <- accounts |> Map.add user.AccountId (user, credential.Token)
+        let accountState = {
+            Summary = {
+                User = user
+                DateAdded = credential.Metadata.DateAdded
+                TokenInvalid = credential.Metadata.TokenInvalid
+            }
+            Token = credential.Token
+        }
+
+        accounts <- accounts |> Map.add user.AccountId accountState
 
     // Restore persisted active account selection
     activeAccountId <- SecureAuthStore.getActiveAccountId ()
 
-    // If persisted active account no longer exists, pick the first available
-    match activeAccountId with
-    | Some id when accounts |> Map.containsKey id -> ()
-    | _ ->
-        activeAccountId <- accounts |> Map.tryPick (fun k _ -> Some k)
-        SecureAuthStore.setActiveAccountId activeAccountId
+    reconcileActiveAccountInvariant ()
 
     if not accounts.IsEmpty then
         refreshTokenProvider ()
