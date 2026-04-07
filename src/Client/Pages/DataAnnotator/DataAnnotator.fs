@@ -202,12 +202,12 @@ module private DataAnnotatorHelper =
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
                 match model.SpreadsheetModel.ActiveView with
-                | Spreadsheet.ActivePattern.IsTable ->
+                | Spreadsheet.ActiveView.Table _ ->
                     UpdateSeparatorButton dispatch
                     UpdateIsHeaderCheckbox model dispatch
                     UpdateTargetColumn target setTarget
                 //ResetButton model rmvFile
-                | Spreadsheet.ActivePattern.IsDataMap ->
+                | Spreadsheet.ActiveView.DataMap ->
                     UpdateSeparatorButton dispatch
                     UpdateIsHeaderCheckbox model dispatch
                 //ResetButton model rmvFile
@@ -366,7 +366,7 @@ type DataAnnotator =
             Some "Select at least one target in the preview table."
         else
             match model.SpreadsheetModel.ActiveView with
-            | Spreadsheet.ActivePattern.IsTable ->
+            | Spreadsheet.ActiveView.Table _ ->
                 match targetCol with
                 | TargetColumn.Autodetect ->
                     match model.SpreadsheetModel.ActiveTable.TryGetInputColumn(), model.SpreadsheetModel.ActiveTable.TryGetOutputColumn() with

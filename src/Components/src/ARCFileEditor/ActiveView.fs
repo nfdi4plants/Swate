@@ -33,7 +33,9 @@ type ActiveView =
         | DataMap -> arcFile.CanRenderDataMapView()
         | Metadata -> arcFile.HasMetadata()
 
-    static member Normalize(arcFile: ArcFiles, current: ActiveView) =
+    /// Normalizes the active view based on the content of the arc file.
+    /// If the current active view is not available for the given arc file, it will return a valid active view based on the content of the arc file.
+    static member Forward(arcFile: ArcFiles, current: ActiveView) =
         if current.IsAvailableOn(arcFile) then
             current
         elif arcFile.Tables().Count > 0 then
@@ -42,12 +44,3 @@ type ActiveView =
             ActiveView.DataMap
         else
             ActiveView.Metadata
-
-[<AutoOpen>]
-module ActivePattern =
-
-    let (|IsTable|IsDataMap|IsMetadata|) (input: ActiveView) =
-        match input with
-        | ActiveView.Table _ -> IsTable
-        | ActiveView.DataMap -> IsDataMap
-        | ActiveView.Metadata -> IsMetadata

@@ -303,9 +303,9 @@ type Widget =
 
         let activeView =
             match model.SpreadsheetModel.ActiveView with
-            | Spreadsheet.ActivePattern.IsTable -> WidgetHostView.TableView
-            | Spreadsheet.ActivePattern.IsDataMap -> WidgetHostView.DataMapView
-            | Spreadsheet.ActivePattern.IsMetadata -> WidgetHostView.MetadataView
+            | Spreadsheet.ActiveView.Table _ -> WidgetHostView.TableView
+            | Spreadsheet.ActiveView.DataMap -> WidgetHostView.DataMapView
+            | Spreadsheet.ActiveView.Metadata -> WidgetHostView.MetadataView
 
         let setArcFileState nextArcFileState =
             match nextArcFileState with

@@ -9,7 +9,6 @@ open Swate.Components.Shared
 type ArcFileEditorHeaderProps = {
     arcFile: ArcFiles
     activeView: ActiveView
-    widgetHostView: WidgetHostView
 }
 
 type private AddRowsTarget =
@@ -88,7 +87,7 @@ type ArcFileEditor =
         ]
 
     [<ReactComponent>]
-    static member private ARCObjectView(
+    static member private ArcFileView(
         activeView: ActiveView,
         arcFileState: ArcFiles,
         setArcFileState: ArcFiles -> unit)
@@ -288,17 +287,20 @@ type ArcFileEditor =
 
         React.useEffect (
             (fun () ->
-                let nextActiveView = ActiveView.Normalize(arcFile, activeView)
+                let nextActiveView = ActiveView.Forward(arcFile, activeView)
 
                 setActiveView nextActiveView
             ),
-            [| box arcFile |]
+            [|
+                box (arcFile.Tables().Count)
+                box (arcFile.CanRenderDataMapView())
+                box (arcFile.HasMetadata())
+            |]
         )
 
         let headerProps = {
             arcFile = arcFile
             activeView = activeView
-            widgetHostView = activeView.ToWidgetHostView()
         }
 
         Html.div [
@@ -319,7 +321,7 @@ type ArcFileEditor =
                             prop.children [
                                 Html.div [
                                     prop.className "swt:flex-1 swt:overflow-x-hidden swt:overflow-y-auto"
-                                    prop.children [ ArcFileEditor.ARCObjectView(activeView, arcFile, setArcFile) ]
+                                    prop.children [ ArcFileEditor.ArcFileView(activeView, arcFile, setArcFile) ]
                                 ]
                                 ArcFileEditor.AddRowsFooter(activeView, arcFile, setArcFile)
                                 ArcFileEditor.Footer(arcFile, activeView, setActiveView, setArcFile)

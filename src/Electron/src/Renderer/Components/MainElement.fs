@@ -14,6 +14,7 @@ let CreateARCitectNavbar
     =
 
     let activeTableIndex = editorState.activeView.TryTableIndex
+    let widgetHostView = editorState.activeView.ToWidgetHostView()
 
     let templateImportType, setTemplateImportType =
         React.useState TableJoinOptions.Headers
@@ -21,7 +22,7 @@ let CreateARCitectNavbar
     let widgets =
         createWidgets
             editorState.arcFile
-            editorState.widgetHostView
+            widgetHostView
             activeTableIndex
             setArcFileState
             templateImportType

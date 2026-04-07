@@ -8,14 +8,6 @@ open Swate.Components.Shared
 
 type ActiveView = Swate.Components.ActiveView
 
-module ActivePattern =
-
-    let (|IsTable|IsDataMap|IsMetadata|) (input: ActiveView) =
-        match input with
-        | Swate.Components.ActiveView.Table _ -> IsTable
-        | Swate.Components.ActiveView.DataMap -> IsDataMap
-        | Swate.Components.ActiveView.Metadata -> IsMetadata
-
 type ColumnType =
     | Main
     | Unit

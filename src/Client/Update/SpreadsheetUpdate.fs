@@ -60,9 +60,9 @@ module Spreadsheet =
             | AddDataAnnotation data ->
                 let nextState =
                     match state.ActiveView with
-                    | IsDataMap -> Controller.DataMap.addDataAnnotation data state
-                    | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
-                    | IsMetadata -> failwith "Unable to add data annotation in metadata view"
+                    | ActiveView.DataMap -> Controller.DataMap.addDataAnnotation data state
+                    | ActiveView.Table _ -> Controller.BuildingBlocks.addDataAnnotation data state
+                    | ActiveView.Metadata -> failwith "Unable to add data annotation in metadata view"
 
                 nextState, model, Cmd.none
             | AddTemplates(tables, importType) ->
