@@ -113,16 +113,16 @@ Vitest.beforeAll(fun () -> promise {
 
 Vitest.describe("GitService.classifyFailureKind", fun () ->
     let cases = [|
-        "maps unauthorized message", "authentication failed for remote", GitService.GitFailureKind.Unauthorized
-        "maps forbidden message", "403 Forbidden", GitService.GitFailureKind.Forbidden
-        "maps network message", "could not resolve host github.com", GitService.GitFailureKind.Network
-        "maps timeout message", "operation timed out", GitService.GitFailureKind.Timeout
-        "maps canceled message", "AbortError: signal aborted", GitService.GitFailureKind.Canceled
-        "falls back to unknown message", "something unexpected", GitService.GitFailureKind.Unknown
-        "keeps unauthorized priority over network indicators", "connection refused, could not read username", GitService.GitFailureKind.Unauthorized
-        "keeps timeout priority over authentication indicators", "timeout while authentication failed", GitService.GitFailureKind.Timeout
-        "maps permission denied publickey to unauthorized", "Permission denied (publickey).", GitService.GitFailureKind.Unauthorized
-        "keeps forbidden precedence when 403 and auth text are mixed", "403 Forbidden: could not read username", GitService.GitFailureKind.Forbidden
+        "maps unauthorized message", "authentication failed for remote", GitFailureKind.Unauthorized
+        "maps forbidden message", "403 Forbidden", GitFailureKind.Forbidden
+        "maps network message", "could not resolve host github.com", GitFailureKind.Network
+        "maps timeout message", "operation timed out", GitFailureKind.Timeout
+        "maps canceled message", "AbortError: signal aborted", GitFailureKind.Canceled
+        "falls back to unknown message", "something unexpected", GitFailureKind.Unknown
+        "keeps unauthorized priority over network indicators", "connection refused, could not read username", GitFailureKind.Unauthorized
+        "keeps timeout priority over authentication indicators", "timeout while authentication failed", GitFailureKind.Timeout
+        "maps permission denied publickey to unauthorized", "Permission denied (publickey).", GitFailureKind.Unauthorized
+        "keeps forbidden precedence when 403 and auth text are mixed", "403 Forbidden: could not read username", GitFailureKind.Forbidden
     |]
 
     for testName, message, expected in cases do
@@ -463,7 +463,7 @@ Vitest.describe("GitProvisioningService validation helpers", fun () ->
         Vitest.test("retries without auth for unauthorized with HTTP auth signal", fun () ->
             let shouldRetry =
                 GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitService.GitFailureKind.Unauthorized
+                    Kind = GitFailureKind.Unauthorized
                     Message = "authentication failed for remote"
                 }
 
@@ -472,7 +472,7 @@ Vitest.describe("GitProvisioningService validation helpers", fun () ->
         Vitest.test("retries without auth for forbidden", fun () ->
             let shouldRetry =
                 GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitService.GitFailureKind.Forbidden
+                    Kind = GitFailureKind.Forbidden
                     Message = "403 Forbidden"
                 }
 
@@ -481,7 +481,7 @@ Vitest.describe("GitProvisioningService validation helpers", fun () ->
         Vitest.test("does not retry without auth for generic permission denied", fun () ->
             let shouldRetry =
                 GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitService.GitFailureKind.Unauthorized
+                    Kind = GitFailureKind.Unauthorized
                     Message = "fatal: cannot create directory 'repo': Permission denied"
                 }
 
@@ -490,17 +490,17 @@ Vitest.describe("GitProvisioningService validation helpers", fun () ->
         Vitest.test("retries without auth for ssh publickey permission denied", fun () ->
             let shouldRetry =
                 GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitService.GitFailureKind.Unauthorized
+                    Kind = GitFailureKind.Unauthorized
                     Message = "Permission denied (publickey)."
                 }
 
             Vitest.expect(shouldRetry).toBe(true))
 
         let nonAuthKinds = [|
-            GitService.GitFailureKind.Network
-            GitService.GitFailureKind.Timeout
-            GitService.GitFailureKind.Canceled
-            GitService.GitFailureKind.Unknown
+            GitFailureKind.Network
+            GitFailureKind.Timeout
+            GitFailureKind.Canceled
+            GitFailureKind.Unknown
         |]
 
         for kind in nonAuthKinds do
