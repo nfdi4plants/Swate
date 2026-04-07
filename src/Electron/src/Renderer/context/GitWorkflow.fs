@@ -19,6 +19,7 @@ type GitBusyOperation =
     | FetchingFromRemote
     | PullingFromRemote
     | PushingToRemote
+    | CloningRepository
     | CommittingSelectedChanges
     | CommittingAllChanges
     | SavingGitLfsThreshold
@@ -118,6 +119,7 @@ type GitDependencies = {
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+    gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -143,6 +145,7 @@ let busyNoticeFromOperation = function
     | GitBusyOperation.FetchingFromRemote -> Some "Fetching from remote"
     | GitBusyOperation.PullingFromRemote -> Some "Pulling from remote"
     | GitBusyOperation.PushingToRemote -> Some "Pushing to remote"
+    | GitBusyOperation.CloningRepository -> Some "Cloning repository"
     | GitBusyOperation.CommittingSelectedChanges -> Some "Committing selected changes"
     | GitBusyOperation.CommittingAllChanges -> Some "Committing all changes"
     | GitBusyOperation.SavingGitLfsThreshold -> Some "Saving Git LFS threshold"
@@ -667,6 +670,35 @@ let runSyncWorkflow
                 return Ok()
             | Ok(Some _) ->
                 return! runPushWorkflow deps isArcLoaded getState dispatch
+    }
+
+let runCloneWorkflow (deps: GitDependencies) (dispatch: Msg -> unit) (request: GitCloneRepositoryRequest) =
+    promise {
+        dispatch (SetBusyOperation(Some GitBusyOperation.CloningRepository))
+        dispatch (SetErrorNotice None)
+
+        let! result =
+            runGitOperationWithLfsInstallRetry
+                deps
+                dispatch
+                GitBusyOperation.CloningRepository
+                true
+                (fun () -> deps.gitCloneRepository request)
+
+        dispatch (SetBusyOperation None)
+        dispatch (SetCurrentProgress None)
+
+        match result with
+        | Error message ->
+            dispatch (SetErrorNotice(Some message))
+            return Error message
+        | Ok operationResult when not operationResult.Success ->
+            let message = operationResult.Message |> Option.defaultValue "Clone failed."
+            dispatch (SetErrorNotice(Some message))
+            return Error message
+        | Ok operationResult ->
+            dispatch (SetErrorNotice None)
+            return Ok(operationResult.Path |> Option.defaultValue request.TargetPath)
     }
 
 let runCommitOperation

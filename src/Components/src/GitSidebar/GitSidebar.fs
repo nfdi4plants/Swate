@@ -42,6 +42,117 @@ module private GitSidebarInternal =
 type GitSidebar =
 
     [<ReactComponent>]
+    static member OperationStatusNotice
+        (?currentProgress: GitSidebarProgress, ?busyNotice: string, ?errorNotice: string, ?busyTestId: string, ?errorTestId: string)
+        =
+        React.Fragment [
+            match currentProgress with
+            | Some progress ->
+                Html.div [
+                    prop.className "swt:px-3 swt:pt-3"
+                    prop.children [
+                        Html.div [
+                            if busyTestId.IsSome then
+                                prop.testId busyTestId.Value
+                            prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
+                            prop.children [
+                                Html.span [ prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4" ]
+                                Html.span [
+                                    prop.text (
+                                        busyNotice
+                                        |> Option.defaultValue
+                                            (GitSidebarInternal.progressText progress |> function
+                                                | "" -> "Git operation in progress"
+                                                | text -> text)
+                                    )
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            | None ->
+                match busyNotice with
+                | Some notice ->
+                    Html.div [
+                        prop.className "swt:px-3 swt:pt-3"
+                        prop.children [
+                            Html.div [
+                                if busyTestId.IsSome then
+                                    prop.testId busyTestId.Value
+                                prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
+                                prop.children [
+                                    Html.span [ prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4" ]
+                                    Html.span notice
+                                ]
+                            ]
+                        ]
+                    ]
+                | None ->
+                    Html.none
+
+            match errorNotice with
+            | Some message ->
+                Html.div [
+                    prop.className "swt:px-3 swt:pt-3"
+                    prop.children [
+                        Html.div [
+                            if errorTestId.IsSome then
+                                prop.testId errorTestId.Value
+                            prop.className "swt:alert swt:alert-error swt:px-3 swt:py-2 swt:text-sm"
+                            prop.children [
+                                Html.span [ prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4" ]
+                                Html.span message
+                            ]
+                        ]
+                    ]
+                ]
+            | None ->
+                Html.none
+        ]
+
+    [<ReactComponent>]
+    static member DownloadLargeFilesToggle
+        (
+            downloadLargeFiles: bool,
+            isBusy: bool,
+            onChange: bool -> unit,
+            ?testId: string,
+            ?label: string,
+            ?description: string
+        ) =
+        Html.label [
+            prop.className "swt:flex swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3"
+            prop.children [
+                Html.input [
+                    if testId.IsSome then
+                        prop.testId testId.Value
+                    prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
+                    prop.type'.checkbox
+                    prop.disabled isBusy
+                    prop.isChecked downloadLargeFiles
+                    prop.onChange onChange
+                ]
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:flex-col"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:text-sm swt:font-medium"
+                            prop.text (defaultArg label "Download Large Files")
+                        ]
+                        match description with
+                        | Some text ->
+                            Html.span [
+                                prop.className "swt:text-xs swt:text-base-content/70"
+                                prop.text text
+                            ]
+                        | None ->
+                            Html.none
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private SectionHeader(title: string, countText: string option) =
         Html.div [
             prop.className "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
@@ -543,25 +654,14 @@ type GitSidebar =
                     prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
                     prop.children [
                         Html.label [
-                            prop.className "swt:col-span-2 swt:flex swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3"
+                            prop.className "swt:col-span-2"
                             prop.children [
-                                Html.input [
-                                    prop.testId "GitSidebarDownloadLargeFilesCheckbox"
-                                    prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
-                                    prop.type'.checkbox
-                                    prop.disabled isBusy
-                                    prop.isChecked downloadLargeFilesInput
-                                    prop.onChange submitDownloadLargeFiles
-                                ]
-                                Html.div [
-                                    prop.className "swt:flex swt:min-w-0 swt:flex-col"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "swt:text-sm swt:font-medium"
-                                            prop.text "Download Large Files"
-                                        ]
-                                    ]
-                                ]
+                                GitSidebar.DownloadLargeFilesToggle(
+                                    downloadLargeFilesInput,
+                                    isBusy,
+                                    submitDownloadLargeFiles,
+                                    testId = "GitSidebarDownloadLargeFilesCheckbox"
+                                )
                             ]
                         ]
                         GitSidebar.ActionButton(
@@ -799,71 +899,13 @@ type GitSidebar =
                     ]
                 ]
 
-                match currentProgress with
-                | Some progress ->
-                    Html.div [
-                        prop.className "swt:px-3 swt:pt-3"
-                        prop.children [
-                            Html.div [
-                                prop.testId "GitSidebarProgressNotice"
-                                prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
-                                prop.children [
-                                    Html.span [ prop.className "swt:iconify swt:fluent--arrow-sync-circle-24-regular swt:size-4" ]
-                                    Html.div [
-                                        prop.className "swt:flex swt:min-w-0 swt:flex-col"
-                                        prop.children [
-                                            Html.span [
-                                                prop.className "swt:font-medium"
-                                                prop.text (
-                                                    busyNotice
-                                                    |> Option.defaultValue
-                                                        (GitSidebarInternal.progressText progress |> function
-                                                            | "" -> "Git operation in progress"
-                                                            | text -> text)
-                                                )
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                | None ->
-                    match busyNotice with
-                    | Some notice ->
-                        Html.div [
-                            prop.className "swt:px-3 swt:pt-3"
-                            prop.children [
-                                Html.div [
-                                    prop.testId "GitSidebarBusyNotice"
-                                    prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
-                                    prop.children [
-                                        Html.span [ prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4" ]
-                                        Html.span notice
-                                    ]
-                                ]
-                            ]
-                        ]
-                    | None ->
-                        Html.none
-
-                match visibleError with
-                | Some message ->
-                    Html.div [
-                        prop.className "swt:px-3 swt:pt-3"
-                        prop.children [
-                            Html.div [
-                                prop.testId "GitSidebarErrorNotice"
-                                prop.className "swt:alert swt:alert-error swt:px-3 swt:py-2 swt:text-sm"
-                                prop.children [
-                                    Html.span [ prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4" ]
-                                    Html.span message
-                                ]
-                            ]
-                        ]
-                    ]
-                | None ->
-                    Html.none
+                GitSidebar.OperationStatusNotice(
+                    ?currentProgress = currentProgress,
+                    ?busyNotice = busyNotice,
+                    ?errorNotice = visibleError,
+                    busyTestId = "GitSidebarProgressNotice",
+                    errorTestId = "GitSidebarErrorNotice"
+                )
 
                 if hasConflicts then
                     Html.div [

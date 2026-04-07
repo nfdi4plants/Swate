@@ -119,6 +119,7 @@ type GitCloneRepositoryRequest = {
     RemoteUrl: string
     TargetPath: string
     Branch: string option
+    DownloadLargeFiles: bool
 }
 
 type GitPathspecRequest = { Pathspecs: string[] }

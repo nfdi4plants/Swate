@@ -557,12 +557,13 @@ Vitest.describe("Git IPC provisioning contract reflection", fun () ->
             fields
             |> Microsoft.FSharp.Collections.Array.map (fun field -> field.Name)
             |> Microsoft.FSharp.Collections.Array.sort
-        let expectedNames = [| "Branch"; "RemoteUrl"; "TargetPath" |]
+        let expectedNames = [| "Branch"; "DownloadLargeFiles"; "RemoteUrl"; "TargetPath" |]
 
         Vitest.expect(fieldNames).toEqual(expectedNames)
         Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "RemoteUrl").PropertyType).toEqual(typeof<string>)
         Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "TargetPath").PropertyType).toEqual(typeof<string>)
-        Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "Branch").PropertyType).toEqual(typeof<string option>))
+        Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "Branch").PropertyType).toEqual(typeof<string option>)
+        Vitest.expect((getRecordField typeof<GitCloneRepositoryRequest> "DownloadLargeFiles").PropertyType).toEqual(typeof<bool>))
 )
 
 Vitest.describe("SimpleGit binding surface parity", fun () ->

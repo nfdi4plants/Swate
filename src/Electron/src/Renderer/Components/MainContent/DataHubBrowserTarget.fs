@@ -9,62 +9,20 @@ open Swate.Components.Types.Actionbar
 open Swate.Electron.Shared.GitTypes
 
 module DataHubBrowserHelper =
-    let private isCancelError (error: exn) =
+    let isCancelError (error: exn) =
         String.Equals(error.Message, "Cancelled", StringComparison.OrdinalIgnoreCase)
 
-    let private toRepositoryFolderName (projectInfo: ExploreProjectDto) =
+    let toRepositoryFolderName (projectInfo: ExploreProjectDto) =
         projectInfo.path_with_namespace.Split('/')
         |> Array.tryLast
         |> Option.filter (fun segment -> not (String.IsNullOrWhiteSpace segment))
         |> Option.defaultValue projectInfo.name
 
-    let private logCloneFailure (result: GitOperationResult) =
-        let failureKind =
-            result.FailureKind
-            |> Option.map string
-            |> Option.defaultValue "Unknown"
-
-        let failureMessage = result.Message |> Option.defaultValue "Clone failed."
-        Browser.Dom.console.error ($"[Swate] Clone failed ({failureKind}): {failureMessage}")
-
-    let private cloneAndOpenRepo (projectInfo: ExploreProjectDto) (onSuccess: unit -> unit) =
-        promise {
-            let! destinationResult = Api.ipcArcVaultApi.pickDirectory (unbox null)
-
-            match destinationResult with
-            | Error error when isCancelError error -> ()
-            | Error error -> Browser.Dom.console.error ($"[Swate] Could not pick download folder: {error.Message}")
-            | Ok destinationFolder ->
-                let targetPath =
-                    ARCtrl.ArcPathHelper.combine destinationFolder (toRepositoryFolderName projectInfo)
-
-                let cloneRequest: GitCloneRepositoryRequest = {
-                    RemoteUrl = projectInfo.http_url_to_repo
-                    TargetPath = targetPath
-                    Branch = None
-                }
-
-                let! cloneResult = Api.ipcGitApi.gitCloneRepository (unbox null) cloneRequest
-
-                match cloneResult with
-                | Error error -> Browser.Dom.console.error ($"[Swate] Clone IPC failed: {error.Message}")
-                | Ok result when result.Success ->
-                    let clonedPath = result.Path |> Option.defaultValue targetPath
-                    let! openResult = Api.ipcArcVaultApi.openARCByPath (unbox null) clonedPath
-
-                    match openResult with
-                    | Ok _ -> onSuccess ()
-                    | Error error ->
-                        Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
-                | Ok result -> logCloneFailure result
-        }
-        |> Promise.start
-
-    let createActionBtns (onSuccess: unit -> unit) (projectInfo: ExploreProjectDto) : ButtonInfo[] = [|
+    let createActionBtns (onClone: ExploreProjectDto -> unit) (projectInfo: ExploreProjectDto) : ButtonInfo[] = [|
         ButtonInfo.create (
             "swt:fluent--arrow-download-24-regular swt:size-5",
             "Download repository",
-            (fun _ -> cloneAndOpenRepo projectInfo onSuccess)
+            (fun _ -> onClone projectInfo)
         )
     |]
 
@@ -73,6 +31,7 @@ module DataHubBrowserHelper =
 let DataHubBrowserTarget () =
     let authCtx = Renderer.Context.AuthStateCtx.useAuthState ()
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let gitStateCtx = Renderer.Context.GitStateCtx.useGitState ()
 
     let loadAllRepos (query: ExploreRepoQuery) =
         Api.ipcGitLabApi.loadAllRepos (unbox null) query
@@ -99,11 +58,64 @@ let DataHubBrowserTarget () =
 
     let closePage _ = pageCtx.setState None
     let closeBrowser () = pageCtx.setState None
+    let isCloneBusy = gitStateCtx.state.BusyOperation.IsSome
 
-    DataHubBrowser.ExplorePanel(
-        accounts = authCtx,
-        loaders = loaders,
-        projectActionBtns = DataHubBrowserHelper.createActionBtns closeBrowser,
-        classNames = "swt:grow swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:pb-4",
-        onClose = closePage
-    )
+    let cloneAndOpenRepo (projectInfo: ExploreProjectDto) =
+        promise {
+            let! destinationResult = Api.ipcArcVaultApi.pickDirectory (unbox null)
+
+            match destinationResult with
+            | Error error when DataHubBrowserHelper.isCancelError error -> ()
+            | Error error -> Browser.Dom.console.error ($"[Swate] Could not pick download folder: {error.Message}")
+            | Ok destinationFolder ->
+                let targetPath =
+                    ARCtrl.ArcPathHelper.combine destinationFolder (DataHubBrowserHelper.toRepositoryFolderName projectInfo)
+
+                let cloneRequest: GitCloneRepositoryRequest = {
+                    RemoteUrl = projectInfo.http_url_to_repo
+                    TargetPath = targetPath
+                    Branch = None
+                    DownloadLargeFiles = gitStateCtx.state.DownloadLargeFiles
+                }
+
+                match! gitStateCtx.cloneRepository cloneRequest with
+                | Error _ -> ()
+                | Ok clonedPath ->
+                    match! Api.ipcArcVaultApi.openARCByPath (unbox null) clonedPath with
+                    | Ok _ -> closeBrowser ()
+                    | Error error ->
+                        Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
+        }
+        |> Promise.start
+
+    Html.div [
+        prop.className "swt:size-full swt:flex swt:flex-col"
+        prop.children [
+            GitSidebar.OperationStatusNotice(
+                ?currentProgress = gitStateCtx.state.CurrentProgress,
+                ?busyNotice = gitStateCtx.state.BusyNotice,
+                ?errorNotice = gitStateCtx.state.ErrorNotice,
+                busyTestId = "DataHubCloneProgressNotice",
+                errorTestId = "DataHubCloneErrorNotice"
+            )
+            Html.div [
+                prop.className "swt:px-2 swt:pt-2"
+                prop.children [
+                    GitSidebar.DownloadLargeFilesToggle(
+                        gitStateCtx.state.DownloadLargeFiles,
+                        isCloneBusy,
+                        (fun nextValue -> gitStateCtx.saveDownloadLargeFiles nextValue |> Promise.start),
+                        testId = "DataHubDownloadLargeFilesCheckbox",
+                        description = "Reuse the Git LFS download preference for repository clones from DataHub."
+                    )
+                ]
+            ]
+            DataHubBrowser.ExplorePanel(
+                accounts = authCtx,
+                loaders = loaders,
+                projectActionBtns = DataHubBrowserHelper.createActionBtns cloneAndOpenRepo,
+                classNames = "swt:grow swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:pb-4",
+                onClose = closePage
+            )
+        ]
+    ]

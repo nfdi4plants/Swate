@@ -35,6 +35,9 @@ let private gitPullRaw (request: GitRemoteOperationRequest) : JS.Promise<Result<
 let private gitPushRaw (request: GitRemoteOperationRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     gitApi.gitPush (unbox null) request
 
+let private gitCloneRepositoryRaw (request: GitCloneRepositoryRequest) : JS.Promise<Result<GitOperationResult, exn>> =
+    gitApi.gitCloneRepository (unbox null) request
+
 let private createBranchRaw (request: GitCreateBranchRequest) : JS.Promise<Result<GitOperationResult, exn>> =
     gitApi.createBranch (unbox null) request
 
@@ -103,6 +106,11 @@ let gitPull (request: GitRemoteOperationRequest) = promise {
 
 let gitPush (request: GitRemoteOperationRequest) = promise {
     let! result = gitPushRaw request
+    return mapExnResult result
+}
+
+let gitCloneRepository (request: GitCloneRepositoryRequest) = promise {
+    let! result = gitCloneRepositoryRaw request
     return mapExnResult result
 }
 

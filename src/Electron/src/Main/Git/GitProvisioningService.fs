@@ -348,6 +348,12 @@ let private cloneWithGit
         })
         git
 
+let private applyCloneLfsDownloadPreference (downloadLargeFiles: bool) (git: ISimpleGit) =
+    if downloadLargeFiles then
+        git
+    else
+        git.env ("GIT_LFS_SKIP_SMUDGE", "1")
+
 let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string>> =
     promise {
         match validateAndNormalizeTargetPathWithResolver resolveAbsolutePath targetPath with
@@ -411,6 +417,7 @@ let cloneRepository
     (remoteUrl: string)
     (targetPath: string)
     (branch: string option)
+    (downloadLargeFiles: bool)
     (progress: GitService.GitProgressCallback option)
     : JS.Promise<GitService.GitResult<string>> =
     promise {
@@ -494,8 +501,11 @@ let cloneRepository
                                                 | Error authError ->
                                                     return errorResult authError
                                                 | Ok authenticatedGit ->
+                                                    let configuredGit =
+                                                        applyCloneLfsDownloadPreference downloadLargeFiles authenticatedGit
+
                                                     let! authenticatedCloneResult =
-                                                        cloneWithGit authenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
+                                                        cloneWithGit configuredGit safeRemoteUrl normalizedTargetPath safeBranch
 
                                                     match authenticatedCloneResult with
                                                     | Ok _ ->
@@ -508,12 +518,18 @@ let cloneRepository
                                                         | Error cleanupError ->
                                                             return errorResult cleanupError
                                                         | Ok () ->
-                                                            let unauthenticatedGit = createGit cloneOptions
+                                                            let unauthenticatedGit =
+                                                                createGit cloneOptions
+                                                                |> applyCloneLfsDownloadPreference downloadLargeFiles
+
                                                             return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
                                                     | Error _ ->
                                                         return authenticatedCloneResult
                                             | None ->
-                                                let unauthenticatedGit = createGit cloneOptions
+                                                let unauthenticatedGit =
+                                                    createGit cloneOptions
+                                                    |> applyCloneLfsDownloadPreference downloadLargeFiles
+
                                                 return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
                         with error ->
                             return errorResult error

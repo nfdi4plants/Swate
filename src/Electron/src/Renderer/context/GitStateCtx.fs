@@ -20,6 +20,7 @@ type GitStateController = {
     fetch: unit -> JS.Promise<Result<unit, string>>
     pull: unit -> JS.Promise<Result<unit, string>>
     push: unit -> JS.Promise<Result<unit, string>>
+    cloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<string, string>>
     sync: unit -> JS.Promise<Result<unit, string>>
     commitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>
     commitAll: string -> JS.Promise<Result<unit, string>>
@@ -61,6 +62,7 @@ let private dependencies: GitDependencies = {
     gitFetch = Renderer.GitApiClient.gitFetch
     gitPull = Renderer.GitApiClient.gitPull
     gitPush = Renderer.GitApiClient.gitPush
+    gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
     createBranch = Renderer.GitApiClient.createBranch
     checkoutBranch = Renderer.GitApiClient.checkoutBranch
     gitStagePaths = Renderer.GitApiClient.gitStagePaths
@@ -79,6 +81,7 @@ let GitStateCtx =
             fetch = fun () -> promise { return Ok() }
             pull = fun () -> promise { return Ok() }
             push = fun () -> promise { return Ok() }
+            cloneRepository = fun _ -> promise { return Ok "" }
             sync = fun () -> promise { return Ok() }
             commitSelection = fun _ -> promise { return Ok() }
             commitAll = fun _ -> promise { return Ok() }
@@ -139,6 +142,9 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let push () =
         runPushWorkflow dependencies isArcLoaded getState dispatch
+
+    let cloneRepository (request: GitCloneRepositoryRequest) =
+        runCloneWorkflow dependencies dispatch request
 
     let sync () = promise {
         return! runSyncWorkflow dependencies isArcLoaded getState dispatch
@@ -204,23 +210,7 @@ let GitStateCtxProvider (children: ReactElement) =
     }
 
     let saveDownloadLargeFiles (downloadLargeFiles: bool) = promise {
-        let! result =
-            runWriteOperation
-                dependencies
-                isArcLoaded
-                getState
-                dispatch
-                GitBusyOperation.SavingGitLfsDownloadPreference
-                (fun () ->
-                    let state = getState ()
-
-                    dependencies.setGitLfsSettings {
-                        AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
-                        DownloadLargeFiles = downloadLargeFiles
-                    })
-
-        match result with
-        | Ok () ->
+        if not (isArcLoaded ()) then
             let state = getState ()
 
             dispatch (SetLfsSettings(Some {
@@ -229,8 +219,34 @@ let GitStateCtxProvider (children: ReactElement) =
             }))
 
             return Ok()
-        | Error message ->
-            return Error message
+        else
+            let! result =
+                runWriteOperation
+                    dependencies
+                    isArcLoaded
+                    getState
+                    dispatch
+                    GitBusyOperation.SavingGitLfsDownloadPreference
+                    (fun () ->
+                        let state = getState ()
+
+                        dependencies.setGitLfsSettings {
+                            AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
+                            DownloadLargeFiles = downloadLargeFiles
+                        })
+
+            match result with
+            | Ok () ->
+                let state = getState ()
+
+                dispatch (SetLfsSettings(Some {
+                    AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
+                    DownloadLargeFiles = downloadLargeFiles
+                }))
+
+                return Ok()
+            | Error message ->
+                return Error message
     }
 
     let createBranchFrom (request: GitSidebarCreateBranchRequest) =
@@ -309,6 +325,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 fetch = fetch
                 pull = pull
                 push = push
+                cloneRepository = cloneRepository
                 sync = sync
                 commitSelection = commitSelection
                 commitAll = commitAll

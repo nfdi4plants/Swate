@@ -285,6 +285,7 @@ let api: IGitApi = {
                     request.RemoteUrl
                     request.TargetPath
                     request.Branch
+                    request.DownloadLargeFiles
                     progressReporter
 
             return
