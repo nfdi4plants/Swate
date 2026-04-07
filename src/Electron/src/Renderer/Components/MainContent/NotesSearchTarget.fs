@@ -12,7 +12,7 @@ let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let notes, setNotes = React.useState ([]: NoteSearch list)
+    let notes, setNotes = React.useState ([]: Note list)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)
 
