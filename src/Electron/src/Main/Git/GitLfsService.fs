@@ -3,6 +3,7 @@ module Main.Git.GitLfsService
 open System
 open System.Text.RegularExpressions
 open Fable.Core
+open Fable.Core.JsInterop
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.SimpleGit
 open Main.Git.GitLfsAdapter
@@ -19,6 +20,7 @@ type OutboundPushPlan =
 let private lfsPointerOidPattern = Regex("^oid sha256:[0-9a-f]{64}$", RegexOptions.Multiline)
 let private lfsPointerSizePattern = Regex("^size \\d+$", RegexOptions.Multiline)
 let private maxLfsPointerProbeBytes = 1024L
+let private childProcessDynamic: obj = importAll "node:child_process"
 
 let extractFailureMessage (result: GitLfsResult) =
     let errorText = result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
@@ -108,6 +110,24 @@ let installSystem () : JS.Promise<Result<unit, string>> =
         with ex ->
             return Error ex.Message
     }
+
+let isSystemInstalled () : bool =
+    try
+        let output: string =
+            childProcessDynamic?execFileSync (
+                "git",
+                [| "lfs"; "version" |],
+                createObj [
+                    "encoding" ==> "utf8"
+                    "stdio" ==> "pipe"
+                    "shell" ==> false
+                ]
+            )
+            |> unbox<string>
+
+        not (String.IsNullOrWhiteSpace output)
+    with _ ->
+        false
 
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
     gitLfs.IsTrackedByAttributes repoRoot relativePath
