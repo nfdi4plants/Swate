@@ -3,6 +3,7 @@ module Renderer.Components.MainContent.NotesDraftTarget
 open Feliz
 open Swate.Components.Landing
 open Swate.Components.Notes.Editor
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -49,8 +50,7 @@ let NotesDraftTarget () =
                 | Ok() ->
                     let selectedPath = normalizePath payload.Intent.RelativePath
 
-                    fileStateCtx.setSelectedTreeItemPath (Some selectedPath)
-                    arcObjectCtx.setSelectedExplorerItemId None
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
                     setNotesDraft NotesDraft.init
                     setNotesUiState NotesUiState.init
 

@@ -2,6 +2,7 @@ module Renderer.Components.RightSidebar.ArcObjectDetailsSidebar
 
 open Feliz
 open Swate.Components
+open Swate.Components.Shared
 
 [<ReactComponent>]
 let Main () =
@@ -11,8 +12,7 @@ let Main () =
     let viewModel =
         ArcObjectExplorerView.create
             arcObjectCtx.state.Nodes
-            arcObjectCtx.state.SelectedExplorerItemId
-            fileStateCtx.state.SelectedTreeItemPath
+            fileStateCtx.state.Selection
             arcObjectCtx.state.SelectedKindIndices
 
     Html.div [
@@ -27,7 +27,17 @@ let Main () =
                         arcObjectCtx.state.PageState,
                         arcObjectCtx.state.ArcFileState,
                         arcObjectCtx.setArcFileState,
-                        (fun nodeId -> arcObjectCtx.setSelectedExplorerItemId (Some nodeId)),
+                        (fun nodeId ->
+                            match Swate.Components.ARCExplorer.tryFindNodeById nodeId arcObjectCtx.state.Nodes with
+                            | Some node -> fileStateCtx.setSelection (ArcSelection.forExplorerNode node.id node.path)
+                            | None ->
+                                fileStateCtx.setSelection (
+                                    {
+                                        fileStateCtx.state.Selection with
+                                            ExplorerNodeId = Some nodeId
+                                    }
+                                    |> ArcSelection.normalize
+                                )),
                         false
                     )
             )

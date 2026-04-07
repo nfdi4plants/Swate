@@ -2,6 +2,7 @@ module Renderer.Components.FileExplorer
 
 open Swate.Components
 open Swate.Components.FileExplorerTypes
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Feliz
@@ -58,7 +59,7 @@ let FileTree () =
 
         let fileTree = fileStateCtx.state.FileTree |> toFileTreeNode
 
-        let fileItem = loopPaths fileStateCtx.state.SelectedTreeItemPath fileTree
+        let fileItem = loopPaths fileStateCtx.state.Selection.TreePath fileTree
 
         let setError (errorMsg: string option) =
             match errorMsg with
@@ -76,7 +77,7 @@ let FileTree () =
                 match item.Path with
                 | None ->
                     let errorMessage = $"File '{item.Name}' has no path."
-                    arcObjectCtx.setSelectedExplorerItemId None
+                    fileStateCtx.setSelection ArcSelection.empty
 
                     Renderer.Components.ARCHelper.applyPreviewError
                         pageStateCtx.setState
@@ -86,8 +87,7 @@ let FileTree () =
                         errorMessage
                 | Some path when item.IsDirectory ->
                     let selectedPath = normalizePath path
-                    fileStateCtx.setSelectedTreeItemPath (Some selectedPath)
-                    arcObjectCtx.setSelectedExplorerItemId None
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                     Renderer.Components.ARCHelper.clearArcObjectPreview
                         arcObjectCtx.setArcFileState
@@ -97,8 +97,7 @@ let FileTree () =
                     pageStateCtx.setState None
                 | Some path ->
                     let selectedPath = normalizePath path
-                    fileStateCtx.setSelectedTreeItemPath (Some selectedPath)
-                    arcObjectCtx.setSelectedExplorerItemId None
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                     let! result = Renderer.Components.ARCHelper.openPreview selectedPath
 
@@ -132,6 +131,6 @@ let FileTree () =
                 initialItems = [ fileItem ],
                 onItemClick = openPreview,
                 onContextMenu = contextMenuItems,
-                selectedItemId = fileStateCtx.state.SelectedTreeItemPath
+                selectedItemId = fileStateCtx.state.Selection.TreePath
             )
         | None -> EmptyFileTreePlaceholder()

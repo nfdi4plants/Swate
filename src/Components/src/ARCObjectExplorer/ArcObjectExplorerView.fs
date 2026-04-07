@@ -117,8 +117,7 @@ module ArcObjectExplorerView =
 
     let create
         (nodes: ArcExplorerNode list)
-        (selectedExplorerItemId: string option)
-        (selectedTreeItemPath: string option)
+        (selection: ArcSelection)
         (selectedKindIndices: Set<int>)
         =
         let visibleKinds = ARCObjectWidget.SelectedKindLabels selectedKindIndices
@@ -126,8 +125,7 @@ module ArcObjectExplorerView =
         let explorerItems = ARCExplorer.toFileItems filteredTree
         let searchItems = searchableItems filteredTree explorerItems
 
-        let selectedItemId =
-            ARCExplorer.getSelectedItemId filteredTree selectedExplorerItemId selectedTreeItemPath
+        let selectedItemId = ARCExplorer.getSelectedItemId filteredTree selection
 
         let selectedNodeLineage =
             selectedItemId

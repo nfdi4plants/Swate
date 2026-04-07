@@ -103,7 +103,7 @@ let createArcExplorerServices
     let toggleLfsMark = runToggleLfsMark
 
     {
-        openPreview =
+        openView =
             fun previewPath -> promise {
                 let! result = loadPreviewResult previewPath
 

@@ -12,8 +12,7 @@ let Main () =
     let viewModel =
         ArcObjectExplorerView.create
             arcObjectCtx.state.Nodes
-            arcObjectCtx.state.SelectedExplorerItemId
-            fileStateCtx.state.SelectedTreeItemPath
+            fileStateCtx.state.Selection
             arcObjectCtx.state.SelectedKindIndices
 
     let services =
@@ -25,8 +24,7 @@ let Main () =
 
     let handleExplorerSelection =
         Swate.Components.ARCExplorer.createOpenPreviewHandler
-            arcObjectCtx.setSelectedExplorerItemId
-            fileStateCtx.setSelectedTreeItemPath
+            fileStateCtx.setSelection
             services
 
     let searchAction =

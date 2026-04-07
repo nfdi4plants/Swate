@@ -2,18 +2,19 @@ module Renderer.Context.FileStateCtx
 
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Components.Shared
 open Fable.Electron.Remoting.Renderer
 
 open Feliz
 
 type FileState = {
     FileTree: FileEntry[]
-    SelectedTreeItemPath: string option
+    Selection: ArcSelection
 } with
 
     static member init() : FileState = {
         FileTree = [||]
-        SelectedTreeItemPath = None
+        Selection = ArcSelection.empty
     }
 
 
@@ -21,7 +22,7 @@ type FileStateController = {
     state: FileState
     setState: (FileState -> FileState) -> unit
     setFileTree: FileEntry[] -> unit
-    setSelectedTreeItemPath: string option -> unit
+    setSelection: ArcSelection -> unit
 }
 
 let FileStateCtx =
@@ -30,7 +31,7 @@ let FileStateCtx =
             state = FileState.init ()
             setState = ignore
             setFileTree = ignore
-            setSelectedTreeItemPath = ignore
+            setSelection = ignore
         }
     )
 
@@ -61,11 +62,11 @@ let FileStateCtxProvider (children: ReactElement) =
                 setFileTree =
                     fun fileTree ->
                         setFileState (fun fs -> { fs with FileTree = fileTree })
-                setSelectedTreeItemPath =
-                    fun selectedTreeItemPath ->
+                setSelection =
+                    fun selection ->
                         setFileState (fun fs -> {
                             fs with
-                                SelectedTreeItemPath = selectedTreeItemPath
+                                Selection = ArcSelection.normalize selection
                         })
             }),
             [| box fileState |]

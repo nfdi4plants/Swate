@@ -6,7 +6,6 @@ open Swate.Components.Shared
 
 type ArcObjectExplorerState = {
     Nodes: ArcExplorerNode list
-    SelectedExplorerItemId: string option
     SelectedKindIndices: Set<int>
     ArcFileState: ArcFiles option
     PageState: PageState option
@@ -15,7 +14,6 @@ type ArcObjectExplorerState = {
 
     static member init() = {
         Nodes = []
-        SelectedExplorerItemId = None
         SelectedKindIndices = Swate.Components.ARCObjectWidget.DefaultKindFilterIndices()
         ArcFileState = None
         PageState = None
@@ -26,7 +24,6 @@ type ArcObjectExplorerController = {
     state: ArcObjectExplorerState
     setState: (ArcObjectExplorerState -> ArcObjectExplorerState) -> unit
     setNodes: ArcExplorerNode list -> unit
-    setSelectedExplorerItemId: string option -> unit
     setSelectedKindIndices: Set<int> -> unit
     setArcFileState: ArcFiles option -> unit
     setPreviewState: PageState option -> unit
@@ -39,7 +36,6 @@ let ArcObjectExplorerCtx =
             state = ArcObjectExplorerState.init ()
             setState = ignore
             setNodes = ignore
-            setSelectedExplorerItemId = ignore
             setSelectedKindIndices = ignore
             setArcFileState = ignore
             setPreviewState = ignore
@@ -73,22 +69,43 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                     if isCurrent then
                         match result with
                         | Ok nodes ->
-                            setState (fun currentState ->
-                                let selectedExplorerItemId =
-                                    currentState.SelectedExplorerItemId
-                                    |> Option.filter (fun nodeId -> containsNodeId nodeId nodes)
+                            fileStateCtx.setState (fun currentFileState ->
+                                let nextSelection =
+                                    match currentFileState.Selection.ExplorerNodeId with
+                                    | Some nodeId when containsNodeId nodeId nodes -> currentFileState.Selection
+                                    | Some _ -> ArcSelection.clearExplorerNode currentFileState.Selection
+                                    | None -> currentFileState.Selection
 
+                                if nextSelection = currentFileState.Selection then
+                                    currentFileState
+                                else
+                                    {
+                                        currentFileState with
+                                            Selection = nextSelection
+                                    })
+
+                            setState (fun currentState ->
                                 {
                                     currentState with
                                         Nodes = nodes
-                                        SelectedExplorerItemId = selectedExplorerItemId
                                         StatusMessage = None
                                 })
                         | Error exn ->
+                            fileStateCtx.setState (fun currentFileState ->
+                                let nextSelection =
+                                    ArcSelection.clearExplorerNode currentFileState.Selection
+
+                                if nextSelection = currentFileState.Selection then
+                                    currentFileState
+                                else
+                                    {
+                                        currentFileState with
+                                            Selection = nextSelection
+                                    })
+
                             setState (fun currentState -> {
                                 currentState with
                                     Nodes = []
-                                    SelectedExplorerItemId = None
                                     ArcFileState = None
                                     PageState = Some(PageState.ErrorPage exn.Message)
                                     StatusMessage = Some $"Could not load ARC object explorer: {exn.Message}"
@@ -109,12 +126,6 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                 state = state
                 setState = setState
                 setNodes = fun nodes -> setState (fun currentState -> { currentState with Nodes = nodes })
-                setSelectedExplorerItemId =
-                    fun selectedExplorerItemId ->
-                        setState (fun currentState -> {
-                            currentState with
-                                SelectedExplorerItemId = selectedExplorerItemId
-                        })
                 setSelectedKindIndices =
                     fun selectedKindIndices ->
                         setState (fun currentState -> {

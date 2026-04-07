@@ -51,7 +51,7 @@ module PathHelpers =
         else
             None
 
-    let resolveArcPreviewPath (path: string) =
+    let resolveArcViewPath (path: string) =
         let normalizedPath = normalizePath path
 
         [

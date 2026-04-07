@@ -51,8 +51,7 @@ let NotesSearchTarget () =
             match result with
             | Ok dto ->
                 let selectedPath = normalizePath relativePath
-                fileTreeCtx.setSelectedTreeItemPath (Some selectedPath)
-                arcObjectCtx.setSelectedExplorerItemId None
+                fileTreeCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                 dto
                 |> Renderer.Components.ARCHelper.previewLoadResultOfDto
@@ -62,7 +61,7 @@ let NotesSearchTarget () =
                     arcObjectCtx.setPreviewState
                     arcObjectCtx.setStatusMessage
             | Result.Error exn ->
-                arcObjectCtx.setSelectedExplorerItemId None
+                fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)
 
                 Renderer.Components.ARCHelper.applyPreviewError
                     pageCtx.setState

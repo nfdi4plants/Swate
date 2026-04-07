@@ -2,6 +2,7 @@ module Renderer.Components.MainContent.LandingDraftTarget
 
 open Feliz
 open Swate.Components.Landing
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Renderer
@@ -22,8 +23,7 @@ let LandingDraftTarget () =
             let finishSuccess (response: FileContentDTO) =
                 let selectedPath = normalizePath response.path
 
-                fileStateCtx.setSelectedTreeItemPath (Some selectedPath)
-                arcObjectCtx.setSelectedExplorerItemId None
+                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                 response
                 |> Renderer.Components.ARCHelper.previewLoadResultOfDto

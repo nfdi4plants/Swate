@@ -51,7 +51,7 @@ let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
             Some name
     | _ -> None
 
-let resolveArcPreviewPath (path: string) = Swate.Components.Shared.PathHelpers.resolveArcPreviewPath path
+let resolveArcPreviewPath (path: string) = Swate.Components.Shared.PathHelpers.resolveArcViewPath path
 
 let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: FileEntry) =
     let parts = getNonEmptyPathParts entry.path

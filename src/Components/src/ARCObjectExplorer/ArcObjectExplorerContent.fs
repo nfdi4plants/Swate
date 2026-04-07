@@ -17,7 +17,7 @@ type ArcObjectExplorerContent =
             else
                 Some text)
 
-    static member private summariseStrings (values: seq<string>) =
+    static member private summarizeStrings (values: seq<string>) =
         values
         |> Seq.filter (fun value -> String.IsNullOrWhiteSpace value |> not)
         |> Seq.distinct
@@ -96,7 +96,7 @@ type ArcObjectExplorerContent =
                 for index in 0 .. dataMap.ColumnCount - 1 do
                     yield dataMap.GetHeader(index).ToString()
             }
-            |> ArcObjectExplorerContent.summariseStrings
+            |> ArcObjectExplorerContent.summarizeStrings
 
         [
             ArcObjectExplorerContent.TextRow "Data Contexts" (string dataMap.DataContexts.Count)
@@ -105,7 +105,7 @@ type ArcObjectExplorerContent =
         ]
 
     static member private TableSummaryRows (table: ArcTable) =
-        let headers = table.Headers |> Seq.map _.ToString() |> ArcObjectExplorerContent.summariseStrings
+        let headers = table.Headers |> Seq.map _.ToString() |> ArcObjectExplorerContent.summarizeStrings
 
         [
             ArcObjectExplorerContent.TextRow "Name" table.Name
@@ -216,7 +216,7 @@ type ArcObjectExplorerContent =
                 yield! ArcObjectExplorerContent.OptionalTextRow "Submission Date" (ArcObjectExplorerContent.asOptionalText investigation.SubmissionDate) |> Option.toList
                 yield! ArcObjectExplorerContent.OptionalTextRow "Public Release" (ArcObjectExplorerContent.asOptionalText investigation.PublicReleaseDate) |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (investigation.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
+                    ArcObjectExplorerContent.summarizeStrings (investigation.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
                     |> Option.toList
                 yield! Some(ArcObjectExplorerContent.TextRow "Publications" (string investigation.Publications.Count)) |> Option.toList
@@ -232,11 +232,11 @@ type ArcObjectExplorerContent =
                 yield! ArcObjectExplorerContent.OptionalTextRow "Submission Date" (ArcObjectExplorerContent.asOptionalText study.SubmissionDate) |> Option.toList
                 yield! ArcObjectExplorerContent.OptionalTextRow "Public Release" (ArcObjectExplorerContent.asOptionalText study.PublicReleaseDate) |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (study.StudyDesignDescriptors |> Seq.map _.NameText)
+                    ArcObjectExplorerContent.summarizeStrings (study.StudyDesignDescriptors |> Seq.map _.NameText)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Design" value)
                     |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (study.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
+                    ArcObjectExplorerContent.summarizeStrings (study.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
                     |> Option.toList
                 yield! Some(ArcObjectExplorerContent.TextRow "Publications" (string study.Publications.Count)) |> Option.toList
@@ -252,7 +252,7 @@ type ArcObjectExplorerContent =
                 yield! ArcObjectExplorerContent.ontologyLabel assay.TechnologyType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Technology" value) |> Option.toList
                 yield! ArcObjectExplorerContent.ontologyLabel assay.TechnologyPlatform |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Platform" value) |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (assay.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName)
+                    ArcObjectExplorerContent.summarizeStrings (assay.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Performers" value)
                     |> Option.toList
                 yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string assay.Comments.Count)) |> Option.toList
@@ -266,11 +266,11 @@ type ArcObjectExplorerContent =
                 yield! ArcObjectExplorerContent.ontologyLabel workflow.WorkflowType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Type" value) |> Option.toList
                 yield! ArcObjectExplorerContent.OptionalTextRow "URI" (ArcObjectExplorerContent.asOptionalText workflow.URI) |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings workflow.SubWorkflowIdentifiers
+                    ArcObjectExplorerContent.summarizeStrings workflow.SubWorkflowIdentifiers
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Subworkflows" value)
                     |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (workflow.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
+                    ArcObjectExplorerContent.summarizeStrings (workflow.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
                     |> Option.toList
                 yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string workflow.Comments.Count)) |> Option.toList
@@ -285,11 +285,11 @@ type ArcObjectExplorerContent =
                 yield! ArcObjectExplorerContent.ontologyLabel run.TechnologyType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Technology" value) |> Option.toList
                 yield! ArcObjectExplorerContent.ontologyLabel run.TechnologyPlatform |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Platform" value) |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings run.WorkflowIdentifiers
+                    ArcObjectExplorerContent.summarizeStrings run.WorkflowIdentifiers
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Workflows" value)
                     |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (run.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName)
+                    ArcObjectExplorerContent.summarizeStrings (run.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Performers" value)
                     |> Option.toList
                 yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string run.Comments.Count)) |> Option.toList
@@ -303,11 +303,11 @@ type ArcObjectExplorerContent =
                 yield! ArcObjectExplorerContent.OptionalTextRow "Last Updated" (Some(template.LastUpdated.ToString("yyyy-MM-dd HH:mm"))) |> Option.toList
                 yield! Some(ArcObjectExplorerContent.TextRow "Organisation" (template.Organisation.ToString())) |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (template.Tags |> Seq.map _.NameText)
+                    ArcObjectExplorerContent.summarizeStrings (template.Tags |> Seq.map _.NameText)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Tags" value)
                     |> Option.toList
                 yield!
-                    ArcObjectExplorerContent.summariseStrings (template.Authors |> Seq.map ArcObjectExplorerContent.personDisplayName)
+                    ArcObjectExplorerContent.summarizeStrings (template.Authors |> Seq.map ArcObjectExplorerContent.personDisplayName)
                     |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Authors" value)
                     |> Option.toList
             ]
@@ -324,7 +324,7 @@ type ArcObjectExplorerContent =
             | _ -> None
         | ArcExplorerNodeKind.DataMap -> arcFile.TryGetDataMap() |> Option.map ArcObjectExplorerContent.DataMapSummaryRows
         | _ when arcFile.Tables().Count > 0 ->
-            let tableNames = arcFile.Tables() |> Seq.map _.Name |> ArcObjectExplorerContent.summariseStrings
+            let tableNames = arcFile.Tables() |> Seq.map _.Name |> ArcObjectExplorerContent.summarizeStrings
 
             Some [
                 ArcObjectExplorerContent.TextRow "Tables" (string (arcFile.Tables().Count))
@@ -446,7 +446,7 @@ type ArcObjectExplorerContent =
         =
         match selectedNode.path, arcFile.TryGetRelativePath() with
         | Some nodePath, Some arcFilePath ->
-            let expectedPreviewPath = PathHelpers.resolveArcPreviewPath nodePath
+            let expectedPreviewPath = PathHelpers.resolveArcViewPath nodePath
             PathHelpers.pathsEqual expectedPreviewPath arcFilePath
         | _ -> false
 

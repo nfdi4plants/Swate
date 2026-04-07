@@ -6,7 +6,7 @@ open Swate.Components.Shared
 
 
 type ARCExplorerServices = {
-    openPreview: string -> JS.Promise<Result<unit, string>>
+    openView: string -> JS.Promise<Result<unit, string>>
     setStatusMessage: string option -> unit
     runToggleLfsMark: string -> string -> bool -> JS.Promise<Result<unit, string>>
 }
@@ -24,13 +24,11 @@ type PageState =
 type ArcObjectExplorerProps = {
     rootRepoPath: string option
     nodes: ArcExplorerNode list
-    selectedExplorerItemId: string option
-    selectedTreeItemPath: string option
+    selection: ArcSelection
     arcFileState: ArcFiles option
     previewState: PageState option
     setArcFileState: ArcFiles option -> unit
-    setSelectedExplorerItemId: string option -> unit
-    setSelectedTreeItemPath: string option -> unit
+    setSelection: ArcSelection -> unit
     services: ARCExplorerServices
 }
 
