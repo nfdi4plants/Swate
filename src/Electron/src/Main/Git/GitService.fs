@@ -96,6 +96,8 @@ type GitConfirmMergeResolutionResult = {
     NextConflictedPath: string option
 }
 
+type GitPullResult = { Warning: GitFailure option }
+
 type GitProgressCallback = GitInternals.GitProgressCallback
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -206,6 +208,12 @@ let private toFailure (error: exn) : GitFailure =
 
 let private errorResult (error: exn) : GitResult<'T> =
     GitInternals.errorResult classifyFailureKind createFailure error
+
+// These helpers intentionally throw inside promise callbacks so the surrounding
+// runSimpleGit/withLocalGit boundary can translate the failure into GitFailure.
+let private abortGitPromise<'T> (message: string) : 'T = raise (exn message)
+
+let private abortGitPromiseWith<'T> (error: exn) : 'T = raise error
 
 let private tryGetNodeErrorCode (error: exn) : string option =
     try
@@ -998,6 +1006,11 @@ let private hydratePulledLfsContent (git: ISimpleGit) : JS.Promise<GitResult<uni
         return result
     }
 
+let private createPullHydrationFailure (failure: GitFailure) = {
+    failure with
+        Message = $"Git pull completed, but Git LFS download failed: {failure.Message}"
+}
+
 let private createAuthenticatedGit
     (arcPath: string)
     (remoteName: string)
@@ -1202,116 +1215,122 @@ let getDiffViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitRe
     match ensureValidPathspec requestedPath with
     | Error validationError -> return errorResult validationError
     | Ok safeRequestedPath ->
-        return!
-            withLocalGit
-                arcPath
-                (fun git -> promise {
-                    let! status = git.status ()
-                    let statusDto = toStatusDto arcPath status
+        if isExplicitlyUnsupportedPath safeRequestedPath then
+            return unsupportedGitContentResult safeRequestedPath
+        else
+            return!
+                withLocalGit
+                    arcPath
+                    (fun git -> promise {
+                        let! status = git.status ()
+                        let statusDto = toStatusDto arcPath status
 
-                    match statusDto.Files |> Array.tryFind (fun file -> String.Equals(file.Path, safeRequestedPath, StringComparison.Ordinal)) with
-                    | None ->
-                        return raise (exn $"No git status entry found for '{safeRequestedPath}'.")
-                    | Some fileStatus ->
-                        let previousPathCandidate = fileStatus.OriginalPath |> Option.defaultValue safeRequestedPath
+                        match statusDto.Files |> Array.tryFind (fun file -> String.Equals(file.Path, safeRequestedPath, StringComparison.Ordinal)) with
+                        | None ->
+                            return abortGitPromise $"No git status entry found for '{safeRequestedPath}'."
+                        | Some fileStatus ->
+                            let previousPathCandidate = fileStatus.OriginalPath |> Option.defaultValue safeRequestedPath
 
-                        let! previousContentResult = readHeadTextIfAvailable git previousPathCandidate
+                            let! previousContentResult = readHeadTextIfAvailable git previousPathCandidate
 
-                        let previousContent =
-                            match previousContentResult with
-                            | Ok content -> content
-                            | Error failure -> raise (exn failure.Message)
+                            let previousContent =
+                                match previousContentResult with
+                                | Ok content -> content
+                                | Error failure -> abortGitPromise failure.Message
 
-                        let! currentContentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
+                            let! currentContentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
 
-                        let currentContent =
-                            match currentContentResult with
-                            | Ok content -> content
-                            | Error failure -> raise (exn failure.Message)
+                            let currentContent =
+                                match currentContentResult with
+                                | Ok content -> content
+                                | Error failure -> abortGitPromise failure.Message
 
-                        if previousContent.IsNone && currentContent.IsNone then
-                            return raise (exn $"No git diff content found for '{safeRequestedPath}'.")
-                        else
-                            let diffPaths =
-                                [|
-                                    yield safeRequestedPath
+                            if previousContent.IsNone && currentContent.IsNone then
+                                return abortGitPromise $"No git diff content found for '{safeRequestedPath}'."
+                            else
+                                let diffPaths =
+                                    [|
+                                        yield safeRequestedPath
 
-                                    match fileStatus.OriginalPath with
-                                    | Some originalPath when not (String.Equals(originalPath, safeRequestedPath, StringComparison.Ordinal)) ->
-                                        yield originalPath
-                                    | _ ->
-                                        ()
-                                |]
+                                        match fileStatus.OriginalPath with
+                                        | Some originalPath when not (String.Equals(originalPath, safeRequestedPath, StringComparison.Ordinal)) ->
+                                            yield originalPath
+                                        | _ ->
+                                            ()
+                                    |]
 
-                            let! wordDiffResult =
-                                runSimpleGit
-                                    (fun currentGit ->
-                                        currentGit.raw [|
-                                            "diff"
-                                            "--word-diff=porcelain"
-                                            "-U0"
-                                            "--find-renames"
-                                            "HEAD"
-                                            "--"
-                                            yield! diffPaths
-                                        |]
-                                    )
-                                    git
+                                let! wordDiffResult =
+                                    runSimpleGit
+                                        (fun currentGit ->
+                                            currentGit.raw [|
+                                                "diff"
+                                                "--word-diff=porcelain"
+                                                "-U0"
+                                                "--find-renames"
+                                                "HEAD"
+                                                "--"
+                                                yield! diffPaths
+                                            |]
+                                        )
+                                        git
 
-                            let previousPathForMetadata =
-                                if previousContent.IsSome then
-                                    Some previousPathCandidate
-                                else
-                                    None
+                                let previousPathForMetadata =
+                                    if previousContent.IsSome then
+                                        Some previousPathCandidate
+                                    else
+                                        None
 
-                            let currentPathForMetadata =
-                                if currentContent.IsSome then
-                                    Some safeRequestedPath
-                                else
-                                    None
+                                let currentPathForMetadata =
+                                    if currentContent.IsSome then
+                                        Some safeRequestedPath
+                                    else
+                                        None
 
-                            let wordDiffText =
-                                match wordDiffResult with
-                                | Ok diff when not (String.IsNullOrWhiteSpace diff) -> diff
-                                | _ -> buildSyntheticWordDiffText previousPathForMetadata currentPathForMetadata
+                                let wordDiffText =
+                                    match wordDiffResult with
+                                    | Ok diff when not (String.IsNullOrWhiteSpace diff) -> diff
+                                    | _ -> buildSyntheticWordDiffText previousPathForMetadata currentPathForMetadata
 
-                            return {
-                                Path = safeRequestedPath
-                                PreviousContent = previousContent |> Option.defaultValue ""
-                                CurrentContent = currentContent |> Option.defaultValue ""
-                                WordDiffText = wordDiffText
-                            }
-                })
+                                return {
+                                    Path = safeRequestedPath
+                                    PreviousContent = previousContent |> Option.defaultValue ""
+                                    CurrentContent = currentContent |> Option.defaultValue ""
+                                    WordDiffText = wordDiffText
+                                }
+                    })
 }
 
 let getMergeConflictViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<GitMergeConflictViewDataDto>> = promise {
     match ensureValidPathspec requestedPath with
     | Error validationError -> return errorResult validationError
     | Ok safeRequestedPath ->
-        return!
-            withLocalGit
-                arcPath
-                (fun git -> promise {
-                    let! status = git.status ()
-                    let statusDto = toStatusDto arcPath status
+        if isExplicitlyUnsupportedPath safeRequestedPath then
+            return unsupportedGitContentResult safeRequestedPath
+        else
+            return!
+                withLocalGit
+                    arcPath
+                    (fun git -> promise {
+                        let! status = git.status ()
+                        let statusDto = toStatusDto arcPath status
 
-                    match ensureCurrentlyConflictedPath statusDto safeRequestedPath with
-                    | Error conflictError ->
-                        return raise conflictError
-                    | Ok() ->
-                        let! contentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
+                        match ensureCurrentlyConflictedPath statusDto safeRequestedPath with
+                        | Error conflictError ->
+                            return abortGitPromiseWith conflictError
+                        | Ok() ->
+                            let! contentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
 
-                        match contentResult with
-                        | Ok(Some content) ->
-                            return {
-                                Path = safeRequestedPath
-                                MergeConflictContent = content
-                            }
-                        | Ok None ->
-                            return raise (exn $"Conflicted file '{safeRequestedPath}' no longer exists.")
-                        | Error failure ->
-                            return raise (exn failure.Message)
-                })
+                            match contentResult with
+                            | Ok(Some content) ->
+                                return {
+                                    Path = safeRequestedPath
+                                    MergeConflictContent = content
+                                }
+                            | Ok None ->
+                                return abortGitPromise $"Conflicted file '{safeRequestedPath}' no longer exists."
+                            | Error failure ->
+                                return abortGitPromise failure.Message
+                    })
 }
 
 let fetch
@@ -1350,7 +1369,7 @@ let pull
     (remoteName: string option)
     (branchName: string option)
     (progressCallback: GitProgressCallback option)
-    : JS.Promise<GitResult<unit>> =
+    : JS.Promise<GitResult<GitPullResult>> =
     promise {
         match validateRemoteName (remoteName |> Option.defaultValue "origin") with
         | Error remoteError -> return errorResult remoteError
@@ -1380,10 +1399,12 @@ let pull
                                 let! lfsPullResult = hydratePulledLfsContent effectiveGit
 
                                 match lfsPullResult with
-                                | Ok () -> return ()
-                                | Error failure -> return raise (exn failure.Message)
+                                | Ok () -> return { Warning = None }
+                                | Error failure ->
+                                    let hydrationFailure = createPullHydrationFailure failure
+                                    return { Warning = Some hydrationFailure }
                             else
-                                return ()
+                                return { Warning = None }
                         })
 
                 return result
@@ -1530,7 +1551,7 @@ let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<un
 
                     match lfsResult with
                     | Ok () -> return ()
-                    | Error failure -> return raise (exn failure.Message)
+                    | Error failure -> return abortGitPromise failure.Message
                 })
 }
 
@@ -1564,7 +1585,7 @@ let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> =
 
                     match lfsResult with
                     | Error failure ->
-                        return raise (exn failure.Message)
+                        return abortGitPromise failure.Message
                     | Ok () ->
                         let! result = git.commit (normalizedMessage)
 
@@ -1581,6 +1602,7 @@ let confirmMergeResolution
     (requestedPath: string)
     (expectedConflictContent: string)
     (resolvedContent: string)
+    (autoCommit: bool)
     : JS.Promise<GitResult<GitConfirmMergeResolutionResult>> =
     promise {
         match tryResolveArcRelativePath arcPath requestedPath with
@@ -1598,44 +1620,66 @@ let confirmMergeResolution
 
                             match ensureCurrentlyConflictedPath statusDtoBeforeWrite safeRequestedPath with
                             | Error conflictError ->
-                                return raise conflictError
+                                return abortGitPromiseWith conflictError
                             | Ok() ->
                                 let! currentContentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
 
                                 let currentConflictContent =
                                     match currentContentResult with
                                     | Ok(Some content) -> content
-                                    | Ok None -> raise (exn $"Conflicted file '{safeRequestedPath}' no longer exists.")
-                                    | Error failure -> raise (exn failure.Message)
+                                    | Ok None -> abortGitPromise $"Conflicted file '{safeRequestedPath}' no longer exists."
+                                    | Error failure -> abortGitPromise failure.Message
 
                                 if not (String.Equals(currentConflictContent, expectedConflictContent, StringComparison.Ordinal)) then
                                     return
-                                        raise (
-                                            exn
-                                                $"Conflicted file '{safeRequestedPath}' changed on disk since it was opened. Reopen the merge conflict view and retry."
-                                        )
+                                        abortGitPromise
+                                            $"Conflicted file '{safeRequestedPath}' changed on disk since it was opened. Reopen the merge conflict view and retry."
                                 else
-                                    writeFileSync absolutePath resolvedContent TextEncoding.Utf8
-                                    let! _ = git.add [| safeRequestedPath |]
-                                    let! statusAfterStage = git.status ()
-                                    let updatedStatus = toStatusDto arcPath statusAfterStage
+                                    try
+                                        writeFileSync absolutePath resolvedContent TextEncoding.Utf8
+                                    with error ->
+                                        return
+                                            abortGitPromise
+                                                $"Failed to write resolved content for '{safeRequestedPath}': {error.Message}"
 
-                                    if updatedStatus.Conflicted.Length = 0 && updatedStatus.IsMergeInProgress then
-                                        let! _ = git.commit "Resolve merge conflicts"
-                                        let! statusAfterCommit = git.status ()
-                                        let committedStatus = toStatusDto arcPath statusAfterCommit
+                                    let! addResult =
+                                        runSimpleGit
+                                            (fun currentGit -> currentGit.add [| safeRequestedPath |])
+                                            git
 
-                                        return {
-                                            UpdatedStatus = committedStatus
-                                            RemainingConflictedPaths = committedStatus.Conflicted
-                                            NextConflictedPath = committedStatus.Conflicted |> Array.tryHead
-                                        }
-                                    else
-                                        return {
-                                            UpdatedStatus = updatedStatus
-                                            RemainingConflictedPaths = updatedStatus.Conflicted
-                                            NextConflictedPath = updatedStatus.Conflicted |> Array.tryHead
-                                        }
+                                    match addResult with
+                                    | Error failure ->
+                                        return
+                                            abortGitPromise
+                                                $"Resolved content was written to '{safeRequestedPath}', but staging failed: {failure.Message}"
+                                    | Ok _ ->
+                                        let! statusAfterStage = git.status ()
+                                        let updatedStatus = toStatusDto arcPath statusAfterStage
+
+                                        if autoCommit && updatedStatus.Conflicted.Length = 0 && updatedStatus.IsMergeInProgress then
+                                            let! commitResult =
+                                                runSimpleGit
+                                                    (fun currentGit -> currentGit.commit "Resolve merge conflicts")
+                                                    git
+
+                                            match commitResult with
+                                            | Error failure ->
+                                                return abortGitPromise failure.Message
+                                            | Ok _ ->
+                                                let! statusAfterCommit = git.status ()
+                                                let committedStatus = toStatusDto arcPath statusAfterCommit
+
+                                                return {
+                                                    UpdatedStatus = committedStatus
+                                                    RemainingConflictedPaths = committedStatus.Conflicted
+                                                    NextConflictedPath = committedStatus.Conflicted |> Array.tryHead
+                                                }
+                                        else
+                                            return {
+                                                UpdatedStatus = updatedStatus
+                                                RemainingConflictedPaths = updatedStatus.Conflicted
+                                                NextConflictedPath = updatedStatus.Conflicted |> Array.tryHead
+                                            }
                         })
     }
 
@@ -1685,7 +1729,7 @@ let checkoutBranch (arcPath: string) (branchName: string) : JS.Promise<GitResult
                         )
 
                     if not exists then
-                        return raise (exn $"Branch '{safeBranchName}' does not exist in the local repository.")
+                        return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
 
                     let! _ = git.checkout (safeBranchName)
                     do! reconcileTrackingBranchForCheckout "origin" safeBranchName git

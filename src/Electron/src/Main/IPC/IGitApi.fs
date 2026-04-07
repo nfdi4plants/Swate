@@ -23,16 +23,20 @@ let private toSharedGitFailureKind (kind: GitService.GitFailureKind) =
 let private toGitOperationResult
     (successMessage: 'T -> string option)
     (successPath: ('T -> string option) option)
+    (successWarning: ('T -> GitService.GitFailure option) option)
     (result: GitService.GitResult<'T>)
     : Result<GitOperationResult, exn> =
     match result with
     | Ok payload ->
         let path = successPath |> Option.bind (fun projectPath -> projectPath payload)
+        let warning = successWarning |> Option.bind (fun warningSelector -> warningSelector payload)
 
         Ok {
             Success = true
             Message = successMessage payload
             FailureKind = None
+            WarningMessage = warning |> Option.map _.Message
+            WarningKind = warning |> Option.map (fun current -> toSharedGitFailureKind current.Kind)
             Path = path
         }
     | Error failure ->
@@ -40,6 +44,8 @@ let private toGitOperationResult
             Success = false
             Message = Some failure.Message
             FailureKind = Some(toSharedGitFailureKind failure.Kind)
+            WarningMessage = None
+            WarningKind = None
             Path = None
         }
 
@@ -217,6 +223,8 @@ let api: IGitApi = {
                         Success = true
                         Message = Some "Git LFS installed."
                         FailureKind = None
+                        WarningMessage = None
+                        WarningKind = None
                         Path = None
                     }
                 | Error message ->
@@ -224,6 +232,8 @@ let api: IGitApi = {
                         Success = false
                         Message = Some message
                         FailureKind = Some GitFailureKind.Unknown
+                        WarningMessage = None
+                        WarningKind = None
                         Path = None
                     }
         }
@@ -235,7 +245,7 @@ let api: IGitApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.fetch arcPath request.Remote request.Branch (Some progressReporter)
-                return toGitOperationResult (fun () -> Some "Fetch completed.") None result
+                return toGitOperationResult (fun () -> Some "Fetch completed.") None None result
         }
     gitPull =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
@@ -250,7 +260,12 @@ let api: IGitApi = {
                         (fun () -> promise {
                             let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
                             do! vault.RefreshFileTree()
-                            return toGitOperationResult (fun () -> Some "Pull completed.") None result
+                            return
+                                toGitOperationResult
+                                    (fun _ -> Some "Pull completed.")
+                                    None
+                                    (Some(fun (payload: GitService.GitPullResult) -> payload.Warning))
+                                    result
                         })
         }
     gitPush =
@@ -261,7 +276,7 @@ let api: IGitApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.push arcPath request.Remote request.Branch (Some progressReporter)
-                return toGitOperationResult (fun () -> Some "Push completed.") None result
+                return toGitOperationResult (fun () -> Some "Push completed.") None None result
         }
     gitInitRepository =
         fun (_event: IpcMainEvent) (targetPath: string) -> promise {
@@ -272,6 +287,7 @@ let api: IGitApi = {
                 toGitOperationResult
                     (fun _ -> Some "Repository initialized.")
                     (Some(fun normalizedPath -> Some normalizedPath))
+                    None
                     result
         }
     gitCloneRepository =
@@ -292,6 +308,7 @@ let api: IGitApi = {
                 toGitOperationResult
                     (fun _ -> Some "Clone completed.")
                     (Some(fun normalizedPath -> Some normalizedPath))
+                    None
                     result
         }
     gitStagePaths =
@@ -306,7 +323,7 @@ let api: IGitApi = {
                             let! result = GitService.stagePaths arcPath request.Pathspecs
                             if Result.isOk result then
                                 do! vault.RefreshFileTree()
-                            return toGitOperationResult (fun () -> Some "Files staged.") None result
+                            return toGitOperationResult (fun () -> Some "Files staged.") None None result
                         })
         }
     gitUnstagePaths =
@@ -319,7 +336,7 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.unstagePaths arcPath request.Pathspecs
-                            return toGitOperationResult (fun () -> Some "Files unstaged.") None result
+                            return toGitOperationResult (fun () -> Some "Files unstaged.") None None result
                         })
         }
     gitCommit =
@@ -337,6 +354,7 @@ let api: IGitApi = {
                                 toGitOperationResult
                                     (fun commitHash -> Some $"Commit completed ({commitHash}).")
                                     None
+                                    None
                                     result
                         })
         }
@@ -353,7 +371,7 @@ let api: IGitApi = {
                             DownloadLargeFiles = settings.DownloadLargeFiles
                         }
 
-                return toGitOperationResult (fun () -> Some "Git LFS threshold updated.") None result
+                return toGitOperationResult (fun () -> Some "Git LFS threshold updated.") None None result
         }
     createBranch =
         fun (event: IpcMainEvent) (request: GitCreateBranchRequest) -> promise {
@@ -368,7 +386,7 @@ let api: IGitApi = {
                             do! vault.RefreshFileTree()
 
                             return
-                                toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None result
+                                toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None None result
                         })
         }
     checkoutBranch =
@@ -386,6 +404,7 @@ let api: IGitApi = {
                             return
                                 toGitOperationResult
                                     (fun () -> Some $"Checked out branch '{request.Name}'.")
+                                    None
                                     None
                                     result
                         })
@@ -405,6 +424,7 @@ let api: IGitApi = {
                                     request.Path
                                     request.ExpectedConflictContent
                                     request.ResolvedContent
+                                    request.AutoCommit
 
                             match result with
                             | Ok payload ->

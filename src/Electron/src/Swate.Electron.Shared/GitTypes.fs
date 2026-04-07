@@ -99,6 +99,8 @@ type GitOperationResult = {
     Success: bool
     Message: string option
     FailureKind: GitFailureKind option
+    WarningMessage: string option
+    WarningKind: GitFailureKind option
     Path: string option
 }
 
@@ -142,6 +144,7 @@ type GitConfirmMergeResolutionRequest = {
     Path: string
     ExpectedConflictContent: string
     ResolvedContent: string
+    AutoCommit: bool
 }
 
 type GitConfirmMergeResolutionResult = {
