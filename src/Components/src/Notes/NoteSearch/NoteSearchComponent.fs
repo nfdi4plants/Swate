@@ -40,7 +40,7 @@ module InputField =
                         ]
                     ]
                 ]
-                FilterComponents.filterDropdown (filterOptions, selectedOptIndices, setSelectedOptIndices)
+                FilterComponents.filterDropdown filterOptions selectedOptIndices setSelectedOptIndices
             ]
         ]
 
@@ -99,13 +99,13 @@ type SearchComponent =
     static member Main(notes: Note list, isLoading: bool, error: string option, onOpen: string -> unit) =
         let startSearch, setStartSearch = React.useState false
         let searchTerm, setSearchTerm = React.useState ""
-        let selectedOptIndices, setSelectedOptIndices = React.useState (Set [])
+        let selectedOptIndices, setSelectedOptIndices = React.useState (Set [ 0 ]) // the default is to search in the title, but it can be changed to content and tags as well. If no filter is selected, it will search in all fields.
 
         let filterOptions = [ "Title"; "Content"; "Tags" ]
 
         let searchResults =
             if startSearch then
-                FilterComponents.noteSuggestions searchTerm selectedOptIndices notes
+                FilterComponents.filteredNotes (searchTerm, selectedOptIndices, notes)
             else
                 []
 
