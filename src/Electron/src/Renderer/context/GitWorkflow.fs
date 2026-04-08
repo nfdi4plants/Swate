@@ -6,6 +6,7 @@ open Fable.Core
 
 open Renderer.Types
 open Swate.Components.GitSidebarTypes
+open Swate.Electron.Shared
 open Swate.Electron.Shared.GitTypes
 
 [<RequireQualifiedAccess>]
@@ -64,6 +65,7 @@ type GitState = {
     MergeResolutionPendingPath: string option
     InstallRetryState: GitInstallRetryState
     PageLoadRequestId: int
+    CurrentArcPath: ArcRootPath
 } with
 
     static member Empty = {
@@ -90,12 +92,21 @@ type GitState = {
         MergeResolutionPendingPath = None
         InstallRetryState = GitInstallRetryState.Idle
         PageLoadRequestId = 0
+        CurrentArcPath = None
     }
 
 type GitRefreshResult = {
     Status: Result<GitStatusDto, string>
     Branches: Result<GitBranchRefDto[], string>
     LfsSettings: Result<GitLfsSettingsDto, string>
+}
+
+type Reply<'T> = Result<'T, string> -> unit
+
+type ConfirmMergeResolutionOutcome = {
+    UpdatedStatus: GitStatusDto
+    NextConflictedPath: string option
+    PageChange: GitPageChange
 }
 
 type Msg =
@@ -114,6 +125,13 @@ type Msg =
     | FinishRefreshRequest of requestId: int * refreshResult: GitRefreshResult
     | StartPageLoad of requestId: int
     | FinishPageLoad of requestId: int * path: string * result: Result<unit, string>
+    | ArcPathChanged of ArcRootPath
+    | RefreshRequested of Reply<unit>
+    | RefreshCompleted of requestId: int * reply: Reply<unit> * result: Result<GitRefreshResult, string>
+    | SelectChangeRequested of GitSidebarChange * Reply<unit>
+    | SelectChangeCompleted of requestId: int * path: string * reply: Reply<unit> * result: Result<GitPageChange, string>
+    | ConfirmMergeResolutionRequested of GitConfirmMergeResolutionRequest * Reply<unit>
+    | ConfirmMergeResolutionCompleted of reply: Reply<unit> * result: Result<ConfirmMergeResolutionOutcome, string>
 
 type GitDependencies = {
     getGitStatus: unit -> JS.Promise<Result<GitStatusDto, string>>
@@ -325,6 +343,67 @@ let buildUpdatedLfsSettings (state: GitState) (thresholdMb: int option) (downloa
     DownloadLargeFiles = downloadLargeFiles |> Option.defaultValue state.DownloadLargeFiles
 }
 
+let private effectCmd (effect: unit -> unit) : Cmd<'msg> = [ fun _dispatch -> effect () ]
+
+let private ignoreReply (_: Result<'T, string>) = ()
+
+let private resolveReplyCmd (reply: Reply<'T>) (result: Result<'T, string>) : Cmd<'msg> =
+    effectCmd (fun () -> reply result)
+
+let private applyPageChangeCmd (setPageState: PageState option -> unit) =
+    function
+    | GitPageChange.NoChange -> Cmd.none
+    | GitPageChange.Set page -> effectCmd (fun () -> setPageState (Some page))
+    | GitPageChange.Clear -> effectCmd (fun () -> setPageState None)
+
+let private refreshAllAsync (deps: GitDependencies) = promise {
+    let! statusResult = deps.getGitStatus ()
+    let! branchResult = deps.getGitBranches ()
+    let! lfsSettingsResult = deps.getGitLfsSettings ()
+
+    return {
+        Status = statusResult
+        Branches = branchResult
+        LfsSettings = lfsSettingsResult
+    }
+}
+
+let private loadPageAsync (deps: GitDependencies) (path: string) (isConflicted: bool) = promise {
+    let! result =
+        if isConflicted then
+            deps.loadMergeConflictPage path
+        else
+            deps.loadDiffPage path
+
+    return result |> Result.map GitPageChange.Set
+}
+
+let private confirmMergeResolutionAsync (deps: GitDependencies) (request: GitConfirmMergeResolutionRequest) = promise {
+    let! result = deps.confirmGitMergeResolution request
+
+    match result with
+    | Error message -> return Error message
+    | Ok payload ->
+        match payload.NextConflictedPath with
+        | Some nextConflictedPath ->
+            let! pageChangeResult = loadPageAsync deps nextConflictedPath true
+
+            return
+                pageChangeResult
+                |> Result.map (fun pageChange -> {
+                    UpdatedStatus = payload.UpdatedStatus
+                    NextConflictedPath = payload.NextConflictedPath
+                    PageChange = pageChange
+                })
+        | None ->
+            return
+                Ok {
+                    UpdatedStatus = payload.UpdatedStatus
+                    NextConflictedPath = None
+                    PageChange = GitPageChange.Clear
+                }
+}
+
 let transition (msg: Msg) (model: GitState) =
     match msg with
     | ResetWorkflow -> GitState.Empty
@@ -404,10 +483,190 @@ let transition (msg: Msg) (model: GitState) =
                 model with
                     ErrorNotice = Some message
               }
+    | ArcPathChanged _
+    | RefreshRequested _
+    | RefreshCompleted _
+    | SelectChangeRequested _
+    | SelectChangeCompleted _
+    | ConfirmMergeResolutionRequested _
+    | ConfirmMergeResolutionCompleted _ -> model
 
 let init () : GitState * Cmd<Msg> = GitState.Empty, Cmd.none
 
-let update (msg: Msg) (model: GitState) : GitState * Cmd<Msg> = transition msg model, Cmd.none
+let update
+    (deps: GitDependencies)
+    (setPageState: PageState option -> unit)
+    (msg: Msg)
+    (model: GitState)
+    : GitState * Cmd<Msg> =
+    match msg with
+    | ArcPathChanged arcPath when arcPath = model.CurrentArcPath ->
+        model, Cmd.none
+    | ArcPathChanged arcPath ->
+        let nextModel = { GitState.Empty with CurrentArcPath = arcPath }
+
+        let cmd =
+            match arcPath with
+            | Some _ ->
+                Cmd.batch [
+                    applyPageChangeCmd setPageState GitPageChange.Clear
+                    Cmd.ofMsg (RefreshRequested ignoreReply)
+                ]
+            | None -> applyPageChangeCmd setPageState GitPageChange.Clear
+
+        nextModel, cmd
+    | RefreshRequested reply when model.CurrentArcPath.IsNone ->
+        { GitState.Empty with CurrentArcPath = model.CurrentArcPath }, resolveReplyCmd reply (Ok())
+    | RefreshRequested reply ->
+        let requestId = nextRefreshRequestId model
+
+        let nextModel =
+            model
+            |> transition (SetBusyOperation(Some GitBusyOperation.Refreshing))
+            |> transition (SetErrorNotice None)
+            |> transition (SetWarningNotice None)
+            |> transition (StartRefreshRequest requestId)
+
+        let cmd =
+            Cmd.OfPromise.either
+                refreshAllAsync
+                deps
+                (fun refreshResult -> RefreshCompleted(requestId, reply, Ok refreshResult))
+                (fun err -> RefreshCompleted(requestId, reply, Error(string err)))
+
+        nextModel, cmd
+    | RefreshCompleted(requestId, reply, _) when requestId <> model.RefreshRequestId ->
+        model, resolveReplyCmd reply (Ok())
+    | RefreshCompleted(_, reply, Error message) ->
+        let nextModel =
+            { model with RefreshState = GitRefreshState.Idle }
+            |> transition (SetBusyOperation None)
+            |> transition (SetCurrentProgress None)
+            |> transition (SetErrorNotice(Some message))
+            |> transition (SetWarningNotice None)
+
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState GitPageChange.Clear
+            resolveReplyCmd reply (Error message)
+        ]
+    | RefreshCompleted(requestId, reply, Ok refreshResult) ->
+        let nextModel =
+            model
+            |> transition (FinishRefreshRequest(requestId, refreshResult))
+            |> transition (SetBusyOperation None)
+            |> transition (SetCurrentProgress None)
+
+        let replyResult =
+            match refreshResult.Status, refreshErrorMessage refreshResult with
+            | Error message, _ -> Error message
+            | Ok _, Some message -> Error message
+            | Ok _, None -> Ok()
+
+        let cmd =
+            match replyResult with
+            | Ok() -> resolveReplyCmd reply (Ok())
+            | Error message ->
+                Cmd.batch [
+                    applyPageChangeCmd setPageState GitPageChange.Clear
+                    resolveReplyCmd reply (Error message)
+                ]
+
+        nextModel, cmd
+    | SelectChangeRequested(change, reply) when model.CurrentArcPath.IsNone ->
+        model, resolveReplyCmd reply (Error "No ARC is loaded.")
+    | SelectChangeRequested(change, reply) ->
+        let requestId = nextPageLoadRequestId model
+
+        let nextModel =
+            model
+            |> transition (SetErrorNotice None)
+            |> transition (StartPageLoad requestId)
+
+        let cmd =
+            Cmd.OfPromise.either
+                (fun (deps: GitDependencies, change: GitSidebarChange) ->
+                    loadPageAsync deps change.Path change.IsConflicted
+                )
+                (deps, change)
+                (fun result -> SelectChangeCompleted(requestId, change.Path, reply, result))
+                (fun err -> SelectChangeCompleted(requestId, change.Path, reply, Error(string err)))
+
+        nextModel, cmd
+    | SelectChangeCompleted(requestId, _path, reply, _) when requestId <> model.PageLoadRequestId ->
+        model, resolveReplyCmd reply (Ok())
+    | SelectChangeCompleted(requestId, path, reply, Ok pageChange) ->
+        let nextModel = model |> transition (FinishPageLoad(requestId, path, Ok()))
+
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState pageChange
+            resolveReplyCmd reply (Ok())
+        ]
+    | SelectChangeCompleted(requestId, path, reply, Error message) ->
+        let nextModel = model |> transition (FinishPageLoad(requestId, path, Error message))
+        nextModel, resolveReplyCmd reply (Error message)
+    | ConfirmMergeResolutionRequested(_, reply) when model.CurrentArcPath.IsNone ->
+        model, resolveReplyCmd reply (Error "No ARC is loaded.")
+    | ConfirmMergeResolutionRequested(request, reply) ->
+        match model.BusyOperation with
+        | Some(GitBusyOperation.ConfirmingMergeResolution _) ->
+            model, resolveReplyCmd reply (Ok())
+        | _ when model.MergeResolutionPendingPath = Some request.Path ->
+            model, resolveReplyCmd reply (Ok())
+        | _ ->
+            let nextModel =
+                model
+                |> transition (SetBusyOperation(Some(GitBusyOperation.ConfirmingMergeResolution request.Path)))
+                |> transition (SetMergeResolutionPendingPath(Some request.Path))
+                |> transition (SetErrorNotice None)
+                |> transition (SetWarningNotice None)
+
+            let cmd =
+                Cmd.OfPromise.either
+                    (fun (deps, request) -> confirmMergeResolutionAsync deps request)
+                    (deps, request)
+                    (fun result -> ConfirmMergeResolutionCompleted(reply, result))
+                    (fun err -> ConfirmMergeResolutionCompleted(reply, Error(string err)))
+
+            nextModel, cmd
+    | ConfirmMergeResolutionCompleted(reply, Error message) ->
+        let nextModel =
+            model
+            |> transition (SetBusyOperation None)
+            |> transition (SetCurrentProgress None)
+            |> transition (SetMergeResolutionPendingPath None)
+            |> transition (SetErrorNotice(Some message))
+            |> transition (SetWarningNotice None)
+
+        if isStaleMergeConflictError message then
+            let selectionClearedModel = nextModel |> transition (SetSelectedChangePath None)
+
+            selectionClearedModel,
+            Cmd.batch [
+                applyPageChangeCmd setPageState GitPageChange.Clear
+                Cmd.ofMsg (RefreshRequested ignoreReply)
+                resolveReplyCmd reply (Error message)
+            ]
+        else
+            nextModel, resolveReplyCmd reply (Error message)
+    | ConfirmMergeResolutionCompleted(reply, Ok outcome) ->
+        let nextModel =
+            model
+            |> transition (SetBusyOperation None)
+            |> transition (SetCurrentProgress None)
+            |> transition (SetStatus(Some outcome.UpdatedStatus))
+            |> transition (SetMergeResolutionPendingPath None)
+            |> transition (SetSelectedChangePath outcome.NextConflictedPath)
+            |> transition (SetErrorNotice None)
+            |> transition (SetWarningNotice None)
+
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState outcome.PageChange
+            resolveReplyCmd reply (Ok())
+        ]
+    | _ -> transition msg model, Cmd.none
 
 let subscribe (_model: GitState) : Sub<Msg> = [
     [ "gitProgress" ],

@@ -2,6 +2,7 @@ module ElectronRenderer.GitWorkflowTests
 
 open Browser.Dom
 open Browser.Types
+open Elmish
 open Fable.Core
 open Feliz
 open Renderer.Context.GitWorkflow
@@ -167,6 +168,13 @@ let private renderToBody (element: ReactElement) = promise {
 
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
 
+let private collectMessages (cmd: Cmd<Msg>) = promise {
+    let messages = ResizeArray<Msg>()
+    cmd |> List.iter (fun sub -> sub messages.Add)
+    do! Promise.sleep 0
+    return messages |> Seq.toArray
+}
+
 Vitest.describe("GitWorkflow request preparation", fun () ->
     Vitest.test("prepareCommitAll snapshots distinct changed paths from the current model", fun () ->
         let state = {
@@ -226,6 +234,167 @@ Vitest.describe("GitWorkflow request preparation", fun () ->
             DownloadLargeFiles = false
         })
     )
+)
+
+Vitest.describe("GitWorkflow update command flow", fun () ->
+    Vitest.test("ArcPathChanged clears page state and schedules a refresh when switching repositories", fun () -> promise {
+        let clearedPages = ResizeArray<PageState option>()
+        let setPageState pageState = clearedPages.Add pageState
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                SelectedChangePath = Some "tracked.txt"
+                BusyOperation = Some GitBusyOperation.Refreshing
+        }
+
+        let nextState, cmd = update defaultDependencies setPageState (ArcPathChanged(Some "C:/arc-b")) state
+        let! messages = collectMessages cmd
+
+        Vitest.expect(nextState).toEqual({
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-b"
+        })
+        Vitest.expect(clearedPages |> Seq.toArray).toEqual([| None |])
+
+        match messages with
+        | [| RefreshRequested _ |] -> ()
+        | _ -> failwith $"Unexpected follow-up message count: {messages.Length}"
+    })
+
+    Vitest.test("RefreshCompleted ignores stale responses and still resolves the older caller", fun () -> promise {
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                RefreshRequestId = 2
+                Status = {
+                    GitState.Empty.Status with
+                        CurrentBranch = Some "feature/live"
+                }
+        }
+
+        let staleRefresh = {
+            Status = Ok(statusForBranch "feature/stale")
+            Branches = Ok [| localBranch "feature/stale" true true |]
+            LfsSettings = Ok(lfsSettings 9 false)
+        }
+
+        let nextState, cmd = update defaultDependencies ignore (RefreshCompleted(1, reply, Ok staleRefresh)) state
+        let! _ = collectMessages cmd
+
+        Vitest.expect(nextState.Status.CurrentBranch).toEqual(Some "feature/live")
+        Vitest.expect(replyResult).toEqual(Some(Ok()))
+    })
+
+    Vitest.test("RefreshCompleted ignores stale failures and keeps the current model untouched", fun () -> promise {
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                RefreshRequestId = 2
+                ErrorNotice = Some "keep current error"
+                Status = {
+                    GitState.Empty.Status with
+                        CurrentBranch = Some "feature/live"
+                }
+        }
+
+        let nextState, cmd = update defaultDependencies ignore (RefreshCompleted(1, reply, Error "older refresh failed")) state
+        let! _ = collectMessages cmd
+
+        Vitest.expect(nextState.Status.CurrentBranch).toEqual(Some "feature/live")
+        Vitest.expect(nextState.ErrorNotice).toEqual(Some "keep current error")
+        Vitest.expect(replyResult).toEqual(Some(Ok()))
+    })
+
+    Vitest.test("SelectChangeCompleted leaves the current selection untouched when an older request finishes late", fun () -> promise {
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                PageLoadRequestId = 2
+                SelectedChangePath = Some "B.txt"
+        }
+
+        let nextState, cmd =
+            update
+                defaultDependencies
+                ignore
+                (SelectChangeCompleted(1, "A.txt", reply, Ok(GitPageChange.Set(diffPage "A.txt"))))
+                state
+
+        let! _ = collectMessages cmd
+
+        Vitest.expect(nextState.SelectedChangePath).toEqual(Some "B.txt")
+        Vitest.expect(replyResult).toEqual(Some(Ok()))
+    })
+
+    Vitest.test("SelectChangeCompleted ignores stale failures and keeps the current selection/error untouched", fun () -> promise {
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                PageLoadRequestId = 2
+                SelectedChangePath = Some "B.txt"
+                ErrorNotice = None
+        }
+
+        let nextState, cmd =
+            update
+                defaultDependencies
+                ignore
+                (SelectChangeCompleted(1, "A.txt", reply, Error "older load failed"))
+                state
+
+        let! _ = collectMessages cmd
+
+        Vitest.expect(nextState.SelectedChangePath).toEqual(Some "B.txt")
+        Vitest.expect(nextState.ErrorNotice).toEqual(None)
+        Vitest.expect(replyResult).toEqual(Some(Ok()))
+    })
+
+    Vitest.test("ConfirmMergeResolutionCompleted refreshes git state after stale merge-conflict errors", fun () -> promise {
+        let clearedPages = ResizeArray<PageState option>()
+        let setPageState pageState = clearedPages.Add pageState
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                SelectedChangePath = Some "conflict-a.txt"
+                MergeResolutionPendingPath = Some "conflict-a.txt"
+                BusyOperation = Some(GitBusyOperation.ConfirmingMergeResolution "conflict-a.txt")
+        }
+
+        let nextState, cmd =
+            update
+                defaultDependencies
+                setPageState
+                (ConfirmMergeResolutionCompleted(reply, Error "File is not currently marked as conflicted."))
+                state
+
+        let! messages = collectMessages cmd
+
+        Vitest.expect(nextState.SelectedChangePath).toEqual(None)
+        Vitest.expect(nextState.MergeResolutionPendingPath).toEqual(None)
+        Vitest.expect(clearedPages |> Seq.toArray).toEqual([| None |])
+
+        match messages with
+        | [| RefreshRequested _ |] -> ()
+        | _ -> failwith $"Unexpected follow-up message count: {messages.Length}"
+
+        Vitest.expect(replyResult).toEqual(Some(Error "File is not currently marked as conflicted."))
+    })
 )
 
 Vitest.describe (

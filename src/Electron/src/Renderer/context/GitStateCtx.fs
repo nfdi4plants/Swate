@@ -101,7 +101,13 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let gitState, elmishDispatch = React.useElmish (init, update, subscribe, [||])
+    let gitState, elmishDispatch =
+        React.useElmish (
+            (fun () -> init ()),
+            update dependencies pageStateCtx.setState,
+            subscribe,
+            [||]
+        )
     let gitStateRef = React.useRef gitState
     let previousArcPathRef = React.useRef appStateCtx.state
 
