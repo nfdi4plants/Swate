@@ -31,6 +31,12 @@ type GitStateController = {
     confirmMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<unit, string>>
 }
 
+let private dispatchPromise
+    (dispatch: Msg -> unit)
+    (buildMsg: (Result<'T, string> -> unit) -> Msg)
+    : JS.Promise<Result<'T, string>> =
+    Promise.create (fun resolve _reject -> dispatch (buildMsg resolve))
+
 let private mapDiffPageResult (_requestedPath: string) =
     function
     | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(PageState.GitDiffPage diffData)
@@ -101,267 +107,59 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let gitState, elmishDispatch =
+    let gitState, dispatch =
         React.useElmish (
             (fun () -> init ()),
             update dependencies pageStateCtx.setState,
             subscribe,
             [||]
         )
-    let gitStateRef = React.useRef gitState
-    let previousArcPathRef = React.useRef appStateCtx.state
 
-    // Keep the ref in sync with Elmish's latest render state.
-    gitStateRef.current <- gitState
-
-    // Eager-write dispatch: update the ref synchronously before handing the message to Elmish,
-    // so that async workflows reading getState() within the same tick see the latest state.
-    let dispatch msg =
-        let nextState = transition msg gitStateRef.current
-        gitStateRef.current <- nextState
-        elmishDispatch msg
-
-    let getState () = gitStateRef.current
-    let isArcLoaded () = appStateCtx.state.IsSome
-
-    let applyPageChange =
-        function
-        | GitPageChange.NoChange -> ()
-        | GitPageChange.Set page -> pageStateCtx.setState (Some page)
-        | GitPageChange.Clear -> pageStateCtx.setState None
-
-    let refresh () = promise {
-        dispatch (SetBusyOperation(Some GitBusyOperation.Refreshing))
-        let! result = refreshAll dependencies isArcLoaded getState dispatch
-        dispatch (SetBusyOperation None)
-
-        match result with
-        | Ok _ -> return Ok()
-        | Error message ->
-            // Clear the page viewer when refresh fails, so stale diff/merge content
-            // does not remain visible while the sidebar shows an error state.
-            pageStateCtx.setState None
-            return Error message
-    }
+    let refresh () =
+        dispatchPromise dispatch RefreshRequested
 
     let fetch () =
-        runWriteOperation
-            dependencies
-            isArcLoaded
-            getState
-            dispatch
-            GitBusyOperation.FetchingFromRemote
-            (fun () -> dependencies.gitFetch { Remote = None; Branch = None })
+        dispatchPromise dispatch FetchRequested
 
     let pull () = promise {
-        let! result = runPullWorkflow dependencies isArcLoaded getState dispatch
-
-        return
-            match result with
-            | Ok pullResult ->
-                applyPageChange pullResult.PageChange
-                Ok()
-            | Error message -> Error message
+        return! dispatchPromise dispatch PullRequested
     }
 
     let push () =
-        runPushWorkflow dependencies isArcLoaded getState dispatch
+        dispatchPromise dispatch PushRequested
 
     let cloneRepository (request: GitCloneRepositoryRequest) =
-        runCloneWorkflow dependencies dispatch request
+        dispatchPromise dispatch (fun reply -> CloneRequested(request, reply))
 
-    let sync () = promise {
-        let! result = runSyncWorkflow dependencies isArcLoaded getState dispatch
-
-        return
-            match result with
-            | Ok pageChange ->
-                applyPageChange pageChange
-                Ok()
-            | Error message -> Error message
-    }
+    let sync () =
+        dispatchPromise dispatch SyncRequested
 
     let commitSelection (request: GitSidebarCommitSelectionRequest) =
-        runCommitOperation
-            dependencies
-            isArcLoaded
-            getState
-            dispatch
-            GitBusyOperation.CommittingSelectedChanges
-            request.Paths
-            true
-            request.Message
+        dispatchPromise dispatch (fun reply -> CommitSelectionRequested(request, reply))
 
     let commitAll (message: string) =
-        let state = getState ()
+        dispatchPromise dispatch (fun reply -> CommitAllRequested(message, reply))
 
-        let allChangedPaths = state.ChangedFiles |> Array.map _.Path |> Array.distinct
+    let saveLfsAutoTrackThreshold (thresholdMb: int) =
+        dispatchPromise dispatch (fun reply -> SaveLfsAutoTrackThresholdRequested(thresholdMb, reply))
 
-        runCommitOperation
-            dependencies
-            isArcLoaded
-            getState
-            dispatch
-            GitBusyOperation.CommittingAllChanges
-            allChangedPaths
-            false
-            message
-
-    let saveLfsAutoTrackThreshold (thresholdMb: int) = promise {
-        let! result =
-            runWriteOperation
-                dependencies
-                isArcLoaded
-                getState
-                dispatch
-                GitBusyOperation.SavingGitLfsThreshold
-                (fun () ->
-                    let state = getState ()
-
-                    dependencies.setGitLfsSettings {
-                        AutoTrackThresholdMb = thresholdMb
-                        DownloadLargeFiles = state.DownloadLargeFiles
-                    }
-                )
-
-        match result with
-        | Ok() ->
-            let state = getState ()
-
-            dispatch (
-                SetLfsSettings(
-                    Some {
-                        AutoTrackThresholdMb = thresholdMb
-                        DownloadLargeFiles = state.DownloadLargeFiles
-                    }
-                )
-            )
-
-            return Ok()
-        | Error message -> return Error message
-    }
-
-    let saveDownloadLargeFiles (downloadLargeFiles: bool) = promise {
-        if not (isArcLoaded ()) then
-            let state = getState ()
-
-            dispatch (
-                SetLfsSettings(
-                    Some {
-                        AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
-                        DownloadLargeFiles = downloadLargeFiles
-                    }
-                )
-            )
-
-            return Ok()
-        else
-            let! result =
-                runWriteOperation
-                    dependencies
-                    isArcLoaded
-                    getState
-                    dispatch
-                    GitBusyOperation.SavingGitLfsDownloadPreference
-                    (fun () ->
-                        let state = getState ()
-
-                        dependencies.setGitLfsSettings {
-                            AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
-                            DownloadLargeFiles = downloadLargeFiles
-                        }
-                    )
-
-            match result with
-            | Ok() ->
-                let state = getState ()
-
-                dispatch (
-                    SetLfsSettings(
-                        Some {
-                            AutoTrackThresholdMb = state.LfsAutoTrackThresholdMb
-                            DownloadLargeFiles = downloadLargeFiles
-                        }
-                    )
-                )
-
-                return Ok()
-            | Error message -> return Error message
-    }
+    let saveDownloadLargeFiles (downloadLargeFiles: bool) =
+        dispatchPromise dispatch (fun reply -> SaveDownloadLargeFilesRequested(downloadLargeFiles, reply))
 
     let createBranchFrom (request: GitSidebarCreateBranchRequest) =
-        runWriteOperation
-            dependencies
-            isArcLoaded
-            getState
-            dispatch
-            GitBusyOperation.CreatingBranch
-            (fun () ->
-                dependencies.createBranch {
-                    Name = request.BranchName
-                    StartPoint = request.StartPoint
-                }
-            )
+        dispatchPromise dispatch (fun reply -> CreateBranchRequested(request, reply))
 
     let switchBranchTo (branchName: string) =
-        let normalizedBranchName = branchName.Trim()
+        dispatchPromise dispatch (fun reply -> SwitchBranchRequested(branchName, reply))
 
-        if System.String.IsNullOrWhiteSpace normalizedBranchName then
-            promise { return Error "Branch name must not be empty." }
-        else
-            runWriteOperation
-                dependencies
-                isArcLoaded
-                getState
-                dispatch
-                GitBusyOperation.SwitchingBranch
-                (fun () -> dependencies.checkoutBranch { Name = normalizedBranchName })
+    let selectChange (change: GitSidebarChange) =
+        dispatchPromise dispatch (fun reply -> SelectChangeRequested(change, reply))
 
-    let selectChange (change: GitSidebarChange) = promise {
-        let! result = loadPage dependencies getState dispatch change.Path change.IsConflicted
-
-        return
-            match result with
-            | Ok pageChange ->
-                applyPageChange pageChange
-                Ok()
-            | Error message -> Error message
-    }
-
-    let confirmMergeResolutionAction request = promise {
-        let! result =
-            Renderer.Context.GitWorkflow.confirmMergeResolution dependencies isArcLoaded getState dispatch request
-
-        return
-            match result with
-            | Ok pageChange ->
-                applyPageChange pageChange
-                Ok()
-            | Error message ->
-                if isStaleMergeConflictError message then
-                    pageStateCtx.setState None
-
-                Error message
-    }
+    let confirmMergeResolutionAction request =
+        dispatchPromise dispatch (fun reply -> ConfirmMergeResolutionRequested(request, reply))
 
     React.useEffect (
-        (fun () ->
-            let previousArcPath = previousArcPathRef.current
-            previousArcPathRef.current <- appStateCtx.state
-
-            match appStateCtx.state with
-            | Some _ ->
-                if previousArcPath <> appStateCtx.state then
-                    // Switching to a different ARC should dismiss any git page opened for the
-                    // previous repository before the next refresh repopulates git state.
-                    pageStateCtx.setState None
-                    dispatch ResetWorkflow
-
-                refreshAll dependencies isArcLoaded getState dispatch |> Promise.start
-            | None ->
-                pageStateCtx.setState None
-                dispatch ResetWorkflow
-        ),
+        (fun () -> dispatch (ArcPathChanged appStateCtx.state)),
         [| box appStateCtx.state |]
     )
 
