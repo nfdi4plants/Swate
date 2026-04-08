@@ -1,7 +1,6 @@
 module Renderer.Components.MainContent.LandingDraftTarget
 
 open Feliz
-open Swate.Components
 open Swate.Components.Landing
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -13,17 +12,19 @@ let LandingDraftTarget () =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let errorModal = Contexts.ErrorModal.useErrorModal ()
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
     let onSubmit =
         fun (payload: SubmitPayload) ->
 
-            let finishSuccess (pageState: PageState) (response: FileContentDTO) =
+            let finishSuccess (response: FileContentDTO) =
 
                 fileStateCtx.setSelectedTreeItemPath (Some response.path)
-                pageStateCtx.setState (Some pageState)
+
+                let page = PageState.fromFileContentDTO response
+
+                pageStateCtx.setState (Some page)
                 setLandingDraft LandingDraft.init
                 setLandingUiState LandingUiState.init
 
@@ -44,18 +45,8 @@ let LandingDraftTarget () =
                             Error = Some message.Message
                     }
                 | Ok previewData ->
-                    let previewPage =
-                        match PageState.fromFileContentDTO previewData with
-                        | Ok pageState -> pageState
-                        | Error message ->
-                            errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = "ARC preview could not be opened")
-                            )
-
-                            PageState.ArcFilePage payload.ArcFile
-
                     match payload.ProtocolIntent with
-                    | None -> finishSuccess previewPage previewData
+                    | None -> finishSuccess previewData
                     | Some protocolIntent ->
                         let request: FileContentDTO =
                             FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
@@ -63,7 +54,7 @@ let LandingDraftTarget () =
                         let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
 
                         match writeResult with
-                        | Ok() -> finishSuccess previewPage previewData
+                        | Ok() -> finishSuccess previewData
                         | Result.Error exn ->
                             setLandingUiState {
                                 landingUiState with

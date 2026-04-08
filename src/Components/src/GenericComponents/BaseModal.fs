@@ -162,9 +162,9 @@ type BaseModal =
         )
 
 
-    ///<summary>Obsolete modal used to display legacy inline error surfaces.</summary>
+    ///<summary>This modal is used to display errors from for example api communication</summary>
     [<ReactComponent>]
-    static member ErrorModalObsolete(isOpen: bool, setIsOpen: bool -> unit, error: string, ?debug: string) =
+    static member ErrorBaseModal(isOpen: bool, setIsOpen: bool -> unit, error: string, ?debug: string) =
 
         let debug = debug |> Option.map (fun d -> "errormodal_" + d)
 

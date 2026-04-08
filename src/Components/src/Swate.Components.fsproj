@@ -80,8 +80,6 @@
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
-    <Compile Include="GenericComponents\CancelableErrorModal.fs" />
-    <Compile Include="GenericComponents\ErrorModalProvider.fs" />
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
     <Compile Include="GenericComponents\CardGrid.fs" />

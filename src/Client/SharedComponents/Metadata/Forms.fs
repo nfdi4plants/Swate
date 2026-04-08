@@ -507,7 +507,7 @@ type FormComponents =
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
-                Swate.Components.BaseModal.ErrorModalObsolete(
+                Swate.Components.BaseModal.ErrorBaseModal(
                     error.IsSome,
                     (fun _ -> setError None),
                     error |> Option.defaultValue ""

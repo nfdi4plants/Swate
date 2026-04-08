@@ -3,7 +3,6 @@ module Renderer.Components.FileExplorer
 open System
 open Browser.Dom
 open Renderer
-open Swate.Components
 open Swate.Components.FileExplorerTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -54,7 +53,6 @@ let FileTree () =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let errorModal = Contexts.ErrorModal.useErrorModal ()
 
     match fileStateCtx.state.FileTree with
     | [||] -> EmptyFileTreePlaceholder()
@@ -89,8 +87,8 @@ let FileTree () =
 
         let setError (errorMsg: string option) =
             match errorMsg with
-            | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed"))
-            | None -> ()
+            | Some msg -> pageStateCtx.setState (Some(PageState.ErrorPage msg))
+            | None -> pageStateCtx.setState (None)
 
         let toggleLfsMark =
             FileExplorerGitLfsHelper.ToggleLfsMark(setError, runToggleLfsMark)
@@ -101,8 +99,7 @@ let FileTree () =
         let openPreview (item: FileItem) =
             promise {
                 match item.Path with
-                | None ->
-                    errorModal.enqueue (ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed"))
+                | None -> pageStateCtx.setState (Some(PageState.ErrorPage $"File '{item.Name}' has no path."))
                 | Some _ when item.IsDirectory -> pageStateCtx.setState (None)
                 | Some path ->
                     let previewPath = resolveArcPreviewPath path
@@ -112,27 +109,20 @@ let FileTree () =
                     else
                         console.log ($"[Renderer] Opening file: {previewPath}")
 
+                    fileStateCtx.setSelectedTreeItemPath (Some path)
+
                     let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
 
                     match result with
                     | Ok data ->
+                        let pageState = PageState.fromFileContentDTO data
                         console.log ("[Renderer] Received data, processing...")
-
-                        match PageState.fromFileContentDTO data with
-                        | Ok pageState ->
-                            fileStateCtx.setSelectedTreeItemPath (Some path)
-                            pageStateCtx.setState (Some pageState)
-                        | Error message ->
-                            errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = $"Could not preview '{item.Name}'")
-                            )
+                        pageStateCtx.setState (Some pageState)
                     | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
-                        errorModal.enqueue (
-                            ErrorModalRequest.create(
-                                $"Could not open preview for '{item.Name}': {exn.Message}",
-                                title = "Preview failed"
-                            )
+
+                        pageStateCtx.setState (
+                            Some(PageState.ErrorPage $"Could not open preview for '{item.Name}': {exn.Message}")
                         )
             }
             |> Promise.start

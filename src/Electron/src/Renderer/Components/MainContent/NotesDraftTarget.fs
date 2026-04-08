@@ -1,7 +1,6 @@
 module Renderer.Components.MainContent.NotesDraftTarget
 
 open Feliz
-open Swate.Components
 open Swate.Components.Landing
 open Swate.Components.Notes.Editor
 open Swate.Electron.Shared
@@ -18,7 +17,6 @@ let NotesDraftTarget () =
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let errorModal = Contexts.ErrorModal.useErrorModal ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -57,15 +55,8 @@ let NotesDraftTarget () =
 
                     match previewResult with
                     | Ok previewData ->
-                        match PageState.fromFileContentDTO previewData with
-                        | Ok page ->
-                            pageStateCtx.setState (Some page)
-                        | Error message ->
-                            errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = "Note preview could not be opened")
-                            )
-
-                            pageStateCtx.setState (Some(PageState.TextPage payload.Intent.Content))
+                        let page = PageState.fromFileContentDTO previewData
+                        pageStateCtx.setState (Some page)
                     | Result.Error _ -> pageStateCtx.setState (Some(PageState.TextPage payload.Intent.Content))
             }
             |> Promise.start
