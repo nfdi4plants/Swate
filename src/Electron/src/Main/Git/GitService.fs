@@ -10,6 +10,7 @@ open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
 open Main.Bindings.Filesystem
 open Main.Bindings.SimpleGit
+open Main.Git.GitLfsAdapter
 open Main.Git.GitLfsService
 open Main.Git.GitTokenProvider
 open Main.Git.GitAuthAdapter
@@ -934,11 +935,16 @@ let private createPullHydrationFailure (failure: GitFailure) = {
         Message = $"Git pull completed, but Git LFS download failed: {failure.Message}"
 }
 
-let private createAuthenticatedGit
+type private AuthenticatedGitSession = {
+    Git: ISimpleGit
+    CommandAuth: GitAuthAdapter.GitCommandAuthentication
+}
+
+let private createAuthenticatedGitSession
     (arcPath: string)
     (remoteName: string)
     (progressCallback: GitProgressCallback option)
-    =
+    : JS.Promise<GitResult<AuthenticatedGitSession>> =
     promise {
         let probeOptions = createOptions arcPath standardTimeout None
         let probeGit = createGit probeOptions
@@ -967,7 +973,10 @@ let private createAuthenticatedGit
                         try
                             let operationOptions = createOptions arcPath syncTimeout progressCallback
                             let git = applyAuth createGit operationOptions host token (Some remoteName) (Some allowedRemoteUrl)
-                            return Ok git
+                            let commandAuth =
+                                createCommandAuthentication host token (Some remoteName) (Some allowedRemoteUrl)
+
+                            return Ok { Git = git; CommandAuth = commandAuth }
                         with error ->
                             return errorResult error
                     | _ ->
@@ -1005,11 +1014,11 @@ let private withAuthenticatedGit
     (operation: ISimpleGit -> JS.Promise<'T>)
     =
     promise {
-        let! gitResult = createAuthenticatedGit arcPath remoteName progressCallback
+        let! gitResult = createAuthenticatedGitSession arcPath remoteName progressCallback
 
         match gitResult with
         | Error failure -> return Error failure
-        | Ok git -> return! runSimpleGit operation git
+        | Ok session -> return! runSimpleGit operation session.Git
     }
 
 let getStatus (arcPath: string) : JS.Promise<GitResult<GitStatusDto>> =
@@ -1336,8 +1345,8 @@ let pull
 let executePushWorkflow
     (pushTarget: GitPushTarget)
     (buildOutboundPlan: unit -> JS.Promise<Result<OutboundPushPlan, GitFailure>>)
-    (uploadLfsObjects: string -> JS.Promise<GitResult<unit>>)
-    (pushToRemote: GitPushTarget -> JS.Promise<GitResult<unit>>)
+    (uploadLfsObjects: string[] -> JS.Promise<GitResult<unit>>)
+    (pushToRemote: bool -> GitPushTarget -> JS.Promise<GitResult<unit>>)
     (collectLfsDiagnostics: GitFailure -> JS.Promise<string option>)
     : JS.Promise<GitResult<unit>> =
     promise {
@@ -1346,24 +1355,22 @@ let executePushWorkflow
         match lfsPlanResult with
         | Error failure ->
             return Error failure
-        | Ok lfsPlan ->
-            match lfsPlan with
-            | OutboundPushPlan.SkipLfsUpload ->
-                return! pushToRemote pushTarget
-            | OutboundPushPlan.UploadLfsObjects refSpec ->
-                let! lfsUploadResult = uploadLfsObjects refSpec
+        | Ok OutboundPushPlan.SkipLfsUpload ->
+            return! pushToRemote false pushTarget
+        | Ok(OutboundPushPlan.UploadLfsObjects lfsObjectIds) ->
+            let! lfsUploadResult = uploadLfsObjects lfsObjectIds
 
-                match lfsUploadResult with
-                | Ok () ->
-                    return! pushToRemote pushTarget
-                | Error failure ->
-                    let! diagnostics = collectLfsDiagnostics failure
+            match lfsUploadResult with
+            | Ok () ->
+                return! pushToRemote true pushTarget
+            | Error failure ->
+                let! diagnostics = collectLfsDiagnostics failure
 
-                    return
-                        Error {
-                            failure with
-                                Message = appendPushDiagnostics failure.Message diagnostics
-                        }
+                return
+                    Error {
+                        failure with
+                            Message = appendPushDiagnostics failure.Message diagnostics
+                    }
     }
 
 // Push keeps LFS planning and optional upload here because they are part of the repository push workflow.
@@ -1380,11 +1387,12 @@ let push
             match validateOptionalBranchName branchName with
             | Error branchError -> return errorResult branchError
             | Ok safeBranchName ->
-                let! gitResult = createAuthenticatedGit arcPath safeRemoteName progressCallback
+                let! gitResult = createAuthenticatedGitSession arcPath safeRemoteName progressCallback
 
                 match gitResult with
                 | Error failure -> return Error failure
-                | Ok git ->
+                | Ok session ->
+                    let git = session.Git
                     let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
                     match pushStatusResult with
@@ -1400,17 +1408,37 @@ let push
                                 (fun () ->
                                     planOutboundPush
                                         runSimpleGit
+                                        runGitCaptured
+                                        toFailure
                                         (fun currentGit -> runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit)
+                                        arcPath
                                         safeRemoteName
                                         (Some pushTarget.RefSpec)
                                         git)
-                                (fun refSpec -> uploadObjects runSimpleGit safeRemoteName refSpec git)
-                                (fun currentPushTarget ->
+                                (fun objectIds -> promise {
+                                    let! uploadResult =
+                                        GitLfsService.uploadObjects
+                                            runGitCaptured
+                                            session.CommandAuth
+                                            arcPath
+                                            safeRemoteName
+                                            pushTarget.RefSpec
+                                            objectIds
+
+                                    return uploadResult |> Result.mapError toFailure
+                                })
+                                (fun skipLfsHook currentPushTarget ->
                                     runSimpleGit
                                         (fun currentGit -> promise {
+                                            let pushGit =
+                                                if skipLfsHook then
+                                                    currentGit.env ("GIT_LFS_SKIP_PUSH", "1")
+                                                else
+                                                    currentGit
+
                                             if currentPushTarget.SetUpstream then
                                                 let! _ =
-                                                    currentGit.push (
+                                                    pushGit.push (
                                                         safeRemoteName,
                                                         currentPushTarget.PushBranch,
                                                         !^[| "--set-upstream" |]
@@ -1418,7 +1446,7 @@ let push
 
                                                 return ()
                                             else
-                                                let! _ = currentGit.push (safeRemoteName, currentPushTarget.PushBranch)
+                                                let! _ = pushGit.push (safeRemoteName, currentPushTarget.PushBranch)
                                                 return ()
                                         })
                                         git)

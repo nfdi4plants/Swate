@@ -12,6 +12,7 @@ open Vitest
 module GitService = Main.Git.GitService
 module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
+module GitLfsAdapter = Main.Git.GitLfsAdapter
 module GitLfsService = Main.Git.GitLfsService
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -97,6 +98,17 @@ let private expectOkResult<'T> (operationName: string) (result: Result<'T, exn>)
     | Ok value -> value
     | Error error -> failwith $"{operationName} failed: {error.Message}"
 
+let private expectErrorResult<'T> (result: Result<'T, exn>) =
+    match result with
+    | Ok _ -> failwith "Expected operation to fail."
+    | Error error -> error
+
+[<Emit("Buffer.from($0, 'utf8')")>]
+let private utf8Buffer (text: string) : obj = jsNative
+
+[<Emit("Buffer.byteLength($0, 'utf8')")>]
+let private utf8ByteLength (text: string) : int = jsNative
+
 let private runSimpleGitResult
     (operation: ISimpleGit -> JS.Promise<'T>)
     (git: ISimpleGit)
@@ -104,6 +116,29 @@ let private runSimpleGitResult
     promise {
         try
             let! result = operation git
+            return Ok result
+        with error ->
+            return Error error
+    }
+
+let private createRawOnlyGit (rawHandler: string[] -> JS.Promise<string>) : ISimpleGit =
+    createObj [
+        "raw" ==> (fun (command: obj) ->
+            match command with
+            | :? (string array) as commands -> rawHandler commands
+            | :? string as singleCommand -> rawHandler [| singleCommand |]
+            | _ -> failwith "Unexpected raw command payload.")
+    ]
+    |> unbox<ISimpleGit>
+
+let private runSimpleGitRawWithFakeGit
+    (fakeGit: ISimpleGit)
+    (operation: ISimpleGit -> JS.Promise<string>)
+    (_: ISimpleGit)
+    : JS.Promise<Result<string, exn>> =
+    promise {
+        try
+            let! result = operation fakeGit
             return Ok result
         with error ->
             return Error error
@@ -365,6 +400,207 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "planOutboundPush ignores remote-only ls-remote tips that are missing locally",
+            fun () -> promise {
+                let candidateBlobId = "1111111111111111111111111111111111111111"
+                let remoteBranchTip = "9999999999999999999999999999999999999999"
+                let remoteOnlyTip = "3c1332ae987944dcdf3f68977206561b4cb1a2dc"
+                let lfsObjectId = "abababababababababababababababababababababababababababababababab"
+                let pointerContent =
+                    $"version https://git-lfs.github.com/spec/v1\noid sha256:{lfsObjectId}\nsize 18\n"
+
+                let pointerSize = utf8ByteLength pointerContent
+                let mutable batchCheckStdin = None
+                let mutable revListStdin = None
+                let mutable batchCheckStdin = None
+                let optimizedRevListArgs =
+                    [|
+                        "rev-list"
+                        "--objects"
+                        "--no-object-names"
+                        "--stdin"
+                        "--ignore-missing"
+                        "--filter=blob:limit=1024"
+                        "--filter=object:type=blob"
+                        "--filter-provided-objects"
+                    |]
+                let catFileBatchCheckArgs = [| "cat-file"; "--batch-check" |]
+                let catFileBatchArgs = [| "cat-file"; "--batch"; "--buffer" |]
+
+                let fakeGit =
+                    createRawOnlyGit (fun command -> promise {
+                        let commandText = String.concat " " command
+
+                        match command with
+                        | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
+                            return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] ->
+                            return
+                                $"{remoteBranchTip}\trefs/heads/main\n{remoteOnlyTip}\trefs/merge-requests/1/merge\n"
+                        | _ ->
+                            return failwith $"Unexpected raw command: {commandText}"
+                    })
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun request -> promise {
+                        let commandText = String.concat " " request.Arguments
+
+                        match request.Arguments with
+                        | args when args = catFileBatchCheckArgs ->
+                            batchCheckStdin <- request.StandardInput
+
+                            let stdoutText = $"{remoteBranchTip} commit 123\n{remoteOnlyTip} missing\n"
+
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer stdoutText
+                                StdoutText = stdoutText
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | args when args = optimizedRevListArgs ->
+                            revListStdin <- request.StandardInput
+
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer $"{candidateBlobId}\n"
+                                StdoutText = $"{candidateBlobId}\n"
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | args when args = catFileBatchArgs ->
+                            let stdoutText = $"{candidateBlobId} blob {pointerSize}\n{pointerContent}"
+
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer stdoutText
+                                StdoutText = stdoutText
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | _ ->
+                            return failwith $"Unexpected spawned command: {commandText}"
+                    }
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        (runSimpleGitRawWithFakeGit fakeGit)
+                        fakeSpawnedGit
+                        id
+                        (fun _ -> promise { return Error(exn "status should not be called") })
+                        "C:/repo"
+                        "origin"
+                        (Some "refs/heads/main")
+                        fakeGit
+
+                let actualPlan = expectOkResult "plan outbound push with remote-only tips" plan
+
+                Vitest.expect(batchCheckStdin).toEqual (Some $"{remoteBranchTip}\n{remoteOnlyTip}\n")
+                Vitest.expect(revListStdin).toEqual (Some $"refs/heads/main\n--not\n{remoteBranchTip}\n")
+                Vitest.expect(actualPlan).toEqual (GitLfsService.OutboundPushPlan.UploadLfsObjects [| lfsObjectId |])
+            }
+        )
+
+        Vitest.test (
+            "planOutboundPush returns exact LFS object IDs from batch pointer blobs",
+            fun () -> promise {
+                let candidateBlobId = "1111111111111111111111111111111111111111"
+                let remoteTip = "9999999999999999999999999999999999999999"
+                let lfsObjectId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                let pointerContent =
+                    $"version https://git-lfs.github.com/spec/v1\noid sha256:{lfsObjectId}\nsize 18\n"
+
+                let pointerSize = utf8ByteLength pointerContent
+                let mutable batchCheckStdin = None
+                let mutable revListStdin = None
+                let optimizedRevListArgs =
+                    [|
+                        "rev-list"
+                        "--objects"
+                        "--no-object-names"
+                        "--stdin"
+                        "--ignore-missing"
+                        "--filter=blob:limit=1024"
+                        "--filter=object:type=blob"
+                        "--filter-provided-objects"
+                    |]
+                let catFileBatchCheckArgs = [| "cat-file"; "--batch-check" |]
+                let catFileBatchArgs = [| "cat-file"; "--batch"; "--buffer" |]
+
+                let fakeGit =
+                    createRawOnlyGit (fun command -> promise {
+                        let commandText = String.concat " " command
+
+                        match command with
+                        | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
+                            return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] ->
+                            return $"{remoteTip}\trefs/heads/main\n"
+                        | _ ->
+                            return failwith $"Unexpected raw command: {commandText}"
+                    })
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
+                        let commandText = String.concat " " request.Arguments
+
+                        match request.Arguments with
+                        | args when args = catFileBatchCheckArgs ->
+                            batchCheckStdin <- request.StandardInput
+
+                            let stdoutText = $"{remoteTip} commit 123\n"
+
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer stdoutText
+                                StdoutText = stdoutText
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | args when args = optimizedRevListArgs ->
+                            revListStdin <- request.StandardInput
+
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer $"{candidateBlobId}\n"
+                                StdoutText = $"{candidateBlobId}\n"
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | args when args = catFileBatchArgs ->
+                            let stdoutText = $"{candidateBlobId} blob {pointerSize}\n{pointerContent}"
+
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer stdoutText
+                                StdoutText = stdoutText
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | _ ->
+                            return failwith $"Unexpected spawned command: {commandText}"
+                    }
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        (runSimpleGitRawWithFakeGit fakeGit)
+                        fakeSpawnedGit
+                        id
+                        (fun _ -> promise { return Error(exn "status should not be called") })
+                        "C:/repo"
+                        "origin"
+                        (Some "refs/heads/main")
+                        fakeGit
+
+                let actualPlan = expectOkResult "plan outbound push exact OIDs" plan
+
+                Vitest.expect(batchCheckStdin).toEqual (Some $"{remoteTip}\n")
+                Vitest.expect(revListStdin).toEqual (Some $"refs/heads/main\n--not\n{remoteTip}\n")
+                Vitest.expect(actualPlan).toEqual (GitLfsService.OutboundPushPlan.UploadLfsObjects [| lfsObjectId |])
+            }
+        )
+
+        Vitest.test (
             "planOutboundPush skips LFS upload when outbound commits do not contain LFS pointers",
             fun () -> promise {
                 do!
@@ -386,7 +622,10 @@ Vitest.describe (
                         let! plan =
                             GitLfsService.planOutboundPush
                                 runSimpleGitResult
+                                GitLfsAdapter.runGitCaptured
+                                id
                                 (fun git -> runSimpleGitResult (fun currentGit -> currentGit.status ()) git)
+                                context.RepoPath
                                 "origin"
                                 None
                                 context.Git
@@ -423,7 +662,10 @@ Vitest.describe (
                         let! plan =
                             GitLfsService.planOutboundPush
                                 runSimpleGitResult
+                                GitLfsAdapter.runGitCaptured
+                                id
                                 (fun git -> runSimpleGitResult (fun currentGit -> currentGit.status ()) git)
+                                context.RepoPath
                                 "origin"
                                 None
                                 context.Git
@@ -431,8 +673,8 @@ Vitest.describe (
                         let actualPlan = expectOkResult "plan outbound push with lfs" plan
 
                         match actualPlan with
-                        | GitLfsService.OutboundPushPlan.UploadLfsObjects refSpec ->
-                            Vitest.expect(String.IsNullOrWhiteSpace refSpec).toBe (false)
+                        | GitLfsService.OutboundPushPlan.UploadLfsObjects lfsObjectIds ->
+                            Vitest.expect(lfsObjectIds.Length).toBeGreaterThan (0)
                         | GitLfsService.OutboundPushPlan.SkipLfsUpload ->
                             failwith "Expected outbound LFS upload to be required."
                     })
@@ -480,7 +722,10 @@ Vitest.describe (
                         let! plan =
                             GitLfsService.planOutboundPush
                                 runSimpleGitResult
+                                GitLfsAdapter.runGitCaptured
+                                id
                                 (fun git -> runSimpleGitResult (fun currentGit -> currentGit.status ()) git)
+                                context.RepoPath
                                 "origin"
                                 None
                                 context.Git
@@ -490,6 +735,60 @@ Vitest.describe (
 
                         Vitest.expect(actualPlan).toEqual (GitLfsService.OutboundPushPlan.SkipLfsUpload)
                     })
+            }
+        )
+
+        Vitest.test (
+            "uploadObjects sends exact object IDs over stdin",
+            fun () -> promise {
+                let lfsObjectId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+                let commandAuth: GitAuthAdapter.GitCommandAuthentication = {
+                    ConfigArgs = [| "-c"; "http.extraHeader=Authorization: Basic TEST" |]
+                    Environment = createObj []
+                }
+
+                let mutable recordedArgs = [||]
+                let mutable recordedStdin = None
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
+                        recordedArgs <- request.Arguments
+                        recordedStdin <- request.StandardInput
+
+                        return {
+                            ExitCode = 0
+                            StdoutBuffer = utf8Buffer ""
+                            StdoutText = ""
+                            StderrText = ""
+                            TimedOut = false
+                        }
+                    }
+
+                let! result =
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [| lfsObjectId |]
+
+                expectOkResult "upload exact object ids" result |> ignore
+
+                Vitest.expect(recordedArgs).toEqual (
+                    [|
+                        "-c"
+                        "http.extraHeader=Authorization: Basic TEST"
+                        "lfs"
+                        "push"
+                        "--object-id"
+                        "origin"
+                        "--stdin"
+                    |]
+                )
+
+                Vitest.expect(recordedStdin).toEqual (Some $"{lfsObjectId}\n")
             }
         )
 
@@ -511,23 +810,24 @@ Vitest.describe (
                             events.Add "plan"
                             promise { return Ok GitLfsService.OutboundPushPlan.SkipLfsUpload }
                         )
-                        (fun refSpec ->
-                            events.Add $"upload:{refSpec}"
+                        (fun objectIds ->
+                            let joinedObjectIds = String.concat "," objectIds
+                            events.Add $"upload:{joinedObjectIds}"
                             promise { return Ok() }
                         )
-                        (fun _ ->
-                            events.Add "push"
+                        (fun skipLfsHook _ ->
+                            events.Add $"push:skip={skipLfsHook}"
                             promise { return Ok() }
                         )
                         (fun _ -> promise { return None })
 
                 expectOk "execute push workflow without lfs upload" result |> ignore
-                Vitest.expect(events.ToArray()).toEqual ([| "plan"; "push" |])
+                Vitest.expect(events.ToArray()).toEqual ([| "plan"; "push:skip=false" |])
             }
         )
 
         Vitest.test (
-            "executePushWorkflow uploads LFS objects before pushing when the plan requires it",
+            "executePushWorkflow enables GIT_LFS_SKIP_PUSH only after successful exact upload",
             fun () -> promise {
                 let events = ResizeArray<string>()
 
@@ -540,32 +840,38 @@ Vitest.describe (
                 let! result =
                     GitService.executePushWorkflow
                         pushTarget
-                        (fun () ->
-                            events.Add "plan"
-
-                            promise {
-                                return
-                                    Ok(GitLfsService.OutboundPushPlan.UploadLfsObjects "refs/heads/feature/upload-lfs")
-                            }
-                        )
-                        (fun refSpec ->
-                            events.Add $"upload:{refSpec}"
+                        (fun () -> promise {
+                            return
+                                Ok(
+                                    GitLfsService.OutboundPushPlan.UploadLfsObjects [|
+                                        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                                    |]
+                                )
+                        })
+                        (fun objectIds ->
+                            let joinedObjectIds = String.concat "," objectIds
+                            events.Add($"upload:{joinedObjectIds}")
                             promise { return Ok() }
                         )
-                        (fun _ ->
-                            events.Add "push"
+                        (fun skipLfsHook _ ->
+                            events.Add($"push:skip={skipLfsHook}")
                             promise { return Ok() }
                         )
                         (fun _ -> promise { return None })
 
-                expectOk "execute push workflow with lfs upload" result |> ignore
+                expectOk "execute push workflow with exact upload" result |> ignore
 
-                Vitest.expect(events.ToArray()).toEqual ([| "plan"; "upload:refs/heads/feature/upload-lfs"; "push" |])
+                Vitest.expect(events.ToArray()).toEqual (
+                    [|
+                        "upload:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        "push:skip=true"
+                    |]
+                )
             }
         )
 
         Vitest.test (
-            "executePushWorkflow appends diagnostics when the LFS upload step fails",
+            "executePushWorkflow aborts and appends diagnostics when exact upload fails",
             fun () -> promise {
                 let uploadFailure: GitService.GitFailure = {
                     Kind = GitFailureKind.Network
@@ -582,16 +888,384 @@ Vitest.describe (
                     GitService.executePushWorkflow
                         pushTarget
                         (fun () -> promise {
-                            return Ok(GitLfsService.OutboundPushPlan.UploadLfsObjects "refs/heads/feature/diagnostics")
+                            return
+                                Ok(
+                                    GitLfsService.OutboundPushPlan.UploadLfsObjects [|
+                                        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                                    |]
+                                )
                         })
                         (fun _ -> promise { return Error uploadFailure })
-                        (fun _ -> promise { return Ok() })
+                        (fun _ _ -> promise { return Ok() })
                         (fun _ -> promise { return Some "Git LFS Env:\n[REDACTED]" })
 
                 let failure = expectError result
                 Vitest.expect(failure.Kind).toEqual (GitFailureKind.Network)
                 Vitest.expect(failure.Message.Contains("lfs upload failed")).toBe (true)
                 Vitest.expect(failure.Message.Contains("LFS diagnostics")).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "planOutboundPush falls back to remote-truth per-object probes when filter planning is unavailable",
+            fun () -> promise {
+                let candidateBlobId = "3333333333333333333333333333333333333333"
+                let remoteTip = "7777777777777777777777777777777777777777"
+                let lfsObjectId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+
+                let fakeGit =
+                    createRawOnlyGit (fun command -> promise {
+                        let commandText = String.concat " " command
+
+                        match command with
+                        | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
+                            return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] ->
+                            return $"{remoteTip}\trefs/heads/main\n"
+                        | [| "cat-file"; "-t"; currentObjectId |] when currentObjectId = candidateBlobId ->
+                            return "blob\n"
+                        | [| "cat-file"; "-s"; currentObjectId |] when currentObjectId = candidateBlobId ->
+                            return "129\n"
+                        | [| "cat-file"; "-p"; currentObjectId |] when currentObjectId = candidateBlobId ->
+                            return $"version https://git-lfs.github.com/spec/v1\noid sha256:{lfsObjectId}\nsize 18\n"
+                        | [| "for-each-ref"; "--format=%(refname)"; "refs/remotes/origin" |] ->
+                            return failwith "Legacy local remote-ref fallback must not run in this test."
+                        | _ ->
+                            return failwith $"Unexpected raw command: {commandText}"
+                    })
+
+                let seenRevListModes = ResizeArray<string>()
+                let batchCheckArgs = [| "cat-file"; "--batch-check" |]
+                let optimizedRevListArgs =
+                    [|
+                        "rev-list"
+                        "--objects"
+                        "--no-object-names"
+                        "--stdin"
+                        "--ignore-missing"
+                        "--filter=blob:limit=1024"
+                        "--filter=object:type=blob"
+                        "--filter-provided-objects"
+                    |]
+                let fallbackRevListArgs =
+                    [| "rev-list"; "--objects"; "--no-object-names"; "--stdin"; "--ignore-missing" |]
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
+                        let commandText = String.concat " " request.Arguments
+
+                        match request.Arguments with
+                        | args when args = batchCheckArgs ->
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer $"{remoteTip} commit 123\n"
+                                StdoutText = $"{remoteTip} commit 123\n"
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | args when args = optimizedRevListArgs ->
+                            seenRevListModes.Add "optimized"
+
+                            return {
+                                ExitCode = 129
+                                StdoutBuffer = utf8Buffer ""
+                                StdoutText = ""
+                                StderrText = "fatal: unknown option `--filter-provided-objects`"
+                                TimedOut = false
+                            }
+                        | args when args = fallbackRevListArgs ->
+                            seenRevListModes.Add "fallback"
+
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer $"{candidateBlobId}\n"
+                                StdoutText = $"{candidateBlobId}\n"
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | _ ->
+                            return failwith $"Unexpected spawned command: {commandText}"
+                    }
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        (runSimpleGitRawWithFakeGit fakeGit)
+                        fakeSpawnedGit
+                        id
+                        (fun _ -> promise { return Error(exn "status should not be called") })
+                        "C:/repo"
+                        "origin"
+                        (Some "refs/heads/main")
+                        fakeGit
+
+                let actualPlan = expectOkResult "plan outbound push fallback" plan
+
+                Vitest.expect(seenRevListModes.ToArray()).toEqual ([| "optimized"; "fallback" |])
+                Vitest.expect(actualPlan).toEqual (GitLfsService.OutboundPushPlan.UploadLfsObjects [| lfsObjectId |])
+            }
+        )
+
+        Vitest.test (
+            "uploadObjects falls back to ref-spec upload when object-id mode is unavailable",
+            fun () -> promise {
+                let lfsObjectId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+
+                let commandAuth: GitAuthAdapter.GitCommandAuthentication = {
+                    ConfigArgs = [| "-c"; "http.extraHeader=Authorization: Basic TEST" |]
+                    Environment = createObj []
+                }
+
+                let calls = ResizeArray<string>()
+                let objectIdUploadArgs =
+                    [|
+                        "-c"
+                        "http.extraHeader=Authorization: Basic TEST"
+                        "lfs"
+                        "push"
+                        "--object-id"
+                        "origin"
+                        "--stdin"
+                    |]
+                let refSpecUploadArgs =
+                    [|
+                        "-c"
+                        "http.extraHeader=Authorization: Basic TEST"
+                        "lfs"
+                        "push"
+                        "origin"
+                        "refs/heads/main"
+                    |]
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
+                        let commandText = String.concat " " request.Arguments
+                        calls.Add commandText
+
+                        match request.Arguments with
+                        | args when args = objectIdUploadArgs ->
+                            return {
+                                ExitCode = 2
+                                StdoutBuffer = utf8Buffer ""
+                                StdoutText = ""
+                                StderrText = "unknown flag: --object-id"
+                                TimedOut = false
+                            }
+                        | args when args = refSpecUploadArgs ->
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer ""
+                                StdoutText = ""
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | _ ->
+                            return failwith $"Unexpected spawned command: {commandText}"
+                    }
+
+                let! result =
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [| lfsObjectId |]
+
+                expectOkResult "upload fallback" result |> ignore
+                Vitest.expect(calls.ToArray()).toEqual (
+                    [|
+                        "-c http.extraHeader=Authorization: Basic TEST lfs push --object-id origin --stdin"
+                        "-c http.extraHeader=Authorization: Basic TEST lfs push origin refs/heads/main"
+                    |]
+                )
+            }
+        )
+
+        Vitest.test (
+            "planOutboundPush returns a timeout failure when optimized planner probing fails",
+            fun () -> promise {
+                let remoteTip = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                let batchCheckArgs = [| "cat-file"; "--batch-check" |]
+                let optimizedRevListArgs =
+                    [|
+                        "rev-list"
+                        "--objects"
+                        "--no-object-names"
+                        "--stdin"
+                        "--ignore-missing"
+                        "--filter=blob:limit=1024"
+                        "--filter=object:type=blob"
+                        "--filter-provided-objects"
+                    |]
+
+                let fakeGit =
+                    createRawOnlyGit (fun command -> promise {
+                        let commandText = String.concat " " command
+
+                        match command with
+                        | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
+                            return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] ->
+                            return $"{remoteTip}\trefs/heads/main\n"
+                        | [| "for-each-ref"; "--format=%(refname)"; "refs/remotes/origin" |] ->
+                            return failwith "Legacy local remote-ref fallback must not run for planner timeouts."
+                        | _ ->
+                            return failwith $"Unexpected raw command: {commandText}"
+                    })
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun request -> promise {
+                        let commandText = String.concat " " request.Arguments
+
+                        if request.Arguments = batchCheckArgs then
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer $"{remoteTip} commit 123\n"
+                                StdoutText = $"{remoteTip} commit 123\n"
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        elif request.Arguments = optimizedRevListArgs then
+                            return {
+                                ExitCode = -1
+                                StdoutBuffer = utf8Buffer ""
+                                StdoutText = ""
+                                StderrText = ""
+                                TimedOut = true
+                            }
+                        else
+                            return failwith $"Unexpected spawned command: {commandText}"
+                    }
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        (runSimpleGitRawWithFakeGit fakeGit)
+                        fakeSpawnedGit
+                        id
+                        (fun _ -> promise { return Error(exn "status should not be called") })
+                        "C:/repo"
+                        "origin"
+                        (Some "refs/heads/main")
+                        fakeGit
+
+                let failure = expectErrorResult plan
+                Vitest.expect(failure.Message.Contains("timed out")).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "planOutboundPush returns a timeout failure when remote-truth fallback probing fails",
+            fun () -> promise {
+                let remoteTip = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                let batchCheckArgs = [| "cat-file"; "--batch-check" |]
+                let optimizedRevListArgs =
+                    [|
+                        "rev-list"
+                        "--objects"
+                        "--no-object-names"
+                        "--stdin"
+                        "--ignore-missing"
+                        "--filter=blob:limit=1024"
+                        "--filter=object:type=blob"
+                        "--filter-provided-objects"
+                    |]
+                let fallbackRevListArgs =
+                    [| "rev-list"; "--objects"; "--no-object-names"; "--stdin"; "--ignore-missing" |]
+
+                let fakeGit =
+                    createRawOnlyGit (fun command -> promise {
+                        let commandText = String.concat " " command
+
+                        match command with
+                        | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
+                            return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] ->
+                            return $"{remoteTip}\trefs/heads/main\n"
+                        | [| "for-each-ref"; "--format=%(refname)"; "refs/remotes/origin" |] ->
+                            return failwith "Legacy local remote-ref fallback must not run for planner timeouts."
+                        | _ ->
+                            return failwith $"Unexpected raw command: {commandText}"
+                    })
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun request -> promise {
+                        let commandText = String.concat " " request.Arguments
+
+                        match request.Arguments with
+                        | args when args = batchCheckArgs ->
+                            return {
+                                ExitCode = 0
+                                StdoutBuffer = utf8Buffer $"{remoteTip} commit 123\n"
+                                StdoutText = $"{remoteTip} commit 123\n"
+                                StderrText = ""
+                                TimedOut = false
+                            }
+                        | args when args = optimizedRevListArgs ->
+                            return {
+                                ExitCode = 129
+                                StdoutBuffer = utf8Buffer ""
+                                StdoutText = ""
+                                StderrText = "fatal: unknown option `--filter-provided-objects`"
+                                TimedOut = false
+                            }
+                        | args when args = fallbackRevListArgs ->
+                            return {
+                                ExitCode = -1
+                                StdoutBuffer = utf8Buffer ""
+                                StdoutText = ""
+                                StderrText = ""
+                                TimedOut = true
+                            }
+                        | _ ->
+                            return failwith $"Unexpected spawned command: {commandText}"
+                    }
+
+                let! plan =
+                    GitLfsService.planOutboundPush
+                        (runSimpleGitRawWithFakeGit fakeGit)
+                        fakeSpawnedGit
+                        id
+                        (fun _ -> promise { return Error(exn "status should not be called") })
+                        "C:/repo"
+                        "origin"
+                        (Some "refs/heads/main")
+                        fakeGit
+
+                let failure = expectErrorResult plan
+                Vitest.expect(failure.Message.Contains("timed out")).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "uploadObjects preserves timeout failures from spawned git",
+            fun () -> promise {
+                let commandAuth: GitAuthAdapter.GitCommandAuthentication = {
+                    ConfigArgs = [| "-c"; "http.extraHeader=Authorization: Basic TEST" |]
+                    Environment = createObj []
+                }
+
+                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun _ -> promise {
+                        return {
+                            ExitCode = -1
+                            StdoutBuffer = utf8Buffer ""
+                            StdoutText = ""
+                            StderrText = ""
+                            TimedOut = true
+                        }
+                    }
+
+                let! result =
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [| "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" |]
+
+                let failure = expectErrorResult result
+                Vitest.expect(failure.Message.Contains("timed out")).toBe (true)
             }
         )
 
