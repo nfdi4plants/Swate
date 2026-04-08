@@ -66,6 +66,7 @@ type GitState = {
     InstallRetryState: GitInstallRetryState
     PageLoadRequestId: int
     CurrentArcPath: ArcRootPath
+    ArcSessionId: int
 } with
 
     static member Empty = {
@@ -93,6 +94,7 @@ type GitState = {
         InstallRetryState = GitInstallRetryState.Idle
         PageLoadRequestId = 0
         CurrentArcPath = None
+        ArcSessionId = 0
     }
 
 type GitRefreshResult = {
@@ -162,7 +164,7 @@ type Msg =
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
     | SelectChangeCompleted of requestId: int * path: string * reply: Reply<unit> * result: Result<GitPageChange, string>
     | ConfirmMergeResolutionRequested of GitConfirmMergeResolutionRequest * Reply<unit>
-    | ConfirmMergeResolutionCompleted of reply: Reply<unit> * result: Result<ConfirmMergeResolutionOutcome, string>
+    | ConfirmMergeResolutionCompleted of sessionId: int * reply: Reply<unit> * result: Result<ConfirmMergeResolutionOutcome, string>
     | SaveLfsAutoTrackThresholdRequested of int * Reply<unit>
     | SaveDownloadLargeFilesRequested of bool * Reply<unit>
     | FetchRequested of Reply<unit>
@@ -175,9 +177,9 @@ type Msg =
     | CreateBranchRequested of GitSidebarCreateBranchRequest * Reply<unit>
     | SwitchBranchRequested of string * Reply<unit>
     | WriteRequested of WriteRequest
-    | WriteCompleted of WriteRequest * Result<WriteAttemptOutcome, string>
-    | WriteInstallPromptAnswered of WriteRequest * bool
-    | WriteInstallCompleted of WriteRequest * Result<GitOperationResult, string>
+    | WriteCompleted of sessionId: int * WriteRequest * Result<WriteAttemptOutcome, string>
+    | WriteInstallPromptAnswered of sessionId: int * WriteRequest * bool
+    | WriteInstallCompleted of sessionId: int * WriteRequest * Result<GitOperationResult, string>
 
 type GitDependencies = {
     getGitStatus: unit -> JS.Promise<Result<GitStatusDto, string>>
@@ -205,6 +207,8 @@ let staleMergeConflictTokens = [|
     "not currently marked as conflicted"
     "changed on disk since it was opened"
 |]
+
+let staleArcSessionMessage = "Git operation was canceled because the active ARC changed."
 
 let isStaleMergeConflictError (message: string) =
     let normalizedMessage = message.ToLowerInvariant()
@@ -353,6 +357,8 @@ let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
 
 let nextPageLoadRequestId (model: GitState) = model.PageLoadRequestId + 1
 
+let nextArcSessionId (model: GitState) = model.ArcSessionId + 1
+
 let private distinctPaths (paths: string[]) =
     paths
     |> Array.map _.Trim()
@@ -490,6 +496,22 @@ let private resolveWriteCmd request result =
         resolveReplyCmd reply (Error message)
     | Clone(_, reply), Ok _ ->
         resolveReplyCmd reply (Error "Clone request produced an invalid result.")
+
+let private resolveStaleWriteCompletedCmd request result =
+    match result with
+    | Ok(Completed success) -> resolveWriteCmd request (Ok success)
+    | Ok(RequiresLfsInstall _) -> resolveWriteCmd request (Error staleArcSessionMessage)
+    | Error message -> resolveWriteCmd request (Error message)
+
+let private writeErrorModel (message: string) (model: GitState) =
+    {
+        model with
+            BusyOperation = None
+            BusyNotice = None
+            CurrentProgress = None
+            ErrorNotice = Some message
+            WarningNotice = None
+    }
 
 let private classifyWriteResult (busyOperation: GitBusyOperation) (result: Result<GitOperationResult, string>) =
     match result with
@@ -819,7 +841,11 @@ let update
     | ArcPathChanged arcPath when arcPath = model.CurrentArcPath ->
         model, Cmd.none
     | ArcPathChanged arcPath ->
-        let nextModel = { GitState.Empty with CurrentArcPath = arcPath }
+        let nextModel = {
+            GitState.Empty with
+                CurrentArcPath = arcPath
+                ArcSessionId = nextArcSessionId model
+        }
 
         let cmd =
             match arcPath with
@@ -832,7 +858,12 @@ let update
 
         nextModel, cmd
     | RefreshRequested reply when model.CurrentArcPath.IsNone ->
-        { GitState.Empty with CurrentArcPath = model.CurrentArcPath }, resolveReplyCmd reply (Ok())
+        {
+            GitState.Empty with
+                CurrentArcPath = model.CurrentArcPath
+                ArcSessionId = model.ArcSessionId
+        },
+        resolveReplyCmd reply (Ok())
     | RefreshRequested reply ->
         let requestId = nextRefreshRequestId model
 
@@ -942,11 +973,13 @@ let update
                 Cmd.OfPromise.either
                     (fun (deps, request) -> confirmMergeResolutionAsync deps request)
                     (deps, request)
-                    (fun result -> ConfirmMergeResolutionCompleted(reply, result))
-                    (fun err -> ConfirmMergeResolutionCompleted(reply, Error(string err)))
+                    (fun result -> ConfirmMergeResolutionCompleted(model.ArcSessionId, reply, result))
+                    (fun err -> ConfirmMergeResolutionCompleted(model.ArcSessionId, reply, Error(string err)))
 
             nextModel, cmd
-    | ConfirmMergeResolutionCompleted(reply, Error message) ->
+    | ConfirmMergeResolutionCompleted(sessionId, reply, result) when sessionId <> model.ArcSessionId ->
+        model, resolveReplyCmd reply (Result.map ignore result)
+    | ConfirmMergeResolutionCompleted(_, reply, Error message) ->
         let nextModel =
             model
             |> transition (SetBusyOperation None)
@@ -966,7 +999,7 @@ let update
             ]
         else
             nextModel, resolveReplyCmd reply (Error message)
-    | ConfirmMergeResolutionCompleted(reply, Ok outcome) ->
+    | ConfirmMergeResolutionCompleted(_, reply, Ok outcome) ->
         let nextModel =
             model
             |> transition (SetBusyOperation None)
@@ -1062,20 +1095,17 @@ let update
             Cmd.OfPromise.either
                 (fun (deps, model, request) -> executeWriteAttempt deps model request)
                 (deps, model, request)
-                (fun result -> WriteCompleted(request, result))
-                (fun err -> WriteCompleted(request, Error(string err)))
+                (fun result -> WriteCompleted(model.ArcSessionId, request, result))
+                (fun err -> WriteCompleted(model.ArcSessionId, request, Error(string err)))
 
         nextModel, cmd
-    | WriteCompleted(request, Error message) ->
-        let nextModel =
-            model
-            |> transition (SetBusyOperation None)
-            |> transition (SetCurrentProgress None)
-            |> transition (SetErrorNotice(Some message))
-            |> transition (SetWarningNotice None)
+    | WriteCompleted(sessionId, request, result) when sessionId <> model.ArcSessionId ->
+        model, resolveStaleWriteCompletedCmd request result
+    | WriteCompleted(_, request, Error message) ->
+        let nextModel = writeErrorModel message model
 
         nextModel, resolveWriteCmd request (Error message)
-    | WriteCompleted(request, Ok(RequiresLfsInstall promptMessage)) ->
+    | WriteCompleted(sessionId, request, Ok(RequiresLfsInstall promptMessage)) ->
         let busyOperation = busyOperationForWriteRequest request
 
         let nextModel =
@@ -1086,17 +1116,21 @@ let update
             Cmd.OfFunc.perform
                 deps.confirmInstall
                 promptMessage
-                (fun shouldInstall -> WriteInstallPromptAnswered(request, shouldInstall))
+                (fun shouldInstall -> WriteInstallPromptAnswered(sessionId, request, shouldInstall))
 
         nextModel, cmd
-    | WriteInstallPromptAnswered(request, false) ->
+    | WriteInstallPromptAnswered(sessionId, request, _) when sessionId <> model.ArcSessionId ->
+        model, resolveWriteCmd request (Error staleArcSessionMessage)
+    | WriteInstallPromptAnswered(_, request, false) ->
+        let message = "Git LFS installation is required to continue."
+
         let nextModel =
             model
-            |> transition (SetBusyOperation None)
+            |> writeErrorModel message
             |> transition (SetInstallRetryState GitInstallRetryState.Idle)
 
-        nextModel, resolveWriteCmd request (Error "Git LFS installation is required to continue.")
-    | WriteInstallPromptAnswered(request, true) ->
+        nextModel, resolveWriteCmd request (Error message)
+    | WriteInstallPromptAnswered(sessionId, request, true) ->
         let busyOperation = busyOperationForWriteRequest request
 
         let nextModel =
@@ -1108,29 +1142,29 @@ let update
             Cmd.OfPromise.either
                 deps.installGitLfs
                 ()
-                (fun installResult -> WriteInstallCompleted(request, installResult))
-                (fun err -> WriteInstallCompleted(request, Error(string err)))
+                (fun installResult -> WriteInstallCompleted(sessionId, request, installResult))
+                (fun err -> WriteInstallCompleted(sessionId, request, Error(string err)))
 
         nextModel, cmd
-    | WriteInstallCompleted(request, Error message) ->
+    | WriteInstallCompleted(sessionId, request, _) when sessionId <> model.ArcSessionId ->
+        model, resolveWriteCmd request (Error staleArcSessionMessage)
+    | WriteInstallCompleted(_, request, Error message) ->
         let nextModel =
             model
-            |> transition (SetBusyOperation None)
+            |> writeErrorModel message
             |> transition (SetInstallRetryState GitInstallRetryState.Idle)
-            |> transition (SetErrorNotice(Some message))
 
         nextModel, resolveWriteCmd request (Error message)
-    | WriteInstallCompleted(request, Ok operationResult) when not operationResult.Success ->
+    | WriteInstallCompleted(_, request, Ok operationResult) when not operationResult.Success ->
         let message = operationResult.Message |> Option.defaultValue "Git LFS installation failed."
 
         let nextModel =
             model
-            |> transition (SetBusyOperation None)
+            |> writeErrorModel message
             |> transition (SetInstallRetryState GitInstallRetryState.Idle)
-            |> transition (SetErrorNotice(Some message))
 
         nextModel, resolveWriteCmd request (Error message)
-    | WriteInstallCompleted(request, Ok _) ->
+    | WriteInstallCompleted(sessionId, request, Ok _) ->
         let busyOperation = busyOperationForWriteRequest request
 
         let nextModel =
@@ -1142,11 +1176,11 @@ let update
             Cmd.OfPromise.either
                 (fun (deps, model, request) -> executeWriteAttempt deps model request)
                 (deps, model, request)
-                (fun result -> WriteCompleted(request, result))
-                (fun err -> WriteCompleted(request, Error(string err)))
+                (fun result -> WriteCompleted(sessionId, request, result))
+                (fun err -> WriteCompleted(sessionId, request, Error(string err)))
 
         nextModel, cmd
-    | WriteCompleted(request, Ok(Completed success)) ->
+    | WriteCompleted(_, request, Ok(Completed success)) ->
         let baseModel, pageChange, warningMessage =
             match success with
             | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->

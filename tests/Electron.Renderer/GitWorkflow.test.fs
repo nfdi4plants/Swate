@@ -84,6 +84,12 @@ let private lfsSettings thresholdMb downloadLargeFiles = {
     DownloadLargeFiles = downloadLargeFiles
 }
 
+let private sidebarProgress stage percent = {
+    Method = Some "git"
+    Stage = Some stage
+    ProgressPercent = Some percent
+}
+
 let private changedFile path indexStatus workingTreeStatus isConflicted = {
     Path = path
     OriginalPath = None
@@ -228,6 +234,7 @@ Vitest.describe("GitWorkflow update command flow", fun () ->
         Vitest.expect(nextState).toEqual({
             GitState.Empty with
                 CurrentArcPath = Some "C:/arc-b"
+                ArcSessionId = 1
         })
         Vitest.expect(clearedPages |> Seq.toArray).toEqual([| None |])
 
@@ -354,7 +361,7 @@ Vitest.describe("GitWorkflow update command flow", fun () ->
             update
                 defaultDependencies
                 setPageState
-                (ConfirmMergeResolutionCompleted(reply, Error "File is not currently marked as conflicted."))
+                (ConfirmMergeResolutionCompleted(state.ArcSessionId, reply, Error "File is not currently marked as conflicted."))
                 state
 
         let! messages = collectMessages cmd
@@ -368,6 +375,62 @@ Vitest.describe("GitWorkflow update command flow", fun () ->
         | _ -> failwith $"Unexpected follow-up message count: {messages.Length}"
 
         Vitest.expect(replyResult).toEqual(Some(Error "File is not currently marked as conflicted."))
+    })
+
+    Vitest.test("ConfirmMergeResolutionCompleted ignores late results from the previous ARC", fun () -> promise {
+        let pageStates = ResizeArray<PageState option>()
+        let setPageState pageState = pageStates.Add pageState
+        let mutable replyResult = None
+
+        let deps = {
+            defaultDependencies with
+                confirmGitMergeResolution =
+                    fun _ -> promise {
+                        return
+                            Ok {
+                                UpdatedStatus = conflictedStatus [| "conflict-b.txt" |]
+                                RemainingConflictedPaths = [| "conflict-b.txt" |]
+                                NextConflictedPath = Some "conflict-b.txt"
+                            }
+                    }
+                loadMergeConflictPage = fun path -> promise { return Ok(diffPage path) }
+        }
+
+        let request = {
+            Path = "conflict-a.txt"
+            ExpectedConflictContent = "<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> branch\n"
+            ResolvedContent = "resolved"
+            AutoCommit = false
+        }
+
+        let initialState = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                SelectedChangePath = Some "conflict-a.txt"
+        }
+
+        let stateAfterRequest, requestCmd =
+            update deps setPageState (ConfirmMergeResolutionRequested(request, fun result -> replyResult <- Some result)) initialState
+
+        let switchedState, switchCmd = update deps setPageState (ArcPathChanged(Some "C:/arc-b")) stateAfterRequest
+        let! _ = collectMessages switchCmd
+        let! completionMessages = collectMessages requestCmd
+
+        let nextState, finishCmd =
+            match completionMessages with
+            | [| ConfirmMergeResolutionCompleted _ |] ->
+                update deps setPageState completionMessages[0] switchedState
+            | _ -> failwith "Expected a merge-resolution completion message."
+
+        let! _ = collectMessages finishCmd
+
+        Vitest.expect(nextState).toEqual({
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-b"
+                ArcSessionId = 1
+        })
+        Vitest.expect(pageStates |> Seq.toArray).toEqual([| None |])
+        Vitest.expect(replyResult).toEqual(Some(Ok()))
     })
 )
 
@@ -427,7 +490,7 @@ Vitest.describe("GitWorkflow write request flow", fun () ->
 
         let _, finishCmd =
             match requestMessages with
-            | [| WriteCompleted(Clone _, Ok(Completed(CloneSuccess "C:/clone-target"))) |] ->
+            | [| WriteCompleted(_, Clone _, Ok(Completed(CloneSuccess "C:/clone-target"))) |] ->
                 update deps ignore requestMessages[0] stateAfterRequest
             | _ -> failwith "Expected the clone request to complete successfully."
 
@@ -465,7 +528,7 @@ Vitest.describe("GitWorkflow write request flow", fun () ->
 
         let nextState, finishCmd =
             match requestMessages with
-            | [| WriteCompleted(Push _, Ok(Completed(UnitSuccess(_, GitPageChange.NoChange, None, None)))) |] ->
+            | [| WriteCompleted(_, Push _, Ok(Completed(UnitSuccess(_, GitPageChange.NoChange, None, None)))) |] ->
                 update deps ignore requestMessages[0] stateAfterRequest
             | _ -> failwith "Expected the push request to complete with a refreshed snapshot."
 
@@ -526,7 +589,7 @@ Vitest.describe("GitWorkflow write request flow", fun () ->
 
         let stateAfterWriteCompleted, promptCmd =
             match requestMessages with
-            | [| WriteCompleted(Push _, Ok(RequiresLfsInstall _)) |] ->
+            | [| WriteCompleted(_, Push _, Ok(RequiresLfsInstall _)) |] ->
                 update deps ignore requestMessages[0] stateAfterRequest
             | _ -> failwith "Expected a Git LFS install prompt request."
 
@@ -534,7 +597,7 @@ Vitest.describe("GitWorkflow write request flow", fun () ->
 
         let stateAfterPromptAnswer, installCmd =
             match promptMessages with
-            | [| WriteInstallPromptAnswered(Push _, true) |] ->
+            | [| WriteInstallPromptAnswered(_, Push _, true) |] ->
                 update deps ignore promptMessages[0] stateAfterWriteCompleted
             | _ -> failwith "Expected an affirmative Git LFS install answer."
 
@@ -542,7 +605,7 @@ Vitest.describe("GitWorkflow write request flow", fun () ->
 
         let stateAfterInstall, retryCmd =
             match installMessages with
-            | [| WriteInstallCompleted(Push _, Ok _) |] ->
+            | [| WriteInstallCompleted(_, Push _, Ok _) |] ->
                 update deps ignore installMessages[0] stateAfterPromptAnswer
             | _ -> failwith "Expected a successful Git LFS install completion."
 
@@ -550,7 +613,7 @@ Vitest.describe("GitWorkflow write request flow", fun () ->
 
         let _, finishCmd =
             match retryMessages with
-            | [| WriteCompleted(Push _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
+            | [| WriteCompleted(_, Push _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
                 update deps ignore retryMessages[0] stateAfterInstall
             | _ -> failwith "Expected the retried push to succeed."
 
@@ -560,6 +623,106 @@ Vitest.describe("GitWorkflow write request flow", fun () ->
         Vitest.expect(installCalls).toBe(1)
         Vitest.expect(pushCalls).toBe(2)
         Vitest.expect(replyResult).toEqual(Some(Ok()))
+    })
+
+    Vitest.test("WriteCompleted ignores late results from the previous ARC", fun () -> promise {
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let deps = {
+            defaultDependencies with
+                gitPush = fun _ -> promise { return Ok okOperationResult }
+                getGitStatus = fun () -> promise { return Ok(statusForBranch "feature/old-arc") }
+                getGitBranches = fun () -> promise { return Ok [| localBranch "feature/old-arc" true true |] }
+                getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 13 true) }
+        }
+
+        let initialState = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                Status = {
+                    GitState.Empty.Status with
+                        CurrentBranch = Some "feature/a"
+                }
+        }
+
+        let stateAfterRequest, requestCmd = update deps ignore (WriteRequested(Push reply)) initialState
+        let switchedState, switchCmd = update deps ignore (ArcPathChanged(Some "C:/arc-b")) stateAfterRequest
+        let! _ = collectMessages switchCmd
+        let! requestMessages = collectMessages requestCmd
+
+        let nextState, finishCmd =
+            match requestMessages with
+            | [| WriteCompleted(_, Push _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
+                update deps ignore requestMessages[0] switchedState
+            | _ -> failwith "Expected the push request to complete successfully."
+
+        let! _ = collectMessages finishCmd
+
+        Vitest.expect(nextState).toEqual({
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-b"
+                ArcSessionId = 1
+        })
+        Vitest.expect(replyResult).toEqual(Some(Ok()))
+    })
+
+    Vitest.test("WriteInstallPromptAnswered(false) clears progress and records the cancellation error", fun () -> promise {
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                BusyOperation = Some GitBusyOperation.PushingToRemote
+                CurrentProgress = Some(sidebarProgress "pushing" 50.)
+                InstallRetryState = GitInstallRetryState.PromptingForInstall("Install Git LFS now?", GitBusyOperation.PushingToRemote)
+        }
+
+        let nextState, cmd = update defaultDependencies ignore (WriteInstallPromptAnswered(state.ArcSessionId, Push reply, false)) state
+        let! _ = collectMessages cmd
+
+        Vitest.expect(nextState.BusyOperation).toEqual(None)
+        Vitest.expect(nextState.CurrentProgress).toEqual(None)
+        Vitest.expect(nextState.ErrorNotice).toEqual(Some "Git LFS installation is required to continue.")
+        Vitest.expect(currentRunStatus nextState).toEqual(None)
+        Vitest.expect(replyResult).toEqual(Some(Error "Git LFS installation is required to continue."))
+    })
+
+    Vitest.test("WriteInstallCompleted clears progress when the installer reports failure", fun () -> promise {
+        let mutable replyResult = None
+        let reply result = replyResult <- Some result
+
+        let state = {
+            GitState.Empty with
+                CurrentArcPath = Some "C:/arc-a"
+                BusyOperation = Some GitBusyOperation.InstallingGitLfs
+                CurrentProgress = Some(sidebarProgress "installing" 75.)
+                InstallRetryState = GitInstallRetryState.InstallingForRetry GitBusyOperation.PushingToRemote
+        }
+
+        let nextState, cmd =
+            update
+                defaultDependencies
+                ignore
+                (WriteInstallCompleted(
+                    state.ArcSessionId,
+                    Push reply,
+                    Ok {
+                        okOperationResult with
+                            Success = false
+                            Message = Some "Git LFS installation failed."
+                    }
+                ))
+                state
+
+        let! _ = collectMessages cmd
+
+        Vitest.expect(nextState.BusyOperation).toEqual(None)
+        Vitest.expect(nextState.CurrentProgress).toEqual(None)
+        Vitest.expect(nextState.ErrorNotice).toEqual(Some "Git LFS installation failed.")
+        Vitest.expect(currentRunStatus nextState).toEqual(None)
+        Vitest.expect(replyResult).toEqual(Some(Error "Git LFS installation failed."))
     })
 )
 
