@@ -70,16 +70,13 @@ let private tryBuildScopedAuthUrl (remoteUrl: string) =
     let mutable uri = Unchecked.defaultof<Uri>
 
     if Uri.TryCreate(remoteUrl, UriKind.Absolute, &uri) && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) then
-        let schemePrefix = $"{uri.Scheme}://"
-        let authorityAndPath = remoteUrl.Substring(schemePrefix.Length)
-        let slashIndex = authorityAndPath.IndexOf('/')
         let authority =
-            if slashIndex >= 0 then
-                authorityAndPath.Substring(0, slashIndex)
+            if uri.IsDefaultPort then
+                uri.Host
             else
-                authorityAndPath
+                $"{uri.Host}:{uri.Port}"
 
-        Some($"{schemePrefix}{authority}/")
+        Some($"{uri.Scheme}://{authority}/")
     else
         None
 
