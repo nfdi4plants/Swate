@@ -31,8 +31,11 @@ module FilterLogic = //filters the note list based on the search term and the se
             |> Array.toList
 
     type ExactMatchSearch =
-        static member private containsIgnoreCase (needle: string) (haystack: string) = //
-            haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
+        static member private containsIgnoreCase(needle: string, haystack: string) = //
+            if needle.Trim() = "" then
+                false
+            else
+                haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
 
         static member search
             (searchTerm: string, selectedIndices: Set<int>, notes: Swate.Components.NoteTypes.Note list)
@@ -41,13 +44,16 @@ module FilterLogic = //filters the note list based on the search term and the se
             |> List.filter (fun note ->
 
                 // let inTitle = ExactMatchSearch.containsIgnoreCase (searchTerm.Trim()) note.Title
-                let inContent = ExactMatchSearch.containsIgnoreCase (searchTerm.Trim()) note.Content
+                let inContent =
+                    ExactMatchSearch.containsIgnoreCase (searchTerm.Trim(), note.Content)
 
                 let inTags =
                     match note.Tags with
                     | Some tags ->
                         tags
-                        |> Seq.exists (fun tag -> ExactMatchSearch.containsIgnoreCase (searchTerm.Trim()) tag.NameText)
+                        |> Seq.exists (fun tag ->
+                            ExactMatchSearch.containsIgnoreCase (searchTerm.Trim(), tag.NameText)
+                        )
                     | None -> false
 
                 if Set.isEmpty selectedIndices then
@@ -79,9 +85,9 @@ module FilterComponents =
 
         notesFilteredAfterTitle @ notesFilteredAfterRest
 
-    let filterDropdown (filterOptions: string list, selectedIndices: Set<int>, setSelectedIndices: Set<int> -> unit) =
+    let filterDropdown (filterOptions: string list) (selectedIndices: Set<int>) (setSelectedIndices: Set<int> -> unit) =
 
-        let filterFields: SelectItem<string>[] = //
+        let filterFields: SelectItem<string>[] =
             React.useMemo (
                 (fun () ->
                     filterOptions
@@ -106,7 +112,7 @@ module FilterComponents =
 
         Select.Select(
             filterFields,
-            selectedIndices, //
+            selectedIndices,
             setSelectedIndices,
             triggerRenderFn = TriggerRenderFn,
             dropdownPlacement = FloatingUI.Placement.BottomEnd,
