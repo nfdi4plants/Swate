@@ -55,6 +55,7 @@ let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private simpleGitSourcePath = join [| ".."; ".."; "src"; "Electron"; "src"; "Main"; "Bindings"; "SimpleGit.fs" |]
 let private gitApiClientSourcePath = join [| ".."; ".."; "src"; "Electron"; "src"; "Renderer"; "GitApiClient.fs" |]
 let private gitStateCtxSourcePath = join [| ".."; ".."; "src"; "Electron"; "src"; "Renderer"; "context"; "GitStateCtx.fs" |]
+let private gitProvisioningServiceSourcePath = join [| ".."; ".."; "src"; "Electron"; "src"; "Main"; "Git"; "GitProvisioningService.fs" |]
 
 let private gitMergeConflictTargetSourcePath =
     join [| ".."; ".."; "src"; "Electron"; "src"; "Renderer"; "Components"; "MainContent"; "GitMergeConflictTarget.fs" |]
@@ -62,6 +63,7 @@ let private gitMergeConflictTargetSourcePath =
 let mutable private simpleGitSourceText: string option = None
 let mutable private gitApiClientSourceText: string option = None
 let mutable private gitStateCtxSourceText: string option = None
+let mutable private gitProvisioningServiceSourceText: string option = None
 let mutable private gitMergeConflictTargetSourceText: string option = None
 
 let private readUtf8FileAsync (path: string) : JS.Promise<string> = promise {
@@ -80,6 +82,10 @@ let private getGitApiClientSource () =
 let private getGitStateCtxSource () =
     gitStateCtxSourceText
     |> Option.defaultWith (fun () -> failwith "Expected GitStateCtx source text to be loaded before running tests.")
+
+let private getGitProvisioningServiceSource () =
+    gitProvisioningServiceSourceText
+    |> Option.defaultWith (fun () -> failwith "Expected GitProvisioningService source text to be loaded before running tests.")
 
 let private getGitMergeConflictTargetSource () =
     gitMergeConflictTargetSourceText
@@ -104,10 +110,12 @@ Vitest.beforeAll(fun () -> promise {
     let! sourceText = readUtf8FileAsync simpleGitSourcePath
     let! gitApiClientText = readUtf8FileAsync gitApiClientSourcePath
     let! gitStateCtxText = readUtf8FileAsync gitStateCtxSourcePath
+    let! gitProvisioningServiceText = readUtf8FileAsync gitProvisioningServiceSourcePath
     let! gitMergeConflictTargetText = readUtf8FileAsync gitMergeConflictTargetSourcePath
     simpleGitSourceText <- Some sourceText
     gitApiClientSourceText <- Some gitApiClientText
     gitStateCtxSourceText <- Some gitStateCtxText
+    gitProvisioningServiceSourceText <- Some gitProvisioningServiceText
     gitMergeConflictTargetSourceText <- Some gitMergeConflictTargetText
 })
 
@@ -502,82 +510,18 @@ Vitest.describe("GitProvisioningService validation helpers", fun () ->
                     result |> expectError)
     )
 
-    Vitest.describe("clone retry decision", fun () ->
-        Vitest.test("retries without auth for unauthorized with HTTP auth signal", fun () ->
-            let shouldRetry =
-                GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitFailureKind.Unauthorized
-                    Message = "authentication failed for remote"
-                }
+    Vitest.describe("clone auth fallback removal", fun () ->
+        Vitest.test("removes the unauthenticated clone retry helpers from provisioning", fun () ->
+            let sourceText = getGitProvisioningServiceSource ()
+            expectSourceNotContains sourceText "let shouldRetryWithoutAuth (failure: GitService.GitFailure) ="
+            expectSourceNotContains sourceText "let validateCloneRetryCleanupEntries (entries: string[]) : Result<string option, exn> ="
+            expectSourceNotContains sourceText "let private cleanupCloneTargetForRetry")
 
-            Vitest.expect(shouldRetry).toBe(true))
-
-        Vitest.test("retries without auth for forbidden", fun () ->
-            let shouldRetry =
-                GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitFailureKind.Forbidden
-                    Message = "403 Forbidden"
-                }
-
-            Vitest.expect(shouldRetry).toBe(true))
-
-        Vitest.test("does not retry without auth for generic permission denied", fun () ->
-            let shouldRetry =
-                GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitFailureKind.Unauthorized
-                    Message = "fatal: cannot create directory 'repo': Permission denied"
-                }
-
-            Vitest.expect(shouldRetry).toBe(false))
-
-        Vitest.test("retries without auth for ssh publickey permission denied", fun () ->
-            let shouldRetry =
-                GitProvisioningService.shouldRetryWithoutAuth {
-                    Kind = GitFailureKind.Unauthorized
-                    Message = "Permission denied (publickey)."
-                }
-
-            Vitest.expect(shouldRetry).toBe(true))
-
-        let nonAuthKinds = [|
-            GitFailureKind.Network
-            GitFailureKind.Timeout
-            GitFailureKind.Canceled
-            GitFailureKind.Unknown
-        |]
-
-        for kind in nonAuthKinds do
-            Vitest.test($"does not retry without auth for {kind}", fun () ->
-                let shouldRetry =
-                    GitProvisioningService.shouldRetryWithoutAuth {
-                        Kind = kind
-                        Message = "not auth"
-                }
-
-                Vitest.expect(shouldRetry).toBe(false))
-    )
-
-    Vitest.describe("clone retry cleanup entry guard", fun () ->
-        let validCases = [|
-            "allows empty directory (no cleanup required)", [||], None
-            "allows single .git entry", [| ".git" |], Some ".git"
-            "treats .GIT as .git (case-insensitive) and preserves entry name", [| ".GIT" |], Some ".GIT"
-        |]
-
-        for testName, entries, expected in validCases do
-            Vitest.test(testName, fun () ->
-                GitProvisioningService.validateCloneRetryCleanupEntries entries
-                |> expectOk expected)
-
-        let invalidCases = [|
-            "refuses cleanup when non-git files exist and no .git is present", [| "README.md" |]
-            "refuses cleanup when files exist in addition to .git", [| ".git"; "README.md" |]
-        |]
-
-        for testName, entries in invalidCases do
-            Vitest.test(testName, fun () ->
-                GitProvisioningService.validateCloneRetryCleanupEntries entries
-                |> expectError)
+        Vitest.test("does not retry authenticated clone failures without auth", fun () ->
+            let sourceText = getGitProvisioningServiceSource ()
+            expectSourceNotContains sourceText "| Error failure when shouldRetryWithoutAuth failure ->"
+            expectSourceNotContains sourceText "cleanupCloneTargetForRetry normalizedTargetPath"
+            expectSourceContains sourceText "return! hydrateIfRequested (Some token) authenticatedCloneResult")
     )
 
     Vitest.describe("clone branch option assembly", fun () ->

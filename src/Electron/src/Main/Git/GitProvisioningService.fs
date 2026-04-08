@@ -126,40 +126,6 @@ let ensureCloneTargetIsEmpty (state: CloneTargetState) : Result<unit, exn> =
     | CloneTargetState.Missing ->
         Ok ()
 
-let shouldRetryWithoutAuth (failure: GitService.GitFailure) =
-    let message =
-        failure.Message
-        |> Option.ofObj
-        |> Option.defaultValue String.Empty
-        |> fun text -> text.ToLowerInvariant()
-
-    let contains (term: string) = message.Contains(term)
-
-    match failure.Kind with
-    | GitFailureKind.Forbidden ->
-        true
-    | GitFailureKind.Unauthorized ->
-        // Treat generic local filesystem permission errors conservatively (no cleanup+retry).
-        // Allow SSH publickey failures, and common HTTP 401 auth signals.
-        let hasHttpAuthSignal =
-            contains "unauthorized"
-            || contains "authentication failed"
-            || contains "401"
-            || contains "could not read username"
-            || contains "no access token available"
-
-        let isSshPublicKeyFailure =
-            contains "permission denied" && contains "publickey"
-
-        hasHttpAuthSignal || isSshPublicKeyFailure
-    | GitFailureKind.LfsInstallRequired ->
-        false
-    | GitFailureKind.Network
-    | GitFailureKind.Timeout
-    | GitFailureKind.Canceled
-    | GitFailureKind.Unknown ->
-        false
-
 let buildCloneBranchOptions (branch: string option) : string[] =
     match branch with
     | None -> [||]
@@ -206,89 +172,6 @@ let private removeRecursiveAsync (targetPath: string) : JS.Promise<unit> =
 
         let! _ = rmPromise
         return ()
-    }
-
-let validateCloneRetryCleanupEntries (entries: string[]) : Result<string option, exn> =
-    let safeEntries = if isNull entries then [||] else entries
-
-    if safeEntries.Length = 0 then
-        Ok None
-    else
-        let gitEntries =
-            safeEntries
-            |> Array.filter (fun entry -> entry.Equals(".git", StringComparison.OrdinalIgnoreCase))
-
-        if gitEntries.Length = 0 then
-            Error(
-                exn
-                    "Refusing to clean clone target for auth-fallback retry because it contains unexpected files (no .git directory detected)."
-            )
-        elif safeEntries.Length = 1 then
-            Ok(Some gitEntries.[0])
-        else
-            Error(
-                exn
-                    "Refusing to clean clone target for auth-fallback retry because it contains unexpected files in addition to the .git directory."
-            )
-
-let private cleanupCloneTargetForRetry
-    (targetPath: string)
-    : JS.Promise<Result<unit, exn>> =
-    promise {
-        try
-            // Safety guard:
-            // This cleanup is only used to enable a single unauthenticated clone retry after an auth failure.
-            // It is intentionally conservative to avoid deleting unrelated user data if the target path is
-            // concurrently modified by another process between attempts.
-            let! kindResult = tryGetExistingPathKindNoFollow targetPath
-
-            match kindResult with
-            | Error statError ->
-                return Error statError
-            | Ok None ->
-                // Target is missing; nothing to clean.
-                return Ok ()
-            | Ok (Some ExistingPathKind.Directory) ->
-                let! entries = fsPromisesDynamic?readdir(targetPath) |> unbox<JS.Promise<string[]>>
-
-                match validateCloneRetryCleanupEntries entries with
-                | Error entryError ->
-                    return Error entryError
-                | Ok None ->
-                    // An empty directory is a valid clone destination; avoid deleting it unnecessarily.
-                    return Ok ()
-                | Ok (Some gitEntryName) ->
-                    // Only remove the git metadata, and only when the directory contains nothing else.
-                    // This avoids deleting concurrently-created unrelated files and reduces TOCTOU impact.
-                    let gitDirPath = pathDynamic?join(targetPath, gitEntryName) |> unbox<string>
-                    let! gitKindResult = tryGetExistingPathKindNoFollow gitDirPath
-
-                    match gitKindResult with
-                    | Error gitKindError ->
-                        return Error gitKindError
-                    | Ok (Some ExistingPathKind.Directory) ->
-                        do! removeRecursiveAsync gitDirPath
-                        return Ok ()
-                    | Ok (Some ExistingPathKind.Symlink) ->
-                        return Error(exn "Refusing to clean clone target for retry because .git is a symbolic link/junction.")
-                    | Ok (Some ExistingPathKind.File)
-                    | Ok (Some ExistingPathKind.Other) ->
-                        return Error(exn "Refusing to clean clone target for retry because .git is not a directory.")
-                    | Ok None ->
-                        // Directory contents indicated .git, but it is missing now; treat as race and refuse.
-                        return
-                            Error(
-                                exn
-                                    "Refusing to clean clone target for retry because .git could not be found (directory contents changed concurrently)."
-                            )
-            | Ok (Some ExistingPathKind.Symlink) ->
-                return Error(exn "Refusing to clean clone target for retry because target path is a symbolic link/junction.")
-            | Ok (Some ExistingPathKind.File)
-            | Ok (Some ExistingPathKind.Other) ->
-                return Error(exn "Refusing to clean clone target for retry because target path is not a directory.")
-
-        with error ->
-            return Error(exn $"Failed to clean clone target before retry: {error.Message}")
     }
 
 let private getCloneTargetState (targetPath: string) : JS.Promise<Result<CloneTargetState, exn>> =
@@ -605,22 +488,6 @@ let cloneRepository
                                                             cloneWithGit configuredGit safeRemoteUrl normalizedTargetPath safeBranch
 
                                                         match authenticatedCloneResult with
-                                                        | Error failure when shouldRetryWithoutAuth failure ->
-                                                            let! cleanupResult =
-                                                                cleanupCloneTargetForRetry normalizedTargetPath
-
-                                                            match cleanupResult with
-                                                            | Error cleanupError ->
-                                                                return errorResult cleanupError
-                                                            | Ok () ->
-                                                                let unauthenticatedGit =
-                                                                    createGit cloneOptions
-                                                                    |> applyCloneSkipSmudge
-
-                                                                let! unauthenticatedCloneResult =
-                                                                    cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
-
-                                                                return! hydrateIfRequested None unauthenticatedCloneResult
                                                         | _ ->
                                                             return! hydrateIfRequested (Some token) authenticatedCloneResult
                                                 | None ->
