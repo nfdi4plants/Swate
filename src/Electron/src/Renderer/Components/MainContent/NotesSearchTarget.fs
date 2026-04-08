@@ -12,6 +12,7 @@ let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
+    let errorModal = Contexts.ErrorModal.useErrorModal ()
     let notes, setNotes = React.useState ([]: NoteSearch list)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)
@@ -54,8 +55,17 @@ let NotesSearchTarget () =
                 | DTOType.DTOTypeIsPlainTextVariant ->
                     pageCtx.setState (Some(PageState.TextPage dto.content))
                     fileTreeCtx.setSelectedTreeItemPath (Some relativePath)
-                | _ -> pageCtx.setState (Some(PageState.ErrorPage $"Unsupported file type for note: {dto.fileType}"))
-            | Result.Error exn -> pageCtx.setState (Some(PageState.ErrorPage $"Could not open note: {exn.Message}"))
+                | _ ->
+                    errorModal.enqueue (
+                        ErrorModalRequest.create(
+                            $"Unsupported file type for note: {dto.fileType}",
+                            title = "Could not open note"
+                        )
+                    )
+            | Result.Error exn ->
+                errorModal.enqueue (
+                    ErrorModalRequest.create($"Could not open note: {exn.Message}", title = "Could not open note")
+                )
         }
         |> Promise.start
 

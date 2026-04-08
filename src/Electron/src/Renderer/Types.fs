@@ -1,7 +1,6 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open Swate.Components
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -17,17 +16,16 @@ type PageState =
     | LandingDraftPage
     | NotesDraftPage
     | NotesSearchPage
-    | ErrorPage of string
 
-    static member fromFileContentDTO(dto: FileContentDTO) : PageState =
+    static member fromFileContentDTO(dto: FileContentDTO) : Result<PageState, string> =
         match dto.fileType with
-        | DTOType.DTOTypeIsPlainTextVariant -> PageState.TextPage dto.content
+        | DTOType.DTOTypeIsPlainTextVariant -> Ok(PageState.TextPage dto.content)
         | DTOType.DTOTypeIsISAFileVariant ->
             let arcfile = FileContentDTO.toArcFile dto
 
             match arcfile with
-            | Some arcFile -> PageState.ArcFilePage arcFile
+            | Some arcFile -> Ok(PageState.ArcFilePage arcFile)
             | None ->
-                PageState.ErrorPage
-                    $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
-        | _ -> PageState.UnknownPage
+                Error $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
+        | _ -> Ok PageState.UnknownPage
+

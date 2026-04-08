@@ -8,7 +8,6 @@ open Renderer.Types
 open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
-open Renderer.Components.MainContent.ErrorPreviewTarget
 open Renderer.Components.MainContent.LandingDraftTarget
 open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
@@ -30,7 +29,6 @@ let ArcTarget () =
                 | PageState.ArcFilePage arcFile -> ArcFilePreviewTarget(arcFile)
                 | PageState.TextPage content -> TextPreviewTarget content
                 | PageState.UnknownPage -> UnknownPreviewTarget()
-                | PageState.ErrorPage errMsg -> ErrorPreviewTarget errMsg
                 | PageState.LandingDraftPage -> LandingDraftTarget()
                 | PageState.NotesDraftPage -> NotesDraftTarget()
                 | PageState.NotesSearchPage -> NotesSearchTarget()
