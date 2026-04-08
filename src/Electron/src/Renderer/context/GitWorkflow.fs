@@ -289,6 +289,42 @@ let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
 
 let nextPageLoadRequestId (model: GitState) = model.PageLoadRequestId + 1
 
+type PreparedCommitOperation = {
+    BusyOperation: GitBusyOperation
+    NormalizedMessage: string
+    PathsToCommit: string[]
+    CurrentlyStagedPaths: string[]
+}
+
+let private distinctPaths (paths: string[]) =
+    paths
+    |> Array.map _.Trim()
+    |> Array.filter (String.IsNullOrWhiteSpace >> not)
+    |> Array.distinct
+
+let prepareCommitSelection (state: GitState) (request: GitSidebarCommitSelectionRequest) = {
+    BusyOperation = GitBusyOperation.CommittingSelectedChanges
+    NormalizedMessage = request.Message.Trim()
+    PathsToCommit = distinctPaths request.Paths
+    CurrentlyStagedPaths =
+        state.ChangedFiles
+        |> Array.filter (fun change -> GitStatusCode.isStagedIndexStatus change.IndexStatus)
+        |> Array.map _.Path
+        |> Array.distinct
+}
+
+let prepareCommitAll (state: GitState) (message: string) = {
+    BusyOperation = GitBusyOperation.CommittingAllChanges
+    NormalizedMessage = message.Trim()
+    PathsToCommit = state.ChangedFiles |> Array.map _.Path |> distinctPaths
+    CurrentlyStagedPaths = [||]
+}
+
+let buildUpdatedLfsSettings (state: GitState) (thresholdMb: int option) (downloadLargeFiles: bool option) = {
+    AutoTrackThresholdMb = thresholdMb |> Option.defaultValue state.LfsAutoTrackThresholdMb
+    DownloadLargeFiles = downloadLargeFiles |> Option.defaultValue state.DownloadLargeFiles
+}
+
 let transition (msg: Msg) (model: GitState) =
     match msg with
     | ResetWorkflow -> GitState.Empty

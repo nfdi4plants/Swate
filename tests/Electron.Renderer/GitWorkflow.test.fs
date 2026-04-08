@@ -103,6 +103,14 @@ let private lfsSettings thresholdMb downloadLargeFiles = {
     DownloadLargeFiles = downloadLargeFiles
 }
 
+let private changedFile path indexStatus workingTreeStatus isConflicted = {
+    Path = path
+    OriginalPath = None
+    IndexStatus = indexStatus
+    WorkingTreeStatus = workingTreeStatus
+    IsConflicted = isConflicted
+}
+
 let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>> = promise {
     return failwith $"Unexpected call: {name}"
 }
@@ -158,6 +166,67 @@ let private renderToBody (element: ReactElement) = promise {
 }
 
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
+
+Vitest.describe("GitWorkflow request preparation", fun () ->
+    Vitest.test("prepareCommitAll snapshots distinct changed paths from the current model", fun () ->
+        let state = {
+            GitState.Empty with
+                ChangedFiles = [|
+                    changedFile "a.txt" "M" " " false
+                    changedFile "b.txt" "M" " " false
+                    changedFile "a.txt" "M" " " false
+                |]
+        }
+
+        let prepared = prepareCommitAll state "  save everything  "
+
+        Vitest.expect(prepared.NormalizedMessage).toBe("save everything")
+        Vitest.expect(prepared.PathsToCommit).toEqual([| "a.txt"; "b.txt" |])
+        Vitest.expect(prepared.CurrentlyStagedPaths).toEqual([||])
+        Vitest.expect(prepared.BusyOperation).toEqual(GitBusyOperation.CommittingAllChanges)
+    )
+
+    Vitest.test("prepareCommitSelection snapshots already staged paths before rewriting the stage", fun () ->
+        let state = {
+            GitState.Empty with
+                ChangedFiles = [|
+                    changedFile "staged.txt" "M" " " false
+                    changedFile "unstaged.txt" "." "M" false
+                |]
+        }
+
+        let prepared =
+            prepareCommitSelection
+                state
+                {
+                    Message = "  save selected  "
+                    Paths = [| "unstaged.txt"; "staged.txt"; "unstaged.txt" |]
+                }
+
+        Vitest.expect(prepared.NormalizedMessage).toBe("save selected")
+        Vitest.expect(prepared.PathsToCommit).toEqual([| "unstaged.txt"; "staged.txt" |])
+        Vitest.expect(prepared.CurrentlyStagedPaths).toEqual([| "staged.txt" |])
+        Vitest.expect(prepared.BusyOperation).toEqual(GitBusyOperation.CommittingSelectedChanges)
+    )
+
+    Vitest.test("buildUpdatedLfsSettings keeps untouched values from the current model snapshot", fun () ->
+        let state = {
+            GitState.Empty with
+                LfsAutoTrackThresholdMb = 7
+                DownloadLargeFiles = true
+        }
+
+        Vitest.expect(buildUpdatedLfsSettings state (Some 12) None).toEqual({
+            AutoTrackThresholdMb = 12
+            DownloadLargeFiles = true
+        })
+
+        Vitest.expect(buildUpdatedLfsSettings state None (Some false)).toEqual({
+            AutoTrackThresholdMb = 7
+            DownloadLargeFiles = false
+        })
+    )
+)
 
 Vitest.describe (
     "GitWorkflow renderer behavior",
