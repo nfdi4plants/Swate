@@ -546,10 +546,11 @@ let cloneRepository
                                                         | Ok () when not downloadLargeFiles ->
                                                             return cloneResult
                                                         | Ok () ->
+                                                            let repoOptions =
+                                                                createOptions normalizedTargetPath syncTimeout progress
+
                                                             let hydrateGitResult =
                                                                 try
-                                                                    let repoOptions = createOptions normalizedTargetPath syncTimeout progress
-
                                                                     match
                                                                         tokenOption
                                                                         |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token))
@@ -576,8 +577,10 @@ let cloneRepository
                                                                 let! hydrateResult = hydrateClonedLfsContent hydrateGit
 
                                                                 match hydrateResult with
-                                                                | Ok () -> return cloneResult
-                                                                | Error failure -> return Error failure
+                                                                | Ok () ->
+                                                                    return cloneResult
+                                                                | Error failure ->
+                                                                    return Error failure
                                                 }
 
                                             match tokenResult with

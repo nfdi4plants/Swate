@@ -66,9 +66,32 @@ let private buildLfsEndpointUrl (remoteUrl: string) =
     let trimmedRemoteUrl = remoteUrl.TrimEnd('/')
     $"{trimmedRemoteUrl}/info/lfs"
 
+let private tryBuildScopedAuthUrl (remoteUrl: string) =
+    let mutable uri = Unchecked.defaultof<Uri>
+
+    if Uri.TryCreate(remoteUrl, UriKind.Absolute, &uri) && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) then
+        let schemePrefix = $"{uri.Scheme}://"
+        let authorityAndPath = remoteUrl.Substring(schemePrefix.Length)
+        let slashIndex = authorityAndPath.IndexOf('/')
+        let authority =
+            if slashIndex >= 0 then
+                authorityAndPath.Substring(0, slashIndex)
+            else
+                authorityAndPath
+
+        Some($"{schemePrefix}{authority}/")
+    else
+        None
+
 let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (remoteUrl: string option) : string[] = [|
-    yield "-c"
-    yield $"http.extraHeader=Authorization: {buildBasicAuthorizationValue gitLabBasicAuthUsername token}"
+    let authorizationValue = buildBasicAuthorizationValue gitLabBasicAuthUsername token
+
+    match remoteUrl |> Option.bind tryBuildScopedAuthUrl with
+    | Some scopeUrl ->
+        yield "-c"
+        yield $"http.{scopeUrl}.extraHeader=Authorization: {authorizationValue}"
+    | _ ->
+        ()
 
     match remoteName, remoteUrl with
     | Some name, Some url when url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ->

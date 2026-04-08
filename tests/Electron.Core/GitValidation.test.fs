@@ -380,9 +380,52 @@ Vitest.describe("GitAuthAdapter.toConfigEntries and buildAuthArgs", fun () ->
         Vitest.test(testName, fun () ->
             Vitest.expect(GitAuthAdapter.toConfigEntries args).toEqual(expected))
 
-    Vitest.test("buildAuthArgs returns -c header tuple", fun () ->
-        let args = GitAuthAdapter.buildAuthArgs "github.com" "abc123" None None
-        Vitest.expect(args).toEqual([| "-c"; "http.extraHeader=Authorization: Basic b2F1dGgyOmFiYzEyMw==" |]))
+    Vitest.test("buildAuthArgs scopes clone auth header to the gitlab host when remote name is missing", fun () ->
+        let repoUrl = "https://git.nfdi4plants.org/caroott/TestARCGit.git"
+
+        let args =
+            GitAuthAdapter.buildAuthArgs
+                "git.nfdi4plants.org"
+                "abc123"
+                None
+                (Some repoUrl)
+
+        Vitest.expect(args).toEqual(
+            [|
+                "-c"
+                "http.https://git.nfdi4plants.org/.extraHeader=Authorization: Basic b2F1dGgyOmFiYzEyMw=="
+            |]
+        ))
+
+    Vitest.test("buildAuthArgs does not emit a global http.extraHeader", fun () ->
+        let repoUrl = "https://git.nfdi4plants.org/caroott/TestARCGit.git"
+
+        let args =
+            GitAuthAdapter.buildAuthArgs
+                "git.nfdi4plants.org"
+                "abc123"
+                (Some "origin")
+                (Some repoUrl)
+
+        let containsEntry entry = args |> Seq.exists ((=) entry)
+
+        Vitest.expect(containsEntry "http.extraHeader=Authorization: Basic b2F1dGgyOmFiYzEyMw==").toBe(false))
+
+    Vitest.test("buildAuthArgs keeps scoped auth alongside authenticated remote and lfs urls", fun () ->
+        let repoUrl = "https://git.nfdi4plants.org/caroott/TestARCGit.git"
+
+        let args =
+            GitAuthAdapter.buildAuthArgs
+                "git.nfdi4plants.org"
+                "abc123"
+                (Some "origin")
+                (Some repoUrl)
+
+        let containsEntry entry = args |> Seq.exists ((=) entry)
+
+        Vitest.expect(containsEntry "http.https://git.nfdi4plants.org/.extraHeader=Authorization: Basic b2F1dGgyOmFiYzEyMw==").toBe(true)
+        Vitest.expect(containsEntry "remote.origin.url=https://oauth2:abc123@git.nfdi4plants.org/caroott/TestARCGit.git").toBe(true)
+        Vitest.expect(containsEntry "remote.origin.lfsurl=https://oauth2:abc123@git.nfdi4plants.org/caroott/TestARCGit.git/info/lfs").toBe(true))
 )
 
 Vitest.describe("GitService.validateRemoteName", fun () ->
@@ -509,7 +552,7 @@ Vitest.describe("GitProvisioningService validation helpers", fun () ->
                     GitProvisioningService.shouldRetryWithoutAuth {
                         Kind = kind
                         Message = "not auth"
-                    }
+                }
 
                 Vitest.expect(shouldRetry).toBe(false))
     )
