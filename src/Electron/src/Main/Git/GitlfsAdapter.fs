@@ -1,5 +1,6 @@
 module Main.Git.GitLfsAdapter
 
+open System
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open Swate.Electron.Shared.GitTypes
@@ -7,6 +8,113 @@ open Main.Bindings.Node
 
 [<Literal>]
 let private repoValidationTimeoutMs = 5000
+
+type GitSpawnRequest = {
+    WorkingDirectory: string option
+    Arguments: string[]
+    Environment: obj option
+    StandardInput: string option
+    TimeoutMs: int option
+}
+
+type GitSpawnResult = {
+    ExitCode: int
+    StdoutBuffer: obj
+    StdoutText: string
+    StderrText: string
+    TimedOut: bool
+}
+
+let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> =
+    promise {
+        let! result =
+            Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+                let spawnOptions =
+                    createObj [
+                        "shell" ==> false
+                        "windowsHide" ==> true
+
+                        match request.WorkingDirectory with
+                        | Some value -> "cwd" ==> value
+                        | None -> ()
+
+                        match request.Environment with
+                        | Some value -> "env" ==> value
+                        | None -> ()
+                    ]
+
+                let proc: obj = childProcessDynamic?spawn ("git", request.Arguments, spawnOptions)
+                let stdoutChunks = ResizeArray<obj>()
+                let stderrChunks = ResizeArray<string>()
+                let mutable finished = false
+                let mutable timedOut = false
+
+                let finish exitCode =
+                    if not finished then
+                        finished <- true
+
+                        let stdoutBuffer = bufferConcat (stdoutChunks.ToArray())
+
+                        resolve {
+                            ExitCode = exitCode
+                            StdoutBuffer = stdoutBuffer
+                            StdoutText = bufferToUtf8String stdoutBuffer
+                            StderrText = String.Concat(stderrChunks.ToArray())
+                            TimedOut = timedOut
+                        }
+
+                proc?stdout?on ("data", fun d -> stdoutChunks.Add d) |> ignore
+
+                proc?stderr?on (
+                    "data",
+                    fun d -> stderrChunks.Add(d?toString ("utf8") |> unbox<string>)
+                )
+                |> ignore
+
+                let timeoutId =
+                    request.TimeoutMs
+                    |> Option.map (fun timeoutMs ->
+                        Fable.Core.JS.setTimeout
+                            (fun () ->
+                                if not finished then
+                                    timedOut <- true
+                                    stderrChunks.Add $"Git command timed out after {timeoutMs} ms."
+                                    proc?kill ("SIGTERM") |> ignore)
+                            timeoutMs
+                    )
+
+                proc?on (
+                    "close",
+                    fun code ->
+                        timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                        finish (if isNull code then -1 else int (unbox<float> code))
+                )
+                |> ignore
+
+                proc?on (
+                    "error",
+                    fun error ->
+                        timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                        stderrChunks.Add(
+                            error
+                            |> Option.ofObj
+                            |> Option.map string
+                            |> Option.defaultValue "Failed to start git process."
+                        )
+                        finish -1
+                )
+                |> ignore
+
+                match request.StandardInput with
+                | Some input ->
+                    proc?stdin?setDefaultEncoding ("utf8") |> ignore
+                    proc?stdin?``end`` (input) |> ignore
+                | None ->
+                    proc?stdin?``end`` () |> ignore
+            )
+
+        return result
+    }
 
 let tryExecGitText
     (workingDirectory: string option)

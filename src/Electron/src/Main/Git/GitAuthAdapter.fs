@@ -8,6 +8,11 @@ open Main.Bindings.SimpleGit
 
 type GitFactory = SimpleGitOptions -> ISimpleGit
 
+type GitCommandAuthentication = {
+    ConfigArgs: string[]
+    Environment: obj
+}
+
 let private authorizationRedactPattern =
     Regex(@"(Authorization:\s*)(?:Bearer\s*|Basic\s*)[^\s'""]+", RegexOptions.IgnoreCase)
 
@@ -86,6 +91,17 @@ let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (r
         ()
 |]
 
+let createCommandAuthentication
+    (host: string)
+    (token: string)
+    (remoteName: string option)
+    (remoteUrl: string option)
+    : GitCommandAuthentication =
+    {
+        ConfigArgs = buildAuthArgs host token remoteName remoteUrl
+        Environment = createNonInteractiveEnv ()
+    }
+
 let applyAuth
     (gitFactory: GitFactory)
     (baseOptions: SimpleGitOptions)
@@ -94,8 +110,8 @@ let applyAuth
     (remoteName: string option)
     (remoteUrl: string option)
     : ISimpleGit =
-    let authArgs = buildAuthArgs host token remoteName remoteUrl
-    let authConfig = toConfigEntries authArgs
+    let commandAuth = createCommandAuthentication host token remoteName remoteUrl
+    let authConfig = toConfigEntries commandAuth.ConfigArgs
 
     let mergedConfig = [|
         yield! baseConfigEntries baseOptions
