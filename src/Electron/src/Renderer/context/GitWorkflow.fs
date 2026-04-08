@@ -109,6 +109,37 @@ type ConfirmMergeResolutionOutcome = {
     PageChange: GitPageChange
 }
 
+type PreparedCommitOperation = {
+    BusyOperation: GitBusyOperation
+    NormalizedMessage: string
+    PathsToCommit: string[]
+    CurrentlyStagedPaths: string[]
+}
+
+type WriteRequest =
+    | Fetch of Reply<unit>
+    | Pull of Reply<unit>
+    | Push of Reply<unit>
+    | Sync of Reply<unit>
+    | Clone of GitCloneRepositoryRequest * Reply<string>
+    | CommitSelection of PreparedCommitOperation * Reply<unit>
+    | CommitAll of PreparedCommitOperation * Reply<unit>
+    | SaveLfsSettings of GitBusyOperation * GitLfsSettingsDto * Reply<unit>
+    | CreateBranch of GitCreateBranchRequest * Reply<unit>
+    | SwitchBranch of GitCheckoutBranchRequest * Reply<unit>
+
+type WriteSuccess =
+    | UnitSuccess of GitRefreshResult * GitPageChange * string option option * string option
+    | CloneSuccess of string
+
+type WriteAttemptOutcome =
+    | Completed of WriteSuccess
+    | RequiresLfsInstall of string
+
+type private WriteOperationClassification =
+    | WriteOperationReady of GitOperationResult
+    | WriteOperationNeedsLfsInstall of string
+
 type Msg =
     | ResetWorkflow
     | SetBusyOperation of GitBusyOperation option
@@ -132,6 +163,21 @@ type Msg =
     | SelectChangeCompleted of requestId: int * path: string * reply: Reply<unit> * result: Result<GitPageChange, string>
     | ConfirmMergeResolutionRequested of GitConfirmMergeResolutionRequest * Reply<unit>
     | ConfirmMergeResolutionCompleted of reply: Reply<unit> * result: Result<ConfirmMergeResolutionOutcome, string>
+    | SaveLfsAutoTrackThresholdRequested of int * Reply<unit>
+    | SaveDownloadLargeFilesRequested of bool * Reply<unit>
+    | FetchRequested of Reply<unit>
+    | PullRequested of Reply<unit>
+    | PushRequested of Reply<unit>
+    | SyncRequested of Reply<unit>
+    | CloneRequested of GitCloneRepositoryRequest * Reply<string>
+    | CommitSelectionRequested of GitSidebarCommitSelectionRequest * Reply<unit>
+    | CommitAllRequested of string * Reply<unit>
+    | CreateBranchRequested of GitSidebarCreateBranchRequest * Reply<unit>
+    | SwitchBranchRequested of string * Reply<unit>
+    | WriteRequested of WriteRequest
+    | WriteCompleted of WriteRequest * Result<WriteAttemptOutcome, string>
+    | WriteInstallPromptAnswered of WriteRequest * bool
+    | WriteInstallCompleted of WriteRequest * Result<GitOperationResult, string>
 
 type GitDependencies = {
     getGitStatus: unit -> JS.Promise<Result<GitStatusDto, string>>
@@ -307,13 +353,6 @@ let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
 
 let nextPageLoadRequestId (model: GitState) = model.PageLoadRequestId + 1
 
-type PreparedCommitOperation = {
-    BusyOperation: GitBusyOperation
-    NormalizedMessage: string
-    PathsToCommit: string[]
-    CurrentlyStagedPaths: string[]
-}
-
 let private distinctPaths (paths: string[]) =
     paths
     |> Array.map _.Trim()
@@ -404,6 +443,268 @@ let private confirmMergeResolutionAsync (deps: GitDependencies) (request: GitCon
                 }
 }
 
+let private successfulNoopOperationResult = {
+    Success = true
+    Message = None
+    FailureKind = None
+    WarningMessage = None
+    WarningKind = None
+    Path = None
+}
+
+let private busyOperationForWriteRequest =
+    function
+    | Fetch _ -> GitBusyOperation.FetchingFromRemote
+    | Pull _ -> GitBusyOperation.PullingFromRemote
+    | Push _ -> GitBusyOperation.PushingToRemote
+    | Sync _ -> GitBusyOperation.PushingToRemote
+    | Clone _ -> GitBusyOperation.CloningRepository
+    | CommitSelection(prepared, _)
+    | CommitAll(prepared, _) -> prepared.BusyOperation
+    | SaveLfsSettings(busyOperation, _, _) -> busyOperation
+    | CreateBranch _ -> GitBusyOperation.CreatingBranch
+    | SwitchBranch _ -> GitBusyOperation.SwitchingBranch
+
+let private requiresArcForWriteRequest =
+    function
+    | Clone _ -> false
+    | _ -> true
+
+let private resolveWriteCmd request result =
+    match request, result with
+    | Fetch reply, result
+    | Pull reply, result
+    | Push reply, result
+    | Sync reply, result
+    | CommitSelection(_, reply), result
+    | CommitAll(_, reply), result
+    | SaveLfsSettings(_, _, reply), result
+    | CreateBranch(_, reply), result
+    | SwitchBranch(_, reply), result ->
+        match result with
+        | Ok _ -> resolveReplyCmd reply (Ok())
+        | Error message -> resolveReplyCmd reply (Error message)
+    | Clone(_, reply), Ok(CloneSuccess path) ->
+        resolveReplyCmd reply (Ok path)
+    | Clone(_, reply), Error message ->
+        resolveReplyCmd reply (Error message)
+    | Clone(_, reply), Ok _ ->
+        resolveReplyCmd reply (Error "Clone request produced an invalid result.")
+
+let private classifyWriteResult (busyOperation: GitBusyOperation) (result: Result<GitOperationResult, string>) =
+    match result with
+    | Error message -> Error message
+    | Ok operationResult when operationResult.FailureKind = Some GitFailureKind.LfsInstallRequired ->
+        Ok(
+            WriteOperationNeedsLfsInstall(
+                operationResult.Message
+                |> Option.defaultValue "Git LFS is required for this operation. Install Git LFS now?"
+            )
+        )
+    | Ok operationResult when not operationResult.Success ->
+        Error(
+            operationResult.Message
+            |> Option.defaultValue (
+                busyNoticeFromOperation busyOperation
+                |> Option.defaultValue "Git operation failed."
+            )
+        )
+    | Ok operationResult -> Ok(WriteOperationReady operationResult)
+
+let private refreshAfterSuccess
+    (deps: GitDependencies)
+    (warningMessage: string option)
+    (pageChange: GitPageChange)
+    (selectedChangePathOverride: string option option)
+    =
+    promise {
+        let! refreshResult = refreshAllAsync deps
+
+        return
+            match refreshResult.Status, refreshErrorMessage refreshResult with
+            | Error message, _ -> Error message
+            | Ok _, Some message -> Error message
+            | Ok _, None ->
+                Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage)))
+    }
+
+let private runSimpleWriteAttemptAsync
+    (deps: GitDependencies)
+    (busyOperation: GitBusyOperation)
+    (operation: unit -> JS.Promise<Result<GitOperationResult, string>>)
+    =
+    promise {
+        let! result = operation ()
+
+        match classifyWriteResult busyOperation result with
+        | Error message -> return Error message
+        | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationReady operationResult) ->
+            return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
+    }
+
+let private runCloneAttemptAsync (deps: GitDependencies) (request: GitCloneRepositoryRequest) = promise {
+    let! result = deps.gitCloneRepository request
+
+    return
+        match classifyWriteResult GitBusyOperation.CloningRepository result with
+        | Error message -> Error message
+        | Ok(WriteOperationNeedsLfsInstall promptMessage) -> Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationReady operationResult) ->
+            Ok(Completed(CloneSuccess(operationResult.Path |> Option.defaultValue request.TargetPath)))
+}
+
+let private runPullAttemptAsync (deps: GitDependencies) = promise {
+    let! pullResult = deps.gitPull { Remote = None; Branch = None }
+
+    match classifyWriteResult GitBusyOperation.PullingFromRemote pullResult with
+    | Error message -> return Error message
+    | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+    | Ok(WriteOperationReady operationResult) ->
+        let! refreshResult = refreshAllAsync deps
+
+        match refreshResult.Status, refreshErrorMessage refreshResult with
+        | Error message, _ -> return Error message
+        | Ok _, Some message -> return Error message
+        | Ok latestStatus, None when latestStatus.Conflicted.Length > 0 ->
+            let firstConflictPath = latestStatus.Conflicted.[0]
+            let! pageResult = loadPageAsync deps firstConflictPath true
+
+            return
+                pageResult
+                |> Result.map (fun pageChange ->
+                    Completed(UnitSuccess(refreshResult, pageChange, Some(Some firstConflictPath), operationResult.WarningMessage))
+                )
+        | Ok _, None ->
+            return Ok(Completed(UnitSuccess(refreshResult, GitPageChange.NoChange, None, operationResult.WarningMessage)))
+}
+
+let private runSyncAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
+    if shouldPublishCurrentBranchFirst state then
+        return!
+            runSimpleWriteAttemptAsync deps GitBusyOperation.PushingToRemote (fun () ->
+                deps.gitPush { Remote = None; Branch = None }
+            )
+    else
+        let! pullResult = deps.gitPull { Remote = None; Branch = None }
+
+        match classifyWriteResult GitBusyOperation.PullingFromRemote pullResult with
+        | Error message -> return Error message
+        | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationReady pullOperation) ->
+            let! refreshResult = refreshAllAsync deps
+
+            match refreshResult.Status, refreshErrorMessage refreshResult with
+            | Error message, _ -> return Error message
+            | Ok _, Some message -> return Error message
+            | Ok latestStatus, None when
+                pullOperation.WarningMessage.IsSome
+                || latestStatus.Conflicted.Length > 0
+                || latestStatus.IsMergeInProgress
+                ->
+                let selectedChangePathOverride =
+                    latestStatus.Conflicted
+                    |> Array.tryHead
+                    |> Option.map Some
+
+                let! pageChangeResult =
+                    if latestStatus.Conflicted.Length > 0 then
+                        loadPageAsync deps latestStatus.Conflicted.[0] true
+                    else
+                        promise { return Ok GitPageChange.NoChange }
+
+                return
+                    pageChangeResult
+                    |> Result.map (fun pageChange ->
+                        Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, pullOperation.WarningMessage))
+                    )
+            | Ok _, None ->
+                return!
+                    runSimpleWriteAttemptAsync deps GitBusyOperation.PushingToRemote (fun () ->
+                        deps.gitPush { Remote = None; Branch = None }
+                    )
+}
+
+let private runCommitAttemptAsync
+    (deps: GitDependencies)
+    (prepared: PreparedCommitOperation)
+    =
+    promise {
+        if String.IsNullOrWhiteSpace prepared.NormalizedMessage then
+            return Error "Commit message must not be empty."
+        elif prepared.PathsToCommit.Length = 0 then
+            return Error "No changes available to commit."
+        else
+            let! unstageResult =
+                if prepared.CurrentlyStagedPaths.Length = 0 then
+                    promise { return Ok successfulNoopOperationResult }
+                else
+                    deps.gitUnstagePaths { Pathspecs = prepared.CurrentlyStagedPaths }
+
+            match classifyWriteResult prepared.BusyOperation unstageResult with
+            | Error message -> return Error message
+            | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+            | Ok(WriteOperationReady _) ->
+                let! stageResult = deps.gitStagePaths { Pathspecs = prepared.PathsToCommit }
+
+                match classifyWriteResult prepared.BusyOperation stageResult with
+                | Error message -> return Error message
+                | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+                | Ok(WriteOperationReady _) ->
+                    let! commitResult = deps.gitCommit { Message = prepared.NormalizedMessage }
+
+                    match classifyWriteResult prepared.BusyOperation commitResult with
+                    | Error message -> return Error message
+                    | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+                    | Ok(WriteOperationReady operationResult) ->
+                        return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
+    }
+
+let private runSaveLfsSettingsAttemptAsync
+    (deps: GitDependencies)
+    (busyOperation: GitBusyOperation)
+    (settings: GitLfsSettingsDto)
+    =
+    promise {
+        let! result = deps.setGitLfsSettings settings
+
+        match classifyWriteResult busyOperation result with
+        | Error message -> return Error message
+        | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationReady operationResult) ->
+            return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
+    }
+
+let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (request: WriteRequest) = promise {
+    match request with
+    | Fetch _ ->
+        return!
+            runSimpleWriteAttemptAsync deps GitBusyOperation.FetchingFromRemote (fun () ->
+                deps.gitFetch { Remote = None; Branch = None }
+            )
+    | Pull _ ->
+        return! runPullAttemptAsync deps
+    | Push _ ->
+        return!
+            runSimpleWriteAttemptAsync deps GitBusyOperation.PushingToRemote (fun () ->
+                deps.gitPush { Remote = None; Branch = None }
+            )
+    | Sync _ ->
+        return! runSyncAttemptAsync deps state
+    | Clone(request, _) ->
+        return! runCloneAttemptAsync deps request
+    | CommitSelection(prepared, _) ->
+        return! runCommitAttemptAsync deps prepared
+    | CommitAll(prepared, _) ->
+        return! runCommitAttemptAsync deps prepared
+    | SaveLfsSettings(busyOperation, settings, _) ->
+        return! runSaveLfsSettingsAttemptAsync deps busyOperation settings
+    | CreateBranch(request, _) ->
+        return! runSimpleWriteAttemptAsync deps GitBusyOperation.CreatingBranch (fun () -> deps.createBranch request)
+    | SwitchBranch(request, _) ->
+        return! runSimpleWriteAttemptAsync deps GitBusyOperation.SwitchingBranch (fun () -> deps.checkoutBranch request)
+}
+
 let transition (msg: Msg) (model: GitState) =
     match msg with
     | ResetWorkflow -> GitState.Empty
@@ -489,7 +790,22 @@ let transition (msg: Msg) (model: GitState) =
     | SelectChangeRequested _
     | SelectChangeCompleted _
     | ConfirmMergeResolutionRequested _
-    | ConfirmMergeResolutionCompleted _ -> model
+    | ConfirmMergeResolutionCompleted _
+    | SaveLfsAutoTrackThresholdRequested _
+    | SaveDownloadLargeFilesRequested _
+    | FetchRequested _
+    | PullRequested _
+    | PushRequested _
+    | SyncRequested _
+    | CloneRequested _
+    | CommitSelectionRequested _
+    | CommitAllRequested _
+    | CreateBranchRequested _
+    | SwitchBranchRequested _
+    | WriteRequested _
+    | WriteCompleted _
+    | WriteInstallPromptAnswered _
+    | WriteInstallCompleted _ -> model
 
 let init () : GitState * Cmd<Msg> = GitState.Empty, Cmd.none
 
@@ -666,6 +982,197 @@ let update
             applyPageChangeCmd setPageState outcome.PageChange
             resolveReplyCmd reply (Ok())
         ]
+    | SaveDownloadLargeFilesRequested(downloadLargeFiles, reply) when model.CurrentArcPath.IsNone ->
+        let nextModel =
+            model
+            |> transition (SetLfsSettings(Some(buildUpdatedLfsSettings model None (Some downloadLargeFiles))))
+
+        nextModel, resolveReplyCmd reply (Ok())
+    | SaveDownloadLargeFilesRequested(downloadLargeFiles, reply) ->
+        model,
+        Cmd.ofMsg (
+            WriteRequested(
+                SaveLfsSettings(
+                    GitBusyOperation.SavingGitLfsDownloadPreference,
+                    buildUpdatedLfsSettings model None (Some downloadLargeFiles),
+                    reply
+                )
+            )
+        )
+    | SaveLfsAutoTrackThresholdRequested(thresholdMb, reply) ->
+        model,
+        Cmd.ofMsg (
+            WriteRequested(
+                SaveLfsSettings(
+                    GitBusyOperation.SavingGitLfsThreshold,
+                    buildUpdatedLfsSettings model (Some thresholdMb) None,
+                    reply
+                )
+            )
+        )
+    | FetchRequested reply -> model, Cmd.ofMsg (WriteRequested(Fetch reply))
+    | PullRequested reply -> model, Cmd.ofMsg (WriteRequested(Pull reply))
+    | PushRequested reply -> model, Cmd.ofMsg (WriteRequested(Push reply))
+    | SyncRequested reply -> model, Cmd.ofMsg (WriteRequested(Sync reply))
+    | CloneRequested(request, reply) -> model, Cmd.ofMsg (WriteRequested(Clone(request, reply)))
+    | CommitSelectionRequested(request, reply) ->
+        model, Cmd.ofMsg (WriteRequested(CommitSelection(prepareCommitSelection model request, reply)))
+    | CommitAllRequested(message, reply) ->
+        model, Cmd.ofMsg (WriteRequested(CommitAll(prepareCommitAll model message, reply)))
+    | CreateBranchRequested(request, reply) ->
+        model,
+        Cmd.ofMsg (
+            WriteRequested(
+                CreateBranch(
+                    {
+                        Name = request.BranchName
+                        StartPoint = request.StartPoint
+                    },
+                    reply
+                )
+            )
+        )
+    | SwitchBranchRequested(branchName, reply) ->
+        let normalizedBranchName = branchName.Trim()
+
+        if String.IsNullOrWhiteSpace normalizedBranchName then
+            model, resolveReplyCmd reply (Error "Branch name must not be empty.")
+        else
+            model,
+            Cmd.ofMsg (
+                WriteRequested(
+                    SwitchBranch(
+                        { Name = normalizedBranchName },
+                        reply
+                    )
+                )
+            )
+    | WriteRequested request when requiresArcForWriteRequest request && model.CurrentArcPath.IsNone ->
+        model, resolveWriteCmd request (Error "No ARC is loaded.")
+    | WriteRequested request ->
+        let busyOperation = busyOperationForWriteRequest request
+
+        let nextModel =
+            model
+            |> transition (SetBusyOperation(Some busyOperation))
+            |> transition (SetErrorNotice None)
+            |> transition (SetWarningNotice None)
+
+        let cmd =
+            Cmd.OfPromise.either
+                (fun (deps, model, request) -> executeWriteAttempt deps model request)
+                (deps, model, request)
+                (fun result -> WriteCompleted(request, result))
+                (fun err -> WriteCompleted(request, Error(string err)))
+
+        nextModel, cmd
+    | WriteCompleted(request, Error message) ->
+        let nextModel =
+            model
+            |> transition (SetBusyOperation None)
+            |> transition (SetCurrentProgress None)
+            |> transition (SetErrorNotice(Some message))
+            |> transition (SetWarningNotice None)
+
+        nextModel, resolveWriteCmd request (Error message)
+    | WriteCompleted(request, Ok(RequiresLfsInstall promptMessage)) ->
+        let busyOperation = busyOperationForWriteRequest request
+
+        let nextModel =
+            model
+            |> transition (SetInstallRetryState(GitInstallRetryState.PromptingForInstall(promptMessage, busyOperation)))
+
+        let cmd =
+            Cmd.OfFunc.perform
+                deps.confirmInstall
+                promptMessage
+                (fun shouldInstall -> WriteInstallPromptAnswered(request, shouldInstall))
+
+        nextModel, cmd
+    | WriteInstallPromptAnswered(request, false) ->
+        let nextModel =
+            model
+            |> transition (SetBusyOperation None)
+            |> transition (SetInstallRetryState GitInstallRetryState.Idle)
+
+        nextModel, resolveWriteCmd request (Error "Git LFS installation is required to continue.")
+    | WriteInstallPromptAnswered(request, true) ->
+        let busyOperation = busyOperationForWriteRequest request
+
+        let nextModel =
+            model
+            |> transition (SetInstallRetryState(GitInstallRetryState.InstallingForRetry busyOperation))
+            |> transition (SetBusyOperation(Some GitBusyOperation.InstallingGitLfs))
+
+        let cmd =
+            Cmd.OfPromise.either
+                deps.installGitLfs
+                ()
+                (fun installResult -> WriteInstallCompleted(request, installResult))
+                (fun err -> WriteInstallCompleted(request, Error(string err)))
+
+        nextModel, cmd
+    | WriteInstallCompleted(request, Error message) ->
+        let nextModel =
+            model
+            |> transition (SetBusyOperation None)
+            |> transition (SetInstallRetryState GitInstallRetryState.Idle)
+            |> transition (SetErrorNotice(Some message))
+
+        nextModel, resolveWriteCmd request (Error message)
+    | WriteInstallCompleted(request, Ok operationResult) when not operationResult.Success ->
+        let message = operationResult.Message |> Option.defaultValue "Git LFS installation failed."
+
+        let nextModel =
+            model
+            |> transition (SetBusyOperation None)
+            |> transition (SetInstallRetryState GitInstallRetryState.Idle)
+            |> transition (SetErrorNotice(Some message))
+
+        nextModel, resolveWriteCmd request (Error message)
+    | WriteInstallCompleted(request, Ok _) ->
+        let busyOperation = busyOperationForWriteRequest request
+
+        let nextModel =
+            model
+            |> transition (SetInstallRetryState GitInstallRetryState.Idle)
+            |> transition (SetBusyOperation(Some busyOperation))
+
+        let cmd =
+            Cmd.OfPromise.either
+                (fun (deps, model, request) -> executeWriteAttempt deps model request)
+                (deps, model, request)
+                (fun result -> WriteCompleted(request, result))
+                (fun err -> WriteCompleted(request, Error(string err)))
+
+        nextModel, cmd
+    | WriteCompleted(request, Ok(Completed success)) ->
+        let baseModel, pageChange, warningMessage =
+            match success with
+            | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
+                let refreshedModel = applyRefreshResult refreshResult model
+
+                let selectionAdjustedModel =
+                    match selectedChangePathOverride with
+                    | Some selectedChangePath -> refreshedModel |> transition (SetSelectedChangePath selectedChangePath)
+                    | None -> refreshedModel
+
+                selectionAdjustedModel, pageChange, warningMessage
+            | CloneSuccess _ ->
+                model, GitPageChange.NoChange, None
+
+        let nextModel =
+            baseModel
+            |> transition (SetBusyOperation None)
+            |> transition (SetCurrentProgress None)
+            |> transition (SetErrorNotice None)
+            |> transition (SetWarningNotice warningMessage)
+
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState pageChange
+            resolveWriteCmd request (Ok success)
+        ]
     | _ -> transition msg model, Cmd.none
 
 let subscribe (_model: GitState) : Sub<Msg> = [
@@ -680,554 +1187,3 @@ let subscribe (_model: GitState) : Sub<Msg> = [
             member _.Dispose() = dispose ()
         }
 ]
-
-let refreshAll
-    (deps: GitDependencies)
-    (isArcLoaded: unit -> bool)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    =
-    promise {
-        if not (isArcLoaded ()) then
-            dispatch ResetWorkflow
-            return Ok None
-        else
-            let requestId = nextRefreshRequestId (getState ())
-            dispatch (StartRefreshRequest requestId)
-
-            let! statusResult = deps.getGitStatus ()
-            let! branchResult = deps.getGitBranches ()
-            let! lfsSettingsResult = deps.getGitLfsSettings ()
-
-            let refreshResult = {
-                Status = statusResult
-                Branches = branchResult
-                LfsSettings = lfsSettingsResult
-            }
-
-            dispatch (FinishRefreshRequest(requestId, refreshResult))
-
-            return
-                if (getState ()).RefreshRequestId <> requestId then
-                    Ok None
-                else
-                    match statusResult, refreshErrorMessage refreshResult with
-                    | Ok status, None -> Ok(Some status)
-                    | Ok _, Some message -> Error message
-                    | Error message, _ -> Error message
-    }
-
-let loadPage
-    (deps: GitDependencies)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    (path: string)
-    (isConflicted: bool)
-    =
-    promise {
-        let requestId = nextPageLoadRequestId (getState ())
-        dispatch (StartPageLoad requestId)
-
-        let! result =
-            if isConflicted then
-                deps.loadMergeConflictPage path
-            else
-                deps.loadDiffPage path
-
-        dispatch (FinishPageLoad(requestId, path, result |> Result.map ignore))
-
-        if (getState ()).PageLoadRequestId <> requestId then
-            return Ok GitPageChange.NoChange
-        else
-            return result |> Result.map GitPageChange.Set
-    }
-
-let promptForGitLfsInstall
-    (deps: GitDependencies)
-    (dispatch: Msg -> unit)
-    (busyOperation: GitBusyOperation)
-    (message: string)
-    =
-    promise {
-        dispatch (SetInstallRetryState(GitInstallRetryState.PromptingForInstall(message, busyOperation)))
-
-        let shouldInstall = deps.confirmInstall message
-
-        if not shouldInstall then
-            dispatch (SetInstallRetryState GitInstallRetryState.Idle)
-            return Ok false
-        else
-            dispatch (SetInstallRetryState(GitInstallRetryState.InstallingForRetry busyOperation))
-            dispatch (SetBusyOperation(Some GitBusyOperation.InstallingGitLfs))
-            dispatch (SetErrorNotice None)
-
-            let! installResult = deps.installGitLfs ()
-
-            dispatch (SetBusyOperation None)
-            dispatch (SetInstallRetryState GitInstallRetryState.Idle)
-
-            match installResult with
-            | Error message -> return Error message
-            | Ok operationResult when not operationResult.Success ->
-                let message =
-                    operationResult.Message |> Option.defaultValue "Git LFS installation failed."
-
-                return Error message
-            | Ok _ -> return Ok true
-    }
-
-let rec runGitOperationWithLfsInstallRetry
-    (deps: GitDependencies)
-    (dispatch: Msg -> unit)
-    (busyOperation: GitBusyOperation)
-    (allowRetry: bool)
-    (operation: unit -> JS.Promise<Result<GitOperationResult, string>>)
-    =
-    promise {
-        let! result = operation ()
-
-        match result with
-        | Ok operationResult when
-            allowRetry
-            && operationResult.FailureKind = Some GitFailureKind.LfsInstallRequired
-            ->
-            let promptMessage =
-                operationResult.Message
-                |> Option.defaultValue "Git LFS is required for this operation. Install Git LFS now?"
-
-            let! promptResult = promptForGitLfsInstall deps dispatch busyOperation promptMessage
-
-            match promptResult with
-            | Error message ->
-                return
-                    Ok {
-                        Success = false
-                        Message = Some message
-                        FailureKind = Some GitFailureKind.LfsInstallRequired
-                        WarningMessage = None
-                        WarningKind = None
-                        Path = None
-                    }
-            | Ok false ->
-                return
-                    Ok {
-                        operationResult with
-                            Message = Some "Git LFS installation is required to continue."
-                    }
-            | Ok true ->
-                dispatch (SetBusyOperation(Some busyOperation))
-                return! runGitOperationWithLfsInstallRetry deps dispatch busyOperation false operation
-        | _ -> return result
-    }
-
-let runWriteOperation
-    (deps: GitDependencies)
-    (isArcLoaded: unit -> bool)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    (busyOperation: GitBusyOperation)
-    (operation: unit -> JS.Promise<Result<GitOperationResult, string>>)
-    =
-    promise {
-        if not (isArcLoaded ()) then
-            return Error "No ARC is loaded."
-        else
-            dispatch (SetBusyOperation(Some busyOperation))
-            dispatch (SetErrorNotice None)
-            dispatch (SetWarningNotice None)
-
-            let! result = runGitOperationWithLfsInstallRetry deps dispatch busyOperation true operation
-
-            match result with
-            | Error message ->
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-                dispatch (SetErrorNotice(Some message))
-                dispatch (SetWarningNotice None)
-                return Error message
-            | Ok operationResult when not operationResult.Success ->
-                let message =
-                    operationResult.Message
-                    |> Option.defaultValue (
-                        (busyNoticeFromOperation busyOperation)
-                        |> Option.defaultValue "Git operation failed."
-                    )
-
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-                dispatch (SetErrorNotice(Some message))
-                dispatch (SetWarningNotice None)
-                return Error message
-            | Ok operationResult ->
-                let! refreshResult = refreshAll deps isArcLoaded getState dispatch
-
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-
-                match refreshResult with
-                | Ok(Some _) ->
-                    dispatch (SetErrorNotice None)
-                    dispatch (SetWarningNotice operationResult.WarningMessage)
-                    return Ok()
-                | Ok None ->
-                    dispatch (SetWarningNotice operationResult.WarningMessage)
-                    return Ok()
-                | Error message ->
-                    dispatch (SetErrorNotice(Some message))
-                    dispatch (SetWarningNotice None)
-                    return Error message
-    }
-
-let runPushWorkflow
-    (deps: GitDependencies)
-    (isArcLoaded: unit -> bool)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    =
-    runWriteOperation
-        deps
-        isArcLoaded
-        getState
-        dispatch
-        GitBusyOperation.PushingToRemote
-        (fun () -> deps.gitPush { Remote = None; Branch = None })
-
-let runPullWorkflow
-    (deps: GitDependencies)
-    (isArcLoaded: unit -> bool)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    =
-    promise {
-        if not (isArcLoaded ()) then
-            return Error "No ARC is loaded."
-        else
-            dispatch (SetBusyOperation(Some GitBusyOperation.PullingFromRemote))
-            dispatch (SetErrorNotice None)
-            dispatch (SetWarningNotice None)
-
-            let! result =
-                runGitOperationWithLfsInstallRetry
-                    deps
-                    dispatch
-                    GitBusyOperation.PullingFromRemote
-                    true
-                    (fun () -> deps.gitPull { Remote = None; Branch = None })
-
-            match result with
-            | Error message ->
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-                dispatch (SetErrorNotice(Some message))
-                dispatch (SetWarningNotice None)
-                return Error message
-            | Ok operationResult when not operationResult.Success ->
-                let message = operationResult.Message |> Option.defaultValue "Pull failed."
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-                dispatch (SetErrorNotice(Some message))
-                dispatch (SetWarningNotice None)
-                return Error message
-            | Ok operationResult ->
-                let! refreshResult = refreshAll deps isArcLoaded getState dispatch
-
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-
-                match refreshResult with
-                | Error message ->
-                    dispatch (SetErrorNotice(Some message))
-                    dispatch (SetWarningNotice None)
-                    return Error message
-                | Ok(Some latestStatus) when latestStatus.Conflicted.Length > 0 ->
-                    let firstConflictPath = latestStatus.Conflicted.[0]
-                    let! openResult = loadPage deps getState dispatch firstConflictPath true
-
-                    match openResult with
-                    | Ok pageChange ->
-                        dispatch (SetErrorNotice None)
-                        dispatch (SetWarningNotice operationResult.WarningMessage)
-
-                        return
-                            Ok {
-                                Status = Some latestStatus
-                                WarningMessage = operationResult.WarningMessage
-                                PageChange = pageChange
-                            }
-                    | Error message ->
-                        dispatch (SetErrorNotice(Some message))
-                        dispatch (SetWarningNotice None)
-                        return Error message
-                | Ok(Some latestStatus) ->
-                    dispatch (SetErrorNotice None)
-                    dispatch (SetWarningNotice operationResult.WarningMessage)
-
-                    return
-                        Ok {
-                            Status = Some latestStatus
-                            WarningMessage = operationResult.WarningMessage
-                            PageChange = GitPageChange.NoChange
-                        }
-                | Ok None ->
-                    dispatch (SetWarningNotice operationResult.WarningMessage)
-
-                    return
-                        Ok {
-                            Status = None
-                            WarningMessage = operationResult.WarningMessage
-                            PageChange = GitPageChange.NoChange
-                        }
-    }
-
-let runSyncWorkflow
-    (deps: GitDependencies)
-    (isArcLoaded: unit -> bool)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    =
-    promise {
-        if shouldPublishCurrentBranchFirst (getState ()) then
-            let! pushResult = runPushWorkflow deps isArcLoaded getState dispatch
-            return pushResult |> Result.map (fun () -> GitPageChange.NoChange)
-        else
-            let! pullResult = runPullWorkflow deps isArcLoaded getState dispatch
-
-            match pullResult with
-            | Error message -> return Error message
-            | Ok pullResult when pullResult.Status.IsNone -> return Ok pullResult.PageChange
-            | Ok pullResult when pullResult.WarningMessage.IsSome -> return Ok pullResult.PageChange
-            | Ok pullResult when
-                pullResult.Status
-                |> Option.exists (fun status -> status.Conflicted.Length > 0 || status.IsMergeInProgress)
-                ->
-                return Ok pullResult.PageChange
-            | Ok pullResult ->
-                let! pushResult = runPushWorkflow deps isArcLoaded getState dispatch
-                return pushResult |> Result.map (fun () -> pullResult.PageChange)
-    }
-
-let runCloneWorkflow (deps: GitDependencies) (dispatch: Msg -> unit) (request: GitCloneRepositoryRequest) = promise {
-    dispatch (SetBusyOperation(Some GitBusyOperation.CloningRepository))
-    dispatch (SetErrorNotice None)
-    dispatch (SetWarningNotice None)
-
-    let! result =
-        runGitOperationWithLfsInstallRetry
-            deps
-            dispatch
-            GitBusyOperation.CloningRepository
-            true
-            (fun () -> deps.gitCloneRepository request)
-
-    dispatch (SetBusyOperation None)
-    dispatch (SetCurrentProgress None)
-
-    match result with
-    | Error message ->
-        dispatch (SetErrorNotice(Some message))
-        dispatch (SetWarningNotice None)
-        return Error message
-    | Ok operationResult when not operationResult.Success ->
-        let message = operationResult.Message |> Option.defaultValue "Clone failed."
-        dispatch (SetErrorNotice(Some message))
-        dispatch (SetWarningNotice None)
-        return Error message
-    | Ok operationResult ->
-        dispatch (SetErrorNotice None)
-        dispatch (SetWarningNotice operationResult.WarningMessage)
-        return Ok(operationResult.Path |> Option.defaultValue request.TargetPath)
-}
-
-let runCommitOperation
-    (deps: GitDependencies)
-    (isArcLoaded: unit -> bool)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    (busyOperation: GitBusyOperation)
-    (pathsToCommit: string[])
-    (clearExistingStage: bool)
-    (message: string)
-    =
-    promise {
-        let normalizedMessage = message.Trim()
-
-        if String.IsNullOrWhiteSpace normalizedMessage then
-            return Error "Commit message must not be empty."
-        elif pathsToCommit.Length = 0 then
-            return Error "No changes available to commit."
-        elif not (isArcLoaded ()) then
-            return Error "No ARC is loaded."
-        else
-            let normalizedPaths = pathsToCommit |> Array.distinct
-
-            let currentlyStagedPaths =
-                if clearExistingStage then
-                    let state = getState ()
-
-                    state.ChangedFiles
-                    |> Array.filter (fun change -> GitStatusCode.isStagedIndexStatus change.IndexStatus)
-                    |> Array.map _.Path
-                    |> Array.distinct
-                else
-                    [||]
-
-            dispatch (SetBusyOperation(Some busyOperation))
-            dispatch (SetErrorNotice None)
-            dispatch (SetWarningNotice None)
-
-            let! prepareStageResult =
-                if currentlyStagedPaths.Length = 0 then
-                    promise { return Ok() }
-                else
-                    promise {
-                        let! result = deps.gitUnstagePaths { Pathspecs = currentlyStagedPaths }
-
-                        return
-                            match result with
-                            | Error message -> Error message
-                            | Ok operationResult when not operationResult.Success ->
-                                Error(
-                                    operationResult.Message
-                                    |> Option.defaultValue "Preparing the selected commit failed."
-                                )
-                            | Ok _ -> Ok()
-                    }
-
-            match prepareStageResult with
-            | Error message ->
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-                dispatch (SetErrorNotice(Some message))
-                dispatch (SetWarningNotice None)
-                return Error message
-            | Ok() ->
-                let! stageResult =
-                    runGitOperationWithLfsInstallRetry
-                        deps
-                        dispatch
-                        busyOperation
-                        true
-                        (fun () -> deps.gitStagePaths { Pathspecs = normalizedPaths })
-
-                match stageResult with
-                | Error message ->
-                    dispatch (SetBusyOperation None)
-                    dispatch (SetCurrentProgress None)
-                    dispatch (SetErrorNotice(Some message))
-                    dispatch (SetWarningNotice None)
-                    return Error message
-                | Ok operationResult when not operationResult.Success ->
-                    let message =
-                        operationResult.Message
-                        |> Option.defaultValue "Staging changes before commit failed."
-
-                    dispatch (SetBusyOperation None)
-                    dispatch (SetCurrentProgress None)
-                    dispatch (SetErrorNotice(Some message))
-                    dispatch (SetWarningNotice None)
-                    return Error message
-                | Ok _ ->
-                    let! commitResult =
-                        runGitOperationWithLfsInstallRetry
-                            deps
-                            dispatch
-                            busyOperation
-                            true
-                            (fun () -> deps.gitCommit { Message = normalizedMessage })
-
-                    match commitResult with
-                    | Error message ->
-                        dispatch (SetBusyOperation None)
-                        dispatch (SetCurrentProgress None)
-                        dispatch (SetErrorNotice(Some message))
-                        dispatch (SetWarningNotice None)
-                        return Error message
-                    | Ok operationResult when not operationResult.Success ->
-                        let message = operationResult.Message |> Option.defaultValue "Commit failed."
-
-                        dispatch (SetBusyOperation None)
-                        dispatch (SetCurrentProgress None)
-                        dispatch (SetErrorNotice(Some message))
-                        dispatch (SetWarningNotice None)
-                        return Error message
-                    | Ok _ ->
-                        let! refreshResult = refreshAll deps isArcLoaded getState dispatch
-
-                        dispatch (SetBusyOperation None)
-                        dispatch (SetCurrentProgress None)
-
-                        match refreshResult with
-                        | Ok(Some _) ->
-                            dispatch (SetErrorNotice None)
-                            dispatch (SetWarningNotice None)
-                            return Ok()
-                        | Ok None ->
-                            dispatch (SetWarningNotice None)
-                            return Ok()
-                        | Error message ->
-                            dispatch (SetErrorNotice(Some message))
-                            dispatch (SetWarningNotice None)
-                            return Error message
-    }
-
-let confirmMergeResolution
-    (deps: GitDependencies)
-    (isArcLoaded: unit -> bool)
-    (getState: unit -> GitState)
-    (dispatch: Msg -> unit)
-    (request: GitConfirmMergeResolutionRequest)
-    =
-    promise {
-        if not (isArcLoaded ()) then
-            return Error "No ARC is loaded."
-        else
-            let currentState = getState ()
-
-            match currentState.BusyOperation with
-            | Some(GitBusyOperation.ConfirmingMergeResolution _) -> return Ok GitPageChange.NoChange
-            | _ when currentState.MergeResolutionPendingPath = Some request.Path -> return Ok GitPageChange.NoChange
-            | _ ->
-                dispatch (SetBusyOperation(Some(GitBusyOperation.ConfirmingMergeResolution request.Path)))
-                dispatch (SetMergeResolutionPendingPath(Some request.Path))
-                dispatch (SetErrorNotice None)
-                dispatch (SetWarningNotice None)
-
-                let! result = deps.confirmGitMergeResolution request
-
-                dispatch (SetBusyOperation None)
-                dispatch (SetCurrentProgress None)
-
-                match result with
-                | Error message ->
-                    dispatch (SetMergeResolutionPendingPath None)
-
-                    if isStaleMergeConflictError message then
-                        let! _ = refreshAll deps isArcLoaded getState dispatch
-                        dispatch (SetSelectedChangePath None)
-
-                    dispatch (SetErrorNotice(Some message))
-                    dispatch (SetWarningNotice None)
-                    return Error message
-                | Ok payload ->
-                    dispatch (SetStatus(Some payload.UpdatedStatus))
-                    dispatch (SetMergeResolutionPendingPath None)
-
-                    match payload.NextConflictedPath with
-                    | Some nextConflictPath ->
-                        let! openResult = loadPage deps getState dispatch nextConflictPath true
-
-                        match openResult with
-                        | Ok pageChange ->
-                            dispatch (SetErrorNotice None)
-                            dispatch (SetWarningNotice None)
-                            return Ok pageChange
-                        | Error message ->
-                            dispatch (SetErrorNotice(Some message))
-                            dispatch (SetWarningNotice None)
-                            return Error message
-                    | None ->
-                        dispatch (SetSelectedChangePath None)
-                        dispatch (SetErrorNotice None)
-                        dispatch (SetWarningNotice None)
-                        return Ok GitPageChange.Clear
-    }
