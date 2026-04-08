@@ -75,7 +75,7 @@ module FilterLogic = //filters the note list based on the search term and the se
 module FilterComponents =
     let noteSuggestions (searchTerm: string, selectedIndices: Set<int>, notes: Swate.Components.NoteTypes.Note list) =
         let notesFilteredAfterTitle =
-            if Set.contains 0 selectedIndices || selectedIndices.IsEmpty then
+            if Set.contains 0 selectedIndices || Set.isEmpty selectedIndices then
                 FilterLogic.FuzzySearch.search (searchTerm, "Title", notes)
             else
                 []
