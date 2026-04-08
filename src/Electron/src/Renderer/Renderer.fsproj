@@ -25,7 +25,6 @@
     <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs" />
     <Compile Include="Components\MainContent\TextPreviewTarget.fs" />
     <Compile Include="Components\MainContent\UnknownPreviewTarget.fs" />
-    <Compile Include="Components\MainContent\ErrorPreviewTarget.fs" />
     <Compile Include="Components\MainContent\LandingDraftTarget.fs" />
     <Compile Include="Components\MainContent\NotesDraftTarget.fs" />
     <Compile Include="Components\MainContent\NotesSearchTarget.fs" />

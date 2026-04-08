@@ -2,6 +2,7 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 
 open ARCtrl
 open Feliz
+open Swate.Components
 open Renderer.Components.MainElement
 open Renderer.Components.MainContent.Types
 open Renderer.Components.MainContent.Helper
@@ -13,6 +14,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
     let activeView, setActiveView = React.useState PreviewActiveView.Metadata
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let errorModal = Contexts.ErrorModal.useErrorModal ()
 
     let setArcFile =
         fun (arcFile: ArcFiles) ->
@@ -25,7 +27,8 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             promise {
                 match! MainContentHelper.saveArcFile arcFile with
                 | Ok() -> ()
-                | Error exn -> pageStateCtx.setState (PageState.ErrorPage exn.Message |> Some)
+                | Error exn ->
+                    errorModal.enqueue (ErrorModalRequest.create(exn.Message, title = "Could not save ARC file"))
             }
             |> Promise.start
 

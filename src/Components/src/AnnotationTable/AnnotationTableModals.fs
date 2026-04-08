@@ -798,7 +798,7 @@ type ContextMenuModals =
                 tableRef.current.focus ()
                 setModal None
 
-        BaseModal.ErrorBaseModal(true, (fun _ -> rmv ()), exn)
+        BaseModal.ErrorModalObsolete(true, (fun _ -> rmv ()), exn)
 
     [<ReactComponent>]
     static member UnknownPasteCase
@@ -825,7 +825,7 @@ type ContextMenuModals =
             |]
             |> String.concat System.Environment.NewLine
 
-        BaseModal.ErrorBaseModal(true, (fun _ -> rmv ()), msg)
+        BaseModal.ErrorModalObsolete(true, (fun _ -> rmv ()), msg)
 
 
 

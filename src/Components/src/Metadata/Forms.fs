@@ -127,7 +127,7 @@ type FormComponents =
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
-                BaseModal.ErrorBaseModal(error.IsSome, (fun _ -> setError None), error |> Option.defaultValue "")
+                BaseModal.ErrorModalObsolete(error.IsSome, (fun _ -> setError None), error |> Option.defaultValue "")
                 if label.IsSome then
                     Generic.FieldTitle label.Value
                 if extendedElements.IsSome then

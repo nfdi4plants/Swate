@@ -89,3 +89,11 @@ module BaseModal =
     }
 
     let BaseModalCtx = React.createContext<BaseModalContext option> (None)
+
+[<Erase; Mangle(false)>]
+module ErrorModal =
+
+    let ErrorModalCtx = React.createContext<ErrorModalContext> (ErrorModalContext.Empty)
+
+    [<Hook>]
+    let useErrorModal () = React.useContext ErrorModalCtx
