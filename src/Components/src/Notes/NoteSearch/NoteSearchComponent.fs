@@ -105,7 +105,7 @@ type SearchComponent =
 
         let searchResults =
             if startSearch then
-                FilterComponents.filteredNotes (searchTerm, selectedOptIndices, notes)
+                FilterComponents.noteSuggestions (searchTerm, selectedOptIndices, notes)
             else
                 []
 
