@@ -106,6 +106,8 @@ type SearchComponent =
         let searchResults =
             if startSearch then
                 FilterComponents.noteSuggestions (searchTerm, selectedOptIndices, notes)
+            else
+                []
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:items-center swt:pt-8 swt:min-h-screen"
@@ -147,6 +149,8 @@ type SearchComponent =
                                     prop.className "swt:mt-2 swt:text-center"
                                     prop.text "No results found."
                                 ]
+                        else
+                            Html.none
                     ]
                 ]
             ]
