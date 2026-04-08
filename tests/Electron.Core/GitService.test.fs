@@ -743,10 +743,12 @@ Vitest.describe (
             fun () -> promise {
                 let lfsObjectId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
-                let commandAuth: GitAuthAdapter.GitCommandAuthentication = {
-                    ConfigArgs = [| "-c"; "http.extraHeader=Authorization: Basic TEST" |]
-                    Environment = createObj []
-                }
+                let commandAuth =
+                    GitAuthAdapter.createCommandAuthentication
+                        "git.nfdi4plants.org"
+                        "abc123"
+                        (Some "origin")
+                        (Some "https://git.nfdi4plants.org/caroott/TestARCGit.git")
 
                 let mutable recordedArgs = [||]
                 let mutable recordedStdin = None
@@ -776,18 +778,19 @@ Vitest.describe (
 
                 expectOkResult "upload exact object ids" result |> ignore
 
-                Vitest.expect(recordedArgs).toEqual (
+                let expectedArgs =
                     [|
-                        "-c"
-                        "http.extraHeader=Authorization: Basic TEST"
-                        "lfs"
-                        "push"
-                        "--object-id"
-                        "origin"
-                        "--stdin"
+                        yield! commandAuth.ConfigArgs
+                        yield "lfs"
+                        yield "push"
+                        yield "--object-id"
+                        yield "origin"
+                        yield "--stdin"
                     |]
-                )
 
+                Vitest.expect(recordedArgs).toEqual (
+                    expectedArgs
+                )
                 Vitest.expect(recordedStdin).toEqual (Some $"{lfsObjectId}\n")
             }
         )
