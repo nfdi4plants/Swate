@@ -58,7 +58,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
                                 |> String.concat "\n\n"
 
                             let close = fun b -> UpdateDisplayLogList [] |> DevMsg |> dispatch
-                            Swate.Components.BaseModal.ErrorModalObsolete(true, close, errors)
+                            Swate.Components.BaseModal.ErrorBaseModal(true, close, errors)
                         | _ -> Modals.InteropLogging.Main(model.DevState, dispatch)
                         match model.PageState.IsHome, model.PersistentStorageState.Host with
                         | false, _ -> View.MainPageView.Main(model, dispatch)
