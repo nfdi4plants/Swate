@@ -118,7 +118,6 @@ type Layout =
                      "swt:fluent--panel-right-48-regular"),
             tooltip = "Toggle left sidebar",
             tooltipClassName = "swt:tooltip-left",
-            //?isActive = showIsActive,
             onClick = (fun () -> ctx.setState (not ctx.state))
         )
 
@@ -135,7 +134,6 @@ type Layout =
                      "swt:fluent--panel-left-48-regular"),
             tooltip = "Toggle right sidebar",
             tooltipClassName = "swt:tooltip-left",
-            //?isActive = showIsActive,
             onClick = fun () -> ctx.setIsOpen (not ctx.isOpen)
         )
 
