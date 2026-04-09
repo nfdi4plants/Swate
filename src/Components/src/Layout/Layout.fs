@@ -186,7 +186,7 @@ type Layout =
                 | Sidebar.Side.Right -> "layout-main-right-navbar"
             )
             prop.className [
-                "swt:flex swt:flex-col swt:gap-2 swt:p-1 swt:border-base-content/50"
+                "swt:flex swt:shrink-0 swt:flex-col swt:gap-2 swt:p-1 swt:border-base-content/50"
                 match side with
                 | Sidebar.Side.Left -> "swt:border-r"
                 | Sidebar.Side.Right -> "swt:border-l"
@@ -215,7 +215,7 @@ type Layout =
                 if not isOpen then style.width 0 else style.width width
             ]
             prop.className [
-                "swt:flex swt:flex-row swt:h-full swt:relative swt:overflow-hidden"
+                "swt:flex swt:shrink-0 swt:flex-row swt:h-full swt:relative swt:overflow-hidden"
                 if isOpen then
                     "swt:border-base-content/50 swt:bg-base-100"
 
@@ -396,7 +396,7 @@ type Layout =
                         Sidebar.Side.Left
                     )
                 Html.div [
-                    prop.className "swt:grow"
+                    prop.className "swt:grow swt:min-w-0"
                     prop.children [
                         Html.div [
                             prop.className "swt:flex swt:size-full"

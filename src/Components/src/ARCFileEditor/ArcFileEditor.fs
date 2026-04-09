@@ -82,7 +82,7 @@ type ArcFileEditor =
     static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
 
         Html.div [
-            prop.className "swt:w-screen swt:pb-4"
+            prop.className "swt:w-full swt:min-w-0 swt:pb-4"
             prop.children [ AnnotationTable.AnnotationTable(table, setTableInArcFile) ]
         ]
 
