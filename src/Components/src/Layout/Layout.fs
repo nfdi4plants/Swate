@@ -215,10 +215,13 @@ type Layout =
                 if not isOpen then style.width 0 else style.width width
             ]
             prop.className [
-                "swt:flex swt:flex-row swt:h-full swt:relative swt:border-base-content/50 swt:bg-base-100"
-                match side with
-                | Sidebar.Side.Left -> "swt:border-r"
-                | Sidebar.Side.Right -> "swt:border-l"
+                "swt:flex swt:flex-row swt:h-full swt:relative swt:overflow-hidden"
+                if isOpen then
+                    "swt:border-base-content/50 swt:bg-base-100"
+
+                    match side with
+                    | Sidebar.Side.Left -> "swt:border-r"
+                    | Sidebar.Side.Right -> "swt:border-l"
             ]
             prop.children [
                 Html.div [
@@ -228,7 +231,8 @@ type Layout =
                     ]
                     prop.children children
                 ]
-                Layout.ResizeHandler(setPointerPosition, side)
+                if isOpen then
+                    Layout.ResizeHandler(setPointerPosition, side)
             ]
         ]
 
