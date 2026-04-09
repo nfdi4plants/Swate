@@ -8,6 +8,7 @@ open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open ARCtrl.Contract
+open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent.Types
 open Renderer.Types
 
@@ -19,6 +20,7 @@ let NotesDraftTarget () =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
     let errorModal = Contexts.ErrorModal.useErrorModal ()
+    let arcScopeId = useCurrentArcScopeId ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -62,7 +64,7 @@ let NotesDraftTarget () =
                             pageStateCtx.setState (Some page)
                         | Error message ->
                             errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = "Note preview could not be opened")
+                                ErrorModalRequest.create(message, title = "Note preview could not be opened", ?scopeId = arcScopeId)
                             )
 
                             pageStateCtx.setState (Some(PageState.TextPage payload.Intent.Content))

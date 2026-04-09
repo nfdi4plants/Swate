@@ -7,8 +7,8 @@ type private ErrorModalMsg =
     | Enqueue of ErrorModalEntry
     | EnqueueMany of ErrorModalEntry list
     | DismissById of string
+    | DismissManyByIds of Set<string>
     | DismissBatchItem of string * string
-    | DismissAll
 
 [<Erase; Mangle(false)>]
 type ErrorModalProvider =
@@ -18,6 +18,7 @@ type ErrorModalProvider =
         | Enqueue entry -> queue @ [ entry ]
         | EnqueueMany entries -> queue @ entries
         | DismissById id -> queue |> List.filter (fun entry -> entry.Id <> id)
+        | DismissManyByIds ids -> queue |> List.filter (fun entry -> not (ids.Contains entry.Id))
         | DismissBatchItem(batchId, itemId) ->
             queue
             |> List.choose (fun entry ->
@@ -31,7 +32,9 @@ type ErrorModalProvider =
                         ErrorModalEntry.Batch { batch with Errors = nextErrors } |> Some
                 | _ -> Some entry
             )
-        | DismissAll -> []
+
+    static member private entriesInScope (scopeId: string option) (queue: ErrorModalEntry list) =
+        queue |> List.filter (fun entry -> entry.ScopeId = scopeId)
 
     static member private actionButton (action: ErrorModalAction) =
         let className =
@@ -131,6 +134,13 @@ type ErrorModalProvider =
                 ]
             ]
 
+    static member private bulkDismissButton (onClick: unit -> unit) =
+        Html.button [
+            prop.className "swt:btn swt:btn-neutral"
+            prop.text "Dismiss Related Errors"
+            prop.onClick (fun _ -> onClick ())
+        ]
+
     static member private dismissSingleRequest (dismissById: string -> unit) (request: ErrorModalRequest) =
         request.OnDismiss |> Option.iter (fun callback -> callback ())
         dismissById request.Id
@@ -209,7 +219,7 @@ type ErrorModalProvider =
             ]
         ]
 
-    static member private resolveEntryForDismissAll (entry: ErrorModalEntry) =
+    static member private resolveEntryForScopedDismiss (entry: ErrorModalEntry) =
         match entry with
         | ErrorModalEntry.Single request ->
             request.OnDismiss |> Option.iter (fun callback -> callback ())
@@ -219,12 +229,17 @@ type ErrorModalProvider =
 
             batch.OnDismiss |> Option.iter (fun callback -> callback ())
         | ErrorModalEntry.Cancelable request ->
-            request.OnCancel |> Option.iter (fun callback -> callback ())
+            request.OnDismiss |> Option.iter (fun callback -> callback ())
 
     [<ReactComponent>]
     static member ErrorModalHost() =
         let errorModal = Contexts.ErrorModal.useErrorModal ()
         let currentEntry = errorModal.current
+        let currentScopeEntries =
+            match currentEntry with
+            | Some entry -> ErrorModalProvider.entriesInScope entry.ScopeId errorModal.queue
+            | None -> []
+        let hasAdditionalScopeEntries = currentScopeEntries.Length > 1
 
         let remainingEntries =
             match errorModal.queue with
@@ -268,12 +283,8 @@ type ErrorModalProvider =
                                 prop.children [
                                     for action in request.Actions do
                                         ErrorModalProvider.actionButton action
-                                    if errorModal.queue.Length > 1 then
-                                        Html.button [
-                                            prop.className "swt:btn swt:btn-neutral"
-                                            prop.text "Dismiss All Errors"
-                                            prop.onClick (fun _ -> errorModal.dismissAll ())
-                                        ]
+                                    if hasAdditionalScopeEntries then
+                                        ErrorModalProvider.bulkDismissButton errorModal.dismissAll
                                     Html.button [
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.text request.DismissLabel
@@ -333,12 +344,8 @@ type ErrorModalProvider =
                     Html.div [
                         prop.className "swt:flex swt:w-full swt:flex-wrap swt:justify-end swt:gap-2"
                         prop.children [
-                            if errorModal.queue.Length > 1 then
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-neutral"
-                                    prop.text "Dismiss All Errors"
-                                    prop.onClick (fun _ -> errorModal.dismissAll ())
-                                ]
+                            if hasAdditionalScopeEntries then
+                                ErrorModalProvider.bulkDismissButton errorModal.dismissAll
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary"
                                 prop.text batch.DismissLabel
@@ -351,12 +358,8 @@ type ErrorModalProvider =
             )
         | Some(ErrorModalEntry.Cancelable request) ->
             let footerExtraButtons =
-                if errorModal.queue.Length > 1 then
-                    Html.button [
-                        prop.className "swt:btn swt:btn-neutral"
-                        prop.text "Dismiss All Errors"
-                        prop.onClick (fun _ -> errorModal.dismissAll ())
-                    ]
+                if hasAdditionalScopeEntries then
+                    ErrorModalProvider.bulkDismissButton errorModal.dismissAll
                 else
                     Html.none
 
@@ -383,8 +386,16 @@ type ErrorModalProvider =
         let dismissBatchItem batchId itemId = dispatch (DismissBatchItem(batchId, itemId))
 
         let dismissAll () =
-            queue |> List.iter ErrorModalProvider.resolveEntryForDismissAll
-            dispatch DismissAll
+            let targets =
+                match currentEntry with
+                | Some entry -> ErrorModalProvider.entriesInScope entry.ScopeId queue
+                | None -> []
+
+            let targetIds = targets |> List.map _.Id |> Set.ofList
+
+            if not targetIds.IsEmpty then
+                targets |> List.iter ErrorModalProvider.resolveEntryForScopedDismiss
+                dispatch (DismissManyByIds targetIds)
 
         let dismissCurrent () =
             match currentEntry with
@@ -536,6 +547,64 @@ type ErrorModalProvider =
         ]
 
     [<ReactComponent>]
+    static member private ScopedEntryContent() =
+        let errorModal = Contexts.ErrorModal.useErrorModal ()
+        let scopedDismissCount, setScopedDismissCount = React.useStateWithUpdater 0
+        let scopedCancelCount, setScopedCancelCount = React.useStateWithUpdater 0
+
+        let enqueueScopedQueue () =
+            errorModal.enqueue (
+                ErrorModalRequest.create(
+                    "The visible ARC A error should dismiss together with other ARC A entries only.",
+                    title = "ARC A error",
+                    scopeId = "arc-a"
+                )
+            )
+
+            errorModal.enqueueCancelable (
+                CancelableErrorModalRequest.create(
+                    "This queued ARC A request should use dismiss semantics during scoped bulk dismiss.",
+                    title = "ARC A cancelable error",
+                    dismissLabel = "Continue ARC A work",
+                    onDismiss = (fun () -> setScopedDismissCount (fun current -> current + 1)),
+                    onCancel = (fun () -> setScopedCancelCount (fun current -> current + 1)),
+                    scopeId = "arc-a"
+                )
+            )
+
+            errorModal.enqueue (
+                ErrorModalRequest.create(
+                    "This ARC B error should remain queued after ARC A related errors are dismissed.",
+                    title = "ARC B error",
+                    scopeId = "arc-b"
+                )
+            )
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-3"
+            prop.children [
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.text "Queue Scoped Errors"
+                    prop.onClick (fun _ -> enqueueScopedQueue ())
+                ]
+                Html.div [
+                    prop.className "swt:flex swt:flex-col swt:gap-1 swt:text-sm"
+                    prop.children [
+                        Html.p [
+                            prop.testId "scoped-dismiss-count"
+                            prop.text $"ARC A dismiss callbacks: {scopedDismissCount}"
+                        ]
+                        Html.p [
+                            prop.testId "scoped-cancel-count"
+                            prop.text $"ARC A cancel callbacks: {scopedCancelCount}"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member SingleEntry() =
         ErrorModalProvider.ErrorModalProvider(ErrorModalProvider.EntryContent(true, false, false, false))
 
@@ -550,3 +619,7 @@ type ErrorModalProvider =
     [<ReactComponent>]
     static member BatchEntry() =
         ErrorModalProvider.ErrorModalProvider(ErrorModalProvider.EntryContent(false, false, false, true))
+
+    [<ReactComponent>]
+    static member ScopedQueueEntry() =
+        ErrorModalProvider.ErrorModalProvider(ErrorModalProvider.ScopedEntryContent())

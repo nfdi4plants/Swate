@@ -5,6 +5,7 @@ import {
   QueuedEntry,
   CancelableEntry,
   BatchEntry,
+  ScopedQueueEntry,
 } from "./ErrorModalProvider.fs.js";
 
 const meta = {
@@ -57,7 +58,7 @@ export const QueuedErrors: Story = {
     expect(await screen.findByText("Queued error 1")).toBeInTheDocument();
     expect(screen.getByText("There are 1 more error modal(s) waiting.")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /^dismiss all errors$/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^dismiss related errors$/i }));
 
     await waitFor(() => {
       expect(screen.queryByText("Queued error 1")).not.toBeInTheDocument();
@@ -117,5 +118,28 @@ export const MultipleErrorsAtOnce: Story = {
     await waitFor(() => {
       expect(screen.queryByText("Multiple errors at once")).not.toBeInTheDocument();
     });
+  }
+};
+
+export const ScopedDismissKeepsOtherArcEntries: Story = {
+  render: () => <ScopedQueueEntry />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: /queue scoped errors/i }));
+
+    expect(await screen.findByText("ARC A error")).toBeInTheDocument();
+    expect(screen.getByText("There are 2 more error modal(s) waiting.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^dismiss related errors$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("ARC A error")).not.toBeInTheDocument();
+      expect(screen.queryByText("ARC A cancelable error")).not.toBeInTheDocument();
+    });
+
+    expect(await screen.findByText("ARC B error")).toBeInTheDocument();
+    expect(canvas.getByTestId("scoped-dismiss-count")).toHaveTextContent("ARC A dismiss callbacks: 1");
+    expect(canvas.getByTestId("scoped-cancel-count")).toHaveTextContent("ARC A cancel callbacks: 0");
   }
 };

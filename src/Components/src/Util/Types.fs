@@ -80,6 +80,7 @@ type ErrorModalAction = {
 
 type ErrorModalRequest = {
     Id: string
+    ScopeId: string option
     Title: string
     Message: string
     Details: string option
@@ -96,9 +97,11 @@ type ErrorModalRequest = {
             ?dismissLabel: string,
             ?onDismiss: unit -> unit,
             ?actions: ErrorModalAction list,
+            ?scopeId: string,
             ?id: string
         ) = {
         Id = defaultArg id (System.Guid.NewGuid().ToString())
+        ScopeId = scopeId
         Title = defaultArg title "Something went wrong"
         Message = message
         Details = details
@@ -109,6 +112,7 @@ type ErrorModalRequest = {
 
 type CancelableErrorModalRequest = {
     Id: string
+    ScopeId: string option
     Title: string
     Message: string
     Details: string option
@@ -129,9 +133,11 @@ type CancelableErrorModalRequest = {
             ?onCancel: unit -> unit,
             ?onDismiss: unit -> unit,
             ?actions: ErrorModalAction list,
+            ?scopeId: string,
             ?id: string
         ) = {
         Id = defaultArg id (System.Guid.NewGuid().ToString())
+        ScopeId = scopeId
         Title = defaultArg title "Action required"
         Message = message
         Details = details
@@ -144,6 +150,7 @@ type CancelableErrorModalRequest = {
 
 type ErrorModalBatch = {
     Id: string
+    ScopeId: string option
     Title: string
     Summary: string option
     Errors: ErrorModalRequest list
@@ -158,9 +165,11 @@ type ErrorModalBatch = {
             ?summary: string,
             ?dismissLabel: string,
             ?onDismiss: unit -> unit,
+            ?scopeId: string,
             ?id: string
         ) = {
         Id = defaultArg id (System.Guid.NewGuid().ToString())
+        ScopeId = scopeId
         Title = defaultArg title "Multiple errors occurred"
         Summary = summary
         Errors = errors
@@ -184,6 +193,12 @@ type ErrorModalEntry =
         | Single request -> request.Title
         | Batch batch -> batch.Title
         | Cancelable request -> request.Title
+
+    member this.ScopeId =
+        match this with
+        | Single request -> request.ScopeId
+        | Batch batch -> batch.ScopeId
+        | Cancelable request -> request.ScopeId
 
 type ErrorModalContext = {
     current: ErrorModalEntry option

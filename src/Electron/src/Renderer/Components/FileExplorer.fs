@@ -3,6 +3,7 @@ module Renderer.Components.FileExplorer
 open System
 open Browser.Dom
 open Renderer
+open Renderer.Components.ARCHelper
 open Swate.Components
 open Swate.Components.FileExplorerTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -55,6 +56,7 @@ let FileTree () =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
     let errorModal = Contexts.ErrorModal.useErrorModal ()
+    let arcScopeId = useCurrentArcScopeId ()
 
     match fileStateCtx.state.FileTree with
     | [||] -> EmptyFileTreePlaceholder()
@@ -89,7 +91,7 @@ let FileTree () =
 
         let setError (errorMsg: string option) =
             match errorMsg with
-            | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed"))
+            | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
             | None -> ()
 
         let toggleLfsMark =
@@ -102,7 +104,9 @@ let FileTree () =
             promise {
                 match item.Path with
                 | None ->
-                    errorModal.enqueue (ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed"))
+                    errorModal.enqueue (
+                        ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed", ?scopeId = arcScopeId)
+                    )
                 | Some _ when item.IsDirectory -> pageStateCtx.setState (None)
                 | Some path ->
                     let previewPath = resolveArcPreviewPath path
@@ -124,14 +128,15 @@ let FileTree () =
                             pageStateCtx.setState (Some pageState)
                         | Error message ->
                             errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = $"Could not preview '{item.Name}'")
+                                ErrorModalRequest.create(message, title = $"Could not preview '{item.Name}'", ?scopeId = arcScopeId)
                             )
                     | Error exn ->
                         console.log ($"[Renderer] Error: {exn.Message}")
                         errorModal.enqueue (
                             ErrorModalRequest.create(
                                 $"Could not open preview for '{item.Name}': {exn.Message}",
-                                title = "Preview failed"
+                                title = "Preview failed",
+                                ?scopeId = arcScopeId
                             )
                         )
             }

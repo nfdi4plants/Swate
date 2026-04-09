@@ -6,6 +6,7 @@ open Swate.Components
 open Swate.Components.NoteTypes
 open Swate.Electron.Shared.FileIOHelper
 open Renderer
+open Renderer.Components.ARCHelper
 
 [<ReactComponent>]
 let NotesSearchTarget () =
@@ -13,6 +14,7 @@ let NotesSearchTarget () =
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
     let errorModal = Contexts.ErrorModal.useErrorModal ()
+    let arcScopeId = useCurrentArcScopeId ()
     let notes, setNotes = React.useState ([]: NoteSearch list)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)
@@ -59,12 +61,17 @@ let NotesSearchTarget () =
                     errorModal.enqueue (
                         ErrorModalRequest.create(
                             $"Unsupported file type for note: {dto.fileType}",
-                            title = "Could not open note"
+                            title = "Could not open note",
+                            ?scopeId = arcScopeId
                         )
                     )
             | Result.Error exn ->
                 errorModal.enqueue (
-                    ErrorModalRequest.create($"Could not open note: {exn.Message}", title = "Could not open note")
+                    ErrorModalRequest.create(
+                        $"Could not open note: {exn.Message}",
+                        title = "Could not open note",
+                        ?scopeId = arcScopeId
+                    )
                 )
         }
         |> Promise.start

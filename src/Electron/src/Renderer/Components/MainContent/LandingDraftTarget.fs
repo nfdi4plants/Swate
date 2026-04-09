@@ -6,6 +6,7 @@ open Swate.Components.Landing
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Renderer
+open Renderer.Components.ARCHelper
 open ARCtrl.Contract
 
 [<ReactComponent>]
@@ -14,6 +15,7 @@ let LandingDraftTarget () =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
     let errorModal = Contexts.ErrorModal.useErrorModal ()
+    let arcScopeId = useCurrentArcScopeId ()
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
@@ -49,7 +51,7 @@ let LandingDraftTarget () =
                         | Ok pageState -> pageState
                         | Error message ->
                             errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = "ARC preview could not be opened")
+                                ErrorModalRequest.create(message, title = "ARC preview could not be opened", ?scopeId = arcScopeId)
                             )
 
                             PageState.ArcFilePage payload.ArcFile
