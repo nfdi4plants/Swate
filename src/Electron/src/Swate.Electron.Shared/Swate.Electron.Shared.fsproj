@@ -10,6 +10,7 @@
     <Compile Include="AuthTypes.fs" />
     <Compile Include="GitTypes.fs" />
     <Compile Include="IPCTypes.fs" />
+    <Compile Include="CloseWindowSaveHelper.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="FileIOHelper.fs" />
   </ItemGroup>

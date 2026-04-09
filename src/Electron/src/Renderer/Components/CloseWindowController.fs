@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Electron.Remoting.Renderer
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Electron.Shared.CloseWindowSaveHelper
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
@@ -21,13 +22,19 @@ type CloseWindowController =
 
         let modalIsOpen, setModalIsOpen = React.useState false
         let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
+        let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
         let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
-            match pageCtx.state with
-            | Some(PageState.ArcFilePage arcFile) ->
-                return! Renderer.Components.MainContent.Helper.MainContentHelper.saveArcFile arcFile
+            match tryGetArcFileToSave arcObjectCtx.state.PendingArcFileSave pageCtx.state with
+            | Some saveTarget ->
+                let! saveResult = Renderer.Components.MainContent.Helper.MainContentHelper.saveArcFile saveTarget.ArcFile
 
-            | _ -> return Ok()
+                match saveResult with
+                | Ok() ->
+                    arcObjectCtx.setPendingArcFileSave None
+                    return Ok()
+                | Error exn -> return Error exn
+            | None -> return Ok()
         }
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =

@@ -14,6 +14,13 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
+    let isPendingSaveForCurrentArcFile =
+        match arcObjectCtx.state.PendingArcFileSave, arcFile.TryGetRelativePath() with
+        | Some pendingArcFile, Some currentRelativePath ->
+            pendingArcFile.TryGetRelativePath()
+            |> Option.exists (fun pendingRelativePath -> PathHelpers.pathsEqual pendingRelativePath currentRelativePath)
+        | _ -> false
+
     let setArcFile =
         fun (arcFile: ArcFiles) ->
             let page = PageState.ArcFilePage arcFile
@@ -21,12 +28,14 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             pageStateCtx.setState (Some page)
             arcObjectCtx.setArcFileState (Some arcFile)
             arcObjectCtx.setPreviewState (Some page)
+            arcObjectCtx.setPendingArcFileSave (Some arcFile)
             arcObjectCtx.setStatusMessage None
 
     let onSaveArcFile =
         fun _ ->
             promise {
                 match! MainContentHelper.saveArcFile arcFile with
+                | Ok() when isPendingSaveForCurrentArcFile -> arcObjectCtx.setPendingArcFileSave None
                 | Ok() -> ()
                 | Error exn -> pageStateCtx.setState (PageState.ErrorPage exn.Message |> Some)
             }

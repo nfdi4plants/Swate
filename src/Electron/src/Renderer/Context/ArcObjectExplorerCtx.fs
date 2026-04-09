@@ -9,6 +9,7 @@ type ArcObjectExplorerState = {
     SelectedKindIndices: Set<int>
     ArcFileState: ArcFiles option
     PageState: PageState option
+    PendingArcFileSave: ArcFiles option
     StatusMessage: string option
 } with
 
@@ -17,6 +18,7 @@ type ArcObjectExplorerState = {
         SelectedKindIndices = Swate.Components.ARCObjectWidget.DefaultKindFilterIndices()
         ArcFileState = None
         PageState = None
+        PendingArcFileSave = None
         StatusMessage = None
     }
 
@@ -27,6 +29,7 @@ type ArcObjectExplorerController = {
     setSelectedKindIndices: Set<int> -> unit
     setArcFileState: ArcFiles option -> unit
     setPreviewState: PageState option -> unit
+    setPendingArcFileSave: ArcFiles option -> unit
     setStatusMessage: string option -> unit
 }
 
@@ -39,6 +42,7 @@ let ArcObjectExplorerCtx =
             setSelectedKindIndices = ignore
             setArcFileState = ignore
             setPreviewState = ignore
+            setPendingArcFileSave = ignore
             setStatusMessage = ignore
         }
     )
@@ -108,6 +112,7 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                                     Nodes = []
                                     ArcFileState = None
                                     PageState = Some(PageState.ErrorPage exn.Message)
+                                    PendingArcFileSave = None
                                     StatusMessage = Some $"Could not load ARC object explorer: {exn.Message}"
                             })
                 }
@@ -138,6 +143,12 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                 setPreviewState =
                     fun previewState ->
                         setState (fun currentState -> { currentState with PageState = previewState })
+                setPendingArcFileSave =
+                    fun pendingArcFileSave ->
+                        setState (fun currentState -> {
+                            currentState with
+                                PendingArcFileSave = pendingArcFileSave
+                        })
                 setStatusMessage =
                     fun statusMessage ->
                         setState (fun currentState -> {

@@ -1,7 +1,5 @@
 namespace ARCtrl
 
-open System.Collections.Generic
-
 open Swate.Components
 open Swate.Components.Shared
 
@@ -10,8 +8,6 @@ open ARCtrl.Spreadsheet
 
 open Database
 
-open Fable.Core
-open Fable.Core.JsInterop
 
 module TermCollection =
 

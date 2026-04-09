@@ -40,8 +40,8 @@ let Main () =
         prop.className "swt:size-full swt:flex swt:flex-col swt:gap-3 swt:p-4"
         prop.children [
             Swate.Components.ARCObjectWidget.Navbar(
-                viewModel.SelectedTitle,
-                viewModel.SelectedSubtitle,
+                ArcObjectExplorerView.selectedTitle viewModel,
+                ArcObjectExplorerView.selectedSubtitle viewModel,
                 arcObjectCtx.state.SelectedKindIndices,
                 arcObjectCtx.setSelectedKindIndices,
                 rightActions = searchAction
@@ -59,7 +59,7 @@ let Main () =
                 content =
                     Swate.Components.ARCObjectWidget.ExplorerContent(
                         viewModel.ExplorerItems,
-                        ?selectedItemId = viewModel.SelectedItemId,
+                        ?selectedItemId = ArcObjectExplorerView.selectedItemId viewModel,
                         onItemClick =
                             (fun item ->
                                 if item.Selectable then

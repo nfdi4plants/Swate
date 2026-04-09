@@ -22,8 +22,8 @@ let Main () =
                 "ARC Object Details",
                 content =
                     ArcObjectExplorerContent.ARCObjectDetailsContent(
-                        viewModel.SelectedNode,
-                        viewModel.SelectedAncestors,
+                        ArcObjectExplorerView.selectedNode viewModel,
+                        ArcObjectExplorerView.selectedAncestors viewModel,
                         arcObjectCtx.state.PageState,
                         arcObjectCtx.state.ArcFileState,
                         arcObjectCtx.setArcFileState,

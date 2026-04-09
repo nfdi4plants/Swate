@@ -99,17 +99,6 @@ module ARCtrlHelper =
         | Workflow of ArcWorkflow
         | DataMap of (DatamapParentInfo option * DataMap)
 
-        //When time investigate why TableCount <= index is needed instead of TableCount > index, as it seems more intuitive. Maybe we should rename the function to something like "IsTableIndexValid" or "IsTableIndexInRange"
-        member this.IsTableIndexValid(index: int) =
-            match this with
-            | Template _ -> index = 0
-            | DataMap _ -> index = -1
-            | Workflow _ -> index = -2
-            | Investigation _ -> false
-            | Study(s, _) -> s.TableCount <= index
-            | Assay a -> a.TableCount <= index
-            | Run r -> r.TableCount <= index
-
         member this.HasMetadata() =
             match this with
             | Assay _

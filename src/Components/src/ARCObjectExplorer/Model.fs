@@ -5,21 +5,45 @@ open Swate.Components.FileExplorerTypes
 
 module ArcObjectExplorerView =
 
+    type ResolvedSelection = {
+        ItemId: string
+        Node: ArcExplorerNode
+        Ancestors: ArcExplorerNode list
+    }
+
     type Model = {
         VisibleKinds: Set<string>
         FilteredTree: ArcExplorerNode list
         ExplorerItems: FileItem list
         SearchItems: (string * string option * FileItem) array
-        SelectedItemId: string option
-        SelectedNodeLineage: (ArcExplorerNode * ArcExplorerNode list) option
-        SelectedNode: ArcExplorerNode option
-        SelectedAncestors: ArcExplorerNode list
-        SelectedTitle: string
-        SelectedSubtitle: string
+        Selection: ResolvedSelection option
     }
 
     let nodeKindLabel =
         ArcExplorerNodeKind.label
+
+    let selectedItemId (model: Model) : string option =
+        model.Selection |> Option.map _.ItemId
+
+    let selectedNode (model: Model) : ArcExplorerNode option =
+        model.Selection |> Option.map _.Node
+
+    let selectedAncestors (model: Model) : ArcExplorerNode list =
+        model.Selection
+        |> Option.map _.Ancestors
+        |> Option.defaultValue []
+
+    let selectedTitle (model: Model) : string =
+        model.Selection
+        |> Option.map (fun selection -> selection.Node.name)
+        |> Option.defaultValue "No visible selection"
+
+    let selectedSubtitle (model: Model) : string =
+        model.Selection
+        |> Option.map (fun selection ->
+            let role = if selection.Node.isReference then "Reference" else "Canonical"
+            $"{nodeKindLabel selection.Node.kind} | {role}")
+        |> Option.defaultValue "Selection"
 
     let filterTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) =
         let rec loop (node: ArcExplorerNode) =
@@ -126,40 +150,20 @@ module ArcObjectExplorerView =
 
         let selectedItemId = ARCExplorer.getSelectedItemId filteredTree selection
 
-        let selectedNodeLineage =
+        let resolvedSelection =
             selectedItemId
-            |> Option.bind (fun nodeId -> tryGetNodeLineageById nodeId filteredTree)
-
-        let selectedNode =
-            selectedNodeLineage
-            |> Option.map fst
-
-        let selectedAncestors =
-            selectedNodeLineage
-            |> Option.map snd
-            |> Option.defaultValue []
-
-        let selectedTitle =
-            selectedNode
-            |> Option.map (fun node -> node.name)
-            |> Option.defaultValue "No visible selection"
-
-        let selectedSubtitle =
-            selectedNode
-            |> Option.map (fun node ->
-                let role = if node.isReference then "Reference" else "Canonical"
-                $"{nodeKindLabel node.kind} | {role}")
-            |> Option.defaultValue "Selection"
+            |> Option.bind (fun nodeId ->
+                tryGetNodeLineageById nodeId filteredTree
+                |> Option.map (fun (node, ancestors) -> {
+                    ItemId = nodeId
+                    Node = node
+                    Ancestors = ancestors
+                }))
 
         {
             VisibleKinds = visibleKinds
             FilteredTree = filteredTree
             ExplorerItems = explorerItems
             SearchItems = searchItems
-            SelectedItemId = selectedItemId
-            SelectedNodeLineage = selectedNodeLineage
-            SelectedNode = selectedNode
-            SelectedAncestors = selectedAncestors
-            SelectedTitle = selectedTitle
-            SelectedSubtitle = selectedSubtitle
+            Selection = resolvedSelection
         }
