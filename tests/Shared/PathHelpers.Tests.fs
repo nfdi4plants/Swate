@@ -86,4 +86,16 @@ let tests =
                 (PathHelpers.resolveArcViewPath "  workflows\\workflow_01\\notes.md  ")
                 "workflows/workflow_01/notes.md"
                 "Non-datamap paths should only be normalized."
+
+        testCase "resolveArcPreviewPath does not redirect nested assay datamaps" <| fun _ ->
+            Expect.equal
+                (PathHelpers.resolveArcViewPath "assays/archive/old/isa.datamap.xlsx")
+                "assays/archive/old/isa.datamap.xlsx"
+                "Only canonical ARC datamap paths should be redirected."
+
+        testCase "resolveArcPreviewPath does not redirect prefixed assay datamaps" <| fun _ ->
+            Expect.equal
+                (PathHelpers.resolveArcViewPath "backup/assays/archive/isa.datamap.xlsx")
+                "backup/assays/archive/isa.datamap.xlsx"
+                "Folder-name matches outside the canonical ARC root should not be redirected."
     ]

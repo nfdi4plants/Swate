@@ -36,29 +36,27 @@ module PathHelpers =
 
     let private tryResolveDatamapPreviewPath
         (normalizedPath: string)
-        (folderSegment: string)
+        (folderName: string)
         (targetFileName: string)
         =
-        let lowered = normalizedPath.ToLowerInvariant()
-        let normalizedFolderSegment = folderSegment.Trim('/')
-        let matchesFolderSegment =
-            lowered.StartsWith($"{normalizedFolderSegment}/", StringComparison.Ordinal)
-            || lowered.Contains(folderSegment)
+        let pathSegments = normalizedPath.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
 
-        if matchesFolderSegment && lowered.EndsWith("/isa.datamap.xlsx") then
+        match pathSegments with
+        | [| firstSegment; _; lastSegment |]
+            when String.Equals(firstSegment, folderName, StringComparison.OrdinalIgnoreCase)
+                 && String.Equals(lastSegment, "isa.datamap.xlsx", StringComparison.OrdinalIgnoreCase) ->
             tryGetParentPath normalizedPath
             |> Option.map (fun folderPath -> $"{folderPath}/{targetFileName}")
-        else
-            None
+        | _ -> None
 
     let resolveArcViewPath (path: string) =
         let normalizedPath = normalizePath path
 
         [
-            tryResolveDatamapPreviewPath normalizedPath "/assays/" "isa.assay.xlsx"
-            tryResolveDatamapPreviewPath normalizedPath "/studies/" "isa.study.xlsx"
-            tryResolveDatamapPreviewPath normalizedPath "/workflows/" "isa.workflow.xlsx"
-            tryResolveDatamapPreviewPath normalizedPath "/runs/" "isa.run.xlsx"
+            tryResolveDatamapPreviewPath normalizedPath "assays" "isa.assay.xlsx"
+            tryResolveDatamapPreviewPath normalizedPath "studies" "isa.study.xlsx"
+            tryResolveDatamapPreviewPath normalizedPath "workflows" "isa.workflow.xlsx"
+            tryResolveDatamapPreviewPath normalizedPath "runs" "isa.run.xlsx"
         ]
         |> List.tryPick id
         |> Option.defaultValue normalizedPath
