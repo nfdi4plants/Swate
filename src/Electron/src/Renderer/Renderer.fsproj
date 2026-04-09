@@ -17,7 +17,7 @@
     <Compile Include="Components\FileExplorer.fs" />
     <Compile Include="Components\WidgetRegister.fs" />
     <Compile Include="Components\LeftSidebar\ArcObjectTreeSidebar.fs" />
-    <Compile Include="Components\LeftSidebar\FileExplorerSidebar.fs" />
+    <Compile Include="Components\LeftSidebar\ExplorerSidebar.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />
     <Compile Include="Components\MainElement.fs" />
     <Compile Include="Components\MainContent\Types.fs" />

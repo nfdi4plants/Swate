@@ -1,4 +1,4 @@
-module Renderer.Components.LeftSidebar.FileExplorerSidebar
+module Renderer.Components.LeftSidebar.ExplorerSidebar
 
 open Feliz
 open Swate.Components
@@ -6,7 +6,7 @@ open Swate.Components.Shared
 open Renderer.Types
 
 [<ReactComponent>]
-let Main (explorerMode: LeftSidebarPage) =
+let Main (workspaceMode: WorkspaceMode) =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
 
@@ -37,7 +37,7 @@ let Main (explorerMode: LeftSidebarPage) =
                 )
             ]
         ]
-        match explorerMode with
-        | LeftSidebarPage.FileExplorer -> Renderer.Components.FileExplorer.FileTree()
-        | LeftSidebarPage.ArcObjectTree -> Renderer.Components.LeftSidebar.ArcObjectTreeSidebar.Main()
+        match workspaceMode with
+        | WorkspaceMode.FileExplorer -> Renderer.Components.FileExplorer.FileTree()
+        | WorkspaceMode.ArcObjectExplorer -> Renderer.Components.LeftSidebar.ArcObjectTreeSidebar.Main()
     ]

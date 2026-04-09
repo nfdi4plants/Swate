@@ -17,22 +17,22 @@ open Renderer.Components
 type private Model = {
     AppState: ArcRootPath
     PageState: PageState option
-    LeftSidebarIsOpen: bool
-    LeftSidebarTarget: LeftSidebarPage
+    DetailsSidebarIsOpen: bool
+    WorkspaceMode: WorkspaceMode
 } with
 
     static member Empty = {
         AppState = None
         PageState = None
-        LeftSidebarIsOpen = false
-        LeftSidebarTarget = LeftSidebarPage.FileExplorer
+        DetailsSidebarIsOpen = false
+        WorkspaceMode = WorkspaceMode.FileExplorer
     }
 
 type private Msg =
     | SetArcRootPath of ArcRootPath
     | PageStateChanged of PageState option
-    | ToggleRightSidebarTarget of LeftSidebarPage
-    | SetRightSidebarIsOpen of bool
+    | SetDetailsSidebarIsOpen of bool
+    | SetWorkspaceMode of WorkspaceMode
 
 let private createGetOpenPathCmd () : Cmd<Msg> =
     Cmd.OfPromise.either
@@ -45,8 +45,8 @@ let private init () : Model * Cmd<Msg> =
     {
         AppState = None
         PageState = None
-        LeftSidebarIsOpen = false
-        LeftSidebarTarget = LeftSidebarPage.FileExplorer
+        DetailsSidebarIsOpen = false
+        WorkspaceMode = WorkspaceMode.FileExplorer
     },
     createGetOpenPathCmd ()
 
@@ -54,8 +54,8 @@ let private msgName (msg: Msg) =
     match msg with
     | SetArcRootPath _ -> "SetArcRootPath"
     | PageStateChanged _ -> "PageStateChanged"
-    | SetRightSidebarIsOpen _ -> "SetLeftSidebarIsOpen"
-    | ToggleRightSidebarTarget _ -> "ToggleLeftSidebarTarget"
+    | SetDetailsSidebarIsOpen _ -> "SetDetailsSidebarIsOpen"
+    | SetWorkspaceMode _ -> "SetWorkspaceMode"
 
 let private traceUpdateMsg (msg: Msg) =
     console.log ($"[Renderer.App Elmish] {msgName msg}")
@@ -77,64 +77,45 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 PageState = pageStateOption
         },
         Cmd.none
-    | ToggleRightSidebarTarget target ->
-        let nextModel =
-            if model.LeftSidebarTarget = target then
-                {
-                    model with
-                        LeftSidebarIsOpen = not model.LeftSidebarIsOpen
-                }
-            else
-                {
-                    model with
-                        LeftSidebarIsOpen = true
-                        LeftSidebarTarget = target
-                }
-
-        nextModel, Cmd.none
-    | SetRightSidebarIsOpen isOpen ->
+    | SetWorkspaceMode workspaceMode ->
         {
             model with
-                LeftSidebarIsOpen = isOpen
+                WorkspaceMode = workspaceMode
+                DetailsSidebarIsOpen =
+                    match workspaceMode with
+                    | WorkspaceMode.ArcObjectExplorer -> true
+                    | WorkspaceMode.FileExplorer -> model.DetailsSidebarIsOpen
+        },
+        Cmd.none
+    | SetDetailsSidebarIsOpen isOpen ->
+        {
+            model with
+                DetailsSidebarIsOpen = isOpen
         },
         Cmd.none
 
 [<ReactComponent>]
-let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget) =
+let private WorkspaceModeButtons (workspaceMode: WorkspaceMode, setWorkspaceMode) =
 
     let toggleArcObjectExplorer () =
-        match leftSidebarTarget with
-        | LeftSidebarPage.ArcObjectTree -> toggleTarget LeftSidebarPage.FileExplorer
-        | LeftSidebarPage.FileExplorer -> toggleTarget LeftSidebarPage.ArcObjectTree
+        match workspaceMode with
+        | WorkspaceMode.ArcObjectExplorer -> setWorkspaceMode WorkspaceMode.FileExplorer
+        | WorkspaceMode.FileExplorer -> setWorkspaceMode WorkspaceMode.ArcObjectExplorer
 
     React.Fragment [
         Layout.LayoutBtn(
             iconClassName = "swt:fluent--home-24-regular",
             tooltip = "Home",
-            isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
-            onClick = fun () -> toggleTarget (LeftSidebarPage.FileExplorer)
+            isActive = (workspaceMode = WorkspaceMode.FileExplorer),
+            onClick = fun () -> setWorkspaceMode WorkspaceMode.FileExplorer
         )
         Layout.LayoutBtn(
             iconClassName = "swt:fluent--database-24-regular",
             tooltip = "ARC object explorer",
-            isActive = (leftSidebarTarget = LeftSidebarPage.ArcObjectTree),
+            isActive = (workspaceMode = WorkspaceMode.ArcObjectExplorer),
             onClick = toggleArcObjectExplorer
         )
     ]
-
-[<ReactComponent>]
-let private LeftSidebarSync (explorerMode: LeftSidebarPage) =
-    let leftSidebarCtx = React.useContext Swate.Components.LayoutContext.LeftSidebarContext
-
-    React.useEffect (
-        (fun () ->
-            match explorerMode with
-            | LeftSidebarPage.ArcObjectTree when not leftSidebarCtx.state -> leftSidebarCtx.setState true
-            | _ -> ()),
-        [| box explorerMode |]
-    )
-
-    Html.none
 
 [<ReactComponent>]
 let Main () =
@@ -177,14 +158,14 @@ let Main () =
     React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
 
     ///Main content module
-    let children = Renderer.Components.MainContent.Main.Main(model.AppState, model.LeftSidebarTarget)
+    let children = Renderer.Components.MainContent.Main.Main(model.AppState, model.WorkspaceMode)
 
-    let toggleLeftSidebarTarget =
-        React.useCallback ((fun target -> dispatch (ToggleRightSidebarTarget target)), [||])
+    let setWorkspaceMode =
+        React.useCallback ((fun workspaceMode -> dispatch (SetWorkspaceMode workspaceMode)), [||])
 
-    let rightSidebar =
-        match model.AppState, model.LeftSidebarTarget with
-        | Some _, LeftSidebarPage.ArcObjectTree -> Some(Renderer.Components.RightSidebar.ArcObjectDetailsSidebar.Main())
+    let detailsSidebar =
+        match model.AppState, model.WorkspaceMode with
+        | Some _, WorkspaceMode.ArcObjectExplorer -> Some(Renderer.Components.DetailsSidebar.ArcObjectDetailsSidebar.Main())
         | _ -> None
 
     Context.AppStateCtx.AppStateCtx.Provider(
@@ -197,22 +178,22 @@ let Main () =
                         Layout.Main(
                             children =
                                 React.Fragment [|
-                                    LeftSidebarSync(model.LeftSidebarTarget)
                                     children
                                     CloseWindowController.CloseWindowController.Subscription()
                                 |],
                             navbar =
                                 Renderer.Components.Navbar.Main(
-                                    showRightSidebarToggle = (model.AppState.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectTree)
+                                    showDetailsSidebarToggle =
+                                        (model.AppState.IsSome && model.WorkspaceMode = WorkspaceMode.ArcObjectExplorer)
                                 ),
-                            leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
-                            ?rightSidebar = rightSidebar,
-                            leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
+                            leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.WorkspaceMode),
+                            ?rightSidebar = detailsSidebar,
+                            leftActions = WorkspaceModeButtons(model.WorkspaceMode, setWorkspaceMode),
                             rightSidebarState = {
-                                isOpen = model.LeftSidebarIsOpen
-                                setIsOpen = fun isOpen -> dispatch (SetRightSidebarIsOpen isOpen)
-                                sidebarType = model.LeftSidebarTarget
-                                setSidebarType = fun target -> dispatch (ToggleRightSidebarTarget target)
+                                isOpen = model.DetailsSidebarIsOpen
+                                setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
+                                sidebarType = model.WorkspaceMode
+                                setSidebarType = fun workspaceMode -> dispatch (SetWorkspaceMode workspaceMode)
                             }
                         )
                     )

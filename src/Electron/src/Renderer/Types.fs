@@ -8,9 +8,9 @@ open Swate.Electron.Shared.FileIOHelper
 
 
 [<RequireQualifiedAccess>]
-type LeftSidebarPage =
+type WorkspaceMode =
     | FileExplorer
-    | ArcObjectTree
+    | ArcObjectExplorer
 
 let pageStateOfFileContentDTO (dto: FileContentDTO) : PageState =
     match dto.fileType with

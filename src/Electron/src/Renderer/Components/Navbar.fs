@@ -276,8 +276,8 @@ module private Authentication =
 type Navbar =
 
     [<ReactComponent>]
-    static member Main(?showRightSidebarToggle: bool) =
-        let showRightSidebarToggle = defaultArg showRightSidebarToggle false
+    static member Main(?showDetailsSidebarToggle: bool) =
+        let showDetailsSidebarToggle = defaultArg showDetailsSidebarToggle false
 
         let left = Selector.Main()
 
@@ -287,11 +287,9 @@ type Navbar =
                 prop.children [
                     Authentication.UserAvatar()
                     Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                    if showRightSidebarToggle then
-                        //Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                        Layout.RightSidebarToggleBtn()
-                    //Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                    Layout.LeftSidebarToggleBtn(activeBorderStyle = false)
+                    if showDetailsSidebarToggle then
+                        Layout.LeftSidebarToggleBtn(activeBorderStyle = false)
+                    Layout.RightSidebarToggleBtn()
                 ]
             ]
 

@@ -1,4 +1,4 @@
-module Renderer.Components.RightSidebar.ArcObjectDetailsSidebar
+module Renderer.Components.DetailsSidebar.ArcObjectDetailsSidebar
 
 open Feliz
 open Swate.Components

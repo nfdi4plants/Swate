@@ -6,7 +6,7 @@ open Fable.Core
 module private Mocks =
 
     [<StringEnum>]
-    type LeftSidebarStateMock =
+    type RightSidebarTargetMock =
         | Home
         | Settings
         | Info
@@ -95,6 +95,7 @@ type Layout =
             prop.children [
                 Html.div [ prop.className "swt:tooltip-content"; prop.text tooltip ]
                 Html.button [
+                    prop.ariaLabel tooltip
                     prop.className "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
                     prop.children [
                         Html.i [ prop.className ("swt:iconify " + iconClassName) ]
@@ -116,9 +117,9 @@ type Layout =
                  else
                      "swt:fluent--panel-right-48-regular"),
             tooltip = "Toggle left sidebar",
-            onClick = (fun () -> ctx.setState (not ctx.state)),
             tooltipClassName = "swt:tooltip-left",
-            ?isActive = showIsActive
+            //?isActive = showIsActive,
+            onClick = (fun () -> ctx.setState (not ctx.state))
         )
 
     [<ReactComponent>]
@@ -134,7 +135,7 @@ type Layout =
                      "swt:fluent--panel-left-48-regular"),
             tooltip = "Toggle right sidebar",
             tooltipClassName = "swt:tooltip-left",
-            ?isActive = showIsActive,
+            //?isActive = showIsActive,
             onClick = fun () -> ctx.setIsOpen (not ctx.isOpen)
         )
 
@@ -207,6 +208,11 @@ type Layout =
         ) =
         Html.div [
             prop.ref ref
+            prop.testId (
+                match side with
+                | Sidebar.Side.Left -> "layout-main-left-sidebar"
+                | Sidebar.Side.Right -> "layout-main-right-sidebar"
+            )
             prop.style [
                 if not isOpen then style.width 0 else style.width width
             ]
@@ -265,7 +271,7 @@ type Layout =
                 if StartResizeState.current.IsNone then
                     StartResizeState.current <-
                         Some {|
-                            isOpen = ctxLeft.state
+                            isOpen = ctxRight.isOpen
                             width = widthRight
                         |}
 
@@ -286,7 +292,7 @@ type Layout =
                 if StartResizeState.current.IsNone then
                     StartResizeState.current <-
                         Some {|
-                            isOpen = ctxRight.isOpen
+                            isOpen = ctxLeft.state
                             width = widthLeft
                         |}
 
@@ -314,19 +320,20 @@ type Layout =
 
                     match calcResize newWidth windowX widthRight with
                     | CloseTargetSidebar ->
-                        ctxLeft.setState StartResizeState.current.Value.isOpen
-                        ctxRight.setIsOpen false
+                        ctxRight.setIsOpen StartResizeState.current.Value.isOpen
+                        ctxLeft.setState false
                     | ResizeTarget width ->
-                        ctxLeft.setState StartResizeState.current.Value.isOpen
-                        ctxRight.setIsOpen true
+                        ctxRight.setIsOpen StartResizeState.current.Value.isOpen
+                        ctxLeft.setState true
                         setWidthLeft width
                     | ResizeBoth(leftWidth, rightWidth) ->
-                        ctxLeft.setState StartResizeState.current.Value.isOpen
+                        ctxRight.setIsOpen StartResizeState.current.Value.isOpen
                         setWidthLeft leftWidth
                         setWidthRight rightWidth
                     | ResizeTargetCollapseOther width ->
+                        ctxLeft.setState true
                         setWidthLeft width
-                        ctxLeft.setState false
+                        ctxRight.setIsOpen false
             ),
             [| box throttledLeftPointerPosition |]
         )
@@ -348,19 +355,20 @@ type Layout =
 
                     match calcResize newWidth windowX widthLeft with
                     | CloseTargetSidebar ->
-                        ctxRight.setIsOpen StartResizeState.current.Value.isOpen
-                        ctxLeft.setState false
+                        ctxLeft.setState StartResizeState.current.Value.isOpen
+                        ctxRight.setIsOpen false
                     | ResizeTarget width ->
-                        ctxRight.setIsOpen StartResizeState.current.Value.isOpen
-                        ctxLeft.setState true
+                        ctxLeft.setState StartResizeState.current.Value.isOpen
+                        ctxRight.setIsOpen true
                         setWidthRight width
                     | ResizeBoth(rightWidth, leftWidth) ->
-                        ctxRight.setIsOpen StartResizeState.current.Value.isOpen
+                        ctxLeft.setState StartResizeState.current.Value.isOpen
                         setWidthRight rightWidth
                         setWidthLeft leftWidth
                     | ResizeTargetCollapseOther width ->
+                        ctxRight.setIsOpen true
                         setWidthRight width
-                        ctxRight.setIsOpen false
+                        ctxLeft.setState false
             ),
             [| box throttledRightPointerPosition |]
         )
@@ -380,7 +388,7 @@ type Layout =
                     Layout.SidebarArea(
                         leftContent.Value,
                         widthLeft,
-                        ctxRight.isOpen,
+                        ctxLeft.state,
                         leftRef,
                         setLeftPointerPositionWrapper,
                         Sidebar.Side.Left
@@ -398,7 +406,7 @@ type Layout =
                     Layout.SidebarArea(
                         rightContent.Value,
                         widthRight,
-                        ctxLeft.state,
+                        ctxRight.isOpen,
                         rightRef,
                         setRightPointerPositionWrapper,
                         Sidebar.Side.Right
@@ -417,16 +425,36 @@ type Layout =
             ?rightSidebar: ReactElement,
             ?leftActions: ReactElement,
             ?rightActions: ReactElement,
-            ?rightSidebarState: SidebarState<'A>,
-            ?sidebarLeftDefault: bool
+            ?rightSidebarState: RightSidebarState<'A>,
+            ?leftSidebarDefaultOpen: bool,
+            ?rightSidebarDefaultOpen: bool
         ) =
 
-        let sidebarLeftDefault = defaultArg sidebarLeftDefault false
+        let leftSidebarDefaultOpen = defaultArg leftSidebarDefaultOpen false
+        let rightSidebarDefaultOpen = defaultArg rightSidebarDefaultOpen false
 
-        let leftSidebarState, setLeftSidebarState =
-            React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen", sidebarLeftDefault)
+        // Keep the legacy storage key so existing left-sidebar visibility preferences survive the naming fix.
+        let leftSidebarIsOpen, setLeftSidebarIsOpen =
+            React.useLocalStorage (
+                Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen",
+                leftSidebarDefaultOpen
+            )
 
-        let rightSidebarState = defaultArg rightSidebarState (SidebarState.Empty())
+        let unmanagedRightSidebarIsOpen, setUnmanagedRightSidebarIsOpen =
+            React.useState rightSidebarDefaultOpen
+
+        let unmanagedRightSidebarType, setUnmanagedRightSidebarType =
+            React.useState (Unchecked.defaultof<'A>)
+
+        let rightSidebarState =
+            defaultArg
+                rightSidebarState
+                {
+                    isOpen = unmanagedRightSidebarIsOpen
+                    setIsOpen = setUnmanagedRightSidebarIsOpen
+                    sidebarType = unmanagedRightSidebarType
+                    setSidebarType = setUnmanagedRightSidebarType
+                }
 
         let navbar = React.useMemo ((fun () -> navbar), [| box navbar |])
 
@@ -450,8 +478,8 @@ type Layout =
 
         LeftSidebarContext.Provider(
             {
-                state = leftSidebarState
-                setState = setLeftSidebarState
+                state = leftSidebarIsOpen
+                setState = setLeftSidebarIsOpen
             },
             RightSidebarContext.Provider(
                 rightSidebarState,
@@ -494,14 +522,14 @@ type Layout =
 
         let rightSidebarTarget, setRightSidebarTarget =
             React.useLocalStorage (
-                Keys.mkLocalStorageKey "layout" "main" "leftSidebarTarget",
-                Mocks.LeftSidebarStateMock.Home
+                Keys.mkLocalStorageKey "layout" "main" "rightSidebarTarget",
+                Mocks.RightSidebarTargetMock.Home
             )
 
         let rightSidebarIsOpen, setRightSidebarIsOpen =
-            React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "leftSidebarIsOpen", true)
+            React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "rightSidebarIsOpen", true)
 
-        let toggleLeftSidebarTarget =
+        let toggleRightSidebarTarget =
             fun target ->
                 if rightSidebarTarget = target then
                     setRightSidebarIsOpen (not rightSidebarIsOpen)
@@ -550,24 +578,24 @@ type Layout =
                 ],
             leftActions =
                 React.Fragment [
-                    Layout.LayoutBtn(
-                        iconClassName = "swt:fluent--home-24-regular",
-                        tooltip = "Home",
-                        isActive = (rightSidebarTarget = Mocks.LeftSidebarStateMock.Home),
-                        onClick = fun () -> toggleLeftSidebarTarget Mocks.LeftSidebarStateMock.Home
-                    )
-                    Layout.LayoutBtn(
-                        iconClassName = "swt:fluent--settings-24-regular",
-                        tooltip = "Settings",
-                        isActive = (rightSidebarTarget = Mocks.LeftSidebarStateMock.Settings),
-                        onClick = fun () -> toggleLeftSidebarTarget Mocks.LeftSidebarStateMock.Settings
-                    )
-                    Layout.LayoutBtn(
-                        iconClassName = "swt:fluent--info-24-regular",
-                        tooltip = "Info",
-                        isActive = (rightSidebarTarget = Mocks.LeftSidebarStateMock.Info),
-                        onClick = fun () -> toggleLeftSidebarTarget Mocks.LeftSidebarStateMock.Info
-                    )
+                        Layout.LayoutBtn(
+                            iconClassName = "swt:fluent--home-24-regular",
+                            tooltip = "Home",
+                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Home),
+                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Home
+                        )
+                        Layout.LayoutBtn(
+                            iconClassName = "swt:fluent--settings-24-regular",
+                            tooltip = "Settings",
+                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Settings),
+                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Settings
+                        )
+                        Layout.LayoutBtn(
+                            iconClassName = "swt:fluent--info-24-regular",
+                            tooltip = "Info",
+                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Info),
+                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Info
+                        )
                 ],
             rightSidebarState = {
                 isOpen = rightSidebarIsOpen
@@ -575,5 +603,5 @@ type Layout =
                 sidebarType = rightSidebarTarget
                 setSidebarType = setRightSidebarTarget
             },
-            sidebarLeftDefault = true
+            leftSidebarDefaultOpen = true
         )
