@@ -3,14 +3,8 @@ module Renderer.App
 open Elmish
 open Feliz
 open Feliz.UseElmish
-open Fable.Electron.Remoting.Renderer
-open Fable.Core
-
 open Swate.Components
 open Swate.Electron.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Types
 open Browser.Dom
 open Renderer.Components
@@ -113,6 +107,12 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, toggleTarget)
             isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
             onClick = fun () -> toggleTarget (LeftSidebarPage.FileExplorer)
         )
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--branch-fork-24-regular",
+            tooltip = "Git",
+            isActive = (leftSidebarTarget = LeftSidebarPage.Git),
+            onClick = fun () -> toggleTarget (LeftSidebarPage.Git)
+        )
     ]
 
 [<ReactComponent>]
@@ -142,21 +142,15 @@ let Main () =
             [| box model.PageState |]
         )
 
-    let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-        pathChange =
-            fun pathOption ->
-                console.log ("[Swate] CHANGE PATH!")
-                dispatch (SetArcRootPath pathOption)
-        recentARCsUpdate = ignore
-        authAccountsUpdate = ignore
-        fileTreeUpdate = ignore
-        gitProgressUpdate = ignore
-    }
-
-    React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler ipcHandler)
+    React.useEffectOnce (fun () ->
+        Renderer.MainUpdateRendererBridge.subscribePathChange (fun pathOption ->
+            console.log ("[Swate] CHANGE PATH!")
+            dispatch (SetArcRootPath pathOption)
+        ))
 
     ///Main content module
-    let children = Renderer.Components.MainContent.Main.Main(model.AppState)
+    let children =
+        Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState)
 
     let toggleLeftSidebarTarget =
         React.useCallback ((fun target -> dispatch (ToggleLeftSidebarTarget target)), [||])
@@ -166,22 +160,26 @@ let Main () =
         Renderer.Context.FileStateCtx.FileStateCtxProvider(
             Renderer.Context.PageStateCtx.PageStateCtx.Provider(
                 pageCtx,
-                AnnotationTableContextProvider.AnnotationTableContextProvider(
-                    Layout.Main(
-                        children =
-                            React.Fragment [|
-                                children
-                                CloseWindowController.CloseWindowController.Subscription()
-                            |],
-                        navbar = Renderer.Components.Navbar.Main(),
-                        leftSidebar = Renderer.Components.LeftSidebar.Main.Main(),
-                        leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
-                        leftSidebarState = {
-                            isOpen = model.LeftSidebarIsOpen
-                            setIsOpen = fun isOpen -> dispatch (SetLeftSidebarIsOpen isOpen)
-                            sidebarType = model.LeftSidebarTarget
-                            setSidebarType = fun target -> dispatch (ToggleLeftSidebarTarget target)
-                        }
+                Renderer.Context.AuthStateCtx.Provider(
+                    Renderer.Context.GitStateCtx.GitStateCtxProvider(
+                        AnnotationTableContextProvider.AnnotationTableContextProvider(
+                            Layout.Main(
+                                children =
+                                    React.Fragment [|
+                                        children
+                                        CloseWindowController.CloseWindowController.Subscription()
+                                    |],
+                                navbar = Renderer.Components.Navbar.Main(),
+                                leftSidebar = Renderer.Components.LeftSidebar.Main.Main(),
+                                leftActions = LeftActionButtons(model.LeftSidebarTarget, toggleLeftSidebarTarget),
+                                leftSidebarState = {
+                                    isOpen = model.LeftSidebarIsOpen
+                                    setIsOpen = fun isOpen -> dispatch (SetLeftSidebarIsOpen isOpen)
+                                    sidebarType = model.LeftSidebarTarget
+                                    setSidebarType = fun target -> dispatch (ToggleLeftSidebarTarget target)
+                                }
+                            )
+                        )
                     )
                 )
             )

@@ -1,48 +1,56 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Api.fs" />
-    <Compile Include="Types.fs" />
-    <Compile Include="MetadataForm.fs" />
-    <Compile Include="context\AppStateCtx.fs" />
-    <Compile Include="context\PageStateCtx.fs" />
-    <Compile Include="context\FileStateCtx.fs" />
-    <Compile Include="Components\ARCHelper.fs" />
-    <Compile Include="Components\InitState.fs" />
-    <Compile Include="Components\Navbar.fs" />
-    <Compile Include="Components\FileExplorer.fs" />
-    <Compile Include="Components\WidgetRegister.fs" />
-    <Compile Include="Components\LeftSidebar\FileExplorerSidebar.fs" />
-    <Compile Include="Components\LeftSidebar\Main.fs" />
-    <Compile Include="Components\MainElement.fs" />
-    <Compile Include="Components\MainContent\Types.fs" />
-    <Compile Include="Components\MainContent\Helper.fs" />
-    <Compile Include="Components\MainContent\CreateARCPreview.fs" />
-    <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs" />
-    <Compile Include="Components\MainContent\TextPreviewTarget.fs" />
-    <Compile Include="Components\MainContent\UnknownPreviewTarget.fs" />
-    <Compile Include="Components\MainContent\ErrorPreviewTarget.fs" />
-    <Compile Include="Components\MainContent\LandingDraftTarget.fs" />
-    <Compile Include="Components\MainContent\NotesDraftTarget.fs" />
-    <Compile Include="Components\MainContent\NotesSearchTarget.fs" />
-    <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
-    <Compile Include="Components\MainContent\InitTarget.fs" />
-    <Compile Include="Components\MainContent\ArcTarget.fs" />
-    <Compile Include="Components\MainContent\Main.fs" />
-    <Compile Include="Components\CloseWindowController.fs" />
-    <Compile Include="App.fs" />
-    <Compile Include="Program.fs" />
-    <Content Include="tailwind.css" />
+    <Compile Include="Api.fs"/>
+    <Compile Include="Types.fs"/>
+    <Compile Include="MainUpdateRendererBridge.fs"/>
+    <Compile Include="GitApiClient.fs"/>
+    <Compile Include="MetadataForm.fs"/>
+    <Compile Include="context\AppStateCtx.fs"/>
+    <Compile Include="context\PageStateCtx.fs"/>
+    <Compile Include="context\FileStateCtx.fs"/>
+    <Compile Include="context\AuthStateCtx.fs"/>
+    <Compile Include="context\GitWorkflow.fs"/>
+    <Compile Include="context\GitStateCtx.fs"/>
+    <Compile Include="Components\ARCHelper.fs"/>
+    <Compile Include="Components\InitState.fs"/>
+    <Compile Include="Components\Navbar.fs"/>
+    <Compile Include="Components\FileExplorer.fs"/>
+    <Compile Include="Components\WidgetRegister.fs"/>
+    <Compile Include="Components\LeftSidebar\FileExplorerSidebar.fs"/>
+    <Compile Include="Components\LeftSidebar\GitSidebarPanel.fs"/>
+    <Compile Include="Components\LeftSidebar\Main.fs"/>
+    <Compile Include="Components\MainElement.fs"/>
+    <Compile Include="Components\MainContent\Types.fs"/>
+    <Compile Include="Components\MainContent\Helper.fs"/>
+    <Compile Include="Components\MainContent\CreateARCPreview.fs"/>
+    <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs"/>
+    <Compile Include="Components\MainContent\TextPreviewTarget.fs"/>
+    <Compile Include="Components\MainContent\UnknownPreviewTarget.fs"/>
+    <Compile Include="Components\MainContent\ErrorPreviewTarget.fs"/>
+    <Compile Include="Components\MainContent\LandingDraftTarget.fs"/>
+    <Compile Include="Components\MainContent\NotesDraftTarget.fs"/>
+    <Compile Include="Components\MainContent\NotesSearchTarget.fs"/>
+    <Compile Include="Components\MainContent\GitDiffTarget.fs"/>
+    <Compile Include="Components\MainContent\GitMergeConflictTarget.fs"/>
+    <Compile Include="Components\MainContent\GitUnsupportedTarget.fs"/>
+    <Compile Include="Components\MainContent\EmptySelectionTarget.fs"/>
+    <Compile Include="Components\MainContent\DataHubBrowserTarget.fs"/>
+    <Compile Include="Components\MainContent\Main.fs"/>
+    <Compile Include="Components\CloseWindowController.fs"/>
+    <Compile Include="App.fs"/>
+    <Compile Include="Program.fs"/>
+    <Content Include="tailwind.css"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Client\Client.fsproj" />
-    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
-    <ProjectReference Include="..\Swate.Electron.Shared\Swate.Electron.Shared.fsproj" />
+    <ProjectReference Include="..\..\..\Client\Client.fsproj"/>
+    <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj"/>
+    <ProjectReference Include="..\Swate.Electron.Shared\Swate.Electron.Shared.fsproj"/>
   </ItemGroup>
 
 </Project>

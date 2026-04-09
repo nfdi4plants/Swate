@@ -8,8 +8,16 @@ open Main.Bindings.SimpleGit
 
 type GitFactory = SimpleGitOptions -> ISimpleGit
 
-let private redactPattern =
-    Regex(@"(Authorization:\s*Bearer\s+)[^\s'""]+", RegexOptions.IgnoreCase)
+type GitCommandAuthentication = {
+    ConfigArgs: string[]
+    Environment: obj
+}
+
+let private authorizationRedactPattern =
+    Regex(@"(Authorization:\s*)(?:Bearer\s*|Basic\s*)[^\s'""]+", RegexOptions.IgnoreCase)
+
+let private tokenHeaderRedactPattern =
+    Regex(@"((?:Private-Token|X-Access-Token)\s*:\s*)[^\s'""]+", RegexOptions.IgnoreCase)
 
 let private credentialUrlPattern =
     Regex("(https?://)([^\\s/@]+(?::[^\\s/@]*)?@)", RegexOptions.IgnoreCase)
@@ -33,14 +41,97 @@ let createNonInteractiveEnv () : obj =
 
 let applyNonInteractiveEnv (git: ISimpleGit) = git.env (createNonInteractiveEnv ())
 
-let buildAuthArgs (_host: string) (token: string) : string[] = [|
-    "-c"
-    $"http.extraHeader=Authorization: Bearer {token}"
+[<Emit("Buffer.from($0, 'utf8').toString('base64')")>]
+let private toBase64 (value: string) : string = jsNative
+
+[<Emit("encodeURIComponent($0)")>]
+let private encodeUriComponent (value: string) : string = jsNative
+
+let private gitLabBasicAuthUsername = "oauth2"
+
+let private buildBasicAuthorizationValue (username: string) (token: string) =
+    let credentials = $"{username}:{token}"
+    let base64Credentials = toBase64 credentials
+    $"Basic {base64Credentials}"
+
+let private buildAuthenticatedRemoteUrl (remoteUrl: string) (token: string) =
+    if remoteUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) then
+        let remoteUrlWithoutScheme = remoteUrl.Substring("https://".Length)
+        let encodedToken = encodeUriComponent token
+        $"https://{gitLabBasicAuthUsername}:{encodedToken}@{remoteUrlWithoutScheme}"
+    else
+        remoteUrl
+
+let private buildLfsEndpointUrl (remoteUrl: string) =
+    let trimmedRemoteUrl = remoteUrl.TrimEnd('/')
+    $"{trimmedRemoteUrl}/info/lfs"
+
+let private tryBuildScopedAuthUrl (remoteUrl: string) =
+    let mutable uri = Unchecked.defaultof<Uri>
+
+    if Uri.TryCreate(remoteUrl, UriKind.Absolute, &uri) && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) then
+        let authority =
+            if uri.IsDefaultPort then
+                uri.Host
+            else
+                $"{uri.Host}:{uri.Port}"
+
+        Some($"{uri.Scheme}://{authority}/")
+    else
+        None
+
+let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (remoteUrl: string option) : string[] = [|
+    let authorizationValue = buildBasicAuthorizationValue gitLabBasicAuthUsername token
+
+    match remoteUrl |> Option.bind tryBuildScopedAuthUrl with
+    | Some scopeUrl ->
+        yield "-c"
+        yield $"http.{scopeUrl}.extraHeader=Authorization: {authorizationValue}"
+    | _ ->
+        ()
+
+    match remoteName, remoteUrl with
+    | Some name, Some url when url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ->
+        let authenticatedRemoteUrl = buildAuthenticatedRemoteUrl url token
+        let plainLfsUrl = buildLfsEndpointUrl url
+        let authenticatedLfsUrl = buildLfsEndpointUrl authenticatedRemoteUrl
+        yield "-c"
+        yield $"remote.{name}.url={authenticatedRemoteUrl}"
+        yield "-c"
+        yield $"remote.{name}.pushurl={authenticatedRemoteUrl}"
+        yield "-c"
+        yield $"remote.{name}.lfsurl={authenticatedLfsUrl}"
+        yield "-c"
+        yield $"lfs.url={authenticatedLfsUrl}"
+        yield "-c"
+        yield $"lfs.{plainLfsUrl}.access=basic"
+        yield "-c"
+        yield $"lfs.{authenticatedLfsUrl}.access=basic"
+    | _ ->
+        ()
 |]
 
-let applyAuth (gitFactory: GitFactory) (baseOptions: SimpleGitOptions) (host: string) (token: string) : ISimpleGit =
-    let authArgs = buildAuthArgs host token
-    let authConfig = toConfigEntries authArgs
+let createCommandAuthentication
+    (host: string)
+    (token: string)
+    (remoteName: string option)
+    (remoteUrl: string option)
+    : GitCommandAuthentication =
+    {
+        ConfigArgs = buildAuthArgs host token remoteName remoteUrl
+        Environment = createNonInteractiveEnv ()
+    }
+
+let applyAuth
+    (gitFactory: GitFactory)
+    (baseOptions: SimpleGitOptions)
+    (host: string)
+    (token: string)
+    (remoteName: string option)
+    (remoteUrl: string option)
+    : ISimpleGit =
+    let commandAuth = createCommandAuthentication host token remoteName remoteUrl
+    let authConfig = toConfigEntries commandAuth.ConfigArgs
 
     let mergedConfig = [|
         yield! baseConfigEntries baseOptions
@@ -57,7 +148,16 @@ let redactToken (text: string) : string =
         text
     else
         text
-        |> fun t -> redactPattern.Replace(t, "$1[REDACTED]")
+        |> fun t ->
+            authorizationRedactPattern.Replace(
+                t,
+                MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
+            )
+        |> fun t ->
+            tokenHeaderRedactPattern.Replace(
+                t,
+                MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
+            )
         |> fun t -> credentialUrlPattern.Replace(t, "$1[REDACTED]@")
 
 let redactArgs (args: string[]) : string[] = args |> Array.map redactToken

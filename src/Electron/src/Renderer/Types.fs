@@ -1,13 +1,17 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open Swate.Components
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.GitTypes
 
 [<RequireQualifiedAccess>]
-type LeftSidebarPage = | FileExplorer
+type LeftSidebarPage =
+    | FileExplorer
+    | Git
+
+type GitUnsupportedPageData = GitUnsupportedContentDto
 
 [<RequireQualifiedAccess>]
 type PageState =
@@ -17,7 +21,11 @@ type PageState =
     | LandingDraftPage
     | NotesDraftPage
     | NotesSearchPage
+    | GitDiffPage of GitDiffViewDataDto
+    | GitMergeConflictPage of GitMergeConflictViewDataDto
+    | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
+    | DataHubBrowser
 
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with

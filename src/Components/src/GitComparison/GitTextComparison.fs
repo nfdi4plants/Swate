@@ -140,17 +140,17 @@ module internal GitTextComparisonRendering =
                 theme: ComparisonTheme option
             ) =
             let rows = if List.isEmpty rows then [ Rows.emptyRow () ] else rows
-            let maxHeightPx = defaultArg maxHeightPx 640
             let theme = defaultArg theme DiffTheme
 
             Html.div [
                 if scrollTestId.IsSome then
                     prop.testId scrollTestId.Value
-                prop.className "swt:overflow-auto swt:scrollbar-fade"
-                prop.style [ style.maxHeight maxHeightPx ]
+                prop.className "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade"
+                if maxHeightPx.IsSome then
+                    prop.style [ style.maxHeight maxHeightPx.Value ]
                 prop.children [
                     Html.div [
-                        prop.className "swt:min-w-[58rem]"
+                        prop.className "swt:min-h-full swt:min-w-[58rem]"
                         prop.children [
                             Html.div [
                                 prop.className "swt:sticky swt:top-0 swt:z-10 swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"

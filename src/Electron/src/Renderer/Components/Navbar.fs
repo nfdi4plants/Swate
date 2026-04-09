@@ -1,12 +1,9 @@
 namespace Renderer.Components
 
-open Fable.Core
 open Feliz
 
-open Swate.Electron.Shared
-open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Renderer
 open Swate.Components
-open Fable.Electron.Remoting.Renderer
 
 module NavbarHelper =
 
@@ -50,8 +47,17 @@ type private Selector =
     static member OpenArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
         Actionbar.ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
 
+    static member DownloadArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
+        Actionbar.ButtonInfo.create (
+            "swt:fluent--cloud-beaker-24-regular swt:size-5",
+            "Download ARC from DataHub",
+            onClick
+        )
+
     [<ReactComponent>]
     static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
+
+        let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
 
         let onCreateARC =
             fun _ ->
@@ -61,6 +67,11 @@ type private Selector =
         let onOpenARC =
             fun _ ->
                 NavbarHelper.Selector.openARC ()
+                toggleSelector ()
+
+        let openDataHubBrowser =
+            fun _ ->
+                pageStateCtx.setState (Some PageState.DataHubBrowser)
                 toggleSelector ()
 
         // let downloadARC =
@@ -73,6 +84,7 @@ type private Selector =
             [|
                 Selector.CreateArcActionBtn(onCreateARC)
                 Selector.OpenArcActionBtn(onOpenARC)
+                Selector.DownloadArcActionBtn(openDataHubBrowser)
             |],
             4
         )
@@ -87,16 +99,8 @@ type private Selector =
 
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
 
-        let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-            pathChange = setCurrentlyOpenArcPath
-            recentARCsUpdate = fun arcs -> setRecentArc arcs
-            authAccountsUpdate = ignore
-            fileTreeUpdate = ignore
-            gitProgressUpdate = ignore
-        }
-
         // Get remote recent ARCs on first load before rendering the selector
-        React.useLayoutEffectOnce (fun _ ->
+        React.useLayoutEffectOnce (fun () ->
             promise {
                 let! arcs = Api.ipcArcVaultApi.getRecentARCs ()
                 let! currentlyOpenArcPath = Api.ipcArcVaultApi.getOpenPath (unbox null)
@@ -106,7 +110,12 @@ type private Selector =
             }
             |> Promise.start
 
-            Remoting.init |> Remoting.buildHandler ipcHandler
+            let disposePathChange = Renderer.MainUpdateRendererBridge.subscribePathChange setCurrentlyOpenArcPath
+            let disposeRecentArcs = Renderer.MainUpdateRendererBridge.subscribeRecentArcsUpdate setRecentArc
+
+            fun () ->
+                disposePathChange ()
+                disposeRecentArcs ()
         )
 
         let selectorControlRef =
@@ -137,86 +146,13 @@ type private Selector =
 
 module private Authentication =
 
-    open AuthenticationTypes
+    open Authentication.Types
     open Swate.Electron.Shared.AuthTypes
-
-    let private toUserInfo (u: AuthUserDto) : UserInformation = {
-        Name = u.Name
-        Email = u.Email
-        AvatarUrl = u.AvatarUrl
-        TargetDataHub = u.TargetDataHub
-    }
-
-    let private toAccountSummary (a: AuthAccountSummary) : AccountSummary = {
-        AccountId = a.AccountId
-        Name = a.Name
-        Email = a.Email
-        AvatarUrl = a.AvatarUrl
-        TargetDataHub = a.TargetDataHub
-        IsActive = a.IsActive
-    }
-
-    let private refreshState (setUser: UserInformation option -> unit) (setAccounts: AuthAccountSummary array -> unit) = promise {
-        let! stateResult = Api.ipcAuthApi.getAuthState ()
-
-        match stateResult with
-        | Ok state ->
-            setAccounts state.Accounts
-
-            match state.User with
-            | Some u when state.IsAuthenticated -> setUser (Some(toUserInfo u))
-            | _ -> setUser None
-        | Error _ ->
-            setUser None
-            setAccounts [||]
-    }
 
     [<ReactComponent>]
     let UserAvatar () =
-        let user, setUser = React.useState (None: UserInformation option)
-        let accounts, setAccounts = React.useState ([||]: AuthAccountSummary array)
         let isLoading, setIsLoading = React.useState false
-
-        let refresh () =
-            refreshState setUser setAccounts |> Promise.start
-
-        let ipcHandler: Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi = {
-            pathChange = ignore
-            recentARCsUpdate = ignore
-            authAccountsUpdate =
-                fun accounts ->
-                    setAccounts accounts
-                    let activeAccount = accounts |> Array.tryFind (fun a -> a.IsActive)
-
-                    match activeAccount with
-                    | Some a ->
-                        {
-                            AccountId = a.AccountId
-                            Name = a.Name
-                            Email = a.Email
-                            AvatarUrl = a.AvatarUrl
-                            TargetDataHub = a.TargetDataHub
-                        }
-                        |> toUserInfo
-                        |> Some
-                        |> setUser
-
-                    | None -> setUser None
-            fileTreeUpdate = ignore
-            gitProgressUpdate = ignore
-        }
-
-        // On mount: load persisted auth state from Main
-        React.useEffectOnce (fun _ ->
-
-            Remoting.init |> Remoting.buildHandler ipcHandler
-
-            promise {
-                do! refreshState setUser setAccounts
-                setIsLoading false
-            }
-            |> Promise.start
-        )
+        let authStateCtx = Renderer.Context.AuthStateCtx.useAuthState ()
 
         let onSignIn (signInInfo: SignInInformation) =
             promise {
@@ -230,7 +166,7 @@ module private Authentication =
                 let! result = Api.ipcAuthApi.signIn request
 
                 match result with
-                | Ok authResult when authResult.Success -> do! refreshState setUser setAccounts
+                | Ok authResult when authResult.Success -> ()
                 | Ok authResult ->
                     let msg = authResult.Message |> Option.defaultValue "Authentication failed."
                     signInInfo.OnErrorCallback(exn msg)
@@ -242,34 +178,38 @@ module private Authentication =
 
         let onLogout () =
             promise {
-                let! _ = Api.ipcAuthApi.signOut ()
-                do! refreshState setUser setAccounts
+                match! Api.ipcAuthApi.signOut () with
+                | Ok _ -> ()
+                | Error _ -> ()
             }
             |> Promise.start
 
         let onSwitchAccount (accountId: string) =
             promise {
-                let! _ = Api.ipcAuthApi.setActiveAccount accountId
-                refresh ()
+                match! Api.ipcAuthApi.setActiveAccount accountId with
+                | Ok _ ->
+                    match! Api.ipcAuthApi.revalidate () with
+                    | Ok _ -> ()
+                    | Error _ -> ()
+                | Error _ -> ()
+
             }
             |> Promise.start
 
         let onRemoveAccount (accountId: string) =
             promise {
-                let! _ = Api.ipcAuthApi.removeAccount accountId
-                refresh ()
+                match! Api.ipcAuthApi.removeAccount accountId with
+                | Ok _ -> ()
+                | Error _ -> ()
             }
             |> Promise.start
 
-        let mappedAccounts = accounts |> Array.map toAccountSummary
-
-        Authentication.UserAvatar(
-            user,
+        Authentication.Authentication.UserAvatar(
+            authStateCtx,
             onSignIn,
             onLogout,
             isLoading = isLoading,
             dropdownClassName = "swt:dropdown-bottom swt:dropdown-end",
-            accounts = mappedAccounts,
             onSwitchAccount = onSwitchAccount,
             onRemoveAccount = onRemoveAccount
         )

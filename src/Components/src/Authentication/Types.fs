@@ -1,4 +1,4 @@
-module Swate.Components.AuthenticationTypes
+module Swate.Components.Authentication.Types
 
 type SignInInformation = {
     GitLabBaseUrl: string
@@ -59,14 +59,16 @@ type GitLabUser = {
     scim_identities: GitLabScimIdentity list
 }
 
-type UserInformation = {
+type AuthUserDto = {
+    AccountId: string
     Name: string
     Email: string
     AvatarUrl: string
     TargetDataHub: string
 } with
 
-    static member FromGitLabUser (gitLabUser: GitLabUser) (targetDataHub: string) : UserInformation = {
+    static member FromGitLabUser (gitLabUser: GitLabUser) (targetDataHub: string) : AuthUserDto = {
+        AccountId = string gitLabUser.id
         Name = gitLabUser.name
         Email = gitLabUser.email
         AvatarUrl = gitLabUser.avatar_url
@@ -75,10 +77,22 @@ type UserInformation = {
 
 /// Platform-agnostic account summary for multi-account UI.
 type AccountSummary = {
-    AccountId: string
-    Name: string
-    Email: string
-    AvatarUrl: string
-    TargetDataHub: string
-    IsActive: bool
+    User: AuthUserDto
+    DateAdded: string
+    TokenInvalid: bool
 }
+
+/// Current auth state returned by getAuthState.
+type AuthStateDto = {
+    ActiveAccount: AccountSummary option
+    StoredAccounts: AccountSummary array
+} with
+
+    static member Empty = {
+        ActiveAccount = None
+        StoredAccounts = [||]
+    }
+
+    member this.ActiveUser() = this.ActiveAccount |> Option.map _.User
+    member this.UsableActiveAccount() = this.ActiveAccount |> Option.filter (fun account -> not account.TokenInvalid)
+    member this.UsableActiveUser() = this.UsableActiveAccount() |> Option.map _.User
