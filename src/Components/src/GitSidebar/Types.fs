@@ -50,23 +50,20 @@ type GitSidebarCreateBranchRequest = {
     StartPoint: string option
 }
 
-type GitSidebarCommitSelectionRequest = {
-    Message: string
-    Paths: string[]
-}
+type GitSidebarCommitSelectionRequest = { Message: string; Paths: string[] }
 
 type GitSidebarCallbacks = {
-    OnRefresh: unit -> JS.Promise<Result<unit, string>>
-    OnFetch: unit -> JS.Promise<Result<unit, string>>
-    OnPull: unit -> JS.Promise<Result<unit, string>>
-    OnPush: unit -> JS.Promise<Result<unit, string>>
-    OnSync: unit -> JS.Promise<Result<unit, string>>
-    OnCommitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>
-    OnCommitAll: string -> JS.Promise<Result<unit, string>>
-    OnSaveDownloadLargeFiles: bool -> JS.Promise<Result<unit, string>>
-    OnSaveLfsAutoTrackThreshold: int -> JS.Promise<Result<unit, string>>
-    OnCreateBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>
-    OnSwitchBranch: string -> JS.Promise<Result<unit, string>>
+    OnRefresh: unit -> unit
+    OnFetch: unit -> unit
+    OnPull: unit -> unit
+    OnPush: unit -> unit
+    OnSync: unit -> unit
+    OnCommitSelection: GitSidebarCommitSelectionRequest -> unit
+    OnCommitAll: string -> unit
+    OnSaveDownloadLargeFiles: bool -> unit
+    OnSaveLfsAutoTrackThreshold: int -> unit
+    OnCreateBranch: GitSidebarCreateBranchRequest -> unit
+    OnSwitchBranch: string -> unit
     OnSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
 }
 
@@ -74,16 +71,9 @@ type GitSidebarCallbacks = {
 module GitStatusCode =
 
     let normalize (code: string) =
-        let trimmed =
-            code
-            |> Option.ofObj
-            |> Option.defaultValue String.Empty
-            |> _.Trim()
+        let trimmed = code |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
 
-        if String.IsNullOrWhiteSpace trimmed then
-            "."
-        else
-            trimmed
+        if String.IsNullOrWhiteSpace trimmed then "." else trimmed
 
     let isStagedIndexStatus (code: string) =
         let normalized = normalize code

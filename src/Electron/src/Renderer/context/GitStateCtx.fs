@@ -15,27 +15,21 @@ open Renderer.Context.GitWorkflow
 
 type GitStateController = {
     state: GitState
-    refresh: unit -> JS.Promise<Result<unit, string>>
-    fetch: unit -> JS.Promise<Result<unit, string>>
-    pull: unit -> JS.Promise<Result<unit, string>>
-    push: unit -> JS.Promise<Result<unit, string>>
+    refresh: unit -> unit
+    fetch: unit -> unit
+    pull: unit -> unit
+    push: unit -> unit
     cloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<string, string>>
-    sync: unit -> JS.Promise<Result<unit, string>>
-    commitSelection: GitSidebarCommitSelectionRequest -> JS.Promise<Result<unit, string>>
-    commitAll: string -> JS.Promise<Result<unit, string>>
-    saveLfsAutoTrackThreshold: int -> JS.Promise<Result<unit, string>>
-    saveDownloadLargeFiles: bool -> JS.Promise<Result<unit, string>>
-    createBranch: GitSidebarCreateBranchRequest -> JS.Promise<Result<unit, string>>
-    switchBranch: string -> JS.Promise<Result<unit, string>>
+    sync: unit -> unit
+    commitSelection: GitSidebarCommitSelectionRequest -> unit
+    commitAll: string -> unit
+    saveLfsAutoTrackThreshold: int -> unit
+    saveDownloadLargeFiles: bool -> unit
+    createBranch: GitSidebarCreateBranchRequest -> unit
+    switchBranch: string -> unit
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
-    confirmMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<unit, string>>
+    confirmMergeResolution: GitConfirmMergeResolutionRequest -> unit
 }
-
-let private dispatchPromise
-    (dispatch: Msg -> unit)
-    (buildMsg: (Result<'T, string> -> unit) -> Msg)
-    : JS.Promise<Result<'T, string>> =
-    Promise.create (fun resolve _reject -> dispatch (buildMsg resolve))
 
 let private mapDiffPageResult (_requestedPath: string) =
     function
@@ -82,20 +76,20 @@ let GitStateCtx =
     React.createContext<GitStateController> (
         {
             state = GitState.Empty
-            refresh = fun () -> promise { return Ok() }
-            fetch = fun () -> promise { return Ok() }
-            pull = fun () -> promise { return Ok() }
-            push = fun () -> promise { return Ok() }
+            refresh = fun () -> ()
+            fetch = fun () -> ()
+            pull = fun () -> ()
+            push = fun () -> ()
             cloneRepository = fun _ -> promise { return Ok "" }
-            sync = fun () -> promise { return Ok() }
-            commitSelection = fun _ -> promise { return Ok() }
-            commitAll = fun _ -> promise { return Ok() }
-            saveLfsAutoTrackThreshold = fun _ -> promise { return Ok() }
-            saveDownloadLargeFiles = fun _ -> promise { return Ok() }
-            createBranch = fun _ -> promise { return Ok() }
-            switchBranch = fun _ -> promise { return Ok() }
+            sync = fun () -> ()
+            commitSelection = fun _ -> ()
+            commitAll = fun _ -> ()
+            saveLfsAutoTrackThreshold = fun _ -> ()
+            saveDownloadLargeFiles = fun _ -> ()
+            createBranch = fun _ -> ()
+            switchBranch = fun _ -> ()
             selectChange = fun _ -> promise { return Ok() }
-            confirmMergeResolution = fun _ -> promise { return Ok() }
+            confirmMergeResolution = fun _ -> ()
         }
     )
 
@@ -107,61 +101,47 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+
     let gitState, dispatch =
-        React.useElmish (
-            (fun () -> init ()),
-            update dependencies pageStateCtx.setState,
-            subscribe,
-            [||]
-        )
+        React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
 
-    let refresh () =
-        dispatchPromise dispatch RefreshRequested
+    let refresh () = dispatch RefreshRequested
 
-    let fetch () =
-        dispatchPromise dispatch FetchRequested
+    let fetch () = dispatch FetchRequested
 
-    let pull () = promise {
-        return! dispatchPromise dispatch PullRequested
-    }
+    let pull () = dispatch PullRequested
 
-    let push () =
-        dispatchPromise dispatch PushRequested
+    let push () = dispatch PushRequested
 
     let cloneRepository (request: GitCloneRepositoryRequest) =
-        dispatchPromise dispatch (fun reply -> CloneRequested(request, reply))
+        Promise.create (fun resolve _reject -> dispatch (CloneRequested(request, resolve)))
 
-    let sync () =
-        dispatchPromise dispatch SyncRequested
+    let sync () = dispatch SyncRequested
 
     let commitSelection (request: GitSidebarCommitSelectionRequest) =
-        dispatchPromise dispatch (fun reply -> CommitSelectionRequested(request, reply))
+        dispatch (CommitSelectionRequested request)
 
-    let commitAll (message: string) =
-        dispatchPromise dispatch (fun reply -> CommitAllRequested(message, reply))
+    let commitAll (message: string) = dispatch (CommitAllRequested message)
 
     let saveLfsAutoTrackThreshold (thresholdMb: int) =
-        dispatchPromise dispatch (fun reply -> SaveLfsAutoTrackThresholdRequested(thresholdMb, reply))
+        dispatch (SaveLfsAutoTrackThresholdRequested thresholdMb)
 
     let saveDownloadLargeFiles (downloadLargeFiles: bool) =
-        dispatchPromise dispatch (fun reply -> SaveDownloadLargeFilesRequested(downloadLargeFiles, reply))
+        dispatch (SaveDownloadLargeFilesRequested downloadLargeFiles)
 
     let createBranchFrom (request: GitSidebarCreateBranchRequest) =
-        dispatchPromise dispatch (fun reply -> CreateBranchRequested(request, reply))
+        dispatch (CreateBranchRequested request)
 
     let switchBranchTo (branchName: string) =
-        dispatchPromise dispatch (fun reply -> SwitchBranchRequested(branchName, reply))
+        dispatch (SwitchBranchRequested branchName)
 
     let selectChange (change: GitSidebarChange) =
-        dispatchPromise dispatch (fun reply -> SelectChangeRequested(change, reply))
+        Promise.create (fun resolve _reject -> dispatch (SelectChangeRequested(change, resolve)))
 
     let confirmMergeResolutionAction request =
-        dispatchPromise dispatch (fun reply -> ConfirmMergeResolutionRequested(request, reply))
+        dispatch (ConfirmMergeResolutionRequested request)
 
-    React.useEffect (
-        (fun () -> dispatch (ArcPathChanged appStateCtx.state)),
-        [| box appStateCtx.state |]
-    )
+    React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx.state)), [| box appStateCtx.state |])
 
     let gitStateController: GitStateController =
         React.useMemo (

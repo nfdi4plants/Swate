@@ -8,7 +8,9 @@ open Swate.Electron.Shared.GitTypes
 let Main (mergeData: GitMergeConflictViewDataDto) =
 
     let gitStateCtx = Renderer.Context.GitStateCtx.useGitState ()
-    let isConfirmingCurrentPath = gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path
+
+    let isConfirmingCurrentPath =
+        gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path
 
     let isMergeResolutionBusy =
         match gitStateCtx.state.BusyOperation with
@@ -19,29 +21,20 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
         if isMergeResolutionBusy then
             ()
         else
-            promise {
-                let! result =
-                    gitStateCtx.confirmMergeResolution {
-                        Path = mergeData.Path
-                        ExpectedConflictContent = mergeData.MergeConflictContent
-                        ResolvedContent = resolvedContent
-                        AutoCommit = true
-                    }
-
-                match result with
-                | Ok() ->
-                    ()
-                | Error _ ->
-                    ()
+            gitStateCtx.confirmMergeResolution {
+                Path = mergeData.Path
+                ExpectedConflictContent = mergeData.MergeConflictContent
+                ResolvedContent = resolvedContent
+                AutoCommit = true
             }
-            |> Promise.start
 
     Html.div [
         prop.className "swt:h-full swt:w-full swt:min-h-0"
         prop.children [
             if isConfirmingCurrentPath then
                 Html.div [
-                    prop.className "swt:border-b swt:border-base-content/10 swt:bg-base-200/70 swt:px-4 swt:py-2 swt:text-sm swt:text-base-content/70"
+                    prop.className
+                        "swt:border-b swt:border-base-content/10 swt:bg-base-200/70 swt:px-4 swt:py-2 swt:text-sm swt:text-base-content/70"
                     prop.text "Applying merge resolution..."
                 ]
 

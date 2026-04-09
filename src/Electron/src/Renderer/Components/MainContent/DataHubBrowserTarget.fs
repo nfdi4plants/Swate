@@ -70,7 +70,9 @@ let DataHubBrowserTarget () =
             | Error error -> Browser.Dom.console.error ($"[Swate] Could not pick download folder: {error.Message}")
             | Ok destinationFolder ->
                 let targetPath =
-                    ARCtrl.ArcPathHelper.combine destinationFolder (DataHubBrowserHelper.toRepositoryFolderName projectInfo)
+                    ARCtrl.ArcPathHelper.combine
+                        destinationFolder
+                        (DataHubBrowserHelper.toRepositoryFolderName projectInfo)
 
                 let cloneRequest: GitCloneRepositoryRequest = {
                     RemoteUrl = projectInfo.http_url_to_repo
@@ -84,8 +86,7 @@ let DataHubBrowserTarget () =
                 | Ok clonedPath ->
                     match! Api.ipcArcVaultApi.openARCByPath (unbox null) clonedPath with
                     | Ok _ -> closeBrowser ()
-                    | Error error ->
-                        Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
+                    | Error error -> Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
         }
         |> Promise.start
 
@@ -105,7 +106,7 @@ let DataHubBrowserTarget () =
                     GitSidebar.DownloadLargeFilesToggle(
                         gitStateCtx.state.DownloadLargeFiles,
                         isCloneBusy,
-                        (fun nextValue -> gitStateCtx.saveDownloadLargeFiles nextValue |> Promise.start),
+                        gitStateCtx.saveDownloadLargeFiles,
                         testId = "DataHubDownloadLargeFilesCheckbox",
                         description = "Reuse the Git LFS download preference for repository clones from DataHub."
                     )

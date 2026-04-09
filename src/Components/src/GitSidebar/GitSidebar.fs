@@ -132,8 +132,7 @@ type GitSidebar =
             ?busyTestId: string,
             ?errorTestId: string,
             ?warningTestId: string
-        )
-        =
+        ) =
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
 
         React.Fragment [
@@ -147,7 +146,9 @@ type GitSidebar =
                                 prop.testId busyTestId.Value
                             prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
                             prop.children [
-                                Html.span [ prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4" ]
+                                Html.span [
+                                    prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4"
+                                ]
                                 Html.span [
                                     prop.text (
                                         GitSidebarInternal.progressText progress
@@ -169,14 +170,15 @@ type GitSidebar =
                                 prop.testId busyTestId.Value
                             prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
                             prop.children [
-                                Html.span [ prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4" ]
+                                Html.span [
+                                    prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4"
+                                ]
                                 Html.span notice
                             ]
                         ]
                     ]
                 ]
-            | GitSidebarRunStatus.Idle ->
-                Html.none
+            | GitSidebarRunStatus.Idle -> Html.none
 
             match errorNotice with
             | Some message ->
@@ -188,14 +190,15 @@ type GitSidebar =
                                 prop.testId errorTestId.Value
                             prop.className "swt:alert swt:alert-error swt:px-3 swt:py-2 swt:text-sm"
                             prop.children [
-                                Html.span [ prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4" ]
+                                Html.span [
+                                    prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4"
+                                ]
                                 Html.span message
                             ]
                         ]
                     ]
                 ]
-            | None ->
-                Html.none
+            | None -> Html.none
 
             match warningNotice with
             | Some message ->
@@ -207,14 +210,15 @@ type GitSidebar =
                                 prop.testId warningTestId.Value
                             prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
                             prop.children [
-                                Html.span [ prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4" ]
+                                Html.span [
+                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                ]
                                 Html.span message
                             ]
                         ]
                     ]
                 ]
-            | None ->
-                Html.none
+            | None -> Html.none
         ]
 
     [<ReactComponent>]
@@ -228,7 +232,8 @@ type GitSidebar =
             ?description: string
         ) =
         Html.label [
-            prop.className "swt:flex swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3"
+            prop.className
+                "swt:flex swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3"
             prop.children [
                 Html.input [
                     if testId.IsSome then
@@ -252,8 +257,7 @@ type GitSidebar =
                                 prop.className "swt:text-xs swt:text-base-content/70"
                                 prop.text text
                             ]
-                        | None ->
-                            Html.none
+                        | None -> Html.none
                     ]
                 ]
             ]
@@ -262,7 +266,8 @@ type GitSidebar =
     [<ReactComponent>]
     static member private SectionHeader(title: string, countText: string option) =
         Html.div [
-            prop.className "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
+            prop.className
+                "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
             prop.children [
                 Html.span title
                 match countText with
@@ -271,21 +276,14 @@ type GitSidebar =
                         prop.className "swt:text-[0.65rem] swt:text-base-content/50"
                         prop.text value
                     ]
-                | None ->
-                    Html.none
+                | None -> Html.none
             ]
         ]
 
     [<ReactComponent>]
     static member private ActionButton
-        (
-            label: string,
-            iconClassName: string,
-            isBusy: bool,
-            onClick: unit -> unit,
-            ?isActive: bool,
-            ?testId: string
-        ) =
+        (label: string, iconClassName: string, isBusy: bool, onClick: unit -> unit, ?isActive: bool, ?testId: string)
+        =
         let isActive = defaultArg isActive false
 
         Html.button [
@@ -301,7 +299,9 @@ type GitSidebar =
             prop.disabled isBusy
             prop.onClick (fun _ -> onClick ())
             prop.children [
-                Html.span [ prop.className [ "swt:iconify"; iconClassName; "swt:size-4" ] ]
+                Html.span [
+                    prop.className [ "swt:iconify"; iconClassName; "swt:size-4" ]
+                ]
                 Html.span label
             ]
         ]
@@ -310,12 +310,15 @@ type GitSidebar =
     static member private BranchHeader(props: BranchHeaderProps) =
         React.Fragment [
             Html.div [
-                prop.className "swt:flex swt:items-center swt:justify-between swt:border-b swt:border-base-content/10 swt:px-3 swt:py-3"
+                prop.className
+                    "swt:flex swt:items-center swt:justify-between swt:border-b swt:border-base-content/10 swt:px-3 swt:py-3"
                 prop.children [
                     Html.div [
                         prop.className "swt:flex swt:items-center swt:gap-2"
                         prop.children [
-                            Html.span [ prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5" ]
+                            Html.span [
+                                prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5"
+                            ]
                             Html.div [
                                 prop.className "swt:flex swt:flex-col"
                                 prop.children [
@@ -340,9 +343,11 @@ type GitSidebar =
                         prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm"
                         prop.disabled props.IsBusy
                         prop.title "Refresh git status"
-                        prop.onClick (fun _ -> props.OnRefresh ())
+                        prop.onClick (fun _ -> props.OnRefresh())
                         prop.children [
-                            Html.span [ prop.className "swt:iconify swt:fluent--arrow-clockwise-24-regular swt:size-4" ]
+                            Html.span [
+                                prop.className "swt:iconify swt:fluent--arrow-clockwise-24-regular swt:size-4"
+                            ]
                         ]
                     ]
                 ]
@@ -351,19 +356,15 @@ type GitSidebar =
                 prop.className "swt:px-3 swt:pt-3"
                 prop.children [
                     Html.div [
-                        prop.className "swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-200/60 swt:p-3"
+                        prop.className
+                            "swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-200/60 swt:p-3"
                         prop.children [
                             Html.div [
                                 prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
                                 prop.children [
                                     Html.span [
                                         prop.className "swt:badge swt:badge-primary swt:badge-sm"
-                                        prop.text (
-                                            if props.Status.IsClean then
-                                                "Clean"
-                                            else
-                                                "Changes"
-                                        )
+                                        prop.text (if props.Status.IsClean then "Clean" else "Changes")
                                     ]
 
                                     if props.HasConflicts then
@@ -389,9 +390,12 @@ type GitSidebar =
                             match props.Status.TrackingBranch with
                             | Some trackingBranch ->
                                 Html.div [
-                                    prop.className "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                                    prop.className
+                                        "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
                                     prop.children [
-                                        Html.span [ prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4" ]
+                                        Html.span [
+                                            prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4"
+                                        ]
                                         Html.span $"Tracking {trackingBranch}"
                                     ]
                                 ]
@@ -399,14 +403,18 @@ type GitSidebar =
                                 match props.Status.CurrentBranch with
                                 | Some currentBranch ->
                                     Html.div [
-                                        prop.className "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                                        prop.className
+                                            "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
                                         prop.children [
-                                            Html.span [ prop.className "swt:iconify swt:fluent--branch-request-20-regular swt:size-4" ]
-                                            Html.span $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                            Html.span [
+                                                prop.className
+                                                    "swt:iconify swt:fluent--branch-request-20-regular swt:size-4"
+                                            ]
+                                            Html.span
+                                                $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
                                         ]
                                     ]
-                                | None ->
-                                    Html.none
+                                | None -> Html.none
                         ]
                     ]
                 ]
@@ -432,7 +440,8 @@ type GitSidebar =
                 ]
                 Html.p [
                     prop.className "swt:mt-2 swt:text-xs swt:text-base-content/70"
-                    prop.text "Files larger than this limit are automatically re-staged through Git LFS during save operations."
+                    prop.text
+                        "Files larger than this limit are automatically re-staged through Git LFS during save operations."
                 ]
                 Html.div [
                     prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
@@ -461,7 +470,7 @@ type GitSidebar =
                             prop.testId "GitSidebarLfsThresholdSaveButton"
                             prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:normal-case"
                             prop.disabled (not props.CanSaveLfsThreshold)
-                            prop.onClick (fun _ -> props.SubmitLfsThreshold ())
+                            prop.onClick (fun _ -> props.SubmitLfsThreshold())
                             prop.children [
                                 Html.span [
                                     prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4"
@@ -512,9 +521,9 @@ type GitSidebar =
                     GitSidebar.ActionButton(
                         "More Git Actions",
                         (if props.IsAdvancedActionsOpen then
-                            "swt:fluent--chevron-up-24-regular"
+                             "swt:fluent--chevron-up-24-regular"
                          else
-                            "swt:fluent--chevron-down-24-regular"),
+                             "swt:fluent--chevron-down-24-regular"),
                         props.IsBusy,
                         props.ToggleAdvancedActions,
                         isActive = props.IsAdvancedActionsOpen,
@@ -598,7 +607,8 @@ type GitSidebar =
                                     ]
                                     Html.textarea [
                                         prop.testId "GitSidebarCommitMessageInput"
-                                        prop.className "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
+                                        prop.className
+                                            "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
                                         prop.disabled (not props.CanEditCommit)
                                         prop.value props.CommitMessage
                                         prop.placeholder (
@@ -614,7 +624,8 @@ type GitSidebar =
                                 ]
                             ]
                             Html.div [
-                                prop.className "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
+                                prop.className
+                                    "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
                                 prop.children [
                                     Html.span (
                                         if props.SelectedCommitCount = 1 then
@@ -637,10 +648,11 @@ type GitSidebar =
                                         prop.testId "GitSidebarCommitSelectionButton"
                                         prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:normal-case"
                                         prop.disabled (not props.CanSubmitCommitSelection)
-                                        prop.onClick (fun _ -> props.SubmitCommitSelection ())
+                                        prop.onClick (fun _ -> props.SubmitCommitSelection())
                                         prop.children [
                                             Html.span [
-                                                prop.className "swt:iconify swt:fluent--checkbox-checked-24-regular swt:size-4"
+                                                prop.className
+                                                    "swt:iconify swt:fluent--checkbox-checked-24-regular swt:size-4"
                                             ]
                                             Html.span (
                                                 if props.ActiveAction = Some "Commit Selection" then
@@ -654,10 +666,11 @@ type GitSidebar =
                                         prop.testId "GitSidebarCommitAllButton"
                                         prop.className "swt:btn swt:btn-sm swt:btn-secondary swt:gap-2 swt:normal-case"
                                         prop.disabled (not props.CanSubmitCommitAll)
-                                        prop.onClick (fun _ -> props.SubmitCommitAll ())
+                                        prop.onClick (fun _ -> props.SubmitCommitAll())
                                         prop.children [
                                             Html.span [
-                                                prop.className "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
+                                                prop.className
+                                                    "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
                                             ]
                                             Html.span (
                                                 if props.ActiveAction = Some "Commit All" then
@@ -693,7 +706,8 @@ type GitSidebar =
                 prop.children [
                     if props.ChangedFiles.Length = 0 then
                         Html.div [
-                            prop.className "swt:mt-2 swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60"
+                            prop.className
+                                "swt:mt-2 swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60"
                             prop.text "No changed files. Your repository is in sync."
                         ]
                     else
@@ -703,7 +717,9 @@ type GitSidebar =
                                 for change in props.ChangedFiles do
                                     let isSelected =
                                         props.SelectedFile
-                                        |> Option.exists (fun selected -> String.Equals(selected, change.Path, StringComparison.Ordinal))
+                                        |> Option.exists (fun selected ->
+                                            String.Equals(selected, change.Path, StringComparison.Ordinal)
+                                        )
 
                                     let isSelectedForCommit = Set.contains change.Path props.SelectedCommitPaths
 
@@ -727,12 +743,15 @@ type GitSidebar =
                                                 prop.children [
                                                     Html.input [
                                                         prop.testId ("GitSidebarCommitSelectionCheckbox-" + change.Path)
-                                                        prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
+                                                        prop.className
+                                                            "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
                                                         prop.type'.checkbox
                                                         prop.disabled (not props.CanEditCommit || change.IsConflicted)
                                                         prop.isChecked isSelectedForCommit
                                                         prop.onClick (fun event -> event.stopPropagation ())
-                                                        prop.onChange (fun (_: bool) -> props.ToggleCommitSelection change.Path)
+                                                        prop.onChange (fun (_: bool) ->
+                                                            props.ToggleCommitSelection change.Path
+                                                        )
                                                     ]
                                                     Html.span [
                                                         prop.className [
@@ -748,14 +767,18 @@ type GitSidebar =
                                                         prop.className "swt:min-w-0 swt:flex-1"
                                                         prop.children [
                                                             Html.div [
-                                                                prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                                                                prop.className
+                                                                    "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
                                                                 prop.children [
                                                                     Html.span [
-                                                                        prop.className "swt:truncate swt:text-sm swt:font-medium"
+                                                                        prop.className
+                                                                            "swt:truncate swt:text-sm swt:font-medium"
                                                                         prop.text change.Path
                                                                     ]
                                                                     Html.span [
-                                                                        prop.className (GitSidebarInternal.changeBadgeClasses change)
+                                                                        prop.className (
+                                                                            GitSidebarInternal.changeBadgeClasses change
+                                                                        )
                                                                         prop.text (
                                                                             if change.IsConflicted then
                                                                                 "Conflict"
@@ -768,11 +791,11 @@ type GitSidebar =
                                                             match change.OriginalPath with
                                                             | Some originalPath ->
                                                                 Html.div [
-                                                                    prop.className "swt:mt-1 swt:text-xs swt:text-base-content/60"
+                                                                    prop.className
+                                                                        "swt:mt-1 swt:text-xs swt:text-base-content/60"
                                                                     prop.text $"Renamed from {originalPath}"
                                                                 ]
-                                                            | None ->
-                                                                Html.none
+                                                            | None -> Html.none
                                                         ]
                                                     ]
                                                 ]
@@ -830,7 +853,7 @@ type GitSidebar =
                                             if String.IsNullOrWhiteSpace nextValue then
                                                 props.SetSelectedStartPoint None
                                             else
-                                                props.SetSelectedStartPoint (Some nextValue)
+                                                props.SetSelectedStartPoint(Some nextValue)
                                         )
                                         prop.children [
                                             for startPoint, label in props.BranchOptionsWithHead do
@@ -851,7 +874,7 @@ type GitSidebar =
                             prop.className "swt:btn swt:btn-ghost"
                             prop.disabled props.ActiveAction.IsSome
                             prop.text "Cancel"
-                            prop.onClick (fun _ -> props.CloseDialog ())
+                            prop.onClick (fun _ -> props.CloseDialog())
                         ]
                         Html.button [
                             prop.testId "GitSidebarCreateBranchSubmit"
@@ -863,7 +886,7 @@ type GitSidebar =
                                 else
                                     "Create Branch"
                             )
-                            prop.onClick (fun _ -> props.SubmitCreateBranch ())
+                            prop.onClick (fun _ -> props.SubmitCreateBranch())
                         ]
                     ]
             )
@@ -894,7 +917,7 @@ type GitSidebar =
                                             if String.IsNullOrWhiteSpace nextValue then
                                                 props.SetSelectedSwitchBranch None
                                             else
-                                                props.SetSelectedSwitchBranch (Some nextValue)
+                                                props.SetSelectedSwitchBranch(Some nextValue)
                                         )
                                         prop.children [
                                             for branch in props.LocalBranchOptionsForSwitch do
@@ -915,7 +938,7 @@ type GitSidebar =
                             prop.className "swt:btn swt:btn-ghost"
                             prop.disabled props.ActiveAction.IsSome
                             prop.text "Cancel"
-                            prop.onClick (fun _ -> props.CloseDialog ())
+                            prop.onClick (fun _ -> props.CloseDialog())
                         ]
                         Html.button [
                             prop.testId "GitSidebarSwitchBranchSubmit"
@@ -927,7 +950,7 @@ type GitSidebar =
                                 else
                                     "Switch Branch"
                             )
-                            prop.onClick (fun _ -> props.SubmitSwitchBranch ())
+                            prop.onClick (fun _ -> props.SubmitSwitchBranch())
                         ]
                     ]
             )
@@ -970,11 +993,20 @@ type GitSidebar =
         let activeDialog, setActiveDialog = React.useState ActiveDialog.None
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
-        let downloadLargeFilesInput, setDownloadLargeFilesInput = React.useState downloadLargeFiles
-        let lfsThresholdInput, setLfsThresholdInput = React.useState (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)
-        let selectedCommitPaths, setSelectedCommitPaths = React.useStateWithUpdater Set.empty<string>
+
+        let downloadLargeFilesInput, setDownloadLargeFilesInput =
+            React.useState downloadLargeFiles
+
+        let lfsThresholdInput, setLfsThresholdInput =
+            React.useState (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)
+
+        let selectedCommitPaths, setSelectedCommitPaths =
+            React.useStateWithUpdater Set.empty<string>
+
         let selectedStartPoint, setSelectedStartPoint = React.useState (None: string option)
-        let selectedSwitchBranch, setSelectedSwitchBranch = React.useState (None: string option)
+
+        let selectedSwitchBranch, setSelectedSwitchBranch =
+            React.useState (None: string option)
 
         let isAdvancedActionsOpen = activeDialog = ActiveDialog.AdvancedActions
         let isCreateBranchModalOpen = activeDialog = ActiveDialog.CreateBranch
@@ -998,14 +1030,12 @@ type GitSidebar =
 
         let isBusy =
             activeAction.IsSome
-            ||
-            match runStatus with
-            | GitSidebarRunStatus.Idle -> false
-            | GitSidebarRunStatus.Busy _
-            | GitSidebarRunStatus.Progress _ -> true
+            || match runStatus with
+               | GitSidebarRunStatus.Idle -> false
+               | GitSidebarRunStatus.Busy _
+               | GitSidebarRunStatus.Progress _ -> true
 
-        let visibleError =
-            errorNotice |> Option.orElse localError
+        let visibleError = errorNotice |> Option.orElse localError
 
         // Sync selectedCommitPaths with changedFiles: remove paths that are no longer in the changed
         // files list (e.g., after a commit or discard operation updates the server-side file list).
@@ -1017,16 +1047,14 @@ type GitSidebar =
                         changedFiles
                         |> Array.exists (fun change -> String.Equals(change.Path, path, StringComparison.Ordinal))
                     )
-                )),
+                )
+            ),
             [| box changedFiles |]
         )
 
         // Reset the local downloadLargeFiles toggle when the prop changes
         // (e.g., after the server confirms or rejects a preference update).
-        React.useEffect (
-            (fun () -> setDownloadLargeFilesInput downloadLargeFiles),
-            [| box downloadLargeFiles |]
-        )
+        React.useEffect ((fun () -> setDownloadLargeFilesInput downloadLargeFiles), [| box downloadLargeFiles |])
 
         // Reset the local LFS threshold input when the prop changes
         // (same sync pattern as downloadLargeFiles above).
@@ -1065,21 +1093,18 @@ type GitSidebar =
 
         let localBranchOptionsForSwitch =
             branchOptions
-            |> Array.filter (fun branch ->
-                branch.Kind = GitSidebarBranchKind.Local
-                && not branch.IsCurrent
-            )
+            |> Array.filter (fun branch -> branch.Kind = GitSidebarBranchKind.Local && not branch.IsCurrent)
 
-        let runAction (label: string) (operation: unit -> JS.Promise<Result<unit, string>>) =
+        let runSelectChangeAction (change: GitSidebarChange) =
             promise {
                 setLocalError None
-                setActiveAction (Some label)
+                setActiveAction (Some $"Open {change.Path}")
 
                 try
-                    let! result = operation ()
+                    let! result = onSelectChange change
 
                     match result with
-                    | Ok () -> ()
+                    | Ok() -> ()
                     | Error message -> setLocalError (Some message)
                 finally
                     setActiveAction None
@@ -1103,9 +1128,7 @@ type GitSidebar =
             setLocalError None
 
             let defaultBranch =
-                localBranchOptionsForSwitch
-                |> Array.tryHead
-                |> Option.map _.RefName
+                localBranchOptionsForSwitch |> Array.tryHead |> Option.map _.RefName
 
             setSelectedSwitchBranch defaultBranch
             setActiveDialog ActiveDialog.SwitchBranch
@@ -1120,37 +1143,22 @@ type GitSidebar =
 
         let submitCommitSelection () =
             let normalizedCommitMessage = commitMessage.Trim()
-            let selectedPaths =
-                selectedCommitPaths
-                |> Set.toArray
-                |> Array.sort
+            let selectedPaths = selectedCommitPaths |> Set.toArray |> Array.sort
 
             if String.IsNullOrWhiteSpace normalizedCommitMessage then
                 setLocalError (Some "Save message must not be empty.")
             elif selectedPaths.Length = 0 then
                 setLocalError (Some "Select at least one file to save.")
             else
-                promise {
-                    setLocalError None
-                    setActiveAction (Some "Commit Selection")
+                setLocalError None
 
-                    try
-                        let! result =
-                            onCommitSelection {
-                                Message = normalizedCommitMessage
-                                Paths = selectedPaths
-                            }
-
-                        match result with
-                        | Ok () ->
-                            setCommitMessage ""
-                            setSelectedCommitPaths (fun _ -> Set.empty)
-                        | Error message ->
-                            setLocalError (Some message)
-                    finally
-                        setActiveAction None
+                onCommitSelection {
+                    Message = normalizedCommitMessage
+                    Paths = selectedPaths
                 }
-                |> Promise.start
+
+                setCommitMessage ""
+                setSelectedCommitPaths (fun _ -> Set.empty)
 
         let submitCommitAll () =
             let normalizedCommitMessage = commitMessage.Trim()
@@ -1158,29 +1166,14 @@ type GitSidebar =
             if String.IsNullOrWhiteSpace normalizedCommitMessage then
                 setLocalError (Some "Save message must not be empty.")
             else
-                promise {
-                    setLocalError None
-                    setActiveAction (Some "Commit All")
-
-                    try
-                        let! result = onCommitAll normalizedCommitMessage
-
-                        match result with
-                        | Ok () ->
-                            setCommitMessage ""
-                        | Error message ->
-                            setLocalError (Some message)
-                    finally
-                        setActiveAction None
-                }
-                |> Promise.start
+                setLocalError None
+                onCommitAll normalizedCommitMessage
+                setCommitMessage ""
 
         let submitLfsThreshold () =
-            let normalizedInput =
-                lfsThresholdInput.Trim()
+            let normalizedInput = lfsThresholdInput.Trim()
 
-            let success, parsedThresholdMb =
-                Int32.TryParse normalizedInput
+            let success, parsedThresholdMb = Int32.TryParse normalizedInput
 
             if not success then
                 setLocalError (Some "Git LFS threshold must be a whole number.")
@@ -1189,45 +1182,17 @@ type GitSidebar =
             elif parsedThresholdMb > 100 then
                 setLocalError (Some "Git LFS threshold must not exceed 100 MB.")
             else
-                promise {
-                    setLocalError None
-                    setActiveAction (Some "Save Git LFS Threshold")
-
-                    try
-                        let! result = onSaveLfsAutoTrackThreshold parsedThresholdMb
-
-                        match result with
-                        | Ok () ->
-                            setLfsThresholdInput (GitSidebarInternal.formatThresholdInput parsedThresholdMb)
-                        | Error message ->
-                            setLocalError (Some message)
-                    finally
-                        setActiveAction None
-                }
-                |> Promise.start
+                setLocalError None
+                onSaveLfsAutoTrackThreshold parsedThresholdMb
+                setLfsThresholdInput (GitSidebarInternal.formatThresholdInput parsedThresholdMb)
 
         let submitDownloadLargeFiles (nextValue: bool) =
             if nextValue = downloadLargeFilesInput then
                 ()
             else
-                promise {
-                    let previousValue = downloadLargeFilesInput
-                    setLocalError None
-                    setActiveAction (Some "Save Git LFS Download Preference")
-                    setDownloadLargeFilesInput nextValue
-
-                    try
-                        let! result = onSaveDownloadLargeFiles nextValue
-
-                        match result with
-                        | Ok () -> ()
-                        | Error message ->
-                            setDownloadLargeFilesInput previousValue
-                            setLocalError (Some message)
-                    finally
-                        setActiveAction None
-                }
-                |> Promise.start
+                setLocalError None
+                setDownloadLargeFilesInput nextValue
+                onSaveDownloadLargeFiles nextValue
 
         let submitCreateBranch () =
             let normalizedBranchName = branchName.Trim()
@@ -1235,64 +1200,37 @@ type GitSidebar =
             if String.IsNullOrWhiteSpace normalizedBranchName then
                 setLocalError (Some "Branch name must not be empty.")
             else
-                promise {
-                    setLocalError None
-                    setActiveAction (Some "Create Branch From")
+                setLocalError None
 
-                    try
-                        let! result =
-                            onCreateBranch {
-                                BranchName = normalizedBranchName
-                                StartPoint = selectedStartPoint
-                            }
-
-                        match result with
-                        | Ok () ->
-                            setActiveDialog ActiveDialog.None
-                            setBranchName ""
-                        | Error message ->
-                            setLocalError (Some message)
-                    finally
-                        setActiveAction None
+                onCreateBranch {
+                    BranchName = normalizedBranchName
+                    StartPoint = selectedStartPoint
                 }
-                |> Promise.start
+
+                setActiveDialog ActiveDialog.None
+                setBranchName ""
 
         let submitSwitchBranch () =
             match selectedSwitchBranch with
-            | None ->
-                setLocalError (Some "Select a branch to switch to.")
+            | None -> setLocalError (Some "Select a branch to switch to.")
             | Some branchName ->
-                promise {
-                    setLocalError None
-                    setActiveAction (Some "Switch Branch")
-
-                    try
-                        let! result = onSwitchBranch branchName
-
-                        match result with
-                        | Ok () ->
-                            setActiveDialog ActiveDialog.None
-                        | Error message ->
-                            setLocalError (Some message)
-                    finally
-                        setActiveAction None
-                }
-                |> Promise.start
+                setLocalError None
+                onSwitchBranch branchName
+                setActiveDialog ActiveDialog.None
 
         let hasConflicts = GitSidebarInternal.hasConflicts status changedFiles
         let canEditCommit = not status.IsClean && not hasConflicts && not isBusy
         let selectedCommitCount = Set.count selectedCommitPaths
+
         let canSubmitCommitSelection =
             canEditCommit
             && selectedCommitCount > 0
             && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
 
         let canSubmitCommitAll =
-            canEditCommit
-            && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
+            canEditCommit && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
 
-        let normalizedLfsThresholdInput =
-            lfsThresholdInput.Trim()
+        let normalizedLfsThresholdInput = lfsThresholdInput.Trim()
 
         let canSaveLfsThreshold =
             not isBusy
@@ -1314,7 +1252,10 @@ type GitSidebar =
                         Status = status
                         HasConflicts = hasConflicts
                         IsBusy = isBusy
-                        OnRefresh = fun () -> runAction "Refresh" onRefresh
+                        OnRefresh =
+                            fun () ->
+                                setLocalError None
+                                onRefresh ()
                     }
                 )
 
@@ -1323,7 +1264,10 @@ type GitSidebar =
                         DownloadLargeFilesInput = downloadLargeFilesInput
                         IsBusy = isBusy
                         SubmitDownloadLargeFiles = submitDownloadLargeFiles
-                        SubmitSync = fun () -> runAction "Sync" onSync
+                        SubmitSync =
+                            fun () ->
+                                setLocalError None
+                                onSync ()
                         IsAdvancedActionsOpen = isAdvancedActionsOpen
                         ToggleAdvancedActions =
                             fun () ->
@@ -1333,9 +1277,18 @@ type GitSidebar =
                                     else
                                         ActiveDialog.AdvancedActions
                                 )
-                        SubmitFetch = fun () -> runAction "Fetch" onFetch
-                        SubmitPull = fun () -> runAction "Pull" onPull
-                        SubmitPush = fun () -> runAction "Push" onPush
+                        SubmitFetch =
+                            fun () ->
+                                setLocalError None
+                                onFetch ()
+                        SubmitPull =
+                            fun () ->
+                                setLocalError None
+                                onPull ()
+                        SubmitPush =
+                            fun () ->
+                                setLocalError None
+                                onPush ()
                         OpenCreateBranchModal = openCreateBranchModal
                         OpenSwitchBranchModal = openSwitchBranchModal
                         CanSwitchBranch = localBranchOptionsForSwitch.Length > 0
@@ -1382,7 +1335,9 @@ type GitSidebar =
                                 prop.testId "GitSidebarMergeBanner"
                                 prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
                                 prop.children [
-                                    Html.span [ prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4" ]
+                                    Html.span [
+                                        prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                    ]
                                     Html.span "Resolve all conflicted files before pushing."
                                 ]
                             ]
@@ -1397,7 +1352,7 @@ type GitSidebar =
                         IsBusy = isBusy
                         CanEditCommit = canEditCommit
                         ToggleCommitSelection = toggleCommitSelection
-                        OpenChange = fun change -> runAction $"Open {change.Path}" (fun () -> onSelectChange change)
+                        OpenChange = fun change -> runSelectChangeAction change
                     }
                 )
 
