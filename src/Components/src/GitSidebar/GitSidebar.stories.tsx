@@ -3,33 +3,32 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { Main as GitSidebarComponent } from "./GitSidebar.fs.js";
 import {
-  FSharpResult$2_Error$,
   FSharpResult$2_Ok,
 } from "../fable_modules/fable-library-ts.5.0.0-alpha.21/Result.ts";
 
-const ok = () => Promise.resolve(FSharpResult$2_Ok<void, string>(undefined));
-const fail = (message: string) =>
-  Promise.resolve(FSharpResult$2_Error$<void, string>(message));
-const okWithArg = (_arg: unknown) => ok();
-const okWithMessage = (_message: string) => ok();
-const okWithSelection = (_request: unknown) => ok();
-const okWithBranch = (_branchName: string) => ok();
-const okWithThreshold = (_thresholdMb: number) => ok();
-const okWithDownloadPreference = (_downloadLargeFiles: boolean) => ok();
+const noop = () => {};
+const noopWithArg = (_arg: unknown) => {};
+const noopWithMessage = (_message: string) => {};
+const noopWithSelection = (_request: unknown) => {};
+const noopWithBranch = (_branchName: string) => {};
+const noopWithThreshold = (_thresholdMb: number) => {};
+const noopWithDownloadPreference = (_downloadLargeFiles: boolean) => {};
+const okSelectChange = (_change: unknown) =>
+  Promise.resolve(FSharpResult$2_Ok<void, string>(undefined));
 
 const baseCallbacks = {
-  OnRefresh: ok,
-  OnFetch: ok,
-  OnPull: ok,
-  OnPush: ok,
-  OnSync: ok,
-  OnCommitSelection: okWithSelection,
-  OnCommitAll: okWithMessage,
-  OnSaveDownloadLargeFiles: okWithDownloadPreference,
-  OnSaveLfsAutoTrackThreshold: okWithThreshold,
-  OnCreateBranch: okWithArg,
-  OnSwitchBranch: okWithBranch,
-  OnSelectChange: okWithArg,
+  OnRefresh: noop,
+  OnFetch: noop,
+  OnPull: noop,
+  OnPush: noop,
+  OnSync: noop,
+  OnCommitSelection: noopWithSelection,
+  OnCommitAll: noopWithMessage,
+  OnSaveDownloadLargeFiles: noopWithDownloadPreference,
+  OnSaveLfsAutoTrackThreshold: noopWithThreshold,
+  OnCreateBranch: noopWithArg,
+  OnSwitchBranch: noopWithBranch,
+  OnSelectChange: okSelectChange,
 };
 
 const buildCallbacks = (
@@ -360,24 +359,14 @@ export const CommitComposer: Story = {
   },
 };
 
-export const CallbackErrorHandling: Story = {
+export const GlobalErrorState: Story = {
   args: {
     status: baseStatus,
     changedFiles: changedFiles.slice(),
     branchOptions: branchOptions.slice(),
-    callbacks: buildCallbacks({
-      OnFetch: () =>
-        fail("Fetch failed because the remote rejected the request."),
-    }),
+    callbacks: buildCallbacks(),
+    errorNotice: "Fetch failed because the remote rejected the request.",
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
-    await userEvent.click(canvas.getByTestId("GitSidebarFetchButton"));
-    await expect(canvas.getByTestId("GitSidebarErrorNotice")).toHaveTextContent(
-      "Fetch failed because the remote rejected the request.",
-    );
   },
 };
