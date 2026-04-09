@@ -13,7 +13,7 @@ const noopWithSelection = (_request: unknown) => {};
 const noopWithBranch = (_branchName: string) => {};
 const noopWithThreshold = (_thresholdMb: number) => {};
 const noopWithDownloadPreference = (_downloadLargeFiles: boolean) => {};
-const okSelectChange = (_change: unknown) =>
+const noopSelectChange = (_change: unknown) =>
   Promise.resolve(FSharpResult$2_Ok<void, string>(undefined));
 
 const baseCallbacks = {
@@ -28,7 +28,7 @@ const baseCallbacks = {
   OnSaveLfsAutoTrackThreshold: noopWithThreshold,
   OnCreateBranch: noopWithArg,
   OnSwitchBranch: noopWithBranch,
-  OnSelectChange: okSelectChange,
+  OnSelectChange: noopSelectChange,
 };
 
 const buildCallbacks = (

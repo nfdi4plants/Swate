@@ -380,6 +380,8 @@ let buildUpdatedLfsSettings (state: GitState) (thresholdMb: int option) (downloa
     DownloadLargeFiles = downloadLargeFiles |> Option.defaultValue state.DownloadLargeFiles
 }
 
+/// Resolves a caller-provided reply callback synchronously when the command runs.
+/// No IPC or async work is needed — the reply executes in the same dispatch cycle.
 let private resolveReplyCmd (reply: Reply<'T>) (result: Result<'T, string>) : Cmd<'msg> = [
     fun _dispatch -> reply result
 ]
