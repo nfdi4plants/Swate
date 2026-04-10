@@ -748,7 +748,6 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFilesList(props: ChangedFilesListProps) =
         let scrollContainerRef = React.useElementRef ()
-        let virtualizerTick, setVirtualizerTick = React.useState 0
 
         let rowVirtualizer =
             Virtual.useVirtualizer (
@@ -758,11 +757,6 @@ type GitSidebar =
                 overscan = 2,
                 gap = 8
             )
-
-        React.useEffect (
-            (fun () -> setVirtualizerTick (virtualizerTick + 1)),
-            [| box props.ChangedFiles.Length |]
-        )
 
         React.Fragment [
             GitSidebar.SectionHeader(
@@ -786,7 +780,7 @@ type GitSidebar =
                             prop.text "No changed files. Your repository is in sync."
                         ]
                     else
-                        let renderChangeRow (isVirtualized: bool) (index: int) (top: int) (size: int) =
+                        let renderChangeRow (isVirtualized: bool) (index: int) (top: int option) =
                                     let change = props.ChangedFiles.[index]
                                     let isSelected =
                                         props.SelectedFile
@@ -800,6 +794,8 @@ type GitSidebar =
                                     Html.button [
                                         prop.testId $"GitSidebarChangeRow-{index}"
                                         prop.key change.Path
+                                        if isVirtualized then
+                                            prop.custom ("data-index", index)
                                         prop.disabled props.IsBusy
                                         prop.className [
                                             "swt:flex swt:w-full swt:flex-col swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-3 swt:py-2 swt:text-left swt:transition-colors"
@@ -815,9 +811,10 @@ type GitSidebar =
                                         if isVirtualized then
                                             prop.style [
                                                 style.top 0
-                                                style.custom ("transform", $"translateY({top}px)")
-                                                style.height size
+                                                style.custom ("transform", $"translateY({top.Value}px)")
                                             ]
+                                        if isVirtualized then
+                                            prop.ref rowVirtualizer.measureElement
                                         prop.onClick (fun _ -> props.OpenChange change)
                                         prop.children [
                                             Html.div [
@@ -891,33 +888,21 @@ type GitSidebar =
                                 prop.className "swt:mt-2 swt:flex swt:flex-col swt:gap-2"
                                 prop.children (
                                     props.ChangedFiles
-                                    |> Array.mapi (fun index _ -> renderChangeRow false index 0 0)
+                                    |> Array.mapi (fun index _ -> renderChangeRow false index None)
                                 )
                             ]
 
                         if props.ChangedFiles.Length <= 24 then
                             renderRows ()
                         else
-                            let virtualRows = rowVirtualizer.getVirtualItems ()
-                            let totalSize =
-                                if virtualRows.Length = 0 then
-                                    props.ChangedFiles.Length * 96
-                                else
-                                    rowVirtualizer.getTotalSize ()
-
                             Html.div [
-                                prop.className "swt:relative"
-                                prop.style [ style.height totalSize ]
+                                prop.className "swt:mt-2 swt:relative"
+                                prop.style [ style.height (rowVirtualizer.getTotalSize ()) ]
                                 prop.children (
-                                    if virtualRows.Length = 0 then
-                                        props.ChangedFiles
-                                        |> Array.mapi (fun index _ -> renderChangeRow false index 0 0)
-                                        |> Array.take (min 12 props.ChangedFiles.Length)
-                                    else
-                                        virtualRows
-                                        |> Array.map (fun virtualRow ->
-                                            renderChangeRow true virtualRow.index virtualRow.start virtualRow.size
-                                        )
+                                    rowVirtualizer.getVirtualItems ()
+                                    |> Array.map (fun virtualRow ->
+                                        renderChangeRow true virtualRow.index (Some virtualRow.start)
+                                    )
                                 )
                             ]
                 ]

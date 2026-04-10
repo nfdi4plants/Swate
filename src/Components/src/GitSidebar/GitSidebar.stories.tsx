@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, fireEvent, userEvent, within } from "storybook/test";
 import { Main as GitSidebarComponent } from "./GitSidebar.fs.js";
 import {
   FSharpResult$2_Ok,
@@ -275,9 +275,15 @@ export const LargeChangedSet: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const gitSidebar = canvas.getByTestId("GitSidebar");
     await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("400 files");
     await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toBeInTheDocument();
     await expect(canvas.queryByTestId("GitSidebarChangeRow-399")).toBeNull();
+    const scrollContainer = gitSidebar.querySelector("div[class*='overflow-y-auto']") as HTMLElement | null;
+    expect(scrollContainer).not.toBeNull();
+    scrollContainer.scrollTop = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    await fireEvent.scroll(scrollContainer);
+    await expect(await canvas.findByTestId("GitSidebarChangeRow-399")).toBeInTheDocument();
   },
 };
 

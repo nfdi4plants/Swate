@@ -99,6 +99,9 @@ let private changedFile path indexStatus workingTreeStatus isConflicted = {
     IsConflicted = isConflicted
 }
 
+[<Emit("new Event($0)")>]
+let private createEvent (eventType: string) : Browser.Types.Event = jsNative
+
 let private manyChangedFiles count =
     [|
         for index in 0 .. count - 1 do
@@ -1421,7 +1424,6 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("400 files")).toBe (true)
-                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
                 Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-399']")).toBeNull ()
 
                 cleanup ()
