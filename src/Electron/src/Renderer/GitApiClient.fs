@@ -50,6 +50,24 @@ let gitPull (request: GitRemoteOperationRequest) =
 let gitPush (request: GitRemoteOperationRequest) =
     callIpcWith request (gitApi.gitPush (unbox null))
 
+let gitInitRepository (targetPath: string) =
+    promise {
+        let! result = gitApi.gitInitRepository (unbox null) targetPath
+
+        return
+            result
+            |> mapExnResult
+            |> Result.bind (fun operation ->
+                if operation.Success then
+                    Ok(operation.Path |> Option.defaultValue targetPath)
+                else
+                    Error(operation.Message |> Option.defaultValue "Git repository initialization failed.")
+            )
+    }
+
+let gitAddRemote (request: GitRemoteConfigRequest) =
+    callIpcWith request (gitApi.gitAddRemote (unbox null))
+
 let gitCloneRepository (request: GitCloneRepositoryRequest) =
     callIpcWith request (gitApi.gitCloneRepository (unbox null))
 

@@ -7,6 +7,7 @@ open Fable.Core
 open Feliz
 open Renderer.Context.GitWorkflow
 open Renderer.Types
+open Swate.Components.Api.GitLabApi
 open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Vitest
@@ -108,10 +109,13 @@ let private defaultDependencies: GitDependencies = {
     getGitLfsSettings = fun () -> unexpectedPromise "getGitLfsSettings"
     loadDiffPage = fun path -> unexpectedPromise $"loadDiffPage:{path}"
     loadMergeConflictPage = fun path -> unexpectedPromise $"loadMergeConflictPage:{path}"
+    initGitRepository = fun path -> unexpectedPromise $"initGitRepository:{path}"
+    createDataHubProject = fun name -> unexpectedPromise $"createDataHubProject:{name}"
     installGitLfs = fun () -> unexpectedPromise "installGitLfs"
     gitFetch = fun _ -> unexpectedPromise "gitFetch"
     gitPull = fun _ -> unexpectedPromise "gitPull"
     gitPush = fun _ -> unexpectedPromise "gitPush"
+    gitAddRemote = fun _ -> unexpectedPromise "gitAddRemote"
     gitCloneRepository = fun _ -> unexpectedPromise "gitCloneRepository"
     createBranch = fun _ -> unexpectedPromise "createBranch"
     checkoutBranch = fun _ -> unexpectedPromise "checkoutBranch"
@@ -324,6 +328,33 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "RefreshCompleted records missing-repository state instead of leaving the sidebar in generic error mode",
+            fun () -> promise {
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                        RefreshRequestId = 1
+                        RefreshState = GitRefreshState.Loading
+                        BusyOperation = Some GitBusyOperation.Refreshing
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (RefreshCompleted(1, Error "git status failed (Unknown): The selected ARC path is not a git repository."))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.MissingRepository)
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(nextState.ChangedFiles).toEqual ([||])
+                Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "SelectChangeCompleted leaves the current selection untouched when an older request finishes late",
             fun () -> promise {
                 let mutable replyResult = None
@@ -499,6 +530,119 @@ Vitest.describe (
                 let! _ = collectMessages cmd
 
                 Vitest.expect(nextState.DownloadLargeFiles).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "InitRepositoryCompleted clears the missing-repository state and schedules a refresh",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        initGitRepository = fun path -> promise { return Ok path }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
+                }
+
+                let requestedState, requestCmd =
+                    update deps ignore (InitRepositoryRequested None) state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| InitRepositoryCompleted(sessionId, Ok()) |] when sessionId = state.ArcSessionId ->
+                        update deps ignore requestMessages[0] requestedState
+                    | _ -> failwith "Expected init-repository completion."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+
+                match finishMessages with
+                | [| RefreshRequested |] -> ()
+                | _ -> failwith "Expected init-repository success to trigger RefreshRequested."
+            }
+        )
+
+        Vitest.test (
+            "InitRepositoryRequested can create a DataHub project and add origin before refreshing",
+            fun () -> promise {
+                let mutable addedRemote = None
+
+                let deps = {
+                    defaultDependencies with
+                        initGitRepository = fun path -> promise { return Ok path }
+                        createDataHubProject =
+                            fun projectName -> promise {
+                                return
+                                    Ok {
+                                        id = 42
+                                        name = projectName
+                                        path_with_namespace = $"caroott/{projectName}"
+                                        name_with_namespace = $"caroott / {projectName}"
+                                        description = None
+                                        web_url = $"https://git.nfdi4plants.org/caroott/{projectName}"
+                                        http_url_to_repo = $"https://git.nfdi4plants.org/caroott/{projectName}.git"
+                                        ssh_url_to_repo = None
+                                        avatar_url = None
+                                        visibility = Some "private"
+                                        star_count = 0
+                                        created_at = None
+                                        last_activity_at = None
+                                        tag_list = [||]
+                                        ``namespace`` = {
+                                            id = 1
+                                            name = "caroott"
+                                            kind = "user"
+                                            full_path = "caroott"
+                                        }
+                                    }
+                            }
+                        gitAddRemote =
+                            fun request -> promise {
+                                addedRemote <- Some request
+                                return Ok okOperationResult
+                            }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
+                }
+
+                let requestedState, requestCmd =
+                    update deps ignore (InitRepositoryRequested(Some "arc-a")) state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| InitRepositoryCompleted(sessionId, Ok()) |] when sessionId = state.ArcSessionId ->
+                        update deps ignore requestMessages[0] requestedState
+                    | _ -> failwith "Expected a successful init-and-remote bootstrap completion."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest
+                    .expect(addedRemote)
+                    .toEqual (
+                        Some {
+                            RemoteName = "origin"
+                            RemoteUrl = "https://git.nfdi4plants.org/caroott/arc-a.git"
+                        }
+                    )
+
+                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
+
+                match finishMessages with
+                | [| RefreshRequested |] -> ()
+                | _ -> failwith "Expected remote bootstrap success to trigger RefreshRequested."
             }
         )
 
@@ -995,6 +1139,81 @@ Vitest.describe (
                         )
                     )
                     .toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebarEmptyState renders the bootstrap call-to-action",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
+                            title = "Initialize Git for this ARC",
+                            description = "The selected ARC folder is not a Git repository yet.",
+                            primaryAction = {
+                                Label = "Initialize Repository"
+                                IconClassName = "swt:fluent--branch-fork-24-regular"
+                                Disabled = false
+                                OnClick = ignore
+                            },
+                            ?infoText = Some "Remote actions remain disabled until you sign in."
+                        )
+                    )
+
+                Vitest.expect(container.textContent.Contains("Initialize Git for this ARC")).toBe (true)
+                Vitest.expect(container.textContent.Contains("Initialize Repository")).toBe (true)
+                Vitest.expect(container.textContent.Contains("Remote actions remain disabled")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar disables remote actions and shows the requested warning when auth is unavailable",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = true
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [||],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnSync = fun () -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5,
+                            remoteActionsEnabled = false,
+                            remoteActionsWarning =
+                                "Sign in to a DataHub account to use fetch, pull, push, or sync."
+                        )
+                    )
+
+                let syncButton =
+                    container.querySelector ("[data-testid='GitSidebarSyncButton']")
+                    :?> HTMLButtonElement
+
+                Vitest.expect(syncButton.disabled).toBe (true)
+                Vitest.expect(container.textContent.Contains("Sign in to a DataHub account")).toBe (true)
 
                 cleanup ()
             }

@@ -64,6 +64,8 @@ type private LfsSettingsSectionProps = {
 type private AdvancedActionsProps = {
     DownloadLargeFilesInput: bool
     IsBusy: bool
+    RemoteActionsEnabled: bool
+    RemoteActionsWarning: string option
     SubmitDownloadLargeFiles: bool -> unit
     SubmitSync: unit -> unit
     IsAdvancedActionsOpen: bool
@@ -514,7 +516,7 @@ type GitSidebar =
                     GitSidebar.ActionButton(
                         "Synchronize Changes",
                         "swt:fluent--arrow-sync-24-regular",
-                        props.IsBusy,
+                        props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitSync,
                         testId = "GitSidebarSyncButton"
                     )
@@ -532,6 +534,25 @@ type GitSidebar =
                 ]
             ]
 
+            match props.RemoteActionsWarning with
+            | Some warning when not props.RemoteActionsEnabled ->
+                Html.div [
+                    prop.className "swt:px-3 swt:pt-3"
+                    prop.children [
+                        Html.div [
+                            prop.testId "GitSidebarRemoteAuthWarning"
+                            prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                ]
+                                Html.span warning
+                            ]
+                        ]
+                    ]
+                ]
+            | _ -> Html.none
+
             if props.IsAdvancedActionsOpen then
                 Html.div [
                     prop.className "swt:px-3 swt:pt-3"
@@ -546,21 +567,21 @@ type GitSidebar =
                                 GitSidebar.ActionButton(
                                     "Check for Changes",
                                     "swt:fluent--arrow-download-24-regular",
-                                    props.IsBusy,
+                                    props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitFetch,
                                     testId = "GitSidebarFetchButton"
                                 )
                                 GitSidebar.ActionButton(
                                     "Download Changes",
                                     "swt:fluent--arrow-down-24-regular",
-                                    props.IsBusy,
+                                    props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitPull,
                                     testId = "GitSidebarPullButton"
                                 )
                                 GitSidebar.ActionButton(
                                     "Upload Changes",
                                     "swt:fluent--arrow-up-24-regular",
-                                    props.IsBusy,
+                                    props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitPush,
                                     testId = "GitSidebarPushButton"
                                 )
@@ -968,12 +989,16 @@ type GitSidebar =
             ?runStatus: GitSidebarRunStatus,
             ?selectedFile: string,
             ?errorNotice: string,
-            ?warningNotice: string
+            ?warningNotice: string,
+            ?remoteActionsEnabled: bool,
+            ?remoteActionsWarning: string
         ) =
 
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
         let errorNotice = errorNotice
         let warningNotice = warningNotice
+        let remoteActionsEnabled = defaultArg remoteActionsEnabled true
+        let remoteActionsWarning = remoteActionsWarning
         let selectedFile = selectedFile
         let onRefresh = callbacks.OnRefresh
         let onFetch = callbacks.OnFetch
@@ -1263,6 +1288,8 @@ type GitSidebar =
                     {
                         DownloadLargeFilesInput = downloadLargeFilesInput
                         IsBusy = isBusy
+                        RemoteActionsEnabled = remoteActionsEnabled
+                        RemoteActionsWarning = remoteActionsWarning
                         SubmitDownloadLargeFiles = submitDownloadLargeFiles
                         SubmitSync =
                             fun () ->

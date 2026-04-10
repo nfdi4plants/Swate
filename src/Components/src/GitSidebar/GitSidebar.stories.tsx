@@ -359,6 +359,29 @@ export const CommitComposer: Story = {
   },
 };
 
+export const RemoteActionsDisabled: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+    remoteActionsEnabled: false,
+    remoteActionsWarning:
+      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarSyncButton")).toBeDisabled();
+    await expect(
+      canvas.getByTestId("GitSidebarRemoteAuthWarning"),
+    ).toHaveTextContent(
+      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+    );
+  },
+};
+
 export const GlobalErrorState: Story = {
   args: {
     status: baseStatus,
