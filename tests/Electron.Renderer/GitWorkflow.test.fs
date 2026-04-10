@@ -330,6 +330,9 @@ Vitest.describe (
         Vitest.test (
             "RefreshCompleted records missing-repository state instead of leaving the sidebar in generic error mode",
             fun () -> promise {
+                let clearedPages = ResizeArray<PageState option>()
+                let setPageState pageState = clearedPages.Add pageState
+
                 let state = {
                     GitState.Empty with
                         CurrentArcPath = Some "C:/arc-a"
@@ -341,7 +344,7 @@ Vitest.describe (
                 let nextState, cmd =
                     update
                         defaultDependencies
-                        ignore
+                        setPageState
                         (RefreshCompleted(1, Error "git status failed (Unknown): The selected ARC path is not a git repository."))
                         state
 
@@ -350,6 +353,7 @@ Vitest.describe (
                 Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.MissingRepository)
                 Vitest.expect(nextState.ErrorNotice).toEqual (None)
                 Vitest.expect(nextState.ChangedFiles).toEqual ([||])
+                Vitest.expect(clearedPages |> Seq.toArray).toEqual ([| None |])
                 Vitest.expect(messages).toEqual ([||])
             }
         )
@@ -649,11 +653,16 @@ Vitest.describe (
         Vitest.test (
             "InitRepositoryRequested recovers to a ready local repository when DataHub bootstrap fails after git init",
             fun () -> promise {
+                let warningMessage = "DataHub project creation failed."
+
                 let deps = {
                     defaultDependencies with
                         initGitRepository = fun path -> promise { return Ok path }
                         createDataHubProject =
-                            fun _ -> promise { return Error "DataHub project creation failed." }
+                            fun _ -> promise { return Error warningMessage }
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 1 false) }
                 }
 
                 let state = {
@@ -676,7 +685,25 @@ Vitest.describe (
 
                 Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
                 Vitest.expect(nextState.BusyOperation).toEqual (None)
-                Vitest.expect(nextState.WarningNotice).toEqual (Some "DataHub project creation failed.")
+
+                let afterRefreshRequestedState, refreshRequestCmd =
+                    match finishMessages with
+                    | [| RefreshRequested |] -> update deps ignore RefreshRequested nextState
+                    | _ -> failwith "Expected partial init success to trigger RefreshRequested."
+
+                let! refreshMessages = collectMessages refreshRequestCmd
+
+                let finalState, finalCmd =
+                    match refreshMessages with
+                    | [| RefreshCompleted(_, Ok refreshResult) |] ->
+                        update deps ignore refreshMessages[0] afterRefreshRequestedState
+                    | _ -> failwith "Expected queued refresh completion."
+
+                let! finalMessages = collectMessages finalCmd
+
+                Vitest.expect(finalState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
+                Vitest.expect(finalState.WarningNotice).toEqual (Some warningMessage)
+                Vitest.expect(finalMessages).toEqual ([||])
 
                 match finishMessages with
                 | [| RefreshRequested |] -> ()

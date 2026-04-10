@@ -71,6 +71,7 @@ type GitState = {
     CurrentProgress: GitSidebarProgress option
     ErrorNotice: string option
     WarningNotice: string option
+    PendingRefreshWarningNotice: string option
     SelectedChangePath: string option
     MergeResolutionPendingPath: string option
     InstallRetryState: GitInstallRetryState
@@ -100,6 +101,7 @@ type GitState = {
         CurrentProgress = None
         ErrorNotice = None
         WarningNotice = None
+        PendingRefreshWarningNotice = None
         SelectedChangePath = None
         MergeResolutionPendingPath = None
         InstallRetryState = GitInstallRetryState.Idle
@@ -364,6 +366,8 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
             RepositoryAvailability = GitRepositoryAvailability.Ready
             RefreshState = GitRefreshState.Idle
             ErrorNotice = refreshErrorMessage refreshResult
+            WarningNotice = model.PendingRefreshWarningNotice
+            PendingRefreshWarningNotice = None
     }
 
 let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
@@ -810,6 +814,7 @@ let private missingRepositoryModel (model: GitState) = {
         CurrentProgress = None
         ErrorNotice = None
         WarningNotice = None
+        PendingRefreshWarningNotice = None
         SelectedChangePath = None
         MergeResolutionPendingPath = None
         InstallRetryState = GitInstallRetryState.Idle
@@ -864,7 +869,10 @@ let update
             |> fun state -> {
                 state with
                     ErrorNotice = None
-                    WarningNotice = None
+                    WarningNotice =
+                        match state.PendingRefreshWarningNotice with
+                        | Some _ -> state.WarningNotice
+                        | None -> None
             }
 
         let cmd =
@@ -877,7 +885,7 @@ let update
         nextModel, cmd
     | RefreshCompleted(requestId, _) when requestId <> model.RefreshRequestId -> model, Cmd.none
     | RefreshCompleted(_, Error message) when isMissingRepositoryMessage message ->
-        missingRepositoryModel model, Cmd.none
+        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
     | RefreshCompleted(_, Error message) ->
         let nextModel = {
             model with
@@ -887,12 +895,13 @@ let update
                 CurrentProgress = None
                 ErrorNotice = Some message
                 WarningNotice = None
+                PendingRefreshWarningNotice = None
         }
 
         nextModel, applyPageChangeCmd setPageState GitPageChange.Clear
     | RefreshCompleted(_, Ok refreshResult)
         when refreshErrorMessage refreshResult |> Option.exists isMissingRepositoryMessage ->
-        missingRepositoryModel model, Cmd.none
+        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
     | RefreshCompleted(requestId, Ok refreshResult) ->
         let nextModel =
             model
@@ -941,6 +950,7 @@ let update
                 CurrentProgress = None
                 ErrorNotice = Some message
                 WarningNotice = None
+                PendingRefreshWarningNotice = None
         }
 
         nextModel, Cmd.none
@@ -953,6 +963,7 @@ let update
                 CurrentProgress = None
                 ErrorNotice = None
                 WarningNotice = outcome.WarningMessage
+                PendingRefreshWarningNotice = outcome.WarningMessage
         }
 
         nextModel, Cmd.ofMsg RefreshRequested
