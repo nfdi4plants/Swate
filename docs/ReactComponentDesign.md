@@ -5,12 +5,12 @@ Components in `src/Components` are expected to be reusable and application-agnos
 # File Rules
 
 - **Component folder**: Each component should be placed in a folder named after the component use context.
-    - e.g. `src\Components\src\TermSearch` contains `TermSearch.tsx`, `TermSearchConfigProvider.fs` and `TermSearchConfigSetter.fs`
-    - e.g. `src\Components\src\Authentication` contains `Authentication.fs`, `AccountManager.fs`, `Helper.fs` and `Types.fs`
-- **PascalCase file Names**: `MyComponent.tsx` for the component "MyComponent" and `MyComponent.stories.tsx` for its Storybook tests.
+    - e.g. `src/Components/src/TermSearch` contains `TermSearch.tsx`, `TermSearchConfigProvider.fs` and `TermSearchConfigSetter.fs`
+    - e.g. `src/Components/src/Authentication` contains `Authentication.fs`, `AccountManager.fs`, `Helper.fs` and `Types.fs`
+- **PascalCase file names**: `MyComponent.tsx` for the component "MyComponent" and `MyComponent.stories.tsx` for its Storybook tests.
 - **File namespace**: The file namespace should match the folder structure. For example:
 
-    -  `src\Components\src\Authentication\Authentication.fs` should have:
+    -  `src/Components/src/Authentication/Authentication.fs` should have:
 
         ```fsharp
         namespace Swate.Components.Authentication
@@ -20,7 +20,7 @@ Components in `src/Components` are expected to be reusable and application-agnos
             // ...
         ```
 
-    - `src\Components\src\Authentication\Types.fs` should have:
+    - `src/Components/src/Authentication/Types.fs` should have:
 
         ```fsharp
         module Swate.Components.Authentication.Types
@@ -34,7 +34,7 @@ Components in `src/Components` are expected to be reusable and application-agnos
 - **PascalCase**: MUST use PascalCase for component and object names.
 - **CamelCase**: MUST use camelCase for props and functions.
 - **`[<ReactComponent>]`**: If a component returns a `ReactElement`, it MUST be decorated with `[<ReactComponent>]`.
-- **Components as static members**: Any components SHOULD be defined as static members of a class. They MUST use tupled args. This allows us to use optional params with `?optionalParam` syntax, as well as named params with `namedParam = namedParamValue` syntax. These Classes MUST have the `[<Erase; Mangle(false)>]` attribute to improve interop with native typescript.
+- **Components as static members**: Any components SHOULD be defined as static members of a class. They MUST use tupled args. This allows us to use optional params with `?optionalParam` syntax, as well as named params with `namedParam = namedParamValue` syntax. These Classes MUST have the `[<Erase; Mangle(false)>]` attribute to improve interop with native TypeScript.
 
     ```fsharp
     [<Erase; Mangle(false)>]
