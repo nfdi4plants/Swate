@@ -55,6 +55,8 @@ type GitPullWorkflowResult = {
     PageChange: GitPageChange
 }
 
+type InitRepositoryOutcome = { WarningMessage: string option }
+
 type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
@@ -158,7 +160,7 @@ type Msg =
     | RefreshRequested
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | InitRepositoryRequested of remoteProjectName: string option
-    | InitRepositoryCompleted of sessionId: int * result: Result<unit, string>
+    | InitRepositoryCompleted of sessionId: int * result: Result<InitRepositoryOutcome, string>
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
     | SelectChangeCompleted of
         requestId: int *
@@ -451,12 +453,16 @@ let private runInitRepositoryAsync
         | Error message -> return Error message
         | Ok _ ->
             match remoteProjectName |> Option.map _.Trim() |> Option.filter (String.IsNullOrWhiteSpace >> not) with
-            | None -> return Ok()
+            | None -> return Ok { WarningMessage = None }
             | Some projectName ->
                 let! projectResult = deps.createDataHubProject projectName
 
                 match projectResult with
-                | Error message -> return Error message
+                | Error message ->
+                    return
+                        Ok {
+                            WarningMessage = Some message
+                        }
                 | Ok project ->
                     let! addRemoteResult =
                         deps.gitAddRemote {
@@ -465,10 +471,19 @@ let private runInitRepositoryAsync
                         }
 
                     match addRemoteResult with
-                    | Error message -> return Error message
-                    | Ok operationResult when operationResult.Success -> return Ok()
+                    | Error message ->
+                        return
+                            Ok {
+                                WarningMessage = Some message
+                            }
+                    | Ok operationResult when operationResult.Success ->
+                        return Ok { WarningMessage = None }
                     | Ok operationResult ->
-                        return Error(operationResult.Message |> Option.defaultValue "Adding origin remote failed.")
+                        return
+                            Ok {
+                                WarningMessage =
+                                    Some(operationResult.Message |> Option.defaultValue "Adding origin remote failed.")
+                            }
     }
 
 let private loadPageAsync (deps: GitDependencies) (path: string) (isConflicted: bool) = promise {
@@ -929,7 +944,7 @@ let update
         }
 
         nextModel, Cmd.none
-    | InitRepositoryCompleted(_, Ok()) ->
+    | InitRepositoryCompleted(_, Ok outcome) ->
         let nextModel = {
             model with
                 RepositoryAvailability = GitRepositoryAvailability.Ready
@@ -937,7 +952,7 @@ let update
                 BusyNotice = None
                 CurrentProgress = None
                 ErrorNotice = None
-                WarningNotice = None
+                WarningNotice = outcome.WarningMessage
         }
 
         nextModel, Cmd.ofMsg RefreshRequested

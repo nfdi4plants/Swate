@@ -554,7 +554,7 @@ Vitest.describe (
 
                 let nextState, finishCmd =
                     match requestMessages with
-                    | [| InitRepositoryCompleted(sessionId, Ok()) |] when sessionId = state.ArcSessionId ->
+                    | [| InitRepositoryCompleted(sessionId, Ok _) |] when sessionId = state.ArcSessionId ->
                         update deps ignore requestMessages[0] requestedState
                     | _ -> failwith "Expected init-repository completion."
 
@@ -623,7 +623,7 @@ Vitest.describe (
 
                 let nextState, finishCmd =
                     match requestMessages with
-                    | [| InitRepositoryCompleted(sessionId, Ok()) |] when sessionId = state.ArcSessionId ->
+                    | [| InitRepositoryCompleted(sessionId, Ok _) |] when sessionId = state.ArcSessionId ->
                         update deps ignore requestMessages[0] requestedState
                     | _ -> failwith "Expected a successful init-and-remote bootstrap completion."
 
@@ -643,6 +643,44 @@ Vitest.describe (
                 match finishMessages with
                 | [| RefreshRequested |] -> ()
                 | _ -> failwith "Expected remote bootstrap success to trigger RefreshRequested."
+            }
+        )
+
+        Vitest.test (
+            "InitRepositoryRequested recovers to a ready local repository when DataHub bootstrap fails after git init",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        initGitRepository = fun path -> promise { return Ok path }
+                        createDataHubProject =
+                            fun _ -> promise { return Error "DataHub project creation failed." }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
+                }
+
+                let requestedState, requestCmd =
+                    update deps ignore (InitRepositoryRequested(Some "arc-a")) state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| (InitRepositoryCompleted _ as message) |] -> update deps ignore message requestedState
+                    | _ -> failwith "Expected init-repository completion."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "DataHub project creation failed.")
+
+                match finishMessages with
+                | [| RefreshRequested |] -> ()
+                | _ -> failwith "Expected partial init success to trigger RefreshRequested."
             }
         )
 
