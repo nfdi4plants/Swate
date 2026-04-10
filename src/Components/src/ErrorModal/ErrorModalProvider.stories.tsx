@@ -3,10 +3,9 @@ import { within, expect, userEvent, waitFor, screen } from 'storybook/test';
 import {
   SingleEntry,
   QueuedEntry,
-  CancelableEntry,
   BatchEntry,
   ScopedQueueEntry,
-} from "./ErrorModalProvider.fs.js";
+} from "./Provider.fs.js";
 
 const meta = {
   title: "Components/ErrorModal",
@@ -28,7 +27,6 @@ export const SingleError: Story = {
     const canvas = within(canvasElement);
 
     expect(canvas.queryByRole("button", { name: /queue errors/i })).not.toBeInTheDocument();
-    expect(canvas.queryByRole("button", { name: /show cancelable error/i })).not.toBeInTheDocument();
     expect(canvas.queryByRole("button", { name: /show multiple errors/i })).not.toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole("button", { name: /show error/i }));
@@ -50,7 +48,6 @@ export const QueuedErrors: Story = {
     const canvas = within(canvasElement);
 
     expect(canvas.queryByRole("button", { name: /show error/i })).not.toBeInTheDocument();
-    expect(canvas.queryByRole("button", { name: /show cancelable error/i })).not.toBeInTheDocument();
     expect(canvas.queryByRole("button", { name: /show multiple errors/i })).not.toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole("button", { name: /queue errors/i }));
@@ -66,28 +63,6 @@ export const QueuedErrors: Story = {
   }
 };
 
-export const CancelableError: Story = {
-  render: () => <CancelableEntry />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    expect(canvas.queryByRole("button", { name: /show error/i })).not.toBeInTheDocument();
-    expect(canvas.queryByRole("button", { name: /queue errors/i })).not.toBeInTheDocument();
-    expect(canvas.queryByRole("button", { name: /show multiple errors/i })).not.toBeInTheDocument();
-
-    await userEvent.click(canvas.getByRole("button", { name: /show cancelable error/i }));
-
-    expect(await screen.findByText("Cancelable error")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
-
-    await waitFor(() => {
-      expect(screen.queryByText("Cancelable error")).not.toBeInTheDocument();
-    });
-  }
-};
-
 export const MultipleErrorsAtOnce: Story = {
   render: () => <BatchEntry />,
   play: async ({ canvasElement }) => {
@@ -95,7 +70,6 @@ export const MultipleErrorsAtOnce: Story = {
 
     expect(canvas.queryByRole("button", { name: /show error/i })).not.toBeInTheDocument();
     expect(canvas.queryByRole("button", { name: /queue errors/i })).not.toBeInTheDocument();
-    expect(canvas.queryByRole("button", { name: /show cancelable error/i })).not.toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole("button", { name: /show multiple errors/i }));
 
@@ -135,11 +109,9 @@ export const ScopedDismissKeepsOtherArcEntries: Story = {
 
     await waitFor(() => {
       expect(screen.queryByText("ARC A error")).not.toBeInTheDocument();
-      expect(screen.queryByText("ARC A cancelable error")).not.toBeInTheDocument();
+      expect(screen.queryByText("ARC A follow-up error")).not.toBeInTheDocument();
     });
 
     expect(await screen.findByText("ARC B error")).toBeInTheDocument();
-    expect(canvas.getByTestId("scoped-dismiss-count")).toHaveTextContent("ARC A dismiss callbacks: 1");
-    expect(canvas.getByTestId("scoped-cancel-count")).toHaveTextContent("ARC A cancel callbacks: 0");
   }
 };

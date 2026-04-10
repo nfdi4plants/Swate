@@ -1,6 +1,6 @@
 module Renderer.Components.FileExplorer
 
-open Browser.Dom
+
 open Renderer.Components.ARCHelper
 open Swate.Components
 open Swate.Components.FileExplorerTypes
@@ -54,7 +54,7 @@ let FileTree () =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
-    let errorModal = Contexts.ErrorModal.useErrorModal ()
+    let errorModal = Context.ErrorModal.useErrorModal ()
     let arcScopeId = useCurrentArcScopeId ()
 
     match fileStateCtx.state.FileTree with

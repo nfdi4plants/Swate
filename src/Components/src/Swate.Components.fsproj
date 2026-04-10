@@ -23,23 +23,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="YAMLicious"/>
-    <PackageReference Include="ARCtrl.Core"/>
-    <PackageReference Include="ARCtrl.Javascript"/>
-    <PackageReference Include="ARCtrl.Spreadsheet"/>
-    <PackageReference Include="Fable.Remoting.Client"/>
-    <PackageReference Include="Fable.Fetch"/>
-    <PackageReference Include="Fable.React.Types"/>
-    <PackageReference Include="Fable.Core"/>
-    <PackageReference Include="Feliz"/>
-    <PackageReference Include="Feliz.UseElmish"/>
-    <PackageReference Include="Fable.Browser.Dom"/>
+    <PackageReference Include="YAMLicious" />
+    <PackageReference Include="ARCtrl.Core" />
+    <PackageReference Include="ARCtrl.Javascript" />
+    <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="Fable.Remoting.Client" />
+    <PackageReference Include="Fable.Fetch" />
+    <PackageReference Include="Fable.React.Types" />
+    <PackageReference Include="Fable.Core" />
+    <PackageReference Include="Feliz" />
+    <PackageReference Include="Feliz.UseElmish" />
+    <PackageReference Include="Fable.Browser.Dom" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Include all files that are compiled with this project -->
     <!-- Include the project file itself as well -->
-    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/"/>
+    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
     <Content Include="..\package.json">
       <Link>package.json</Link>
     </Content>
@@ -58,7 +58,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj"/>
+    <ProjectReference Include="..\..\Shared\Swate.Components.Core.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -81,8 +81,6 @@
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
-    <Compile Include="GenericComponents\CancelableErrorModal.fs" />
-    <Compile Include="GenericComponents\ErrorModalProvider.fs" />
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
     <Compile Include="GenericComponents\CardGrid.fs" />
@@ -125,6 +123,10 @@
     <Compile Include="MarkdownText\Plugins\MarkdownPluginPromptModal.fs" />
     <Compile Include="MarkdownText\Preview.fs" />
     <Compile Include="MarkdownText\TextInputWithMarkdown.fs" />
+    <Compile Include="ErrorModal\Types.fs" />
+    <Compile Include="ErrorModal\Context.fs" />
+    <Compile Include="ErrorModal\Modal.fs" />
+    <Compile Include="ErrorModal\Provider.fs" />
     <Compile Include="Landing\Types.fs" />
     <Compile Include="Landing\State.fs" />
     <Compile Include="Landing\Validation.fs" />
@@ -183,17 +185,17 @@
 
   <PropertyGroup>
     <NpmDependencies>
-      <NpmPackage Name="@floating-ui/react" Version="gte 0.27.7 lt 1.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="@dnd-kit/core" Version="gte 6.3.0 lt 7.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="@dnd-kit/sortable" Version="gte 10.0.0 lt 11.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="@dnd-kit/utilities" Version="gte 3.2.0 lt 4.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="@uiw/react-md-editor" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="mermaid" Version="gte 11.0.0 lt 12.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="rehype-rewrite" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="rehype-sanitize" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max"/>
-      <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max"/>
+      <NpmPackage Name="@floating-ui/react" Version="gte 0.27.7 lt 1.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@dnd-kit/core" Version="gte 6.3.0 lt 7.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@dnd-kit/sortable" Version="gte 10.0.0 lt 11.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@dnd-kit/utilities" Version="gte 3.2.0 lt 4.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uiw/react-md-editor" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="mermaid" Version="gte 11.0.0 lt 12.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="rehype-rewrite" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="rehype-sanitize" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max" />
     </NpmDependencies>
   </PropertyGroup>
 
