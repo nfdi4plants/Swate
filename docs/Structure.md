@@ -62,17 +62,7 @@ For example: IPC base types are defined here and implemented in preload, main, a
 	- `Preload` contains bridge and IPC registration code.
 	- `Renderer` contains UI and renderer-safe integrations.
 
-## Guidelines for isolated React components (`src/Components`)
 
-Components in `src/Components` are expected to be reusable and application-agnostic.
-
-- **PascalCase file and component names**: `MyComponent.tsx` for the component "MyComponent" and `MyComponent.stories.tsx` for its Storybook tests. This also includes subcomponent names (These can be exported from the same file or split into separate files if they are large enough to warrant it).
-- **No app-state coupling**: no direct dependency on Client Elmish model/update logic.
-- **No app-side effects**: do not call app-specific services directly; pass handlers via props.
-- **Stable public API**: prefer explicit props and callbacks over hidden global state.
-- **Presentation-first**: keep components focused on rendering and local UI interaction.
-- **Portable behavior**: component behavior must work in both browser and Electron renderer contexts.
-- **Local stories/tests**: test files must be colocated and named `<Component>.stories.tsx`.
 
 ### Placement rule of thumb
 
