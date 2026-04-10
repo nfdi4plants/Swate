@@ -1,7 +1,7 @@
 module Main.IPC.ArcVaultsApi
 
 open System
-open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
@@ -421,6 +421,27 @@ let api: IPCTypes.IArcVaultsApi = {
                     return Ok(importedFiles.ToArray())
             with e ->
                 return Error(exn $"Could not import external text files: {e.Message}")
+        }
+    getArcObjectTree =
+        fun event -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path, vault.arc with
+                    | Some arcPath, Some arc ->
+                        let! fileEntries =
+                            if vault.fileTree.Count > 0 then
+                                promise { return vault.fileTree.Values |> Seq.toArray }
+                            else
+                                getFileEntries arcPath
+
+                        return Ok(ArcObjectTreeBuilder.create arcPath arc fileEntries)
+                    | _ -> return Error(exn "ARC is not loaded.")
+            with e ->
+                return Error e
         }
     readNotes =
         fun event -> promise {

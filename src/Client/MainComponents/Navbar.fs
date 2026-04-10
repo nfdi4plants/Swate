@@ -9,6 +9,7 @@ open MainComponents
 open Model
 open Swate.Components
 open ARCtrl
+open Swate.Components.Shared
 
 open LocalStorage.AutosaveConfig
 
@@ -152,13 +153,13 @@ let private WidgetNavbarList (model, addWidget: MainComponents.Widget -> unit) =
 
     React.Fragment [
         match model.SpreadsheetModel.ActiveView with
-        | Spreadsheet.ActivePattern.IsTable ->
+        | Spreadsheet.ActiveView.Table _ ->
             addBuildingBlock
             addTemplate
             filePicker
             dataAnnotator
-        | Spreadsheet.ActivePattern.IsDataMap -> dataAnnotator
-        | Spreadsheet.ActivePattern.IsMetadata -> Html.none
+        | Spreadsheet.ActiveView.DataMap -> dataAnnotator
+        | Spreadsheet.ActiveView.Metadata -> Html.none
     ]
 
 [<ReactComponent>]

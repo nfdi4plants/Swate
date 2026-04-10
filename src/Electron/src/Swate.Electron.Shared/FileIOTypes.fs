@@ -1,6 +1,5 @@
 module Swate.Electron.Shared.FileIOTypes
 
-open ARCtrl
 open System.Collections.Generic
 
 type FileEntry = {
@@ -53,3 +52,10 @@ type FileContentDTO = {|
     content: string
     path: string
 |}
+
+type NoteTarget =
+    | Root
+    | Study of string
+    | Assay of string
+    | Workflow of string
+    | Run of string

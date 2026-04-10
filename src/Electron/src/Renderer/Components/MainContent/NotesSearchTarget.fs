@@ -3,15 +3,15 @@ module Renderer.Components.MainContent.NotesSearchTarget
 open Feliz
 open Feliz
 open Swate.Components
-open Swate.Components.NoteTypes
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
-open Renderer
 
 [<ReactComponent>]
 let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
     let notes, setNotes = React.useState ([]: NoteSearch list)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)
@@ -50,12 +50,25 @@ let NotesSearchTarget () =
 
             match result with
             | Ok dto ->
-                match dto.fileType with
-                | DTOType.DTOTypeIsPlainTextVariant ->
-                    pageCtx.setState (Some(PageState.TextPage dto.content))
-                    fileTreeCtx.setSelectedTreeItemPath (Some relativePath)
-                | _ -> pageCtx.setState (Some(PageState.ErrorPage $"Unsupported file type for note: {dto.fileType}"))
-            | Result.Error exn -> pageCtx.setState (Some(PageState.ErrorPage $"Could not open note: {exn.Message}"))
+                let selectedPath = normalizePath relativePath
+                fileTreeCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                dto
+                |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                |> Renderer.Components.ARCHelper.applyLoadedPreview
+                    pageCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
+            | Result.Error exn ->
+                fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)
+
+                Renderer.Components.ARCHelper.applyPreviewError
+                    pageCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
+                    $"Could not open note: {exn.Message}"
         }
         |> Promise.start
 

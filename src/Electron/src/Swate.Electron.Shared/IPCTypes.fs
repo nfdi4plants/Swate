@@ -3,16 +3,13 @@ module Swate.Electron.Shared.IPCTypes
 
 open Fable.Core
 open Fable.Electron
-
-open Swate.Components
-open Swate.Components.NoteTypes
+open Swate.Components.Api.GitLabApi
 open Swate.Components.Authentication.Types
 open Swate.Components.DataHubTypes
-open Swate.Components.Api.GitLabApi
-
+open Swate.Components.Shared
 open AuthTypes
-open GitTypes
 open FileIOTypes
+open GitTypes
 
 module IPCTypesHelper =
 
@@ -34,13 +31,14 @@ type IArcVaultsApi = {
     createARC: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
     closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getOpenPath: IpcMainEvent -> JS.Promise<string option>
-    getRecentARCs: unit -> JS.Promise<SelectorTypes.ARCPointer[]>
-    removeRecentARC: SelectorTypes.ARCPointer -> JS.Promise<Result<unit, exn>>
+    getRecentARCs: unit -> JS.Promise<ARCPointer[]>
+    removeRecentARC: ARCPointer -> JS.Promise<Result<unit, exn>>
 
     pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
     pickDirectory: IpcMainEvent -> JS.Promise<Result<string, exn>>
     pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
-    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<Swate.Components.ImportedTextFile[], exn>>
+    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
+    getArcObjectTree: IpcMainEvent -> JS.Promise<Result<ArcExplorerNode list, exn>>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
     readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
@@ -64,7 +62,8 @@ type IGitApi = {
     getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
     getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
     getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>
-    getGitMergeConflictViewData: IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>>
+    getGitMergeConflictViewData:
+        IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>>
     installGitLfs: IpcMainEvent -> JS.Promise<Result<GitOperationResult, exn>>
     gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
@@ -96,12 +95,12 @@ type IGitLabApi = {
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
-    recentARCsUpdate: SelectorTypes.ARCPointer[] -> unit
+    recentARCsUpdate: ARCPointer[] -> unit
     authAccountsUpdate: AuthStateDto -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit
-} with
-
+}
+with
     static member empty = {
         pathChange = ignore
         recentARCsUpdate = ignore

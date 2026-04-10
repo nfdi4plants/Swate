@@ -88,25 +88,25 @@ module JsonImportHelper =
         /// This updates the existing tables based on import config (joinOptions)
         let arcFile =
             match uploadedFile with
-            | Assay a as arcFile ->
+            | ArcFiles.Assay a as arcFile ->
                 let tables = createUpdatedTables a.Tables state deselectedColumns None
                 a.Tables <- tables
                 arcFile
-            | Run r as arcFile ->
+            | ArcFiles.Run r as arcFile ->
                 let tables = createUpdatedTables r.Tables state deselectedColumns None
                 r.Tables <- tables
                 arcFile
-            | Study(s, _) as arcFile ->
+            | ArcFiles.Study(s, _) as arcFile ->
                 let tables = createUpdatedTables s.Tables state deselectedColumns None
                 s.Tables <- tables
                 arcFile
-            | Template t as arcFile ->
+            | ArcFiles.Template t as arcFile ->
                 let table = createUpdatedTables (ResizeArray[t.Table]) state deselectedColumns None
                 t.Table <- table.[0]
                 arcFile
-            | Investigation _
-            | Workflow _
-            | DataMap _ as arcFile -> arcFile
+            | ArcFiles.Investigation _
+            | ArcFiles.Workflow _
+            | ArcFiles.DataMap _ as arcFile -> arcFile
 
         arcFile
 
@@ -213,12 +213,12 @@ module JsonImportHelper =
         =
         let importTables =
             match import with
-            | Assay a -> a.Tables
-            | Run r -> r.Tables
-            | Study(s, _) -> s.Tables
-            | Template t -> ResizeArray([ t.Table ])
-            | DataMap _
-            | Workflow _
-            | Investigation _ -> ResizeArray()
+            | ArcFiles.Assay a -> a.Tables
+            | ArcFiles.Run r -> r.Tables
+            | ArcFiles.Study(s, _) -> s.Tables
+            | ArcFiles.Template t -> ResizeArray([ t.Table ])
+            | ArcFiles.DataMap _
+            | ArcFiles.Workflow _
+            | ArcFiles.Investigation _ -> ResizeArray()
 
         updateTables importTables importState activeTableIndex existingOpt

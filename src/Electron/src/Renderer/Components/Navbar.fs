@@ -1,9 +1,8 @@
 namespace Renderer.Components
 
 open Feliz
-
-open Renderer
 open Swate.Components
+open Swate.Components.Shared
 
 module NavbarHelper =
 
@@ -22,7 +21,7 @@ module NavbarHelper =
                 |> Promise.start
 
         /// Click on a recent ARC: main process decides open-or-focus.
-        let openArcByPath (clickedARC: SelectorTypes.ARCPointer) =
+        let openArcByPath (clickedARC: ARCPointer) =
             promise {
                 match! Api.ipcArcVaultApi.openARCByPath (unbox null) clickedARC.path with
                 | Ok _ -> ()
@@ -30,14 +29,13 @@ module NavbarHelper =
             }
             |> Promise.start
 
-        let rmvRecentArc (pointer: SelectorTypes.ARCPointer) =
+        let rmvRecentArc (pointer: ARCPointer) =
             promise {
                 match! Api.ipcArcVaultApi.removeRecentARC pointer with
                 | Ok _ -> ()
                 | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
             }
             |> Promise.start
-
 
 type private Selector =
 
@@ -56,7 +54,6 @@ type private Selector =
 
     [<ReactComponent>]
     static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
-
         let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
 
         let onCreateARC =
@@ -71,15 +68,9 @@ type private Selector =
 
         let openDataHubBrowser =
             fun _ ->
-                pageStateCtx.setState (Some PageState.DataHubBrowser)
+                pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
                 toggleSelector ()
 
-        // let downloadARC =
-        //     Actionbar.ButtonInfo.create (
-        //         "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
-        //         "Download an existing ARC",
-        //         onClick
-        //     )
         Actionbar.Main(
             [|
                 Selector.CreateArcActionBtn(onCreateARC)
@@ -91,7 +82,7 @@ type private Selector =
 
     [<ReactComponent>]
     static member Main() =
-        let recentArc, setRecentArc = React.useState ([||]: SelectorTypes.ARCPointer[])
+        let recentArc, setRecentArc = React.useState ([||]: ARCPointer[])
         let isLoading, setIsLoading = React.useState true
 
         let currentlyOpenArcPath, setCurrentlyOpenArcPath =
@@ -99,7 +90,6 @@ type private Selector =
 
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
 
-        // Get remote recent ARCs on first load before rendering the selector
         React.useLayoutEffectOnce (fun () ->
             promise {
                 let! arcs = Api.ipcArcVaultApi.getRecentARCs ()
@@ -119,11 +109,11 @@ type private Selector =
         )
 
         let selectorControlRef =
-            React.useRef ({ toggle = ignore }: SelectorTypes.SelectorRef)
+            React.useRef ({ toggle = ignore }: SelectorRef)
 
         let onOpen =
-            fun (b: bool) ->
-                if b then
+            fun (isOpen: bool) ->
+                if isOpen then
                     Api.ipcArcVaultApi.getRecentARCs () |> Promise.map setRecentArc |> Promise.start
 
         React.Fragment [
@@ -192,7 +182,6 @@ module private Authentication =
                     | Ok _ -> ()
                     | Error _ -> ()
                 | Error _ -> ()
-
             }
             |> Promise.start
 
@@ -217,7 +206,8 @@ module private Authentication =
 type Navbar =
 
     [<ReactComponent>]
-    static member Main() =
+    static member Main(?showDetailsSidebarToggle: bool) =
+        let showDetailsSidebarToggle = defaultArg showDetailsSidebarToggle false
 
         let left = Selector.Main()
 
@@ -227,7 +217,9 @@ type Navbar =
                 prop.children [
                     Authentication.UserAvatar()
                     Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                    Layout.LeftSidebarToggleBtn()
+                    if showDetailsSidebarToggle then
+                        Layout.RightSidebarToggleBtn()
+                    Layout.LeftSidebarToggleBtn(activeBorderStyle = false)
                 ]
             ]
 

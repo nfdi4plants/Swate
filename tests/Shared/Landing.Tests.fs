@@ -8,6 +8,7 @@ open Expecto
 
 open ARCtrl
 open Swate.Components.Landing
+open Swate.Components.Shared
 
 let private mkPerson (firstName: string) (lastName: string) =
     Person.create (firstName = firstName, lastName = lastName)

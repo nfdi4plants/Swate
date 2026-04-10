@@ -2,8 +2,11 @@ namespace Spreadsheet
 
 open Swate.Components
 open ARCtrl
-open Fable.Core
 open FileImport
+open Swate.Components.Shared
+
+
+type ActiveView = Swate.Components.ActiveView
 
 type ColumnType =
     | Main
@@ -42,42 +45,6 @@ type ColumnType =
 
     member this.IsRefColumn = not this.IsMainColumn
 
-[<RequireQualifiedAccess>]
-type ActiveView =
-    | Table of index: int
-    | DataMap
-    | Metadata
-
-    /// <summary>
-    /// A identifier that returns an integer based on the ActiveView type.
-    /// </summary>
-    member this.ViewIndex =
-        match this with
-        | Table i -> i
-        | DataMap -> -1
-        | Metadata -> -2
-
-    member this.TryTableIndex =
-        match this with
-        | Table i -> Some i
-        | _ -> None
-
-    /// This function is used to verify if the current arcfile supports the active view type.
-    member this.ArcFileHasView(arcfile: ArcFiles) =
-        match this with
-        | Table i -> arcfile.HasTableAt(i)
-        | DataMap -> arcfile.HasTableAt(-1)
-        | Metadata -> arcfile.HasMetadata()
-
-[<AutoOpen>]
-module ActivePattern =
-
-    let (|IsTable|IsDataMap|IsMetadata|) (input: ActiveView) =
-        match input with
-        | ActiveView.Table _ -> IsTable
-        | ActiveView.DataMap -> IsDataMap
-        | ActiveView.Metadata -> IsMetadata
-
 ///<summary>If you change this model, it will kill caching for users! if you apply changes to it, make sure to keep a version
 ///of it and add a try case for it to `tryInitFromLocalStorage` in Spreadsheet/LocalStorage.fs .</summary>
 type Model = {
@@ -92,13 +59,13 @@ type Model = {
 
     member this.FileType =
         match this.ArcFile with
-        | Some(Assay _) -> "Assay"
-        | Some(Study _) -> "Study"
-        | Some(Investigation _) -> "Investigation"
-        | Some(Run _) -> "Run"
-        | Some(Workflow _) -> "Workflow"
-        | Some(DataMap _) -> "Datamap"
-        | Some(Template _) -> "Template"
+        | Some(ArcFiles.Assay _) -> "Assay"
+        | Some(ArcFiles.Study _) -> "Study"
+        | Some(ArcFiles.Investigation _) -> "Investigation"
+        | Some(ArcFiles.Run _) -> "Run"
+        | Some(ArcFiles.Workflow _) -> "Workflow"
+        | Some(ArcFiles.DataMap _) -> "Datamap"
+        | Some(ArcFiles.Template _) -> "Template"
         | None -> "No File"
 
     member this.Tables =
@@ -130,16 +97,16 @@ type Model = {
 
     member this.DataMapOrDefault =
         match this.ArcFile with
-        | Some(Assay a) when a.DataMap.IsSome -> a.DataMap.Value
-        | Some(Run r) when r.DataMap.IsSome -> r.DataMap.Value
-        | Some(Workflow w) when w.DataMap.IsSome -> w.DataMap.Value
-        | Some(Study(s, _)) when s.DataMap.IsSome -> s.DataMap.Value
-        | Some(DataMap(_, d)) -> d
+        | Some(ArcFiles.Assay a) when a.DataMap.IsSome -> a.DataMap.Value
+        | Some(ArcFiles.Run r) when r.DataMap.IsSome -> r.DataMap.Value
+        | Some(ArcFiles.Workflow w) when w.DataMap.IsSome -> w.DataMap.Value
+        | Some(ArcFiles.Study(s, _)) when s.DataMap.IsSome -> s.DataMap.Value
+        | Some(ArcFiles.DataMap(_, d)) -> d
         | _ -> DataMap.init ()
 
     member this.GetAssay() =
         match this.ArcFile with
-        | Some(Assay a) -> a
+        | Some(ArcFiles.Assay a) -> a
         | _ -> ArcAssay.init ("ASSAY_NULL")
 
     member this.CanHaveTables() =

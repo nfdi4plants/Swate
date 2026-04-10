@@ -1,26 +1,25 @@
 module Renderer.Context.FileStateCtx
 
-open Swate.Electron.Shared.IPCTypes
-open Swate.Electron.Shared.FileIOTypes
-
 open Feliz
+open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes
 
 type FileState = {
     FileTree: FileEntry[]
-    SelectedTreeItemPath: string option
-} with
-
+    Selection: ArcSelection
+}
+with
     static member init() : FileState = {
         FileTree = [||]
-        SelectedTreeItemPath = None
+        Selection = ArcSelection.empty
     }
-
 
 type FileStateController = {
     state: FileState
     setState: (FileState -> FileState) -> unit
     setFileTree: FileEntry[] -> unit
-    setSelectedTreeItemPath: string option -> unit
+    setSelection: ArcSelection -> unit
 }
 
 let FileStateCtx =
@@ -29,7 +28,7 @@ let FileStateCtx =
             state = FileState.init ()
             setState = ignore
             setFileTree = ignore
-            setSelectedTreeItemPath = ignore
+            setSelection = ignore
         }
     )
 
@@ -38,8 +37,7 @@ let useFileState () = React.useContext FileStateCtx
 
 [<ReactComponent>]
 let FileStateCtxProvider (children: ReactElement) =
-
-    let (fileState, setFileState) = React.useStateWithUpdater (FileState.init ())
+    let fileState, setFileState = React.useStateWithUpdater (FileState.init ())
 
     React.useEffectOnce (fun () ->
         Renderer.MainUpdateRendererBridge.subscribeFileTreeUpdate (fun fileTreeDict ->
@@ -55,11 +53,11 @@ let FileStateCtxProvider (children: ReactElement) =
                 setFileTree =
                     fun fileTree ->
                         setFileState (fun fs -> { fs with FileTree = fileTree })
-                setSelectedTreeItemPath =
-                    fun selectedTreeItemPath ->
+                setSelection =
+                    fun selection ->
                         setFileState (fun fs -> {
                             fs with
-                                SelectedTreeItemPath = selectedTreeItemPath
+                                Selection = ArcSelection.normalize selection
                         })
             }),
             [| box fileState |]

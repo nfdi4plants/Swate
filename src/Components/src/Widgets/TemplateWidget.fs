@@ -3,6 +3,8 @@ namespace Swate.Components
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components.Shared
+
 
 type private TemplateLoadState =
     | TemplateLoading
@@ -391,7 +393,7 @@ type TemplateWidget =
         let widgetCtx = WidgetContext.useWidgetController ()
 
         let tryGetActiveTableIndex (arcFile: ArcFiles) =
-            WidgetArcFile.tryGetActiveTable activeTableIndex arcFile |> Option.map fst
+            arcFile.TryGetActiveTable(activeTableIndex) |> Option.map fst
 
         let disabledMessage =
             match tryGetActiveTableIndex arcFile with

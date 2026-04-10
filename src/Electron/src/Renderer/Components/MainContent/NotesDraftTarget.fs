@@ -3,6 +3,7 @@ module Renderer.Components.MainContent.NotesDraftTarget
 open Feliz
 open Swate.Components.Landing
 open Swate.Components.Notes.Editor
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -17,6 +18,7 @@ let NotesDraftTarget () =
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -46,8 +48,9 @@ let NotesDraftTarget () =
                             Error = Some $"Failed to write note: {exn.Message}"
                     }
                 | Ok() ->
+                    let selectedPath = normalizePath payload.Intent.RelativePath
 
-                    fileStateCtx.setSelectedTreeItemPath (Some payload.Intent.RelativePath)
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
                     setNotesDraft NotesDraft.init
                     setNotesUiState NotesUiState.init
 
@@ -55,9 +58,21 @@ let NotesDraftTarget () =
 
                     match previewResult with
                     | Ok previewData ->
-                        let page = PageState.fromFileContentDTO previewData
-                        pageStateCtx.setState (Some page)
-                    | Result.Error _ -> pageStateCtx.setState (Some(PageState.TextPage payload.Intent.Content))
+                        previewData
+                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                        |> Renderer.Components.ARCHelper.applyLoadedPreview
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
+                    | Result.Error _ ->
+                        FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
+                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                        |> Renderer.Components.ARCHelper.applyLoadedPreview
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
             }
             |> Promise.start
 

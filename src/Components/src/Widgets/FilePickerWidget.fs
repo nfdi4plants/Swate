@@ -3,6 +3,8 @@ namespace Swate.Components
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components.Shared
+
 
 [<Erase; Mangle(false)>]
 type FilePickerWidget =
@@ -128,7 +130,7 @@ type FilePickerWidget =
 
         let selectedCells =
 
-            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+            match arcFile.TryGetActiveTable(activeTableIndex) with
             | Some(_, table) ->
                 annotationCtx.state
                 |> Map.tryFind table.Name
@@ -143,7 +145,7 @@ type FilePickerWidget =
             | None -> None
 
         let disabledMessage =
-            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+            match arcFile.TryGetActiveTable(activeTableIndex) with
             | Some _ -> None
             | None -> Some "Select a table tab first to use the file picker."
 
@@ -213,7 +215,7 @@ type FilePickerWidget =
 
         let insertPaths () =
 
-            match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile, selectedCells with
+            match arcFile.TryGetActiveTable(activeTableIndex), selectedCells with
             | Some(_, table), Some selection ->
                 let columnIndex = selection.xStart
                 let mutable rowIndex = selection.yStart

@@ -2,6 +2,7 @@
 module Renderer.Types
 
 open ARCtrl
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.GitTypes
@@ -9,6 +10,7 @@ open Swate.Electron.Shared.GitTypes
 [<RequireQualifiedAccess>]
 type LeftSidebarPage =
     | FileExplorer
+    | ArcObjectExplorer
     | Git
 
 type GitUnsupportedPageData = GitUnsupportedContentDto
@@ -26,7 +28,7 @@ type PageState =
     | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
     | DataHubBrowser
-
+with
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with
         | DTOType.DTOTypeIsPlainTextVariant -> PageState.TextPage dto.content
@@ -39,3 +41,6 @@ type PageState =
                 PageState.ErrorPage
                     $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
         | _ -> PageState.UnknownPage
+
+let pageStateOfFileContentDTO (dto: FileContentDTO) : PageState =
+    PageState.fromFileContentDTO dto

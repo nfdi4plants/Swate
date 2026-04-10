@@ -3,6 +3,9 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CloseWindowSaveHelper.test.fs" />
+    <Compile Include="ArcObjectWidget.test.fs" />
+    <Compile Include="ArcObjectTreeBuilder.test.fs" />
     <Compile Include="GitService.test.fs" />
     <Compile Include="GitValidation.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />

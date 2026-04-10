@@ -2,6 +2,7 @@ module Spreadsheet.Tests.DataAnnotator
 
 open Fable.Mocha
 open ARCtrl
+open Swate.Components.Shared
 open global.Spreadsheet
 
 let private createTableState rowCount =

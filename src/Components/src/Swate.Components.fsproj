@@ -87,7 +87,6 @@
     <Compile Include="GenericComponents\Dropdown.fs"/>
     <Compile Include="GenericComponents\Actionbar.fs"/>
     <Compile Include="GenericComponents\Navbar.fs"/>
-    <Compile Include="ARCSelector\Types.fs"/>
     <Compile Include="ARCSelector\Selector.fs"/>
     <Compile Include="Layout\LayoutContext.fs"/>
     <Compile Include="Layout\Layout.fs"/>
@@ -111,6 +110,7 @@
     <Compile Include="Metadata\TextInput.fs"/>
     <Compile Include="Metadata\JsBindings\DndKit.fs"/>
     <Compile Include="Metadata\Forms.fs"/>
+    <Compile Include="Metadata\ArcFileMetadata.fs"/>
     <Compile Include="MarkdownText\Types.fs"/>
     <Compile Include="MarkdownText\JsBindings\ReactMDEditor.fs"/>
     <Compile Include="MarkdownText\JsBindings\Mermaid.fs"/>
@@ -149,7 +149,14 @@
     <Compile Include="Widgets\FilePickerWidget.fs"/>
     <Compile Include="Widgets\DataAnnotatorWidget.fs"/>
     <Compile Include="Widgets\TemplateWidget.fs"/>
-    <Compile Include="Notes\Types.fs"/>
+    <Compile Include="ARCFileEditor\ActiveView.fs"/>
+    <Compile Include="ARCFileEditor\ArcFileEditor.fs"/>
+    <Compile Include="ARCObjectExplorer\ARCExplorer.fs"/>
+    <Compile Include="ARCObjectExplorer\ARCObjectPanel.fs"/>
+    <Compile Include="ARCObjectExplorer\ARCObjectWidget.fs"/>
+    <Compile Include="ARCObjectExplorer\Model.fs"/>
+    <Compile Include="ARCObjectExplorer\ArcObjectExplorerContent.fs"/>
+    <Compile Include="ARCObjectExplorer\ARCObjectFixture.fs"/>
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs"/>
     <Compile Include="Notes\Editor\Types.fs"/>
     <Compile Include="Notes\Editor\State.fs"/>

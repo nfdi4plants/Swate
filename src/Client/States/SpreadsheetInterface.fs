@@ -3,6 +3,8 @@ namespace SpreadsheetInterface
 open Swate.Components
 open ARCtrl
 open FileImport
+open Swate.Components.Shared
+
 
 type ImportJsonRawDTO = {|
     jsonString: string

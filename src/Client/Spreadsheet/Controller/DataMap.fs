@@ -1,22 +1,24 @@
 module Spreadsheet.Controller.DataMap
 
-open Swate.Components.Shared
+
 open ARCtrl
+open Swate.Components.Shared
+
 
 let updateDatamap (dataMapOpt: DataMap option) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let nextArcFile =
         match state.ArcFile with
-        | Some(Assay a) ->
+        | Some(ArcFiles.Assay a) ->
             a.DataMap <- dataMapOpt
-            Some(Assay a)
-        | Some(Study(s, _)) ->
+            Some(ArcFiles.Assay a)
+        | Some(ArcFiles.Study(s, _)) ->
             s.DataMap <- dataMapOpt
-            Some(Study(s, []))
-        | Some(DataMap(p, d)) ->
+            Some(ArcFiles.Study(s, []))
+        | Some(ArcFiles.DataMap(p, d)) ->
             if dataMapOpt.IsSome then
-                Some(DataMap(p, dataMapOpt.Value))
+                Some(ArcFiles.DataMap(p, dataMapOpt.Value))
             else
-                Some(DataMap(p, d))
+                Some(ArcFiles.DataMap(p, d))
         | _ ->
             console.warn "[WARNING] updateDatamap: No Assay, Study or Datamap found in ArcFile"
             state.ArcFile
@@ -39,14 +41,14 @@ let updateDataMapDataContextAt (dtx) (index) (state: Spreadsheet.Model) : Spread
 
     let nextArcFile =
         match state.ArcFile with
-        | Some(Assay a) when a.DataMap.IsSome ->
+        | Some(ArcFiles.Assay a) when a.DataMap.IsSome ->
             ensureIndexExists a.DataMap.Value
             a.DataMap.Value.DataContexts.[index] <- dtx
-            Some(Assay a)
-        | Some(Study(s, _)) when s.DataMap.IsSome ->
+            Some(ArcFiles.Assay a)
+        | Some(ArcFiles.Study(s, _)) when s.DataMap.IsSome ->
             ensureIndexExists s.DataMap.Value
             s.DataMap.Value.DataContexts.[index] <- dtx
-            Some(Study(s, []))
+            Some(ArcFiles.Study(s, []))
         | _ ->
             console.warn "[WARNING] updateDatamap: No Assay or Study found in ArcFile"
             state.ArcFile

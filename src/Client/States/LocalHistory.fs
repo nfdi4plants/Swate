@@ -146,7 +146,7 @@ module ConversionTypes =
                 | Some(ArcFiles.Assay a) -> JsonArcFiles.Assay, ArcAssay.toJsonString 0 a
                 | Some(ArcFiles.Template t) -> JsonArcFiles.Template, Template.toJsonString 0 t
                 | Some(ArcFiles.Run r) -> JsonArcFiles.Run, ArcRun.toJsonString 0 r
-                | Some(Workflow w) -> JsonArcFiles.Workflow, ArcWorkflow.toJsonString 0 w
+                | Some(ArcFiles.Workflow w) -> JsonArcFiles.Workflow, ArcWorkflow.toJsonString 0 w
                 | Some(ArcFiles.DataMap(p, d)) ->
                     let data = DataMap.encoder d |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
                     JsonArcFiles.DataMap p, data
