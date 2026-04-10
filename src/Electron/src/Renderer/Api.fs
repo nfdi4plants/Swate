@@ -9,5 +9,6 @@ open Fable.Remoting.Client
 open Fable.Electron.Remoting.Renderer
 
 let ipcGitApi = Remoting.init |> Remoting.buildClient<IGitApi>
+let ipcGitLabApi = Remoting.init |> Remoting.buildClient<IGitLabApi>
 let ipcArcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
 let ipcAuthApi = Remoting.init |> Remoting.buildClient<IAuthApi>

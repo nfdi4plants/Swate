@@ -10,59 +10,49 @@ open Fable.Electron.Remoting.Main
 open Main
 open Main.Git
 
-let private toSharedGitFailureKind (kind: GitService.GitFailureKind) =
-    match kind with
-    | GitService.GitFailureKind.Unauthorized -> GitFailureKind.Unauthorized
-    | GitService.GitFailureKind.Forbidden -> GitFailureKind.Forbidden
-    | GitService.GitFailureKind.Network -> GitFailureKind.Network
-    | GitService.GitFailureKind.Timeout -> GitFailureKind.Timeout
-    | GitService.GitFailureKind.Canceled -> GitFailureKind.Canceled
-    | GitService.GitFailureKind.Unknown -> GitFailureKind.Unknown
-
 let private toGitOperationResult
     (successMessage: 'T -> string option)
     (successPath: ('T -> string option) option)
+    (successWarning: ('T -> GitService.GitFailure option) option)
     (result: GitService.GitResult<'T>)
     : Result<GitOperationResult, exn> =
     match result with
     | Ok payload ->
         let path = successPath |> Option.bind (fun projectPath -> projectPath payload)
+        let warning = successWarning |> Option.bind (fun warningSelector -> warningSelector payload)
 
         Ok {
             Success = true
             Message = successMessage payload
             FailureKind = None
+            WarningMessage = warning |> Option.map _.Message
+            WarningKind = warning |> Option.map _.Kind
             Path = path
         }
     | Error failure ->
         Ok {
             Success = false
             Message = Some failure.Message
-            FailureKind = Some(toSharedGitFailureKind failure.Kind)
+            FailureKind = Some failure.Kind
+            WarningMessage = None
+            WarningKind = None
             Path = None
         }
 
-let private toStatusDto (status: GitService.GitStatusDto) : GitStatusDto = {
-    Current = status.Current
-    Tracking = status.Tracking
-    Ahead = status.Ahead
-    Behind = status.Behind
-    IsClean = status.IsClean
-    Files =
-        status.Files
-        |> Array.map (fun file -> {
-            Path = file.Path
-            Index = file.Index
-            WorkingDir = file.WorkingDir
-            OriginalPath = file.OriginalPath
-        })
-}
-
-let private toDiffSummaryDto (diff: GitService.GitDiffSummaryDto) : GitDiffSummaryDto = {
-    Changed = diff.Changed
-    Insertions = diff.Insertions
-    Deletions = diff.Deletions
-}
+let private toGitPageLoadResultDto
+    (requestedPath: string)
+    (operationName: string)
+    (result: GitService.GitResult<'T>)
+    : Result<GitPageLoadResultDto<'T>, exn> =
+    match result with
+    | Ok payload ->
+        Ok(GitPageLoadResultDto.Loaded payload)
+    | Error failure ->
+        match GitService.tryGetUnsupportedGitContent requestedPath failure with
+        | Some unsupported ->
+            Ok(GitPageLoadResultDto.Unsupported unsupported)
+        | None ->
+            Error(exn $"{operationName} failed ({failure.Kind}): {failure.Message}")
 
 let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgressCallback =
     let rendererApi =
@@ -88,8 +78,30 @@ let api: IGitApi = {
                 let! result = GitService.getStatus arcPath
 
                 match result with
-                | Ok statusDto -> return Ok(toStatusDto statusDto)
+                | Ok statusDto -> return Ok statusDto
                 | Error failure -> return Error(exn $"git status failed ({failure.Kind}): {failure.Message}")
+        }
+    getGitBranches =
+        fun (event: IpcMainEvent) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getBranches arcPath
+
+                match result with
+                | Ok branches -> return Ok branches
+                | Error failure -> return Error(exn $"git branch list failed ({failure.Kind}): {failure.Message}")
+        }
+    getGitLfsSettings =
+        fun (event: IpcMainEvent) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getLfsSettings arcPath
+
+                match result with
+                | Ok settings -> return Ok settings
+                | Error failure -> return Error(exn $"git lfs settings failed ({failure.Kind}): {failure.Message}")
         }
     getGitDiffSummary =
         fun (event: IpcMainEvent) -> promise {
@@ -99,7 +111,7 @@ let api: IGitApi = {
                 let! result = GitService.getDiffSummary arcPath
 
                 match result with
-                | Ok diffDto -> return Ok(toDiffSummaryDto diffDto)
+                | Ok diffDto -> return Ok diffDto
                 | Error failure -> return Error(exn $"git diff summary failed ({failure.Kind}): {failure.Message}")
         }
     getGitWordDiff =
@@ -113,6 +125,47 @@ let api: IGitApi = {
                 | Ok diffText -> return Ok diffText
                 | Error failure -> return Error(exn $"git word diff failed ({failure.Kind}): {failure.Message}")
         }
+    getGitDiffViewData =
+        fun (event: IpcMainEvent) (requestedPath: string) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getDiffViewData arcPath requestedPath
+                return toGitPageLoadResultDto requestedPath "git diff view" result
+        }
+    getGitMergeConflictViewData =
+        fun (event: IpcMainEvent) (requestedPath: string) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.getMergeConflictViewData arcPath requestedPath
+                return toGitPageLoadResultDto requestedPath "git merge conflict view" result
+        }
+    installGitLfs =
+        fun (_event: IpcMainEvent) -> promise {
+            let! result = GitLfsService.installSystem ()
+
+            return
+                match result with
+                | Ok () ->
+                    Ok {
+                        Success = true
+                        Message = Some "Git LFS installed."
+                        FailureKind = None
+                        WarningMessage = None
+                        WarningKind = None
+                        Path = None
+                    }
+                | Error message ->
+                    Ok {
+                        Success = false
+                        Message = Some message
+                        FailureKind = Some GitFailureKind.Unknown
+                        WarningMessage = None
+                        WarningKind = None
+                        Path = None
+                    }
+        }
     gitFetch =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with
@@ -121,7 +174,7 @@ let api: IGitApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.fetch arcPath request.Remote request.Branch (Some progressReporter)
-                return toGitOperationResult (fun () -> Some "Fetch completed.") None result
+                return toGitOperationResult (fun () -> Some "Fetch completed.") None None result
         }
     gitPull =
         fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
@@ -135,7 +188,13 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
-                            return toGitOperationResult (fun () -> Some "Pull completed.") None result
+                            do! vault.RefreshFileTree()
+                            return
+                                toGitOperationResult
+                                    (fun _ -> Some "Pull completed.")
+                                    None
+                                    (Some(fun (payload: GitService.GitPullResult) -> payload.Warning))
+                                    result
                         })
         }
     gitPush =
@@ -146,7 +205,7 @@ let api: IGitApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 let! result = GitService.push arcPath request.Remote request.Branch (Some progressReporter)
-                return toGitOperationResult (fun () -> Some "Push completed.") None result
+                return toGitOperationResult (fun () -> Some "Push completed.") None None result
         }
     gitInitRepository =
         fun (_event: IpcMainEvent) (targetPath: string) -> promise {
@@ -157,6 +216,7 @@ let api: IGitApi = {
                 toGitOperationResult
                     (fun _ -> Some "Repository initialized.")
                     (Some(fun normalizedPath -> Some normalizedPath))
+                    None
                     result
         }
     gitCloneRepository =
@@ -170,12 +230,14 @@ let api: IGitApi = {
                     request.RemoteUrl
                     request.TargetPath
                     request.Branch
+                    request.DownloadLargeFiles
                     progressReporter
 
             return
                 toGitOperationResult
                     (fun _ -> Some "Clone completed.")
                     (Some(fun normalizedPath -> Some normalizedPath))
+                    None
                     result
         }
     gitStagePaths =
@@ -188,7 +250,9 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.stagePaths arcPath request.Pathspecs
-                            return toGitOperationResult (fun () -> Some "Files staged.") None result
+                            if Result.isOk result then
+                                do! vault.RefreshFileTree()
+                            return toGitOperationResult (fun () -> Some "Files staged.") None None result
                         })
         }
     gitUnstagePaths =
@@ -201,7 +265,7 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.unstagePaths arcPath request.Pathspecs
-                            return toGitOperationResult (fun () -> Some "Files unstaged.") None result
+                            return toGitOperationResult (fun () -> Some "Files unstaged.") None None result
                         })
         }
     gitCommit =
@@ -219,8 +283,24 @@ let api: IGitApi = {
                                 toGitOperationResult
                                     (fun commitHash -> Some $"Commit completed ({commitHash}).")
                                     None
+                                    None
                                     result
                         })
+        }
+    setGitLfsSettings =
+        fun (event: IpcMainEvent) (settings: GitLfsSettingsDto) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result =
+                    GitService.setLfsSettings
+                        arcPath
+                        {
+                            AutoTrackThresholdMb = settings.AutoTrackThresholdMb
+                            DownloadLargeFiles = settings.DownloadLargeFiles
+                        }
+
+                return toGitOperationResult (fun () -> Some "Git LFS settings updated.") None None result
         }
     createBranch =
         fun (event: IpcMainEvent) (request: GitCreateBranchRequest) -> promise {
@@ -232,9 +312,10 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.createBranch arcPath request.Name request.StartPoint
+                            do! vault.RefreshFileTree()
 
                             return
-                                toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None result
+                                toGitOperationResult (fun () -> Some $"Branch '{request.Name}' created.") None None result
                         })
         }
     checkoutBranch =
@@ -247,12 +328,39 @@ let api: IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.checkoutBranch arcPath request.Name
+                            do! vault.RefreshFileTree()
 
                             return
                                 toGitOperationResult
                                     (fun () -> Some $"Checked out branch '{request.Name}'.")
                                     None
+                                    None
                                     result
+                        })
+        }
+    confirmGitMergeResolution =
+        fun (event: IpcMainEvent) (request: GitConfirmMergeResolutionRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result =
+                                GitService.confirmMergeResolution
+                                    arcPath
+                                    request.Path
+                                    request.ExpectedConflictContent
+                                    request.ResolvedContent
+                                    request.AutoCommit
+
+                            match result with
+                            | Ok payload ->
+                                do! vault.RefreshFileTree()
+                                return Ok payload
+                            | Error failure ->
+                                return Error(exn $"confirm merge resolution failed ({failure.Kind}): {failure.Message}")
                         })
         }
 }

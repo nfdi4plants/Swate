@@ -5,8 +5,6 @@ open Feliz
 open Fable.Core
 open Fable.Electron.Remoting.Renderer
 open Swate.Components
-open Swate.Components.Shared
-open Swate.Electron.Shared.CloseWindowSaveHelper
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
@@ -25,9 +23,17 @@ type CloseWindowController =
         let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
         let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
-            match tryGetArcFileToSave arcObjectCtx.state.PendingArcFileSave pageCtx.state with
-            | Some saveTarget ->
-                let! saveResult = Renderer.Components.MainContent.Helper.MainContentHelper.saveArcFile saveTarget.ArcFile
+            let saveTarget =
+                match arcObjectCtx.state.PendingArcFileSave with
+                | Some pendingArcFile -> Some pendingArcFile
+                | None ->
+                    match pageCtx.state with
+                    | Some(Renderer.Types.PageState.ArcFilePage arcFile) -> Some arcFile
+                    | _ -> None
+
+            match saveTarget with
+            | Some arcFile ->
+                let! saveResult = Renderer.Components.MainContent.Helper.MainContentHelper.saveArcFile arcFile
 
                 match saveResult with
                 | Ok() ->

@@ -63,7 +63,7 @@ let FileTree () =
 
         let setError (errorMsg: string option) =
             match errorMsg with
-            | Some msg -> pageStateCtx.setState (Some(PageState.ErrorPage msg))
+            | Some msg -> pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage msg))
             | None -> pageStateCtx.setState (None)
 
         let toggleLfsMark =

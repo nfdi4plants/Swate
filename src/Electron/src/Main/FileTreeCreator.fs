@@ -16,8 +16,7 @@ let normalizeRootPath (path: string) =
     pathMod?resolve (path) |> unbox<string> |> normalizePath
 
 let private containsTraversalSegments (path: string) =
-    path.Split('/')
-    |> Array.exists (fun segment -> segment = "." || segment = "..")
+    path.Split('/') |> Array.exists (fun segment -> segment = "." || segment = "..")
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
@@ -52,8 +51,7 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
     entries
     |> Seq.iter (fun entry ->
         match tryGetRepoRelativePathOrRoot repoRoot entry.path with
-        | Some relativePath ->
-            rendererFileTree.[relativePath] <- { entry with path = relativePath }
+        | Some relativePath -> rendererFileTree.[relativePath] <- { entry with path = relativePath }
         | None -> ()
     )
 
@@ -145,6 +143,7 @@ let private tryGetLfsTrackedByAttributes
                             resolve results
                     )
     }
+
 
 let getFileEntry (path: string) = promise {
     let! stats = fs?promises?stat (path)

@@ -11,10 +11,15 @@ module private GitMergeConflictViewerInternal =
         | Incoming
         | Current
 
+    type UndoAvailability =
+        | UndoAvailable
+        | UndoUnavailable of string
+
     type ConflictResolutionState = {
         Choice: ConflictResolutionChoice
-        AppliedText: string
+        CurrentText: string
         StartIndex: int
+        UndoAvailability: UndoAvailability
     }
 
     type ConflictPaneState =
@@ -25,6 +30,29 @@ module private GitMergeConflictViewerInternal =
         EntryId: int
         State: ConflictPaneState
     }
+
+    type ConflictPaneSession = {
+        ResolvedText: string
+        PaneEntries: ConflictPaneEntry list
+        NextEntryId: int
+    }
+
+    type SelectionSnapshot = {
+        StartIndex: int
+        EndIndex: int
+    }
+
+    type TextEdit = {
+        StartIndex: int
+        PreviousEndIndex: int
+        NextEndIndex: int
+        Delta: int
+    }
+
+    type TextChange =
+        | NoTextChange
+        | DocumentReplacement
+        | IncrementalEdit of TextEdit
 
     let parseConflictBlocks (content: string) =
         GitTextComparisonCore.MergeConflicts.parseMergeConflictFragments content
@@ -42,6 +70,18 @@ module private GitMergeConflictViewerInternal =
             }
         )
 
+    let private nextEntryIdFromEntries (entries: ConflictPaneEntry list) =
+        entries |> List.fold (fun current entry -> max current (entry.EntryId + 1)) 1
+
+    let createSessionState (content: string) =
+        let paneEntries = parsePaneEntries content
+
+        {
+            ResolvedText = content
+            PaneEntries = paneEntries
+            NextEntryId = nextEntryIdFromEntries paneEntries
+        }
+
     let countUnresolvedEntries (entries: ConflictPaneEntry list) =
         entries
         |> List.sumBy (fun entry ->
@@ -49,6 +89,141 @@ module private GitMergeConflictViewerInternal =
             | Unresolved _ -> 1
             | Resolved _ -> 0
         )
+
+    let createResolutionState choice startIndex resolvedText = {
+        Choice = choice
+        CurrentText = resolvedText
+        StartIndex = startIndex
+        UndoAvailability = UndoAvailable
+    }
+
+    let canUndoResolution (resolution: ConflictResolutionState) =
+        match resolution.UndoAvailability with
+        | UndoAvailable -> true
+        | UndoUnavailable _ -> false
+
+    let tryGetUndoUnavailableMessage (resolution: ConflictResolutionState) =
+        match resolution.UndoAvailability with
+        | UndoAvailable -> None
+        | UndoUnavailable message -> Some message
+
+    let private tryDescribeTextEdit (previousText: string) (nextText: string) =
+        if previousText = nextText then
+            None
+        else
+            let maxPrefixLength = min previousText.Length nextText.Length
+            let mutable prefixLength = 0
+
+            while prefixLength < maxPrefixLength
+                  && previousText.[prefixLength] = nextText.[prefixLength] do
+                prefixLength <- prefixLength + 1
+
+            let maxSuffixLength = min (previousText.Length - prefixLength) (nextText.Length - prefixLength)
+            let mutable suffixLength = 0
+
+            while suffixLength < maxSuffixLength
+                  && previousText.[previousText.Length - 1 - suffixLength] = nextText.[nextText.Length - 1 - suffixLength] do
+                suffixLength <- suffixLength + 1
+
+            Some {
+                StartIndex = prefixLength
+                PreviousEndIndex = previousText.Length - suffixLength
+                NextEndIndex = nextText.Length - suffixLength
+                Delta = nextText.Length - previousText.Length
+            }
+
+    let private describeTextChange
+        (previousText: string)
+        (nextText: string)
+        (selectionSnapshot: SelectionSnapshot option)
+        =
+        match tryDescribeTextEdit previousText nextText with
+        | None ->
+            NoTextChange
+        | Some edit ->
+            let unchangedPrefix = previousText.Substring(0, edit.StartIndex)
+            let unchangedSuffix = previousText.Substring(edit.PreviousEndIndex)
+
+            let unchangedTextIsTrivial (text: string) =
+                text |> Seq.forall (fun character -> character = '\n')
+
+            let selectedWholeDocument =
+                selectionSnapshot
+                |> Option.exists (fun selection ->
+                    selection.StartIndex = 0 && selection.EndIndex = previousText.Length
+                )
+
+            if
+                selectedWholeDocument
+                || (unchangedTextIsTrivial unchangedPrefix && unchangedTextIsTrivial unchangedSuffix)
+            then
+                DocumentReplacement
+            else
+                IncrementalEdit edit
+
+    let private trySliceExclusive (content: string) (startIndex: int) (endIndexExclusive: int) =
+        if startIndex < 0 || endIndexExclusive < startIndex || endIndexExclusive > content.Length then
+            None
+        else
+            Some(content.Substring(startIndex, endIndexExclusive - startIndex))
+
+    let private mapBoundaryThroughEdit boundaryIndex replacementBoundaryIndex (edit: TextEdit) =
+        if boundaryIndex <= edit.StartIndex then
+            boundaryIndex
+        elif boundaryIndex >= edit.PreviousEndIndex then
+            boundaryIndex + edit.Delta
+        else
+            replacementBoundaryIndex
+
+    let private boundaryEditUndoUnavailableMessage =
+        "Undo is unavailable because a manual edit crossed this resolved conflict boundary."
+
+    let private trackingUndoUnavailableMessage =
+        "Undo is unavailable because the resolved conflict can no longer be tracked after manual edits."
+
+    let private reconcileResolutionAfterTextEdit
+        (nextText: string)
+        (edit: TextEdit)
+        (resolution: ConflictResolutionState)
+        =
+        let spanStart = resolution.StartIndex
+        let spanEnd = resolution.StartIndex + resolution.CurrentText.Length
+        let overlapsSpan = edit.StartIndex < spanEnd && edit.PreviousEndIndex > spanStart
+        let editIsInsideSpan = edit.StartIndex >= spanStart && edit.PreviousEndIndex <= spanEnd
+        let nextSpanStart = mapBoundaryThroughEdit spanStart edit.StartIndex edit
+        let nextSpanEnd = mapBoundaryThroughEdit spanEnd edit.NextEndIndex edit
+
+        match trySliceExclusive nextText nextSpanStart nextSpanEnd with
+        | Some nextTrackedText ->
+            let nextUndoAvailability =
+                match resolution.UndoAvailability with
+                | UndoUnavailable message -> UndoUnavailable message
+                | UndoAvailable ->
+                    if not overlapsSpan || editIsInsideSpan then
+                        UndoAvailable
+                    else
+                        UndoUnavailable boundaryEditUndoUnavailableMessage
+
+            {
+                resolution with
+                    CurrentText = nextTrackedText
+                    StartIndex = nextSpanStart
+                    UndoAvailability = nextUndoAvailability
+            }
+        | None ->
+            let fallbackStartIndex =
+                nextSpanStart |> max 0 |> min nextText.Length
+
+            let nextUndoAvailability =
+                match resolution.UndoAvailability with
+                | UndoUnavailable message -> UndoUnavailable message
+                | UndoAvailable -> UndoUnavailable trackingUndoUnavailableMessage
+
+            {
+                resolution with
+                    StartIndex = fallbackStartIndex
+                    UndoAvailability = nextUndoAvailability
+            }
 
     let shiftResolvedEntryOffsetsAfter cutoffIndex delta (entries: ConflictPaneEntry list) =
         if delta = 0 then
@@ -71,31 +246,93 @@ module private GitMergeConflictViewerInternal =
                     }
                 | _ ->
                     entry
-            )
+                )
 
-    let refreshPaneEntries (content: string) (entries: ConflictPaneEntry list) =
-        let unresolvedBlocks = parseConflictBlocks content
-        let expectedUnresolvedCount = countUnresolvedEntries entries
+    let private entryStartIndex (entry: ConflictPaneEntry) =
+        match entry.State with
+        | Unresolved block -> block.StartIndex
+        | Resolved(_, resolution) -> resolution.StartIndex
 
-        if unresolvedBlocks.Length <> expectedUnresolvedCount then
-            parsePaneEntries content
-        else
-            let mutable unresolvedIndex = 0
-
+    let normalizeSessionEntries (content: string) (nextEntryId: int) (entries: ConflictPaneEntry list) =
+        let unresolvedCandidateIdsRev, resolvedEntriesRev =
             entries
-            |> List.map (fun entry ->
-                match entry.State with
-                | Resolved _ ->
-                    entry
-                | Unresolved _ ->
-                    let nextBlock = unresolvedBlocks.[unresolvedIndex]
-                    unresolvedIndex <- unresolvedIndex + 1
+            |> List.fold
+                (fun (candidateIdsRev, resolvedEntriesRev) entry ->
+                    match entry.State with
+                    | Unresolved _ ->
+                        entry.EntryId :: candidateIdsRev, resolvedEntriesRev
+                    | Resolved(block, resolution) when resolution.CurrentText = block.RawContent ->
+                        entry.EntryId :: candidateIdsRev, resolvedEntriesRev
+                    | Resolved _ ->
+                        candidateIdsRev, entry :: resolvedEntriesRev)
+                ([], [])
 
-                    {
-                        entry with
-                            State = Unresolved nextBlock
-                    }
+        let unresolvedCandidateIds = unresolvedCandidateIdsRev |> List.rev |> List.toArray
+        let unresolvedBlocks = parseConflictBlocks content
+        let mutable unresolvedIndex = 0
+        let mutable currentNextEntryId = nextEntryId
+
+        let unresolvedEntries =
+            unresolvedBlocks
+            |> List.map (fun block ->
+                let entryId =
+                    if unresolvedIndex < unresolvedCandidateIds.Length then
+                        let reusedEntryId = unresolvedCandidateIds.[unresolvedIndex]
+                        unresolvedIndex <- unresolvedIndex + 1
+                        reusedEntryId
+                    else
+                        let newEntryId = currentNextEntryId
+                        currentNextEntryId <- currentNextEntryId + 1
+                        newEntryId
+
+                {
+                    EntryId = entryId
+                    State = Unresolved block
+                }
             )
+
+        {
+            ResolvedText = content
+            PaneEntries =
+                (resolvedEntriesRev |> List.rev) @ unresolvedEntries
+                |> List.sortBy (fun entry -> entryStartIndex entry, entry.EntryId)
+            NextEntryId = currentNextEntryId
+        }
+
+    let reconcileSessionResolvedText
+        (content: string)
+        (selectionSnapshot: SelectionSnapshot option)
+        (session: ConflictPaneSession)
+        =
+        match describeTextChange session.ResolvedText content selectionSnapshot with
+        | NoTextChange ->
+            session
+        | DocumentReplacement ->
+            createSessionState content
+        | IncrementalEdit textEdit ->
+            let nextEntries =
+                session.PaneEntries
+                |> List.map (fun entry ->
+                    match entry.State with
+                    | Unresolved _ ->
+                        entry
+                    | Resolved(block, resolution) ->
+                        let nextResolution =
+                            reconcileResolutionAfterTextEdit content textEdit resolution
+
+                        if nextResolution.CurrentText = block.RawContent then
+                            {
+                                entry with
+                                    State = Unresolved block
+                            }
+                        else
+                            {
+                                entry with
+                                    State = Resolved(block, nextResolution)
+                            }
+                )
+
+            normalizeSessionEntries content session.NextEntryId nextEntries
 
     [<ReactComponent>]
     let VerticalSplitHandle
@@ -293,6 +530,9 @@ module private GitMergeConflictViewerInternal =
             | ConflictResolutionChoice.Incoming -> "incoming"
             | ConflictResolutionChoice.Current -> "current"
 
+        let canUndo = canUndoResolution resolution
+        let undoUnavailableMessage = tryGetUndoUnavailableMessage resolution
+
         let header =
             GitComparisonView.HeaderRow
                 (GitComparisonView.TitleStack
@@ -303,7 +543,13 @@ module private GitMergeConflictViewerInternal =
                     (Some(
                         Html.p [
                             prop.className "swt:text-xs swt:text-base-content/60"
-                            prop.text $"Resolved with {resolutionLabel}. Expand again with Undo if you want to choose differently."
+                            prop.text
+                                (
+                                    match undoUnavailableMessage with
+                                    | Some message -> $"Resolved with {resolutionLabel}. {message}"
+                                    | None ->
+                                        $"Resolved with {resolutionLabel}. Expand again with Undo if you want to choose differently."
+                                )
                         ]
                     ))
                     None)
@@ -314,8 +560,14 @@ module private GitMergeConflictViewerInternal =
                             prop.className "swt:badge swt:badge-ghost swt:badge-sm"
                             prop.text $"Using {resolutionLabel}"
                         ]
+                        if not canUndo then
+                            Html.span [
+                                prop.className "swt:badge swt:badge-outline swt:badge-sm"
+                                prop.text "Undo unavailable"
+                            ]
                         Html.button [
                             prop.className "swt:btn swt:btn-sm"
+                            prop.disabled (not canUndo)
                             prop.text "Undo"
                             prop.onClick (fun _ -> undoResolution entryId block resolution)
                         ]
@@ -340,6 +592,7 @@ type GitMergeConflictViewer =
             ?defaultResolvedContent: string,
             ?onResolvedContentChange: (string -> unit),
             ?onConfirmMerge: (string -> unit),
+            ?confirmDisabled: bool,
             ?incomingTitle: string,
             ?currentTitle: string,
             ?resolvedTitle: string,
@@ -351,6 +604,7 @@ type GitMergeConflictViewer =
         let normalizedConflictContent = GitTextComparisonCore.Text.normalizeLineEndings mergeConflictContent
         let normalizedControlledResolvedText = resolvedContent |> Option.map GitTextComparisonCore.Text.normalizeLineEndings
         let normalizedDefaultResolvedText = defaultResolvedContent |> Option.map GitTextComparisonCore.Text.normalizeLineEndings
+        let confirmDisabled = defaultArg confirmDisabled false
 
         match normalizedControlledResolvedText, normalizedDefaultResolvedText, onResolvedContentChange with
         | Some _, Some _, _ ->
@@ -369,15 +623,20 @@ type GitMergeConflictViewer =
             |> Option.defaultValue normalizedConflictContent
 
         let internalResolvedText, setInternalResolvedText = React.useState initialUncontrolledResolvedText
+        let lastKnownResolvedSelection =
+            React.useRef<GitMergeConflictViewerInternal.SelectionSnapshot option> None
 
-        let initialActiveResolvedText =
+        let initialObservedResolvedText =
             normalizedControlledResolvedText
             |> Option.defaultValue initialUncontrolledResolvedText
 
-        let paneEntries, setPaneEntries =
-            React.useState (GitMergeConflictViewerInternal.parsePaneEntries initialActiveResolvedText)
+        let sessionState, setSessionState =
+            React.useStateWithUpdater (GitMergeConflictViewerInternal.createSessionState initialObservedResolvedText)
 
-        let skipPaneSync = React.useRef false
+        let pendingResolvedText = React.useRef<string option> None
+        let previousObservedResolvedText = React.useRef initialObservedResolvedText
+        let previousConflictContent = React.useRef normalizedConflictContent
+        let previousDefaultResolvedText = React.useRef normalizedDefaultResolvedText
 
         React.useEffect (
             (fun () ->
@@ -390,17 +649,71 @@ type GitMergeConflictViewer =
             [| box normalizedConflictContent; box normalizedDefaultResolvedText; box isControlled |]
         )
 
-        let activeResolvedText =
+        let observedResolvedText =
             normalizedControlledResolvedText
             |> Option.defaultValue internalResolvedText
 
+        let resolvedText = sessionState.ResolvedText
+
+        let captureResolvedSelection (textarea: Browser.Types.HTMLTextAreaElement) =
+            lastKnownResolvedSelection.current <-
+                Some {
+                    StartIndex = textarea.selectionStart
+                    EndIndex = textarea.selectionEnd
+                }
+
+        let trackResolvedSelectionFromTarget (target: obj) =
+            let textarea = target :?> Browser.Types.HTMLTextAreaElement
+            captureResolvedSelection textarea
+
         React.useEffect (
             (fun () ->
-                if skipPaneSync.current then
-                    skipPaneSync.current <- false
+                let didConflictContentChange = previousConflictContent.current <> normalizedConflictContent
+
+                let didDefaultResolvedTextChange =
+                    not isControlled && previousDefaultResolvedText.current <> normalizedDefaultResolvedText
+
+                let previousResolvedText = previousObservedResolvedText.current
+
+                previousConflictContent.current <- normalizedConflictContent
+                previousDefaultResolvedText.current <- normalizedDefaultResolvedText
+                previousObservedResolvedText.current <- observedResolvedText
+
+                if didConflictContentChange || didDefaultResolvedTextChange then
+                    pendingResolvedText.current <- None
+                    lastKnownResolvedSelection.current <- None
+
+                    let nextSourceResolvedText =
+                        if isControlled then
+                            observedResolvedText
+                        else
+                            normalizedDefaultResolvedText
+                            |> Option.defaultValue normalizedConflictContent
+
+                    setSessionState (fun _ -> GitMergeConflictViewerInternal.createSessionState nextSourceResolvedText)
                 else
-                    setPaneEntries (GitMergeConflictViewerInternal.parsePaneEntries activeResolvedText)),
-            [| box activeResolvedText |]
+                    match pendingResolvedText.current with
+                    | Some expectedResolvedText when expectedResolvedText = observedResolvedText ->
+                        pendingResolvedText.current <- None
+                    | Some _ when isControlled && observedResolvedText = previousResolvedText ->
+                        ()
+                    | Some _ ->
+                        pendingResolvedText.current <- None
+
+                        setSessionState (fun current ->
+                            if current.ResolvedText = observedResolvedText then
+                                current
+                            else
+                                GitMergeConflictViewerInternal.reconcileSessionResolvedText observedResolvedText None current
+                        )
+                    | None ->
+                        setSessionState (fun current ->
+                            if current.ResolvedText = observedResolvedText then
+                                current
+                            else
+                                GitMergeConflictViewerInternal.reconcileSessionResolvedText observedResolvedText None current
+                        )),
+            [| box observedResolvedText; box normalizedConflictContent; box normalizedDefaultResolvedText; box isControlled |]
         )
 
         let updateResolvedText nextValue =
@@ -412,9 +725,36 @@ type GitMergeConflictViewer =
                 setInternalResolvedText normalizedValue
                 onResolvedContentChange |> Option.iter (fun notifyResolvedTextChanged -> notifyResolvedTextChanged normalizedValue)
 
-        let handleResolvedTextChange nextValue =
-            skipPaneSync.current <- false
-            updateResolvedText nextValue
+        let commitSessionAndResolvedText
+            (nextSessionState: GitMergeConflictViewerInternal.ConflictPaneSession)
+            (nextResolvedText: string)
+            =
+            pendingResolvedText.current <- Some nextResolvedText
+            setSessionState (fun _ -> nextSessionState)
+            updateResolvedText nextResolvedText
+
+        let syncSessionToObservedResolvedText () =
+            pendingResolvedText.current <- None
+
+            setSessionState (fun current ->
+                if current.ResolvedText = observedResolvedText then
+                    current
+                else
+                    GitMergeConflictViewerInternal.reconcileSessionResolvedText observedResolvedText None current
+            )
+
+        let handleResolvedTextChange (event: Browser.Types.Event) =
+            let textarea = event.target :?> Browser.Types.HTMLTextAreaElement
+            let normalizedNextValue = GitTextComparisonCore.Text.normalizeLineEndings textarea.value
+            let selectionBeforeEdit = lastKnownResolvedSelection.current
+
+            if normalizedNextValue <> resolvedText then
+                let nextSessionState =
+                    GitMergeConflictViewerInternal.reconcileSessionResolvedText normalizedNextValue selectionBeforeEdit sessionState
+
+                commitSessionAndResolvedText nextSessionState normalizedNextValue
+
+            captureResolvedSelection textarea
 
         let rootTestId =
             testIdPrefix |> Option.map (fun prefix -> prefix + "-root")
@@ -431,8 +771,7 @@ type GitMergeConflictViewer =
         let splitHandleTestId =
             testIdPrefix |> Option.map (fun prefix -> prefix + "-split-handle")
 
-        let resetPaneEntriesFromActiveText () =
-            setPaneEntries (GitMergeConflictViewerInternal.parsePaneEntries activeResolvedText)
+        let paneEntries = sessionState.PaneEntries
 
         let applyResolution
             (choice: GitMergeConflictViewerInternal.ConflictResolutionChoice)
@@ -447,18 +786,15 @@ type GitMergeConflictViewer =
                     block.StartIndex
                     block.RawContent
                     normalizedReplacementText
-                    activeResolvedText
+                    resolvedText
             with
             | Some nextResolvedText ->
-                let resolution: GitMergeConflictViewerInternal.ConflictResolutionState = {
-                    Choice = choice
-                    AppliedText = normalizedReplacementText
-                    StartIndex = block.StartIndex
-                }
+                let resolution =
+                    GitMergeConflictViewerInternal.createResolutionState choice block.StartIndex normalizedReplacementText
 
                 let delta = normalizedReplacementText.Length - block.RawContent.Length
 
-                let nextPaneEntries =
+                let nextEntries =
                     paneEntries
                     |> List.map (fun entry ->
                         if entry.EntryId = entryId then
@@ -470,14 +806,16 @@ type GitMergeConflictViewer =
                             entry
                     )
                     |> GitMergeConflictViewerInternal.shiftResolvedEntryOffsetsAfter block.StartIndex delta
-                    |> GitMergeConflictViewerInternal.refreshPaneEntries nextResolvedText
 
-                skipPaneSync.current <- true
-                setPaneEntries nextPaneEntries
-                updateResolvedText nextResolvedText
+                let nextSessionState =
+                    GitMergeConflictViewerInternal.normalizeSessionEntries
+                        nextResolvedText
+                        sessionState.NextEntryId
+                        nextEntries
+
+                commitSessionAndResolvedText nextSessionState nextResolvedText
             | None ->
-                skipPaneSync.current <- false
-                resetPaneEntriesFromActiveText ()
+                syncSessionToObservedResolvedText ()
 
         let undoResolution
             (entryId: int)
@@ -487,14 +825,14 @@ type GitMergeConflictViewer =
             match
                 GitTextComparisonCore.MergeConflicts.tryReplaceExactTextAt
                     resolution.StartIndex
-                    resolution.AppliedText
+                    resolution.CurrentText
                     block.RawContent
-                    activeResolvedText
+                    resolvedText
             with
             | Some nextResolvedText ->
-                let delta = block.RawContent.Length - resolution.AppliedText.Length
+                let delta = block.RawContent.Length - resolution.CurrentText.Length
 
-                let nextPaneEntries =
+                let nextEntries =
                     paneEntries
                     |> List.map (fun entry ->
                         if entry.EntryId = entryId then
@@ -506,19 +844,21 @@ type GitMergeConflictViewer =
                             entry
                     )
                     |> GitMergeConflictViewerInternal.shiftResolvedEntryOffsetsAfter resolution.StartIndex delta
-                    |> GitMergeConflictViewerInternal.refreshPaneEntries nextResolvedText
 
-                skipPaneSync.current <- true
-                setPaneEntries nextPaneEntries
-                updateResolvedText nextResolvedText
+                let nextSessionState =
+                    GitMergeConflictViewerInternal.normalizeSessionEntries
+                        nextResolvedText
+                        sessionState.NextEntryId
+                        nextEntries
+
+                commitSessionAndResolvedText nextSessionState nextResolvedText
             | None ->
-                skipPaneSync.current <- false
-                resetPaneEntriesFromActiveText ()
+                syncSessionToObservedResolvedText ()
 
         let hasRemainingConflictMarkers =
             React.useMemo (
-                (fun () -> GitTextComparisonCore.MergeConflicts.containsConflictMarkers activeResolvedText),
-                [| box activeResolvedText |]
+                (fun () -> GitTextComparisonCore.MergeConflicts.containsConflictMarkers resolvedText),
+                [| box resolvedText |]
             )
 
         let unresolvedConflictCount =
@@ -529,12 +869,14 @@ type GitMergeConflictViewer =
 
         let resolvedLineCount =
             React.useMemo (
-                (fun () -> (GitTextComparisonCore.Text.splitContentToLines activeResolvedText).Length),
-                [| box activeResolvedText |]
+                (fun () -> (GitTextComparisonCore.Text.splitContentToLines resolvedText).Length),
+                [| box resolvedText |]
             )
 
         let canConfirmMerge =
-            onConfirmMerge.IsSome && not hasRemainingConflictMarkers
+            onConfirmMerge.IsSome
+            && not hasRemainingConflictMarkers
+            && not confirmDisabled
 
         let header =
             GitComparisonView.HeaderRow
@@ -626,8 +968,11 @@ type GitMergeConflictViewer =
                             prop.testId resolvedEditorTestId.Value
                         prop.className
                             "swt:mt-2 swt:min-h-0 swt:flex-1 swt:w-full swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:px-4 swt:py-3 swt:font-mono swt:text-xs swt:leading-6 swt:resize-none swt:focus:outline-hidden"
-                        prop.value activeResolvedText
+                        prop.value resolvedText
                         prop.onChange handleResolvedTextChange
+                        prop.onSelect (fun (event: Browser.Types.UIEvent) -> trackResolvedSelectionFromTarget event.target)
+                        prop.onClick (fun (event: Browser.Types.MouseEvent) -> trackResolvedSelectionFromTarget event.target)
+                        prop.onKeyUp (fun (event: Browser.Types.KeyboardEvent) -> trackResolvedSelectionFromTarget event.target)
                     ]
                     Html.div [
                         prop.className "swt:mt-3 swt:flex swt:justify-end"
@@ -636,12 +981,12 @@ type GitMergeConflictViewer =
                                 if confirmMergeButtonTestId.IsSome then
                                     prop.testId confirmMergeButtonTestId.Value
                                 prop.className "swt:btn swt:btn-primary"
-                                prop.disabled (not canConfirmMerge)
+                                prop.disabled (confirmDisabled || not canConfirmMerge)
                                 prop.text "Confirm Merge"
                                 prop.onClick (fun _ ->
                                     if canConfirmMerge then
                                         onConfirmMerge
-                                        |> Option.iter (fun confirm -> confirm activeResolvedText)
+                                        |> Option.iter (fun confirm -> confirm resolvedText)
                                 )
                             ]
                         ]

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,10 +7,15 @@
   <ItemGroup>
     <Compile Include="Api.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="MainUpdateRendererBridge.fs" />
+    <Compile Include="GitApiClient.fs" />
     <Compile Include="Context\AppStateCtx.fs" />
     <Compile Include="Context\PageStateCtx.fs" />
     <Compile Include="Context\FileStateCtx.fs" />
     <Compile Include="Context\ArcObjectExplorerCtx.fs" />
+    <Compile Include="Context\AuthStateCtx.fs" />
+    <Compile Include="Context\GitWorkflow.fs" />
+    <Compile Include="Context\GitStateCtx.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\Navbar.fs" />
@@ -18,6 +23,7 @@
     <Compile Include="Components\WidgetRegister.fs" />
     <Compile Include="Components\LeftSidebar\ArcObjectTreeSidebar.fs" />
     <Compile Include="Components\LeftSidebar\ExplorerSidebar.fs" />
+    <Compile Include="Components\LeftSidebar\GitSidebarPanel.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />
     <Compile Include="Components\MainElement.fs" />
     <Compile Include="Components\MainContent\Types.fs" />
@@ -29,9 +35,11 @@
     <Compile Include="Components\MainContent\LandingDraftTarget.fs" />
     <Compile Include="Components\MainContent\NotesDraftTarget.fs" />
     <Compile Include="Components\MainContent\NotesSearchTarget.fs" />
+    <Compile Include="Components\MainContent\GitDiffTarget.fs" />
+    <Compile Include="Components\MainContent\GitMergeConflictTarget.fs" />
+    <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
-    <Compile Include="Components\MainContent\InitTarget.fs" />
-    <Compile Include="Components\MainContent\ArcTarget.fs" />
+    <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
     <Compile Include="Components\MainContent\ArcObjectExplorerTarget.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
     <Compile Include="Components\RightSidebar\ArcObjectDetailsSidebar.fs" />

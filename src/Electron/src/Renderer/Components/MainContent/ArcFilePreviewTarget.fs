@@ -1,16 +1,13 @@
 module Renderer.Components.MainContent.ArcFilePreviewTarget
 
-
 open Feliz
-open Renderer.Components.MainElement
 open Renderer.Components.MainContent.Helper
+open Renderer.Components.MainElement
 open Swate.Components
 open Swate.Components.Shared
 
-
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
-
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
@@ -22,13 +19,13 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
         | _ -> false
 
     let setArcFile =
-        fun (arcFile: ArcFiles) ->
-            let page = PageState.ArcFilePage arcFile
+        fun (nextArcFile: ArcFiles) ->
+            let page = Renderer.Types.PageState.ArcFilePage nextArcFile
 
             pageStateCtx.setState (Some page)
-            arcObjectCtx.setArcFileState (Some arcFile)
-            arcObjectCtx.setPreviewState (Some page)
-            arcObjectCtx.setPendingArcFileSave (Some arcFile)
+            arcObjectCtx.setArcFileState (Some nextArcFile)
+            arcObjectCtx.setPreviewState (Some(Swate.Components.Shared.PageState.ArcFilePage nextArcFile))
+            arcObjectCtx.setPendingArcFileSave (Some nextArcFile)
             arcObjectCtx.setStatusMessage None
 
     let onSaveArcFile =
@@ -37,7 +34,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 match! MainContentHelper.saveArcFile arcFile with
                 | Ok() when isPendingSaveForCurrentArcFile -> arcObjectCtx.setPendingArcFileSave None
                 | Ok() -> ()
-                | Error exn -> pageStateCtx.setState (PageState.ErrorPage exn.Message |> Some)
+                | Error exn -> pageStateCtx.setState (Renderer.Types.PageState.ErrorPage exn.Message |> Some)
             }
             |> Promise.start
 

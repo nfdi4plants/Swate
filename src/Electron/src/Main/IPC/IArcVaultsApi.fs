@@ -357,6 +357,24 @@ let api: IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    pickDirectory =
+        fun _ -> promise {
+            try
+                let properties = [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                |]
+
+                let! result = dialog.showOpenDialog (properties = properties)
+
+                if result.canceled then
+                    return Error(exn "Cancelled")
+                elif result.filePaths.Length <> 1 then
+                    return Error(exn "Not exactly one path")
+                else
+                    return Ok(result.filePaths |> Array.exactlyOne)
+            with e ->
+                return Error(exn $"Could not pick directory: {e.Message}")
+        }
     pickAbsolutePaths =
         fun _ -> promise {
             try

@@ -3,11 +3,13 @@ module Swate.Electron.Shared.IPCTypes
 
 open Fable.Core
 open Fable.Electron
-
+open Swate.Components.Api.GitLabApi
+open Swate.Components.Authentication.Types
+open Swate.Components.DataHubTypes
 open Swate.Components.Shared
 open AuthTypes
-open GitTypes
 open FileIOTypes
+open GitTypes
 
 module IPCTypesHelper =
 
@@ -33,6 +35,7 @@ type IArcVaultsApi = {
     removeRecentARC: ARCPointer -> JS.Promise<Result<unit, exn>>
 
     pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
+    pickDirectory: IpcMainEvent -> JS.Promise<Result<string, exn>>
     pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
     pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
     getArcObjectTree: IpcMainEvent -> JS.Promise<Result<ArcExplorerNode list, exn>>
@@ -54,8 +57,14 @@ type IGitLfsApi = {
 /// Two Way Bridge: Renderer <-> Main
 type IGitApi = {
     getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
+    getGitBranches: IpcMainEvent -> JS.Promise<Result<GitBranchRefDto[], exn>>
+    getGitLfsSettings: IpcMainEvent -> JS.Promise<Result<GitLfsSettingsDto, exn>>
     getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
     getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
+    getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>
+    getGitMergeConflictViewData:
+        IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>>
+    installGitLfs: IpcMainEvent -> JS.Promise<Result<GitOperationResult, exn>>
     gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
@@ -64,19 +73,34 @@ type IGitApi = {
     gitStagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitUnstagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    setGitLfsSettings: IpcMainEvent -> GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: IpcMainEvent -> GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    confirmGitMergeResolution:
+        IpcMainEvent -> GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
+type IGitLabApi = {
+    loadAllRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadMostStarredRepos:
+        IpcMainEvent -> ExploreMostStarredQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadUserRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadOrganisationGroups:
+        IpcMainEvent -> ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
+    loadOrganisationRepos:
+        IpcMainEvent -> ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
 }
 
 /// One Way Bridge: Main -> Renderer
 type IMainUpdateRendererApi = {
     pathChange: string option -> unit
     recentARCsUpdate: ARCPointer[] -> unit
-    authAccountsUpdate: AuthAccountSummary[] -> unit
+    authAccountsUpdate: AuthStateDto -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit
-} with
-
+}
+with
     static member empty = {
         pathChange = ignore
         recentARCsUpdate = ignore
@@ -100,7 +124,7 @@ type IAuthApi = {
     getAuthState: unit -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
     revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
-    listAccounts: unit -> Fable.Core.JS.Promise<Result<AuthAccountSummary array, exn>>
+    listAccounts: unit -> Fable.Core.JS.Promise<Result<AccountSummary array, exn>>
     setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
 }

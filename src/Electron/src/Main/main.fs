@@ -18,6 +18,7 @@ app
         ARC_VAULTS.RegisterVault() |> ignore
 
         Remoting.init |> Remoting.buildHandler IPC.IGitApi.api
+        Remoting.init |> Remoting.buildHandler IPC.IGitLabApi.api
         Remoting.init |> Remoting.buildHandler IPC.ArcVaultsApi.api
         Remoting.init |> Remoting.buildHandler Main.IPC.AuthApi.api
 

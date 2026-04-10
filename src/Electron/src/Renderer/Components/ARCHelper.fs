@@ -1,43 +1,57 @@
 module Renderer.Components.ARCHelper
 
 open System
+open Renderer.Types
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
-open Renderer.Types
 
 type PreviewLoadResult = {
-    PageState: PageState
+    RendererPageState: Renderer.Types.PageState
     ArcFileState: ArcFiles option
-    PreviewState: PageState option
+    PreviewState: Swate.Components.Shared.PageState option
 }
 
+let private previewStateOfRendererPageState =
+    function
+    | Renderer.Types.PageState.ArcFilePage arcFile -> Some(Swate.Components.Shared.PageState.ArcFilePage arcFile)
+    | Renderer.Types.PageState.TextPage content -> Some(Swate.Components.Shared.PageState.TextPage content)
+    | Renderer.Types.PageState.UnknownPage -> Some Swate.Components.Shared.PageState.UnknownPage
+    | Renderer.Types.PageState.LandingDraftPage -> Some Swate.Components.Shared.PageState.LandingDraftPage
+    | Renderer.Types.PageState.NotesDraftPage -> Some Swate.Components.Shared.PageState.NotesDraftPage
+    | Renderer.Types.PageState.NotesSearchPage -> Some Swate.Components.Shared.PageState.NotesSearchPage
+    | Renderer.Types.PageState.ErrorPage errMsg -> Some(Swate.Components.Shared.PageState.ErrorPage errMsg)
+    | Renderer.Types.PageState.GitDiffPage _
+    | Renderer.Types.PageState.GitMergeConflictPage _
+    | Renderer.Types.PageState.GitUnsupportedPage _
+    | Renderer.Types.PageState.DataHubBrowser -> None
+
 let previewLoadResultOfDto (data: FileContentDTO) =
-    let pageState = pageStateOfFileContentDTO data
+    let pageState = Renderer.Types.PageState.fromFileContentDTO data
 
     {
-        PageState = pageState
+        RendererPageState = pageState
         ArcFileState = FileContentDTO.toArcFile data
-        PreviewState = Some pageState
+        PreviewState = previewStateOfRendererPageState pageState
     }
 
 let applyLoadedPreview
-    (setPageState: PageState option -> unit)
+    (setPageState: Renderer.Types.PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: PageState option -> unit)
+    (setPreviewState: Swate.Components.Shared.PageState option -> unit)
     (setStatusMessage: string option -> unit)
     (loaded: PreviewLoadResult)
     =
-    setPageState (Some loaded.PageState)
+    setPageState (Some loaded.RendererPageState)
     setArcFileState loaded.ArcFileState
     setPreviewState loaded.PreviewState
     setStatusMessage None
 
 let clearArcObjectPreview
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: PageState option -> unit)
+    (setPreviewState: Swate.Components.Shared.PageState option -> unit)
     (setStatusMessage: string option -> unit)
     =
     setArcFileState None
@@ -45,15 +59,15 @@ let clearArcObjectPreview
     setStatusMessage None
 
 let applyPreviewError
-    (setPageState: PageState option -> unit)
+    (setPageState: Renderer.Types.PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: PageState option -> unit)
+    (setPreviewState: Swate.Components.Shared.PageState option -> unit)
     (setStatusMessage: string option -> unit)
     (errorMessage: string)
     =
-    setPageState (Some(PageState.ErrorPage errorMessage))
+    setPageState (Some(Renderer.Types.PageState.ErrorPage errorMessage))
     setArcFileState None
-    setPreviewState (Some(PageState.ErrorPage errorMessage))
+    setPreviewState (Some(Swate.Components.Shared.PageState.ErrorPage errorMessage))
     setStatusMessage (Some errorMessage)
 
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
@@ -94,9 +108,9 @@ let openPreview (path: string) = promise {
 }
 
 let createArcExplorerServices
-    (setPageState: PageState option -> unit)
+    (setPageState: Renderer.Types.PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
-    (setPreviewState: PageState option -> unit)
+    (setPreviewState: Swate.Components.Shared.PageState option -> unit)
     (setStatusMessage: string option -> unit)
     : ARCExplorerServices
     =

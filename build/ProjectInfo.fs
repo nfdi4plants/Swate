@@ -18,6 +18,7 @@ module ProjectPaths =
     let serverTestsPath = Path.GetFullPath "tests/Server"
     let clientTestsPath = Path.GetFullPath "tests/Client"
     let electronCoreTestsPath = Path.GetFullPath "tests/Electron.Core"
+    let electronRendererTestsPath = Path.GetFullPath "tests/Electron.Renderer"
     let componentTestsPath = Path.GetFullPath "src/Components"
 
     let dockerComposePath = Path.GetFullPath ".db/docker-compose.yml"
