@@ -2,10 +2,61 @@ namespace Swate.Components.FileExplorerTypes
 
 open System
 
+[<RequireQualifiedAccess>]
+type FileItemIconTone =
+    | BaseMuted
+    | BaseSubtle
+    | Secondary
+    | Success
+    | Primary
+    | Warning
+    | Info
+    | Accent
+    | Error
+
+[<RequireQualifiedAccess>]
+module FileItemIconTone =
+
+    let className =
+        function
+        | FileItemIconTone.BaseMuted -> "swt:text-base-content/70"
+        | FileItemIconTone.BaseSubtle -> "swt:text-base-content/60"
+        | FileItemIconTone.Secondary -> "swt:text-secondary"
+        | FileItemIconTone.Success -> "swt:text-success"
+        | FileItemIconTone.Primary -> "swt:text-primary"
+        | FileItemIconTone.Warning -> "swt:text-warning"
+        | FileItemIconTone.Info -> "swt:text-info"
+        | FileItemIconTone.Accent -> "swt:text-accent"
+        | FileItemIconTone.Error -> "swt:text-error"
+
+[<RequireQualifiedAccess>]
+type FileItemIcon =
+    | Folder
+    | Document
+    | Table
+    | Database
+    | Tag
+    | Block
+    | MoreHorizontal
+
+[<RequireQualifiedAccess>]
+module FileItemIcon =
+
+    let className =
+        function
+        | FileItemIcon.Folder -> "swt:fluent--folder-24-regular"
+        | FileItemIcon.Document -> "swt:fluent--document-24-regular"
+        | FileItemIcon.Table -> "swt:fluent--table-24-regular"
+        | FileItemIcon.Database -> "swt:fluent--database-24-regular"
+        | FileItemIcon.Tag -> "swt:fluent--tag-24-regular"
+        | FileItemIcon.Block -> "swt:fluent--prohibited-24-regular"
+        | FileItemIcon.MoreHorizontal -> "swt:fluent--more-horizontal-24-regular"
+
 type FileItem = {
     Id: string
     Name: string
-    IconPath: string
+    Icon: FileItemIcon
+    IconTone: FileItemIconTone option
     IsExpanded: bool
     Children: FileItem list option
     IdRel: string option
@@ -25,10 +76,17 @@ type FileItem = {
 // Helper type for file tree creation using a predefined config
 type FileItemConfig = {
     Name: string
-    IconPath: string
+    Icon: FileItemIcon
+    IconTone: FileItemIconTone option
     IsDirectory: bool
     ItemType: string
 }
+
+[<RequireQualifiedAccess>]
+type DirectoryInteractionMode =
+    | SingleClickToggle
+    | OpenOnDoubleClickCloseOnSingleClick
+    | ToggleOnSingleClickSelectOnDoubleClick
 
 
 // ============================================================================
@@ -44,10 +102,11 @@ module FileTree =
         let divisor = Math.Pow(1024.0, float log)
         sprintf "%.0f %s" (float size / divisor) suffixes.[log]
 
-    let createFile (name: string) path (iconPath: string) : FileItem = {
+    let createFile (name: string) path (icon: FileItemIcon) : FileItem = {
         Id = generateId ()
         Name = name
-        IconPath = iconPath
+        Icon = icon
+        IconTone = None
         IsExpanded = false
         Children = None
         IdRel = None
@@ -64,10 +123,11 @@ module FileTree =
         Path = path
     }
 
-    let createFolder (name: string) path (iconPath: string) : FileItem = {
+    let createFolder (name: string) path (icon: FileItemIcon) : FileItem = {
         Id = generateId ()
         Name = name
-        IconPath = iconPath
+        Icon = icon
+        IconTone = None
         IsExpanded = false
         Children = Some []
         IdRel = None
@@ -87,7 +147,8 @@ module FileTree =
     let createFromConfig (config: FileItemConfig) path (id: string) : FileItem = {
         Id = id
         Name = config.Name
-        IconPath = config.IconPath
+        Icon = config.Icon
+        IconTone = config.IconTone
         IsExpanded = false
         Children = if config.IsDirectory then Some [] else None
         IdRel = None
@@ -228,7 +289,8 @@ module FileTree =
     let createEmptyPlaceholder (parentId: string) : FileItem = {
         Id = sprintf "%s/empty$%s" parentId (generateId ())
         Name = "empty"
-        IconPath = "block"
+        Icon = FileItemIcon.Block
+        IconTone = None
         IsExpanded = false
         Children = None
         IdRel = None
@@ -253,6 +315,24 @@ type ContextMenuItem = {
 }
 
 module FileExplorerLogic =
+
+    let private expandedIdsFromPath includeSelectedItem itemId items =
+        let pathItems =
+            match FileTree.getPath itemId items [] with
+            | Some pathItems -> pathItems
+            | None -> []
+
+        let expandablePathItems =
+            if includeSelectedItem then
+                pathItems
+            else
+                pathItems
+                |> List.take (max 0 (List.length pathItems - 1))
+
+        expandablePathItems
+        |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
+        |> Set.ofList
+
     let rec private collectExpandedIds acc items =
         items
         |> List.fold
@@ -295,7 +375,7 @@ module FileExplorerLogic =
         | EnsurePathVisible of string
         | ShowContextMenu of float * float * ContextMenuItem list
         | HideContextMenu
-        | UpdateItems of FileItem list
+        | UpdateItems of FileItem list * selectedItemId: string option option * includeSelectedItem: bool
         | AddChild of parentId: string * child: FileItem
         | RemoveItem of string
         | RenameItem of string * string
@@ -379,7 +459,7 @@ module FileExplorerLogic =
                 ContextMenuVisible = false
           }
 
-        | UpdateItems items ->
+        | UpdateItems(items, selectedItemId, includeSelectedItem) ->
             let validIds = collectIds Set.empty items
             let expandedFromItems = collectExpandedIds Set.empty items
 
@@ -387,10 +467,38 @@ module FileExplorerLogic =
                 model.ExpandedIds
                 |> Set.filter (fun id -> validIds.Contains id)
 
+            let persistedSelectedId =
+                model.SelectedId
+                |> Option.filter validIds.Contains
+
+            let nextSelectedId =
+                selectedItemId
+                |> Option.map (Option.filter validIds.Contains)
+                |> Option.defaultValue persistedSelectedId
+
+            let breadcrumbPath =
+                match nextSelectedId with
+                | Some itemId ->
+                    match FileTree.getPath itemId items [] with
+                    | Some path -> path
+                    | None -> []
+                | None -> []
+
+            let expandedFromSelection =
+                nextSelectedId
+                |> Option.map (fun itemId -> expandedIdsFromPath includeSelectedItem itemId items)
+                |> Option.defaultValue Set.empty
+
+
             {
                 model with
                     Items = items
-                    ExpandedIds = Set.union persistedExpanded expandedFromItems
+                    SelectedId = nextSelectedId
+                    BreadcrumbPath = breadcrumbPath
+                    ExpandedIds =
+                        persistedExpanded
+                        |> Set.union expandedFromItems
+                        |> Set.union expandedFromSelection
             }
 
         | AddChild(parentId, child) ->

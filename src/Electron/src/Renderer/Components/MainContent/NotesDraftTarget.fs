@@ -1,16 +1,14 @@
 module Renderer.Components.MainContent.NotesDraftTarget
 
 open Feliz
-open Swate.Components
 open Swate.Components.Landing
 open Swate.Components.Notes.Editor
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open ARCtrl.Contract
-open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent.Types
-open Renderer.Types
 
 [<ReactComponent>]
 let NotesDraftTarget () =
@@ -19,8 +17,7 @@ let NotesDraftTarget () =
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let errorModal = Contexts.ErrorModal.useErrorModal ()
-    let arcScopeId = useCurrentArcScopeId ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -50,8 +47,9 @@ let NotesDraftTarget () =
                             Error = Some $"Failed to write note: {exn.Message}"
                     }
                 | Ok() ->
+                    let selectedPath = normalizePath payload.Intent.RelativePath
 
-                    fileStateCtx.setSelectedTreeItemPath (Some payload.Intent.RelativePath)
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
                     setNotesDraft NotesDraft.init
                     setNotesUiState NotesUiState.init
 
@@ -59,16 +57,21 @@ let NotesDraftTarget () =
 
                     match previewResult with
                     | Ok previewData ->
-                        match PageState.fromFileContentDTO previewData with
-                        | Ok page ->
-                            pageStateCtx.setState (Some page)
-                        | Error message ->
-                            errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = "Note preview could not be opened", ?scopeId = arcScopeId)
-                            )
-
-                            pageStateCtx.setState (Some(PageState.TextPage payload.Intent.Content))
-                    | Result.Error _ -> pageStateCtx.setState (Some(PageState.TextPage payload.Intent.Content))
+                        previewData
+                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                        |> Renderer.Components.ARCHelper.applyLoadedPreview
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
+                    | Result.Error _ ->
+                        FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
+                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                        |> Renderer.Components.ARCHelper.applyLoadedPreview
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
             }
             |> Promise.start
 

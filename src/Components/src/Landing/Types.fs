@@ -2,6 +2,8 @@ namespace Swate.Components.Landing
 
 open ARCtrl
 open Fable.Core
+open Swate.Components.Shared
+
 
 [<RequireQualifiedAccess>]
 type LandingTarget =

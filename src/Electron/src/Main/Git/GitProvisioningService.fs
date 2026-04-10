@@ -3,13 +3,14 @@ module Main.Git.GitProvisioningService
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Swate.Electron.Shared.GitTypes
+open Main.Bindings.Node
 open Main.Bindings.SimpleGit
 open Main.Git.GitAuthAdapter
 open Main.Git.GitInternals
 open Main.Git.GitTokenProvider
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private pathDynamic: obj = importAll "path"
+let private gitLfsDownloadLargeFilesConfigKey = "swate.lfs.downloadlargefiles"
 
 type ExistingPathKind =
     | Directory
@@ -125,38 +126,6 @@ let ensureCloneTargetIsEmpty (state: CloneTargetState) : Result<unit, exn> =
     | CloneTargetState.Missing ->
         Ok ()
 
-let shouldRetryWithoutAuth (failure: GitService.GitFailure) =
-    let message =
-        failure.Message
-        |> Option.ofObj
-        |> Option.defaultValue String.Empty
-        |> fun text -> text.ToLowerInvariant()
-
-    let contains (term: string) = message.Contains(term)
-
-    match failure.Kind with
-    | GitService.GitFailureKind.Forbidden ->
-        true
-    | GitService.GitFailureKind.Unauthorized ->
-        // Treat generic local filesystem permission errors conservatively (no cleanup+retry).
-        // Allow SSH publickey failures, and common HTTP 401 auth signals.
-        let hasHttpAuthSignal =
-            contains "unauthorized"
-            || contains "authentication failed"
-            || contains "401"
-            || contains "could not read username"
-            || contains "no access token available"
-
-        let isSshPublicKeyFailure =
-            contains "permission denied" && contains "publickey"
-
-        hasHttpAuthSignal || isSshPublicKeyFailure
-    | GitService.GitFailureKind.Network
-    | GitService.GitFailureKind.Timeout
-    | GitService.GitFailureKind.Canceled
-    | GitService.GitFailureKind.Unknown ->
-        false
-
 let buildCloneBranchOptions (branch: string option) : string[] =
     match branch with
     | None -> [||]
@@ -182,6 +151,9 @@ let private resolveAbsolutePath (pathValue: string) =
 let private dirname (pathValue: string) =
     pathDynamic?dirname(pathValue) |> unbox<string>
 
+let private formatDownloadLargeFilesConfigValue (downloadLargeFiles: bool) =
+    if downloadLargeFiles then "true" else "false"
+
 let private mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> =
     promise {
         let mkdirPromise =
@@ -200,89 +172,6 @@ let private removeRecursiveAsync (targetPath: string) : JS.Promise<unit> =
 
         let! _ = rmPromise
         return ()
-    }
-
-let validateCloneRetryCleanupEntries (entries: string[]) : Result<string option, exn> =
-    let safeEntries = if isNull entries then [||] else entries
-
-    if safeEntries.Length = 0 then
-        Ok None
-    else
-        let gitEntries =
-            safeEntries
-            |> Array.filter (fun entry -> entry.Equals(".git", StringComparison.OrdinalIgnoreCase))
-
-        if gitEntries.Length = 0 then
-            Error(
-                exn
-                    "Refusing to clean clone target for auth-fallback retry because it contains unexpected files (no .git directory detected)."
-            )
-        elif safeEntries.Length = 1 then
-            Ok(Some gitEntries.[0])
-        else
-            Error(
-                exn
-                    "Refusing to clean clone target for auth-fallback retry because it contains unexpected files in addition to the .git directory."
-            )
-
-let private cleanupCloneTargetForRetry
-    (targetPath: string)
-    : JS.Promise<Result<unit, exn>> =
-    promise {
-        try
-            // Safety guard:
-            // This cleanup is only used to enable a single unauthenticated clone retry after an auth failure.
-            // It is intentionally conservative to avoid deleting unrelated user data if the target path is
-            // concurrently modified by another process between attempts.
-            let! kindResult = tryGetExistingPathKindNoFollow targetPath
-
-            match kindResult with
-            | Error statError ->
-                return Error statError
-            | Ok None ->
-                // Target is missing; nothing to clean.
-                return Ok ()
-            | Ok (Some ExistingPathKind.Directory) ->
-                let! entries = fsPromisesDynamic?readdir(targetPath) |> unbox<JS.Promise<string[]>>
-
-                match validateCloneRetryCleanupEntries entries with
-                | Error entryError ->
-                    return Error entryError
-                | Ok None ->
-                    // An empty directory is a valid clone destination; avoid deleting it unnecessarily.
-                    return Ok ()
-                | Ok (Some gitEntryName) ->
-                    // Only remove the git metadata, and only when the directory contains nothing else.
-                    // This avoids deleting concurrently-created unrelated files and reduces TOCTOU impact.
-                    let gitDirPath = pathDynamic?join(targetPath, gitEntryName) |> unbox<string>
-                    let! gitKindResult = tryGetExistingPathKindNoFollow gitDirPath
-
-                    match gitKindResult with
-                    | Error gitKindError ->
-                        return Error gitKindError
-                    | Ok (Some ExistingPathKind.Directory) ->
-                        do! removeRecursiveAsync gitDirPath
-                        return Ok ()
-                    | Ok (Some ExistingPathKind.Symlink) ->
-                        return Error(exn "Refusing to clean clone target for retry because .git is a symbolic link/junction.")
-                    | Ok (Some ExistingPathKind.File)
-                    | Ok (Some ExistingPathKind.Other) ->
-                        return Error(exn "Refusing to clean clone target for retry because .git is not a directory.")
-                    | Ok None ->
-                        // Directory contents indicated .git, but it is missing now; treat as race and refuse.
-                        return
-                            Error(
-                                exn
-                                    "Refusing to clean clone target for retry because .git could not be found (directory contents changed concurrently)."
-                            )
-            | Ok (Some ExistingPathKind.Symlink) ->
-                return Error(exn "Refusing to clean clone target for retry because target path is a symbolic link/junction.")
-            | Ok (Some ExistingPathKind.File)
-            | Ok (Some ExistingPathKind.Other) ->
-                return Error(exn "Refusing to clean clone target for retry because target path is not a directory.")
-
-        with error ->
-            return Error(exn $"Failed to clean clone target before retry: {error.Message}")
     }
 
 let private getCloneTargetState (targetPath: string) : JS.Promise<Result<CloneTargetState, exn>> =
@@ -316,13 +205,13 @@ let private validateOptionalBranch (branch: string option) : Result<string optio
 
 let private createNonEmptyTargetFailure () : GitService.GitResult<'T> =
     Error {
-        Kind = GitService.GitFailureKind.Unknown
+        Kind = GitFailureKind.Unknown
         Message = "Target path already exists and is not empty."
     }
 
 let private createExistingRepositoryFailure () : GitService.GitResult<'T> =
     Error {
-        Kind = GitService.GitFailureKind.Unknown
+        Kind = GitFailureKind.Unknown
         Message = "Target path is already a git repository."
     }
 
@@ -345,6 +234,41 @@ let private cloneWithGit
                 return targetPath
         })
         git
+
+// Skip the LFS smudge filter during clone to avoid downloading all LFS objects upfront.
+// The user's "Download Large Files" preference controls whether LFS content is hydrated
+// after clone via a separate `git lfs pull` step (see hydrateClonedLfsContent).
+let private applyCloneSkipSmudge (git: ISimpleGit) =
+    git.env (GitLfsSkipSmudgeEnvKey, "1")
+
+let private hydrateClonedLfsContent (git: ISimpleGit) : JS.Promise<GitService.GitResult<unit>> =
+    runSimpleGit
+        (fun currentGit -> promise {
+            let! _ = currentGit.raw [| "lfs"; "pull" |]
+            return ()
+        })
+        git
+
+let private persistCloneDownloadPreference
+    (repoPath: string)
+    (downloadLargeFiles: bool)
+    : JS.Promise<GitService.GitResult<unit>> =
+    let repoOptions = createOptions repoPath standardTimeout None
+    let repoGit = createGit repoOptions
+
+    runSimpleGit
+        (fun currentGit -> promise {
+            let! _ =
+                currentGit.raw [|
+                    "config"
+                    "--local"
+                    gitLfsDownloadLargeFilesConfigKey
+                    formatDownloadLargeFilesConfigValue downloadLargeFiles
+                |]
+
+            return ()
+        })
+        repoGit
 
 let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string>> =
     promise {
@@ -409,6 +333,7 @@ let cloneRepository
     (remoteUrl: string)
     (targetPath: string)
     (branch: string option)
+    (downloadLargeFiles: bool)
     (progress: GitService.GitProgressCallback option)
     : JS.Promise<GitService.GitResult<string>> =
     promise {
@@ -422,97 +347,158 @@ let cloneRepository
             | Error hostError ->
                 return errorResult hostError
             | Ok host ->
-                match validateAndNormalizeTargetPathWithResolver resolveAbsolutePath targetPath with
-                | Error pathError ->
-                    return errorResult pathError
-                | Ok normalizedTargetPath ->
-                    match validateOptionalBranch branch with
-                    | Error branchError ->
-                        return errorResult branchError
-                    | Ok safeBranch ->
-                        try
-                            let targetParent = dirname normalizedTargetPath
-                            let! parentEnsureResult =
-                                promise {
-                                    let! parentKindResult = tryGetExistingPathKind targetParent
+                let! isLfsInstalled =
+                    if downloadLargeFiles then
+                        GitLfsService.isSystemInstalled ()
+                    else
+                        promise { return true }
 
-                                    match parentKindResult with
-                                    | Error parentError ->
-                                        return Error parentError
-                                    | Ok (Some ExistingPathKind.Directory) ->
-                                        return Ok ()
-                                    | Ok (Some ExistingPathKind.Symlink) ->
-                                        return Error(exn "Target parent path exists and is a symbolic link/junction (not a directory).")
-                                    | Ok (Some ExistingPathKind.File)
-                                    | Ok (Some ExistingPathKind.Other) ->
-                                        return Error(exn "Target parent path exists and is not a directory.")
-                                    | Ok None ->
-                                        do! mkdirRecursiveAsync targetParent
-                                        return Ok ()
-                                }
+                if downloadLargeFiles && not isLfsInstalled then
+                    return
+                        Error {
+                            Kind = GitFailureKind.LfsInstallRequired
+                            Message = "Git LFS is required for this operation. Install Git LFS now?"
+                        }
+                else
+                    match validateAndNormalizeTargetPathWithResolver resolveAbsolutePath targetPath with
+                    | Error pathError ->
+                        return errorResult pathError
+                    | Ok normalizedTargetPath ->
+                        match validateOptionalBranch branch with
+                        | Error branchError ->
+                            return errorResult branchError
+                        | Ok safeBranch ->
+                            try
+                                let targetParent = dirname normalizedTargetPath
+                                let! parentEnsureResult =
+                                    promise {
+                                        let! parentKindResult = tryGetExistingPathKind targetParent
 
-                            match parentEnsureResult with
-                            | Error parentError ->
-                                return errorResult parentError
-                            | Ok () ->
-                                let! cloneTargetStateResult = getCloneTargetState normalizedTargetPath
+                                        match parentKindResult with
+                                        | Error parentError ->
+                                            return Error parentError
+                                        | Ok (Some ExistingPathKind.Directory) ->
+                                            return Ok ()
+                                        | Ok (Some ExistingPathKind.Symlink) ->
+                                            return Error(exn "Target parent path exists and is a symbolic link/junction (not a directory).")
+                                        | Ok (Some ExistingPathKind.File)
+                                        | Ok (Some ExistingPathKind.Other) ->
+                                            return Error(exn "Target parent path exists and is not a directory.")
+                                        | Ok None ->
+                                            do! mkdirRecursiveAsync targetParent
+                                            return Ok ()
+                                    }
 
-                                match cloneTargetStateResult with
-                                | Error cloneTargetError ->
-                                    return errorResult cloneTargetError
-                                | Ok cloneTargetState ->
-                                    match ensureCloneTargetIsEmpty cloneTargetState with
-                                    | Error _ ->
-                                        return createNonEmptyTargetFailure ()
-                                    | Ok () ->
-                                        let cloneOptions = createOptions targetParent syncTimeout progress
+                                match parentEnsureResult with
+                                | Error parentError ->
+                                    return errorResult parentError
+                                | Ok () ->
+                                    let! cloneTargetStateResult = getCloneTargetState normalizedTargetPath
 
-                                        let! tokenResult =
-                                            promise {
-                                                try
-                                                    let! tokenOption = tryGetAccessToken host
-                                                    return Ok tokenOption
-                                                with tokenError ->
-                                                    return Error tokenError
-                                            }
+                                    match cloneTargetStateResult with
+                                    | Error cloneTargetError ->
+                                        return errorResult cloneTargetError
+                                    | Ok cloneTargetState ->
+                                        match ensureCloneTargetIsEmpty cloneTargetState with
+                                        | Error _ ->
+                                            return createNonEmptyTargetFailure ()
+                                        | Ok () ->
+                                            let cloneOptions = createOptions targetParent syncTimeout progress
 
-                                        match tokenResult with
-                                        | Error tokenError ->
-                                            return errorResult tokenError
-                                        | Ok tokenOption ->
-                                            match tokenOption |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token)) with
-                                            | Some token ->
-                                                let authenticatedGitResult =
+                                            let! tokenResult =
+                                                promise {
                                                     try
-                                                        Ok(applyAuth createGit cloneOptions host token)
-                                                    with authError ->
-                                                        Error authError
+                                                        let! tokenOption = tryGetAccessToken host
+                                                        return Ok tokenOption
+                                                    with tokenError ->
+                                                        return Error tokenError
+                                                }
 
-                                                match authenticatedGitResult with
-                                                | Error authError ->
-                                                    return errorResult authError
-                                                | Ok authenticatedGit ->
-                                                    let! authenticatedCloneResult =
-                                                        cloneWithGit authenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
-
-                                                    match authenticatedCloneResult with
-                                                    | Ok _ ->
-                                                        return authenticatedCloneResult
-                                                    | Error failure when shouldRetryWithoutAuth failure ->
-                                                        let! cleanupResult =
-                                                            cleanupCloneTargetForRetry normalizedTargetPath
-
-                                                        match cleanupResult with
-                                                        | Error cleanupError ->
-                                                            return errorResult cleanupError
-                                                        | Ok () ->
-                                                            let unauthenticatedGit = createGit cloneOptions
-                                                            return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
+                                            let hydrateIfRequested tokenOption cloneResult =
+                                                promise {
+                                                    match cloneResult with
                                                     | Error _ ->
-                                                        return authenticatedCloneResult
-                                            | None ->
-                                                let unauthenticatedGit = createGit cloneOptions
-                                                return! cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
-                        with error ->
-                            return errorResult error
+                                                        return cloneResult
+                                                    | Ok _ ->
+                                                        let! persistResult =
+                                                            persistCloneDownloadPreference normalizedTargetPath downloadLargeFiles
+
+                                                        match persistResult with
+                                                        | Error failure ->
+                                                            return Error failure
+                                                        | Ok () when not downloadLargeFiles ->
+                                                            return cloneResult
+                                                        | Ok () ->
+                                                            let repoOptions =
+                                                                createOptions normalizedTargetPath syncTimeout progress
+
+                                                            let hydrateGitResult =
+                                                                try
+                                                                    match
+                                                                        tokenOption
+                                                                        |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token))
+                                                                    with
+                                                                    | Some token ->
+                                                                        Ok(
+                                                                            applyAuth
+                                                                                createGit
+                                                                                repoOptions
+                                                                                host
+                                                                                token
+                                                                                (Some "origin")
+                                                                                (Some safeRemoteUrl)
+                                                                        )
+                                                                    | None ->
+                                                                        Ok(createGit repoOptions)
+                                                                with authError ->
+                                                                    Error authError
+
+                                                            match hydrateGitResult with
+                                                            | Error authError ->
+                                                                return errorResult authError
+                                                            | Ok hydrateGit ->
+                                                                let! hydrateResult = hydrateClonedLfsContent hydrateGit
+
+                                                                match hydrateResult with
+                                                                | Ok () ->
+                                                                    return cloneResult
+                                                                | Error failure ->
+                                                                    return Error failure
+                                                }
+
+                                            match tokenResult with
+                                            | Error tokenError ->
+                                                return errorResult tokenError
+                                            | Ok tokenOption ->
+                                                match tokenOption |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token)) with
+                                                | Some token ->
+                                                    let authenticatedGitResult =
+                                                        try
+                                                            Ok(applyAuth createGit cloneOptions host token None (Some safeRemoteUrl))
+                                                        with authError ->
+                                                            Error authError
+
+                                                    match authenticatedGitResult with
+                                                    | Error authError ->
+                                                        return errorResult authError
+                                                    | Ok authenticatedGit ->
+                                                        let configuredGit = applyCloneSkipSmudge authenticatedGit
+
+                                                        let! authenticatedCloneResult =
+                                                            cloneWithGit configuredGit safeRemoteUrl normalizedTargetPath safeBranch
+
+                                                        match authenticatedCloneResult with
+                                                        | _ ->
+                                                            return! hydrateIfRequested (Some token) authenticatedCloneResult
+                                                | None ->
+                                                    let unauthenticatedGit =
+                                                        createGit cloneOptions
+                                                        |> applyCloneSkipSmudge
+
+                                                    let! unauthenticatedCloneResult =
+                                                        cloneWithGit unauthenticatedGit safeRemoteUrl normalizedTargetPath safeBranch
+
+                                                    return! hydrateIfRequested None unauthenticatedCloneResult
+                            with error ->
+                                return errorResult error
     }

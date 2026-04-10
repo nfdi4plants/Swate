@@ -24,6 +24,7 @@ import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
 // import {Entry as DataHubSidebarEntry} from '../src/DataHub/DataHubSidebar.fs.ts';
 import {GitLabEntry as DataHubBrowser} from '../src/DataHub/DataHubBrowser.fs.ts';
 import {Entry as ARCSelectorEntry} from '../src/ARCSelector/Selector.fs.ts';
+import {Entry as ArcFileEditor} from '../src/ArcFileEditor/ArcFileEditor.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -219,7 +220,7 @@ function ARCSelectorContainer() {
 
 const App = () => {
     return (
-        <Layout />
+        <ArcFileEditor />
         // <AuthButtonContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
         //     <NoteSearch />

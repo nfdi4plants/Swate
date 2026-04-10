@@ -3,12 +3,14 @@ module Swate.Electron.Shared.FileIOHelper
 open System
 open System.Collections.Generic
 open ARCtrl
-open Swate.Components.Notes.Editor
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
-let normalizePath (path: string) =
-    path.Replace("\\", "/").Trim().TrimEnd('/')
+let normalizeSeparators (path: string) = Swate.Components.Shared.PathHelpers.normalizeSeparators path
+
+/// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
+let normalizePath (path: string) = Swate.Components.Shared.PathHelpers.normalizePath path
 
 /// normalizes the path and splits it into parts
 let getPathParts (path: string) =
@@ -49,38 +51,7 @@ let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
             Some name
     | _ -> None
 
-let private tryGetParentPath (path: string) =
-    let normalizedPath = normalizePath path
-    let separatorIndex = normalizedPath.LastIndexOf('/')
-
-    if separatorIndex < 0 then
-        None
-    else
-        Some(normalizedPath.Substring(0, separatorIndex))
-
-let private tryResolveDatamapPreviewPath
-    (normalizedPath: string)
-    (folderSegment: string)
-    (targetFileName: string)
-    =
-    let lowered = normalizedPath.ToLowerInvariant()
-
-    if lowered.Contains(folderSegment) && lowered.EndsWith("/isa.datamap.xlsx") then
-        tryGetParentPath normalizedPath
-        |> Option.map (fun folderPath -> $"{folderPath}/{targetFileName}")
-    else
-        None
-
-let resolveArcPreviewPath (path: string) =
-    let normalizedPath = normalizePath path
-
-    [
-        tryResolveDatamapPreviewPath normalizedPath "/assays/" "isa.assay.xlsx"
-        tryResolveDatamapPreviewPath normalizedPath "/studies/" "isa.study.xlsx"
-        tryResolveDatamapPreviewPath normalizedPath "/runs/" "isa.run.xlsx"
-    ]
-    |> List.tryPick id
-    |> Option.defaultValue normalizedPath
+let resolveArcPreviewPath (path: string) = Swate.Components.Shared.PathHelpers.resolveArcViewPath path
 
 let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: FileEntry) =
     let parts = getNonEmptyPathParts entry.path
@@ -189,17 +160,7 @@ let tryGetArcFilePath (arcRootPath: ArcRootPath) (arcFile: ArcFiles) =
     let arcRootPath = defaultArg arcRootPath ""
     let root = normalizePath arcRootPath
 
-    match arcFile with
-    | ArcFiles.Investigation _ -> Some ARCtrl.ArcPathHelper.InvestigationFileName
-    | ArcFiles.Study(study, _) -> ARCtrl.Helper.Identifier.Study.fileNameFromIdentifier study.Identifier |> Some
-    | ArcFiles.Assay assay -> ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier assay.Identifier |> Some
-    | ArcFiles.Run run -> ARCtrl.Helper.Identifier.Run.fileNameFromIdentifier run.Identifier |> Some
-    | ArcFiles.Workflow workflow ->
-        ARCtrl.Helper.Identifier.Workflow.fileNameFromIdentifier workflow.Identifier
-        |> Some
-    | ArcFiles.DataMap(Some dmpi, _) -> DatamapParentInfo.toPath dmpi |> Some
-    | ArcFiles.DataMap(None, _)
-    | ArcFiles.Template _ -> None
+    arcFile.TryGetRelativePath()
     |> Option.map (fun p -> combineMany [| root; p |])
 
 
@@ -347,7 +308,14 @@ module FileContentDTO =
                 discFileType <- Some DTOType.ISA_Study
                 let identifier = (Identifier.Study.identifierFromFileName p)
                 let study = arc.TryGetStudy identifier
-                study |> Option.map (fun s -> ArcFiles.Study(s, []))
+                study
+                |> Option.map (fun s ->
+                    let assignedAssays =
+                        s.RegisteredAssayIdentifiers
+                        |> Seq.choose arc.TryGetAssay
+                        |> List.ofSeq
+
+                    ArcFiles.Study(s, assignedAssays))
             | WorkflowPath p ->
                 discFileType <- Some DTOType.ISA_Workflow
 

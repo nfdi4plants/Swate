@@ -1,14 +1,12 @@
 module Renderer.Components.FileExplorer
 
-open System
 open Browser.Dom
-open Renderer
 open Renderer.Components.ARCHelper
 open Swate.Components
 open Swate.Components.FileExplorerTypes
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.GitTypes
 open Feliz
 
 
@@ -26,7 +24,7 @@ module private FileExplorerHelper =
                 |> List.ofArray
 
             Some {
-                FileTree.createFolder parent.name (Some parent.path) "swt:fluent--folder-24-regular" with
+                FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
                     Id = parent.path
                     IsExpanded =
                         selectedTreeItemPath
@@ -36,7 +34,7 @@ module private FileExplorerHelper =
             }
         | false ->
             Some {
-                FileTree.createFile parent.name (Some parent.path) "swt:fluent--document-24-regular" with
+                FileTree.createFile parent.name (Some parent.path) FileItemIcon.Document with
                     Id = parent.path
                     IsLFS = parent.isLfs
             }
@@ -55,6 +53,7 @@ let FileTree () =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
     let errorModal = Contexts.ErrorModal.useErrorModal ()
     let arcScopeId = useCurrentArcScopeId ()
 
@@ -64,30 +63,7 @@ let FileTree () =
 
         let fileTree = fileStateCtx.state.FileTree |> toFileTreeNode
 
-        let fileItem = loopPaths fileStateCtx.state.SelectedTreeItemPath fileTree
-
-        let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
-            let request: GitLfsRequest = {
-                RequestId = Guid.NewGuid().ToString()
-                RepoPath = ""
-                Command =
-                    if markAsLfs then
-                        GitLfsCommand.Track
-                    else
-                        GitLfsCommand.Untrack
-                FilePath = Some relativePath
-                TimeoutMs = Some 10000
-            }
-
-
-            // This seems to behave oddly. It runs some git lfs command and then refreshes filetree in arcvault. But it does it with a type that does not track lfs?
-            let! result = Api.ipcArcVaultApi.runGitLfs (unbox null) request
-
-            return
-                match result with
-                | Ok _ -> Ok()
-                | Error exn -> Error exn.Message
-        }
+        let fileItem = loopPaths fileStateCtx.state.Selection.TreePath fileTree
 
         let setError (errorMsg: string option) =
             match errorMsg with
@@ -95,7 +71,7 @@ let FileTree () =
             | None -> ()
 
         let toggleLfsMark =
-            FileExplorerGitLfsHelper.ToggleLfsMark(setError, runToggleLfsMark)
+            FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
 
         let contextMenuItems (item: FileItem) =
             FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
@@ -107,38 +83,42 @@ let FileTree () =
                     errorModal.enqueue (
                         ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed", ?scopeId = arcScopeId)
                     )
-                | Some _ when item.IsDirectory -> pageStateCtx.setState (None)
+                | Some path when item.IsDirectory ->
+                    let selectedPath = normalizePath path
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                    Renderer.Components.ARCHelper.clearArcObjectPreview
+                        arcObjectCtx.setArcFileState
+                        arcObjectCtx.setPreviewState
+                        arcObjectCtx.setStatusMessage
+
+                    pageStateCtx.setState None
                 | Some path ->
-                    let previewPath = resolveArcPreviewPath path
+                    let selectedPath = normalizePath path
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    if previewPath <> normalizePath path then
-                        console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
-                    else
-                        console.log ($"[Renderer] Opening file: {previewPath}")
-
-                    let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+                    let! result = Renderer.Components.ARCHelper.openPreview selectedPath
 
                     match result with
-                    | Ok data ->
+                    | Ok loaded ->
                         console.log ("[Renderer] Received data, processing...")
 
-                        match PageState.fromFileContentDTO data with
-                        | Ok pageState ->
-                            fileStateCtx.setSelectedTreeItemPath (Some path)
-                            pageStateCtx.setState (Some pageState)
-                        | Error message ->
-                            errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = $"Could not preview '{item.Name}'", ?scopeId = arcScopeId)
-                            )
-                    | Error exn ->
-                        console.log ($"[Renderer] Error: {exn.Message}")
-                        errorModal.enqueue (
-                            ErrorModalRequest.create(
-                                $"Could not open preview for '{item.Name}': {exn.Message}",
-                                title = "Preview failed",
-                                ?scopeId = arcScopeId
-                            )
-                        )
+                        Renderer.Components.ARCHelper.applyLoadedPreview
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
+                            loaded
+                    | Error errorMessage ->
+                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
+                        console.log ($"[Renderer] Error: {fullErrorMessage}")
+
+                        Renderer.Components.ARCHelper.applyPreviewError
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
+                            fullErrorMessage
             }
             |> Promise.start
 
@@ -149,6 +129,6 @@ let FileTree () =
                 initialItems = [ fileItem ],
                 onItemClick = openPreview,
                 onContextMenu = contextMenuItems,
-                ?selectedItemId = fileStateCtx.state.SelectedTreeItemPath
+                selectedItemId = fileStateCtx.state.Selection.TreePath
             )
         | None -> EmptyFileTreePlaceholder()

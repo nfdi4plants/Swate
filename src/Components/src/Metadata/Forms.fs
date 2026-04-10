@@ -184,7 +184,7 @@ type FormComponents =
             ?label: string,
             ?validator: string -> Result<unit, string>,
             ?placeholder: string,
-            ?isarea: bool,
+            ?isArea: bool,
             ?isJoin: bool,
             ?disabled: bool,
             ?rmv: MouseEvent -> unit,
@@ -196,7 +196,7 @@ type FormComponents =
             ?label = label,
             ?validator = validator,
             ?placeholder = placeholder,
-            isArea = defaultArg isarea false,
+            isArea = defaultArg isArea false,
             isJoin = defaultArg isJoin false,
             disabled = defaultArg disabled false,
             ?rmv = rmv,
@@ -635,7 +635,7 @@ type FormComponents =
                         input.Description <- toOptionalString value
                         setter input),
                     "Description",
-                    isarea = true
+                    isArea = true
                 )
                 FormComponents.CommentsInput(
                     input.Comments,

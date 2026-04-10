@@ -3,6 +3,8 @@ namespace Swate.Components.Notes.Editor
 open Fable.Core
 open Feliz
 open Browser.Dom
+open Swate.Components.Shared
+
 
 [<Erase; Mangle(false)>]
 type Notes =

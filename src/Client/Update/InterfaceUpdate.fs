@@ -6,6 +6,7 @@ namespace Update
 open Messages
 open OfficeInterop
 open SpreadsheetInterface
+open Swate.Components.Shared
 // </-->
 
 open Elmish

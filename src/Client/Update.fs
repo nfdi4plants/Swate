@@ -264,33 +264,33 @@ module History =
 
             if host = Some Swatehost.ARCitect then
                 match spreadsheetState.ArcFile with // model is not yet updated at this position.
-                | Some(Assay assay) ->
+                | Some(ArcFiles.Assay assay) ->
                     ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Assay, ArcAssay.toJsonString 0 assay, None)
                     |> Promise.start
-                | Some(Study(study, _)) ->
+                | Some(ArcFiles.Study(study, _)) ->
                     ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Study, ArcStudy.toJsonString 0 study, None)
                     |> Promise.start
-                | Some(Investigation inv) ->
+                | Some(ArcFiles.Investigation inv) ->
                     ARCitect.api.Save(
                         ArcFilesDiscriminateStringEnum.Investigation,
                         ArcInvestigation.toJsonString 0 inv,
                         None
                     )
                     |> Promise.start
-                | Some(Run run) ->
+                | Some(ArcFiles.Run run) ->
                     ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Run, ArcRun.toJsonString 0 run, None)
                     |> Promise.start
-                | Some(Workflow workflow) ->
+                | Some(ArcFiles.Workflow workflow) ->
                     ARCitect.api.Save(
                         ArcFilesDiscriminateStringEnum.Workflow,
                         ArcWorkflow.toJsonString 0 workflow,
                         None
                     )
                     |> Promise.start
-                | Some(Template template) ->
+                | Some(ArcFiles.Template template) ->
                     ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Template, Template.toJsonString 0 template, None)
                     |> Promise.start
-                | Some(DataMap(parent, datamap)) ->
+                | Some(ArcFiles.DataMap(parent, datamap)) ->
                     if parent.IsSome then
                         ARCitect.api.Save(
                             ArcFilesDiscriminateStringEnum.DataMap,

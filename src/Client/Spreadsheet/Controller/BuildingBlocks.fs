@@ -11,6 +11,8 @@ open GlobalBindings
 
 open Regex
 open Swate.Components
+open Swate.Components.Shared
+
 
 module SidebarControllerAux =
 

@@ -47,6 +47,21 @@ let Watch () =
                 "vitest"
             ]
             ProjectPaths.electronCoreTestsPath
+        runAsync
+            "electron-renderer"
+            "dotnet"
+            [
+                "fable"
+                "watch"
+                "-o"
+                "output"
+                "-s"
+                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                "--run"
+                "npx"
+                "vitest"
+            ]
+            ProjectPaths.electronRendererTestsPath
         runAsync "components" "npm" [ "run"; "test" ] ProjectPaths.componentTestsPath
     ]
     |> runParallel
@@ -86,6 +101,21 @@ let WatchJs () =
                 "vitest"
             ]
             ProjectPaths.electronCoreTestsPath
+        runAsync
+            "electron-renderer"
+            "dotnet"
+            [
+                "fable"
+                "watch"
+                "-o"
+                "output"
+                "-s"
+                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                "--run"
+                "npx"
+                "vitest"
+            ]
+            ProjectPaths.electronRendererTestsPath
     ]
     |> runParallel
 
@@ -126,6 +156,23 @@ module Run =
             ]
             ProjectPaths.electronCoreTestsPath
 
+    let electronRenderer =
+        runAsync
+            "electron-renderer"
+            "dotnet"
+            [
+                "fable"
+                "-o"
+                "output"
+                "-s"
+                yield! DEFINE_SWATE_ENVIRONMENT_FABLE
+                "--run"
+                "npx"
+                "vitest"
+                "run"
+            ]
+            ProjectPaths.electronRendererTestsPath
+
     let components =
         runAsync "components" "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
 
@@ -138,11 +185,13 @@ module Run =
             let! clientResult = client
             printGreenfn "Running electron core tests..."
             let! electronCoreResult = electronCore
+            printGreenfn "Running electron renderer tests..."
+            let! electronRendererResult = electronRenderer
             printGreenfn "Running component tests..."
             let! componentsResult = components
 
-            match serverResult, clientResult, electronCoreResult, componentsResult with
-            | Ok(), Ok(), Ok(), Ok() ->
+            match serverResult, clientResult, electronCoreResult, electronRendererResult, componentsResult with
+            | Ok(), Ok(), Ok(), Ok(), Ok() ->
                 printGreenfn "All tests passed!"
                 exit 0
             | _ ->
@@ -154,6 +203,9 @@ module Run =
 
                 if electronCoreResult.IsError then
                     printRedfn "Electron core tests failed."
+
+                if electronRendererResult.IsError then
+                    printRedfn "Electron renderer tests failed."
 
                 if componentsResult.IsError then
                     printRedfn "Component tests failed."

@@ -592,6 +592,7 @@ type GitMergeConflictViewer =
             ?defaultResolvedContent: string,
             ?onResolvedContentChange: (string -> unit),
             ?onConfirmMerge: (string -> unit),
+            ?confirmDisabled: bool,
             ?incomingTitle: string,
             ?currentTitle: string,
             ?resolvedTitle: string,
@@ -603,6 +604,7 @@ type GitMergeConflictViewer =
         let normalizedConflictContent = GitTextComparisonCore.Text.normalizeLineEndings mergeConflictContent
         let normalizedControlledResolvedText = resolvedContent |> Option.map GitTextComparisonCore.Text.normalizeLineEndings
         let normalizedDefaultResolvedText = defaultResolvedContent |> Option.map GitTextComparisonCore.Text.normalizeLineEndings
+        let confirmDisabled = defaultArg confirmDisabled false
 
         match normalizedControlledResolvedText, normalizedDefaultResolvedText, onResolvedContentChange with
         | Some _, Some _, _ ->
@@ -872,7 +874,9 @@ type GitMergeConflictViewer =
             )
 
         let canConfirmMerge =
-            onConfirmMerge.IsSome && not hasRemainingConflictMarkers
+            onConfirmMerge.IsSome
+            && not hasRemainingConflictMarkers
+            && not confirmDisabled
 
         let header =
             GitComparisonView.HeaderRow
@@ -977,7 +981,7 @@ type GitMergeConflictViewer =
                                 if confirmMergeButtonTestId.IsSome then
                                     prop.testId confirmMergeButtonTestId.Value
                                 prop.className "swt:btn swt:btn-primary"
-                                prop.disabled (not canConfirmMerge)
+                                prop.disabled (confirmDisabled || not canConfirmMerge)
                                 prop.text "Confirm Merge"
                                 prop.onClick (fun _ ->
                                     if canConfirmMerge then

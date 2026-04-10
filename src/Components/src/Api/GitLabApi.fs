@@ -83,6 +83,8 @@ type ExploreProjectDto = {
     name_with_namespace: string
     description: string option
     web_url: string
+    http_url_to_repo: string
+    ssh_url_to_repo: string option
     avatar_url: string option
     visibility: string option
     star_count: int
@@ -152,6 +154,8 @@ type private GitLabProjectResponse = {
     name_with_namespace: string
     description: string option
     web_url: string
+    http_url_to_repo: string
+    ssh_url_to_repo: string option
     avatar_url: string option
     visibility: string option
     star_count: int
@@ -284,6 +288,8 @@ module private Internals =
         path_with_namespace = project.path_with_namespace
         description = project.description
         web_url = project.web_url
+        http_url_to_repo = project.http_url_to_repo
+        ssh_url_to_repo = project.ssh_url_to_repo
         avatar_url = project.avatar_url
         visibility = project.visibility
         star_count = project.star_count

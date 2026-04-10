@@ -2,6 +2,7 @@ namespace Swate.Components.Notes.Editor
 
 open System
 open Feliz
+open Swate.Components.Shared
 
 [<RequireQualifiedAccess>]
 module TargetSelector =

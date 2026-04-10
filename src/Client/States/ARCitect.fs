@@ -2,7 +2,8 @@ module Model.ARCitect
 
 open ARCtrl
 open Fable.Core
-open Swate.Components
+open Swate.Components.Shared
+
 
 module Interop =
 

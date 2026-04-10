@@ -3,6 +3,8 @@ namespace Swate.Components
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components.Shared
+
 
 module private BuildingBlockWidgetState =
 
@@ -313,7 +315,7 @@ type BuildingBlockWidget =
 
         let widgetCtx = WidgetContext.useWidgetController ()
 
-        match WidgetArcFile.tryGetActiveTable activeTableIndex arcFile with
+        match arcFile.TryGetActiveTable(activeTableIndex) with
         | None -> BuildingBlockWidget.disabledState "Switch to a table tab to add a building block."
         | Some(_, table) ->
             let selectedColumnIndex =

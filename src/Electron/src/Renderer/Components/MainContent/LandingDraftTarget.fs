@@ -1,12 +1,10 @@
 module Renderer.Components.MainContent.LandingDraftTarget
 
 open Feliz
-open Swate.Components
 open Swate.Components.Landing
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Renderer
-open Renderer.Components.ARCHelper
 open ARCtrl.Contract
 
 [<ReactComponent>]
@@ -14,18 +12,26 @@ let LandingDraftTarget () =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let errorModal = Contexts.ErrorModal.useErrorModal ()
-    let arcScopeId = useCurrentArcScopeId ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
     let onSubmit =
         fun (payload: SubmitPayload) ->
 
-            let finishSuccess (pageState: PageState) (response: FileContentDTO) =
+            let finishSuccess (response: FileContentDTO) =
+                let selectedPath = normalizePath response.path
 
-                fileStateCtx.setSelectedTreeItemPath (Some response.path)
-                pageStateCtx.setState (Some pageState)
+                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                response
+                |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                |> Renderer.Components.ARCHelper.applyLoadedPreview
+                    pageStateCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
+
                 setLandingDraft LandingDraft.init
                 setLandingUiState LandingUiState.init
 
@@ -46,34 +52,22 @@ let LandingDraftTarget () =
                             Error = Some message.Message
                     }
                 | Ok previewData ->
-                    match PageState.fromFileContentDTO previewData with
-                    | Error message ->
-                        errorModal.enqueue (
-                            ErrorModalRequest.create(message, title = "ARC preview could not be opened", ?scopeId = arcScopeId)
-                        )
+                    match payload.ProtocolIntent with
+                    | None -> finishSuccess previewData
+                    | Some protocolIntent ->
+                        let request: FileContentDTO =
+                            FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
 
-                        setLandingUiState {
-                            landingUiState with
-                                IsSubmitting = false
-                                Error = Some $"Saved ARC metadata but failed to preview the saved file: {message}"
-                        }
-                    | Ok previewPage ->
-                        match payload.ProtocolIntent with
-                        | None -> finishSuccess previewPage previewData
-                        | Some protocolIntent ->
-                            let request: FileContentDTO =
-                                FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
+                        let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
 
-                            let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
-
-                            match writeResult with
-                            | Ok() -> finishSuccess previewPage previewData
-                            | Result.Error exn ->
-                                setLandingUiState {
-                                    landingUiState with
-                                        IsSubmitting = false
-                                        Error = Some $"Saved ARC metadata but failed to write protocol file: {exn.Message}"
-                                }
+                        match writeResult with
+                        | Ok() -> finishSuccess previewData
+                        | Result.Error exn ->
+                            setLandingUiState {
+                                landingUiState with
+                                    IsSubmitting = false
+                                    Error = Some $"Saved ARC metadata but failed to write protocol file: {exn.Message}"
+                            }
             }
             |> Promise.start
 

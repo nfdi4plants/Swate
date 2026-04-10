@@ -3,9 +3,7 @@ namespace Update
 open Elmish
 
 open Messages
-open OfficeInterop
-open OfficeInterop.Core
-
+open Swate.Components.Shared
 open Model
 
 module ARCitect =

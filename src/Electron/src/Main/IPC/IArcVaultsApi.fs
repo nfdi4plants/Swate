@@ -1,7 +1,7 @@
 module Main.IPC.ArcVaultsApi
 
 open System
-open Swate.Components
+open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
@@ -357,6 +357,24 @@ let api: IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    pickDirectory =
+        fun _ -> promise {
+            try
+                let properties = [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                |]
+
+                let! result = dialog.showOpenDialog (properties = properties)
+
+                if result.canceled then
+                    return Error(exn "Cancelled")
+                elif result.filePaths.Length <> 1 then
+                    return Error(exn "Not exactly one path")
+                else
+                    return Ok(result.filePaths |> Array.exactlyOne)
+            with e ->
+                return Error(exn $"Could not pick directory: {e.Message}")
+        }
     pickAbsolutePaths =
         fun _ -> promise {
             try
@@ -403,6 +421,27 @@ let api: IPCTypes.IArcVaultsApi = {
                     return Ok(importedFiles.ToArray())
             with e ->
                 return Error(exn $"Could not import external text files: {e.Message}")
+        }
+    getArcObjectTree =
+        fun event -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path, vault.arc with
+                    | Some arcPath, Some arc ->
+                        let! fileEntries =
+                            if vault.fileTree.Count > 0 then
+                                promise { return vault.fileTree.Values |> Seq.toArray }
+                            else
+                                getFileEntries arcPath
+
+                        return Ok(ArcObjectTreeBuilder.create arcPath arc fileEntries)
+                    | _ -> return Error(exn "ARC is not loaded.")
+            with e ->
+                return Error e
         }
     readNotes =
         fun event -> promise {

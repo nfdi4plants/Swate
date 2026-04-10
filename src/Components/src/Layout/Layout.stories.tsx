@@ -18,6 +18,31 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const getLeftSidebar = (canvas: ReturnType<typeof within>) =>
+  canvas.getByTestId('layout-main-left-sidebar');
+
+const getRightSidebar = (canvas: ReturnType<typeof within>) =>
+  canvas.getByTestId('layout-main-right-sidebar');
+
+const getLeftSidebarToggle = (canvas: ReturnType<typeof within>) =>
+  canvas.getByRole('button', { name: 'Toggle left sidebar' });
+
+const getRightSidebarToggle = (canvas: ReturnType<typeof within>) =>
+  canvas.getByRole('button', { name: 'Toggle right sidebar' });
+
+const ensureSidebarIsOpen = async (
+  sidebar: HTMLElement,
+  toggleButton: HTMLElement,
+) => {
+  if (sidebar.style.width === '0px') {
+    await userEvent.click(toggleButton);
+  }
+
+  await waitFor(() => {
+    expect(sidebar).not.toHaveStyle({ width: '0px' });
+  });
+};
+
 export const Default: Story = {
   args: {
     navbar: <div className="swt:flex swt:items-center swt:justify-center swt:h-full swt:grow">
@@ -58,8 +83,8 @@ export const Default: Story = {
         tooltip="Settings"
         onClick={() => {}} />
     </>,
-    sidebarRightDefault: true,
-    sidebarLeftDefault: true,
+    rightSidebarDefaultOpen: true,
+    leftSidebarDefaultOpen: true,
   }
 }
 
@@ -105,7 +130,7 @@ export const ContentLeftSidebar: Story = {
         ))
       }
     </ul>,
-    sidebarLeftDefault: true,
+    leftSidebarDefaultOpen: true,
   }
 }
 
@@ -126,7 +151,7 @@ export const ContentLeftSidebarActions: Story = {
         ))
       }
     </ul>,
-    sidebarLeftDefault: true,
+    leftSidebarDefaultOpen: true,
     leftActions: <>
       <LeftSidebarToggleBtn activeBorderStyle/>
       <LayoutBtn
@@ -159,6 +184,65 @@ export const ContentRightSidebar: Story = {
       }
     </ul>,
     rightActions: <RightSidebarToggleBtn />,
-    sidebarRightDefault: true,
+    rightSidebarDefaultOpen: true,
   }
+}
+
+export const ToggleButtonsControlOwnSide: Story = {
+  name: "Toggle Buttons Control Own Side",
+  parameters: { isolated: true },
+  args: {
+    navbar: <div className="swt:flex swt:items-center swt:justify-end swt:h-full swt:grow swt:gap-2 swt:px-4">
+      <LeftSidebarToggleBtn />
+      <RightSidebarToggleBtn />
+    </div>,
+    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
+      Main Content
+    </div>,
+    leftSidebar: <ul className="swt:menu swt:flex-nowrap">
+      <li className="menu-title">Left Sidebar</li>
+      {
+        Array.from({ length: 8 }, (_, i) => (
+          <li key={i}><a>Left Item {i + 1}</a></li>
+        ))
+      }
+    </ul>,
+    rightSidebar: <ul className="swt:menu swt:flex-nowrap">
+      <li className="menu-title">Right Sidebar</li>
+      {
+        Array.from({ length: 8 }, (_, i) => (
+          <li key={i}><a>Right Item {i + 1}</a></li>
+        ))
+      }
+    </ul>,
+    leftSidebarDefaultOpen: true,
+    rightSidebarDefaultOpen: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const leftSidebar = getLeftSidebar(canvas);
+    const rightSidebar = getRightSidebar(canvas);
+    const leftToggle = getLeftSidebarToggle(canvas);
+    const rightToggle = getRightSidebarToggle(canvas);
+
+    await ensureSidebarIsOpen(leftSidebar, leftToggle);
+    await ensureSidebarIsOpen(rightSidebar, rightToggle);
+
+    await userEvent.click(leftToggle);
+
+    await waitFor(() => {
+      expect(leftSidebar).toHaveStyle({ width: '0px' });
+      expect(rightSidebar).not.toHaveStyle({ width: '0px' });
+    });
+
+    await userEvent.click(leftToggle);
+    await ensureSidebarIsOpen(leftSidebar, leftToggle);
+
+    await userEvent.click(rightToggle);
+
+    await waitFor(() => {
+      expect(rightSidebar).toHaveStyle({ width: '0px' });
+      expect(leftSidebar).not.toHaveStyle({ width: '0px' });
+    });
+  },
 }

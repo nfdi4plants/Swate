@@ -84,5 +84,5 @@ type GitDiffViewer =
                 )
             ])
             rootTestId
-            None
+            (Some "swt:flex swt:h-full swt:w-full swt:min-h-0 swt:min-w-0 swt:flex-col")
             None

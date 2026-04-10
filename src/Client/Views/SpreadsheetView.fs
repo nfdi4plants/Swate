@@ -81,7 +81,7 @@ let Main (model: Model, dispatch) =
                                             | ArcFiles.Assay assay ->
                                                 let setAssay assay =
                                                     assay
-                                                    |> Assay
+                                                    |> ArcFiles.Assay
                                                     |> Spreadsheet.UpdateArcFile
                                                     |> SpreadsheetMsg
                                                     |> dispatch
@@ -90,7 +90,7 @@ let Main (model: Model, dispatch) =
                                             | ArcFiles.Study(study, assays) ->
                                                 let setStudy (study, assays) =
                                                     (study, assays)
-                                                    |> Study
+                                                    |> ArcFiles.Study
                                                     |> Spreadsheet.UpdateArcFile
                                                     |> SpreadsheetMsg
                                                     |> dispatch
@@ -99,7 +99,7 @@ let Main (model: Model, dispatch) =
                                             | ArcFiles.Investigation investigation ->
                                                 let setInvesigation investigation =
                                                     investigation
-                                                    |> Investigation
+                                                    |> ArcFiles.Investigation
                                                     |> Spreadsheet.UpdateArcFile
                                                     |> SpreadsheetMsg
                                                     |> dispatch

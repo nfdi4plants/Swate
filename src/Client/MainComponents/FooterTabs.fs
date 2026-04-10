@@ -4,6 +4,8 @@ open Feliz
 open ARCtrl
 open Model
 open Swate.Components
+open Swate.Components.Shared
+
 
 type private FooterTab = {
     IsEditable: bool
@@ -291,7 +293,7 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
                     if model.SpreadsheetModel.HasMetadata() then
                         MainMetadata(model, dispatch)
                     match model.SpreadsheetModel.ArcFile with
-                    | Some(DataMap _) -> MainDataMap(model, dispatch)
+                    | Some(ArcFiles.DataMap _) -> MainDataMap(model, dispatch)
                     | _ -> ()
                     // if model.SpreadsheetModel.HasDataMap() then
                     //     MainDataMap(model, dispatch)

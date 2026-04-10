@@ -60,9 +60,9 @@ module Spreadsheet =
             | AddDataAnnotation data ->
                 let nextState =
                     match state.ActiveView with
-                    | IsDataMap -> Controller.DataMap.addDataAnnotation data state
-                    | IsTable -> Controller.BuildingBlocks.addDataAnnotation data state
-                    | IsMetadata -> failwith "Unable to add data annotation in metadata view"
+                    | ActiveView.DataMap -> Controller.DataMap.addDataAnnotation data state
+                    | ActiveView.Table _ -> Controller.BuildingBlocks.addDataAnnotation data state
+                    | ActiveView.Metadata -> failwith "Unable to add data annotation in metadata view"
 
                 nextState, model, Cmd.none
             | AddTemplates(tables, importType) ->
@@ -92,32 +92,16 @@ module Spreadsheet =
 
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
-                let reset = state.ActiveView.ArcFileHasView(arcFile) //verify that active view is still valid
-
                 let nextState =
-                    let baseState =
-                        if reset then
-                            Spreadsheet.Model.init (arcFile)
-                        else
-                            { state with ArcFile = Some arcFile }
-
-                    match arcFile with
-                    | ArcFiles.Workflow _ -> {
-                        baseState with
-                            ActiveView = ActiveView.Metadata
-                      }
-                    | ArcFiles.DataMap _ -> {
-                        baseState with
-                            ActiveView = ActiveView.DataMap
-                      }
-                    | _ -> baseState
+                    {
+                        state with
+                            ArcFile = Some arcFile
+                            ActiveView = ActiveView.Forward(arcFile, state.ActiveView)
+                    }
 
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState =
-                    match arcFile with
-                    | ArcFiles.DataMap _ -> Spreadsheet.Model.init (arcFile, ActiveView.DataMap)
-                    | _ -> Spreadsheet.Model.init (arcFile)
+                let nextState = Spreadsheet.Model.init (arcFile, ActiveView.Forward(arcFile, ActiveView.Metadata))
 
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation(range, oa) ->
@@ -261,13 +245,13 @@ module Spreadsheet =
                     let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
 
                     match arcfile with
-                    | Investigation ai -> n + "_" + ArcInvestigation.FileName, ArcInvestigation.toFsWorkbook ai
-                    | Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
-                    | Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
-                    | Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
-                    | Run r -> n + "_" + ArcRun.FileName, ArcRun.toFsWorkbook r
-                    | Workflow w -> n + "_" + ArcWorkflow.FileName, ArcWorkflow.toFsWorkbook w
-                    | DataMap(_, d) -> n + "_" + "datamap.xlsx", Spreadsheet.DataMap.toFsWorkbook d
+                    | ArcFiles.Investigation ai -> n + "_" + ArcInvestigation.FileName, ArcInvestigation.toFsWorkbook ai
+                    | ArcFiles.Study(as', aaList) -> n + "_" + ArcStudy.FileName, ArcStudy.toFsWorkbook (as', aaList)
+                    | ArcFiles.Assay aa -> n + "_" + ArcAssay.FileName, ArcAssay.toFsWorkbook aa
+                    | ArcFiles.Template t -> n + "_" + t.FileName, Spreadsheet.Template.toFsWorkbook t
+                    | ArcFiles.Run r -> n + "_" + ArcRun.FileName, ArcRun.toFsWorkbook r
+                    | ArcFiles.Workflow w -> n + "_" + ArcWorkflow.FileName, ArcWorkflow.toFsWorkbook w
+                    | ArcFiles.DataMap(_, d) -> n + "_" + "datamap.xlsx", Spreadsheet.DataMap.toFsWorkbook d
 
                 let cmd =
                     Cmd.OfPromise.either

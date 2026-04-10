@@ -48,7 +48,7 @@ module SharedFields =
                 draft.Description,
                 (fun value -> setDraft { draft with Description = value }),
                 label = "Description (Required)",
-                isarea = true,
+                isArea = true,
                 placeholder = "Experiment description"
             )
             BoxedHelperField "Involved People" (
@@ -68,7 +68,7 @@ module SharedFields =
                 draft.MainText,
                 (fun value -> setDraft { draft with MainText = value }),
                 label = "Main Text",
-                isarea = true,
+                isArea = true,
                 placeholder = "Will be saved as protocol markdown"
             )
             Html.fieldSet [

@@ -8,7 +8,7 @@ open Swate.Electron.Shared.AuthTypes
 open Main.Auth
 
 let private broadcastAccountsUpdate () =
-    let accounts = AuthService.listAccounts ()
+    let authState = AuthService.getState ()
 
     ARC_VAULTS.Vaults.Values
     |> Array.ofSeq
@@ -16,7 +16,7 @@ let private broadcastAccountsUpdate () =
         Remoting.init
         |> Remoting.withWindow window.window
         |> Remoting.buildClient<IMainUpdateRendererApi>
-        |> fun client -> client.authAccountsUpdate accounts
+        |> fun client -> client.authAccountsUpdate authState
     )
 
 let api: IAuthApi = {
@@ -51,8 +51,11 @@ let api: IAuthApi = {
     revalidate =
         fun () -> promise {
             try
-                let! result = AuthService.revalidate ()
-                broadcastAccountsUpdate ()
+                let! result, didRevalidate = AuthService.revalidate ()
+
+                if didRevalidate then
+                    broadcastAccountsUpdate ()
+
                 return Ok result
             with _ ->
                 return Error(exn "Token revalidation failed due to an unexpected error.")
