@@ -8,19 +8,55 @@ open Swate.Components.GitSidebarTypes
 
 module private GitSidebarInternal =
 
+    type GitChangeKind =
+        | Added
+        | Modified
+        | Deleted
+        | Renamed
+        | Untracked
+        | Conflict
+
     let hasConflicts (status: GitSidebarStatus) (changedFiles: GitSidebarChange[]) =
         status.IsMergeInProgress || (changedFiles |> Array.exists _.IsConflicted)
 
-    let describeChange (change: GitSidebarChange) =
+    let private rawChangeCode (change: GitSidebarChange) =
         let indexCode = GitStatusCode.normalize change.IndexStatus
         let worktreeCode = GitStatusCode.normalize change.WorkingTreeStatus
         $"{indexCode}{worktreeCode}"
 
-    let changeBadgeClasses (change: GitSidebarChange) =
+    let describeChange (change: GitSidebarChange) = $"git: {rawChangeCode change}"
+
+    let classifyChange (change: GitSidebarChange) =
+        let indexCode = GitStatusCode.normalize change.IndexStatus
+        let worktreeCode = GitStatusCode.normalize change.WorkingTreeStatus
+
         if change.IsConflicted then
-            "swt:badge swt:badge-error swt:badge-sm"
+            GitChangeKind.Conflict
+        elif change.OriginalPath.IsSome || indexCode.StartsWith("R", StringComparison.Ordinal) || worktreeCode.StartsWith("R", StringComparison.Ordinal) then
+            GitChangeKind.Renamed
+        elif indexCode = "?" || worktreeCode = "?" then
+            GitChangeKind.Untracked
+        elif indexCode = "D" || worktreeCode = "D" then
+            GitChangeKind.Deleted
+        elif indexCode = "A" || worktreeCode = "A" then
+            GitChangeKind.Added
         else
-            "swt:badge swt:badge-ghost swt:badge-sm"
+            GitChangeKind.Modified
+
+    let changePresentation (change: GitSidebarChange) =
+        match classifyChange change with
+        | GitChangeKind.Added ->
+            "Added", "swt:badge swt:badge-success swt:badge-sm", "swt:fluent--add-24-regular"
+        | GitChangeKind.Modified ->
+            "Modified", "swt:badge swt:badge-info swt:badge-sm", "swt:fluent--edit-24-regular"
+        | GitChangeKind.Deleted ->
+            "Deleted", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--delete-24-regular"
+        | GitChangeKind.Renamed ->
+            "Renamed", "swt:badge swt:badge-warning swt:badge-sm", "swt:fluent--arrow-swap-24-regular"
+        | GitChangeKind.Untracked ->
+            "Untracked", "swt:badge swt:badge-neutral swt:badge-sm", "swt:fluent--document-24-regular"
+        | GitChangeKind.Conflict ->
+            "Conflict", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--warning-24-regular"
 
     let branchKindLabel (kind: GitSidebarBranchKind) =
         match kind with
@@ -711,6 +747,23 @@ type GitSidebar =
 
     [<ReactComponent>]
     static member private ChangedFilesList(props: ChangedFilesListProps) =
+        let scrollContainerRef = React.useElementRef ()
+        let virtualizerTick, setVirtualizerTick = React.useState 0
+
+        let rowVirtualizer =
+            Virtual.useVirtualizer (
+                count = props.ChangedFiles.Length,
+                getScrollElement = (fun () -> scrollContainerRef.current),
+                estimateSize = (fun _ -> 96),
+                overscan = 2,
+                gap = 8
+            )
+
+        React.useEffect (
+            (fun () -> setVirtualizerTick (virtualizerTick + 1)),
+            [| box props.ChangedFiles.Length |]
+        )
+
         React.Fragment [
             GitSidebar.SectionHeader(
                 "Changes",
@@ -723,6 +776,7 @@ type GitSidebar =
             )
 
             Html.div [
+                prop.ref scrollContainerRef
                 prop.className "swt:min-h-0 swt:flex-1 swt:overflow-y-auto swt:px-3 swt:pb-3"
                 prop.children [
                     if props.ChangedFiles.Length = 0 then
@@ -732,10 +786,8 @@ type GitSidebar =
                             prop.text "No changed files. Your repository is in sync."
                         ]
                     else
-                        Html.div [
-                            prop.className "swt:mt-2 swt:flex swt:flex-col swt:gap-2"
-                            prop.children [
-                                for change in props.ChangedFiles do
+                        let renderChangeRow (isVirtualized: bool) (index: int) (top: int) (size: int) =
+                                    let change = props.ChangedFiles.[index]
                                     let isSelected =
                                         props.SelectedFile
                                         |> Option.exists (fun selected ->
@@ -743,13 +795,16 @@ type GitSidebar =
                                         )
 
                                     let isSelectedForCommit = Set.contains change.Path props.SelectedCommitPaths
+                                    let badgeLabel, badgeClass, iconClass = GitSidebarInternal.changePresentation change
 
                                     Html.button [
-                                        prop.testId ("GitSidebarChangeRow-" + change.Path)
+                                        prop.testId $"GitSidebarChangeRow-{index}"
                                         prop.key change.Path
                                         prop.disabled props.IsBusy
                                         prop.className [
                                             "swt:flex swt:w-full swt:flex-col swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-3 swt:py-2 swt:text-left swt:transition-colors"
+                                            if isVirtualized then
+                                                "swt:absolute swt:left-0"
                                             if change.IsConflicted then
                                                 "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
                                             elif isSelected then
@@ -757,6 +812,12 @@ type GitSidebar =
                                             else
                                                 "swt:border-base-content/10 swt:bg-base-100 hover:swt:bg-base-200/80"
                                         ]
+                                        if isVirtualized then
+                                            prop.style [
+                                                style.top 0
+                                                style.custom ("transform", $"translateY({top}px)")
+                                                style.height size
+                                            ]
                                         prop.onClick (fun _ -> props.OpenChange change)
                                         prop.children [
                                             Html.div [
@@ -797,15 +858,16 @@ type GitSidebar =
                                                                         prop.text change.Path
                                                                     ]
                                                                     Html.span [
-                                                                        prop.className (
-                                                                            GitSidebarInternal.changeBadgeClasses change
-                                                                        )
-                                                                        prop.text (
-                                                                            if change.IsConflicted then
-                                                                                "Conflict"
-                                                                            else
-                                                                                "Changed"
-                                                                        )
+                                                                        prop.className badgeClass
+                                                                        prop.children [
+                                                                            Html.span [
+                                                                                prop.className
+                                                                                    $"swt:iconify {iconClass} swt:size-3.5"
+                                                                            ]
+                                                                            Html.span [
+                                                                                prop.text badgeLabel
+                                                                            ]
+                                                                        ]
                                                                     ]
                                                                 ]
                                                             ]
@@ -823,8 +885,41 @@ type GitSidebar =
                                             ]
                                         ]
                                     ]
+
+                        let renderRows () =
+                            Html.div [
+                                prop.className "swt:mt-2 swt:flex swt:flex-col swt:gap-2"
+                                prop.children (
+                                    props.ChangedFiles
+                                    |> Array.mapi (fun index _ -> renderChangeRow false index 0 0)
+                                )
                             ]
-                        ]
+
+                        if props.ChangedFiles.Length <= 24 then
+                            renderRows ()
+                        else
+                            let virtualRows = rowVirtualizer.getVirtualItems ()
+                            let totalSize =
+                                if virtualRows.Length = 0 then
+                                    props.ChangedFiles.Length * 96
+                                else
+                                    rowVirtualizer.getTotalSize ()
+
+                            Html.div [
+                                prop.className "swt:relative"
+                                prop.style [ style.height totalSize ]
+                                prop.children (
+                                    if virtualRows.Length = 0 then
+                                        props.ChangedFiles
+                                        |> Array.mapi (fun index _ -> renderChangeRow false index 0 0)
+                                        |> Array.take (min 12 props.ChangedFiles.Length)
+                                    else
+                                        virtualRows
+                                        |> Array.map (fun virtualRow ->
+                                            renderChangeRow true virtualRow.index virtualRow.start virtualRow.size
+                                        )
+                                )
+                            ]
                 ]
             ]
         ]

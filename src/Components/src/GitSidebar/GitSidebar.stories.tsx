@@ -122,6 +122,14 @@ const conflictedFiles = [
   },
 ] as const;
 
+const largeChangedFiles = Array.from({ length: 400 }, (_, index) => ({
+  Path: `src/file-${String(index).padStart(3, "0")}.txt`,
+  OriginalPath: undefined,
+  IndexStatus: "M",
+  WorkingTreeStatus: " ",
+  IsConflicted: false,
+}));
+
 function StatefulSidebar(
   props: React.ComponentProps<typeof GitSidebarComponent>,
 ) {
@@ -235,7 +243,12 @@ export const ConflictsPresent: Story = {
       ...baseStatus,
       IsMergeInProgress: true,
     },
-    changedFiles: conflictedFiles.slice(),
+    changedFiles: [
+      conflictedFiles[3],
+      conflictedFiles[0],
+      conflictedFiles[1],
+      conflictedFiles[2],
+    ],
     branchOptions: branchOptions.slice(),
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
@@ -246,7 +259,49 @@ export const ConflictsPresent: Story = {
     await expect(canvas.getByTestId("GitSidebarMergeBanner")).toHaveTextContent(
       "Resolve all conflicted files before pushing.",
     );
+    await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
     await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Conflict");
+  },
+};
+
+export const LargeChangedSet: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: largeChangedFiles,
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("400 files");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("GitSidebarChangeRow-399")).toBeNull();
+  },
+};
+
+export const DeletedFile: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: [
+      {
+        Path: "obsolete.md",
+        OriginalPath: undefined,
+        IndexStatus: "D",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+    ],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Deleted");
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("git: D.");
   },
 };
 

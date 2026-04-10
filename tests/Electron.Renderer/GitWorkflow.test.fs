@@ -99,6 +99,12 @@ let private changedFile path indexStatus workingTreeStatus isConflicted = {
     IsConflicted = isConflicted
 }
 
+let private manyChangedFiles count =
+    [|
+        for index in 0 .. count - 1 do
+            changedFile (sprintf "src/file-%03i.txt" index) "M" " " false
+    |]
+
 let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>> = promise {
     return failwith $"Unexpected call: {name}"
 }
@@ -1320,6 +1326,157 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.querySelector ("[data-testid='GitSidebar']")).not.toBeNull ()
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar renders conflicted change rows alongside other changed files",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = true
+                            },
+                            changedFiles = [|
+                                changedFile "README.md" "M" " " false
+                                changedFile "assays/isa.assay.xlsx" "?" "?" false
+                                changedFile "notes/protocol.md" "R" "M" false
+                                changedFile "studies/s-study-01/protocol.md" "U" "U" true
+                            |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnSync = fun () -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
+                Vitest.expect(container.textContent.Contains("Conflict")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar virtualizes long change lists instead of mounting every row at once",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [
+                                style.width 340
+                                style.height 760
+                            ]
+                            prop.children [
+                                Swate.Components.GitSidebar.Main(
+                                    status = {
+                                        CurrentBranch = Some "main"
+                                        TrackingBranch = Some "origin/main"
+                                        Ahead = 0
+                                        Behind = 0
+                                        IsClean = false
+                                        IsMergeInProgress = false
+                                    },
+                                    changedFiles = manyChangedFiles 400,
+                                    branchOptions = [| sidebarLocalBranch "main" true true |],
+                                    callbacks = {
+                                        OnRefresh = fun () -> ()
+                                        OnFetch = fun () -> ()
+                                        OnPull = fun () -> ()
+                                        OnPush = fun () -> ()
+                                        OnSync = fun () -> ()
+                                        OnCommitSelection = fun _ -> ()
+                                        OnCommitAll = fun _ -> ()
+                                        OnSaveDownloadLargeFiles = fun _ -> ()
+                                        OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnCreateBranch = fun _ -> ()
+                                        OnSwitchBranch = fun _ -> ()
+                                        OnSelectChange = fun _ -> promise { return Ok() }
+                                    },
+                                    downloadLargeFiles = true,
+                                    lfsAutoTrackThresholdMb = 5
+                                )
+                            ]
+                        ]
+                    )
+
+                Vitest.expect(container.textContent.Contains("400 files")).toBe (true)
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-399']")).toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar labels deleted files explicitly instead of showing only a generic Changed badge",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [
+                                style.width 340
+                                style.height 760
+                            ]
+                            prop.children [
+                                Swate.Components.GitSidebar.Main(
+                                    status = {
+                                        CurrentBranch = Some "main"
+                                        TrackingBranch = Some "origin/main"
+                                        Ahead = 0
+                                        Behind = 0
+                                        IsClean = false
+                                        IsMergeInProgress = false
+                                    },
+                                    changedFiles =
+                                        [|
+                                            changedFile "obsolete.md" "D" " " false
+                                        |],
+                                    branchOptions = [| sidebarLocalBranch "main" true true |],
+                                    callbacks = {
+                                        OnRefresh = fun () -> ()
+                                        OnFetch = fun () -> ()
+                                        OnPull = fun () -> ()
+                                        OnPush = fun () -> ()
+                                        OnSync = fun () -> ()
+                                        OnCommitSelection = fun _ -> ()
+                                        OnCommitAll = fun _ -> ()
+                                        OnSaveDownloadLargeFiles = fun _ -> ()
+                                        OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnCreateBranch = fun _ -> ()
+                                        OnSwitchBranch = fun _ -> ()
+                                        OnSelectChange = fun _ -> promise { return Ok() }
+                                    },
+                                    downloadLargeFiles = true,
+                                    lfsAutoTrackThresholdMb = 5
+                                )
+                            ]
+                        ]
+                    )
+
+                Vitest.expect(container.textContent.Contains("Deleted")).toBe (true)
+                Vitest.expect(container.textContent.Contains("git: D.")).toBe (true)
+
                 cleanup ()
             }
         )
