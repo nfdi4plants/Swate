@@ -1,8 +1,8 @@
-## Guidelines for isolated React components (`src/Components`)
+# Guidelines for isolated React components (`src/Components`)
 
 Components in `src/Components` are expected to be reusable and application-agnostic.
 
-### File Rules
+# File Rules
 
 - **Component folder**: Each component should be placed in a folder named after the component use context.
     - e.g. `src\Components\src\TermSearch` contains `TermSearch.tsx`, `TermSearchConfigProvider.fs` and `TermSearchConfigSetter.fs`
@@ -29,7 +29,7 @@ Components in `src/Components` are expected to be reusable and application-agnos
         ```
 - **Colocated stories**: Storybook files must be colocated with the component and named `<Component>.stories.tsx`.
 
-### Syntax Rules
+# Syntax Rules
 
 - **PascalCase**: MUST use PascalCase for component and object names.
 - **CamelCase**: MUST use camelCase for props and functions.
@@ -46,7 +46,9 @@ Components in `src/Components` are expected to be reusable and application-agnos
 - **Subcomponents**: Larger components MUST be split into smaller logical subcomponents. These subcomponents MAY be defined as static members of the main component class, or as separate component-files in the same folder.
 - **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MAY be defined in a separate file, or as private module `module <FileName>Helper` within the component file.
 
-### Design Principles
+# Design Principles
 
 - **No app-state coupling**: Components MUST be designed to be reusable and not coupled to any specific application state or workflow. They should receive all necessary data and handlers via props.
 - **No app-side effects**: do not call app-specific services directly; pass handlers/callbacks via props.
+
+#

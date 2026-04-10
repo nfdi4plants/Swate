@@ -84,5 +84,9 @@ Afterwards you can fork the repository and start working on your feature/bug. Wh
 
 We are currently still working on a nice project structure. For now ask us if any questions arise in the related GitHub issue!
 
+Check out the following files for more specific contribution guidelines:
+- [docs/Structure.md](docs/Structure.md) for architecture and project structure guidelines.
+- [docs/ReactComponentDesign.md](docs/ReactComponentDesign.md) for guidelines on designing reusable React components in `src/Components`.
+
 > [!IMPORTANT]
 > Use VS Code or Rider for development, as they allow autoformatting via Fantomas on file save. This ensures that the code style is consistent across the project and reduces the amount of formatting-related comments in pull requests.
