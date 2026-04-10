@@ -46,32 +46,34 @@ let LandingDraftTarget () =
                             Error = Some message.Message
                     }
                 | Ok previewData ->
-                    let previewPage =
-                        match PageState.fromFileContentDTO previewData with
-                        | Ok pageState -> pageState
-                        | Error message ->
-                            errorModal.enqueue (
-                                ErrorModalRequest.create(message, title = "ARC preview could not be opened", ?scopeId = arcScopeId)
-                            )
+                    match PageState.fromFileContentDTO previewData with
+                    | Error message ->
+                        errorModal.enqueue (
+                            ErrorModalRequest.create(message, title = "ARC preview could not be opened", ?scopeId = arcScopeId)
+                        )
 
-                            PageState.ArcFilePage payload.ArcFile
+                        setLandingUiState {
+                            landingUiState with
+                                IsSubmitting = false
+                                Error = Some $"Saved ARC metadata but failed to preview the saved file: {message}"
+                        }
+                    | Ok previewPage ->
+                        match payload.ProtocolIntent with
+                        | None -> finishSuccess previewPage previewData
+                        | Some protocolIntent ->
+                            let request: FileContentDTO =
+                                FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
 
-                    match payload.ProtocolIntent with
-                    | None -> finishSuccess previewPage previewData
-                    | Some protocolIntent ->
-                        let request: FileContentDTO =
-                            FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
+                            let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
 
-                        let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
-
-                        match writeResult with
-                        | Ok() -> finishSuccess previewPage previewData
-                        | Result.Error exn ->
-                            setLandingUiState {
-                                landingUiState with
-                                    IsSubmitting = false
-                                    Error = Some $"Saved ARC metadata but failed to write protocol file: {exn.Message}"
-                            }
+                            match writeResult with
+                            | Ok() -> finishSuccess previewPage previewData
+                            | Result.Error exn ->
+                                setLandingUiState {
+                                    landingUiState with
+                                        IsSubmitting = false
+                                        Error = Some $"Saved ARC metadata but failed to write protocol file: {exn.Message}"
+                                }
             }
             |> Promise.start
 
