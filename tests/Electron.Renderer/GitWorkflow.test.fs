@@ -932,6 +932,26 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "GitDiffViewer renders synthetic new-file diff metadata without blanking the content pane",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitDiffViewer.Viewer(
+                            wordDiffText = "new file mode 100644\n--- /dev/null\n+++ b/notes/draft.txt\n",
+                            previousContent = "",
+                            currentContent = "Draft line\n",
+                            testIdPrefix = "renderer-synthetic-diff"
+                        )
+                    )
+
+                Vitest.expect(container.textContent.Contains("Draft line")).toBe (true)
+                Vitest.expect(container.textContent.Contains("Changed")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
             "GitSidebar shows when the current local branch has no upstream yet",
             fun () -> promise {
                 let status: GitSidebarStatus = {
