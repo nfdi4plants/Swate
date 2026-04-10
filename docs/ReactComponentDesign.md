@@ -7,6 +7,7 @@ Components in `src/Components` are expected to be reusable and application-agnos
 - **Component folder**: Each component should be placed in a folder named after the component use context.
     - e.g. `src/Components/src/TermSearch` contains `TermSearch.tsx`, `TermSearchConfigProvider.fs` and `TermSearchConfigSetter.fs`
     - e.g. `src/Components/src/Authentication` contains `Authentication.fs`, `AccountManager.fs`, `Helper.fs` and `Types.fs`
+    - e.g. higher level nested components MAY be placed in subfolders and add the subfolder name to the namespace, e.g. `src/Components/src/Notes/NoteSearch/src/Components/src/Notes/NoteSearch/NoteSearchComponent.fs` with namespace `namespace Swate.Components.Notes.NoteSearch`.
 - **PascalCase file names**: `MyComponent.tsx` for the component "MyComponent" and `MyComponent.stories.tsx` for its Storybook tests.
 - **File namespace**: The file namespace should match the folder structure. For example:
 
@@ -45,10 +46,3 @@ Components in `src/Components` are expected to be reusable and application-agnos
     ```
 - **Subcomponents**: Larger components MUST be split into smaller logical subcomponents. These subcomponents MAY be defined as static members of the main component class, or as separate component-files in the same folder.
 - **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MAY be defined in a separate file, or as private module `module <FileName>Helper` within the component file.
-
-# Design Principles
-
-- **No app-state coupling**: Components MUST be designed to be reusable and not coupled to any specific application state or workflow. They should receive all necessary data and handlers via props.
-- **No app-side effects**: do not call app-specific services directly; pass handlers/callbacks via props.
-
-#
