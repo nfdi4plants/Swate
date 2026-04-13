@@ -4,6 +4,8 @@ open Feliz
 open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent.Helper
 open Renderer.Components.MainElement
+open Renderer.Components.WidgetRegistry
+open Swate.Components.ArcFileEditor
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ErrorModal
@@ -48,4 +50,4 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let renderHeader editorState =
         CreateARCitectNavbar editorState setArcFile onSaveArcFile
 
-    ArcFileEditor.Main(arcFile, setArcFile, header = renderHeader)
+    Main.ArcFileEditor(arcFile, setArcFile, templateServices, ?header = Some renderHeader)

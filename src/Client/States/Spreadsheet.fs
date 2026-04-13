@@ -6,7 +6,7 @@ open FileImport
 open Swate.Components.Shared
 
 
-type ActiveView = Swate.Components.ActiveView
+type ActiveView = Swate.Components.ArcFileEditor.Types.ActiveView
 
 type ColumnType =
     | Main
