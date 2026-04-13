@@ -1,7 +1,10 @@
 namespace Swate.Components.ErrorModal
 
 open Feliz
+open Fable.Core
+open Swate.Components
 
+[<Erase; Mangle(false)>]
 type ErrorModal =
 
     [<ReactComponent>]
@@ -71,3 +74,44 @@ type ErrorModal =
                 details
             ]
         ]
+
+    [<ReactComponent>]
+    static member Modal
+        (
+            isOpen: bool,
+            setIsOpen: bool -> unit,
+            title: string,
+            children: ReactElement,
+            ?headerAdornment: ReactElement,
+            ?description: ReactElement,
+            ?modalActions: ReactElement,
+            ?footer: ReactElement,
+            ?initialFocusRef: IRefValue<option<Browser.Types.HTMLElement>>,
+            ?returnFocusRef: IRefValue<option<Browser.Types.HTMLElement>>,
+            ?debug: string,
+            ?className: string
+        ) : ReactElement =
+        BaseModal.Modal(
+            isOpen = isOpen,
+            setIsOpen = setIsOpen,
+            header =
+                Html.div [
+                    prop.className "swt:flex swt:items-center swt:gap-2"
+                    prop.children [
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--error-circle-24-filled swt:size-6"
+                        ]
+                        Html.span title
+                        if headerAdornment.IsSome then
+                            headerAdornment.Value
+                    ]
+                ],
+            children = children,
+            ?description = description,
+            ?modalActions = modalActions,
+            ?footer = footer,
+            ?initialFocusRef = initialFocusRef,
+            ?returnFocusRef = returnFocusRef,
+            ?debug = debug,
+            ?className = className
+        )
