@@ -207,8 +207,20 @@ module internal GitTextComparisonRendering =
                         )
                     | _ ->
                         FsReact.createDisposable (fun () -> ())
-                ),
-                [| box rows.Length; box maxHeightPx |]
+                )
+            )
+
+            React.useEffect (fun () ->
+                match bodyScrollRef.current with
+                | Some bodyScroll ->
+                    let nextComparisonContentWidthPx = int bodyScroll.clientWidth
+
+                    if nextComparisonContentWidthPx <> comparisonContentWidthPx then
+                        setComparisonContentWidthPx nextComparisonContentWidthPx
+                | None ->
+                    ()
+
+                FsReact.createDisposable (fun () -> ())
             )
 
             let comparisonContentWidth =
