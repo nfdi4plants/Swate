@@ -45,4 +45,5 @@ Components in `src/Components` are expected to be reusable and application-agnos
             // ...
     ```
 - **Subcomponents**: Larger components MUST be split into smaller logical subcomponents. These subcomponents MAY be defined as static members of the main component class, or as separate component-files in the same folder.
-- **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MAY be defined in a separate file, or as private module `module <FileName>Helper` within the component file.
+- **Types**: `private` types that are only used within a single component file MUST be defined in the same file. Public types that are shared across multiple files MUST be defined in a separate `Types.fs` file.
+- **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MAY be defined in a separate file, or as **private** module `module <FileName>Helper` within the component file.

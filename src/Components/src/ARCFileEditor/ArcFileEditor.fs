@@ -7,6 +7,12 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
 
+module private EntryHelpers =
+
+    let templateServices: TemplateWidgetServices = {
+        loadTemplates = fun () -> async { return Ok [||] }
+    }
+
 type private AddRowsFooterViewProps = {
     rowsToAdd: int
     minRowsToAdd: int
@@ -59,8 +65,12 @@ type Main =
 
     [<ReactComponent>]
     static member private ArcFileContentView
-        (activeView: ActiveView, arcFileState: ArcFiles, setArcFileState: ArcFiles -> unit)
-        =
+        (
+            activeView: ActiveView,
+            arcFileState: ArcFiles,
+            setArcFileState: ArcFiles -> unit,
+            templateServices: TemplateWidgetServices
+        ) =
         match activeView with
         | ActiveView.Metadata -> ArcFileMetadata.View(arcFileState, setArcFileState)
         | ActiveView.Table index ->
@@ -79,7 +89,7 @@ type Main =
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
                 match table.ColumnCount with
-                | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState)
+                | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState, Some index, templateServices)
                 | _ -> Main.TableView(table, setTable)
             | None ->
                 Html.div [
@@ -173,8 +183,12 @@ type Main =
 
     [<ReactComponent>]
     static member ArcFileEditor
-        (arcFile: ArcFiles, setArcFile: ArcFiles -> unit, ?header: (ArcFileEditorHeaderProps -> ReactElement))
-        =
+        (
+            arcFile: ArcFiles,
+            setArcFile: ArcFiles -> unit,
+            templateServices: TemplateWidgetServices,
+            ?header: (ArcFileEditorHeaderProps -> ReactElement)
+        ) =
         let activeView, setActiveView = React.useState ActiveView.Metadata
 
         React.useEffect (
@@ -213,7 +227,9 @@ type Main =
                             prop.children [
                                 Html.div [
                                     prop.className "swt:flex-1 swt:overflow-x-hidden swt:overflow-y-auto"
-                                    prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
+                                    prop.children [
+                                        Main.ArcFileContentView(activeView, arcFile, setArcFile, templateServices)
+                                    ]
                                 ]
                                 Main.AddRowsFooter(activeView, arcFile, setArcFile)
                                 ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
@@ -230,4 +246,4 @@ type Main =
         let startArcFile = ArcFiles.Assay(ArcAssay.init ("Test"))
 
         let arcFile, setArcFile = React.useState (startArcFile)
-        Main.ArcFileEditor(arcFile, setArcFile)
+        Main.ArcFileEditor(arcFile, setArcFile, EntryHelpers.templateServices)
