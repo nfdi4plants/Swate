@@ -1,7 +1,7 @@
-namespace Swate.Components
+namespace Swate.Components.ErrorModal
 
 open Feliz
-
+open Swate.Components
 
 type ErrorModal =
 

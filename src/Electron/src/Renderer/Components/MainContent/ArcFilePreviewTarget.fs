@@ -11,7 +11,7 @@ open Swate.Components.Shared
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
-    let errorModal = Context.ErrorModal.useErrorModal ()
+    let errorModal = ErrorModal.Context.useErrorModal ()
     let arcScopeId = useCurrentArcScopeId ()
 
     let isPendingSaveForCurrentArcFile =

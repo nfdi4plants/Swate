@@ -1,12 +1,11 @@
-module Swate.Components.Context
+module Swate.Components.ErrorModal.Context
 
-open Fable.Core
+
 open Feliz
+open Swate.Components
 
-[<Erase; Mangle(false)>]
-module ErrorModal =
 
-    let ErrorModalCtx = React.createContext<ErrorModalContext> (ErrorModalContext.Empty)
+let ErrorModalCtx = React.createContext<ErrorModalContext> (ErrorModalContext.Empty)
 
-    [<Hook>]
-    let useErrorModal () = React.useContext ErrorModalCtx
+[<Hook>]
+let useErrorModal () = React.useContext ErrorModalCtx
