@@ -1,5 +1,6 @@
 module ElectronRenderer.GitWorkflowTests
 
+open System
 open Browser.Dom
 open Browser.Types
 open Elmish
@@ -165,6 +166,32 @@ let private manyChangedFiles count =
         for index in 0 .. count - 1 do
             changedFile (sprintf "src/file-%03i.txt" index) "M" " " false
     |]
+
+let private joinLines (lines: string array) =
+    String.concat "\n" lines + "\n"
+
+let private buildAddedFileDiff (path: string) (lines: string array) =
+    [
+        "new file mode 100644"
+        "--- /dev/null"
+        $"+++ b/{path}"
+        $"@@ -0,0 +1,{lines.Length} @@"
+        yield! lines |> Array.map (fun line -> $"+{line}")
+        "~"
+        ""
+    ]
+    |> String.concat "\n"
+
+let private buildSingleConflictDocument (currentLines: string array) (incomingLines: string array) =
+    [
+        "<<<<<<< HEAD"
+        yield! currentLines
+        "======="
+        yield! incomingLines
+        ">>>>>>> origin/main"
+        ""
+    ]
+    |> String.concat "\n"
 
 let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>> = promise {
     return failwith $"Unexpected call: {name}"
@@ -1237,6 +1264,38 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "GitDiffViewer virtualizes large added-file diffs instead of mounting every rendered row",
+            fun () -> promise {
+                let lines =
+                    [| for index in 0 .. 599 -> $"Generated renderer diff line {index + 1}" |]
+
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [
+                                style.width 960
+                                style.height 480
+                            ]
+                            prop.children [
+                                Swate.Components.GitDiffViewer.Viewer(
+                                    wordDiffText = buildAddedFileDiff "notes/renderer-large.txt" lines,
+                                    previousContent = "",
+                                    currentContent = joinLines lines,
+                                    testIdPrefix = "renderer-large-diff"
+                                )
+                            ]
+                        ]
+                    )
+
+                Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-virtual-content']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-row-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-row-599']")).toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
             "GitDiffViewer renders synthetic new-file diff metadata without blanking the content pane",
             fun () -> promise {
                 let! container, cleanup =
@@ -1251,6 +1310,39 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("Draft line")).toBe (true)
                 Vitest.expect(container.textContent.Contains("Changed")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitMergeConflictViewer virtualizes long conflict blocks instead of mounting every rendered row",
+            fun () -> promise {
+                let currentLines =
+                    [| for index in 0 .. 239 -> $"Current renderer conflict line {index + 1}" |]
+
+                let incomingLines =
+                    [| for index in 0 .. 239 -> $"Incoming renderer conflict line {index + 1}" |]
+
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [
+                                style.width 960
+                                style.height 520
+                            ]
+                            prop.children [
+                                Swate.Components.GitMergeConflictViewer.Viewer(
+                                    mergeConflictContent = buildSingleConflictDocument currentLines incomingLines,
+                                    testIdPrefix = "renderer-large-merge"
+                                )
+                            ]
+                        ]
+                    )
+
+                Vitest.expect(container.querySelector("[data-testid='renderer-large-merge-conflict-1-scroll-virtual-content']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='renderer-large-merge-conflict-1-scroll-row-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='renderer-large-merge-conflict-1-scroll-row-239']")).toBeNull ()
 
                 cleanup ()
             }

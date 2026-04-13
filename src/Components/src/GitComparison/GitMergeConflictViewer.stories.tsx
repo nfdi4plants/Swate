@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { within, expect, userEvent, waitFor, fn } from "storybook/test";
+import { within, expect, userEvent, waitFor, fn, fireEvent } from "storybook/test";
 import { Viewer as GitMergeConflictViewerComponent } from "./GitMergeConflictViewer.fs.js";
 
 const introLines = Array.from({ length: 10 }, (_, index) => `Shared intro line ${index + 1}`);
@@ -20,6 +20,23 @@ const incomingClosingLines = [
   "Incoming extra context",
   ...Array.from({ length: 8 }, (_, index) => `Incoming closing note ${index + 1}`),
 ];
+const largeCurrentConflictLines = Array.from(
+  { length: 240 },
+  (_, index) => `Large current conflict line ${index + 1}`,
+);
+const largeIncomingConflictLines = Array.from(
+  { length: 240 },
+  (_, index) => `Large incoming conflict line ${index + 1}`,
+);
+
+const largeConflictContent = [
+  "<<<<<<< HEAD",
+  ...largeCurrentConflictLines,
+  "=======",
+  ...largeIncomingConflictLines,
+  ">>>>>>> origin/main",
+  "",
+].join("\n");
 
 const mergeConflictContent = [
   "# Merge plan",
@@ -206,7 +223,7 @@ export const Default: Story = {
     const hasExactText = (value: string) => (_content: string, element: Element | null) =>
       element?.textContent === value;
     const root = canvas.getByTestId("git-merge-story-root");
-    const firstConflictScroll = canvas.getByTestId("git-merge-story-conflict-1-scroll");
+    const firstConflictScroll = canvas.getByTestId("git-merge-story-conflict-1-scroll") as HTMLElement;
     const conflictsPane = canvas.getByTestId("git-merge-story-conflicts-pane");
     const splitHandle = canvas.getByTestId("git-merge-story-split-handle");
     const confirmMergeButton = canvas.getByTestId("git-merge-story-confirm-merge");
@@ -214,14 +231,27 @@ export const Default: Story = {
     await expect(canvas.getByText("Merge conflict 1")).toBeInTheDocument();
     await expect(canvas.getByText("Merge conflict 2")).toBeInTheDocument();
     await expect(canvas.getByText("Merge conflict 3")).toBeInTheDocument();
+    await expect(
+      canvas.getByTestId("git-merge-story-conflict-1-scroll-virtual-content"),
+    ).toBeInTheDocument();
     await expect(canvas.getByText(hasExactText("Incoming experiment note 1"))).toBeInTheDocument();
-    await expect(canvas.getByText(hasExactText("Current experiment note 32"))).toBeInTheDocument();
     await expect(root).toHaveTextContent("3 conflicts");
     await expect(confirmMergeButton).toBeDisabled();
 
     await waitFor(() => {
       expect(firstConflictScroll.scrollHeight).toBeGreaterThan(firstConflictScroll.clientHeight);
     });
+
+    const firstConflictMaxScrollTop =
+      firstConflictScroll.scrollHeight - firstConflictScroll.clientHeight;
+    firstConflictScroll.scrollTop = firstConflictMaxScrollTop;
+    await fireEvent.scroll(firstConflictScroll, {
+      target: { scrollTop: firstConflictMaxScrollTop },
+    });
+
+    await expect(
+      await canvas.findByText(hasExactText("Current experiment note 32")),
+    ).toBeInTheDocument();
 
     const handleRect = splitHandle.getBoundingClientRect();
     const pointerX = handleRect.left + handleRect.width / 2;
@@ -323,6 +353,43 @@ export const Default: Story = {
     });
 
     expect(args.onConfirmMerge.mock.calls[0][0]).toBe(fullyResolvedContent);
+  },
+};
+
+export const LargeConflictBlockVirtualized: Story = {
+  parameters: { isolated: true },
+  args: {
+    mergeConflictContent: largeConflictContent,
+    testIdPrefix: "git-merge-large-story",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const firstConflictScroll = canvas.getByTestId(
+      "git-merge-large-story-conflict-1-scroll",
+    ) as HTMLElement;
+
+    await expect(
+      canvas.getByTestId("git-merge-large-story-conflict-1-scroll-virtual-content"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByTestId("git-merge-large-story-conflict-1-scroll-row-0"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByTestId("git-merge-large-story-conflict-1-scroll-row-239"),
+    ).toBeNull();
+
+    const maxScrollTop = firstConflictScroll.scrollHeight - firstConflictScroll.clientHeight;
+    firstConflictScroll.scrollTop = maxScrollTop;
+    await fireEvent.scroll(firstConflictScroll, {
+      target: { scrollTop: maxScrollTop },
+    });
+
+    await expect(
+      await canvas.findByTestId("git-merge-large-story-conflict-1-scroll-row-239"),
+    ).toBeInTheDocument();
+    await expect(
+      await canvas.findByText("Large current conflict line 240"),
+    ).toBeInTheDocument();
   },
 };
 

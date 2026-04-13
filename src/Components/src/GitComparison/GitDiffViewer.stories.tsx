@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { within, expect, waitFor } from "storybook/test";
+import { within, expect, waitFor, fireEvent } from "storybook/test";
 import { Viewer as GitDiffViewerComponent } from "./GitDiffViewer.fs.js";
 
 const introLines = Array.from({ length: 14 }, (_, index) => `Context line ${index + 1}`);
@@ -68,6 +68,29 @@ index 1111111..3333333 100644
 ~
 `;
 
+function buildAddedFileWordDiffText(path: string, lines: string[]) {
+  return [
+    "new file mode 100644",
+    "--- /dev/null",
+    `+++ b/${path}`,
+    `@@ -0,0 +1,${lines.length} @@`,
+    ...lines.map((line) => `+${line}`),
+    "~",
+    "",
+  ].join("\n");
+}
+
+const largeDiffLines = Array.from(
+  { length: 600 },
+  (_, index) => `Generated large diff line ${index + 1}`,
+);
+const largeDiffPath = "notes/large-diff.txt";
+const largeDiffContent = `${largeDiffLines.join("\n")}\n`;
+const largeDiffWordDiffText = buildAddedFileWordDiffText(
+  largeDiffPath,
+  largeDiffLines,
+);
+
 const meta = {
   title: "Components/GitComparison/GitDiffViewer",
   component: GitDiffViewerComponent,
@@ -83,7 +106,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div className="swt:p-6 swt:bg-base-200">
+      <div className="swt:h-[80vh] swt:min-h-[48rem] swt:bg-base-200 swt:p-6">
         <Story />
       </div>
     ),
@@ -103,10 +126,13 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const root = canvas.getByTestId("git-diff-story-root");
-    const comparisonScroll = canvas.getByTestId("git-diff-story-comparison-scroll");
+    const comparisonScroll = canvas.getByTestId("git-diff-story-comparison-scroll") as HTMLElement;
 
     await expect(canvas.getByTestId("git-diff-story-previous-header")).toHaveTextContent("notes/protocol.md");
     await expect(canvas.getByTestId("git-diff-story-current-header")).toHaveTextContent("notes/protocol.md");
+    await expect(
+      canvas.getByTestId("git-diff-story-comparison-scroll-virtual-content"),
+    ).toBeInTheDocument();
     await expect(root).toHaveTextContent("Protocol Overview");
     await expect(root).toHaveTextContent("Context line 14");
     await expect(root).toHaveTextContent("Checkpoint item 16");
@@ -114,11 +140,57 @@ export const Default: Story = {
     await expect(root).toHaveTextContent("Step A updated");
     await expect(root).toHaveTextContent("Remove me");
     await expect(root).toHaveTextContent("Added after shared");
-    await expect(root).toHaveTextContent("Tail note refined");
 
     await waitFor(() => {
       expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
+      expect(comparisonScroll.scrollHeight).toBeGreaterThan(comparisonScroll.clientHeight);
     });
+
+    const maxScrollTop = comparisonScroll.scrollHeight - comparisonScroll.clientHeight;
+    comparisonScroll.scrollTop = maxScrollTop;
+    await fireEvent.scroll(comparisonScroll, {
+      target: { scrollTop: maxScrollTop },
+    });
+
+    await expect(await canvas.findByText("Tail note refined")).toBeInTheDocument();
+  },
+};
+
+export const LargeAddedFileVirtualized: Story = {
+  args: {
+    wordDiffText: largeDiffWordDiffText,
+    previousContent: "",
+    currentContent: largeDiffContent,
+    testIdPrefix: "git-diff-large-story",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const comparisonScroll = canvas.getByTestId(
+      "git-diff-large-story-comparison-scroll",
+    ) as HTMLElement;
+
+    await expect(
+      canvas.getByTestId("git-diff-large-story-comparison-scroll-virtual-content"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByTestId("git-diff-large-story-comparison-scroll-row-0"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByTestId("git-diff-large-story-comparison-scroll-row-599"),
+    ).toBeNull();
+
+    const maxScrollTop = comparisonScroll.scrollHeight - comparisonScroll.clientHeight;
+    comparisonScroll.scrollTop = maxScrollTop;
+    await fireEvent.scroll(comparisonScroll, {
+      target: { scrollTop: maxScrollTop },
+    });
+
+    await expect(
+      await canvas.findByTestId("git-diff-large-story-comparison-scroll-row-599"),
+    ).toBeInTheDocument();
+    await expect(
+      await canvas.findByText("Generated large diff line 600"),
+    ).toBeInTheDocument();
   },
 };
 
