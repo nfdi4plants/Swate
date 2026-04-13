@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.ErrorModal
 
 
 [<RequireQualifiedAccess>]
@@ -132,3 +132,10 @@ type ErrorModalContext = {
         dismissBatchItem = fun _ _ -> ()
         dismissAll = ignore
     }
+
+type ErrorModalMsg =
+    | Enqueue of ErrorModalEntry
+    | EnqueueMany of ErrorModalEntry list
+    | DismissById of string
+    | DismissManyByIds of Set<string>
+    | DismissBatchItem of string * string

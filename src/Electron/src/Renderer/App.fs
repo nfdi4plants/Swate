@@ -7,6 +7,7 @@ open Feliz.UseElmish
 open Renderer.Components
 open Renderer.Types
 open Swate.Components
+open Swate.Components.ErrorModal
 open Swate.Electron.Shared
 
 type private Model = {

@@ -3,7 +3,7 @@ module Renderer.Components.FileExplorer
 
 open Renderer.Components.ARCHelper
 open Swate.Components
-open Swate.Components.Contexts
+open Swate.Components.ErrorModal
 open Swate.Components.FileExplorerTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper

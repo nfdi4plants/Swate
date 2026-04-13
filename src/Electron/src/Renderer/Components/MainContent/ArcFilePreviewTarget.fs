@@ -6,6 +6,7 @@ open Renderer.Components.MainContent.Helper
 open Renderer.Components.MainElement
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Components.ErrorModal
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =

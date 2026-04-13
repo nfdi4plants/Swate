@@ -126,6 +126,7 @@
     <Compile Include="ErrorModal\Types.fs" />
     <Compile Include="ErrorModal\Context.fs" />
     <Compile Include="ErrorModal\Modal.fs" />
+    <Compile Include="ErrorModal\Helper.fs" />
     <Compile Include="ErrorModal\Provider.fs" />
     <Compile Include="Landing\Types.fs" />
     <Compile Include="Landing\State.fs" />
