@@ -128,13 +128,26 @@ export const Default: Story = {
     const hasExactText = (value: string) => (_content: string, element: Element | null) =>
       element?.textContent === value;
     const root = canvas.getByTestId("git-diff-story-root");
+    const previousHeader = canvas.getByTestId("git-diff-story-previous-header");
+    const currentHeader = canvas.getByTestId("git-diff-story-current-header");
+    const virtualContent = canvas.getByTestId(
+      "git-diff-story-comparison-scroll-virtual-content",
+    );
     const comparisonScroll = canvas.getByTestId("git-diff-story-comparison-scroll") as HTMLElement;
 
-    await expect(canvas.getByTestId("git-diff-story-previous-header")).toHaveTextContent("notes/protocol.md");
-    await expect(canvas.getByTestId("git-diff-story-current-header")).toHaveTextContent("notes/protocol.md");
+    await expect(previousHeader).toHaveTextContent("notes/protocol.md");
+    await expect(currentHeader).toHaveTextContent("notes/protocol.md");
     await expect(
-      canvas.getByTestId("git-diff-story-comparison-scroll-virtual-content"),
+      virtualContent,
     ).toBeInTheDocument();
+    await waitFor(() => {
+      const headerWidth =
+        previousHeader.getBoundingClientRect().width +
+        currentHeader.getBoundingClientRect().width;
+      const bodyWidth = virtualContent.getBoundingClientRect().width;
+
+      expect(Math.abs(headerWidth - bodyWidth)).toBeLessThanOrEqual(1);
+    });
     await expect(root).toHaveTextContent("Protocol Overview");
     await expect(root).toHaveTextContent("Context line 14");
     await expect(root).toHaveTextContent("Step A updated");

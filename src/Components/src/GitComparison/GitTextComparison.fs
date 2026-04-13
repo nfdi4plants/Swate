@@ -179,6 +179,7 @@ module internal GitTextComparisonRendering =
             let theme = defaultArg theme DiffTheme
             let rowEstimatePx = 28
             let overscan = 8
+            let comparisonContentWidthPx, setComparisonContentWidthPx = React.useState 0
             let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
             let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
 
@@ -189,17 +190,32 @@ module internal GitTextComparisonRendering =
                         let syncHeaderToBody (_: Event) =
                             headerScroll.scrollLeft <- bodyScroll.scrollLeft
 
+                        let updateComparisonContentWidth () =
+                            setComparisonContentWidthPx (int bodyScroll.clientWidth)
+
+                        let handleWindowResize (_: Event) =
+                            updateComparisonContentWidth ()
+
                         bodyScroll.addEventListener ("scroll", syncHeaderToBody)
+                        Browser.Dom.window.addEventListener ("resize", handleWindowResize)
+                        updateComparisonContentWidth ()
                         syncHeaderToBody (unbox null)
 
                         FsReact.createDisposable (fun () ->
                             bodyScroll.removeEventListener ("scroll", syncHeaderToBody)
+                            Browser.Dom.window.removeEventListener ("resize", handleWindowResize)
                         )
                     | _ ->
                         FsReact.createDisposable (fun () -> ())
                 ),
-                [||]
+                [| box rows.Length; box maxHeightPx |]
             )
+
+            let comparisonContentWidth =
+                if comparisonContentWidthPx > 0 then
+                    $"max(58rem, {comparisonContentWidthPx}px)"
+                else
+                    "max(58rem, 100%)"
 
             let rowVirtualizer =
                 Virtual.useVirtualizer (
@@ -250,6 +266,7 @@ module internal GitTextComparisonRendering =
                         prop.children [
                             Html.div [
                                 prop.className "swt:min-w-[58rem]"
+                                prop.style [ style.custom ("width", comparisonContentWidth) ]
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
@@ -282,7 +299,10 @@ module internal GitTextComparisonRendering =
                                 if virtualContentTestId.IsSome then
                                     prop.testId virtualContentTestId.Value
                                 prop.className "swt:relative swt:min-w-[58rem]"
-                                prop.style [ style.height (rowVirtualizer.getTotalSize ()) ]
+                                prop.style [
+                                    style.height (rowVirtualizer.getTotalSize ())
+                                    style.custom ("width", comparisonContentWidth)
+                                ]
                                 prop.children [
                                     for virtualItem in virtualItems do
                                         React.KeyedFragment(
