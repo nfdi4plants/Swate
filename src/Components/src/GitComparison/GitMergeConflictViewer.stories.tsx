@@ -364,6 +364,8 @@ export const LargeConflictBlockVirtualized: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const hasExactText = (value: string) => (_content: string, element: Element | null) =>
+      element?.textContent === value;
     const firstConflictScroll = canvas.getByTestId(
       "git-merge-large-story-conflict-1-scroll",
     ) as HTMLElement;
@@ -378,6 +380,11 @@ export const LargeConflictBlockVirtualized: Story = {
       canvas.queryByTestId("git-merge-large-story-conflict-1-scroll-row-239"),
     ).toBeNull();
 
+    await waitFor(() => {
+      expect(firstConflictScroll.clientHeight).toBeGreaterThan(0);
+      expect(firstConflictScroll.scrollHeight).toBeGreaterThan(firstConflictScroll.clientHeight);
+    });
+
     const maxScrollTop = firstConflictScroll.scrollHeight - firstConflictScroll.clientHeight;
     firstConflictScroll.scrollTop = maxScrollTop;
     await fireEvent.scroll(firstConflictScroll, {
@@ -388,7 +395,7 @@ export const LargeConflictBlockVirtualized: Story = {
       await canvas.findByTestId("git-merge-large-story-conflict-1-scroll-row-239"),
     ).toBeInTheDocument();
     await expect(
-      await canvas.findByText("Large current conflict line 240"),
+      await canvas.findByText(hasExactText("Large current conflict line 240")),
     ).toBeInTheDocument();
   },
 };

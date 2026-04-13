@@ -1,5 +1,6 @@
 namespace Swate.Components
 
+open Browser.Types
 open Feliz
 
 module internal GitTextComparisonRendering =
@@ -17,6 +18,21 @@ module internal GitTextComparisonRendering =
         type ComparisonTheme = {
             LeftChanged: ComparisonSideStyle
             RightChanged: ComparisonSideStyle
+        }
+
+        type private ComparisonGridRowProps = {
+            Row: DiffRow
+            Index: int
+            VirtualStart: int
+            MeasureElementRef: VirtualMeasureElementRef
+            Theme: ComparisonTheme
+            RowTestId: string option
+        }
+
+        type private ComparisonVirtualItem = {
+            Key: string
+            Index: int
+            Start: int
         }
 
         let DiffTheme = {
@@ -127,10 +143,30 @@ module internal GitTextComparisonRendering =
                 ]
             ]
 
+        [<ReactComponent>]
+        let private ComparisonGridRow(props: ComparisonGridRowProps) =
+            Html.div [
+                if props.RowTestId.IsSome then
+                    prop.testId props.RowTestId.Value
+                prop.custom ("data-index", props.Index)
+                prop.ref (fun element -> props.MeasureElementRef (Option.ofObj element))
+                prop.className
+                    "swt:absolute swt:left-0 swt:grid swt:w-full swt:min-w-[58rem] swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
+                prop.style [
+                    style.top 0
+                    style.left 0
+                    style.custom ("transform", $"translateY({props.VirtualStart}px)")
+                ]
+                prop.children [
+                    ComparisonSide(props.Row.Left, props.Theme.LeftChanged)
+                    ComparisonSide(props.Row.Right, props.Theme.RightChanged)
+                ]
+            ]
+
         [<ReactMemoComponent(AreEqualFn.FsEquals)>]
         let ComparisonGrid
             (
-                rows: DiffRow list,
+                rows: DiffRow [],
                 leftHeader: string * (string * int),
                 rightHeader: string * (string * int),
                 leftHeaderTestId: string option,
@@ -139,40 +175,134 @@ module internal GitTextComparisonRendering =
                 maxHeightPx: int option,
                 theme: ComparisonTheme option
             ) =
-            let rows = if List.isEmpty rows then [ Rows.emptyRow () ] else rows
+            let rows = if rows.Length = 0 then [| Rows.emptyRow () |] else rows
             let theme = defaultArg theme DiffTheme
+            let rowEstimatePx = 28
+            let overscan = 8
+            let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
+            let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
+
+            React.useEffect (
+                (fun () ->
+                    match headerScrollRef.current, bodyScrollRef.current with
+                    | Some headerScroll, Some bodyScroll ->
+                        let syncHeaderToBody (_: Event) =
+                            headerScroll.scrollLeft <- bodyScroll.scrollLeft
+
+                        bodyScroll.addEventListener ("scroll", syncHeaderToBody)
+                        syncHeaderToBody (unbox null)
+
+                        FsReact.createDisposable (fun () ->
+                            bodyScroll.removeEventListener ("scroll", syncHeaderToBody)
+                        )
+                    | _ ->
+                        FsReact.createDisposable (fun () -> ())
+                ),
+                [||]
+            )
+
+            let rowVirtualizer =
+                Virtual.useVirtualizer (
+                    count = rows.Length,
+                    getScrollElement = (fun () -> bodyScrollRef.current),
+                    estimateSize = (fun _ -> rowEstimatePx),
+                    overscan = overscan,
+                    gap = 0
+                )
+
+            let virtualItems =
+                let measuredItems = rowVirtualizer.getVirtualItems ()
+
+                if measuredItems.Length = 0 && rows.Length > 0 then
+                    let isInitialScrollPosition =
+                        bodyScrollRef.current
+                        |> Option.map (fun element -> element.scrollTop = 0.0)
+                        |> Option.defaultValue true
+
+                    if not isInitialScrollPosition then
+                        [||]
+                    else
+                        [| 0 .. min (rows.Length - 1) overscan |]
+                        |> Array.map (fun index -> {
+                            Key = $"comparison-row-{index}"
+                            Index = index
+                            Start = index * rowEstimatePx
+                        })
+                else
+                    measuredItems
+                    |> Array.map (fun item -> {
+                        Key = item.key
+                        Index = item.index
+                        Start = item.start
+                    })
+
+            let virtualContentTestId =
+                scrollTestId |> Option.map (fun value -> $"{value}-virtual-content")
 
             Html.div [
-                if scrollTestId.IsSome then
-                    prop.testId scrollTestId.Value
-                prop.className "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade"
+                prop.className "swt:min-h-0 swt:flex swt:flex-1 swt:flex-col"
                 if maxHeightPx.IsSome then
                     prop.style [ style.maxHeight maxHeightPx.Value ]
                 prop.children [
                     Html.div [
-                        prop.className "swt:min-h-full swt:min-w-[58rem]"
+                        prop.ref headerScrollRef
+                        prop.className "swt:overflow-hidden"
                         prop.children [
                             Html.div [
-                                prop.className "swt:sticky swt:top-0 swt:z-10 swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
+                                prop.className "swt:min-w-[58rem]"
                                 prop.children [
-                                    ComparisonHeader(fst leftHeader, (snd leftHeader |> fst), (snd leftHeader |> snd), leftHeaderTestId)
-                                    ComparisonHeader(fst rightHeader, (snd rightHeader |> fst), (snd rightHeader |> snd), rightHeaderTestId)
+                                    Html.div [
+                                        prop.className "swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
+                                        prop.children [
+                                            ComparisonHeader(
+                                                fst leftHeader,
+                                                (snd leftHeader |> fst),
+                                                (snd leftHeader |> snd),
+                                                leftHeaderTestId
+                                            )
+                                            ComparisonHeader(
+                                                fst rightHeader,
+                                                (snd rightHeader |> fst),
+                                                (snd rightHeader |> snd),
+                                                rightHeaderTestId
+                                            )
+                                        ]
+                                    ]
                                 ]
                             ]
+                        ]
+                    ]
+                    Html.div [
+                        if scrollTestId.IsSome then
+                            prop.testId scrollTestId.Value
+                        prop.ref bodyScrollRef
+                        prop.className "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade"
+                        prop.children [
                             Html.div [
-                                prop.children (
-                                    rows
-                                    |> List.mapi (fun index row ->
-                                        Html.div [
-                                            prop.key $"comparison-row-{index}"
-                                            prop.className "swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
-                                            prop.children [
-                                                ComparisonSide(row.Left, theme.LeftChanged)
-                                                ComparisonSide(row.Right, theme.RightChanged)
+                                if virtualContentTestId.IsSome then
+                                    prop.testId virtualContentTestId.Value
+                                prop.className "swt:relative swt:min-w-[58rem]"
+                                prop.style [ style.height (rowVirtualizer.getTotalSize ()) ]
+                                prop.children [
+                                    for virtualItem in virtualItems do
+                                        React.KeyedFragment(
+                                            virtualItem.Key,
+                                            [
+                                                ComparisonGridRow(
+                                                    {
+                                                        Row = rows.[virtualItem.Index]
+                                                        Index = virtualItem.Index
+                                                        VirtualStart = virtualItem.Start
+                                                        MeasureElementRef = rowVirtualizer.measureElement
+                                                        Theme = theme
+                                                        RowTestId =
+                                                            scrollTestId
+                                                            |> Option.map (fun value -> $"{value}-row-{virtualItem.Index}")
+                                                    }
+                                                )
                                             ]
-                                        ]
-                                    )
-                                )
+                                        )
+                                ]
                             ]
                         ]
                     ]

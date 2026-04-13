@@ -125,6 +125,8 @@ export const Default: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const hasExactText = (value: string) => (_content: string, element: Element | null) =>
+      element?.textContent === value;
     const root = canvas.getByTestId("git-diff-story-root");
     const comparisonScroll = canvas.getByTestId("git-diff-story-comparison-scroll") as HTMLElement;
 
@@ -135,16 +137,28 @@ export const Default: Story = {
     ).toBeInTheDocument();
     await expect(root).toHaveTextContent("Protocol Overview");
     await expect(root).toHaveTextContent("Context line 14");
-    await expect(root).toHaveTextContent("Checkpoint item 16");
-    await expect(root).toHaveTextContent("Temperature 24 C");
     await expect(root).toHaveTextContent("Step A updated");
     await expect(root).toHaveTextContent("Remove me");
-    await expect(root).toHaveTextContent("Added after shared");
 
     await waitFor(() => {
       expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
       expect(comparisonScroll.scrollHeight).toBeGreaterThan(comparisonScroll.clientHeight);
     });
+
+    const middleScrollTop = Math.floor(
+      (comparisonScroll.scrollHeight - comparisonScroll.clientHeight) * 0.7,
+    );
+    comparisonScroll.scrollTop = middleScrollTop;
+    await fireEvent.scroll(comparisonScroll, {
+      target: { scrollTop: middleScrollTop },
+    });
+
+    await expect(
+      await canvas.findByTestId("git-diff-story-comparison-scroll-row-35"),
+    ).toBeInTheDocument();
+    await expect(await canvas.findAllByText("Checkpoint item 16")).toHaveLength(2);
+    await expect(await canvas.findByText(hasExactText("Temperature 24 C"))).toBeInTheDocument();
+    await expect(await canvas.findByText("Added after shared")).toBeInTheDocument();
 
     const maxScrollTop = comparisonScroll.scrollHeight - comparisonScroll.clientHeight;
     comparisonScroll.scrollTop = maxScrollTop;
@@ -152,7 +166,7 @@ export const Default: Story = {
       target: { scrollTop: maxScrollTop },
     });
 
-    await expect(await canvas.findByText("Tail note refined")).toBeInTheDocument();
+    await expect(await canvas.findByText(hasExactText("Tail note refined"))).toBeInTheDocument();
   },
 };
 
@@ -178,6 +192,11 @@ export const LargeAddedFileVirtualized: Story = {
     await expect(
       canvas.queryByTestId("git-diff-large-story-comparison-scroll-row-599"),
     ).toBeNull();
+
+    await waitFor(() => {
+      expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
+      expect(comparisonScroll.scrollHeight).toBeGreaterThan(comparisonScroll.clientHeight);
+    });
 
     const maxScrollTop = comparisonScroll.scrollHeight - comparisonScroll.clientHeight;
     comparisonScroll.scrollTop = maxScrollTop;
