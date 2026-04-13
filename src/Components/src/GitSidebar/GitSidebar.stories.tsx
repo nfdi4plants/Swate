@@ -212,6 +212,9 @@ export const ChangedFiles: Story = {
     await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent(
       "Renamed from notes/protocol-draft.md",
     );
+    await expect(
+      canvas.getByTestId("GitSidebarChangedFilesVirtualContent"),
+    ).toBeInTheDocument();
   },
 };
 
@@ -275,15 +278,24 @@ export const LargeChangedSet: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const gitSidebar = canvas.getByTestId("GitSidebar");
     await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("400 files");
+    await expect(
+      canvas.getByTestId("GitSidebarChangedFilesVirtualContent"),
+    ).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toBeInTheDocument();
     await expect(canvas.queryByTestId("GitSidebarChangeRow-399")).toBeNull();
-    const scrollContainer = gitSidebar.querySelector("div[class*='overflow-y-auto']") as HTMLElement | null;
-    expect(scrollContainer).not.toBeNull();
-    scrollContainer.scrollTop = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-    await fireEvent.scroll(scrollContainer);
-    await expect(await canvas.findByTestId("GitSidebarChangeRow-399")).toBeInTheDocument();
+    const scrollContainer = canvas.getByTestId(
+      "GitSidebarChangedFilesScrollContainer",
+    ) as HTMLElement;
+    const maxScrollTop =
+      scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    scrollContainer.scrollTop = maxScrollTop;
+    await fireEvent.scroll(scrollContainer, {
+      target: { scrollTop: maxScrollTop },
+    });
+    await expect(
+      await canvas.findByTestId("GitSidebarChangeRow-399"),
+    ).toBeInTheDocument();
   },
 };
 

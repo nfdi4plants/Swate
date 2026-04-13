@@ -1,6 +1,7 @@
 namespace Swate.Components
 
 open System
+open Browser.Types
 open Fable.Core
 open Feliz
 
@@ -137,6 +138,28 @@ type private ChangedFilesListProps = {
     CanEditCommit: bool
     ToggleCommitSelection: string -> unit
     OpenChange: GitSidebarChange -> unit
+}
+
+type private ChangeStatusBadgeProps = {
+    Change: GitSidebarChange
+}
+
+type private ChangedFileRowProps = {
+    Change: GitSidebarChange
+    Index: int
+    IsSelected: bool
+    IsSelectedForCommit: bool
+    IsBusy: bool
+    CanEditCommit: bool
+    ToggleCommitSelection: string -> unit
+    OpenChange: GitSidebarChange -> unit
+    VirtualStart: int
+    MeasureElement: IRefValue<HTMLElement option>
+}
+
+type private ChangedFileVirtualItem = {
+    Index: int
+    Start: int
 }
 
 type private ModalsProps = {
@@ -746,17 +769,130 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private ChangedFilesList(props: ChangedFilesListProps) =
-        let scrollContainerRef = React.useElementRef ()
+    static member private ChangeStatusBadge(props: ChangeStatusBadgeProps) =
+        let badgeLabel, badgeClass, iconClass = GitSidebarInternal.changePresentation props.Change
 
-        let rowVirtualizer =
+        Html.span [
+            prop.className [ badgeClass; "swt:gap-1" ]
+            prop.children [
+                Html.span [
+                    prop.className $"swt:iconify {iconClass} swt:size-3.5"
+                ]
+                Html.span [
+                    prop.text badgeLabel
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private ChangedFileRow(props: ChangedFileRowProps) =
+        let change = props.Change
+
+        Html.button [
+            prop.testId $"GitSidebarChangeRow-{props.Index}"
+            prop.custom ("data-index", props.Index)
+            prop.ref props.MeasureElement
+            prop.disabled props.IsBusy
+            prop.className [
+                "swt:absolute swt:left-0 swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors"
+                if change.IsConflicted then
+                    "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
+                elif props.IsSelected then
+                    "swt:border-primary/40 swt:bg-primary/5 hover:swt:bg-primary/10"
+                else
+                    "swt:border-base-content/10 swt:bg-base-100 hover:swt:bg-base-200/80"
+            ]
+            prop.style [
+                style.top 0
+                style.left 0
+                style.width (length.percent 100)
+                style.custom ("transform", $"translateY({props.VirtualStart}px)")
+            ]
+            prop.onClick (fun _ -> props.OpenChange change)
+            prop.children [
+                Html.input [
+                    prop.testId ("GitSidebarCommitSelectionCheckbox-" + change.Path)
+                    prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
+                    prop.type'.checkbox
+                    prop.disabled (not props.CanEditCommit || change.IsConflicted)
+                    prop.isChecked props.IsSelectedForCommit
+                    prop.onClick (fun event -> event.stopPropagation ())
+                    prop.onChange (fun (_: bool) -> props.ToggleCommitSelection change.Path)
+                ]
+                Html.span [
+                    prop.className [
+                        "swt:mt-0.5 swt:font-mono swt:text-[0.7rem]"
+                        if change.IsConflicted then
+                            "swt:text-error"
+                        else
+                            "swt:text-base-content/60"
+                    ]
+                    prop.text (GitSidebarInternal.describeChange change)
+                ]
+                Html.div [
+                    prop.className "swt:min-w-0 swt:flex-1"
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1.5"
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:truncate swt:text-sm swt:font-medium"
+                                    prop.text change.Path
+                                ]
+                                GitSidebar.ChangeStatusBadge({ Change = change })
+                            ]
+                        ]
+                        match change.OriginalPath with
+                        | Some originalPath ->
+                            Html.div [
+                                prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
+                                prop.text $"Renamed from {originalPath}"
+                            ]
+                        | None -> Html.none
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private ChangedFilesList(props: ChangedFilesListProps) =
+        let scrollContainerRef: IRefValue<HTMLElement option> = React.useElementRef ()
+        let itemSize = 64
+        let itemGap = 4
+        let overscan = 8
+
+        let changedFileListVirtualizer =
             Virtual.useVirtualizer (
                 count = props.ChangedFiles.Length,
                 getScrollElement = (fun () -> scrollContainerRef.current),
-                estimateSize = (fun _ -> 96),
-                overscan = 2,
-                gap = 8
+                estimateSize = (fun _ -> itemSize),
+                overscan = overscan,
+                gap = itemGap
             )
+
+        let virtualItems =
+            let measuredItems = changedFileListVirtualizer.getVirtualItems ()
+
+            if measuredItems.Length = 0 && props.ChangedFiles.Length > 0 then
+                let isInitialScrollPosition =
+                    scrollContainerRef.current
+                    |> Option.map (fun element -> element.scrollTop = 0.0)
+                    |> Option.defaultValue true
+
+                if not isInitialScrollPosition then
+                    [||]
+                else
+                    [| 0 .. min (props.ChangedFiles.Length - 1) overscan |]
+                    |> Array.map (fun index -> {
+                        Index = index
+                        Start = index * (itemSize + itemGap)
+                    })
+            else
+                measuredItems
+                |> Array.map (fun item -> {
+                    Index = item.index
+                    Start = item.start
+                })
 
         React.Fragment [
             GitSidebar.SectionHeader(
@@ -770,8 +906,9 @@ type GitSidebar =
             )
 
             Html.div [
+                prop.testId "GitSidebarChangedFilesScrollContainer"
                 prop.ref scrollContainerRef
-                prop.className "swt:min-h-0 swt:flex-1 swt:overflow-y-auto swt:px-3 swt:pb-3"
+                prop.className "swt:min-h-0 swt:flex-1 swt:overflow-y-auto swt:px-2 swt:pb-2"
                 prop.children [
                     if props.ChangedFiles.Length = 0 then
                         Html.div [
@@ -780,8 +917,14 @@ type GitSidebar =
                             prop.text "No changed files. Your repository is in sync."
                         ]
                     else
-                        let renderChangeRow (isVirtualized: bool) (index: int) (top: int option) =
-                                    let change = props.ChangedFiles.[index]
+                        Html.div [
+                            prop.testId "GitSidebarChangedFilesVirtualContent"
+                            prop.className "swt:relative swt:mt-1"
+                            prop.style [ style.height (changedFileListVirtualizer.getTotalSize ()) ]
+                            prop.children [
+                                for virtualItem in virtualItems do
+                                    let change = props.ChangedFiles.[virtualItem.Index]
+
                                     let isSelected =
                                         props.SelectedFile
                                         |> Option.exists (fun selected ->
@@ -789,122 +932,28 @@ type GitSidebar =
                                         )
 
                                     let isSelectedForCommit = Set.contains change.Path props.SelectedCommitPaths
-                                    let badgeLabel, badgeClass, iconClass = GitSidebarInternal.changePresentation change
 
-                                    Html.button [
-                                        prop.testId $"GitSidebarChangeRow-{index}"
-                                        prop.key change.Path
-                                        if isVirtualized then
-                                            prop.custom ("data-index", index)
-                                        prop.disabled props.IsBusy
-                                        prop.className [
-                                            "swt:flex swt:w-full swt:flex-col swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-3 swt:py-2 swt:text-left swt:transition-colors"
-                                            if isVirtualized then
-                                                "swt:absolute swt:left-0"
-                                            if change.IsConflicted then
-                                                "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
-                                            elif isSelected then
-                                                "swt:border-primary/40 swt:bg-primary/5 hover:swt:bg-primary/10"
-                                            else
-                                                "swt:border-base-content/10 swt:bg-base-100 hover:swt:bg-base-200/80"
+                                    React.KeyedFragment(
+                                        change.Path,
+                                        [
+                                            GitSidebar.ChangedFileRow(
+                                                {
+                                                    Change = change
+                                                    Index = virtualItem.Index
+                                                    IsSelected = isSelected
+                                                    IsSelectedForCommit = isSelectedForCommit
+                                                    IsBusy = props.IsBusy
+                                                    CanEditCommit = props.CanEditCommit
+                                                    ToggleCommitSelection = props.ToggleCommitSelection
+                                                    OpenChange = props.OpenChange
+                                                    VirtualStart = virtualItem.Start
+                                                    MeasureElement = changedFileListVirtualizer.measureElement
+                                                }
+                                            )
                                         ]
-                                        if isVirtualized then
-                                            prop.style [
-                                                style.top 0
-                                                style.custom ("transform", $"translateY({top.Value}px)")
-                                            ]
-                                        if isVirtualized then
-                                            prop.ref rowVirtualizer.measureElement
-                                        prop.onClick (fun _ -> props.OpenChange change)
-                                        prop.children [
-                                            Html.div [
-                                                prop.className "swt:flex swt:w-full swt:items-start swt:gap-3"
-                                                prop.children [
-                                                    Html.input [
-                                                        prop.testId ("GitSidebarCommitSelectionCheckbox-" + change.Path)
-                                                        prop.className
-                                                            "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
-                                                        prop.type'.checkbox
-                                                        prop.disabled (not props.CanEditCommit || change.IsConflicted)
-                                                        prop.isChecked isSelectedForCommit
-                                                        prop.onClick (fun event -> event.stopPropagation ())
-                                                        prop.onChange (fun (_: bool) ->
-                                                            props.ToggleCommitSelection change.Path
-                                                        )
-                                                    ]
-                                                    Html.span [
-                                                        prop.className [
-                                                            "swt:mt-0.5 swt:font-mono swt:text-[0.7rem] swt:tracking-[0.2em]"
-                                                            if change.IsConflicted then
-                                                                "swt:text-error"
-                                                            else
-                                                                "swt:text-base-content/60"
-                                                        ]
-                                                        prop.text (GitSidebarInternal.describeChange change)
-                                                    ]
-                                                    Html.div [
-                                                        prop.className "swt:min-w-0 swt:flex-1"
-                                                        prop.children [
-                                                            Html.div [
-                                                                prop.className
-                                                                    "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
-                                                                prop.children [
-                                                                    Html.span [
-                                                                        prop.className
-                                                                            "swt:truncate swt:text-sm swt:font-medium"
-                                                                        prop.text change.Path
-                                                                    ]
-                                                                    Html.span [
-                                                                        prop.className badgeClass
-                                                                        prop.children [
-                                                                            Html.span [
-                                                                                prop.className
-                                                                                    $"swt:iconify {iconClass} swt:size-3.5"
-                                                                            ]
-                                                                            Html.span [
-                                                                                prop.text badgeLabel
-                                                                            ]
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                            match change.OriginalPath with
-                                                            | Some originalPath ->
-                                                                Html.div [
-                                                                    prop.className
-                                                                        "swt:mt-1 swt:text-xs swt:text-base-content/60"
-                                                                    prop.text $"Renamed from {originalPath}"
-                                                                ]
-                                                            | None -> Html.none
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-
-                        let renderRows () =
-                            Html.div [
-                                prop.className "swt:mt-2 swt:flex swt:flex-col swt:gap-2"
-                                prop.children (
-                                    props.ChangedFiles
-                                    |> Array.mapi (fun index _ -> renderChangeRow false index None)
-                                )
-                            ]
-
-                        if props.ChangedFiles.Length <= 24 then
-                            renderRows ()
-                        else
-                            Html.div [
-                                prop.className "swt:mt-2 swt:relative"
-                                prop.style [ style.height (rowVirtualizer.getTotalSize ()) ]
-                                prop.children (
-                                    rowVirtualizer.getVirtualItems ()
-                                    |> Array.map (fun virtualRow ->
-                                        renderChangeRow true virtualRow.index (Some virtualRow.start)
                                     )
-                                )
                             ]
+                        ]
                 ]
             ]
         ]

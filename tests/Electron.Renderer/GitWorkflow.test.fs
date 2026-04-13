@@ -1468,7 +1468,58 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar virtualizes long change lists instead of mounting every row at once",
+            "GitSidebar renders small changed-file sets through the virtualized list path",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [
+                                style.width 340
+                                style.height 760
+                            ]
+                            prop.children [
+                                Swate.Components.GitSidebar.Main(
+                                    status = {
+                                        CurrentBranch = Some "main"
+                                        TrackingBranch = Some "origin/main"
+                                        Ahead = 0
+                                        Behind = 0
+                                        IsClean = false
+                                        IsMergeInProgress = false
+                                    },
+                                    changedFiles = manyChangedFiles 3,
+                                    branchOptions = [| sidebarLocalBranch "main" true true |],
+                                    callbacks = {
+                                        OnRefresh = fun () -> ()
+                                        OnFetch = fun () -> ()
+                                        OnPull = fun () -> ()
+                                        OnPush = fun () -> ()
+                                        OnSync = fun () -> ()
+                                        OnCommitSelection = fun _ -> ()
+                                        OnCommitAll = fun _ -> ()
+                                        OnSaveDownloadLargeFiles = fun _ -> ()
+                                        OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnCreateBranch = fun _ -> ()
+                                        OnSwitchBranch = fun _ -> ()
+                                        OnSelectChange = fun _ -> promise { return Ok() }
+                                    },
+                                    downloadLargeFiles = true,
+                                    lfsAutoTrackThresholdMb = 5
+                                )
+                            ]
+                        ]
+                    )
+
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")).not.toBeNull ()
+                Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']").length).toBe(3)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar virtualizes long changed-file lists instead of mounting every item at once",
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
@@ -1511,7 +1562,9 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("400 files")).toBe (true)
-                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-399']")).toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-399']")).toBeNull ()
 
                 cleanup ()
             }
