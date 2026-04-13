@@ -1662,6 +1662,36 @@ let createBranch (arcPath: string) (branchName: string) (startPoint: string opti
                         })
 }
 
+let addRemote (arcPath: string) (remoteName: string) (remoteUrl: string) : JS.Promise<GitResult<unit>> = promise {
+    match validateRemoteName remoteName with
+    | Error remoteError -> return errorResult remoteError
+    | Ok safeRemoteName ->
+        match ensureAllowedRemoteUrl remoteUrl with
+        | Error remoteUrlError -> return errorResult remoteUrlError
+        | Ok safeRemoteUrl ->
+            return!
+                withLocalGit
+                    arcPath
+                    (fun git -> promise {
+                        let! remoteList = git.getRemotes ()
+
+                        let remoteExists =
+                            match remoteList with
+                            | U2.Case1 remotes ->
+                                remotes
+                                |> Array.exists (fun remote -> String.Equals(remote.name, safeRemoteName, StringComparison.Ordinal))
+                            | U2.Case2 remotes ->
+                                remotes
+                                |> Array.exists (fun remote -> String.Equals(remote.name, safeRemoteName, StringComparison.Ordinal))
+
+                        if remoteExists then
+                            return abortGitPromise $"Remote '{safeRemoteName}' already exists."
+                        else
+                            let! _ = git.addRemote (safeRemoteName, safeRemoteUrl)
+                            return ()
+                    })
+}
+
 let checkoutBranch (arcPath: string) (branchName: string) : JS.Promise<GitResult<unit>> = promise {
     match ensureValidBranchLikeName "Branch name" branchName with
     | Error branchError -> return errorResult branchError

@@ -369,6 +369,41 @@ module private Internals =
                 return Error(GitLabError.NetworkError networkError)
     }
 
+    let sendJson<'TResponse>
+        (url: string)
+        (pat: string)
+        (method': HttpMethod)
+        (body: obj)
+        : JS.Promise<Result<'TResponse, GitLabError>> =
+        promise {
+            if String.IsNullOrWhiteSpace pat then
+                return Error(GitLabError.InvalidRequest "Personal Access Token is required.")
+            else
+                let requestOptions = [
+                    RequestProperties.Method method'
+                    requestHeaders [
+                        HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat)
+                        HttpRequestHeaders.Accept "application/json"
+                        HttpRequestHeaders.ContentType "application/json"
+                    ]
+                    RequestProperties.Body(unbox (Fable.Core.JS.JSON.stringify body))
+                ]
+
+                try
+                    let! response = fetchUnsafe url requestOptions
+
+                    if not response.Ok then
+                        return Error(mapHttpError response.Status)
+                    else
+                        try
+                            let! payload = response.json<'TResponse> ()
+                            return Ok payload
+                        with decodeError ->
+                            return Error(GitLabError.DecodeError decodeError)
+                with networkError ->
+                    return Error(GitLabError.NetworkError networkError)
+        }
+
 [<AttachMembers>]
 type GitLabApi =
 
@@ -378,6 +413,26 @@ type GitLabApi =
         let! response = Internals.sendGetSingle<GitLabCurrentUserResponse> url pat
         return response |> Result.map Internals.toCurrentUserDto
     }
+
+    static member CreateProject(baseUrl: string, pat: string, projectName: string) : JS.Promise<Result<ExploreProjectDto, GitLabError>> =
+        promise {
+            let normalizedName = projectName.Trim()
+
+            if String.IsNullOrWhiteSpace normalizedName then
+                return Error(GitLabError.InvalidRequest "Repository name is required.")
+            else
+                let! response =
+                    Internals.sendJson<GitLabProjectResponse>
+                        $"{baseUrl.TrimEnd('/')}/api/v4/projects"
+                        pat
+                        HttpMethod.POST
+                        (createObj [
+                            "name" ==> normalizedName
+                            "initialize_with_readme" ==> false
+                        ])
+
+                return response |> Result.map Internals.toExploreProjectDto
+        }
 
     /// GET /api/v4/projects
     static member ListProjects

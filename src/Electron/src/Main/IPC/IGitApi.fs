@@ -219,6 +219,20 @@ let api: IGitApi = {
                     None
                     result
         }
+    gitAddRemote =
+        fun (event: IpcMainEvent) (request: GitRemoteConfigRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let! result = GitService.addRemote arcPath request.RemoteName request.RemoteUrl
+
+                return
+                    toGitOperationResult
+                        (fun () -> Some $"Remote '{request.RemoteName}' configured.")
+                        None
+                        None
+                        result
+        }
     gitCloneRepository =
         fun (event: IpcMainEvent) (request: GitCloneRepositoryRequest) -> promise {
             let progressReporter =

@@ -345,7 +345,11 @@ swt:p-0"""
 
                                                                     Html.th [
 
-                                                                        prop.ref columnVirtualizer.measureElement
+                                                                        prop.ref (fun element ->
+                                                                            columnVirtualizer.measureElement (
+                                                                                Option.ofObj element
+                                                                            )
+                                                                        )
 
                                                                         prop.custom ("data-index", virtualColumn.index)
                                                                         prop.key

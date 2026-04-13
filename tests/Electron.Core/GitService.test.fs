@@ -363,6 +363,24 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "addRemote stores the requested origin URL in the local repository config",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let remoteUrl = "https://git.nfdi4plants.org/caroott/arc-a.git"
+
+                        let! _ =
+                            unwrapResultAsync
+                                (GitService.addRemote context.RepoPath "origin" remoteUrl)
+                                (expectOk "add origin remote")
+
+                        let! configuredRemoteUrl = context.Git.raw [| "remote"; "get-url"; "origin" |]
+                        Vitest.expect(configuredRemoteUrl.Trim()).toBe (remoteUrl)
+                    })
+            }
+        )
+
+        Vitest.test (
             "commit keeps the staged version when the working tree changes again before commit",
             fun () -> promise {
                 do!

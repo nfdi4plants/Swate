@@ -119,6 +119,11 @@ type GitRemoteOperationRequest = {
     Branch: string option
 }
 
+type GitRemoteConfigRequest = {
+    RemoteName: string
+    RemoteUrl: string
+}
+
 type GitCloneRepositoryRequest = {
     RemoteUrl: string
     TargetPath: string
