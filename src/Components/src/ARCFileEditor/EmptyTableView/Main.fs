@@ -6,6 +6,7 @@ open Fable.Core
 
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Components.ArcFileEditor.EmptyTableView.Helper
 
 [<RequireQualifiedAccess>]
 type private ModalState =
@@ -302,14 +303,13 @@ type Main =
         let isPreviousTableSelectOpen = modal = Some ModalState.PreviousTableSelect
 
         let isValidTableIndexForArcFile =
-            EmptyTableViewHelpers.tryGetActiveTable arcFile activeTableIndex
-            |> Option.isSome
+            Helper.tryGetActiveTable arcFile activeTableIndex |> Option.isSome
 
         let isDisabled = not isValidTableIndexForArcFile
 
         let canUsePreviousOutput =
             isValidTableIndexForArcFile
-            && (EmptyTableViewHelpers.getOutputTables arcFile |> Array.isEmpty |> not)
+            && (Helper.getOutputTables arcFile |> Array.isEmpty |> not)
 
         Html.div [
             prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col swt:gap-4"
@@ -335,9 +335,7 @@ type Main =
                                     Icons.BasicTable(),
                                     "Create basic table!",
                                     "Create a table with columns: Input, Protocol, Output.",
-                                    (fun _ ->
-                                        EmptyTableViewHelpers.createMinimalTable arcFile activeTableIndex setArcFile
-                                    ),
+                                    (fun _ -> Helper.createMinimalTable arcFile activeTableIndex setArcFile),
                                     (isDisabled)
                                 )
                                 CardGrid.CardGridButton(

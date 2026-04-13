@@ -5,62 +5,7 @@ open Fable.Core
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
-
-module EmptyTableViewHelpers =
-
-    let tryGetActiveTable (arcFile: ArcFiles) (activeTableIndex: int option) =
-        arcFile.TryGetActiveTable(activeTableIndex)
-
-    let createMinimalTable (arcFile: ArcFiles) (activeTableIndex: int option) (setArcFile: ArcFiles -> unit) =
-        match tryGetActiveTable arcFile activeTableIndex with
-        | Some(_, activeTable) ->
-            let newColumns = [|
-                CompositeColumn.create (CompositeHeader.Input IOType.Sample)
-                CompositeColumn.create CompositeHeader.ProtocolUri
-                CompositeColumn.create (CompositeHeader.Output IOType.Sample)
-            |]
-
-            activeTable.AddColumns(newColumns)
-            activeTable.AddRowsEmpty(3)
-            setArcFile (WidgetArcFile.refreshRef arcFile)
-        | None -> ()
-
-    let getOutputTables (arcFile: ArcFiles) =
-        arcFile.Tables()
-        |> Seq.filter (fun table -> table.TryGetOutputColumn().IsSome)
-        |> Seq.toArray
-
-    let tryCreatePreviewColumn (table: ArcTable) =
-        match table.TryGetOutputColumn() with
-        | Some outputColumn ->
-            match outputColumn.Header.TryIOType() with
-            | Some ioType -> Some(CompositeColumn.create (CompositeHeader.Input ioType, outputColumn.Cells))
-            | None -> None
-        | None -> None
-
-    let previewCells (cells: seq<CompositeCell>) =
-        cells |> Seq.truncate 10 |> Seq.map string |> Seq.toArray
-
-    let importSelectedPreviousOutput
-        (arcFile: ArcFiles)
-        (activeTableIndex: int option)
-        (selectedTable: ArcTable option)
-        (setArcFile: ArcFiles -> unit)
-        =
-        match tryGetActiveTable arcFile activeTableIndex, selectedTable with
-        | Some(activeIndex, activeTable), Some sourceTable ->
-            match sourceTable.TryGetOutputColumn() with
-            | Some outputColumn ->
-                match outputColumn.Header.TryIOType() with
-                | Some ioType ->
-
-                    activeTable.AddColumn(CompositeHeader.Input ioType, outputColumn.Cells)
-
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
-                    true
-                | None -> false
-            | None -> false
-        | _ -> false
+open Swate.Components.ArcFileEditor.EmptyTableView
 
 [<Erase; Mangle(false)>]
 type Modals =
@@ -131,7 +76,7 @@ type Modals =
             setIsOpen: bool -> unit
         ) =
 
-        let relevantTables = EmptyTableViewHelpers.getOutputTables arcFile
+        let relevantTables = Helper.getOutputTables arcFile
 
         let (selectedTable: ArcTable option), setSelectedTable =
             React.useState (
@@ -141,8 +86,7 @@ type Modals =
                     None
             )
 
-        let previewColumn =
-            selectedTable |> Option.bind EmptyTableViewHelpers.tryCreatePreviewColumn
+        let previewColumn = selectedTable |> Option.bind Helper.tryCreatePreviewColumn
 
         let canImport =
             activeTableIndex.IsSome && selectedTable.IsSome && previewColumn.IsSome
@@ -207,8 +151,7 @@ type Modals =
                                                 ]
                                             ]
                                             Html.tbody [
-                                                let previewCells =
-                                                    EmptyTableViewHelpers.previewCells previewColumn.Cells
+                                                let previewCells = Helper.previewCells previewColumn.Cells
 
                                                 if previewCells.Length = 0 then
                                                     Html.tr [
@@ -243,7 +186,7 @@ type Modals =
                             prop.disabled (not canImport)
                             prop.onClick (fun _ ->
                                 if
-                                    EmptyTableViewHelpers.importSelectedPreviousOutput
+                                    Helper.importSelectedPreviousOutput
                                         arcFile
                                         activeTableIndex
                                         selectedTable
