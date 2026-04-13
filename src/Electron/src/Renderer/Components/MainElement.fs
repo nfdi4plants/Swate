@@ -2,6 +2,7 @@ module Renderer.Components.MainElement
 
 open Feliz
 open Swate.Components
+open Swate.Components.ArcFileEditor.Types
 open Swate.Components.Shared
 open ARCtrl
 open WidgetRegistry
@@ -29,8 +30,7 @@ let CreateARCitectNavbar
             setTemplateImportType
 
     let hasSelectedTable =
-        editorState.arcFile.TryGetActiveTable(activeTableIndex)
-        |> Option.isSome
+        editorState.arcFile.TryGetActiveTable(activeTableIndex) |> Option.isSome
 
     Widget.WidgetController(
         widgets,

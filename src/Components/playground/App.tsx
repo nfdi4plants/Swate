@@ -218,9 +218,15 @@ function ARCSelectorContainer() {
   </div>
 }
 
+function ArcFileEditorContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:h-screen swt:w-screen swt:overflow-hidden'>
+    <ArcFileEditor />
+  </div>
+}
+
 const App = () => {
     return (
-        <ArcFileEditor />
+        <ArcFileEditorContainer />
         // <AuthButtonContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
         //     <NoteSearch />

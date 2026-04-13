@@ -61,6 +61,9 @@ module Table =
 
     let TableStateCtx = React.createContext<TableState> (TableState.init ())
 
+    [<Hook>]
+    let useTableState () = React.useContext TableStateCtx
+
 
 [<Erase; Mangle(false)>]
 module AnnotationTable =

@@ -22,7 +22,7 @@ let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
         }
 }
 
-let private templateServices: TemplateWidgetServices = {
+let createTemplateServices () = {
     loadTemplates =
         fun () -> async {
             try
@@ -35,6 +35,8 @@ let private templateServices: TemplateWidgetServices = {
                 return Error error.Message
         }
 }
+
+let templateServices = createTemplateServices ()
 
 let BuildingBlockWidget
     (arcFileState: ArcFiles)

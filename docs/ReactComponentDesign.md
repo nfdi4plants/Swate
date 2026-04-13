@@ -45,4 +45,31 @@ Components in `src/Components` are expected to be reusable and application-agnos
             // ...
     ```
 - **Subcomponents**: Larger components MUST be split into smaller logical subcomponents. These subcomponents MAY be defined as static members of the main component class, or as separate component-files in the same folder.
-- **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MAY be defined in a separate file, or as private module `module <FileName>Helper` within the component file.
+- **Types**: `private` types that are only used within a single component file MUST be defined in the same file. Public types that are shared across multiple files MUST be defined in a separate `Types.fs` file.
+- **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MAY be defined in a separate file, or as **private** module `module <FileName>Helper` within the component file.
+- **React context**: If a component needs to share state or configuration with a React context. It MUST define the base context in a separate file `**/<ComponentName>/Context.fs` or `**/<ComponentName>/Contexts/<ContextName>.fs` or `**/<ComponentName>/<ContextName>.fs` if there are multiple contexts associated with the component, with the following properties.
+    - File namespace MUST follow folder structure and be named `Swate.Components.<Path>.<ContextName>`.
+    - MAY contain the relevant public types.
+    - MAY contain helper functions inside a MAYBE public module. This module should be named `<ContextName>Helper`.
+    - It MUST NOT contain any React components.
+    - It MUST contain the `React.createContext` implementation in PascalCase with the suffix `Ctx`. For example, `ExampleCtx`.
+    - It MUST contain a hook to easily bind to the context. This hook MUST be named `use<ContextName>Ctx`. For example, `useExampleCtx`.
+    - Example for an context "Example" for a component "ExampleComponent":
+
+        ```fsharp
+        module Swate.Components.ExampleComponent.Context
+
+        // ..
+
+        type PublicExampleType = {
+            // ...
+        }
+
+        module ContextHelper =
+            // ...
+
+        let ExampleCtx = React.createContext<PublicExampleType> (PublicExampleType.init ())
+
+        [<Hook>]
+        let useExampleCtx () = React.useContext ExampleCtx
+        ```
