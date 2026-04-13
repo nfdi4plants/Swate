@@ -19,16 +19,17 @@
     "./style.css": "./dist/swate-components.css"
   },
   "scripts": {
+    "clean": "dotnet fable clean -e fs.ts --yes",
     "fable": "dotnet fable ./src/Swate.Components.fsproj --lang ts",
     "start": "npm run fable -- --watch --run vite",
     "dev": "npm run start",
-    "test": "dotnet fable clean -e fs.ts --yes && npm run fable -- --watch --run npx vitest --project=storybook",
-    "test:run": "dotnet fable clean -e fs.ts --yes && npm run fable -- --run npx vitest run --project=storybook",
+    "test": "npm run clean && npm run fable -- --watch --run npx vitest --project=storybook",
+    "test:run": "npm run clean && npm run fable -- --run npx vitest run --project=storybook",
     "prelink": "npm run build",
     "storybook": "npm run fable -- --watch --run storybook dev -p 6006",
     "storybook:no-compile": "storybook dev -p 6006",
     "prebuild:net": "npx @tailwindcss/cli -o ./src/swateBundleStyle.css -m",
-    "build": "dotnet fable clean -e fs.ts --yes && npm run fable -- --fableLib @fable-org/fable-library-js --noCache -e fs.ts -o src/output && vite build",
+    "build": "npm run clean && npm run fable -- --fableLib @fable-org/fable-library-js --noCache -e fs.ts -o src/output && vite build",
     "build:net": "dotnet pack ./src/Swate.Components.fsproj",
     "prebuild:storybook": "npm run fable -- --noCache",
     "build:storybook": "storybook build"
