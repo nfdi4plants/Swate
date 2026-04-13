@@ -1,9 +1,9 @@
-module Renderer.Components.MainContent.ErrorPreviewTarget
+module Renderer.Components.MainContent.ErrorViewTarget
 
 open Feliz
 
 [<ReactComponent>]
-let ErrorPreviewTarget (message: string) =
+let ErrorViewTarget (message: string) =
     Html.div [
         prop.className "swt:size-full swt:flex swt:justify-center swt:items-center swt:p-6"
         prop.children [
