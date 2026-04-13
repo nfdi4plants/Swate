@@ -369,11 +369,6 @@ module private Internals =
                 return Error(GitLabError.NetworkError networkError)
     }
 
-    let normalizeProjectPath (name: string) =
-        System.Text.RegularExpressions.Regex("[^A-Za-z0-9._-]+")
-            .Replace(name.Trim().ToLowerInvariant(), "-")
-            .Trim('-')
-
     let sendJson<'TResponse>
         (url: string)
         (pat: string)
@@ -422,9 +417,8 @@ type GitLabApi =
     static member CreateProject(baseUrl: string, pat: string, projectName: string) : JS.Promise<Result<ExploreProjectDto, GitLabError>> =
         promise {
             let normalizedName = projectName.Trim()
-            let normalizedPath = Internals.normalizeProjectPath normalizedName
 
-            if String.IsNullOrWhiteSpace normalizedName || String.IsNullOrWhiteSpace normalizedPath then
+            if String.IsNullOrWhiteSpace normalizedName then
                 return Error(GitLabError.InvalidRequest "Repository name is required.")
             else
                 let! response =
@@ -434,7 +428,6 @@ type GitLabApi =
                         HttpMethod.POST
                         (createObj [
                             "name" ==> normalizedName
-                            "path" ==> normalizedPath
                             "initialize_with_readme" ==> false
                         ])
 

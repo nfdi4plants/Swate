@@ -102,6 +102,64 @@ let private changedFile path indexStatus workingTreeStatus isConflicted = {
 [<Emit("new Event($0)")>]
 let private createEvent (eventType: string) : Browser.Types.Event = jsNative
 
+[<Emit("""
+globalThis.__swateOriginalFetch = globalThis.fetch;
+globalThis.__swateGitLabCreateProjectFetches = [];
+globalThis.fetch = async (url, options) => {
+  const body = options && options.body ? JSON.parse(options.body) : null;
+  globalThis.__swateGitLabCreateProjectFetches.push({ url, options, body });
+  return {
+    ok: true,
+    status: 201,
+    headers: { get: () => null },
+    json: async () => ({
+      id: 123,
+      name: body.name,
+      path_with_namespace: "carol/my-arc-project",
+      name_with_namespace: "carol / " + body.name,
+      description: null,
+      web_url: "https://gitlab.example/carol/my-arc-project",
+      http_url_to_repo: "https://gitlab.example/carol/my-arc-project.git",
+      ssh_url_to_repo: null,
+      avatar_url: null,
+      visibility: "private",
+      star_count: 0,
+      created_at: "2026-04-13T00:00:00Z",
+      last_activity_at: "2026-04-13T00:00:00Z",
+      topics: [],
+      tag_list: [],
+      namespace: {
+        id: 5,
+        name: "carol",
+        kind: "user",
+        full_path: "carol"
+      }
+    })
+  };
+};
+""")>]
+let private installGitLabCreateProjectFetchSpy () : unit = jsNative
+
+[<Emit("globalThis.__swateGitLabCreateProjectFetches[globalThis.__swateGitLabCreateProjectFetches.length - 1].body")>]
+let private lastGitLabCreateProjectBody () : obj = jsNative
+
+[<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
+let private hasOwnProperty (target: obj) (propertyName: string) : bool = jsNative
+
+[<Emit("$0[$1]")>]
+let private getProperty<'T> (target: obj) (propertyName: string) : 'T = jsNative
+
+[<Emit("""
+if (globalThis.__swateOriginalFetch === undefined) {
+  delete globalThis.fetch;
+} else {
+  globalThis.fetch = globalThis.__swateOriginalFetch;
+}
+delete globalThis.__swateOriginalFetch;
+delete globalThis.__swateGitLabCreateProjectFetches;
+""")>]
+let private cleanupGitLabCreateProjectFetchSpy () : unit = jsNative
+
 let private manyChangedFiles count =
     [|
         for index in 0 .. count - 1 do
@@ -240,6 +298,35 @@ Vitest.describe (
                             DownloadLargeFiles = false
                         }
                     )
+        )
+
+        Vitest.test (
+            "GitLabApi.CreateProject lets GitLab generate the project path from the submitted name",
+            fun () -> promise {
+                installGitLabCreateProjectFetchSpy ()
+
+                try
+                    let! result =
+                        GitLabApi.CreateProject(
+                            "https://gitlab.example/",
+                            "token-123",
+                            " My ARC Project "
+                        )
+
+                    match result with
+                    | Error err -> failwith err.GitLabErrorToString
+                    | Ok project ->
+                        Vitest.expect(project.name).toBe("My ARC Project")
+                        Vitest.expect(project.path_with_namespace).toBe("carol/my-arc-project")
+
+                    let body = lastGitLabCreateProjectBody ()
+
+                    Vitest.expect(getProperty<string> body "name").toBe("My ARC Project")
+                    Vitest.expect(getProperty<bool> body "initialize_with_readme").toBe(false)
+                    Vitest.expect(hasOwnProperty body "path").toBe(false)
+                finally
+                    cleanupGitLabCreateProjectFetchSpy ()
+            }
         )
 )
 
