@@ -1,8 +1,12 @@
-namespace Swate.Components
+module Swate.Components.ArcFileEditor.Types
 
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
+
+type AddRowsTarget =
+    | Table of ArcTable
+    | DataMap of DataMap
 
 [<RequireQualifiedAccess>]
 type ActiveView =
@@ -36,11 +40,17 @@ type ActiveView =
     /// Normalizes the active view based on the content of the arc file.
     /// If the current active view is not available for the given arc file, it will return a valid active view based on the content of the arc file.
     static member Forward(arcFile: ArcFiles, current: ActiveView) =
-        if current.IsAvailableOn(arcFile) then
-            current
-        elif arcFile.Tables().Count > 0 then
-            ActiveView.Table 0
-        elif arcFile.CanRenderDataMapView() then
-            ActiveView.DataMap
-        else
-            ActiveView.Metadata
+        if current.IsAvailableOn(arcFile) then current
+        elif arcFile.Tables().Count > 0 then ActiveView.Table 0
+        elif arcFile.CanRenderDataMapView() then ActiveView.DataMap
+        else ActiveView.Metadata
+
+    member this.TryGetActiveTable(arcFile: ArcFiles) =
+        match this with
+        | Table i when i >= 0 && i < arcFile.Tables().Count -> Some(arcFile.Tables().[i])
+        | _ -> None
+
+type ArcFileEditorHeaderProps = {
+    arcFile: ArcFiles
+    activeView: ActiveView
+}
