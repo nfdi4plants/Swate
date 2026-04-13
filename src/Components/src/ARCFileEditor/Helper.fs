@@ -11,7 +11,7 @@ let createNewTableName (tables: ResizeArray<ArcTable>) =
     let existingNames = tables |> Seq.map _.Name
 
     let rec loop index =
-        let name = NewTablePrefix + string index
+        let name = $"{NewTablePrefix} {index}"
 
         if Seq.contains name existingNames then
             loop (index + 1)

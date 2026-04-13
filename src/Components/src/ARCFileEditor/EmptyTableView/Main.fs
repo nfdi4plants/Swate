@@ -14,72 +14,6 @@ type private ModalState =
     | Templates
     | PreviousTableSelect
 
-module private MainHelpers =
-
-    let tryGetActiveTable (arcFile: ArcFiles) (activeTableIndex: int option) =
-        arcFile.TryGetActiveTable(activeTableIndex)
-
-    let createMinimalTable (arcFile: ArcFiles) (activeTableIndex: int option) (setArcFile: ArcFiles -> unit) =
-        match tryGetActiveTable arcFile activeTableIndex with
-        | Some(_, activeTable) ->
-            let inputHeader = CompositeHeader.Input IOType.Sample
-            let parameterHeader = CompositeHeader.ProtocolUri
-            let outputHeader = CompositeHeader.Output IOType.Sample
-
-            let newColumns = [|
-                CompositeColumn.create inputHeader
-                CompositeColumn.create parameterHeader
-                CompositeColumn.create outputHeader
-            |]
-
-            activeTable.AddColumns(newColumns)
-            activeTable.AddRowsEmpty(3)
-            setArcFile (WidgetArcFile.refreshRef arcFile)
-        | None -> ()
-
-    let getOutputTables (arcFile: ArcFiles) =
-        arcFile.Tables()
-        |> Seq.filter (fun table -> table.TryGetOutputColumn().IsSome)
-        |> Seq.toArray
-
-    let tryCreatePreviewColumn (table: ArcTable) =
-        match table.TryGetOutputColumn() with
-        | Some outputColumn ->
-            match outputColumn.Header.TryIOType() with
-            | Some ioType ->
-                let header = CompositeHeader.Input ioType
-                Some(CompositeColumn.create (header, outputColumn.Cells))
-            | None -> None
-        | None -> None
-
-    let importSelectedPreviousOutput
-        (arcFile: ArcFiles)
-        (activeTableIndex: int option)
-        (selectedTable: ArcTable option)
-        (setArcFile: ArcFiles -> unit)
-        =
-        match tryGetActiveTable arcFile activeTableIndex, selectedTable with
-        | Some(activeIndex, activeTable), Some sourceTable ->
-            match sourceTable.TryGetOutputColumn() with
-            | Some outputColumn ->
-                match outputColumn.Header.TryIOType() with
-                | Some ioType ->
-                    let newInputHeader = CompositeHeader.Input ioType
-                    let newInputColumn = CompositeColumn.create (newInputHeader, outputColumn.Cells)
-                    let newTable = ArcTable.init activeTable.Name
-                    newTable.AddColumn(newInputColumn.Header, newInputColumn.Cells)
-
-                    let tables = arcFile.Tables()
-                    tables.[activeIndex] <- newTable
-
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
-                | None -> ()
-            | None -> ()
-        | _ -> ()
-
-    let previewCells (cells: seq<CompositeCell>) =
-        cells |> Seq.truncate 10 |> Seq.map string |> Seq.toArray
-
 [<Erase; Mangle(false)>]
 type Main =
 
@@ -114,9 +48,9 @@ type Main =
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, setView: ModalState -> unit)
         =
         let hasActiveTable =
-            MainHelpers.tryGetActiveTable arcFile activeTableIndex |> Option.isSome
+            Helper.tryGetActiveTable arcFile activeTableIndex |> Option.isSome
 
-        let hasOutputTables = MainHelpers.getOutputTables arcFile |> Array.isEmpty |> not
+        let hasOutputTables = Helper.getOutputTables arcFile |> Array.isEmpty |> not
 
         Html.div [
             prop.className "swt:flex swt:h-full swt:items-center swt:justify-center swt:overflow-auto"
@@ -139,7 +73,7 @@ type Main =
                             Icons.BasicTable(),
                             "Create basic table!",
                             "Create a table with columns: Input, Protocol, Output.",
-                            (fun _ -> MainHelpers.createMinimalTable arcFile activeTableIndex setArcFile),
+                            (fun _ -> Helper.createMinimalTable arcFile activeTableIndex setArcFile),
                             not hasActiveTable
                         )
                         CardGrid.CardGridButton(
@@ -158,7 +92,7 @@ type Main =
     static member private PreviousTableSelectView
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
         =
-        let relevantTables = MainHelpers.getOutputTables arcFile
+        let relevantTables = Helper.getOutputTables arcFile
 
         let initialSelectedTableName =
             relevantTables |> Array.tryHead |> Option.map (fun table -> table.Name)
@@ -170,7 +104,7 @@ type Main =
             selectedTableName
             |> Option.bind (fun tableName -> relevantTables |> Array.tryFind (fun table -> table.Name = tableName))
 
-        let previewColumn = selectedTable |> Option.bind MainHelpers.tryCreatePreviewColumn
+        let previewColumn = selectedTable |> Option.bind Helper.tryCreatePreviewColumn
 
         let canImport =
             activeTableIndex.IsSome && selectedTable.IsSome && previewColumn.IsSome
@@ -243,7 +177,7 @@ type Main =
                                         ]
                                     ]
                                     Html.tbody [
-                                        let previewCells = MainHelpers.previewCells previewColumn.Cells
+                                        let previewCells = Helper.previewCells previewColumn.Cells
 
                                         if previewCells.Length = 0 then
                                             Html.tr [
@@ -277,7 +211,8 @@ type Main =
                     prop.text "Import selected output column"
                     prop.disabled (not canImport)
                     prop.onClick (fun _ ->
-                        MainHelpers.importSelectedPreviousOutput arcFile activeTableIndex selectedTable setArcFile
+                        Helper.importSelectedPreviousOutput arcFile activeTableIndex selectedTable setArcFile
+                        |> ignore
                     )
                 ]
             ]

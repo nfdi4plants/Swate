@@ -11,7 +11,7 @@ let createMinimalTable (arcFile: ArcFiles) (activeTableIndex: int option) (setAr
     match tryGetActiveTable arcFile activeTableIndex with
     | Some(_, activeTable) ->
         let newColumns = [|
-            CompositeColumn.create (CompositeHeader.Input IOType.Sample)
+            CompositeColumn.create (CompositeHeader.Input IOType.Source)
             CompositeColumn.create CompositeHeader.ProtocolUri
             CompositeColumn.create (CompositeHeader.Output IOType.Sample)
         |]
