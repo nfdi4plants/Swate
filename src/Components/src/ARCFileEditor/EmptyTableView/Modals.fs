@@ -118,7 +118,7 @@ type Modals =
                     setImportType,
                     templateServices
                 ),
-            className = "swt:max-w-[95vw]"
+            className = "swt:flex swt:min-w-fit"
         )
 
     [<ReactComponent>]
