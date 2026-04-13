@@ -16,6 +16,7 @@ open Renderer.Context.GitWorkflow
 type GitStateController = {
     state: GitState
     refresh: unit -> unit
+    initRepository: string option -> unit
     fetch: unit -> unit
     pull: unit -> unit
     push: unit -> unit
@@ -57,10 +58,17 @@ let private dependencies: GitDependencies = {
             let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
             return mapMergeConflictPageResult requestedPath result
         }
+    initGitRepository = Renderer.GitApiClient.gitInitRepository
+    createDataHubProject =
+        fun projectName -> promise {
+            let! result = Api.ipcGitLabApi.createProject (unbox null) projectName
+            return result |> Result.mapError _.GitLabErrorToString
+        }
     installGitLfs = Renderer.GitApiClient.installGitLfs
     gitFetch = Renderer.GitApiClient.gitFetch
     gitPull = Renderer.GitApiClient.gitPull
     gitPush = Renderer.GitApiClient.gitPush
+    gitAddRemote = Renderer.GitApiClient.gitAddRemote
     gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
     createBranch = Renderer.GitApiClient.createBranch
     checkoutBranch = Renderer.GitApiClient.checkoutBranch
@@ -77,6 +85,7 @@ let GitStateCtx =
         {
             state = GitState.Empty
             refresh = fun () -> ()
+            initRepository = fun _ -> ()
             fetch = fun () -> ()
             pull = fun () -> ()
             push = fun () -> ()
@@ -106,6 +115,9 @@ let GitStateCtxProvider (children: ReactElement) =
         React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
 
     let refresh () = dispatch RefreshRequested
+
+    let initRepository remoteProjectName =
+        dispatch (InitRepositoryRequested remoteProjectName)
 
     let fetch () = dispatch FetchRequested
 
@@ -148,6 +160,7 @@ let GitStateCtxProvider (children: ReactElement) =
             (fun _ -> {
                 state = gitState
                 refresh = refresh
+                initRepository = initRepository
                 fetch = fetch
                 pull = pull
                 push = push

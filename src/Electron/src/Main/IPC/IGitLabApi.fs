@@ -109,4 +109,10 @@ let api: IGitLabApi = {
                         sort = query.Sort
                     )
         }
+    createProject =
+        fun (_event: IpcMainEvent) (projectName: string) -> promise {
+            match tryGetActiveGitLabContext () with
+            | Error err -> return Error err
+            | Ok(baseUrl, token) -> return! GitLabApi.CreateProject(baseUrl, token, projectName)
+        }
 }

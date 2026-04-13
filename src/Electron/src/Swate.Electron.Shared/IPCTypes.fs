@@ -69,6 +69,7 @@ type IGitApi = {
     gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitInitRepository: IpcMainEvent -> string -> JS.Promise<Result<GitOperationResult, exn>>
+    gitAddRemote: IpcMainEvent -> GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitCloneRepository: IpcMainEvent -> GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitStagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitUnstagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
@@ -90,6 +91,7 @@ type IGitLabApi = {
         IpcMainEvent -> ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
     loadOrganisationRepos:
         IpcMainEvent -> ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    createProject: IpcMainEvent -> string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
 }
 
 /// One Way Bridge: Main -> Renderer

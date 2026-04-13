@@ -4,6 +4,9 @@ open Fable.Core
 open Browser.Types
 open Feliz
 
+// TanStack's measureElement is a React callback ref, not an IRefValue object.
+type VirtualMeasureElementRef = Element option -> unit
+
 module Virtual =
 
     [<Literal>]
@@ -41,7 +44,7 @@ module Virtual =
         member this.scrollToIndex (index: int, ?options: {|align: AlignOption option; behavior: ScrollBehavior option|}) : unit = jsNative
         member this.scrollRect: {|height: int; width: int|} = jsNative
         member this.scrollOffset: int = jsNative
-        member this.measureElement: IRefValue<Browser.Types.HTMLElement option> = jsNative
+        member this.measureElement: VirtualMeasureElementRef = jsNative
 
 [<Erase>]
 type Virtual =

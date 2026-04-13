@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, fireEvent, userEvent, within } from "storybook/test";
 import { Main as GitSidebarComponent } from "./GitSidebar.fs.js";
 import {
   FSharpResult$2_Ok,
@@ -122,6 +122,14 @@ const conflictedFiles = [
   },
 ] as const;
 
+const largeChangedFiles = Array.from({ length: 400 }, (_, index) => ({
+  Path: `src/file-${String(index).padStart(3, "0")}.txt`,
+  OriginalPath: undefined,
+  IndexStatus: "M",
+  WorkingTreeStatus: " ",
+  IsConflicted: false,
+}));
+
 function StatefulSidebar(
   props: React.ComponentProps<typeof GitSidebarComponent>,
 ) {
@@ -204,6 +212,9 @@ export const ChangedFiles: Story = {
     await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent(
       "Renamed from notes/protocol-draft.md",
     );
+    await expect(
+      canvas.getByTestId("GitSidebarChangedFilesVirtualContent"),
+    ).toBeInTheDocument();
   },
 };
 
@@ -235,7 +246,12 @@ export const ConflictsPresent: Story = {
       ...baseStatus,
       IsMergeInProgress: true,
     },
-    changedFiles: conflictedFiles.slice(),
+    changedFiles: [
+      conflictedFiles[3],
+      conflictedFiles[0],
+      conflictedFiles[1],
+      conflictedFiles[2],
+    ],
     branchOptions: branchOptions.slice(),
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
@@ -246,7 +262,64 @@ export const ConflictsPresent: Story = {
     await expect(canvas.getByTestId("GitSidebarMergeBanner")).toHaveTextContent(
       "Resolve all conflicted files before pushing.",
     );
+    await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
     await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Conflict");
+  },
+};
+
+export const LargeChangedSet: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: largeChangedFiles,
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("400 files");
+    await expect(
+      canvas.getByTestId("GitSidebarChangedFilesVirtualContent"),
+    ).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("GitSidebarChangeRow-399")).toBeNull();
+    const scrollContainer = canvas.getByTestId(
+      "GitSidebarChangedFilesScrollContainer",
+    ) as HTMLElement;
+    const maxScrollTop =
+      scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    scrollContainer.scrollTop = maxScrollTop;
+    await fireEvent.scroll(scrollContainer, {
+      target: { scrollTop: maxScrollTop },
+    });
+    await expect(
+      await canvas.findByTestId("GitSidebarChangeRow-399"),
+    ).toBeInTheDocument();
+  },
+};
+
+export const DeletedFile: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: [
+      {
+        Path: "obsolete.md",
+        OriginalPath: undefined,
+        IndexStatus: "D",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+    ],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Deleted");
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("git: D.");
   },
 };
 
@@ -356,6 +429,29 @@ export const CommitComposer: Story = {
     );
     await userEvent.click(canvas.getByTestId("GitSidebarCommitSelectionButton"));
     await expect(canvas.getByTestId("GitSidebarCommitMessageInput")).toHaveValue("");
+  },
+};
+
+export const RemoteActionsDisabled: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+    remoteActionsEnabled: false,
+    remoteActionsWarning:
+      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarSyncButton")).toBeDisabled();
+    await expect(
+      canvas.getByTestId("GitSidebarRemoteAuthWarning"),
+    ).toHaveTextContent(
+      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+    );
   },
 };
 

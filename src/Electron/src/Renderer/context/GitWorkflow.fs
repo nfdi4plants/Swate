@@ -5,6 +5,7 @@ open Elmish
 open Fable.Core
 
 open Renderer.Types
+open Swate.Components.Api.GitLabApi
 open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.GitTypes
@@ -17,6 +18,7 @@ type GitRefreshState =
 [<RequireQualifiedAccess>]
 type GitBusyOperation =
     | Refreshing
+    | InitializingRepository
     | FetchingFromRemote
     | PullingFromRemote
     | PushingToRemote
@@ -29,6 +31,11 @@ type GitBusyOperation =
     | SwitchingBranch
     | InstallingGitLfs
     | ConfirmingMergeResolution of path: string
+
+[<RequireQualifiedAccess>]
+type GitRepositoryAvailability =
+    | Ready
+    | MissingRepository
 
 [<RequireQualifiedAccess>]
 type GitInstallRetryState =
@@ -48,12 +55,15 @@ type GitPullWorkflowResult = {
     PageChange: GitPageChange
 }
 
+type InitRepositoryOutcome = { WarningMessage: string option }
+
 type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
     BranchOptions: GitSidebarBranchOption[]
     LfsAutoTrackThresholdMb: int
     DownloadLargeFiles: bool
+    RepositoryAvailability: GitRepositoryAvailability
     RefreshState: GitRefreshState
     RefreshRequestId: int
     BusyOperation: GitBusyOperation option
@@ -61,6 +71,7 @@ type GitState = {
     CurrentProgress: GitSidebarProgress option
     ErrorNotice: string option
     WarningNotice: string option
+    PendingRefreshWarningNotice: string option
     SelectedChangePath: string option
     MergeResolutionPendingPath: string option
     InstallRetryState: GitInstallRetryState
@@ -82,6 +93,7 @@ type GitState = {
         BranchOptions = [||]
         LfsAutoTrackThresholdMb = 1
         DownloadLargeFiles = false
+        RepositoryAvailability = GitRepositoryAvailability.Ready
         RefreshState = GitRefreshState.Idle
         RefreshRequestId = 0
         BusyOperation = None
@@ -89,6 +101,7 @@ type GitState = {
         CurrentProgress = None
         ErrorNotice = None
         WarningNotice = None
+        PendingRefreshWarningNotice = None
         SelectedChangePath = None
         MergeResolutionPendingPath = None
         InstallRetryState = GitInstallRetryState.Idle
@@ -148,6 +161,8 @@ type Msg =
     | ArcPathChanged of ArcRootPath
     | RefreshRequested
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
+    | InitRepositoryRequested of remoteProjectName: string option
+    | InitRepositoryCompleted of sessionId: int * result: Result<InitRepositoryOutcome, string>
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
     | SelectChangeCompleted of
         requestId: int *
@@ -178,10 +193,13 @@ type GitDependencies = {
     getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, string>>
     loadDiffPage: string -> JS.Promise<Result<PageState, string>>
     loadMergeConflictPage: string -> JS.Promise<Result<PageState, string>>
+    initGitRepository: string -> JS.Promise<Result<string, string>>
+    createDataHubProject: string -> JS.Promise<Result<ExploreProjectDto, string>>
     installGitLfs: unit -> JS.Promise<Result<GitOperationResult, string>>
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+    gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -202,6 +220,9 @@ let staleMergeConflictTokens = [|
 let staleArcSessionMessage =
     "Git operation was canceled because the active ARC changed."
 
+let private isMissingRepositoryMessage (message: string) =
+    message.ToLowerInvariant().Contains("not a git repository")
+
 let isStaleMergeConflictError (message: string) =
     let normalizedMessage = message.ToLowerInvariant()
 
@@ -211,6 +232,7 @@ let isStaleMergeConflictError (message: string) =
 let busyNoticeFromOperation =
     function
     | GitBusyOperation.Refreshing -> Some "Refreshing Git state"
+    | GitBusyOperation.InitializingRepository -> Some "Initializing repository"
     | GitBusyOperation.FetchingFromRemote -> Some "Fetching from remote"
     | GitBusyOperation.PullingFromRemote -> Some "Pulling from remote"
     | GitBusyOperation.PushingToRemote -> Some "Pushing to remote"
@@ -341,8 +363,11 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
 
     {
         modelWithSettings with
+            RepositoryAvailability = GitRepositoryAvailability.Ready
             RefreshState = GitRefreshState.Idle
             ErrorNotice = refreshErrorMessage refreshResult
+            WarningNotice = model.PendingRefreshWarningNotice
+            PendingRefreshWarningNotice = None
     }
 
 let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
@@ -419,6 +444,51 @@ let private refreshAllAsync (deps: GitDependencies) = promise {
         LfsSettings = lfsSettingsResult
     }
 }
+
+let private runInitRepositoryAsync
+    (deps: GitDependencies)
+    (arcPath: string)
+    (remoteProjectName: string option)
+    =
+    promise {
+        let! initResult = deps.initGitRepository arcPath
+
+        match initResult with
+        | Error message -> return Error message
+        | Ok _ ->
+            match remoteProjectName |> Option.map _.Trim() |> Option.filter (String.IsNullOrWhiteSpace >> not) with
+            | None -> return Ok { WarningMessage = None }
+            | Some projectName ->
+                let! projectResult = deps.createDataHubProject projectName
+
+                match projectResult with
+                | Error message ->
+                    return
+                        Ok {
+                            WarningMessage = Some message
+                        }
+                | Ok project ->
+                    let! addRemoteResult =
+                        deps.gitAddRemote {
+                            RemoteName = "origin"
+                            RemoteUrl = project.http_url_to_repo
+                        }
+
+                    match addRemoteResult with
+                    | Error message ->
+                        return
+                            Ok {
+                                WarningMessage = Some message
+                            }
+                    | Ok operationResult when operationResult.Success ->
+                        return Ok { WarningMessage = None }
+                    | Ok operationResult ->
+                        return
+                            Ok {
+                                WarningMessage =
+                                    Some(operationResult.Message |> Option.defaultValue "Adding origin remote failed.")
+                            }
+    }
 
 let private loadPageAsync (deps: GitDependencies) (path: string) (isConflicted: bool) = promise {
     let! result =
@@ -730,6 +800,26 @@ let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (reque
 
 let init () : GitState * Cmd<Msg> = GitState.Empty, Cmd.none
 
+let private missingRepositoryModel (model: GitState) = {
+    model with
+        Status = GitState.Empty.Status
+        ChangedFiles = [||]
+        BranchOptions = [||]
+        LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
+        DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
+        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
+        RefreshState = GitRefreshState.Idle
+        BusyOperation = None
+        BusyNotice = None
+        CurrentProgress = None
+        ErrorNotice = None
+        WarningNotice = None
+        PendingRefreshWarningNotice = None
+        SelectedChangePath = None
+        MergeResolutionPendingPath = None
+        InstallRetryState = GitInstallRetryState.Idle
+}
+
 let update
     (deps: GitDependencies)
     (setPageState: PageState option -> unit)
@@ -779,7 +869,10 @@ let update
             |> fun state -> {
                 state with
                     ErrorNotice = None
-                    WarningNotice = None
+                    WarningNotice =
+                        match state.PendingRefreshWarningNotice with
+                        | Some _ -> state.WarningNotice
+                        | None -> None
             }
 
         let cmd =
@@ -791,6 +884,8 @@ let update
 
         nextModel, cmd
     | RefreshCompleted(requestId, _) when requestId <> model.RefreshRequestId -> model, Cmd.none
+    | RefreshCompleted(_, Error message) when isMissingRepositoryMessage message ->
+        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
     | RefreshCompleted(_, Error message) ->
         let nextModel = {
             model with
@@ -800,9 +895,13 @@ let update
                 CurrentProgress = None
                 ErrorNotice = Some message
                 WarningNotice = None
+                PendingRefreshWarningNotice = None
         }
 
         nextModel, applyPageChangeCmd setPageState GitPageChange.Clear
+    | RefreshCompleted(_, Ok refreshResult)
+        when refreshErrorMessage refreshResult |> Option.exists isMissingRepositoryMessage ->
+        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
     | RefreshCompleted(requestId, Ok refreshResult) ->
         let nextModel =
             model
@@ -823,6 +922,51 @@ let update
                 Cmd.none
 
         nextModel, cmd
+    | InitRepositoryRequested _ when model.CurrentArcPath.IsNone -> model, Cmd.none
+    | InitRepositoryRequested remoteProjectName ->
+        let nextModel =
+            model
+            |> withBusyOperation (Some GitBusyOperation.InitializingRepository)
+            |> fun state -> {
+                state with
+                    ErrorNotice = None
+                    WarningNotice = None
+            }
+
+        let cmd =
+            Cmd.OfPromise.either
+                (fun (deps, arcPath, remoteProjectName) -> runInitRepositoryAsync deps arcPath remoteProjectName)
+                (deps, Option.get model.CurrentArcPath, remoteProjectName)
+                (fun result -> InitRepositoryCompleted(model.ArcSessionId, result))
+                (fun err -> InitRepositoryCompleted(model.ArcSessionId, Error(string err)))
+
+        nextModel, cmd
+    | InitRepositoryCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
+    | InitRepositoryCompleted(_, Error message) ->
+        let nextModel = {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = Some message
+                WarningNotice = None
+                PendingRefreshWarningNotice = None
+        }
+
+        nextModel, Cmd.none
+    | InitRepositoryCompleted(_, Ok outcome) ->
+        let nextModel = {
+            model with
+                RepositoryAvailability = GitRepositoryAvailability.Ready
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+                WarningNotice = outcome.WarningMessage
+                PendingRefreshWarningNotice = outcome.WarningMessage
+        }
+
+        nextModel, Cmd.ofMsg RefreshRequested
     | SelectChangeRequested(_, reply) when model.CurrentArcPath.IsNone ->
         model, resolveReplyCmd reply (Error "No ARC is loaded.")
     | SelectChangeRequested(change, reply) ->
