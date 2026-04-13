@@ -154,7 +154,7 @@ type private ChangedFileRowProps = {
     ToggleCommitSelection: string -> unit
     OpenChange: GitSidebarChange -> unit
     VirtualStart: int
-    MeasureElement: IRefValue<HTMLElement option>
+    MeasureElementRef: VirtualMeasureElementRef
 }
 
 type private ChangedFileVirtualItem = {
@@ -791,7 +791,7 @@ type GitSidebar =
         Html.button [
             prop.testId $"GitSidebarChangeRow-{props.Index}"
             prop.custom ("data-index", props.Index)
-            prop.ref props.MeasureElement
+            prop.ref (fun element -> props.MeasureElementRef (Option.ofObj element))
             prop.disabled props.IsBusy
             prop.className [
                 "swt:absolute swt:left-0 swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors"
@@ -947,7 +947,7 @@ type GitSidebar =
                                                     ToggleCommitSelection = props.ToggleCommitSelection
                                                     OpenChange = props.OpenChange
                                                     VirtualStart = virtualItem.Start
-                                                    MeasureElement = changedFileListVirtualizer.measureElement
+                                                    MeasureElementRef = changedFileListVirtualizer.measureElement
                                                 }
                                             )
                                         ]
