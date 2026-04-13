@@ -58,16 +58,16 @@ let NotesDraftTarget () =
                     match previewResult with
                     | Ok previewData ->
                         previewData
-                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedPreview
+                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                        |> Renderer.Components.ARCHelper.applyLoadedView
                             pageStateCtx.setState
                             arcObjectCtx.setArcFileState
                             arcObjectCtx.setPreviewState
                             arcObjectCtx.setStatusMessage
                     | Result.Error _ ->
                         FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
-                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedPreview
+                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                        |> Renderer.Components.ARCHelper.applyLoadedView
                             pageStateCtx.setState
                             arcObjectCtx.setArcFileState
                             arcObjectCtx.setPreviewState

@@ -2,12 +2,12 @@ module Renderer.Components.ARCHelper
 
 open System
 open Feliz
-open Renderer.Types
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
+
 
 [<Hook>]
 let useCurrentArcScopeId () =
@@ -22,13 +22,13 @@ let useCurrentArcScopeId () =
             Some path
     )
 
-type PreviewLoadResult = {
+type ViewLoadResult = {
     RendererPageState: Renderer.Types.PageState
     ArcFileState: ArcFiles option
     PreviewState: Swate.Components.Shared.PageState option
 }
 
-let private previewStateOfRendererPageState =
+let private stateOfRendererPageState =
     function
     | Renderer.Types.PageState.ArcFilePage arcFile -> Some(Swate.Components.Shared.PageState.ArcFilePage arcFile)
     | Renderer.Types.PageState.TextPage content -> Some(Swate.Components.Shared.PageState.TextPage content)
@@ -42,21 +42,21 @@ let private previewStateOfRendererPageState =
     | Renderer.Types.PageState.GitUnsupportedPage _
     | Renderer.Types.PageState.DataHubBrowser -> None
 
-let previewLoadResultOfDto (data: FileContentDTO) =
+let viewLoadResultOfDto (data: FileContentDTO) =
     let pageState = Renderer.Types.PageState.fromFileContentDTO data
 
     {
         RendererPageState = pageState
         ArcFileState = FileContentDTO.toArcFile data
-        PreviewState = previewStateOfRendererPageState pageState
+        PreviewState = stateOfRendererPageState pageState
     }
 
-let applyLoadedPreview
+let applyLoadedView
     (setPageState: Renderer.Types.PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
     (setPreviewState: Swate.Components.Shared.PageState option -> unit)
     (setStatusMessage: string option -> unit)
-    (loaded: PreviewLoadResult)
+    (loaded: ViewLoadResult)
     =
     setPageState (Some loaded.RendererPageState)
     setArcFileState loaded.ArcFileState
@@ -72,7 +72,7 @@ let clearArcObjectPreview
     setPreviewState None
     setStatusMessage None
 
-let applyPreviewError
+let applyViewError
     (setPageState: Renderer.Types.PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
     (setPreviewState: Swate.Components.Shared.PageState option -> unit)
@@ -101,16 +101,16 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
         | Error exn -> Error exn.Message
 }
 
-let private loadPreviewResult (previewPath: string) = promise {
+let private loadViewResult (previewPath: string) = promise {
     let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
 
     return
         match result with
-        | Ok data -> Ok(previewLoadResultOfDto data)
+        | Ok data -> Ok(viewLoadResultOfDto data)
         | Error exn -> Error exn.Message
 }
 
-let openPreview (path: string) = promise {
+let openView (path: string) = promise {
     let previewPath = resolveArcPreviewPath path
 
     if previewPath <> normalizePath path then
@@ -118,7 +118,7 @@ let openPreview (path: string) = promise {
     else
         console.log ($"[Renderer] Opening file: {previewPath}")
 
-    return! loadPreviewResult previewPath
+    return! loadViewResult previewPath
 }
 
 let createArcExplorerServices
@@ -133,14 +133,14 @@ let createArcExplorerServices
     {
         openView =
             fun previewPath -> promise {
-                let! result = loadPreviewResult previewPath
+                let! result = loadViewResult previewPath
 
                 match result with
                 | Ok loaded ->
-                    applyLoadedPreview setPageState setArcFileState setPreviewState setStatusMessage loaded
+                    applyLoadedView setPageState setArcFileState setPreviewState setStatusMessage loaded
                     return Ok()
                 | Error errorMessage ->
-                    applyPreviewError setPageState setArcFileState setPreviewState setStatusMessage errorMessage
+                    applyViewError setPageState setArcFileState setPreviewState setStatusMessage errorMessage
                     return Error errorMessage
             }
         setStatusMessage = setStatusMessage

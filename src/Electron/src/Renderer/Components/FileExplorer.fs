@@ -97,13 +97,13 @@ let FileTree () =
                     let selectedPath = normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    let! result = Renderer.Components.ARCHelper.openPreview selectedPath
+                    let! result = Renderer.Components.ARCHelper.openView selectedPath
 
                     match result with
                     | Ok loaded ->
                         console.log ("[Renderer] Received data, processing...")
 
-                        Renderer.Components.ARCHelper.applyLoadedPreview
+                        Renderer.Components.ARCHelper.applyLoadedView
                             pageStateCtx.setState
                             arcObjectCtx.setArcFileState
                             arcObjectCtx.setPreviewState
@@ -113,7 +113,7 @@ let FileTree () =
                         let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
                         console.log ($"[Renderer] Error: {fullErrorMessage}")
 
-                        Renderer.Components.ARCHelper.applyPreviewError
+                        Renderer.Components.ARCHelper.applyViewError
                             pageStateCtx.setState
                             arcObjectCtx.setArcFileState
                             arcObjectCtx.setPreviewState
