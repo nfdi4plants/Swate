@@ -2,6 +2,7 @@ module Renderer.Components.WidgetRegistry
 
 open Feliz
 open Swate.Components
+open Swate.Components.ArcFileEditor.Types
 open Swate.Components.Shared
 open Swate.Components.Widgets.Contexts
 open ARCtrl
@@ -38,6 +39,11 @@ let createTemplateServices () = {
 }
 
 let templateServices = createTemplateServices ()
+
+let arcFileEditorWidgetServices: ArcFileEditorWidgetServices = {
+    filePickerServices = filePickerServices
+    dataAnnotatorServices = dataAnnotatorServices
+}
 
 let BuildingBlockWidget
     (arcFileState: ArcFiles)
