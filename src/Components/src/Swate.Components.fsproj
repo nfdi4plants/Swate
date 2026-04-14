@@ -153,6 +153,7 @@
     <Compile Include="DataMapTable\DataMapTable.fs" />
     <Compile Include="Widgets\LocalStorage.fs" />
     <Compile Include="Widgets\Contexts.fs" />
+    <Compile Include="Widgets\LegacyContextCompat.fs" />
     <Compile Include="Widgets\Widgets.fs" />
     <Compile Include="Widgets\WidgetSupport.fs" />
     <Compile Include="Widgets\BuildingBlockWidget.fs" />
