@@ -96,7 +96,10 @@ module private FileExplorerHelper =
             assay.InitTable($"{identifier} Table") |> ignore
             ArcFiles.Assay assay
         | ArcCreateKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow
-        | ArcCreateKind.Run -> ArcRun.init identifier |> ArcFiles.Run
+        | ArcCreateKind.Run ->
+            let run = ArcRun.init identifier
+            run.InitTable($"{identifier} Table") |> ignore
+            ArcFiles.Run run
 
 open FileExplorerHelper
 
@@ -299,7 +302,9 @@ let FileTree () =
 
                         let alreadyExists =
                             fileStateCtx.state.FileTree
-                            |> Array.exists (fun entry -> normalizePath entry.path = requestedPath)
+                            |> Array.exists (fun entry ->
+                                PathHelpers.pathsEqual (normalizePath entry.path) requestedPath
+                            )
 
                         if alreadyExists then
                             applyCreateError $"{label} '{identifier}' already exists."
@@ -334,6 +339,7 @@ let FileTree () =
         let arcCreateContextMenuItems (item: FileItem) =
             if item.IsDirectory then
                 arcCreateKinds
+                |> List.sortBy arcCreateKindLabel
                 |> List.map (fun kind -> {
                     Label = $"Add {arcCreateKindLabel kind}"
                     Icon = arcCreateKindIcon kind
