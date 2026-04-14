@@ -277,7 +277,7 @@ let FileTree () =
             setPendingCreateKind (Some kind)
 
         let applyCreateError errorMessage =
-            Renderer.Components.ARCHelper.applyPreviewError
+            Renderer.Components.ARCHelper.applyViewError
                 pageStateCtx.setState
                 arcObjectCtx.setArcFileState
                 arcObjectCtx.setPreviewState
@@ -316,8 +316,8 @@ let FileTree () =
                                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                                     loadedFile
-                                    |> Renderer.Components.ARCHelper.previewLoadResultOfDto
-                                    |> Renderer.Components.ARCHelper.applyLoadedPreview
+                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                    |> Renderer.Components.ARCHelper.applyLoadedView
                                         pageStateCtx.setState
                                         arcObjectCtx.setArcFileState
                                         arcObjectCtx.setPreviewState
