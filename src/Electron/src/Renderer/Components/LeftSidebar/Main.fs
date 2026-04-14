@@ -7,10 +7,17 @@ open Renderer.Types
 [<ReactComponent>]
 let Main (leftSidebarTarget: LeftSidebarPage) =
     Html.div [
-        // GitSidebar's virtualized changed-file list owns its own scroll viewport.
-        // Give only that target a bounded, box-border host; keep other sidebars
-        // content-sized so Layout.SidebarArea remains their scroll container.
-        prop.className (Renderer.Components.LeftSidebar.MainStyles.wrapperClassName leftSidebarTarget)
+        prop.className [
+            "swt:box-border"
+            "swt:flex"
+            "swt:h-full"
+            "swt:min-h-0"
+            "swt:min-w-0"
+            "swt:max-w-full"
+            "swt:flex-col"
+            "swt:overflow-hidden"
+            "swt:p-4"
+        ]
         prop.children [|
             match leftSidebarTarget with
             | LeftSidebarPage.FileExplorer -> FileExplorerSidebar.Main()
