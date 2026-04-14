@@ -7,15 +7,10 @@ open Renderer.Types
 [<ReactComponent>]
 let Main (leftSidebarTarget: LeftSidebarPage) =
     Html.div [
-        prop.className [
-            "swt:p-4"
-            // The Git sidebar uses @tanstack/react-virtual for the changed-file list.
-            // The virtualizer needs its scroll container to have a bounded height, which
-            // requires CSS `height: 100%` on every ancestor between the fixed-height
-            // Layout.SidebarPanel and the GitSidebar's flex column. Without this, the
-            // scroll container never overflows and the virtualizer renders every item.
-            if leftSidebarTarget = LeftSidebarPage.Git then "swt:h-full"
-        ]
+        // GitSidebar's virtualized changed-file list owns its own scroll viewport.
+        // Give only that target a bounded, box-border host; keep other sidebars
+        // content-sized so Layout.SidebarArea remains their scroll container.
+        prop.className (Renderer.Components.LeftSidebar.MainStyles.wrapperClassName leftSidebarTarget)
         prop.children [|
             match leftSidebarTarget with
             | LeftSidebarPage.FileExplorer -> FileExplorerSidebar.Main()

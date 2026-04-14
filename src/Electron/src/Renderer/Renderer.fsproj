@@ -25,6 +25,7 @@
     <Compile Include="Components\LeftSidebar\ExplorerSidebar.fs" />
     <Compile Include="Components\LeftSidebar\GitSidebarEmptyState.fs" />
     <Compile Include="Components\LeftSidebar\GitSidebarPanel.fs" />
+    <Compile Include="Components\LeftSidebar\MainStyles.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />
     <Compile Include="Components\MainElement.fs" />
     <Compile Include="Components\MainContent\Types.fs" />

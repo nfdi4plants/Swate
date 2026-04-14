@@ -1736,6 +1736,32 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "LeftSidebar.Main wrapper classes bound only the Git sidebar height for virtualization",
+            fun () -> promise {
+                let gitWrapperClasses =
+                    Renderer.Components.LeftSidebar.MainStyles.wrapperClassName LeftSidebarPage.Git
+                    |> Set.ofList
+
+                let fileExplorerWrapperClasses =
+                    Renderer.Components.LeftSidebar.MainStyles.wrapperClassName LeftSidebarPage.FileExplorer
+                    |> Set.ofList
+
+                Vitest.expect(Set.contains "swt:p-4" gitWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:box-border" gitWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:h-full" gitWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:min-h-0" gitWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:min-w-0" gitWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:max-w-full" gitWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:overflow-hidden" gitWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:w-full" gitWrapperClasses).toBe (false)
+
+                Vitest.expect(Set.contains "swt:p-4" fileExplorerWrapperClasses).toBe (true)
+                Vitest.expect(Set.contains "swt:h-full" fileExplorerWrapperClasses).toBe (false)
+                Vitest.expect(Set.contains "swt:overflow-hidden" fileExplorerWrapperClasses).toBe (false)
+            }
+        )
+
+        Vitest.test (
             "GitSidebar labels deleted files explicitly instead of showing only a generic Changed badge",
             fun () -> promise {
                 let! container, cleanup =
