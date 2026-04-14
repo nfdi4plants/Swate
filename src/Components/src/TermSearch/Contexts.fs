@@ -29,13 +29,12 @@ type TermSearchConfigCtx = {
         allChildrenSearchQueries = ResizeArray()
     }
 
-    static member TermSearchConfigCtx =
+module private StableContexts =
+
+    let TermSearchConfigCtx =
         React.createContext<TermSearchConfigCtx> (TermSearchConfigCtx.init ())
 
-    [<Hook>]
-    static member useTermSearchConfigCtx () = React.useContext TermSearchConfigCtx.TermSearchConfigCtx
-
-    static member TermSearchActiveKeysCtx =
+    let TermSearchActiveKeysCtx =
         React.createContext<StateContext<TermSearchConfigLocalStorageActiveKeysCtx>> (
             {
                 state = TermSearchConfigLocalStorageActiveKeysCtx.init ()
@@ -43,10 +42,23 @@ type TermSearchConfigCtx = {
             }
         )
 
+    let TermSearchAllKeysCtx = React.createContext<Set<string>> (Set.empty)
+
+type TermSearchConfigCtx with
+
+    static member TermSearchConfigCtx =
+        StableContexts.TermSearchConfigCtx
+
+    [<Hook>]
+    static member useTermSearchConfigCtx () = React.useContext TermSearchConfigCtx.TermSearchConfigCtx
+
+    static member TermSearchActiveKeysCtx =
+        StableContexts.TermSearchActiveKeysCtx
+
     [<Hook>]
     static member useTermSearchActiveKeysCtx () = React.useContext TermSearchConfigCtx.TermSearchActiveKeysCtx
 
-    static member TermSearchAllKeysCtx = React.createContext<Set<string>> (Set.empty)
+    static member TermSearchAllKeysCtx = StableContexts.TermSearchAllKeysCtx
 
     [<Hook>]
     static member useTermSearchAllKeysCtx () = React.useContext TermSearchConfigCtx.TermSearchAllKeysCtx
