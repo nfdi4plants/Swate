@@ -5,6 +5,7 @@ open Browser.Types
 open WidgetsLocalStorage
 open Swate
 open Swate.Components
+open Swate.Components.Widgets.Contexts
 
 module InitExtensions =
 
@@ -118,15 +119,6 @@ module ResizeEventListener =
             FsReact.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize))
         )
 
-[<RequireQualifiedAccess>]
-[<StringEnum>]
-type WidgetType =
-    | BuildingBlock
-    | Template
-    | FilePicker
-    | DataAnnotator
-    | Playground
-
 type WidgetBlock =
     {
         prefix: string
@@ -135,39 +127,6 @@ type WidgetBlock =
 
     static member CreateWidgetBlock prefix content : WidgetBlock =
         { prefix = prefix; content = content }
-
-module WidgetContext =
-
-    type WidgetControllerContext = {
-        activeWidgets: WidgetType list
-        isActive: WidgetType -> bool
-        openWidget: WidgetType -> unit
-        closeWidget: WidgetType -> unit
-        toggleWidget: WidgetType -> unit
-        focusWidget: WidgetType -> unit
-    }
-
-    module WidgetControllerContext =
-
-        let init () = {
-            activeWidgets = []
-            isActive = fun _ -> false
-            openWidget = fun _ -> ()
-            closeWidget = fun _ -> ()
-            toggleWidget = fun _ -> ()
-            focusWidget = fun _ -> ()
-        }
-
-    let ActiveWidgetContext =
-        React.createContext<WidgetControllerContext> (WidgetControllerContext.init ())
-
-    [<Hook>]
-    let useWidgetController () = React.useContext ActiveWidgetContext
-
-type WidgetDefinition = {|
-    prefix: string
-    content: ReactElement
-|}
 
 [<RequireQualifiedAccess>]
 [<Erase; Mangle(false)>]
@@ -381,7 +340,7 @@ type Widget =
                     widgets @ [ widgetType ]
             )
 
-        let widgetContext: WidgetContext.WidgetControllerContext = {
+        let widgetContext: WidgetControllerContext = {
             activeWidgets = activeWidgets
             isActive = fun widgetType -> activeWidgets |> List.contains widgetType
             openWidget = openWidget
@@ -390,7 +349,7 @@ type Widget =
             focusWidget = focusWidget
         }
 
-        WidgetContext.ActiveWidgetContext.Provider(
+        ActiveWidgetContext.Provider(
             widgetContext,
             [
                 yield! children
@@ -413,7 +372,7 @@ type Widget =
     /// This component is only used for testing and development via playground
     [<ReactComponent>]
     static member private EntryControls(widgetTypes: WidgetType list) =
-        let context = WidgetContext.useWidgetController ()
+        let context = useWidgetController ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType
@@ -512,7 +471,7 @@ type Widget =
                             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-80"
                             prop.children [
                                 Html.h3 [ prop.className "swt:font-bold"; prop.text "Template POC" ]
-                                TermSearch.TermSearch(term, setTerm)
+                                TermSearch.TermSearch.Init(term, setTerm)
                                 Html.span [
                                     prop.className "swt:text-xs swt:opacity-70"
                                     prop.textf

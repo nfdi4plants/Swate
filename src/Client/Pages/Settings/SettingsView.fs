@@ -1,8 +1,6 @@
 namespace Pages
 
-open Fable
-open Fable.React
-open Fable.React.Props
+
 open Fable.Core.JsInterop
 
 open Model
@@ -10,14 +8,8 @@ open Messages
 
 open Feliz
 
+open Swate.Client.Theme.Context
 open Swate.Components
-open Swate.Components.ReactHelper
-
-open Browser.Dom
-
-open Fable
-open Feliz
-open Messages
 
 type Settings =
 
@@ -49,7 +41,7 @@ type Settings =
     [<ReactComponent>]
     static member ThemeToggle() =
 
-        let themeCtx = React.useContext ReactContext.ThemeCtx
+        let themeCtx = useThemeCtx ()
 
         let iconRef = React.useElementRef ()
 
@@ -180,7 +172,7 @@ type Settings =
         Components.Forms.Generic.BoxedField(
             "Term Search Configuration",
             content = [
-                Swate.Components.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer
+                Swate.Components.TermSearch.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer
             ]
         )
 

@@ -3,6 +3,7 @@ namespace Swate.Components
 open System
 open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -269,7 +270,7 @@ swt:p-0"""
                             else
                                 GridSelect.selectAt (index, e.shiftKey)
 
-            Contexts.Table.TableState(
+            TableState(
                 isActive = isActive,
                 isOrigin = isOrigin,
                 isSelected = isSelected,
@@ -278,7 +279,7 @@ swt:p-0"""
                 onClick = onClick
             )
 
-        Contexts.Table.TableStateCtx.Provider(
+        TableStateCtx.Provider(
             ctx,
             React.Fragment [
                 Html.div [
@@ -525,7 +526,7 @@ swt:p-0"""
 
     [<ReactComponent>]
     static member private EntryInactiveCell(index: CellCoordinate, data: string) =
-        let ctx = React.useContext (Contexts.Table.TableStateCtx)
+        let ctx = useTableStateCtx ()
 
         TableCell.InactiveCell(index, data |> Html.text)
 

@@ -2,6 +2,7 @@ namespace Swate.Components
 
 open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -51,7 +52,7 @@ type TableCell =
     [<ReactComponent>]
     static member InactiveCell(index: CellCoordinate, children: ReactElement, ?disableActivation: bool, ?debug) =
         let disableActivation = defaultArg disableActivation false
-        let ctx = React.useContext Contexts.Table.TableStateCtx
+        let ctx = useTableStateCtx ()
 
         let isSelected = ctx.isSelected index
 
@@ -89,7 +90,7 @@ type TableCell =
 
         React.useEffect ((fun _ -> setTempData data), [| box data |])
 
-        let ctx = React.useContext Contexts.Table.TableStateCtx
+        let ctx = useTableStateCtx ()
 
         let isCancelledRef = React.useRef (false)
         let isSetForced = React.useRef (false)
@@ -222,7 +223,7 @@ type TableCell =
 
         let TermSearch =
             fun (props: ActiveCellProps<Term option>) ->
-                TermSearch.TermSearch(
+                TermSearch.TermSearch.Init(
                     props.data,
                     props.setData,
                     ?parentId = parentId,

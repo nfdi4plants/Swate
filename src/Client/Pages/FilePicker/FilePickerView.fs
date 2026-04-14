@@ -8,6 +8,7 @@ open Messages
 open Feliz
 open Swate
 open Swate.Components
+open Swate.Components.AnnotationTable
 
 module FilePicker =
 
@@ -90,7 +91,7 @@ type FilePicker =
     static member ActionButtons (model: Model) dispatch =
 
         let ctx =
-            React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
+            AnnotationTableContext.useAnnotationTableCtx ()
 
         let selectedCells =
             ctx.state

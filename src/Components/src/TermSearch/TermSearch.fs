@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.TermSearch
 
 open Swate.Components.Shared
 open Swate.Components
@@ -762,7 +762,7 @@ type TermSearch =
     // [<ExportDefaultAttribute; NamedParams>]
     // #endif
     [<ReactComponent(true)>]
-    static member TermSearch
+    static member Init
         (
             term: Term option,
             onTermChange: Term option -> unit,
@@ -798,7 +798,7 @@ type TermSearch =
         let inputText = term |> Option.bind _.name |> Option.defaultValue ""
         let input, setInput = React.useState (inputText)
 
-        let termSearchConfigCtx = React.useContext (Contexts.TermSearch.TermSearchConfigCtx)
+        let termSearchConfigCtx = TermSearchConfigCtx.useTermSearchConfigCtx ()
 
         React.useLayoutEffect (
             (fun () -> term |> Option.bind _.name |> Option.defaultValue "" |> setInput),

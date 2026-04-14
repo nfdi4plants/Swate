@@ -1,32 +1,8 @@
 namespace Swate.Components
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
-
-type private SelectContext = {|
-    activeIndex: int option
-    selectedIndices: Set<int>
-    optionCount: int
-    getItemProps: obj -> obj
-    handleSelect: int option -> unit
-|}
-
-module private SelectHelper =
-
-    let SelectContext =
-        React.createContext (
-            {|
-                activeIndex = None
-                selectedIndex = None
-                getItemProps = fun () -> ()
-                handleSelect = fun _ -> ()
-            |}
-            |> unbox<SelectContext>
-        )
-
-    [<Literal>]
-    let SelectAllIndex = -1
+open Swate.Components.GenericComponents.Context
 
 [<Erase; Mangle(false)>]
 type Select =
@@ -63,7 +39,7 @@ type Select =
                     index: int
                     ref: IRefValue<option<Browser.Types.HTMLElement>>
                 |},
-            selectContext: SelectContext,
+            selectContext: SelectContextValue,
             toggleSelect: bool -> unit,
             children: ReactElement
         ) =
@@ -98,7 +74,7 @@ type Select =
 
     [<ReactComponent>]
     static member private SelectAll(setSelectIndices: Set<int> -> unit, key: string) =
-        let selectContext = React.useContext SelectHelper.SelectContext
+        let selectContext = useSelectCtx ()
         let listItem = FloatingUI.useListItem ()
         let allIndices: Set<int> = Set(List.init selectContext.optionCount id)
 
@@ -148,7 +124,7 @@ type Select =
 
         let index = key
 
-        let selectContext = React.useContext SelectHelper.SelectContext
+        let selectContext = useSelectCtx ()
         let listItem = FloatingUI.useListItem ()
 
         let isActive = selectContext.activeIndex = Some listItem.index
@@ -280,7 +256,7 @@ type Select =
         let interactions =
             FloatingUI.useInteractions ([| listNav; typeahead; click; dismiss; role |])
 
-        let selectContext: SelectContext =
+        let selectContext: SelectContextValue =
             React.useMemo (
                 (fun () -> {|
                     activeIndex = activeIndex
@@ -333,7 +309,7 @@ type Select =
                 yield! prop.spread <| interactions.getReferenceProps (null)
                 prop.children (TriggerRender {| isOpen = isOpen |})
             ]
-            SelectHelper.SelectContext.Provider(
+            SelectCtx.Provider(
                 selectContext,
                 React.Fragment [
                     if isOpen then

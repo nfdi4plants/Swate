@@ -282,33 +282,6 @@ type ParentSearchCall = (string * string) -> JS.Promise<ResizeArray<Term>>
 type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
 
 
-type TermSearchConfigLocalStorageActiveKeysCtx = {
-    disableDefault: bool
-    aktiveKeys: string[] //cannot use Set<_> with local storage
-} with
-
-    static member init(?defaultActive: Set<string>) = {
-        disableDefault = false
-        aktiveKeys = defaultActive |> Option.map Set.toArray |> Option.defaultValue [||]
-    }
-
-type TermSearchConfigCtx = {
-    hasProvider: bool
-    disableDefault: bool
-    termSearchQueries: ResizeArray<string * SearchCall>
-    parentSearchQueries: ResizeArray<string * ParentSearchCall>
-    allChildrenSearchQueries: ResizeArray<string * AllChildrenSearchCall>
-} with
-
-    static member init() = {
-        hasProvider = false
-        disableDefault = false
-        termSearchQueries = ResizeArray()
-        parentSearchQueries = ResizeArray()
-        allChildrenSearchQueries = ResizeArray()
-    }
-
-
 module AnnotationTableContextMenu =
 
     open ARCtrl

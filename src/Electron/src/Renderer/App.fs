@@ -171,7 +171,7 @@ let Main () =
                     ErrorModalProvider.ErrorModalProvider(
                         Renderer.Context.AuthStateCtx.Provider(
                             Renderer.Context.GitStateCtx.GitStateCtxProvider(
-                                AnnotationTableContextProvider.AnnotationTableContextProvider(
+                                AnnotationTable.AnnotationTableContextProvider.Init(
                                     Layout.Main(
                                         children =
                                             React.Fragment [|

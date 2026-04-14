@@ -3,6 +3,7 @@ module Renderer.Components.WidgetRegistry
 open Feliz
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Components.Widgets.Contexts
 open ARCtrl
 open Swate.Electron.Shared.IPCTypes
 
@@ -120,7 +121,7 @@ let createWidgets
 
 [<ReactComponent>]
 let NavbarButtons (widgetTypes: WidgetType list, isEnabled: bool) =
-    let context = WidgetContext.useWidgetController ()
+    let context = useWidgetController ()
 
     let widgetInfo (widgetType: WidgetType) =
         match widgetType with

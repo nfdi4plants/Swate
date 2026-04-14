@@ -1,9 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.TermSearch
 
 open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 
 [<Erase; Mangle(false)>]
@@ -39,8 +38,8 @@ type TermSearchConfigSetter =
             |}
                 -> ReactElement)
         =
-        let activeKeysCtx = React.useContext (Contexts.TermSearch.TermSearchActiveKeysCtx)
-        let allKeysCtx = React.useContext (Contexts.TermSearch.TermSearchAllKeysCtx)
+        let activeKeysCtx = TermSearchConfigCtx.useTermSearchActiveKeysCtx ()
+        let allKeysCtx = TermSearchConfigCtx.useTermSearchAllKeysCtx ()
 
         let selectedIndices =
             activeKeysCtx.state.aktiveKeys
