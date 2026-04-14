@@ -1665,8 +1665,9 @@ Vitest.describe (
         Vitest.test (
             "GitSidebar virtualizes changed files when nested inside an outer scrollable wrapper",
             fun () -> promise {
-                // Reproduce the production layout: outer scrollable div → content-sized wrapper → GitSidebar.
-                // The content-sized wrapper breaks the CSS height chain unless it has h-full.
+                // Reproduce the production layout: fixed-height sidebar panel -> outer scroll wrapper
+                // -> Git host wrapper -> GitSidebar. The virtualizer only works when the host wrapper
+                // gives GitSidebar a bounded height, so this test keeps the working height contract visible.
                 let! container, cleanup =
                     renderToBody (
                         Html.div [
@@ -1684,8 +1685,7 @@ Vitest.describe (
                                     ]
                                     prop.children [
                                         Html.div [
-                                            // Content-sized wrapper (like the p-4 div in LeftSidebar/Main.fs).
-                                            // Must have h-full for the GitSidebar's height chain to work.
+                                            // Inline height mirrors the Git-only host class in LeftSidebar/MainStyles.fs.
                                             prop.style [ style.height (length.percent 100) ]
                                             prop.children [
                                                 Swate.Components.GitSidebar.Main(
