@@ -15,6 +15,7 @@ import {
 // TypeScript handling — no literal `.fs.js` file is created during dev.
 
 const TESTID_CUSTOM_TRIGGER = "popover_custom_trigger";
+const TESTID_MODAL_PRIMARY_ACTION = "popover_modal_primary_action";
 
 const BasicPopoverExample = () => (
   <Popover debug="basic">
@@ -87,6 +88,49 @@ const NonModalPopoverExample = () => (
   </div>
 );
 
+const ModalPopoverExample = () => (
+  <div className="swt:flex swt:flex-col swt:items-start swt:gap-4">
+    <button className="swt:btn" type="button">
+      Before target
+    </button>
+    <Popover modal debug="modal">
+      <Trigger>Open modal</Trigger>
+      <Content>
+        <Heading>Modal popover</Heading>
+        <Description>Focus stays inside this popover until it closes.</Description>
+        <button className="swt:btn swt:btn-sm" data-testid={TESTID_MODAL_PRIMARY_ACTION}>
+          First action
+        </button>
+        <Close>Close modal</Close>
+      </Content>
+    </Popover>
+    <button className="swt:btn" type="button">
+      After target
+    </button>
+  </div>
+);
+
+const DuplicateHeadingPopoverExample = () => (
+  <Popover debug="duplicate-heading">
+    <Trigger>Open duplicate heading</Trigger>
+    <Content>
+      <Heading>Primary heading</Heading>
+      <Heading>Secondary heading</Heading>
+      <Description>Only the first heading should label the dialog.</Description>
+      <Close>Close duplicate</Close>
+    </Content>
+  </Popover>
+);
+
+const BareContentPopoverExample = () => (
+  <Popover debug="bare">
+    <Trigger>Open plain</Trigger>
+    <Content ariaLabel="Plain actions">
+      <button className="swt:btn swt:btn-sm">Only action</button>
+    </Content>
+  </Popover>
+);
+
 const meta = {
   title: "Components/GenericComponents/Popover",
   tags: ["autodocs"],
@@ -105,9 +149,14 @@ export const Basic: Story = {
   render: () => <BasicPopoverExample />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: /open details/i }));
+    const trigger = canvas.getByTestId("popover_trigger_basic");
 
+    expect(trigger).toHaveAttribute("data-state", "closed");
+    await userEvent.click(trigger);
+
+    const content = await screen.findByTestId("popover_content_basic");
     const dialog = await screen.findByRole("dialog", { name: /dataset actions/i });
+    expect(content).toBe(dialog);
     expect(dialog).toHaveAttribute("data-state", "open");
     expect(screen.getByText(/choose what should happen/i)).toBeInTheDocument();
 
@@ -158,5 +207,72 @@ export const NonModal: Story = {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: /non-modal popover/i })).not.toBeInTheDocument(),
     );
+  },
+};
+
+export const ModalFocus: Story = {
+  render: () => <ModalPopoverExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /open modal/i });
+    const afterTarget = canvas.getByRole("button", { name: /after target/i });
+
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+
+    await userEvent.click(trigger);
+
+    const dialog = await screen.findByTestId("popover_content_modal");
+    const firstAction = screen.getByTestId(TESTID_MODAL_PRIMARY_ACTION);
+    const closeButton = screen.getByRole("button", { name: /close modal/i });
+
+    await waitFor(() => {
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    await userEvent.tab();
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    await userEvent.tab();
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement === firstAction || document.activeElement === closeButton).toBe(true);
+    expect(afterTarget).not.toHaveFocus();
+
+    await userEvent.click(closeButton);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: /modal popover/i })).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
+
+export const DuplicateHeading: Story = {
+  render: () => <DuplicateHeadingPopoverExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: /open duplicate heading/i }));
+
+    const dialog = await screen.findByRole("dialog", { name: /primary heading/i });
+    const labelId = dialog.getAttribute("aria-labelledby");
+
+    expect(labelId).toBeTruthy();
+    expect(document.querySelectorAll(`[id="${labelId}"]`)).toHaveLength(1);
+    expect(screen.getByText(/primary heading/i)).toHaveAttribute("id", labelId);
+    expect(screen.getByText(/secondary heading/i)).not.toHaveAttribute("id", labelId);
+  },
+};
+
+export const BareContent: Story = {
+  render: () => <BareContentPopoverExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId("popover_trigger_bare"));
+
+    const dialog = await screen.findByRole("dialog", { name: /plain actions/i });
+    expect(dialog).toHaveAttribute("data-testid", "popover_content_bare");
+    expect(dialog).toHaveAttribute("aria-label", "Plain actions");
+    expect(dialog).not.toHaveAttribute("aria-labelledby");
+    expect(screen.getByRole("button", { name: /only action/i })).toBeInTheDocument();
   },
 };
