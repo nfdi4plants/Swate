@@ -36,7 +36,7 @@ const ControlledPopoverExample = () => {
       <button className="swt:btn swt:btn-primary" onClick={() => setOpen(true)}>
         Open from outside
       </button>
-      <Popover open={open} onOpenChange={setOpen} debug="controlled">
+      <Popover isOpen={open} onOpenChange={setOpen} debug="controlled">
         <Trigger>Toggle controlled</Trigger>
         <Content>
           <Heading>Controlled popover</Heading>
