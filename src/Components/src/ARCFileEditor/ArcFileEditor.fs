@@ -4,6 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Widgets.Contexts
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
 
@@ -32,7 +33,7 @@ module private WidgetNavbar =
 
     [<ReactComponent>]
     let Buttons(isEnabled: bool) =
-        let context = WidgetContext.useWidgetController ()
+        let context = useWidgetController ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType
