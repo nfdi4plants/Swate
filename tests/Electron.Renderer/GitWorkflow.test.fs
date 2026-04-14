@@ -1605,6 +1605,32 @@ Vitest.describe (
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")).not.toBeNull ()
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")).not.toBeNull ()
                 Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']").length).toBe(3)
+                Vitest
+                    .expect(
+                        container
+                            .querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")
+                            .getAttribute("role")
+                    )
+                    .toBe("region")
+                Vitest
+                    .expect(
+                        container
+                            .querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")
+                            .getAttribute("aria-label")
+                    )
+                    .toBe("Changed files")
+                Vitest
+                    .expect(
+                        container
+                            .querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")
+                            .getAttribute("role")
+                    )
+                    .toBe("list")
+                Vitest.expect(container.querySelectorAll("[role='listitem']").length).toBe(3)
+                Vitest
+                    .expect(container.querySelector("[role='listitem'] [data-testid='GitSidebarChangeRow-0']"))
+                    .not
+                    .toBeNull()
 
                 cleanup ()
             }
