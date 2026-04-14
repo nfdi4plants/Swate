@@ -5,7 +5,6 @@ open Swate.Components.FileExplorerTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
-open Fable.Core.JsInterop
 open Feliz
 open ARCtrl
 
@@ -60,12 +59,28 @@ module private FileExplorerHelper =
         | ArcCreateKind.Workflow -> "swt:fluent--flowchart-24-regular"
         | ArcCreateKind.Run -> "swt:fluent--play-24-regular"
 
+    let arcCreateKinds = [
+        ArcCreateKind.Study
+        ArcCreateKind.Assay
+        ArcCreateKind.Workflow
+        ArcCreateKind.Run
+    ]
+
     let arcCreateKindDefaultIdentifier =
         function
         | ArcCreateKind.Study -> "NewStudy"
         | ArcCreateKind.Assay -> "NewAssay"
         | ArcCreateKind.Workflow -> "NewWorkflow"
         | ArcCreateKind.Run -> "NewRun"
+
+    let isArcCreateIdentifierValid (identifier: string) =
+        let identifier = identifier.Trim()
+
+        (System.String.IsNullOrWhiteSpace identifier |> not)
+        && ARCtrl.Helper.Identifier.tryCheckValidCharacters identifier
+
+    let arcCreateIdentifierError =
+        "Identifier is required and may only contain letters, digits, spaces, underscores, or dashes."
 
     let createArcFile kind identifier =
         match kind with
@@ -80,17 +95,6 @@ module private FileExplorerHelper =
         | ArcCreateKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow
         | ArcCreateKind.Run -> ArcRun.init identifier |> ArcFiles.Run
 
-    let promptForIdentifier kind =
-        let label = arcCreateKindLabel kind
-        let defaultIdentifier = arcCreateKindDefaultIdentifier kind
-        let prompted: string = emitJsExpr ($"Identifier for new {label}", defaultIdentifier) "window.prompt($0, $1)"
-
-        if isNull prompted then
-            None
-        else
-            let identifier = prompted.Trim()
-            if System.String.IsNullOrWhiteSpace identifier then None else Some identifier
-
 open FileExplorerHelper
 
 [<ReactComponent>]
@@ -101,11 +105,91 @@ let EmptyFileTreePlaceholder () =
     ]
 
 [<ReactComponent>]
+let private ArcCreateModal
+    (kind: ArcCreateKind option)
+    (identifier: string)
+    (setIdentifier: string -> unit)
+    (close: unit -> unit)
+    (submit: ArcCreateKind -> string -> unit)
+    =
+
+    let setIsOpen isOpen =
+        if not isOpen then
+            close ()
+
+    match kind with
+    | None -> BaseModal.BaseModal(false, setIsOpen, Html.none)
+    | Some kind ->
+        let label = arcCreateKindLabel kind
+        let isValid = isArcCreateIdentifierValid identifier
+
+        let submitIfValid () =
+            if isValid then
+                submit kind identifier
+
+        let footer =
+            Html.div [
+                prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
+                prop.children [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-ghost"
+                        prop.onClick (fun _ -> close ())
+                        prop.text "Cancel"
+                    ]
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary"
+                        prop.disabled (not isValid)
+                        prop.onClick (fun _ -> submitIfValid ())
+                        prop.text $"Create {label}"
+                    ]
+                ]
+            ]
+
+        let content =
+            Html.fieldSet [
+                prop.className "swt:fieldset"
+                prop.children [
+                    Html.legend [
+                        prop.className "swt:fieldset-legend"
+                        prop.text "Identifier"
+                    ]
+                    Html.label [
+                        prop.className "swt:input swt:w-full"
+                        prop.children [
+                            Html.input [
+                                prop.autoFocus true
+                                prop.value identifier
+                                prop.onChange setIdentifier
+                                prop.onKeyDown (key.enter, fun _ -> submitIfValid ())
+                            ]
+                        ]
+                    ]
+                    Html.p [
+                        prop.hidden isValid
+                        prop.className "swt:text-error swt:text-sm"
+                        prop.text arcCreateIdentifierError
+                    ]
+                ]
+            ]
+
+        BaseModal.Modal(
+            isOpen = true,
+            setIsOpen = setIsOpen,
+            header = Html.text $"Add {label}",
+            description = Html.text $"Create a new {label.ToLowerInvariant()} in the current ARC.",
+            children = content,
+            footer = footer,
+            debug = "arc-create"
+        )
+
+[<ReactComponent>]
 let FileTree () =
 
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let pendingCreateKind, setPendingCreateKind = React.useState<ArcCreateKind option> None
+    let createIdentifier, setCreateIdentifier = React.useState ""
 
     match fileStateCtx.state.FileTree with
     | [||] -> EmptyFileTreePlaceholder()
@@ -175,97 +259,77 @@ let FileTree () =
             }
             |> Promise.start
 
-        let createArcEntry kind (item: FileItem) =
-            if item.IsDirectory then
-                match promptForIdentifier kind with
-                | None -> ()
-                | Some identifier ->
-                    promise {
-                        let arcFile = createArcFile kind identifier
+        let closeCreateModal () =
+            setPendingCreateKind None
+            setCreateIdentifier ""
 
-                        match FileContentDTO.fromArcFile arcFile with
-                        | None ->
-                            let label = arcCreateKindLabel kind
-                            let errorMessage = $"Creating {label} files is not supported in Electron yet."
+        let openCreateModal kind =
+            setCreateIdentifier (arcCreateKindDefaultIdentifier kind)
+            setPendingCreateKind (Some kind)
 
-                            Renderer.Components.ARCHelper.applyPreviewError
-                                pageStateCtx.setState
-                                arcObjectCtx.setArcFileState
-                                arcObjectCtx.setPreviewState
-                                arcObjectCtx.setStatusMessage
-                                errorMessage
-                        | Some request ->
-                            let requestedPath = normalizePath request.path
+        let applyCreateError errorMessage =
+            Renderer.Components.ARCHelper.applyPreviewError
+                pageStateCtx.setState
+                arcObjectCtx.setArcFileState
+                arcObjectCtx.setPreviewState
+                arcObjectCtx.setStatusMessage
+                errorMessage
 
-                            let alreadyExists =
-                                fileStateCtx.state.FileTree
-                                |> Array.exists (fun entry -> normalizePath entry.path = requestedPath)
+        let createArcEntry kind (identifier: string) =
+            let identifier = identifier.Trim()
 
-                            if alreadyExists then
-                                let label = arcCreateKindLabel kind
-                                let errorMessage = $"{label} '{identifier}' already exists."
+            if isArcCreateIdentifierValid identifier then
+                promise {
+                    let label = arcCreateKindLabel kind
+                    let arcFile = createArcFile kind identifier
 
-                                Renderer.Components.ARCHelper.applyPreviewError
-                                    pageStateCtx.setState
-                                    arcObjectCtx.setArcFileState
-                                    arcObjectCtx.setPreviewState
-                                    arcObjectCtx.setStatusMessage
-                                    errorMessage
-                            else
-                                let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
+                    match FileContentDTO.fromArcFile arcFile with
+                    | None ->
+                        applyCreateError $"Creating {label} files is not supported in Electron yet."
+                    | Some request ->
+                        let requestedPath = normalizePath request.path
 
-                                match saveResult with
-                                | Ok() ->
-                                    let! openResult = Api.ipcArcVaultApi.openFile (unbox null) request.path
+                        let alreadyExists =
+                            fileStateCtx.state.FileTree
+                            |> Array.exists (fun entry -> normalizePath entry.path = requestedPath)
 
-                                    match openResult with
-                                    | Ok loadedFile ->
-                                        let selectedPath = normalizePath loadedFile.path
-                                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                        if alreadyExists then
+                            applyCreateError $"{label} '{identifier}' already exists."
+                        else
+                            let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
 
-                                        loadedFile
-                                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
-                                        |> Renderer.Components.ARCHelper.applyLoadedPreview
-                                            pageStateCtx.setState
-                                            arcObjectCtx.setArcFileState
-                                            arcObjectCtx.setPreviewState
-                                            arcObjectCtx.setStatusMessage
-                                    | Error exn ->
-                                        let label = arcCreateKindLabel kind
-                                        let errorMessage =
-                                            $"Created {label} '{identifier}' but could not open it: {exn.Message}"
+                            match saveResult with
+                            | Ok() ->
+                                let! openResult = Api.ipcArcVaultApi.openFile (unbox null) request.path
 
-                                        Renderer.Components.ARCHelper.applyPreviewError
-                                            pageStateCtx.setState
-                                            arcObjectCtx.setArcFileState
-                                            arcObjectCtx.setPreviewState
-                                            arcObjectCtx.setStatusMessage
-                                            errorMessage
-                                | Error exn ->
-                                    let label = arcCreateKindLabel kind
-                                    let errorMessage = $"Could not create {label} '{identifier}': {exn.Message}"
+                                match openResult with
+                                | Ok loadedFile ->
+                                    let selectedPath = normalizePath loadedFile.path
+                                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                                    Renderer.Components.ARCHelper.applyPreviewError
+                                    loadedFile
+                                    |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                                    |> Renderer.Components.ARCHelper.applyLoadedPreview
                                         pageStateCtx.setState
                                         arcObjectCtx.setArcFileState
                                         arcObjectCtx.setPreviewState
                                         arcObjectCtx.setStatusMessage
-                                        errorMessage
-                    }
-                    |> Promise.start
+                                | Error exn ->
+                                    applyCreateError $"Created {label} '{identifier}' but could not open it: {exn.Message}"
+                            | Error exn ->
+                                applyCreateError $"Could not create {label} '{identifier}': {exn.Message}"
+
+                        closeCreateModal ()
+                }
+                |> Promise.start
 
         let arcCreateContextMenuItems (item: FileItem) =
             if item.IsDirectory then
-                [
-                    ArcCreateKind.Study
-                    ArcCreateKind.Assay
-                    ArcCreateKind.Workflow
-                    ArcCreateKind.Run
-                ]
+                arcCreateKinds
                 |> List.map (fun kind -> {
                     Label = $"Add {arcCreateKindLabel kind}"
                     Icon = arcCreateKindIcon kind
-                    OnClick = fun () -> createArcEntry kind item
+                    OnClick = fun () -> openCreateModal kind
                     Disabled = None
                 })
             else
@@ -278,10 +342,18 @@ let FileTree () =
         match fileItem with
 
         | Some fileItem ->
-            Swate.Components.FileExplorer.FileExplorer(
-                initialItems = [ fileItem ],
-                onItemClick = openPreview,
-                onContextMenu = contextMenuItems,
-                selectedItemId = fileStateCtx.state.Selection.TreePath
-            )
+            React.Fragment [
+                Swate.Components.FileExplorer.FileExplorer(
+                    initialItems = [ fileItem ],
+                    onItemClick = openPreview,
+                    onContextMenu = contextMenuItems,
+                    selectedItemId = fileStateCtx.state.Selection.TreePath
+                )
+                ArcCreateModal
+                    pendingCreateKind
+                    createIdentifier
+                    setCreateIdentifier
+                    closeCreateModal
+                    createArcEntry
+            ]
         | None -> EmptyFileTreePlaceholder()
