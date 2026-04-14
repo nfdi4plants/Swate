@@ -1663,6 +1663,79 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "GitSidebar virtualizes changed files when nested inside an outer scrollable wrapper",
+            fun () -> promise {
+                // Reproduce the production layout: outer scrollable div → content-sized wrapper → GitSidebar.
+                // The content-sized wrapper breaks the CSS height chain unless it has h-full.
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [
+                                style.width 340
+                                style.height 760
+                                style.overflow.hidden
+                            ]
+                            prop.children [
+                                Html.div [
+                                    prop.style [
+                                        style.width (length.percent 100)
+                                        style.height (length.percent 100)
+                                        style.overflowY.auto
+                                    ]
+                                    prop.children [
+                                        Html.div [
+                                            // Content-sized wrapper (like the p-4 div in LeftSidebar/Main.fs).
+                                            // Must have h-full for the GitSidebar's height chain to work.
+                                            prop.style [ style.height (length.percent 100) ]
+                                            prop.children [
+                                                Swate.Components.GitSidebar.Main(
+                                                    status = {
+                                                        CurrentBranch = Some "main"
+                                                        TrackingBranch = Some "origin/main"
+                                                        Ahead = 0
+                                                        Behind = 0
+                                                        IsClean = false
+                                                        IsMergeInProgress = false
+                                                    },
+                                                    changedFiles = manyChangedFiles 200,
+                                                    branchOptions = [| sidebarLocalBranch "main" true true |],
+                                                    callbacks = {
+                                                        OnRefresh = fun () -> ()
+                                                        OnFetch = fun () -> ()
+                                                        OnPull = fun () -> ()
+                                                        OnPush = fun () -> ()
+                                                        OnSync = fun () -> ()
+                                                        OnCommitSelection = fun _ -> ()
+                                                        OnCommitAll = fun _ -> ()
+                                                        OnSaveDownloadLargeFiles = fun _ -> ()
+                                                        OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                                        OnCreateBranch = fun _ -> ()
+                                                        OnSwitchBranch = fun _ -> ()
+                                                        OnSelectChange = fun _ -> promise { return Ok() }
+                                                    },
+                                                    downloadLargeFiles = true,
+                                                    lfsAutoTrackThresholdMb = 5
+                                                )
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    )
+
+                // With 200 items, only a subset should be rendered (visible + overscan).
+                // If virtualization is broken, all 200 items would be in the DOM.
+                let renderedRows = container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")
+                Vitest.expect(renderedRows.length).toBeLessThan(200)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-199']")).toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
             "GitSidebar labels deleted files explicitly instead of showing only a generic Changed badge",
             fun () -> promise {
                 let! container, cleanup =
