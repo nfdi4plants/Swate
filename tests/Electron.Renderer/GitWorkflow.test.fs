@@ -1290,6 +1290,7 @@ Vitest.describe (
                 Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-virtual-content']")).not.toBeNull ()
                 Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-row-0']")).not.toBeNull ()
                 Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-row-599']")).toBeNull ()
+                Vitest.expect(container.querySelectorAll("[data-testid^='renderer-large-diff-comparison-scroll-row-']").length).toBeLessThan (120)
 
                 cleanup ()
             }
@@ -1762,28 +1763,31 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "LeftSidebar.Main wrapper classes bound only the Git sidebar height for virtualization",
+            "LeftSidebar.Main applies the bounded wrapper classes to every sidebar target",
             fun () -> promise {
-                let gitWrapperClasses =
-                    Renderer.Components.LeftSidebar.MainStyles.wrapperClassName LeftSidebarPage.Git
-                    |> Set.ofList
+                let expectedClasses = [|
+                    "swt:box-border"
+                    "swt:flex"
+                    "swt:h-full"
+                    "swt:min-h-0"
+                    "swt:min-w-0"
+                    "swt:max-w-full"
+                    "swt:flex-col"
+                    "swt:overflow-hidden"
+                    "swt:p-4"
+                |]
 
-                let fileExplorerWrapperClasses =
-                    Renderer.Components.LeftSidebar.MainStyles.wrapperClassName LeftSidebarPage.FileExplorer
-                    |> Set.ofList
+                for target in [| LeftSidebarPage.Git; LeftSidebarPage.FileExplorer; LeftSidebarPage.ArcObjectExplorer |] do
+                    let! container, cleanup =
+                        renderToBody (Renderer.Components.LeftSidebar.Main.Main target)
 
-                Vitest.expect(Set.contains "swt:p-4" gitWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:box-border" gitWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:h-full" gitWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:min-h-0" gitWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:min-w-0" gitWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:max-w-full" gitWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:overflow-hidden" gitWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:w-full" gitWrapperClasses).toBe (false)
+                    let wrapper = container.children.[0] :?> HTMLElement
 
-                Vitest.expect(Set.contains "swt:p-4" fileExplorerWrapperClasses).toBe (true)
-                Vitest.expect(Set.contains "swt:h-full" fileExplorerWrapperClasses).toBe (false)
-                Vitest.expect(Set.contains "swt:overflow-hidden" fileExplorerWrapperClasses).toBe (false)
+                    for expectedClass in expectedClasses do
+                        Vitest.expect(wrapper.classList.contains expectedClass).toBe (true)
+
+                    Vitest.expect(wrapper.classList.contains "swt:w-full").toBe (false)
+                    cleanup ()
             }
         )
 

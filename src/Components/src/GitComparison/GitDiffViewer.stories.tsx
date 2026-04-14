@@ -205,6 +205,11 @@ export const LargeAddedFileVirtualized: Story = {
     await expect(
       canvas.queryByTestId("git-diff-large-story-comparison-scroll-row-599"),
     ).toBeNull();
+    await expect(
+      canvasElement.querySelectorAll(
+        "[data-testid^='git-diff-large-story-comparison-scroll-row-']",
+      ).length,
+    ).toBeLessThan(100);
 
     await waitFor(() => {
       expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
@@ -223,6 +228,35 @@ export const LargeAddedFileVirtualized: Story = {
     await expect(
       await canvas.findByText("Generated large diff line 600"),
     ).toBeInTheDocument();
+  },
+};
+
+export const ClientHostVirtualized: Story = {
+  args: {
+    wordDiffText: largeDiffWordDiffText,
+    previousContent: "",
+    currentContent: largeDiffContent,
+    testIdPrefix: "git-diff-client-host-story",
+  },
+  render: (args) => (
+    <div className="swt:flex swt:w-full swt:overflow-auto swt:h-screen">
+      <GitDiffViewerComponent {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.getByTestId("git-diff-client-host-story-comparison-scroll-row-0"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByTestId("git-diff-client-host-story-comparison-scroll-row-599"),
+    ).toBeNull();
+    await expect(
+      canvasElement.querySelectorAll(
+        "[data-testid^='git-diff-client-host-story-comparison-scroll-row-']",
+      ).length,
+    ).toBeLessThan(100);
   },
 };
 

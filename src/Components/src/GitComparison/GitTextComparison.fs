@@ -36,16 +36,6 @@ module internal GitTextComparisonRendering =
             Start: int
         }
 
-        type private BrowserResizeObserver =
-            abstract observe: Element -> unit
-            abstract disconnect: unit -> unit
-
-        [<Emit("typeof ResizeObserver !== 'undefined'")>]
-        let private resizeObserverIsAvailable () : bool = jsNative
-
-        [<Emit("new ResizeObserver($0)")>]
-        let private createResizeObserver (_callback: obj -> unit) : BrowserResizeObserver = jsNative
-
         let DiffTheme = {
             LeftChanged = {
                 ChangedLineNumberClass = "swt:text-base-content/60 swt:bg-error/8"
@@ -190,9 +180,18 @@ module internal GitTextComparisonRendering =
             let theme = defaultArg theme DiffTheme
             let rowEstimatePx = 28
             let overscan = 8
-            let comparisonContentWidthPx, setComparisonContentWidthPx = React.useState 0
             let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
             let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
+            let bodyScrollMeasureRef, bodyScrollRect = React.useMeasure<Element> ()
+
+            React.useEffect (
+                (fun () ->
+                    bodyScrollMeasureRef (bodyScrollRef.current |> Option.map unbox<Element>)
+
+                    FsReact.createDisposable (fun () -> bodyScrollMeasureRef None)
+                ),
+                [| box bodyScrollMeasureRef |]
+            )
 
             React.useEffect (
                 (fun () ->
@@ -201,38 +200,23 @@ module internal GitTextComparisonRendering =
                         let syncHeaderToBody (_: Event) =
                             headerScroll.scrollLeft <- bodyScroll.scrollLeft
 
-                        let updateComparisonContentWidth () =
-                            setComparisonContentWidthPx (int bodyScroll.clientWidth)
-
-                        let handleWindowResize (_: Event) =
-                            updateComparisonContentWidth ()
-
                         bodyScroll.addEventListener ("scroll", syncHeaderToBody)
-                        Browser.Dom.window.addEventListener ("resize", handleWindowResize)
 
-                        let resizeObserver =
-                            if resizeObserverIsAvailable () then
-                                let observer =
-                                    createResizeObserver (fun _ -> updateComparisonContentWidth ())
-
-                                observer.observe bodyScroll
-                                Some observer
-                            else
-                                None
-
-                        updateComparisonContentWidth ()
                         syncHeaderToBody (unbox null)
 
                         FsReact.createDisposable (fun () ->
                             bodyScroll.removeEventListener ("scroll", syncHeaderToBody)
-                            Browser.Dom.window.removeEventListener ("resize", handleWindowResize)
-                            resizeObserver |> Option.iter (fun observer -> observer.disconnect())
                         )
                     | _ ->
                         FsReact.createDisposable (fun () -> ())
                 ),
                 [||]
             )
+
+            let comparisonContentWidthPx =
+                bodyScrollRect.width
+                |> Option.map int
+                |> Option.defaultValue 0
 
             let comparisonContentWidth =
                 if comparisonContentWidthPx > 0 then
