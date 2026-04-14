@@ -1,17 +1,21 @@
 module Renderer.Components.MainContent.ArcFilePreviewTarget
 
 open Feliz
+open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent.Helper
 open Renderer.Components.MainElement
 open Renderer.Components.WidgetRegistry
 open Swate.Components.ArcFileEditor
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Components.ErrorModal
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let errorModal = ErrorModal.Context.useErrorModal ()
+    let arcScopeId = useCurrentArcScopeId ()
 
     let isPendingSaveForCurrentArcFile =
         match arcObjectCtx.state.PendingArcFileSave, arcFile.TryGetRelativePath() with
@@ -36,7 +40,10 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 match! MainContentHelper.saveArcFile arcFile with
                 | Ok() when isPendingSaveForCurrentArcFile -> arcObjectCtx.setPendingArcFileSave None
                 | Ok() -> ()
-                | Error exn -> pageStateCtx.setState (Renderer.Types.PageState.ErrorPage exn.Message |> Some)
+                | Error exn ->
+                    errorModal.enqueue (
+                        ErrorModalRequest.create(exn.Message, title = "Could not save ARC file", ?scopeId = arcScopeId)
+                    )
             }
             |> Promise.start
 

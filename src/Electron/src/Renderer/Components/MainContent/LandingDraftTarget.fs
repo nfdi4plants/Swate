@@ -25,8 +25,8 @@ let LandingDraftTarget () =
                 fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                 response
-                |> Renderer.Components.ARCHelper.previewLoadResultOfDto
-                |> Renderer.Components.ARCHelper.applyLoadedPreview
+                |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                |> Renderer.Components.ARCHelper.applyLoadedView
                     pageStateCtx.setState
                     arcObjectCtx.setArcFileState
                     arcObjectCtx.setPreviewState

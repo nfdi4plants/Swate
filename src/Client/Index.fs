@@ -1,23 +1,13 @@
 module Index
 
-open System
-open Elmish.Navigation
-open Elmish.UrlParser
-open Elmish
+
 open Messages
 open Model
-open Update
-
-open Swate.Components.ReactHelper
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
 
 open Feliz
-
-open Fable.Core.JsInterop
-
-open Browser.Dom
 
 [<ReactComponent>]
 let View (model: Model) (dispatch: Msg -> unit) =
@@ -58,7 +48,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
                                 |> String.concat "\n\n"
 
                             let close = fun b -> UpdateDisplayLogList [] |> DevMsg |> dispatch
-                            Swate.Components.BaseModal.ErrorBaseModal(true, close, errors)
+                            Swate.Components.BaseModal.ErrorModalObsolete(true, close, errors)
                         | _ -> Modals.InteropLogging.Main(model.DevState, dispatch)
                         match model.PageState.IsHome, model.PersistentStorageState.Host with
                         | false, _ -> View.MainPageView.Main(model, dispatch)

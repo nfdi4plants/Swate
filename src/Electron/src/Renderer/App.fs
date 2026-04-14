@@ -7,6 +7,7 @@ open Feliz.UseElmish
 open Renderer.Components
 open Renderer.Types
 open Swate.Components
+open Swate.Components.ErrorModal
 open Swate.Electron.Shared
 
 type private Model = {
@@ -167,25 +168,27 @@ let Main () =
             Renderer.Context.ArcObjectExplorerCtx.ArcObjectExplorerCtxProvider(
                 Renderer.Context.PageStateCtx.PageStateCtx.Provider(
                     pageCtx,
-                    Renderer.Context.AuthStateCtx.Provider(
-                        Renderer.Context.GitStateCtx.GitStateCtxProvider(
-                            AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                Layout.Main(
-                                    children =
-                                        React.Fragment [|
-                                            children
-                                            CloseWindowController.CloseWindowController.Subscription()
-                                        |],
-                                    navbar = Renderer.Components.Navbar.Main(showDetailsSidebarToggle = showDetailsSidebarToggle),
-                                    leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
-                                    ?rightSidebar = detailsSidebar,
-                                    leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget),
-                                    rightSidebarState = {
-                                        isOpen = model.DetailsSidebarIsOpen
-                                        setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
-                                        sidebarType = model.LeftSidebarTarget
-                                        setSidebarType = fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)
-                                    }
+                    ErrorModalProvider.ErrorModalProvider(
+                        Renderer.Context.AuthStateCtx.Provider(
+                            Renderer.Context.GitStateCtx.GitStateCtxProvider(
+                                AnnotationTableContextProvider.AnnotationTableContextProvider(
+                                    Layout.Main(
+                                        children =
+                                            React.Fragment [|
+                                                children
+                                                CloseWindowController.CloseWindowController.Subscription()
+                                            |],
+                                        navbar = Renderer.Components.Navbar.Main(showDetailsSidebarToggle = showDetailsSidebarToggle),
+                                        leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
+                                        ?rightSidebar = detailsSidebar,
+                                        leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget),
+                                        rightSidebarState = {
+                                            isOpen = model.DetailsSidebarIsOpen
+                                            setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
+                                            sidebarType = model.LeftSidebarTarget
+                                            setSidebarType = fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)
+                                        }
+                                    )
                                 )
                             )
                         )

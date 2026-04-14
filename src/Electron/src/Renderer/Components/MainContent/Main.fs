@@ -7,7 +7,7 @@ open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.ArcObjectExplorerTarget
 open Renderer.Components.MainContent.DataHubBrowserTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
-open Renderer.Components.MainContent.ErrorPreviewTarget
+open Renderer.Components.MainContent.ErrorViewTarget
 open Renderer.Components.MainContent.GitDiffTarget
 open Renderer.Components.MainContent.GitMergeConflictTarget
 open Renderer.Components.MainContent.GitUnsupportedTarget
@@ -40,7 +40,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option, leftSidebarTarg
             | Some _, Some PageState.UnknownPage ->
                 UnknownPreviewTarget()
             | Some _, Some(PageState.ErrorPage errMsg) ->
-                ErrorPreviewTarget errMsg
+                ErrorViewTarget errMsg
             | Some _, Some PageState.LandingDraftPage ->
                 LandingDraftTarget()
             | Some _, Some PageState.NotesDraftPage ->
