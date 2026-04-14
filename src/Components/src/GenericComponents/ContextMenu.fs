@@ -81,7 +81,7 @@ type ContextMenu =
                     FloatingUI.Middleware.shift {| padding = 10 |}
                 |],
                 placement = FloatingUI.Placement.RightStart,
-                strategy = "fixed",
+                strategy = FloatingUI.FloatingStrategy.Fixed,
                 whileElementsMounted = FloatingUI.autoUpdate
             )
 
@@ -219,7 +219,7 @@ type ContextMenu =
                             visuallyHiddenDismiss = true,
                             children =
                                 Html.div [
-                                    prop.ref floating.refs.setFloating
+                                    prop.ref (unbox floating.refs.setFloating)
                                     if debug then
                                         prop.testId "context_menu"
                                     prop.custom ("style", floating.floatingStyles)

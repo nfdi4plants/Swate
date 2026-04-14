@@ -27,45 +27,38 @@ module FloatingUI =
 
     type ReferenceElement = U2<HTMLElement, VirtualElement>
 
-    [<AllowNullLiteral; Import("UseFloatingReturn", "@floating-ui/react")>]
-    type UseFloatingReturn
-        [<ParamObject; Emit("$0")>]
-        (
-            context: obj,
-            placement: Placement,
-            strategy: obj,
-            x: int,
-            y: int,
-            middlewareData: obj,
-            isPositioned: bool,
-            update: unit -> unit,
-            floatingStyles: obj,
-            refs:
-                {|
-                    reference: IRefValue<ReferenceElement>
-                    floating: IRefValue<HTMLElement option>
-                    domReference: IRefValue<HTMLElement>
-                    setReference: IRefValue<HTMLElement option>
-                    setFloating: IRefValue<HTMLElement option>
-                    setPositionReference: ReferenceElement -> unit
-                |},
-            elements:
-                {|
-                    reference: obj
-                    floating: HTMLElement
-                |}
-        ) =
-        member val context = context with get, set
-        member val placement = placement with get, set
-        member val strategy = strategy with get, set
-        member val x = x with get, set
-        member val y = y with get, set
-        member val middlewareData = middlewareData with get, set
-        member val isPositioned = isPositioned with get, set
-        member val update = update with get, set
-        member val floatingStyles = floatingStyles with get, set
-        member val refs = refs with get, set
-        member val elements = elements with get, set
+    [<StringEnum(CaseRules.LowerAll)>]
+    type FloatingStrategy =
+        | Absolute
+        | Fixed
+
+    [<AllowNullLiteral>]
+    type FloatingRefs =
+        abstract reference: IRefValue<ReferenceElement option>
+        abstract floating: IRefValue<HTMLElement option>
+        abstract domReference: IRefValue<HTMLElement option>
+        abstract setReference: HTMLElement option -> unit
+        abstract setFloating: HTMLElement option -> unit
+        abstract setPositionReference: ReferenceElement -> unit
+
+    [<AllowNullLiteral>]
+    type FloatingElements =
+        abstract reference: ReferenceElement option
+        abstract floating: HTMLElement option
+
+    [<AllowNullLiteral>]
+    type UseFloatingReturn =
+        abstract context: obj
+        abstract placement: Placement
+        abstract strategy: FloatingStrategy
+        abstract x: float
+        abstract y: float
+        abstract middlewareData: obj
+        abstract isPositioned: bool
+        abstract update: unit -> unit
+        abstract floatingStyles: obj
+        abstract refs: FloatingRefs
+        abstract elements: FloatingElements
 
 
     [<AllowNullLiteral; Import("UseInteractionsReturn", "@floating-ui/react")>]
@@ -81,8 +74,34 @@ module FloatingUI =
         | Mousedown
         | Click
 
+    [<AllowNullLiteral; Global>]
+    type UseClickProps
+        [<ParamObject; Emit("$0")>]
+        (
+            ?enabled: bool,
+            ?event: PressEvent,
+            ?toggle: bool,
+            ?ignoreMouse: bool,
+            ?keyboardHandlers: bool,
+            ?stickIfOpen: bool
+        ) =
+        member val enabled = enabled
+        member val event = event
+        member val toggle = toggle
+        member val ignoreMouse = ignoreMouse
+        member val keyboardHandlers = keyboardHandlers
+        member val stickIfOpen = stickIfOpen
 
-    [<AllowNullLiteral; Import("UseDismissProps", "@floating-ui/react")>]
+    type OutsidePressGuard = Browser.Types.Event -> bool
+
+    [<AllowNullLiteral; Global>]
+    type DismissPropagation
+        [<ParamObject; Emit("$0")>]
+        (?escapeKey: bool, ?outsidePress: bool) =
+        member val escapeKey = escapeKey
+        member val outsidePress = outsidePress
+
+    [<AllowNullLiteral; Global>]
     type UseDismissProps
         [<ParamObject; Emit("$0")>]
         (
@@ -90,11 +109,11 @@ module FloatingUI =
             ?escapeKey: bool,
             ?referencePress: bool,
             ?referencePressEvent: PressEvent,
-            ?outsidePress: bool,
+            ?outsidePress: U2<bool, OutsidePressGuard>,
             ?outsidePressEvent: PressEvent,
             ?ancestorScroll: bool,
-            ?bubbles: bool,
-            ?capture: bool
+            ?bubbles: U2<bool, DismissPropagation>,
+            ?capture: U2<bool, DismissPropagation>
         ) =
         member val enabled = enabled
         member val escapeKey = escapeKey
@@ -235,7 +254,7 @@ type FloatingUI =
 
     // reference: ReferenceElement, floating: FloatingElement, update: () => void
     [<ImportMember("@floating-ui/react")>]
-    static member autoUpdate (reference: obj) (floating: obj) (update: unit -> unit) : unit = jsNative
+    static member autoUpdate (reference: obj) (floating: obj) (update: unit -> unit) : (unit -> unit) = jsNative
 
     [<ImportMember("@floating-ui/react"); ParamObject>]
     static member useFloating
@@ -243,11 +262,11 @@ type FloatingUI =
             ?``open``: bool,
             ?onOpenChange: bool -> unit,
             ?placement: FloatingUI.Placement,
-            ?strategy: string,
+            ?strategy: FloatingUI.FloatingStrategy,
             ?transform: bool,
             ?middleware: FloatingUI.IMiddleware[],
             ?elements: obj,
-            ?whileElementsMounted: obj -> obj -> (unit -> unit) -> unit,
+            ?whileElementsMounted: obj -> obj -> (unit -> unit) -> (unit -> unit),
             ?nodeId: string
         ) : FloatingUI.UseFloatingReturn =
         jsNative
@@ -259,7 +278,7 @@ type FloatingUI =
     static member useRole(context: obj, ?props: FloatingUI.UseRoleProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
-    static member useClick(context: obj) : obj = jsNative
+    static member useClick(context: obj, ?props: FloatingUI.UseClickProps) : obj = jsNative
 
     [<ImportMember("@floating-ui/react")>]
     static member useListNavigation(context: obj, ?props: FloatingUI.UseListNavigationProps) : obj = jsNative
@@ -284,7 +303,14 @@ type FloatingUI =
     static member useTransitionStatus(context: obj) : FloatingUI.UseTransitionStatusReturn = jsNative
 
     [<ReactComponent("FloatingPortal", "@floating-ui/react")>]
-    static member FloatingPortal(children: ReactElement) = React.Imported()
+    static member FloatingPortal
+        (
+            children: ReactElement,
+            ?root: obj,
+            ?id: string,
+            ?preserveTabOrder: bool
+        ) =
+        React.Imported()
 
     [<ReactComponent("FloatingOverlay", "@floating-ui/react")>]
     static member FloatingOverlay(children: ReactElement, ?lockScroll: bool, ?className: string) = React.Imported()
@@ -300,10 +326,10 @@ type FloatingUI =
             ?restoreFocus: bool,
             ?guards: bool,
             ?modal: bool,
-            ?visuallyHiddenDismiss: bool,
+            ?visuallyHiddenDismiss: obj,
             ?closeOnFocusOut: bool,
             ?outsideElementsInert: bool,
-            ?getInsideElements: unit -> ReactElement[],
+            ?getInsideElements: unit -> Browser.Types.Element[],
             ?order: string[],
             ?key: string
         ) =

@@ -113,7 +113,7 @@ type BaseModal =
                                                 if className.IsSome then
                                                     className.Value
                                             ]
-                                            prop.ref flui.refs.setFloating
+                                            prop.ref (unbox flui.refs.setFloating)
                                             yield! prop.spread (useInteractions.getFloatingProps (null))
                                             prop.children children
                                         ]
