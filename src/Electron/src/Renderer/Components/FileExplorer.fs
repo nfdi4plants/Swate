@@ -5,10 +5,19 @@ open Swate.Components.FileExplorerTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Fable.Core.JsInterop
 open Feliz
+open ARCtrl
 
 
 module private FileExplorerHelper =
+
+    [<RequireQualifiedAccess>]
+    type ArcCreateKind =
+        | Study
+        | Assay
+        | Workflow
+        | Run
 
     let rec loopPaths (selectedTreeItemPath: string option) (parent: FileTreeNode) =
         match parent.isDirectory with
@@ -36,6 +45,51 @@ module private FileExplorerHelper =
                     Id = parent.path
                     IsLFS = parent.isLfs
             }
+
+    let arcCreateKindLabel =
+        function
+        | ArcCreateKind.Study -> "Study"
+        | ArcCreateKind.Assay -> "Assay"
+        | ArcCreateKind.Workflow -> "Workflow"
+        | ArcCreateKind.Run -> "Run"
+
+    let arcCreateKindIcon =
+        function
+        | ArcCreateKind.Study -> "swt:fluent--document-table-24-regular"
+        | ArcCreateKind.Assay -> "swt:fluent--beaker-24-regular"
+        | ArcCreateKind.Workflow -> "swt:fluent--flowchart-24-regular"
+        | ArcCreateKind.Run -> "swt:fluent--play-24-regular"
+
+    let arcCreateKindDefaultIdentifier =
+        function
+        | ArcCreateKind.Study -> "NewStudy"
+        | ArcCreateKind.Assay -> "NewAssay"
+        | ArcCreateKind.Workflow -> "NewWorkflow"
+        | ArcCreateKind.Run -> "NewRun"
+
+    let createArcFile kind identifier =
+        match kind with
+        | ArcCreateKind.Study ->
+            let study = ArcStudy.init identifier
+            study.InitTable($"{identifier} Table") |> ignore
+            ArcFiles.Study(study, [])
+        | ArcCreateKind.Assay ->
+            let assay = ArcAssay.init identifier
+            assay.InitTable($"{identifier} Table") |> ignore
+            ArcFiles.Assay assay
+        | ArcCreateKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow
+        | ArcCreateKind.Run -> ArcRun.init identifier |> ArcFiles.Run
+
+    let promptForIdentifier kind =
+        let label = arcCreateKindLabel kind
+        let defaultIdentifier = arcCreateKindDefaultIdentifier kind
+        let prompted: string = emitJsExpr ($"Identifier for new {label}", defaultIdentifier) "window.prompt($0, $1)"
+
+        if isNull prompted then
+            None
+        else
+            let identifier = prompted.Trim()
+            if System.String.IsNullOrWhiteSpace identifier then None else Some identifier
 
 open FileExplorerHelper
 
@@ -68,9 +122,6 @@ let FileTree () =
 
         let toggleLfsMark =
             FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
-
-        let contextMenuItems (item: FileItem) =
-            FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
 
         let openPreview (item: FileItem) =
             promise {
@@ -123,6 +174,106 @@ let FileTree () =
                             fullErrorMessage
             }
             |> Promise.start
+
+        let createArcEntry kind (item: FileItem) =
+            if item.IsDirectory then
+                match promptForIdentifier kind with
+                | None -> ()
+                | Some identifier ->
+                    promise {
+                        let arcFile = createArcFile kind identifier
+
+                        match FileContentDTO.fromArcFile arcFile with
+                        | None ->
+                            let label = arcCreateKindLabel kind
+                            let errorMessage = $"Creating {label} files is not supported in Electron yet."
+
+                            Renderer.Components.ARCHelper.applyPreviewError
+                                pageStateCtx.setState
+                                arcObjectCtx.setArcFileState
+                                arcObjectCtx.setPreviewState
+                                arcObjectCtx.setStatusMessage
+                                errorMessage
+                        | Some request ->
+                            let requestedPath = normalizePath request.path
+
+                            let alreadyExists =
+                                fileStateCtx.state.FileTree
+                                |> Array.exists (fun entry -> normalizePath entry.path = requestedPath)
+
+                            if alreadyExists then
+                                let label = arcCreateKindLabel kind
+                                let errorMessage = $"{label} '{identifier}' already exists."
+
+                                Renderer.Components.ARCHelper.applyPreviewError
+                                    pageStateCtx.setState
+                                    arcObjectCtx.setArcFileState
+                                    arcObjectCtx.setPreviewState
+                                    arcObjectCtx.setStatusMessage
+                                    errorMessage
+                            else
+                                let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
+
+                                match saveResult with
+                                | Ok() ->
+                                    let! openResult = Api.ipcArcVaultApi.openFile (unbox null) request.path
+
+                                    match openResult with
+                                    | Ok loadedFile ->
+                                        let selectedPath = normalizePath loadedFile.path
+                                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                                        loadedFile
+                                        |> Renderer.Components.ARCHelper.previewLoadResultOfDto
+                                        |> Renderer.Components.ARCHelper.applyLoadedPreview
+                                            pageStateCtx.setState
+                                            arcObjectCtx.setArcFileState
+                                            arcObjectCtx.setPreviewState
+                                            arcObjectCtx.setStatusMessage
+                                    | Error exn ->
+                                        let label = arcCreateKindLabel kind
+                                        let errorMessage =
+                                            $"Created {label} '{identifier}' but could not open it: {exn.Message}"
+
+                                        Renderer.Components.ARCHelper.applyPreviewError
+                                            pageStateCtx.setState
+                                            arcObjectCtx.setArcFileState
+                                            arcObjectCtx.setPreviewState
+                                            arcObjectCtx.setStatusMessage
+                                            errorMessage
+                                | Error exn ->
+                                    let label = arcCreateKindLabel kind
+                                    let errorMessage = $"Could not create {label} '{identifier}': {exn.Message}"
+
+                                    Renderer.Components.ARCHelper.applyPreviewError
+                                        pageStateCtx.setState
+                                        arcObjectCtx.setArcFileState
+                                        arcObjectCtx.setPreviewState
+                                        arcObjectCtx.setStatusMessage
+                                        errorMessage
+                    }
+                    |> Promise.start
+
+        let arcCreateContextMenuItems (item: FileItem) =
+            if item.IsDirectory then
+                [
+                    ArcCreateKind.Study
+                    ArcCreateKind.Assay
+                    ArcCreateKind.Workflow
+                    ArcCreateKind.Run
+                ]
+                |> List.map (fun kind -> {
+                    Label = $"Add {arcCreateKindLabel kind}"
+                    Icon = arcCreateKindIcon kind
+                    OnClick = fun () -> createArcEntry kind item
+                    Disabled = None
+                })
+            else
+                []
+
+        let contextMenuItems (item: FileItem) =
+            arcCreateContextMenuItems item
+            @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
 
         match fileItem with
 
