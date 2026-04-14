@@ -226,6 +226,49 @@ export const LargeAddedFileVirtualized: Story = {
   },
 };
 
+export const ResizableViewportWidth: Story = {
+  args: {
+    wordDiffText: largeDiffWordDiffText,
+    previousContent: "",
+    currentContent: largeDiffContent,
+    testIdPrefix: "git-diff-resize-story",
+  },
+  render: (args) => (
+    <div
+      data-testid="git-diff-resize-shell"
+      style={{ width: "1120px", height: "34rem" }}
+    >
+      <GitDiffViewerComponent {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const shell = canvas.getByTestId("git-diff-resize-shell") as HTMLElement;
+    const comparisonScroll = canvas.getByTestId(
+      "git-diff-resize-story-comparison-scroll",
+    ) as HTMLElement;
+    const virtualContent = canvas.getByTestId(
+      "git-diff-resize-story-comparison-scroll-virtual-content",
+    ) as HTMLElement;
+
+    const scrollWidth = () => Math.round(comparisonScroll.getBoundingClientRect().width);
+    const contentWidth = () => Math.round(virtualContent.getBoundingClientRect().width);
+
+    await waitFor(() => {
+      expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
+      expect(scrollWidth()).toBeGreaterThan(1000);
+      expect(Math.abs(contentWidth() - scrollWidth())).toBeLessThanOrEqual(1);
+    });
+
+    shell.style.width = "1040px";
+
+    await waitFor(() => {
+      expect(scrollWidth()).toBeLessThanOrEqual(1041);
+      expect(Math.abs(contentWidth() - scrollWidth())).toBeLessThanOrEqual(1);
+    });
+  },
+};
+
 const quotedPath = "notes/my protocol.md";
 const quotedPreviousContent = "Quoted previous line\n";
 const quotedCurrentContent = "Quoted current line\n";

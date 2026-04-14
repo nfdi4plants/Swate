@@ -1,6 +1,7 @@
 namespace Swate.Components
 
 open Browser.Types
+open Fable.Core
 open Feliz
 
 module internal GitTextComparisonRendering =
@@ -34,6 +35,16 @@ module internal GitTextComparisonRendering =
             Index: int
             Start: int
         }
+
+        type private BrowserResizeObserver =
+            abstract observe: Element -> unit
+            abstract disconnect: unit -> unit
+
+        [<Emit("typeof ResizeObserver !== 'undefined'")>]
+        let private resizeObserverIsAvailable () : bool = jsNative
+
+        [<Emit("new ResizeObserver($0)")>]
+        let private createResizeObserver (_callback: obj -> unit) : BrowserResizeObserver = jsNative
 
         let DiffTheme = {
             LeftChanged = {
@@ -198,29 +209,29 @@ module internal GitTextComparisonRendering =
 
                         bodyScroll.addEventListener ("scroll", syncHeaderToBody)
                         Browser.Dom.window.addEventListener ("resize", handleWindowResize)
+
+                        let resizeObserver =
+                            if resizeObserverIsAvailable () then
+                                let observer =
+                                    createResizeObserver (fun _ -> updateComparisonContentWidth ())
+
+                                observer.observe bodyScroll
+                                Some observer
+                            else
+                                None
+
                         updateComparisonContentWidth ()
                         syncHeaderToBody (unbox null)
 
                         FsReact.createDisposable (fun () ->
                             bodyScroll.removeEventListener ("scroll", syncHeaderToBody)
                             Browser.Dom.window.removeEventListener ("resize", handleWindowResize)
+                            resizeObserver |> Option.iter (fun observer -> observer.disconnect())
                         )
                     | _ ->
                         FsReact.createDisposable (fun () -> ())
-                )
-            )
-
-            React.useEffect (fun () ->
-                match bodyScrollRef.current with
-                | Some bodyScroll ->
-                    let nextComparisonContentWidthPx = int bodyScroll.clientWidth
-
-                    if nextComparisonContentWidthPx <> comparisonContentWidthPx then
-                        setComparisonContentWidthPx nextComparisonContentWidthPx
-                | None ->
-                    ()
-
-                FsReact.createDisposable (fun () -> ())
+                ),
+                [||]
             )
 
             let comparisonContentWidth =
