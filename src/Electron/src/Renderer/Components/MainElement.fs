@@ -36,7 +36,7 @@ let CreateARCitectNavbar
         widgets,
         closeAllWhen = not hasSelectedTable,
         children = [
-            Components.BaseNavbar.Main [
+            React.Fragment [
                 NavbarButtons(widgetTypes, hasSelectedTable)
                 QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveClick)
             ]

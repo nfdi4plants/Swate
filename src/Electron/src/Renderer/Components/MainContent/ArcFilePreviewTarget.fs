@@ -43,4 +43,4 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let renderHeader editorState =
         CreateARCitectNavbar editorState setArcFile onSaveArcFile
 
-    Main.ArcFileEditor(arcFile, setArcFile, templateServices, ?header = Some renderHeader)
+    Main.ArcFileEditor(arcFile, setArcFile, templateServices, ?navbar = Some renderHeader)

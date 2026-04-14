@@ -187,7 +187,8 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             templateServices: TemplateWidgetServices,
-            ?header: (ArcFileEditorHeaderProps -> ReactElement)
+            ?header: (ArcFileEditorHeaderProps -> ReactElement),
+            ?navbar: (ArcFileEditorHeaderProps -> ReactElement)
         ) =
         let activeView, setActiveView = React.useState ActiveView.Metadata
 
@@ -212,13 +213,20 @@ type Main =
         Html.div [
             prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
             prop.children [
-                match header with
-                | Some renderHeader ->
+                match navbar, header with
+                | Some renderNavbar, _ ->
+                    Html.div [
+                        prop.className "swt:flex-none"
+                        prop.children [
+                            Navbar.Main(left = renderNavbar headerProps)
+                        ]
+                    ]
+                | None, Some renderHeader ->
                     Html.div [
                         prop.className "swt:flex-none"
                         prop.children [ renderHeader headerProps ]
                     ]
-                | None -> Html.none
+                | None, None -> Html.none
                 Html.div [
                     prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
                     prop.children [
@@ -246,4 +254,13 @@ type Main =
         let startArcFile = ArcFiles.Assay(ArcAssay.init ("Test"))
 
         let arcFile, setArcFile = React.useState (startArcFile)
-        Main.ArcFileEditor(arcFile, setArcFile, EntryHelpers.templateServices)
+
+        let navbarControls _ =
+            React.Fragment [
+                QuickAccessButton.QuickAccessButton("Add Building Block", Icons.BuildingBlock(), fun _ -> ())
+                QuickAccessButton.QuickAccessButton("Add Template", Icons.Templates(), fun _ -> ())
+                QuickAccessButton.QuickAccessButton("File Picker", Icons.FilePicker(), fun _ -> ())
+                QuickAccessButton.QuickAccessButton("Data Annotator", Icons.DataAnnotator(), fun _ -> ())
+                QuickAccessButton.QuickAccessButton("Save", Icons.Save(), fun _ -> ())
+            ]
+        Main.ArcFileEditor(arcFile, setArcFile, EntryHelpers.templateServices, ?navbar = Some navbarControls)
