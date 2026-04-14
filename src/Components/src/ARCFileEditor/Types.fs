@@ -54,3 +54,8 @@ type ArcFileEditorHeaderProps = {
     arcFile: ArcFiles
     activeView: ActiveView
 }
+
+type ArcFileEditorWidgetServices = {
+    filePickerServices: FilePickerWidgetServices
+    dataAnnotatorServices: DataAnnotatorWidgetServices
+}

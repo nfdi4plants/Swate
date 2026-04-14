@@ -3,7 +3,6 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 open Feliz
 open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent.Helper
-open Renderer.Components.MainElement
 open Renderer.Components.WidgetRegistry
 open Swate.Components.ArcFileEditor
 open Swate.Components
@@ -47,7 +46,13 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             }
             |> Promise.start
 
-    let renderHeader editorState =
-        CreateARCitectNavbar editorState setArcFile onSaveArcFile
+    let renderHeader _ =
+        QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveArcFile)
 
-    Main.ArcFileEditor(arcFile, setArcFile, templateServices, ?header = Some renderHeader)
+    Main.ArcFileEditor(
+        arcFile,
+        setArcFile,
+        templateServices,
+        ?header = Some renderHeader,
+        ?widgetServices = Some arcFileEditorWidgetServices
+    )
