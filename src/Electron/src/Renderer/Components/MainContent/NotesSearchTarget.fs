@@ -1,7 +1,6 @@
 module Renderer.Components.MainContent.NotesSearchTarget
 
 open Feliz
-open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
@@ -54,8 +53,8 @@ let NotesSearchTarget () =
                 fileTreeCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                 dto
-                |> Renderer.Components.ARCHelper.previewLoadResultOfDto
-                |> Renderer.Components.ARCHelper.applyLoadedPreview
+                |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                |> Renderer.Components.ARCHelper.applyLoadedView
                     pageCtx.setState
                     arcObjectCtx.setArcFileState
                     arcObjectCtx.setPreviewState
@@ -63,7 +62,7 @@ let NotesSearchTarget () =
             | Result.Error exn ->
                 fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)
 
-                Renderer.Components.ARCHelper.applyPreviewError
+                Renderer.Components.ARCHelper.applyViewError
                     pageCtx.setState
                     arcObjectCtx.setArcFileState
                     arcObjectCtx.setPreviewState
