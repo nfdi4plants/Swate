@@ -478,7 +478,7 @@ type Layout =
                         if navbar.IsSome then
                             Html.div [
                                 prop.className
-                                    "swt:h-12 swt:shrink-0 swt:grow-0 swt:flex swt:flex-row swt:items-center swt:overflow-hidden swt:border-b swt:border-base-content/50"
+                                    "swt:h-12 swt:shrink-0 swt:grow-0 swt:flex swt:flex-row swt:items-center swt:border-b swt:border-base-content/50"
                                 prop.testId "layout-main-navbar"
                                 prop.children navbar.Value
                             ]
