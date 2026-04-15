@@ -125,7 +125,7 @@ type ArcFileFooterTabs =
         ]
 
     [<ReactComponent>]
-    static member private TableTab(index: int, tableName: string, onClick, isActive: bool, ?key: int) =
+    static member private TableTab(index: int, tableName: string, onClick, isActive: bool, ?onDoubleClick, ?key: int) =
 
         let sortable = DndKit.useSortable ({| id = mkTableDragId index |})
 
@@ -145,6 +145,13 @@ type ArcFileFooterTabs =
             dndProps
             @ dndObjectProps sortable.attributes
             @ dndObjectProps sortable.listeners
+            @ [
+                prop.onDoubleClick (fun e ->
+                    match onDoubleClick with
+                    | Some handler -> handler e
+                    | None -> ()
+                )
+            ]
 
         ArcFileFooterTabs.BaseTab(
             Html.span [ prop.text tableName ],
@@ -426,6 +433,7 @@ type ArcFileFooterTabs =
                                                     table.Name,
                                                     (fun _ -> setActiveView (ActiveView.Table index)),
                                                     isActive = isActive,
+                                                    onDoubleClick = (fun _ -> setIsEditorModeTableTab (Some index)),
                                                     key = index
                                                 )
 
