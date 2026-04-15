@@ -89,35 +89,6 @@ swt:p-0"""
         let defaultStyleSelect = defaultArg defaultStyleSelect true
 
         let scrollContainerRef = React.useElementRef ()
-        let stickyScrollbarRef = React.useElementRef ()
-
-        // Sync scroll positions between main container and sticky scrollbar
-        React.useEffect (
-            (fun () ->
-                match scrollContainerRef.current, stickyScrollbarRef.current with
-                | Some mainScroll, Some stickyScroll ->
-                    let syncMainToSticky =
-                        fun (_: Browser.Types.Event) -> stickyScroll?scrollLeft <- mainScroll?scrollLeft
-
-                    let syncStickyToMain =
-                        fun (_: Browser.Types.Event) -> mainScroll?scrollLeft <- stickyScroll?scrollLeft
-
-                    mainScroll.addEventListener ("scroll", syncMainToSticky)
-                    stickyScroll.addEventListener ("scroll", syncStickyToMain)
-
-                    // Return cleanup function
-                    { new IDisposable with
-                        member _.Dispose() =
-                            mainScroll.removeEventListener ("scroll", syncMainToSticky)
-                            stickyScroll.removeEventListener ("scroll", syncStickyToMain)
-                    }
-                | _ ->
-                    { new IDisposable with
-                        member _.Dispose() = ()
-                    }
-            ),
-            [||]
-        )
 
         let rowVirtualizer =
             Virtual.useVirtualizer (
@@ -282,91 +253,181 @@ swt:p-0"""
             ctx,
             React.Fragment [
                 Html.div [
-                    prop.className "swt:relative swt:h-full swt:w-full swt:flex swt:flex-col swt:overflow-hidden"
+                    prop.key "scroll-container"
+                    prop.ref scrollContainerRef
+                    prop.onKeyDown (fun e ->
+                        TableHelper.keyDownController e GridSelect (activeCellIndex, setActiveCellIndex) onKeydown
+                    )
+                    prop.tabIndex 0
+                    prop.style [
+                        if height.IsSome then
+                            style.height height.Value
+                        if width.IsSome then
+                            style.width width.Value
+
+                        style.minHeight 0
+                        style.minWidth 0
+                    ]
+                    prop.className
+                        "swt:overflow-auto swt:grow swt:h-full swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-100"
+                    if debug then
+                        prop.testId "virtualized-table"
                     prop.children [
                         Html.div [
-                            prop.key "scroll-container"
-                            prop.ref scrollContainerRef
-                            prop.onKeyDown (fun e ->
-                                TableHelper.keyDownController
-                                    e
-                                    GridSelect
-                                    (activeCellIndex, setActiveCellIndex)
-                                    onKeydown
-                            )
-                            prop.tabIndex 0
+                            prop.key "table-container"
                             prop.style [
-                                if height.IsSome then
-                                    style.height height.Value
-                                if width.IsSome then
-                                    style.width width.Value
+                                if isSafari then
+                                    style.custom ("willChange", "transform")
+                                    style.custom ("minHeight", $"{rowVirtualizer.getTotalSize ()}px")
+                                    style.minWidth (columnVirtualizer.getTotalSize () + 800)
+                                    style.custom ("contain", "size layout paint")
+                                else
+                                    style.height (rowVirtualizer.getTotalSize ())
+                                    style.width (columnVirtualizer.getTotalSize () + 800) // extra space to improve UX with rightmost columns
 
-                                style.minHeight 0
-                                style.minWidth 0
+                                style.position.relative
                             ]
-                            prop.className
-                                "swt:relative swt:overflow-x-hidden swt:overflow-y-auto swt:flex-1 swt:w-full swt:border swt:border-primary swt:rounded-sm swt:bg-base-100"
-                            if debug then
-                                prop.testId "virtualized-table"
                             prop.children [
-                                Html.div [
-                                    prop.key "table-container"
-                                    prop.style [
-                                        if isSafari then
-                                            style.custom ("willChange", "transform")
-                                            style.custom ("minHeight", $"{rowVirtualizer.getTotalSize ()}px")
-                                            style.minWidth (columnVirtualizer.getTotalSize () + 800)
-                                            style.custom ("contain", "size layout paint")
-                                        else
-                                            style.height (rowVirtualizer.getTotalSize ())
-                                            style.width (columnVirtualizer.getTotalSize () + 800) // extra space to improve UX with rightmost columns
-
-                                        style.position.relative
-                                    ]
+                                Html.table [
+                                    prop.key "table"
+                                    prop.className "swt:w-full swt:h-full"
                                     prop.children [
-                                        Html.table [
-                                            prop.key "table"
-                                            prop.className "swt:w-full swt:h-full"
+                                        Html.thead [
+                                            prop.key "table-thead"
                                             prop.children [
-                                                Html.thead [
-                                                    prop.key "table-thead"
+                                                Html.tr [
+                                                    prop.key "virtualHeaderRow"
+                                                    prop.className
+                                                        "swt:sticky swt:top-0 swt:left-0 swt:z-10 swt:bg-base-100 swt:text-left"
+                                                    prop.style [ style.height Constants.Table.DefaultRowHeight ]
                                                     prop.children [
+                                                        for virtualColumn in columnVirtualizer.getVirtualItems () do
+                                                            let index = {| x = virtualColumn.index; y = 0 |}
+
+                                                            let isActive = isActive index
+
+                                                            Html.th [
+
+                                                                prop.ref (fun element ->
+                                                                    columnVirtualizer.measureElement (
+                                                                        Option.ofObj element
+                                                                    )
+                                                                )
+
+                                                                prop.custom ("data-index", virtualColumn.index)
+                                                                prop.key $"virtualHeaderCell-{virtualColumn.key}--1"
+                                                                prop.className [
+                                                                    if virtualColumn.index <> 0 then
+                                                                        "swt:min-w-32"
+                                                                    else
+                                                                        "swt:min-w-min"
+                                                                    "swt:h-full swt:resize-x swt:overflow-hidden"
+                                                                    if defaultStyleSelect then
+                                                                        Table.TableCellStyle
+                                                                ]
+                                                                prop.dataRow 0
+                                                                prop.dataColumn virtualColumn.index
+                                                                prop.style [
+                                                                    style.position.absolute
+                                                                    style.top 0
+                                                                    style.left 0
+                                                                    style.custom (
+                                                                        "transform",
+                                                                        $"translateX({virtualColumn.start}px)"
+                                                                    )
+                                                                ]
+                                                                if isActive then
+                                                                    prop.custom ("data-active", true)
+                                                                if isSelected (index) then
+                                                                    prop.custom ("data-selected", true)
+                                                                if isOrigin (index) then
+                                                                    prop.custom ("data-is-append-origin", true)
+                                                                prop.children [
+                                                                    if virtualColumn.index = 0 then
+                                                                        TableCell.BaseCell(
+                                                                            index.y,
+                                                                            index.x,
+                                                                            Html.text (
+                                                                                let i =
+                                                                                    rowVirtualizer.getVirtualIndexes ()
+
+                                                                                if i.Length > 0 then
+                                                                                    i |> Seq.last
+                                                                                else
+                                                                                    0
+                                                                            ),
+                                                                            className =
+                                                                                "swt:px-2 swt:py-2 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
+                                                                            debug = debug
+                                                                        )
+                                                                    elif isActive then
+                                                                        renderActiveCell index
+                                                                    else
+                                                                        renderCell index
+                                                                ]
+                                                            ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                        Html.tbody [
+                                            prop.key "body"
+                                            prop.style [ style.marginTop Constants.Table.DefaultRowHeight ]
+                                            prop.children [
+                                                for virtualRow in rowVirtualizer.getVirtualItems () do
+                                                    let rowStart =
+                                                        if annotator then virtualRow.``end`` else virtualRow.start
+
+                                                    if virtualRow.index = 0 && not annotator then
+                                                        Html.none // skip header row, is part of thead
+                                                    else
                                                         Html.tr [
-                                                            prop.key "virtualHeaderRow"
-                                                            prop.className
-                                                                "swt:sticky swt:top-0 swt:left-0 swt:z-10 swt:bg-base-100 swt:text-left"
-                                                            prop.style [ style.height Constants.Table.DefaultRowHeight ]
+                                                            prop.key (sprintf "virtualRow-%s" virtualRow.key)
+                                                            prop.style [
+                                                                style.position.absolute
+                                                                style.top 0
+                                                                style.left 0
+                                                                style.custom ("transform", $"translateY({rowStart}px)")
+                                                                style.height virtualRow.size
+                                                            ]
+                                                            prop.className "swt:w-full"
                                                             prop.children [
                                                                 for virtualColumn in
                                                                     columnVirtualizer.getVirtualItems () do
-                                                                    let index = {| x = virtualColumn.index; y = 0 |}
+                                                                    let index = {|
+                                                                        x = virtualColumn.index
+                                                                        y = virtualRow.index
+                                                                    |}
 
                                                                     let isActive = isActive index
 
-                                                                    Html.th [
-
-                                                                        prop.ref (fun element ->
-                                                                            columnVirtualizer.measureElement (
-                                                                                Option.ofObj element
-                                                                            )
+                                                                    Html.td [
+                                                                        prop.key (
+                                                                            sprintf
+                                                                                "virtualCell-%s-%s"
+                                                                                virtualRow.key
+                                                                                virtualColumn.key
                                                                         )
-
-                                                                        prop.custom ("data-index", virtualColumn.index)
-                                                                        prop.key
-                                                                            $"virtualHeaderCell-{virtualColumn.key}--1"
+                                                                        prop.dataRow virtualRow.index
+                                                                        prop.dataColumn virtualColumn.index
                                                                         prop.className [
-                                                                            if virtualColumn.index <> 0 then
-                                                                                "swt:min-w-32"
-                                                                            else
-                                                                                "swt:min-w-min"
-                                                                            "swt:h-full swt:resize-x swt:overflow-hidden"
                                                                             if defaultStyleSelect then
                                                                                 Table.TableCellStyle
                                                                         ]
-                                                                        prop.dataRow 0
-                                                                        prop.dataColumn virtualColumn.index
+                                                                        if isActive then
+                                                                            prop.custom ("data-active", true)
+                                                                        if isSelected index then
+                                                                            prop.custom ("data-selected", true)
+                                                                        if isOrigin index then
+                                                                            prop.custom ("data-is-append-origin", true)
                                                                         prop.style [
+                                                                            // if virtualColumn.index = 0 then
+                                                                            //     style.position.sticky
+                                                                            //     style.zIndex 10
+                                                                            // else
                                                                             style.position.absolute
+                                                                            style.width virtualColumn.size
+                                                                            style.height virtualRow.size
                                                                             style.top 0
                                                                             style.left 0
                                                                             style.custom (
@@ -374,32 +435,8 @@ swt:p-0"""
                                                                                 $"translateX({virtualColumn.start}px)"
                                                                             )
                                                                         ]
-                                                                        if isActive then
-                                                                            prop.custom ("data-active", true)
-                                                                        if isSelected (index) then
-                                                                            prop.custom ("data-selected", true)
-                                                                        if isOrigin (index) then
-                                                                            prop.custom ("data-is-append-origin", true)
                                                                         prop.children [
-                                                                            if virtualColumn.index = 0 then
-                                                                                TableCell.BaseCell(
-                                                                                    index.y,
-                                                                                    index.x,
-                                                                                    Html.text (
-                                                                                        let i =
-                                                                                            rowVirtualizer
-                                                                                                .getVirtualIndexes ()
-
-                                                                                        if i.Length > 0 then
-                                                                                            i |> Seq.last
-                                                                                        else
-                                                                                            0
-                                                                                    ),
-                                                                                    className =
-                                                                                        "swt:px-2 swt:py-2 swt:flex swt:items-center swt:cursor-not-allowed swt:w-full swt:h-full swt:min-w-8 swt:bg-base-200 swt:text-transparent",
-                                                                                    debug = debug
-                                                                                )
-                                                                            elif isActive then
+                                                                            if isActive then
                                                                                 renderActiveCell index
                                                                             else
                                                                                 renderCell index
@@ -407,113 +444,8 @@ swt:p-0"""
                                                                     ]
                                                             ]
                                                         ]
-                                                    ]
-                                                ]
-                                                Html.tbody [
-                                                    prop.key "body"
-                                                    prop.style [ style.marginTop Constants.Table.DefaultRowHeight ]
-                                                    prop.children [
-                                                        for virtualRow in rowVirtualizer.getVirtualItems () do
-                                                            let rowStart =
-                                                                if annotator then
-                                                                    virtualRow.``end``
-                                                                else
-                                                                    virtualRow.start
-
-                                                            if virtualRow.index = 0 && not annotator then
-                                                                Html.none // skip header row, is part of thead
-                                                            else
-                                                                Html.tr [
-                                                                    prop.key (sprintf "virtualRow-%s" virtualRow.key)
-                                                                    prop.style [
-                                                                        style.position.absolute
-                                                                        style.top 0
-                                                                        style.left 0
-                                                                        style.custom (
-                                                                            "transform",
-                                                                            $"translateY({rowStart}px)"
-                                                                        )
-                                                                        style.height virtualRow.size
-                                                                    ]
-                                                                    prop.className "swt:w-full"
-                                                                    prop.children [
-                                                                        for virtualColumn in
-                                                                            columnVirtualizer.getVirtualItems () do
-                                                                            let index = {|
-                                                                                x = virtualColumn.index
-                                                                                y = virtualRow.index
-                                                                            |}
-
-                                                                            let isActive = isActive index
-
-                                                                            Html.td [
-                                                                                prop.key (
-                                                                                    sprintf
-                                                                                        "virtualCell-%s-%s"
-                                                                                        virtualRow.key
-                                                                                        virtualColumn.key
-                                                                                )
-                                                                                prop.dataRow virtualRow.index
-                                                                                prop.dataColumn virtualColumn.index
-                                                                                prop.className [
-                                                                                    if defaultStyleSelect then
-                                                                                        Table.TableCellStyle
-                                                                                ]
-                                                                                if isActive then
-                                                                                    prop.custom ("data-active", true)
-                                                                                if isSelected index then
-                                                                                    prop.custom ("data-selected", true)
-                                                                                if isOrigin index then
-                                                                                    prop.custom (
-                                                                                        "data-is-append-origin",
-                                                                                        true
-                                                                                    )
-                                                                                prop.style [
-                                                                                    // if virtualColumn.index = 0 then
-                                                                                    //     style.position.sticky
-                                                                                    //     style.zIndex 10
-                                                                                    // else
-                                                                                    style.position.absolute
-                                                                                    style.width virtualColumn.size
-                                                                                    style.height virtualRow.size
-                                                                                    style.top 0
-                                                                                    style.left 0
-                                                                                    style.custom (
-                                                                                        "transform",
-                                                                                        $"translateX({virtualColumn.start}px)"
-                                                                                    )
-                                                                                ]
-                                                                                prop.children [
-                                                                                    if isActive then
-                                                                                        renderActiveCell index
-                                                                                    else
-                                                                                        renderCell index
-                                                                                ]
-                                                                            ]
-                                                                    ]
-                                                                ]
-                                                    ]
-                                                ]
                                             ]
                                         ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                        // Sticky horizontal scrollbar at the bottom
-                        Html.div [
-                            prop.key "sticky-scrollbar-container"
-                            prop.ref stickyScrollbarRef
-                            prop.className
-                                "swt:fixed swt:bottom-11 swt:overflow-x-auto swt:overflow-y-hidden swt:bg-base-100 swt:w-[-webkit-fill-available]"
-                            prop.children [
-                                Html.div [
-                                    prop.style [
-                                        style.height 1
-                                        if isSafari then
-                                            style.minWidth (columnVirtualizer.getTotalSize () + 800)
-                                        else
-                                            style.width (columnVirtualizer.getTotalSize () + 800)
                                     ]
                                 ]
                             ]
@@ -525,7 +457,6 @@ swt:p-0"""
 
     [<ReactComponent>]
     static member private EntryInactiveCell(index: CellCoordinate, data: string) =
-        let ctx = React.useContext (Contexts.Table.TableStateCtx)
 
         TableCell.InactiveCell(index, data |> Html.text)
 

@@ -41,7 +41,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 | Ok() -> ()
                 | Error exn ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create(exn.Message, title = "Could not save ARC file", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create (exn.Message, title = "Could not save ARC file", ?scopeId = arcScopeId)
                     )
             }
             |> Promise.start
@@ -53,6 +53,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
         arcFile,
         setArcFile,
         templateServices,
-        ?header = Some renderHeader,
-        ?widgetServices = Some arcFileEditorWidgetServices
+        header = renderHeader,
+        widgetServices = arcFileEditorWidgetServices
     )

@@ -437,10 +437,7 @@ type Layout =
 
         // Keep the legacy storage key so existing left-sidebar visibility preferences survive the naming fix.
         let leftSidebarIsOpen, setLeftSidebarIsOpen =
-            React.useLocalStorage (
-                Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen",
-                leftSidebarDefaultOpen
-            )
+            React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen", leftSidebarDefaultOpen)
 
         let unmanagedRightSidebarIsOpen, setUnmanagedRightSidebarIsOpen =
             React.useState rightSidebarDefaultOpen
@@ -449,14 +446,12 @@ type Layout =
             React.useState (Unchecked.defaultof<'A>)
 
         let rightSidebarState =
-            defaultArg
-                rightSidebarState
-                {
-                    isOpen = unmanagedRightSidebarIsOpen
-                    setIsOpen = setUnmanagedRightSidebarIsOpen
-                    sidebarType = unmanagedRightSidebarType
-                    setSidebarType = setUnmanagedRightSidebarType
-                }
+            defaultArg rightSidebarState {
+                isOpen = unmanagedRightSidebarIsOpen
+                setIsOpen = setUnmanagedRightSidebarIsOpen
+                sidebarType = unmanagedRightSidebarType
+                setSidebarType = setUnmanagedRightSidebarType
+            }
 
         let navbar = React.useMemo ((fun () -> navbar), [| box navbar |])
 
@@ -470,7 +465,7 @@ type Layout =
             React.useMemo (
                 (fun () ->
                     Html.div [
-                        prop.className "swt:grow"
+                        prop.className "swt:grow swt:overflow-hidden"
                         prop.testId "layout-main-content"
                         prop.children children
                     ]
@@ -580,24 +575,24 @@ type Layout =
                 ],
             leftActions =
                 React.Fragment [
-                        Layout.LayoutBtn(
-                            iconClassName = "swt:fluent--home-24-regular",
-                            tooltip = "Home",
-                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Home),
-                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Home
-                        )
-                        Layout.LayoutBtn(
-                            iconClassName = "swt:fluent--settings-24-regular",
-                            tooltip = "Settings",
-                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Settings),
-                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Settings
-                        )
-                        Layout.LayoutBtn(
-                            iconClassName = "swt:fluent--info-24-regular",
-                            tooltip = "Info",
-                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Info),
-                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Info
-                        )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--home-24-regular",
+                        tooltip = "Home",
+                        isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Home),
+                        onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Home
+                    )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--settings-24-regular",
+                        tooltip = "Settings",
+                        isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Settings),
+                        onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Settings
+                    )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--info-24-regular",
+                        tooltip = "Info",
+                        isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Info),
+                        onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Info
+                    )
                 ],
             rightSidebarState = {
                 isOpen = rightSidebarIsOpen

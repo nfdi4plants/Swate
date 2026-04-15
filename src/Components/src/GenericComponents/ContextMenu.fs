@@ -215,7 +215,7 @@ type ContextMenu =
             FloatingUI.FloatingPortal(
                 FloatingUI.FloatingOverlay(
                     lockScroll = true,
-                    className = "swt:z-[9999]",
+                    className = "swt:z-9999",
                     children =
                         FloatingUI.FloatingFocusManager(
                             context = floating.context,
