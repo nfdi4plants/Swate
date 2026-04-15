@@ -30,11 +30,7 @@ module internal GitTextComparisonRendering =
             RowTestId: string option
         }
 
-        type private ComparisonVirtualItem = {
-            Key: string
-            Index: int
-            Start: int
-        }
+        type private ComparisonVirtualItem = { Key: string; Index: int; Start: int }
 
         let DiffTheme = {
             LeftChanged = {
@@ -108,11 +104,10 @@ module internal GitTextComparisonRendering =
                             "swt:px-3 swt:py-1 swt:min-w-0 swt:font-mono swt:text-xs swt:leading-5"
                             lineClassName
                         ]
-                        prop.style [
-                            style.whitespace.pre
-                            style.overflowWrap.anywhere
+                        prop.style [ style.whitespace.pre; style.overflowWrap.anywhere ]
+                        prop.children [
+                            ComparisonSegments(side.Segments, changedStyle.ChangedSegmentClass)
                         ]
-                        prop.children [ ComparisonSegments(side.Segments, changedStyle.ChangedSegmentClass) ]
                     ]
                 ]
             ]
@@ -122,13 +117,15 @@ module internal GitTextComparisonRendering =
             Html.div [
                 if testId.IsSome then
                     prop.testId testId.Value
-                prop.className "swt:flex swt:items-start swt:justify-between swt:gap-3 swt:px-4 swt:py-3 swt:bg-base-200 swt:border-b swt:border-base-content/10"
+                prop.className
+                    "swt:flex swt:items-start swt:justify-between swt:gap-3 swt:px-4 swt:py-3 swt:bg-base-200 swt:border-b swt:border-base-content/10"
                 prop.children [
                     Html.div [
                         prop.className "swt:min-w-0 swt:flex swt:flex-col swt:gap-0.5"
                         prop.children [
                             Html.span [
-                                prop.className "swt:text-[11px] swt:uppercase swt:tracking-wide swt:text-base-content/60"
+                                prop.className
+                                    "swt:text-[11px] swt:uppercase swt:tracking-wide swt:text-base-content/60"
                                 prop.text sideLabel
                             ]
                             Html.span [
@@ -145,12 +142,12 @@ module internal GitTextComparisonRendering =
             ]
 
         [<ReactComponent>]
-        let private ComparisonGridRow(props: ComparisonGridRowProps) =
+        let private ComparisonGridRow (props: ComparisonGridRowProps) =
             Html.div [
                 if props.RowTestId.IsSome then
                     prop.testId props.RowTestId.Value
                 prop.custom ("data-index", props.Index)
-                prop.ref (fun element -> props.MeasureElementRef (Option.ofObj element))
+                prop.ref (fun element -> props.MeasureElementRef(Option.ofObj element))
                 prop.className
                     "swt:absolute swt:left-0 swt:grid swt:w-full swt:min-w-[58rem] swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
                 prop.style [
@@ -167,7 +164,7 @@ module internal GitTextComparisonRendering =
         [<ReactMemoComponent(AreEqualFn.FsEquals)>]
         let ComparisonGrid
             (
-                rows: DiffRow [],
+                rows: DiffRow[],
                 leftHeader: string * (string * int),
                 rightHeader: string * (string * int),
                 leftHeaderTestId: string option,
@@ -182,15 +179,16 @@ module internal GitTextComparisonRendering =
             let overscan = 8
             let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
             let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
-            let bodyScrollMeasureRef, bodyScrollRect = React.useMeasure<Element> ()
+            let bodyContentRef: IRefValue<HTMLElement option> = React.useElementRef ()
+            let contentMeasureRef, contentRect = React.useMeasure<Element> ()
 
             React.useEffect (
                 (fun () ->
-                    bodyScrollMeasureRef (bodyScrollRef.current |> Option.map unbox<Element>)
+                    contentMeasureRef (bodyContentRef.current |> Option.map unbox<Element>)
 
-                    FsReact.createDisposable (fun () -> bodyScrollMeasureRef None)
+                    FsReact.createDisposable (fun () -> contentMeasureRef None)
                 ),
-                [| box bodyScrollMeasureRef |]
+                [| box contentMeasureRef |]
             )
 
             React.useEffect (
@@ -207,18 +205,15 @@ module internal GitTextComparisonRendering =
                         FsReact.createDisposable (fun () ->
                             bodyScroll.removeEventListener ("scroll", syncHeaderToBody)
                         )
-                    | _ ->
-                        FsReact.createDisposable (fun () -> ())
+                    | _ -> FsReact.createDisposable (fun () -> ())
                 ),
                 [||]
             )
 
             let comparisonContentWidthPx =
-                bodyScrollRect.width
-                |> Option.map int
-                |> Option.defaultValue 0
+                contentRect.width |> Option.map int |> Option.defaultValue 0
 
-            let comparisonContentWidth =
+            let headerContentWidth =
                 if comparisonContentWidthPx > 0 then
                     $"max(58rem, {comparisonContentWidthPx}px)"
                 else
@@ -273,10 +268,11 @@ module internal GitTextComparisonRendering =
                         prop.children [
                             Html.div [
                                 prop.className "swt:min-w-[58rem]"
-                                prop.style [ style.custom ("width", comparisonContentWidth) ]
+                                prop.style [ style.custom ("width", headerContentWidth) ]
                                 prop.children [
                                     Html.div [
-                                        prop.className "swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
+                                        prop.className
+                                            "swt:grid swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
                                         prop.children [
                                             ComparisonHeader(
                                                 fst leftHeader,
@@ -305,11 +301,9 @@ module internal GitTextComparisonRendering =
                             Html.div [
                                 if virtualContentTestId.IsSome then
                                     prop.testId virtualContentTestId.Value
-                                prop.className "swt:relative swt:min-w-[58rem]"
-                                prop.style [
-                                    style.height (rowVirtualizer.getTotalSize ())
-                                    style.custom ("width", comparisonContentWidth)
-                                ]
+                                prop.ref bodyContentRef
+                                prop.className "swt:relative swt:w-full swt:min-w-[58rem]"
+                                prop.style [ style.height (rowVirtualizer.getTotalSize ()) ]
                                 prop.children [
                                     for virtualItem in virtualItems do
                                         React.KeyedFragment(
@@ -324,7 +318,9 @@ module internal GitTextComparisonRendering =
                                                         Theme = theme
                                                         RowTestId =
                                                             scrollTestId
-                                                            |> Option.map (fun value -> $"{value}-row-{virtualItem.Index}")
+                                                            |> Option.map (fun value ->
+                                                                $"{value}-row-{virtualItem.Index}"
+                                                            )
                                                     }
                                                 )
                                             ]
